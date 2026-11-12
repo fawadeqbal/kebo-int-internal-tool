@@ -24,7 +24,7 @@ describe("payment requests in words", () => {
   });
 
   it("links to the request's page, its print page and its PDF", () => {
-    expect(requestHref("o1", "r1")).toBe("/operations/payment-requests/o1/r1");
+    expect(requestHref("o1", "r1")).toBe("/payments/requests/o1/r1");
     expect(requestPrintHref("o1", "r1")).toBe("/print/orders/o1/payment-request?ref=r1");
     expect(requestPrintHref("o1", "r1", { now: true })).toBe("/print/orders/o1/payment-request?ref=r1&now=1");
     expect(requestPrintHref("o1", "r1", { v: 2 })).toBe("/print/orders/o1/payment-request?ref=r1&v=2");

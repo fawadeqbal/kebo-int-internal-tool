@@ -29,7 +29,7 @@ import { FilePicker, uploadFile, useSaveThenSend } from "./attachment";
 import { MoneyInput } from "@/components/common/money-input";
 import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
-import { dueText, money } from "@/lib/format";
+import { date, dueText, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { ExpenseView, FactoryOwed, FactoryPaymentView, OrderMoney } from "@/lib/types-money";
 
@@ -70,7 +70,10 @@ export function PaymentPlan({
   terms,
   action,
   buttonOnly,
+  startOpen = false,
 }: {
+  /** Inside the Edit panel: the parts are open for editing at once. */
+  startOpen?: boolean;
   plan: OrderMoney["plan"];
   currency: string;
   total: string;
@@ -79,7 +82,17 @@ export function PaymentPlan({
   /** The plan is shown elsewhere (the line table): only the "Change the plan" button until editing. */
   buttonOnly?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startOpen);
+  /** What a part's request says about changing it: paid, part paid or already sent. */
+  const noteOf = (id: string | null): { text: string; warn: boolean } | null => {
+    const r = id ? plan.items.find((i) => i.id === id)?.request : undefined;
+    if (!r) return null;
+    if (r.state === "paid") return { text: "Paid in full. Changing it asks why.", warn: false };
+    if (r.state === "part_paid") return { text: "Part of it is paid. Changing it asks why.", warn: true };
+    if (r.with === "request" && r.sentOn) return { text: `Sent on ${date(r.sentOn)}. If you change it, send the request again (R${(r.revision ?? 1) + 1}).`, warn: true };
+    if (r.through === "bank") return { text: "Asked for with the shipping papers through the banks, not with a request.", warn: false };
+    return null;
+  };
   const start = (): Row[] =>
     plan.items.map((i) => ({
       key: i.id,
@@ -180,7 +193,7 @@ export function PaymentPlan({
       {(s) => (
         <>
           <input type="hidden" name="payload" value={JSON.stringify(body)} />
-          <p className="text-sm font-medium">Payment plan — must add up to {money(total, currency)}</p>
+          {!startOpen && <p className="text-sm font-medium">Payment plan — must add up to {money(total, currency)}</p>}
           <ol className="flex flex-col gap-2">
             {rows.map((r, n) => (
               <li key={r.key} className="flex flex-wrap items-center gap-2">
@@ -242,6 +255,7 @@ export function PaymentPlan({
                 >
                   <X aria-hidden />
                 </Button>
+                {noteOf(r.id) && <span className={cn("basis-full text-xs", noteOf(r.id)!.warn ? "text-warn" : "text-muted")}>{noteOf(r.id)!.text}</span>}
               </li>
             ))}
           </ol>
@@ -275,14 +289,14 @@ export function PaymentPlan({
               }
               disabled={rows.length >= 12}
             >
-              <Plus aria-hidden /> Add an instalment
+              <Plus aria-hidden /> {startOpen ? "Add a part" : "Add an instalment"}
             </Button>
             <span className="flex-1" />
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
               Cancel
             </Button>
             <SubmitButton size="sm" pendingText="Saving…" disabled={diff !== 0}>
-              Save the plan
+              {startOpen ? "Save the parts" : "Save the plan"}
             </SubmitButton>
           </div>
         </>

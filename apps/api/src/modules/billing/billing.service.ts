@@ -1,18 +1,19 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDateOrNull, isSupplier, livePart, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDateOrNull, isSupplier, livePart, termsSelect, toDbDateOrNull, type Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
 import {
   can,
   dueRuleWords,
   paperNumber,
   planStatus,
+  routePaymentSentence,
   type FactoryPlanInput,
   type InvoiceSide,
   type PaymentPlanInput,
   type PlanDueRule,
   type RequestState,
 } from "@kebo/shared";
-import { daysBetween, DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
+import { dateIn, daysBetween, DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { LimitsService } from "../../common/company/limits.service";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -25,6 +26,7 @@ import { ordersOwingFactories, ordersWithMoneyDue } from "./due";
 import { factoryPlansOf, owedByFactory } from "./factory-plan";
 import { chargedExpenses, factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, supplierPaidRelation } from "./position";
 import { livePlanOf, livePlansOf } from "./plan-live";
+import { termsOf } from "./route-plan";
 import { requestsOf, requestViewOf } from "./requests";
 
 const person = { select: { id: true, name: true } } as const;
@@ -462,6 +464,197 @@ export class BillingService {
       (a, b) => b.late - a.late || (a.dueOn ?? "9999").localeCompare(b.dueOn ?? "9999") || a.order.refNo.localeCompare(b.order.refNo) || a.number.localeCompare(b.number),
     );
     return { rows, canPay: can(user, "payments.record"), canSend: can(user, "orders.update") || can(user, "documents.manage") };
+  }
+
+  /* ---------------------------------------------------------------- customer invoices */
+
+  /**
+   * The invoice of an order as its customer knows it: the commercial invoice once it is made, the proforma
+   * before that. One per order; paid is worked out from the order's payments, never typed.
+   */
+  private invoiceOf(o: {
+    proformaNo: string | null;
+    proformaIssuedOn: Date | null;
+    papers: { kind: string; number: string; version: number; finalAt: Date | null; madeAt: Date }[];
+  }) {
+    const ci = o.papers.filter((p) => p.kind === "commercial-invoice").at(-1);
+    if (ci) return { kind: "commercial" as const, number: ci.number, issuedOn: dateIn(ci.finalAt ?? ci.madeAt, this.clock.timeZone), version: ci.version };
+    if (!o.proformaNo) return null;
+    const pi = o.papers.filter((p) => p.kind === "proforma").at(-1);
+    return {
+      kind: "proforma" as const,
+      number: o.proformaNo,
+      issuedOn: fromDbDateOrNull(o.proformaIssuedOn) ?? (pi ? dateIn(pi.finalAt ?? pi.madeAt, this.clock.timeZone) : this.clock.today()),
+      version: pi?.version ?? 1,
+    };
+  }
+
+  private static readonly invoicePapers = {
+    where: { kind: { in: ["proforma", "commercial-invoice"] }, status: "final" },
+    orderBy: { version: "asc" },
+    select: { kind: true, number: true, version: true, finalAt: true, madeAt: true },
+  } satisfies Prisma.Order$papersArgs;
+
+  /**
+   * Invoices to customers across the orders a person may see (not cancelled, newest first): each order's
+   * invoice with its total, what was paid and where it stands (unpaid, part paid, paid), and how late its
+   * oldest open part is. `mine`: the orders I handle.
+   */
+  async customerInvoices(user: SessionUser, mine: boolean) {
+    const today = this.clock.today();
+    const s = await this.settings.get();
+    const fx = fxOf(s, await this.limits.allows("expenses"));
+    const orders = await this.prisma.db.order.findMany({
+      where: {
+        AND: [orderAccess(user), mine ? { inquiry: { assigneeId: user.id } } : {}],
+        status: { in: ["open", "closed"] },
+        OR: [{ proformaNo: { not: null } }, { papers: { some: { kind: "commercial-invoice", status: "final" } } }],
+      },
+      select: {
+        id: true,
+        refNo: true,
+        currency: true,
+        mainCurrency: true,
+        mainRate: true,
+        depositPercent: true,
+        total: true,
+        proformaNo: true,
+        proformaIssuedOn: true,
+        expenses: chargedExpenses,
+        customer: { select: { id: true, name: true } },
+        inquiry: { select: { assignee: person } },
+        allocations: { where: livePart, select: { amount: true, bankCharges: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        papers: BillingService.invoicePapers,
+      },
+      orderBy: [{ orderedOn: "desc" }, { refNo: "desc" }],
+      take: 500,
+    });
+    const plans = await livePlansOf(
+      this.prisma.db,
+      orders.map((o) => o.id),
+    );
+    return {
+      rows: orders.flatMap((o) => {
+        const invoice = this.invoiceOf(o);
+        if (!invoice) return [];
+        const pos = positionOf(o, fx);
+        const plan = planStatus(plans.get(o.id)?.items ?? [], pos.settledMinor, today, s.reminders.dueSoonDays);
+        const next = plan.find((p) => p.openMinor > 0) ?? null;
+        return [
+          {
+            invoice,
+            order: { id: o.id, refNo: o.refNo },
+            customer: o.customer,
+            lookedAfterBy: o.inquiry.assignee,
+            currency: o.currency,
+            total: fromMinor(pos.owedMinor),
+            paid: fromMinor(pos.settledMinor),
+            due: fromMinor(pos.dueMinor),
+            status: (pos.dueMinor <= 0 ? "paid" : pos.settledMinor > 0 ? "part_paid" : "unpaid") as "paid" | "part_paid" | "unpaid",
+            /** The oldest open part: when it is due and how late it is. */
+            nextDue: next?.dueOn ?? null,
+            late: next ? lateDays(next.dueOn, today) : 0,
+          },
+        ];
+      }),
+    };
+  }
+
+  /**
+   * One order's invoice, its own view: what it bills (the order's lines), how it is paid (the parts of the
+   * plan, each a request with where it stands; payments and receipts are on the request) and its terms.
+   */
+  async customerInvoice(user: SessionUser, orderId: string) {
+    const o = await this.prisma.db.order.findFirst({
+      where: { id: orderId, ...orderAccess(user) },
+      select: {
+        id: true,
+        refNo: true,
+        status: true,
+        currency: true,
+        mainCurrency: true,
+        mainRate: true,
+        depositPercent: true,
+        total: true,
+        proformaNo: true,
+        proformaIssuedOn: true,
+        incoterm: true,
+        incotermPlace: true,
+        balanceTerms: true,
+        ...termsSelect,
+        expenses: chargedExpenses,
+        customer: { select: { id: true, name: true } },
+        inquiry: { select: { id: true, assignee: person } },
+        revision: { select: { number: true, quotation: { select: { refNo: true } } } },
+        allocations: { where: livePart, select: { amount: true, bankCharges: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        papers: BillingService.invoicePapers,
+        lines: { orderBy: { sortOrder: "asc" }, select: { id: true, type: true, description: true, model: true, quantity: true, unit: true, unitPrice: true, lineTotal: true } },
+      },
+    });
+    if (!o) throw new NotFoundError("Order");
+    // Null: no invoice issued yet (the proforma comes first); the view still shows what it will bill.
+    const invoice = this.invoiceOf(o);
+    const s = await this.settings.get();
+    const fx = fxOf(s, await this.limits.allows("expenses"));
+    const today = this.clock.today();
+    const pos = positionOf(o, fx);
+    const plan = planStatus((await livePlanOf(this.prisma.db, o.id)).items, pos.settledMinor, today, s.reminders.dueSoonDays);
+    const requests = (await requestsOf(this.prisma.db, [o.id], this.clock.timeZone)).get(o.id);
+    const linesMinor = o.lines.reduce((t, l) => t + decimalToMinor(l.lineTotal), 0);
+    const proforma = o.papers.filter((p) => p.kind === "proforma");
+    const commercial = o.papers.filter((p) => p.kind === "commercial-invoice");
+    return {
+      invoice,
+      order: { id: o.id, refNo: o.refNo, status: o.status },
+      customer: o.customer,
+      lookedAfterBy: o.inquiry.assignee,
+      currency: o.currency,
+      lines: o.lines.map((l) => ({
+        id: l.id,
+        type: l.type,
+        description: l.description,
+        model: l.model,
+        quantity: l.quantity.toString(),
+        unit: l.unit,
+        unitPrice: l.unitPrice.toFixed(2),
+        amount: l.lineTotal.toFixed(2),
+      })),
+      /** The lines add up to more than the order total: the discount agreed on the quotation. */
+      discount: linesMinor > decimalToMinor(o.total) ? fromMinor(linesMinor - decimalToMinor(o.total)) : null,
+      orderTotal: o.total.toFixed(2),
+      charged: fromMinor(pos.chargedMinor),
+      total: fromMinor(pos.owedMinor),
+      paid: fromMinor(pos.settledMinor),
+      due: fromMinor(pos.dueMinor),
+      status: (pos.dueMinor <= 0 ? "paid" : pos.settledMinor > 0 ? "part_paid" : "unpaid") as "paid" | "part_paid" | "unpaid",
+      parts: plan.map((p) => {
+        const v = requestViewOf(p, requests);
+        return {
+          ref: p.id,
+          number: paperNumber(o.refNo, "payment-request", p.requestNo),
+          label: p.label,
+          dueOn: p.dueOn,
+          rule: dueRuleWords(p),
+          amount: fromMinor(p.amountMinor),
+          paid: fromMinor(p.paidMinor),
+          late: p.openMinor > 0 ? lateDays(p.dueOn, today) : 0,
+          request: { state: v.state, with: v.with, sentOn: v.sentOn, revision: v.revision, changed: v.changed, through: v.through },
+          /** When its last payment came (a paid part: "Paid 05 Oct"). */
+          lastPaidOn: v.receipts.at(-1)?.paidOn ?? null,
+        };
+      }),
+      terms: {
+        priceBasis: [o.incoterm, o.incotermPlace].filter(Boolean).join(" "),
+        payment: routePaymentSentence(pos.depositPercent, termsOf(o), o.balanceTerms),
+      },
+      linked: {
+        quotation: o.revision.quotation ? { refNo: o.revision.quotation.refNo, revision: o.revision.number, inquiryId: o.inquiry.id } : null,
+        proforma: o.proformaNo ? { number: o.proformaNo, versions: proforma.length } : null,
+        commercial: commercial.length ? { number: commercial.at(-1)!.number, versions: commercial.length } : null,
+      },
+    };
   }
 
   /* ---------------------------------------------------------------- open invoices */

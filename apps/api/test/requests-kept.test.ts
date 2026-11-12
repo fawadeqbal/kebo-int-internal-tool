@@ -310,6 +310,49 @@ describe("payment requests and receipts kept as sent", () => {
     expect((await doc(o.id, "payment-receipt", `?ref=${last.id}&v=1`)).doc.total?.amount).toBe("1000.00");
   });
 
+  it("the invoice of an order: its own view and the list; a request tells how each payment came", async () => {
+    const o = await newOrder();
+    // No proforma yet: the view says so and still shows what it will bill.
+    const before = (await api(app, sana).get(`/billing/customer-invoices/${o.id}`).expect(200)).body;
+    expect(before.invoice).toBeNull();
+    expect(before.lines.length).toBe(1);
+    expect(before.parts.map((p: { request: { state: string } }) => p.request.state)).toEqual(["not_sent", "not_sent"]);
+    const listed = async () =>
+      ((await api(app, sana).get("/billing/customer-invoices").expect(200)).body.rows as { order: { id: string }; invoice: { kind: string; number: string }; status: string; total: string; paid: string; due: string }[]).find(
+        (r) => r.order.id === o.id,
+      );
+    expect(await listed()).toBeUndefined();
+
+    await api(app, sana).post(`/orders/${o.id}/proforma`, {}).expect((r) => expect(r.status).toBeLessThan(300));
+    const m = await money(o.id);
+    const [deposit, balance] = m.plan.items;
+    expect(await listed()).toMatchObject({ invoice: { kind: "proforma" }, status: "unpaid", total: m.total, paid: "0.00", due: m.total });
+
+    // The deposit and a little more come in by cash.
+    const paid = (Number(deposit!.amount) + 250).toFixed(2);
+    await api(app, manager).post(`/orders/${o.id}/payments`, { kind: "deposit", amount: paid, currency: "USD", paidOn: day(-1), method: "cash", reference: "CASH-77" }).expect(201);
+    const v = (await api(app, sana).get(`/billing/customer-invoices/${o.id}`).expect(200)).body;
+    expect(v).toMatchObject({ invoice: { kind: "proforma", version: 1 }, status: "part_paid", total: m.total, paid, due: (Number(m.total) - Number(paid)).toFixed(2) });
+    expect(v.invoice.number).toBeTruthy();
+    expect(v.parts.map((p: { request: { state: string }; paid: string; lastPaidOn: string | null }) => [p.request.state, p.paid, p.lastPaidOn])).toEqual([
+      ["paid", deposit!.amount, day(-1)],
+      ["part_paid", "250.00", day(-1)],
+    ]);
+    expect(v.terms.payment).toBeTruthy();
+    expect(v.linked.quotation?.refNo).toBeTruthy();
+    expect(await listed()).toMatchObject({ status: "part_paid", paid });
+
+    // The request's own view: the payment that paid it, how it came, and where its page is.
+    const page = (await api(app, sana).get(`/orders/${o.id}/requests/${balance!.id}`).expect(200)).body;
+    expect(page.request.receipts).toEqual([
+      expect.objectContaining({ amount: "250.00", whole: paid, method: "cash", reference: "CASH-77", paidOn: day(-1), hasProof: false }),
+    ]);
+    expect(page.request.receipts[0].entryId).toBeTruthy();
+    expect(page.request.receipts[0].recordedBy).toBeTruthy();
+    // Another customer's order: not seen through someone else's company is covered elsewhere; a wrong id is not found.
+    await api(app, sana).get(`/billing/customer-invoices/${balance!.id}`).expect(404);
+  });
+
   it("a request whose row leaves the plan stays, cancelled", async () => {
     const o = await newOrder();
     const m = await money(o.id);

@@ -68,8 +68,9 @@ describe("the sidebar", () => {
       buildModules({ can, feature: () => true, approvals: null, approves: false, companyAddresses: false })
         .find((m) => m.key === "finance")
         ?.pages.map((p) => p.label);
-    expect(pages(() => true)).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);
-    expect(pages((p) => p === "ledger.view")).toEqual(["General ledger"]);
+    expect(pages(() => true)).toEqual(["Invoices", "Receivables (AR)", "Payables (AP)", "General ledger"]);
+    // Invoices are open to everyone who sees orders.
+    expect(pages((p) => p === "ledger.view")).toEqual(["Invoices", "General ledger"]);
     expect(pages((p) => p !== "ledger.view")).not.toContain("General ledger");
   });
 });

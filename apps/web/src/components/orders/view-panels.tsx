@@ -29,7 +29,10 @@ export function PaymentEdit({
   terms,
   fromQuotation,
   suggest,
+  parts,
 }: {
+  /** The plan's parts editor, shown as the panel's second section. */
+  parts?: ReactNode;
   routeAction: Action;
   contractAction: Action;
   route: PaymentRoute | null;
@@ -46,7 +49,7 @@ export function PaymentEdit({
   return (
     <PanelBody className="flex flex-col gap-6">
       <section>
-        <h3 className={h}>The route</h3>
+        <h3 className={h}>{parts ? "1 · How they pay" : "The route"}</h3>
         <RouteForm action={routeAction} route={route} bankRoutes={bankRoutes} terms={terms} fromQuotation={fromQuotation} suggest={suggest} onDone={close} />
       </section>
       {bank && bankRoutes && (
@@ -55,7 +58,15 @@ export function PaymentEdit({
           <BankContractForm action={contractAction} contract={contract} lc={route === "letter_of_credit"} currency={currency} onDone={close} />
         </section>
       )}
-      <p className="text-xs text-muted">Changes show in the step&rsquo;s Changes.</p>
+      {parts && (
+        <section>
+          <h3 className={h}>2 · The parts</h3>
+          {parts}
+        </section>
+      )}
+      <p className="text-xs text-muted">
+        {parts ? "Changing the route builds the parts again. Payments already recorded stay." : "Changes show in the step\u2019s Changes."}
+      </p>
     </PanelBody>
   );
 }

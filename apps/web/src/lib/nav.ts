@@ -68,7 +68,6 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; short: string; icon:
     pages: [
       { href: "/inquiries", label: "Inquiries (RFQs)" },
       { href: "/orders", label: "Orders" },
-      { href: "/operations/payment-requests", label: "Payment requests" },
       { href: "/operations/purchase-orders", label: "Purchase orders" },
       { href: "/operations/shipments", label: "Fulfillment & logistics" },
     ],
@@ -101,6 +100,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; short: string; icon:
     short: "Finance",
     icon: "finance",
     pages: [
+      { href: "/finance/invoices", label: "Invoices" },
       { href: "/finance/to-receive", label: "Receivables (AR)" },
       { href: "/purchasing/to-pay", label: "Payables (AP)" },
       { href: "/finance/ledger", label: "General ledger" },
@@ -201,7 +201,6 @@ export function buildModules({
     "/finance/profit": reports && managers,
     "/finance/expenses": sourcing && managers && feature("expenses"),
     "/finance/leaks": reports && managers,
-    "/payments": ["payments.record", "sourcing.manage", "expenses.manage", "ledger.view", "money.submit"].some(can),
     "/approvals": approvals !== null,
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
     "/finance/to-receive": sourcing && (managers || can("payments.record")),

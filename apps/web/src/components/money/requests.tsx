@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import type { RequestState } from "@kebo/shared";
 import { Button, buttonClass, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
@@ -11,7 +11,6 @@ import { date, dueText, money } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
 import type { OrderMoney, SentWith } from "@/lib/types-money";
 import { requestHref, requestPdfHref, requestPrintHref, requestWords } from "@/lib/requests";
-import { recordPaymentHref } from "./pay-links";
 
 /**
  * Payment requests (claude/core-plan.md, phase 1): a row of the order's plan is a payment request, with the
@@ -161,9 +160,10 @@ export function PlanRequests({
   received,
   due,
   send,
-  canPay,
-  back,
+  foot,
 }: {
+  /** Shown left of the totals (a quiet link to the order's payments). */
+  foot?: ReactNode;
   orderId: string;
   plan: OrderMoney["plan"];
   currency: string;
@@ -171,9 +171,6 @@ export function PlanRequests({
   received: string;
   due: string;
   send: Send;
-  canPay: boolean;
-  /** Where Record payment comes back to. */
-  back: string;
 }) {
   // The dialog lives here, not in the row: once sent, the row's button changes and the dialog still says what to do next.
   const [sending, setSending] = useState<SendWhat | null>(null);
@@ -208,16 +205,27 @@ export function PlanRequests({
       >
         {r.with === "request" ? "Send again" : "Send request"}
       </Button>
-    ) : open && canPay ? (
-      <Link href={recordPaymentHref({ kind: "in", order: orderId, amount: i.open, back })} className={quiet}>
-        Record payment
-      </Link>
     ) : (
       <Link href={requestHref(orderId, i.id)} className={quiet}>
-        View
+        Open
       </Link>
     );
   };
+  /** The receipts of the payments that paid a row, under its status. */
+  const receipts = (i: OrderMoney["plan"]["items"][number]) =>
+    i.request.receipts.length ? (
+      <span className="block text-xs text-muted">
+        {i.request.receipts.slice(0, 2).map((x, n) => (
+          <span key={x.id}>
+            {n > 0 ? ", " : "Receipt "}
+            <a href={`/print/orders/${orderId}/payment-receipt?${new URLSearchParams({ ref: x.id, back: `/orders/${orderId}/payment` })}`} className="hover:text-primary hover:underline">
+              {x.number}
+            </a>
+          </span>
+        ))}
+        {i.request.receipts.length > 2 ? ` +${i.request.receipts.length - 2}` : ""}
+      </span>
+    ) : null;
   return (
     <div className="flex flex-col gap-3">
       {/* Phones: one block per request, so the status and what to do next are never off the screen. */}
@@ -285,6 +293,7 @@ export function PlanRequests({
                   <Td className="hidden text-right whitespace-nowrap tabular sm:table-cell">{grouped(i.paid)}</Td>
                   <Td>
                     <RequestStatus r={r} late={i.late} />
+                    {receipts(i)}
                   </Td>
                   <Td className="text-right">{next(i)}</Td>
                 </Tr>
@@ -315,7 +324,8 @@ export function PlanRequests({
         </Table>
       </div>
       {sending && <SendDialog key={sending.refId} what={sending} onClose={close} />}
-      <div className="flex flex-wrap justify-end gap-x-6 gap-y-1 text-sm">
+      <div data-target="payments.received" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 text-sm">
+        {foot && <span className="mr-auto">{foot}</span>}
         <span className="text-muted">
           Order total <span className="font-semibold text-text tabular">{money(total, currency)}</span>
         </span>

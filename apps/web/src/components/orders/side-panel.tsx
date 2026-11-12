@@ -144,7 +144,10 @@ export async function StepSidePanel({
   step,
   changes,
   historyHref,
+  hidePapers = [],
 }: {
+  /** Paper kinds this step shows elsewhere on the page (the Payment card's requests and receipts). */
+  hidePapers?: string[];
   id: string;
   step: FlowStep;
   changes: HistoryEntry[];
@@ -161,7 +164,7 @@ export async function StepSidePanel({
   // Papers: this step's, the proforma printing as the order's own document (as on Documents).
   const proforma = o.documents.find((x) => x.kind === "proforma");
   const paperRows: PaperLineRow[] = (papers?.papers ?? [])
-    .filter((r) => r.step === step)
+    .filter((r) => r.step === step && !hidePapers.includes(r.kind))
     .map((r) =>
       r.kind === "proforma" && proforma
         ? { ...r, links: { ...docHref(o, proforma), internal: `${docHref(o, proforma).pdf}?copy=internal` } }

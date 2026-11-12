@@ -10,7 +10,9 @@ const dayMonth = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
 /** Where the pages of one request are. */
-export const requestHref = (orderId: string, ref: string) => `/operations/payment-requests/${orderId}/${ref}`;
+export const requestHref = (orderId: string, ref: string) => `/payments/requests/${orderId}/${ref}`;
+/** The invoice of an order: its own view. */
+export const invoiceHref = (orderId: string) => `/finance/invoices/${orderId}`;
 export const requestPrintHref = (orderId: string, ref: string, q: { now?: boolean; v?: number; back?: string } = {}) =>
   `/print/orders/${orderId}/payment-request?${new URLSearchParams({ ref, ...(q.now ? { now: "1" } : {}), ...(q.v ? { v: String(q.v) } : {}), ...(q.back ? { back: q.back } : {}) })}`;
 export const requestPdfHref = (orderId: string, ref: string, v?: number) =>
