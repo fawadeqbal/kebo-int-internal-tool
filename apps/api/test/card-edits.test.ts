@@ -78,8 +78,12 @@ describe("card edits", () => {
   });
 
   it("shows the edits in the record's history", async () => {
-    const h = (await api(app, sana).get(`/history?type=deal&id=${inquiryId}`).expect(200)).body as { action: string; reason: string | null }[];
-    expect(h.filter((e) => e.action === "card.edit").map((e) => e.reason)).toContain("Typed wrong");
+    const h = (await api(app, sana).get(`/history?type=deal&id=${inquiryId}`).expect(200)).body as { action: string; reason: string | null; summary: string }[];
+    const edits = h.filter((e) => e.action === "card.edit");
+    expect(edits.map((e) => e.reason)).toContain("Typed wrong");
+    // In people's words (the card's name, not its key), and the first save is not a line of its own.
+    expect(edits.map((e) => e.summary)).toContain("Items edited (edit 2): 1 · Qty 2 → 3, and 1 more");
+    expect(h.some((e) => e.action === "card.first")).toBe(false);
   });
 
   it("is only for people who see the record", async () => {
