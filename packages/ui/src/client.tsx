@@ -106,17 +106,17 @@ export function Toaster() {
       onMouseLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)}
       onBlur={() => setHeld(false)}
-      className="no-print fixed inset-x-4 bottom-24 z-[95] flex animate-in items-center gap-3 rounded-xl bg-[#18181b] px-4 py-3 text-sm text-white shadow-pop sm:inset-x-auto sm:right-5 sm:min-w-72 lg:bottom-5 dark:bg-surface-3 dark:text-text"
+      className="no-print fixed inset-x-4 bottom-24 z-[95] flex animate-in items-center gap-3 rounded-xl bg-[#15211a] px-3.5 py-3 text-sm text-white shadow-pop sm:inset-x-auto sm:right-5 sm:min-w-72 lg:bottom-5 dark:bg-surface-3 dark:text-text"
     >
-      <Check className="size-4 shrink-0" aria-hidden />
+      <Check className="size-[18px] shrink-0 text-[#7bd39a]" aria-hidden />
       <span className="min-w-0 flex-1">{t.message}</span>
       {t.undo && (
-        <button type="button" onClick={() => void undo()} disabled={busy} className="font-medium text-[#c4b5fd] underline underline-offset-2 hover:text-white disabled:opacity-60">
+        <button type="button" onClick={() => void undo()} disabled={busy} className="font-semibold text-[#9be0b2] hover:text-white disabled:opacity-60">
           {busy ? "Undoing…" : "Undo"}
         </button>
       )}
       {t.action && (
-        <Link href={t.action.href} className="font-medium text-[#c4b5fd] underline underline-offset-2 hover:text-white" onClick={() => dismissToast(t.id)}>
+        <Link href={t.action.href} className="font-semibold text-[#9be0b2] hover:text-white" onClick={() => dismissToast(t.id)}>
           {t.action.label}
         </Link>
       )}

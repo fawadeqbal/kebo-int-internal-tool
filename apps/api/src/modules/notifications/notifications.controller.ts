@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions, AllowWhenReadOnly } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
-import { NotificationsService } from "./notifications.service";
+import { NOTIFICATION_GROUPS, NotificationsService, type NotificationGroup } from "./notifications.service";
 import { RemindersService } from "./reminders.service";
 
 const readInput = z.object({ ids: z.union([z.literal("all"), z.array(z.uuid()).max(500)]) });
@@ -21,10 +21,10 @@ export class NotificationsController {
   @Get("notifications")
   mine(
     @CurrentUser() user: SessionUser,
-    @Query(Validate(z.object({ unread: z.enum(["true", "false"]).optional(), take: z.coerce.number().int().min(1).max(200).optional(), page: z.coerce.number().int().min(1).optional() })))
-    q: { unread?: string; take?: number; page?: number },
+    @Query(Validate(z.object({ unread: z.enum(["true", "false"]).optional(), take: z.coerce.number().int().min(1).max(200).optional(), page: z.coerce.number().int().min(1).optional(), group: z.enum(NOTIFICATION_GROUPS).optional() })))
+    q: { unread?: string; take?: number; page?: number; group?: NotificationGroup },
   ) {
-    return this.notifications.mine(user, { unreadOnly: q.unread === "true", take: q.take, page: q.page });
+    return this.notifications.mine(user, { unreadOnly: q.unread === "true", take: q.take, page: q.page, group: q.group });
   }
 
   /** { ids: [...] | "all" } */

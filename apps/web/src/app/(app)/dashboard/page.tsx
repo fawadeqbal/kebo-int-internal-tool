@@ -3,7 +3,7 @@ import Link from "next/link";
 import { can, ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type InquiryStage, type Priority } from "@kebo/shared";
 import { Alert, Badge, ButtonLink, Card, CardBody, CardHeader, cn, RefCode, StatTile, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { ArrowRight, Coins, FileText, Package, PieChart, Plus, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
-import type { Aging } from "@/lib/types-facts";
+import type { Aging, Funnel } from "@/lib/types-facts";
 import { getSettings } from "@/lib/loaders";
 import type { OrderRow } from "@/lib/types-orders";
 import type { Paged } from "@/lib/types";
@@ -13,9 +13,8 @@ import { money, TZ, plural } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { Reminders } from "@/lib/types-insights";
 import { loadHome, type AccountRow } from "@/lib/insights-data";
-import { amountCell, bigMoney, change, monthYearOf, percent } from "@/lib/insights-period";
+import { bigMoney, change, percent } from "@/lib/insights-period";
 import { Delta } from "@/components/insights/frame";
-import { ChartCard } from "@/components/insights/chart-card";
 import { SalesProfitChart } from "@/components/insights/facts-charts";
 import { readableDates } from "@/components/insights/readable-dates";
 
@@ -101,7 +100,9 @@ export default async function DashboardPage() {
 
       {/* Inquiry pipeline · Needs you · Cash and bank */}
       <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
-        <Pipeline counts={d.counts} />
+        <Suspense fallback={<div className="h-[240px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
+          <Pipeline counts={d.counts} today={d.today} insights={insights} />
+        </Suspense>
         <Suspense fallback={<div className="h-[240px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
           <NeedsYou />
         </Suspense>
@@ -131,7 +132,6 @@ async function HowMany() {
       <strong className="font-semibold text-text">
         {n} thing{n === 1 ? "" : "s"} need{n === 1 ? "s" : ""} you.
       </strong>
-      {r.counts.bad > 0 && <span className="font-medium text-bad"> {r.counts.bad} urgent.</span>}
     </>
   );
 }
@@ -223,12 +223,15 @@ function cashTotals(accounts: AccountRow[]) {
 
 
 /** Inquiry pipeline (board): open inquiries by stage, a bar each. */
-function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
-  const rows = [
-    { label: "New", n: counts.new, href: "/inquiries?stage=new", hint: counts.unassigned ? `${counts.unassigned} not assigned` : "not started" },
-    { label: "Sourcing", n: counts.sourcing, href: "/inquiries?stage=sourcing", hint: "getting prices" },
-    { label: "Quoted", n: counts.quoted, href: "/inquiries?stage=quoted", hint: "waiting for answers" },
-    { label: "Past needed-by", n: counts.overdue, href: "/inquiries?stage=overdue", hint: "late", late: true },
+async function Pipeline({ counts, today, insights }: { counts: Dashboard["counts"]; today: string; insights: boolean }) {
+  const [h, year] = insights
+    ? await Promise.all([getHome(today), api.get<Funnel>("/insights/facts/funnel", { from: `${today.slice(0, 4)}-01-01`, to: today }).catch(() => null)])
+    : [null, null];
+  const rows: { label: string; n: number; href: string; value?: string; won?: boolean }[] = [
+    { label: "New", n: counts.new, href: "/inquiries?stage=new" },
+    { label: "Sourcing", n: counts.sourcing, href: "/inquiries?stage=sourcing" },
+    { label: "Quoted", n: counts.quoted, href: "/inquiries?stage=quoted" },
+    ...(h ? [{ label: "Won this month", n: h.sales.orders, href: "/orders", value: money(h.sales.now, h.currency), won: true }] : []),
   ];
   const max = Math.max(1, ...rows.map((r) => r.n));
   return (
@@ -237,7 +240,7 @@ function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
         title="Inquiry pipeline"
         actions={
           <Link href="/inquiries/board" className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline">
-            Board <ArrowRight className="size-4" aria-hidden />
+            <ArrowRight className="size-4" aria-hidden /> Board
           </Link>
         }
       />
@@ -246,19 +249,24 @@ function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
           {rows.map((r) => (
             <li key={r.label}>
               <Link href={r.href} className="flex flex-col gap-1.5 rounded-lg hover:text-primary">
-                <span className="flex justify-between text-[13px]">
+                <span className="flex justify-between gap-3 text-[13px]">
                   <span>
-                    {r.label} <span className="text-muted">· {r.hint}</span>
+                    {r.label} <span className="text-muted">· {r.n}</span>
                   </span>
-                  <strong className={cn("tabular", r.late && r.n > 0 && "text-bad")}>{r.n}</strong>
+                  {r.value && <strong className="tabular">{r.value}</strong>}
                 </span>
                 <span className="h-2 rounded bg-surface-3">
-                  <span className={cn("block h-2 rounded", r.late ? "bg-chart-2" : "bg-chart-1")} style={{ width: `${(r.n / max) * 100}%` }} />
+                  <span className={cn("block h-2 rounded", r.won ? "bg-action-solid" : "bg-chart-1")} style={{ width: `${(r.n / max) * 100}%` }} />
                 </span>
               </Link>
             </li>
           ))}
         </ul>
+        {year?.winRate != null && (
+          <p className="mt-3 text-xs text-muted">
+            Win rate this year <strong className="text-text">{percent(year.winRate)}</strong>
+          </p>
+        )}
       </CardBody>
     </Card>
   );
@@ -272,7 +280,7 @@ async function NeedsYou() {
   const tone = (lvl: string) => (lvl === "bad" ? "bg-bad-soft text-bad" : lvl === "warn" ? "bg-warn-soft text-warn" : "bg-info-soft text-info");
   return (
     <Card>
-      <CardHeader title="Needs you" actions={r.counts.total ? <Badge tone={r.counts.bad ? "bad" : "info"}>{r.counts.total}</Badge> : undefined} />
+      <CardHeader title="Needs you" />
       <CardBody>
         {top.length ? (
           <ol className="flex flex-col gap-3">
@@ -309,7 +317,7 @@ async function CashAndBank() {
         title="Cash and bank"
         actions={
           <Link href="/finance/cash-book" className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline">
-            Vault <ArrowRight className="size-4" aria-hidden />
+            <ArrowRight className="size-4" aria-hidden /> Vault
           </Link>
         }
       />
@@ -334,43 +342,28 @@ async function CashAndBank() {
 async function SalesChart({ today }: { today: string }) {
   const h = await getHome(today);
   if (!h) return null;
-  const c = h.currency;
   return (
-    <ChartCard
-      title="Sales and costs"
-      description={c}
-      actions={
-        <Link href="/reports" className="text-sm text-primary hover:underline">
-          Open Reports
-        </Link>
-      }
-      table={{
-        columns: ["Month", "Orders", `Sales ${c}`, `Gross profit ${c}`, "Margin"],
-        rows: h.months.map((m) => [monthYearOf(m.month), m.orders, amountCell(m.sales), amountCell(m.profit), percent(m.margin)]),
-      }}
-    >
-      <SalesProfitChart rows={h.months} currency={c} />
-    </ChartCard>
+    <Card>
+      <CardHeader title="Sales and costs" actions={h.profit.margin !== null ? <Badge tone="ok">margin {percent(h.profit.margin)}</Badge> : undefined} />
+      <CardBody>
+        <SalesProfitChart rows={h.months} currency={h.currency} />
+      </CardBody>
+    </Card>
   );
 }
-
-
-
-
 
 /** The latest open sales orders (the board's "Recent sales orders"): what each is worth, what is still due, where it is. */
 async function RecentOrders() {
   const data = await api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1 }).catch(() => null);
   if (!data || !data.rows.length) return null;
-  const rows = data.rows.slice(0, 6);
+  const rows = data.rows.slice(0, 5);
   return (
     <Card className="overflow-hidden">
       <CardHeader
         title="Recent sales orders"
-        description={`${data.total} open`}
         actions={
           <ButtonLink href="/orders" variant="secondary" size="sm">
-            View all <ArrowRight aria-hidden />
+            <ArrowRight aria-hidden /> View all
           </ButtonLink>
         }
       />
@@ -390,7 +383,7 @@ async function RecentOrders() {
               <Td>
                 <RefCode href={`/orders/${o.id}`}>{o.refNo}</RefCode>
               </Td>
-              <Td className="max-w-56 truncate font-semibold">{o.customer.name}</Td>
+              <Td className="max-w-56 truncate">{o.customer.name}</Td>
               <Td className="text-right whitespace-nowrap tabular">{money(o.total, o.currency)}</Td>
               <Td className="text-right whitespace-nowrap tabular">{Number(o.due) > 0.005 ? money(o.due, o.currency) : "—"}</Td>
               <Td>

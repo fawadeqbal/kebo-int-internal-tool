@@ -35,6 +35,16 @@ describe("people: users, two-step sign-in, customers, factories", () => {
     await api(app, admin).post("/users", { name: "Again", email, role: "staff", password: "Welcome123x" }).expect(409);
   });
 
+  it("people change their own name (not their email or role) on My account", async () => {
+    const email = `name-${tag}@example.com`;
+    await api(app, admin).post("/users", { name: "Old Name", email, role: "staff", password: "Welcome123x" }).expect(201);
+    const token = await signIn(app, email, "Welcome123x");
+    const r = await api(app, token).patch("/me", { name: "  New Name ", email: "other@example.com", role: "admin" }).expect(200);
+    expect(r.body).toMatchObject({ name: "New Name", email });
+    expect((await api(app, token).get("/auth/me").expect(200)).body).toMatchObject({ name: "New Name", email, role: "staff" });
+    await api(app, token).patch("/me", { name: " " }).expect(422);
+  });
+
   it("switching someone off ends their sessions at once", async () => {
     const email = `off-${tag}@example.com`;
     const u = await api(app, admin).post("/users", { name: "Temp", email, role: "staff", password: "Welcome123x" }).expect(201);

@@ -128,7 +128,7 @@ export class AuthService {
    */
   async login(email: string, password: string, meta: { ip: string; userAgent?: string }, named?: string) {
     const address = email.trim().toLowerCase();
-    const wrong = new HttpException({ message: "Wrong email or password." }, HttpStatus.UNAUTHORIZED);
+    const wrong = new HttpException({ message: "That email and password do not match. Try again, or ask your admin for a new password." }, HttpStatus.UNAUTHORIZED);
     const limit = this.overIpLimit(meta.ip);
     if (limit.over) {
       // Kept once per window, in the companies where this email is an account, so a flood does not fill the history.

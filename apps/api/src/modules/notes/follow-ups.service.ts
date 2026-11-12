@@ -207,10 +207,22 @@ export class FollowUpsService {
     if (q.on) scope.push({ dueOn: toDbDate(q.on) });
     if (q.from) scope.push({ dueOn: { gte: toDbDate(q.from) } });
     if (q.to) scope.push({ dueOn: { lte: toDbDate(q.to) } });
-    const base: Prisma.FollowUpWhereInput = { AND: scope };
-    const where: Prisma.FollowUpWhereInput =
-      q.open === undefined ? base : { AND: [...scope, q.open ? { doneAt: null } : { doneAt: { not: null } }] };
+    if (q.who) scope.push({ assigneeId: q.who });
+    if (q.q) scope.push({ OR: (["title", "place", "note"] as const).map((f) => ({ [f]: { contains: q.q, mode: "insensitive" as const } })) });
+    if (q.about)
+      scope.push(
+        q.about === "none"
+          ? { inquiryId: null, orderId: null, customerId: null, factoryId: null }
+          : { [`${q.about}Id`]: { not: null } },
+      );
     const { today, time } = this.now();
+    const lateWhere: Prisma.FollowUpWhereInput = { doneAt: null, OR: [{ dueOn: { lt: toDbDate(today) } }, { dueOn: toDbDate(today), dueAt: { lt: time } }] };
+    const base: Prisma.FollowUpWhereInput = { AND: scope };
+    const where: Prisma.FollowUpWhereInput = q.late
+      ? { AND: [...scope, lateWhere] }
+      : q.open === undefined
+        ? base
+        : { AND: [...scope, q.open ? { doneAt: null } : { doneAt: { not: null } }] };
     const [rows, total, open, done, lateDays, lateToday] = await Promise.all([
       this.prisma.db.followUp.findMany({
         where,

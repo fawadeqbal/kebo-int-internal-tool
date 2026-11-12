@@ -48,6 +48,13 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     const created = (await api(app, staff).post("/inquiries", { customerId: customer.id, category: "Machinery", items: [{ description: "Notify test item", quantity: 1 }] }).expect(201)).body;
     const n = (await api(app, manager).get("/notifications").expect(200)).body;
     expect(n.items.some((x: { type: string; link: string }) => x.type === "inquiry.created" && x.link === `/inquiries/${created.id}`)).toBe(true);
+    // The Alerts chips: Inquiries shows it, Payments does not.
+    const inq = (await api(app, manager).get("/notifications?group=inquiries&take=200").expect(200)).body;
+    expect(inq.items.length).toBeGreaterThan(0);
+    expect(inq.items.every((x: { type: string }) => /^(inquiry|quotation|reminder)\./.test(x.type))).toBe(true);
+    const pay = (await api(app, manager).get("/notifications?group=payments&take=200").expect(200)).body;
+    expect(pay.items.some((x: { link: string }) => x.link === `/inquiries/${created.id}`)).toBe(false);
+    await api(app, manager).get("/notifications?group=nope").expect(422);
     const own = (await api(app, staff).get("/notifications").expect(200)).body;
     expect(own.items.some((x: { link: string; type: string }) => x.type === "inquiry.created" && x.link === `/inquiries/${created.id}`)).toBe(false);
     await api(app, manager).post("/notifications/read", { ids: "all" }).expect(200);

@@ -253,6 +253,16 @@ export class UsersService {
 
   /* ---------------------------------------------------------------- my account */
 
+  /** Your own name, as everyone sees it; recorded in the audit log. */
+  async renameSelf(actor: SessionUser, name: string) {
+    const user = await this.prisma.db.user.findUniqueOrThrow({ where: { id: actor.id } });
+    return this.prisma.tx(async (tx) => {
+      const updated = await tx.user.update({ where: { id: actor.id }, data: { name }, select: publicUser });
+      await this.audit.record(tx, { userId: actor.id, action: "update", entityType: "user", entityId: actor.id, summary: `Changed own name`, oldValues: { name: user.name }, newValues: { name } });
+      return updated;
+    });
+  }
+
   async changeOwnPassword(actor: SessionUser, input: z.infer<typeof passwordChangeInput>) {
     const user = await this.prisma.db.user.findUniqueOrThrow({ where: { id: actor.id } });
     if (!(await bcrypt.compare(input.current, user.passwordHash))) throw new DomainError("Your current password is not right.");

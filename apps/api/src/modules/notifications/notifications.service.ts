@@ -31,6 +31,16 @@ export const links = {
  * In-app notifications (+ push to phones), and emails to the admin list for the
  * events chosen in Settings. Nobody is notified about their own action.
  */
+/** The Alerts page's chips: the starts of the notification types each one shows. */
+export const NOTIFICATION_GROUPS = ["payments", "inquiries", "orders", "followUps"] as const;
+export type NotificationGroup = (typeof NOTIFICATION_GROUPS)[number];
+const GROUP_TYPES: Record<NotificationGroup, string[]> = {
+  payments: ["payment.", "approval.", "reminder.instalment"],
+  inquiries: ["inquiry.", "quotation.", "reminder.new", "reminder.sourcing", "reminder.overdue", "reminder.dueSoon", "reminder.quotation"],
+  orders: ["order.", "reminder.order"],
+  followUps: ["followUp."],
+};
+
 @Injectable()
 export class NotificationsService implements OnModuleInit {
   private readonly log = new Logger("Notify");
@@ -241,8 +251,12 @@ export class NotificationsService implements OnModuleInit {
   /* ---------------------------------------------------------------- reading */
 
   /** Mine, newest first, `take` at a time (page 1 by default); `total`: how many there are with the same filter. */
-  async mine(user: SessionUser, opts: { unreadOnly?: boolean; take?: number; page?: number }) {
-    const where = { userId: user.id, ...(opts.unreadOnly ? { readAt: null } : {}) };
+  async mine(user: SessionUser, opts: { unreadOnly?: boolean; take?: number; page?: number; group?: NotificationGroup }) {
+    const where = {
+      userId: user.id,
+      ...(opts.unreadOnly ? { readAt: null } : {}),
+      ...(opts.group ? { OR: GROUP_TYPES[opts.group].map((t) => ({ type: { startsWith: t } })) } : {}),
+    };
     const take = Math.min(opts.take ?? 50, 200);
     const [items, unread, total] = await Promise.all([
       this.prisma.db.notification.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: ((opts.page ?? 1) - 1) * take, take }),

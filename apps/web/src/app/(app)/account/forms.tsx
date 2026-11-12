@@ -7,7 +7,16 @@ import { Alert, Button, Field, Input } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import {
+  PANEL_FORM,
+  PanelActions,
+  PanelBody,
+  PanelKeys,
+  PanelSection,
+  SidePanel,
+  useClosePanel,
+  useSidePanel,
+} from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { TwoStepStatus } from "@/lib/types-people";
 
@@ -46,15 +55,20 @@ export function PasswordForm({ action, onSaved }: { action: Action; onSaved?: ()
       {(s) => (
         <>
           <PanelSection first className="sm:grid-cols-1">
-          <Field label="Current password" htmlFor="current" error={s.errors?.current}>
-            <Input id="current" name="current" type="password" autoComplete="current-password" aria-invalid={!!s.errors?.current} />
-          </Field>
-          <Field label="New password" htmlFor="next" error={s.errors?.next} hint="At least 10 characters, with letters and at least one number. A short sentence is easy to remember.">
-            <Input id="next" name="next" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.next} />
-          </Field>
-          <Field label="New password again" htmlFor="confirm" error={s.errors?.confirm}>
-            <Input id="confirm" name="confirm" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.confirm} />
-          </Field>
+            <Field label="Current password" htmlFor="current" error={s.errors?.current}>
+              <Input id="current" name="current" type="password" autoComplete="current-password" aria-invalid={!!s.errors?.current} />
+            </Field>
+            <Field
+              label="New password"
+              htmlFor="next"
+              error={s.errors?.next}
+              hint="At least 10 characters, with letters and at least one number. A short sentence is easy to remember."
+            >
+              <Input id="next" name="next" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.next} />
+            </Field>
+            <Field label="New password again" htmlFor="confirm" error={s.errors?.confirm}>
+              <Input id="confirm" name="confirm" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.confirm} />
+            </Field>
           </PanelSection>
           <PanelActions>
             <SubmitButton pendingText="Changing…">Change my password</SubmitButton>
@@ -72,7 +86,15 @@ export function PasswordForm({ action, onSaved }: { action: Action; onSaved?: ()
 function CodeField({ id, error, label = "Code from your app" }: { id: string; error?: string[]; label?: string }) {
   return (
     <Field label={label} htmlFor={id} error={error}>
-      <Input id={id} name="code" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" className="max-w-40 font-mono tracking-widest" aria-invalid={!!error} />
+      <Input
+        id={id}
+        name="code"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        placeholder="123456"
+        className="max-w-40 font-mono tracking-widest"
+        aria-invalid={!!error}
+      />
     </Field>
   );
 }
@@ -92,7 +114,10 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
     <div className="flex flex-col gap-3">
       <Alert tone="warning">
         <p className="font-medium">Save these recovery codes now. They are shown only once.</p>
-        <p className="mt-0.5 text-text-2">If you lose your phone, each code lets you sign in one time instead of the code from your app. Keep them somewhere safe, away from your phone (a password manager, or printed).</p>
+        <p className="mt-0.5 text-text-2">
+          If you lose your phone, each code lets you sign in one time instead of the code from your app. Keep them somewhere safe, away from
+          your phone (a password manager, or printed).
+        </p>
       </Alert>
       <ol className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-surface-2/60 p-3 font-mono text-sm tabular sm:grid-cols-2">
         {codes.map((c, i) => (
@@ -160,7 +185,8 @@ export function TwoStepPanel({
           <div className="text-sm">
             <p className="font-medium">Two-step sign-in is on{sinceText ? ` since ${sinceText}` : ""}.</p>
             <p className="text-text-2">
-              After your password you enter the code from your authenticator app. {status.recoveryCodesLeft} recovery code{status.recoveryCodesLeft === 1 ? "" : "s"} left.
+              After your password you enter the code from your authenticator app. {status.recoveryCodesLeft} recovery code
+              {status.recoveryCodesLeft === 1 ? "" : "s"} left.
             </p>
           </div>
         </div>
@@ -168,16 +194,30 @@ export function TwoStepPanel({
           <Alert tone="warning">You are running out of recovery codes. Make new ones so you can still get in if you lose your phone.</Alert>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" className="aria-pressed:bg-surface-2" onClick={() => setManage(manage === "codes" ? null : "codes")} aria-pressed={manage === "codes"}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="aria-pressed:bg-surface-2"
+            onClick={() => setManage(manage === "codes" ? null : "codes")}
+            aria-pressed={manage === "codes"}
+          >
             <KeyRound aria-hidden /> Make new recovery codes
           </Button>
           {!status.required && (
-            <Button size="sm" variant="danger-ghost" className="aria-pressed:bg-bad-soft" onClick={() => setManage(manage === "off" ? null : "off")} aria-pressed={manage === "off"}>
+            <Button
+              size="sm"
+              variant="danger-ghost"
+              className="aria-pressed:bg-bad-soft"
+              onClick={() => setManage(manage === "off" ? null : "off")}
+              aria-pressed={manage === "off"}
+            >
               Turn off
             </Button>
           )}
         </div>
-        {status.required && <p className="text-xs text-muted">Your role ({status.roleName}) needs two-step sign-in, so it cannot be turned off.</p>}
+        {status.required && (
+          <p className="text-xs text-muted">Your role ({status.roleName}) needs two-step sign-in, so it cannot be turned off.</p>
+        )}
         {manage === "codes" && (
           <ActionForm
             key="codes"
@@ -191,7 +231,9 @@ export function TwoStepPanel({
           >
             {(s) => (
               <>
-                <p className="text-sm text-text-2">Your old recovery codes stop working. Enter the code your app shows now to confirm it is you.</p>
+                <p className="text-sm text-text-2">
+                  Your old recovery codes stop working. Enter the code your app shows now to confirm it is you.
+                </p>
                 <CodeField id="codes-code" error={s.errors?.code} />
                 <div>
                   <SubmitButton size="sm" pendingText="Making codes…">
@@ -203,10 +245,17 @@ export function TwoStepPanel({
           </ActionForm>
         )}
         {manage === "off" && (
-          <ActionForm key="off" action={turnOff} onDone={() => setManage(null)} className="flex flex-col gap-3 rounded-lg border border-bad/25 bg-bad-soft/50 p-3">
+          <ActionForm
+            key="off"
+            action={turnOff}
+            onDone={() => setManage(null)}
+            className="flex flex-col gap-3 rounded-lg border border-bad/25 bg-bad-soft/50 p-3"
+          >
             {(s) => (
               <>
-                <p className="text-sm text-text-2">Without it, anyone who learns your password can sign in as you. Enter the code your app shows now to turn it off.</p>
+                <p className="text-sm text-text-2">
+                  Without it, anyone who learns your password can sign in as you. Enter the code your app shows now to turn it off.
+                </p>
                 <CodeField id="off-code" error={s.errors?.code} />
                 <div>
                   <SubmitButton size="sm" variant="danger" pendingText="Turning off…">
@@ -226,13 +275,23 @@ export function TwoStepPanel({
         <ol className="flex flex-col gap-5">
           <li className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-5">
             <div className="w-44 shrink-0 self-center rounded-lg border border-line bg-white p-2 sm:self-start">
-              <img src={`data:image/svg+xml;utf8,${encodeURIComponent(setup.qr)}`} alt="QR code to scan with your authenticator app" className="block size-full" width={160} height={160} />
+              <img
+                src={`data:image/svg+xml;utf8,${encodeURIComponent(setup.qr)}`}
+                alt="QR code to scan with your authenticator app"
+                className="block size-full"
+                width={160}
+                height={160}
+              />
             </div>
             <div className="min-w-0 text-sm">
               <p className="font-medium">1. Scan this with your authenticator app</p>
-              <p className="mt-1 text-text-2">Use Google Authenticator, Microsoft Authenticator, 1Password or a similar app: add an account, then scan the code.</p>
+              <p className="mt-1 text-text-2">
+                Use Google Authenticator, Microsoft Authenticator, 1Password or a similar app: add an account, then scan the code.
+              </p>
               <p className="mt-3 text-xs text-muted">Can&apos;t scan? Enter this key in the app instead (time-based):</p>
-              <p className="mt-1 rounded-md bg-surface-2 px-2 py-1.5 font-mono text-sm tracking-wider break-all select-all">{setup.secret.match(/.{1,4}/g)?.join(" ")}</p>
+              <p className="mt-1 rounded-md bg-surface-2 px-2 py-1.5 font-mono text-sm tracking-wider break-all select-all">
+                {setup.secret.match(/.{1,4}/g)?.join(" ")}
+              </p>
             </div>
           </li>
           <li>
@@ -277,14 +336,79 @@ export function TwoStepPanel({
           </p>
         </div>
       </div>
-      <ActionForm action={start} showSuccess={false} onDone={(s) => {
+      <ActionForm
+        action={start}
+        showSuccess={false}
+        onDone={(s) => {
           setManage(null);
           setSetup(s.data as { secret: string; qr: string });
-        }}>
+        }}
+      >
         <SubmitButton size="sm" pendingText="Starting…">
           Set up two-step sign-in
         </SubmitButton>
       </ActionForm>
     </div>
+  );
+}
+
+/** The Profile card: your name (yours to change) and your email (who manages people changes it). */
+export function ProfileForm({ action, name, email }: { action: Action; name: string; email: string }) {
+  return (
+    <ActionForm action={action} className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      {(s) => (
+        <>
+          <Field label="Name" required htmlFor="profile-name" error={s.errors?.name}>
+            <Input id="profile-name" name="name" maxLength={120} required autoComplete="name" defaultValue={s.values?.name ?? name} />
+          </Field>
+          <Field label="Email" required htmlFor="profile-email" hint="A Super Admin changes it.">
+            <Input id="profile-email" type="email" value={email} readOnly className="bg-surface-2 text-text-2" />
+          </Field>
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <SubmitButton pendingText="Saving…">
+              <Check aria-hidden />
+              Save changes
+            </SubmitButton>
+            <Button type="reset" variant="ghost">
+              Cancel
+            </Button>
+          </div>
+        </>
+      )}
+    </ActionForm>
+  );
+}
+
+/** The Password card: current, new and the new one again, side by side. */
+export function PasswordCardForm({ action }: { action: Action }) {
+  return (
+    <ActionForm action={action} resetOnSuccess className="grid gap-4 sm:grid-cols-3">
+      {(s) => (
+        <>
+          <Field label="Current password" required htmlFor="current" error={s.errors?.current}>
+            <Input
+              id="current"
+              name="current"
+              type="password"
+              required
+              autoComplete="current-password"
+              aria-invalid={!!s.errors?.current}
+            />
+          </Field>
+          <Field label="New password" required htmlFor="next" error={s.errors?.next} hint="At least 10 characters">
+            <Input id="next" name="next" type="password" required autoComplete="new-password" aria-invalid={!!s.errors?.next} />
+          </Field>
+          <Field label="Repeat new password" required htmlFor="confirm" error={s.errors?.confirm}>
+            <Input id="confirm" name="confirm" type="password" required autoComplete="new-password" aria-invalid={!!s.errors?.confirm} />
+          </Field>
+          <div className="border-t border-surface-2 pt-4 sm:col-span-3">
+            <SubmitButton pendingText="Changing…">
+              <Check aria-hidden />
+              Change password
+            </SubmitButton>
+          </div>
+        </>
+      )}
+    </ActionForm>
   );
 }
