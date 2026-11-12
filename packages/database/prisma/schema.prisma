@@ -364,6 +364,7 @@ model User {
   relLedgerStaff           LedgerEntry[]        @relation("LedgerStaff")
   relLedgerPostedBy        LedgerEntry[]        @relation("LedgerPostedBy")
 
+  purchaseOrdersSent PurchaseOrder[] @relation("PurchaseOrderSentBy")
   @@unique([companyId, email])
   @@map("users")
 }
@@ -576,6 +577,7 @@ model Party {
   factoryFollowUps   FollowUp[]           @relation("FollowUpFactory")
   factoryLedger      LedgerEntry[]        @relation("LedgerEntryFactory")
 
+  purchaseOrders  PurchaseOrder[] @relation("PurchaseOrderSupplier")
   @@index([name])
   @@index([country])
   @@index([ownerId])
@@ -1163,6 +1165,7 @@ model Order {
   followUps    FollowUp[]
   ledger       LedgerEntry[]
 
+  purchaseOrders      PurchaseOrder[]
   @@unique([companyId, refNo])
   @@unique([companyId, proformaNo])
   @@index([inquiryId])
@@ -2164,6 +2167,7 @@ model Company {
   recordNotes         Note[]
   followUps           FollowUp[]
 
+  purchaseOrders PurchaseOrder[]
   @@map("companies")
 }
 
@@ -2750,4 +2754,36 @@ model LedgerState {
   report      Json?
 
   @@map("ledger_state")
+}
+
+/// A purchase order: one per sales order × supplier named on its lines, numbered on its own (PO-2026-0001, made by
+/// the database when a line first names the supplier). The ready date stays in order_factories for now.
+model PurchaseOrder {
+  id              String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId       String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company         Company   @relation(fields: [companyId], references: [id])
+  /// The sales order it buys for.
+  orderId         String    @map("order_id") @db.Uuid
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId      String    @map("supplier_id") @db.Uuid
+  supplier        Party     @relation("PurchaseOrderSupplier", fields: [supplierId], references: [id], onDelete: Restrict)
+  /// PO-2026-0001: its own sequence (counter PO-<year>).
+  number          String    @db.VarChar(20)
+  /// When we sent it to the supplier.
+  sentOn          DateTime? @map("sent_on") @db.Date
+  sentById        String?   @map("sent_by") @db.Uuid
+  sentBy          User?     @relation("PurchaseOrderSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+  /// Sent before the customer's deposit was verified: why (decided 12 Nov: allowed with a reason).
+  sentEarlyReason String?   @map("sent_early_reason") @db.VarChar(300)
+  /// The supplier's own number for our order ("their order no.").
+  supplierRef     String?   @map("supplier_ref") @db.VarChar(60)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([orderId, supplierId])
+  @@unique([companyId, number])
+  @@index([supplierId])
+  @@index([companyId])
+  @@map("purchase_orders")
 }

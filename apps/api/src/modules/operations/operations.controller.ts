@@ -27,6 +27,6 @@ export class OperationsController {
     @CurrentUser() user: SessionUser,
     @Query(Validate(z.object({ all: z.enum(["true", "false"]).optional() }))) q: { all?: string },
   ) {
-    return this.operations.purchaseOrders(user, q.all !== "true");
+    return this.operations.purchaseOrders(user, q.all !== "true", q.all === "true");
   }
 }

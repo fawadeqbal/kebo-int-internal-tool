@@ -69,11 +69,11 @@ export class OperationsService {
    * order number (the factory step), that supplier's ready date, and what we owe and paid it (Billing's rule).
    * `open`: only those with something still to pay or not ready yet.
    */
-  async purchaseOrders(user: SessionUser, open: boolean) {
+  async purchaseOrders(user: SessionUser, open: boolean, withCancelled = false) {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
     const fx = fxOf(await this.settings.get(), await this.limits.allows("expenses"));
     const orders = await this.prisma.db.order.findMany({
-      where: { ...orderAccess(user), status: { not: "cancelled" }, lines: { some: { factoryId: { not: null } } } },
+      where: { ...orderAccess(user), ...(withCancelled ? {} : { status: { not: "cancelled" } }), lines: { some: { factoryId: { not: null } } } },
       select: {
         id: true,
         refNo: true,
@@ -82,8 +82,10 @@ export class OperationsService {
         factoryOrderedOn: true,
         factoryOrderNo: true,
         customer: { select: { id: true, name: true } },
+        purchaseOrders: { select: { id: true, number: true, supplierId: true, sentOn: true, sentEarlyReason: true, supplierRef: true } },
         lines: {
           select: {
+            receivedOn: true,
             factoryId: true,
             factoryUnitPrice: true,
             factoryCurrency: true,
@@ -108,13 +110,33 @@ export class OperationsService {
         .filter((f) => f.lines > 0)
         .map((f) => {
           const readyOn: ISODate | null = ready.get(f.factoryId) ?? null;
+          const po = o.purchaseOrders.find((p) => p.supplierId === f.factoryId) ?? null;
+          const sentOn = po?.sentOn ? fromDbDate(po.sentOn) : o.factoryOrderedOn ? fromDbDate(o.factoryOrderedOn) : null;
+          const mine = o.lines.filter((l) => l.factoryId === f.factoryId);
+          const status =
+            o.status === "cancelled"
+              ? "cancelled"
+              : o.stage === "shipped" || o.stage === "done"
+                ? "shipped"
+                : mine.length > 0 && mine.every((l) => l.receivedOn)
+                  ? "ready"
+                  : !sentOn
+                    ? "not_sent"
+                    : readyOn && readyOn < today
+                      ? "late"
+                      : "in_production";
           return {
             key: `${o.id}:${f.key}`,
+            /** The purchase order: PO-2026-0044 (null only for a supplier the database has not numbered yet). */
+            po: po ? { id: po.id, number: po.number } : null,
+            /** not_sent · in_production · late (ready date passed) · ready · shipped · cancelled */
+            status,
+            sentEarlyReason: po?.sentEarlyReason ?? null,
             order: { id: o.id, refNo: o.refNo, stage: o.stage, closed: o.status === "closed" },
             customer: o.customer,
             supplier: { id: f.factoryId, name: names.get(f.factoryId) ?? "Supplier" },
-            orderedOn: o.factoryOrderedOn ? fromDbDate(o.factoryOrderedOn) : null,
-            supplierRef: o.factoryOrderNo,
+            orderedOn: sentOn,
+            supplierRef: po?.supplierRef ?? o.factoryOrderNo,
             readyOn,
             /** Ready date passed and the order not shipped yet. */
             late: !!readyOn && readyOn < today && (o.stage === "confirmed" || o.stage === "in_production"),
@@ -125,6 +147,6 @@ export class OperationsService {
           };
         });
     });
-    return open ? rows.filter((r) => Number(r.toPay) > 0 || r.order.stage === "confirmed" || r.order.stage === "in_production") : rows;
+    return open ? rows.filter((r) => r.status !== "cancelled" && (Number(r.toPay) > 0 || r.order.stage === "confirmed" || r.order.stage === "in_production")) : rows;
   }
 }

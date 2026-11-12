@@ -18,6 +18,7 @@ import {
   paymentRouteInput,
   productionInput,
   satInput,
+  sendPurchaseOrderInput,
   shipmentInput,
   shipmentUpdateInput,
   type BankContractInput,
@@ -36,6 +37,7 @@ import {
   type PaymentRouteInput,
   type ProductionInput,
   type SatInput,
+  type SendPurchaseOrderInput,
   type ShipmentInput,
   type ShipmentUpdateInput,
 } from "@kebo/shared";
@@ -91,6 +93,25 @@ export class OrderFlowController {
   @RequirePermissions("orders.update")
   factoryOrder(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(factoryOrderInput)) body: FactoryOrderInput) {
     return this.flow.setFactoryOrder(user, id, body);
+  }
+
+  /** The order's purchase orders: one per supplier on its lines, with its number and whether it was sent. */
+  @Get(":id/purchase-orders")
+  purchaseOrders(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
+    return this.flow.purchaseOrders(user, id);
+  }
+
+  /** { sentOn, supplierRef?, how?, reason? } — send one purchase order (before the deposit is verified: with a reason). */
+  @Post(":id/purchase-orders/:poId/send")
+  @HttpCode(200)
+  @RequirePermissions("orders.update")
+  sendPurchaseOrder(
+    @CurrentUser() user: SessionUser,
+    @Param("id", uuid) id: string,
+    @Param("poId", uuid) poId: string,
+    @Body(Validate(sendPurchaseOrderInput)) body: SendPurchaseOrderInput,
+  ) {
+    return this.flow.sendPurchaseOrder(user, id, poId, body);
   }
 
   /** { steps: [{ id?, title, factoryId?, plannedOn?, doneOn?, note? }] } — the whole timeline, in order. */

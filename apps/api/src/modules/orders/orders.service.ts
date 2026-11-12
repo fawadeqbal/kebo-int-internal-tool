@@ -26,6 +26,7 @@ import {
   type OrderFacts,
   type OrderGoods,
   type OrderLineInput,
+  ORDER_STAGES,
   type OrderStage,
   type PackingInput,
   type ReceiptInput,
@@ -67,6 +68,8 @@ function orderSearch(term: string | undefined): Prisma.OrderWhereInput {
       { customer: { name: { contains: t, mode: "insensitive" } } },
       { inquiry: { refNo: { contains: t, mode: "insensitive" } } },
       { inquiry: { title: { contains: t, mode: "insensitive" } } },
+      { purchaseOrders: { some: { number: { contains: t, mode: "insensitive" } } } },
+      { shipments: { some: { containerNo: { contains: t, mode: "insensitive" } } } },
     ],
   };
 }
@@ -625,11 +628,16 @@ export class OrdersService {
       ids?: string[];
       /** A search (refNo, customer, inquiry). */
       q?: string;
+      customerId?: string;
+      /** Who handles the order's inquiry. */
+      assigneeId?: string;
     },
   ) {
     const rows = await this.prisma.db.order.findMany({
       where: {
         ...orderAccess(user),
+        ...(filter.customerId ? { customerId: filter.customerId } : {}),
+        ...(filter.assigneeId && !filter.mine ? { inquiry: { assigneeId: filter.assigneeId } } : {}),
         ...(filter.ids ? { id: { in: filter.ids } } : {}),
         ...(filter.status === "all" ? {} : { status: filter.status ?? "open" }),
         ...(filter.stage ? { stage: filter.stage } : {}),
@@ -679,26 +687,50 @@ export class OrdersService {
    */
   async page(
     user: SessionUser,
-    q: { status: "open" | "late" | "closed" | "cancelled" | "all"; mine?: boolean; q?: string; page: number; pageSize: number },
+    q: {
+      status: "open" | "late" | "closed" | "cancelled" | "all";
+      stage?: OrderStage;
+      customer?: string;
+      assignee?: string;
+      mine?: boolean;
+      q?: string;
+      page: number;
+      pageSize: number;
+    },
   ) {
-    const where: Prisma.OrderWhereInput = { ...orderAccess(user), ...(q.mine ? { inquiry: { assigneeId: user.id } } : {}), ...orderSearch(q.q) };
+    const where: Prisma.OrderWhereInput = {
+      ...orderAccess(user),
+      ...(q.mine ? { inquiry: { assigneeId: user.id } } : q.assignee ? { inquiry: { assigneeId: q.assignee } } : {}),
+      ...(q.customer ? { customerId: q.customer } : {}),
+      ...orderSearch(q.q),
+    };
+    const narrow = { mine: q.mine, q: q.q, customerId: q.customer, assigneeId: q.mine ? undefined : q.assignee };
     const [open, closed, cancelled, openRows] = await Promise.all([
       this.prisma.db.order.count({ where: { ...where, status: "open" } }),
       this.prisma.db.order.count({ where: { ...where, status: "closed" } }),
       this.prisma.db.order.count({ where: { ...where, status: "cancelled" } }),
-      this.list(user, { mine: q.mine, q: q.q, status: "open", limit: 1000 }),
+      this.list(user, { ...narrow, status: "open", limit: 1000 }),
     ]);
     const late = openRows.filter((o) => o.needs?.late);
-    const counts = { open, late: late.length, closed, cancelled, all: open + closed + cancelled };
+    const stages = Object.fromEntries(ORDER_STAGES.map((st) => [st, openRows.filter((o) => o.stage === st).length])) as Record<OrderStage, number>;
+    const counts = { open, late: late.length, closed, cancelled, all: open + closed + cancelled, ...stages, lateInProduction: openRows.filter((o) => o.stage === "in_production" && o.needs?.late).length };
     const skip = (q.page - 1) * q.pageSize;
     const urgentFirst = (a: (typeof openRows)[number], b: (typeof openRows)[number]) =>
       Number(!!b.needs?.late) - Number(!!a.needs?.late) || (a.needs?.due ?? "9999").localeCompare(b.needs?.due ?? "9999");
+    const pick = q.status === "late" ? late : q.stage ? openRows.filter((o) => o.stage === q.stage) : openRows;
     const rows =
       q.status === "open" || q.status === "late"
-        ? (q.status === "late" ? late : openRows).sort(urgentFirst).slice(skip, skip + q.pageSize)
-        : await this.list(user, { mine: q.mine, q: q.q, status: q.status, recent: true, skip, limit: q.pageSize });
-    const total = q.status === "late" ? late.length : q.status === "open" ? openRows.length : counts[q.status];
-    return { rows, total, page: q.page, pageSize: q.pageSize, counts };
+        ? pick.sort(urgentFirst).slice(skip, skip + q.pageSize)
+        : await this.list(user, { ...narrow, status: q.status, recent: true, skip, limit: q.pageSize });
+    const total = q.status === "open" || q.status === "late" ? pick.length : counts[q.status];
+    // Each row's purchase orders (PO-2026-0044), for the list's Purchase order column.
+    const pos = await this.prisma.db.purchaseOrder.findMany({
+      where: { orderId: { in: rows.map((r) => r.id) } },
+      select: { orderId: true, number: true },
+      orderBy: { number: "asc" },
+    });
+    const withPos = rows.map((r) => ({ ...r, purchaseOrders: pos.filter((p) => p.orderId === r.id).map((p) => p.number) }));
+    return { rows: withPos, total, page: q.page, pageSize: q.pageSize, counts };
   }
 
   /** "My to-do": what each open order I handle needs, late ones first, then by date. */
