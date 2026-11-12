@@ -7,7 +7,7 @@ import { CurrentUser, RequirePermissions, RequireFeature } from "../../common/au
 import type { SessionUser } from "../../common/auth/session-user";
 import { CustomersService } from "./customers.service";
 
-const customerList = listQuery.extend({ country: z.string().trim().toUpperCase().length(2).optional() });
+const customerList = listQuery.extend({ country: z.string().trim().toUpperCase().length(2).optional(), type: z.enum(["company", "individual"]).optional() });
 
 @ApiTags("customers")
 @Controller("customers")
