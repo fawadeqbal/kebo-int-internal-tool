@@ -1,7 +1,7 @@
 import { decimalToMinor, fromDbDateOrNull, type Prisma, termsSelect } from "@kebo/database";
 import { livePlan, shippedOnOf, type PlanDates } from "@kebo/shared";
 import type { PrismaService, Tx } from "../../database/prisma.service";
-import { readyOnOf, readySelect } from "@kebo/database";
+import { readyOnOf, readySelect, type ReadyOrder } from "@kebo/database";
 import { termsOf } from "./route-plan";
 
 type Db = PrismaService["db"] | Tx;
@@ -20,8 +20,7 @@ export const planDatesSelect = {
   bankSteps: { where: { step: "customer_bank_received" }, select: { doneOn: true }, orderBy: { doneOn: "asc" } },
 } satisfies Prisma.OrderSelect;
 
-type DatesOrder = {
-  factories: { factoryId: string | null; readyOn: Date | null }[];
+type DatesOrder = ReadyOrder & {
   lines: { factoryId: string | null }[];
   shipments: { departedOn: Date | null }[];
   bankSteps: { doneOn: Date }[];

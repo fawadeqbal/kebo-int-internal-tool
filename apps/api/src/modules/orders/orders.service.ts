@@ -52,8 +52,8 @@ import { setPaymentTerms } from "./payment-terms";
 import { freezeOrderDoc, packingFinalNow } from "./order-docs";
 import { LedgerPosting } from "../ledger/posting.service";
 import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
-import { readyWords, setReadyAll, setReadyDates } from "./ready";
-import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
+import { openPurchaseOrdersNow, readyWords, setReadyAll, setReadyDates } from "../purchasing/api";
+import { readyByOf, readyInclude, readyOnOf } from "@kebo/database";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 /** Orders whose number, customer or inquiry (number, title) has the words. */
@@ -98,7 +98,7 @@ const orderInclude = {
   // The shipments hold the B/L, the day the goods left and the container (Shipment 1 first).
   shipments: orderShipments,
   // Each factory's ready date (the order's is the latest of them).
-  ...readySelect,
+  ...readyInclude,
 } satisfies Prisma.OrderInclude;
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -324,6 +324,8 @@ export class OrdersService {
     await createPlan(tx, order.id, plan);
     // How the customer pays: its own row (order_payment_terms), made with every order.
     await setPaymentTerms(tx, order.id, { route: route.route, balanceWhen: route.balanceWhen, lcTerms: route.lcTerms, lcDays: route.lcDays });
+    // What we buy: one purchase order per supplier on the lines (Purchasing), as drafts.
+    await openPurchaseOrdersNow(tx, order.id);
     await this.audit.record(tx, {
       userId: actorId,
       action: "create",

@@ -13,4 +13,5 @@ export * from "./parties";
 export * from "./allocations";
 export * from "./files";
 export * from "./ready";
+export * from "./purchase-orders";
 export * from "./terms";

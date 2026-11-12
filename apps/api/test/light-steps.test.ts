@@ -246,8 +246,8 @@ describe("order v4: light steps", () => {
     try {
       const db = prisma.company(other.id);
       expect(await db.shipment.count({ where: { sealNo: "0048812" } })).toBe(0);
-      expect(await db.order.count({ where: { factoryOrderNo: "HP-2026-118" } })).toBe(0);
-      expect((await db.order.updateMany({ where: { id: first }, data: { factoryOrderNo: "hacked" } })).count).toBe(0);
+      expect(await db.purchaseOrder.count({ where: { supplierRef: "HP-2026-118" } })).toBe(0);
+      expect((await db.purchaseOrder.updateMany({ where: { orderId: first }, data: { supplierRef: "hacked" } })).count).toBe(0);
     } finally {
       await prisma.platform.company.delete({ where: { id: other.id } });
     }

@@ -363,6 +363,7 @@ model User {
   relFollowUpsDone         FollowUp[]           @relation("FollowUpDoneBy")
   relLedgerStaff           LedgerEntry[]        @relation("LedgerStaff")
   relLedgerPostedBy        LedgerEntry[]        @relation("LedgerPostedBy")
+  purchaseOrdersSent       PurchaseOrder[]      @relation("PurchaseOrderSentBy")
 
   @@unique([companyId, email])
   @@map("users")
@@ -566,7 +567,7 @@ model Party {
   requests           FactoryRequest[]     @relation("FactoryRequestFactory")
   checklistItems     OrderChecklistItem[] @relation("OrderChecklistItemFactory")
   payables           Invoice[]            @relation("SupplierInvoices")
-  orderParts         OrderFactory[]       @relation("OrderFactoryFactory")
+  purchaseOrders     PurchaseOrder[]      @relation("PurchaseOrderSupplier")
   factoryOrderFacts  FactoryOrderFact[]   @relation("FactoryOrderFactFactory")
   factoryRecordNotes Note[]               @relation("NoteFactory")
   factoryFollowUps   FollowUp[]           @relation("FollowUpFactory")
@@ -596,23 +597,23 @@ model PartyRole {
 }
 
 model Contact {
-  id         String    @id @default(uuid()) @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId  String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company    Company   @relation(fields: [companyId], references: [id])
+  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company   Company   @relation(fields: [companyId], references: [id])
   /// The customer or supplier this person works for (contacts for every party).
-  partyId    String    @map("party_id") @db.Uuid
-  party      Party     @relation("PartyContacts", fields: [partyId], references: [id], onDelete: Cascade)
-  name       String    @db.VarChar(120)
-  position   String?   @db.VarChar(80)
-  email      String?   @db.VarChar(254)
-  phone      String?   @db.VarChar(40)
-  whatsapp   String?   @db.VarChar(40)
-  wechat     String?   @db.VarChar(80)
-  isPrimary  Boolean   @default(false) @map("is_primary")
-  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  partyId   String    @map("party_id") @db.Uuid
+  party     Party     @relation("PartyContacts", fields: [partyId], references: [id], onDelete: Cascade)
+  name      String    @db.VarChar(120)
+  position  String?   @db.VarChar(80)
+  email     String?   @db.VarChar(254)
+  phone     String?   @db.VarChar(40)
+  whatsapp  String?   @db.VarChar(40)
+  wechat    String?   @db.VarChar(80)
+  isPrimary Boolean   @default(false) @map("is_primary")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   inquiries Inquiry[]
   notes     Note[]
@@ -1055,105 +1056,103 @@ model QuoteLine {
 // ============================================================================
 
 model Order {
-  id                  String            @id @default(uuid()) @db.Uuid
+  id                String            @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId           String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company             Company           @relation(fields: [companyId], references: [id])
+  companyId         String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company           Company           @relation(fields: [companyId], references: [id])
   /// SO-2026-0001
-  refNo               String            @map("ref_no") @db.VarChar(30)
-  inquiryId           String            @map("inquiry_id") @db.Uuid
-  inquiry             Inquiry           @relation(fields: [inquiryId], references: [id])
-  revisionId          String            @unique @map("revision_id") @db.Uuid
-  revision            QuotationRevision @relation(fields: [revisionId], references: [id])
-  customerId          String            @map("customer_id") @db.Uuid
-  customer            Party             @relation("OrderCustomer", fields: [customerId], references: [id])
-  status              OrderStatus       @default(open)
-  stage               OrderStage        @default(confirmed)
+  refNo             String            @map("ref_no") @db.VarChar(30)
+  inquiryId         String            @map("inquiry_id") @db.Uuid
+  inquiry           Inquiry           @relation(fields: [inquiryId], references: [id])
+  revisionId        String            @unique @map("revision_id") @db.Uuid
+  revision          QuotationRevision @relation(fields: [revisionId], references: [id])
+  customerId        String            @map("customer_id") @db.Uuid
+  customer          Party             @relation("OrderCustomer", fields: [customerId], references: [id])
+  status            OrderStatus       @default(open)
+  stage             OrderStage        @default(confirmed)
   /// When the order entered its current stage.
-  stageSince          DateTime          @default(now()) @map("stage_since") @db.Timestamptz
-  orderedOn           DateTime          @map("ordered_on") @db.Date
+  stageSince        DateTime          @default(now()) @map("stage_since") @db.Timestamptz
+  orderedOn         DateTime          @map("ordered_on") @db.Date
   /// The proforma invoice's number once issued, e.g. KEB260916TN07 (prefix, issue date, customer letters, the handler's count this year).
   /// An index only: the proforma itself is its OrderPaper rows (kind "proforma"), final with a snapshot; only issuing writes these.
-  proformaNo          String?           @map("proforma_no") @db.VarChar(40)
-  proformaIssuedOn    DateTime?         @map("proforma_issued_on") @db.Date
+  proformaNo        String?           @map("proforma_no") @db.VarChar(40)
+  proformaIssuedOn  DateTime?         @map("proforma_issued_on") @db.Date
   /// The buyer as on the order (@kebo/shared BuyerSnapshot): taken when the order is made, printed on every paper of the
   /// order; "Refresh from customer" (with a reason) takes it again. Final papers keep the buyer they were printed with.
-  buyerSnapshot       Json?             @map("buyer_snapshot")
+  buyerSnapshot     Json?             @map("buyer_snapshot")
   /// The quotation's own payment text is printed on the papers even though the route now differs from what it said.
-  printQuotedTerms    Boolean           @default(false) @map("print_quoted_terms")
+  printQuotedTerms  Boolean           @default(false) @map("print_quoted_terms")
   /// The last receipt and payment-request numbers given (RC-…-n, PR-…-n): numbers are given once and never reused.
-  lastReceiptNo       Int               @default(0) @map("last_receipt_no")
-  lastRequestNo       Int               @default(0) @map("last_request_no")
+  lastReceiptNo     Int               @default(0) @map("last_receipt_no")
+  lastRequestNo     Int               @default(0) @map("last_request_no")
   /// Ship date promised to the customer (ours: with an LC its latest shipment date is shown beside it, and a
   /// ship-by later than that is warned about).
-  shipBy              DateTime?         @map("ship_by") @db.Date
-  // The ready date is each factory's (OrderFactory.readyOn); the order's is the latest of them (worked out).
+  shipBy            DateTime?         @map("ship_by") @db.Date
+  // The ready date is each purchase order's (PurchaseOrder.readyOn); the order's is the latest of them (worked out).
+  /// The goods' ready date when no line names a supplier (so there is no purchase order to carry it).
+  goodsReadyOn      DateTime?         @map("goods_ready_on") @db.Date
   /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
-  documentTitle       String?           @map("document_title") @db.VarChar(200)
+  documentTitle     String?           @map("document_title") @db.VarChar(200)
   /// The contract destination, e.g. "Hairatan, Afghanistan": printed on the proforma and the contract, and the
   /// default port of discharge of a new shipment. Shipped on, the B/L and the container are the shipments'
   /// (Shipment 1 for the papers; shipped on = the earliest day one left), never the order's.
-  portOfDischarge     String?           @map("port_of_discharge") @db.VarChar(120)
+  portOfDischarge   String?           @map("port_of_discharge") @db.VarChar(120)
   /// When the packing list was filled in (null: not yet).
-  packedAt            DateTime?         @map("packed_at") @db.Timestamptz
-  shippingMarks       String?           @map("shipping_marks")
-  currency            String            @db.Char(3)
-  total               Decimal           @db.Decimal(14, 2)
-  depositPercent      Decimal           @map("deposit_percent") @db.Decimal(5, 2)
-  balanceTerms        BalanceTerms      @map("balance_terms")
-  incoterm            Incoterm
-  incotermPlace       String?           @map("incoterm_place") @db.VarChar(80)
+  packedAt          DateTime?         @map("packed_at") @db.Timestamptz
+  shippingMarks     String?           @map("shipping_marks")
+  currency          String            @db.Char(3)
+  total             Decimal           @db.Decimal(14, 2)
+  depositPercent    Decimal           @map("deposit_percent") @db.Decimal(5, 2)
+  balanceTerms      BalanceTerms      @map("balance_terms")
+  incoterm          Incoterm
+  incotermPlace     String?           @map("incoterm_place") @db.VarChar(80)
   /// The main currency when the order was made, and how many of the order's currency one unit of it bought
   /// (USD order, USD main: 1; CNY order: 7.1). Revenue and costs are turned into the main currency at this rate,
   /// so changing the rates in Settings never moves past months. Empty: not known (Settings is used).
-  mainCurrency        String?           @map("main_currency") @db.Char(3)
-  mainRate            Decimal?          @map("main_rate") @db.Decimal(24, 14)
-  /// When we placed the order with the factory.
-  factoryOrderedOn    DateTime?         @map("factory_ordered_on") @db.Date
-  /// The factory's own number for our order ("their order no.").
-  factoryOrderNo      String?           @map("factory_order_no") @db.VarChar(60)
-  closedAt            DateTime?         @map("closed_at") @db.Timestamptz
+  mainCurrency      String?           @map("main_currency") @db.Char(3)
+  mainRate          Decimal?          @map("main_rate") @db.Decimal(24, 14)
+  closedAt          DateTime?         @map("closed_at") @db.Timestamptz
   /// When the company's checklist was copied into the order (null: not yet; it is copied on first read).
-  checklistSeededAt   DateTime?         @map("checklist_seeded_at") @db.Timestamptz
-  createdById         String            @map("created_by") @db.Uuid
-  createdBy           User              @relation("OrderCreator", fields: [createdById], references: [id])
-  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  checklistSeededAt DateTime?         @map("checklist_seeded_at") @db.Timestamptz
+  createdById       String            @map("created_by") @db.Uuid
+  createdBy         User              @relation("OrderCreator", fields: [createdById], references: [id])
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
-  lines        OrderLine[]
-  stageChanges OrderStageChange[]
-  allocations  Allocation[]
+  lines          OrderLine[]
+  stageChanges   OrderStageChange[]
+  allocations    Allocation[]
   /// What we paid its suppliers (their payments' parts).
-  supplierPaid Allocation[]         @relation("PurchaseParts")
+  supplierPaid   Allocation[]         @relation("PurchaseParts")
   /// What the customer is invoiced: the instalments of the order (deposit, balance…).
-  receivables  Invoice[]            @relation("OrderReceivables")
-  expenses     Expense[]
-  costs        OrderCost[]
-  bankContract OrderBankContract?
-  shipments    Shipment[]
-  documents    OrderDocument[]
-  bankSteps    OrderBankStep[]
-  satChecks    SatCheck[]
-  claims       OrderClaim[]
-  checklist    OrderChecklistItem[]
-  files        Attachment[]
+  receivables    Invoice[]            @relation("OrderReceivables")
+  expenses       Expense[]
+  costs          OrderCost[]
+  bankContract   OrderBankContract?
+  shipments      Shipment[]
+  documents      OrderDocument[]
+  bankSteps      OrderBankStep[]
+  satChecks      SatCheck[]
+  claims         OrderClaim[]
+  checklist      OrderChecklistItem[]
+  files          Attachment[]
   /// What its suppliers invoice: each supplier's instalments on the order.
-  payables     Invoice[]            @relation("OrderPayables")
-  submissions  MoneySubmission[]
+  payables       Invoice[]            @relation("OrderPayables")
+  submissions    MoneySubmission[]
   /// How the customer pays: the payment route and its terms (one row, made with the order).
-  paymentTerms OrderPaymentTerms?
+  paymentTerms   OrderPaymentTerms?
   /// Delivery and the site acceptance test (one row, once there is something to keep).
-  delivery     OrderDelivery?
+  delivery       OrderDelivery?
   /// Why and how it was cancelled (one row when it was).
-  cancellation OrderCancellation?
+  cancellation   OrderCancellation?
   /// Each factory's ready date (the order's ready date is the latest of them).
-  factories    OrderFactory[]
-  papers       OrderPaper[]
-  fact         OrderFact?
-  factoryFacts FactoryOrderFact[]
-  recordNotes  Note[]
-  followUps    FollowUp[]
-  ledger       LedgerEntry[]
+  purchaseOrders PurchaseOrder[]
+  papers         OrderPaper[]
+  fact           OrderFact?
+  factoryFacts   FactoryOrderFact[]
+  recordNotes    Note[]
+  followUps      FollowUp[]
+  ledger         LedgerEntry[]
 
   @@unique([companyId, refNo])
   @@unique([companyId, proformaNo])
@@ -1932,26 +1931,42 @@ model MoneyMovement {
  * not part of the balance). Balance = in − used − refund.
  */
 
-/// One factory's part of an order: the ready date it gave (one per factory; the order's ready date is the
-/// latest of them). factoryId null: the goods of an order whose lines name no factory.
-model OrderFactory {
-  id        String    @id @default(uuid()) @db.Uuid
+/// A purchase order: what we buy from one supplier for one sales order (Purchasing). Its number is its own
+/// (PO-2026-0001); its status is worked out (purchasing/status.ts) from what happened: made (draft), sent to
+/// the supplier, ready, the sales order shipped or closed, or cancelled.
+model PurchaseOrder {
+  id              String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company   Company   @relation(fields: [companyId], references: [id])
-  orderId   String    @map("order_id") @db.Uuid
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  factoryId String?   @map("factory_id") @db.Uuid
-  factory   Party?    @relation("OrderFactoryFactory", fields: [factoryId], references: [id], onDelete: Restrict)
-  readyOn   DateTime? @map("ready_on") @db.Date
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  companyId       String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company         Company   @relation(fields: [companyId], references: [id])
+  /// The sales order it buys for.
+  orderId         String    @map("order_id") @db.Uuid
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId      String    @map("supplier_id") @db.Uuid
+  supplier        Party     @relation("PurchaseOrderSupplier", fields: [supplierId], references: [id], onDelete: Restrict)
+  /// PO-2026-0001: its own sequence (counter PO-<year>).
+  number          String    @db.VarChar(20)
+  /// The supplier's currency (from its offer); null when its lines carry none.
+  currency        String?   @db.Char(3)
+  /// The day the supplier says the goods are ready.
+  readyOn         DateTime? @map("ready_on") @db.Date
+  /// When we placed it with the supplier.
+  sentOn          DateTime? @map("sent_on") @db.Date
+  sentById        String?   @map("sent_by") @db.Uuid
+  sentBy          User?     @relation("PurchaseOrderSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+  /// Sent before the customer's deposit was verified: why (decided 12 Nov: allowed with a reason).
+  sentEarlyReason String?   @map("sent_early_reason") @db.VarChar(300)
+  /// The supplier's own number for our order ("their order no.").
+  supplierRef     String?   @map("supplier_ref") @db.VarChar(60)
+  cancelledAt     DateTime? @map("cancelled_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  /// One row per factory of the order (nulls not distinct: one row for an order with no factory).
-  @@unique([orderId, factoryId])
-  @@index([factoryId])
+  @@unique([orderId, supplierId])
+  @@unique([companyId, number])
+  @@index([supplierId])
   @@index([companyId])
-  @@map("order_factories")
+  @@map("purchase_orders")
 }
 
 // ============================================================================
@@ -2144,7 +2159,7 @@ model Company {
   checklistItems      OrderChecklistItem[]
   checklistTemplates  ChecklistTemplate[]
   moneyMovements      MoneyMovement[]
-  orderFactories      OrderFactory[]
+  purchaseOrders      PurchaseOrder[]
   orderPapers         OrderPaper[]
   orderFacts          OrderFact[]
   inquiryFacts        InquiryFact[]

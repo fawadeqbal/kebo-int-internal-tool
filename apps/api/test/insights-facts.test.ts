@@ -115,7 +115,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
     it("each order's money is its money page and Costs page, at the order's rate", async () => {
       const fx = await main();
       const orders = await db().order.findMany({
-        select: { id: true, status: true, currency: true, mainCurrency: true, mainRate: true, orderedOn: true, factories: true, lines: { select: { factoryId: true } }, shipments: { select: { departedOn: true } } },
+        select: { id: true, status: true, currency: true, mainCurrency: true, mainRate: true, orderedOn: true, purchaseOrders: true, goodsReadyOn: true, lines: { select: { factoryId: true } }, shipments: { select: { departedOn: true } } },
       });
       for (const o of orders) {
         const f = await stored(o.id);
@@ -250,10 +250,9 @@ describe("Insights data: order, inquiry and factory facts", () => {
     });
 
     it("the ready date, a shipment that left, and the delivery", async () => {
-      await db().orderFactory.upsert({
-        where: { orderId_factoryId: { orderId: o.orderId, factoryId: o.factoryId } },
-        create: { orderId: o.orderId, factoryId: o.factoryId, readyOn: new Date(`${day(-6)}T00:00:00Z`) },
-        update: { readyOn: new Date(`${day(-6)}T00:00:00Z`) },
+      await db().purchaseOrder.update({
+        where: { orderId_supplierId: { orderId: o.orderId, supplierId: o.factoryId } },
+        data: { readyOn: new Date(`${day(-6)}T00:00:00Z`) },
       });
       await prisma.platform.$executeRaw`update orders set ship_by = ${day(-5)}::date where id = ${o.orderId}::uuid`;
       await api(app, sana).post(`/orders/${o.orderId}/shipments`, { mode: "sea", status: "departed", departedOn: day(-2) }).expect(201);

@@ -3,7 +3,7 @@ import { fromMinor } from "@kebo/money";
 import { defaultFactoryPlan, factoryPlanStatus, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
-import { factoryReadyOf, readySelect } from "@kebo/database";
+import { factoryReadyOf, placedWith, readySelect } from "@kebo/database";
 import { factoryBorneExpenses, factoryPositionOf, type MoneyCtx, supplierPaidRelation } from "./position";
 
 type Db = PrismaService["db"] | Tx;
@@ -65,7 +65,6 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
   const o = await db.order.findUniqueOrThrow({
     where: { id: orderId },
     select: {
-      factoryOrderedOn: true,
       ...readySelect,
       lines: planLines,
       supplierPaid: supplierPaidRelation,
@@ -87,7 +86,6 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
       owed.set(key, { factory: r.supplier!, currency: r.currency!, owedMinor: 0, settledMinor: paid, takenOffMinor: 0 });
     }
   }
-  const orderedOn = fromDbDateOrNull(o.factoryOrderedOn);
   return [...owed.entries()].map(([key, f]) => {
     const stored = o.payables.filter((r) => `${r.supplierId}:${r.currency}` === key);
     const rows: (FactoryPlanRow & { id: string | null; supplierRef: string | null })[] = stored.length
@@ -105,6 +103,8 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
     const planMinor = rows.reduce((t, r) => t + r.amountMinor, 0);
     // This factory's own ready date (one per factory; the order's is the latest).
     const readyOn = factoryReadyOf(o, f.factory.id);
+    // …and the day its purchase order was placed (the advance falls due then).
+    const orderedOn = placedWith(o, f.factory.id).orderedOn;
     const status = factoryPlanStatus(rows, paidMinor, orderedOn, readyOn, today, soonDays);
     const next = status.find((r) => r.status !== "paid") ?? null;
     return {

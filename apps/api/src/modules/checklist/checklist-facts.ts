@@ -3,7 +3,7 @@ import { fromMinor } from "@kebo/money";
 import { routeFromQuotation, type ChecklistFacts } from "@kebo/shared";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
 import { lcChecksOf, termsOf } from "../billing/api";
-import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
+import { placedOf, readyByOf, readyInclude, readyOnOf } from "@kebo/database";
 import { chargedExpenses, positionOf, type MoneyCtx } from "../billing/api";
 import { dateIn, type ISODate } from "@kebo/utils";
 
@@ -29,7 +29,7 @@ export const checklistOrderInclude = {
     select: { type: true, quantity: true, receivedQty: true, packages: true, grossWeightKg: true, cbm: true, factoryId: true, factory: { select: { name: true } } },
   },
   // Each factory's ready date (the order's is the latest of them).
-  ...readySelect,
+  ...readyInclude,
 } satisfies Prisma.OrderInclude;
 
 export type ChecklistOrderRow = Prisma.OrderGetPayload<{ include: typeof checklistOrderInclude }>;
@@ -80,8 +80,8 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
     deposit: fromMinor(deposit),
     due: fromMinor(position.dueMinor),
     paidInFullOn: position.dueMinor === 0 ? reachedOn(o.allocations, position.owedMinor) : null,
-    factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
-    factoryOrderNo: o.factoryOrderNo,
+    factoryOrderedOn: placedOf(o).orderedOn,
+    factoryOrderNo: placedOf(o).orderNo,
     factories,
     lcChecks: lcChecksOf({ ...o, readyOn: readyOnOf(o) }, lcCourierDays),
     routeFromQuotation: routeFromQuotation(termsOf(o), o.balanceTerms),

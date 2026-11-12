@@ -19,7 +19,7 @@ import { buyerOf } from "./buyer";
 import { makeFinal } from "../documents/api";
 import { orderLineNumbers } from "./orders.service";
 import { orderShipments, shipFacts } from "./shipment-facts";
-import { readyOnOf, readySelect } from "@kebo/database";
+import { readyInclude, readyOnOf } from "@kebo/database";
 import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /**
@@ -67,7 +67,7 @@ export const orderDocInclude = {
   papers: { where: { kind: { in: [...ORDER_DOCUMENTS] } }, orderBy: { version: "asc" } },
   // The packing list prints the shipment's B/L, date, container and ports (Shipment 1).
   shipments: orderShipments,
-  ...readySelect,
+  ...readyInclude,
 } satisfies Prisma.OrderInclude;
 
 export type DocOrder = Prisma.OrderGetPayload<{ include: typeof orderDocInclude }>;

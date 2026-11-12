@@ -8,6 +8,8 @@ export const DOCUMENT_PREFIX = {
   inquiry: "RFQ",
   quotation: "QUO",
   order: "SO",
+  /** Purchase orders: their own sequence (decided 12 Nov). */
+  purchaseOrder: "PO",
 } as const;
 
 export type DocumentKind = keyof typeof DOCUMENT_PREFIX;

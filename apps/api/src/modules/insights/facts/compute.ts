@@ -18,7 +18,7 @@ import { factoryPlansOf } from "../../billing/api";
 import { convert, MainMoney, orderRate } from "../../money/order-money";
 import { livePlansOf } from "../../billing/api";
 import { factoryPositionOf, fxOf, positionOf, type MoneyCtx, supplierPaidRelation } from "../../billing/api";
-import { factoryReadyOf, readyOnOf } from "@kebo/database";
+import { factoryReadyOf, readyOnOf, readySelect } from "@kebo/database";
 import { optionFigures, worthOf } from "../../quotations/revision-figures";
 
 /*
@@ -113,7 +113,7 @@ const orderSelect = {
     },
   },
   supplierPaid: supplierPaidRelation,
-  factories: { select: { factoryId: true, readyOn: true } },
+  ...readySelect,
   _count: { select: { claims: true } },
 } satisfies Prisma.OrderSelect;
 

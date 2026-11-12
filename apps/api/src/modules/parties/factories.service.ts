@@ -93,7 +93,7 @@ export class FactoriesService {
     const [requests, quotes, orders, lateSteps] = await Promise.all([
       db.factoryRequest.findMany({ where: { factoryId: id }, select: { inquiryId: true, status: true, sentOn: true } }),
       db.factoryQuote.findMany({ where: { factoryId: id, deletedAt: null }, select: { inquiryId: true, receivedOn: true } }),
-      db.order.findMany({ where: { status: "open", lines: { some: { factoryId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, factories: { where: { factoryId: id }, select: { readyOn: true } }, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" }, take: 20 }),
+      db.order.findMany({ where: { status: "open", lines: { some: { factoryId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, purchaseOrders: { where: { supplierId: id }, select: { readyOn: true } }, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" }, take: 20 }),
       db.orderChecklistItem.count({ where: { factoryId: id, step: "production", doneAt: null, skippedAt: null, dueOn: { lt: new Date() }, order: { status: "open" } } }),
     ]);
     const answered = requests.filter((r) => r.status === "quoted" || quotes.some((q) => q.inquiryId === r.inquiryId));
@@ -109,7 +109,7 @@ export class FactoriesService {
       declined: requests.filter((r) => r.status === "declined").length,
       noReply: requests.filter((r) => r.status === "no_reply").length,
       avgDaysToAnswer: days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null,
-      openOrders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, readyOn: fromDbDateOrNull(o.factories[0]?.readyOn ?? null) })), // this factory's own ready date
+      openOrders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, readyOn: fromDbDateOrNull(o.purchaseOrders[0]?.readyOn ?? null) })), // this factory's own ready date
       lateSteps,
     };
   }

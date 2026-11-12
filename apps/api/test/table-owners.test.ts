@@ -16,6 +16,7 @@ const OWNERS: Record<string, string> = {
   orderPaymentTerms: "orders",
   orderPaper: "documents",
   orderDocument: "documents",
+  purchaseOrder: "purchasing",
 };
 
 const MODULES = resolve(__dirname, "../src/modules");

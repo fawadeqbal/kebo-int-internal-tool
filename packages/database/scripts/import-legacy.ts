@@ -21,7 +21,7 @@ import { Client, types as pgTypes } from "pg";
 import { fromMinor, toMinor } from "@kebo/money";
 import { portsOf, type BalanceTerms, type Incoterm, type InquiryStage } from "@kebo/shared";
 import { dateIn, type ISODate } from "@kebo/utils";
-import { paymentIn, freezeOrderBuyer, freezeOrderMoney, isCustomer, isSupplier, nextReference, openCompany, roleRows, toDbDate, type Prisma } from "../src";
+import { paymentIn, freezeOrderBuyer, freezeOrderMoney, isCustomer, isSupplier, nextReference, openCompany, openPurchaseOrders, roleRows, toDbDate, type Prisma } from "../src";
 import * as map from "./import-legacy/map";
 
 /* ---------------------------------------------------------------- arguments */
@@ -986,6 +986,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       };
     });
     await tx.orderLine.createMany({ data: lineRows });
+    // Its purchase orders: one per supplier on the lines.
+    await openPurchaseOrders(tx, id, Number(d.orderedOn!.slice(0, 4)));
     await freezeOrderMoney(tx, [id]);
     await freezeOrderBuyer(tx, [id], new Date().toISOString().slice(0, 10));
     await tx.orderStageChange.createMany({

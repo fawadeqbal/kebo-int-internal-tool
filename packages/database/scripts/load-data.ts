@@ -22,7 +22,7 @@ import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, priceForMargin, splitDeposit, toMinor, withTaxMinor } from "@kebo/money";
 import { defaultPlan, type OrderStage } from "@kebo/shared";
 import { addDays, daysBetween, todayIn, type ISODate } from "@kebo/utils";
-import { createPaymentIn, createSupplierPayment, freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, roleRows, toDbDate, type PrismaClient } from "../src";
+import { createPaymentIn, createSupplierPayment, freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, openPurchaseOrders, roleRows, toDbDate, type PrismaClient } from "../src";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
@@ -483,8 +483,10 @@ async function main() {
           at: new Date(`${stageDay(st)}T09:00:00Z`),
         })),
     });
-    // The factory's ready date (one per factory; this order has one).
-    if (oStage !== "confirmed") await db.orderFactory.create({ data: { orderId: order.id, factoryId: factory.id, readyOn: toDbDate(addDays(orderedOn, int(15, 40))) } });
+    // Its purchase order (one per supplier; this order has one), with the supplier's ready date once in production.
+    await openPurchaseOrders(db, order.id, Number(orderedOn.slice(0, 4)));
+    if (oStage !== "confirmed")
+      await db.purchaseOrder.updateMany({ where: { orderId: order.id }, data: { readyOn: toDbDate(addDays(orderedOn, int(15, 40))), sentOn: toDbDate(addDays(orderedOn, 2)) } });
     // The deposit on its date, the balance 14 days after the goods leave (worked out from the ship date).
     await db.invoice.createMany({
       data: defaultPlan(accepted.total, 30, orderedOn, 7).map((p, k) => ({

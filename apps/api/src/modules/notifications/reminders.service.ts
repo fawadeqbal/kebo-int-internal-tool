@@ -14,7 +14,7 @@ import { InsightsService } from "../insights/insights.service";
 import { ordersWithMoneyDue } from "../billing/api";
 import { chargedExpenses, fxOf, moneyFacts, positionOf } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
-import { readyOnOf, readySelect } from "@kebo/database";
+import { readyInclude, readyOnOf } from "@kebo/database";
 import { livePlansOf } from "../billing/api";
 import { FollowUpsService } from "../notes/follow-ups.service";
 
@@ -114,7 +114,7 @@ export class RemindersService {
         inquiry: { select: { id: true, assigneeId: true } },
         lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true, factoryId: true } },
         shipments: { select: { departedOn: true } },
-        ...readySelect,
+        ...readyInclude,
       },
     });
     // The customer's plans as they stand now: each instalment dated from its rule and the order's dates.

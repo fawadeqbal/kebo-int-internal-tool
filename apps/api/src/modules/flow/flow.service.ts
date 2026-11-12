@@ -58,11 +58,12 @@ import { OrdersService } from "../orders/orders.service";
 import type { DomainEvent } from "../../common/events/event-bus";
 import { SettingsService } from "../settings/settings.service";
 import { lcChecksOf, rebuildRoutePlan, termsOf } from "../billing/api";
-import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
+import { placedOf, placedSelect, readyByOf, readyInclude, readyOnOf, readySelect } from "@kebo/database";
 import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../billing/api";
 import { seedFactoryPlans } from "../billing/api";
 import { onPrimaryShipment, SHIPMENT_ORDER } from "../orders/shipment-facts";
 import { addDocument, changeDocument, removeDocument } from "../documents/api";
+import { placePurchaseOrders } from "../purchasing/api";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 
@@ -77,9 +78,9 @@ interface FlowRows {
   stage: OrderStage;
   status: string;
   paymentTerms: WithTerms["paymentTerms"];
-  factoryOrderedOn: Date | null;
-  /** Each factory's ready date, and the factories on the lines (the order's ready date is the latest). */
-  factories: { factoryId: string | null; readyOn: Date | null }[];
+  /** Each purchase order's ready and placed dates, the goods' date, and the suppliers on the lines (the order's ready date is the latest). */
+  purchaseOrders: { supplierId: string; readyOn: Date | null; sentOn: Date | null; supplierRef: string | null }[];
+  goodsReadyOn: Date | null;
   lines: { factoryId: string | null }[];
   proformaNo: string | null;
   packedAt: Date | null;
@@ -124,7 +125,7 @@ export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly str
     cancelled: o.status === "cancelled",
     route,
     depositIn,
-    factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
+    factoryOrderedOn: placedOf(o).orderedOn,
     production: { total: o.checklist.length, done: o.checklist.filter((p) => p.doneAt || p.skippedAt).length },
     readyOn: readyOnOf(o),
     shipments: {
@@ -270,7 +271,7 @@ export class FlowService {
             deliveredCondition: true,
           },
         },
-        ...readySelect,
+        ...readyInclude,
       },
     });
     if (!o) throw new NotFoundError("Order");
@@ -382,8 +383,8 @@ export class FlowService {
             : null,
       },
       factory: {
-        orderedOn: fromDbDateOrNull(o.factoryOrderedOn),
-        orderNo: o.factoryOrderNo,
+        orderedOn: placedOf(o).orderedOn,
+        orderNo: placedOf(o).orderNo,
         readyOn: readyOnOf(o),
         /** Each factory's own ready date (the order's is the latest of them). */
         readyBy: readyByOf(o).map((r) => ({ factoryId: r.factoryId, name: factories.find((f) => f.id === r.factoryId)?.name ?? null, readyOn: r.readyOn })),
@@ -508,7 +509,6 @@ export class FlowService {
         stage: true,
         status: true,
         ...termsSelect,
-        factoryOrderedOn: true,
         ...readySelect,
         lines: { select: { factoryId: true } },
         proformaNo: true,
@@ -626,12 +626,12 @@ export class FlowService {
       throw new DomainError("The factory order date cannot be in the future.");
     const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      const was = { factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn), factoryOrderNo: o.factoryOrderNo };
-      const data: Prisma.OrderUncheckedUpdateInput = {};
-      if (input.factoryOrderedOn !== undefined) data.factoryOrderedOn = toDbDateOrNull(input.factoryOrderedOn);
-      if (input.factoryOrderNo !== undefined) data.factoryOrderNo = input.factoryOrderNo;
-      if (!Object.keys(data).length) return null;
-      await tx.order.update({ where: { id }, data });
+      const placed = placedOf(await tx.order.findUniqueOrThrow({ where: { id }, select: placedSelect }));
+      const was = { factoryOrderedOn: placed.orderedOn, factoryOrderNo: placed.orderNo };
+      if (input.factoryOrderedOn === undefined && input.factoryOrderNo === undefined) return null;
+      // Placed with the suppliers: every purchase order of the order (Purchasing).
+      const n = await placePurchaseOrders(tx, id, { orderedOn: input.factoryOrderedOn, supplierRef: input.factoryOrderNo, byId: user.id });
+      if (!n) throw new DomainError("Name the supplier on the order's lines first: what is ordered from a supplier is its purchase order.");
       const ordered = input.factoryOrderedOn !== undefined ? input.factoryOrderedOn : was.factoryOrderedOn;
       // Ordered: each factory gets the payment plan (advance when we order, balance on the ready date).
       if (input.factoryOrderedOn) await seedFactoryPlans(tx, id, (await this.settings.get()).sales.factoryAdvancePercent);
@@ -1268,7 +1268,7 @@ export class FlowService {
         portOfDischarge: true,
         shipBy: true,
         inquiry: { select: { requiredBy: true, refNo: true } },
-        factoryOrderedOn: true,
+        ...placedSelect,
         revisionId: true,
         shipments: { orderBy: SHIPMENT_ORDER, take: 1, select: { portOfLoading: true, portOfDischarge: true } },
         lines: { where: { factoryId: { not: null } }, select: { factoryId: true } },
@@ -1332,7 +1332,7 @@ export class FlowService {
     const option = rev?.options[0] ?? null;
     const text = option?.leadTime ?? null;
     const days = leadDays(text);
-    const from = fromDbDateOrNull(o.factoryOrderedOn) ?? this.clock.today();
+    const from = placedOf(o).orderedOn ?? this.clock.today();
     return {
       forwarder,
       banks,

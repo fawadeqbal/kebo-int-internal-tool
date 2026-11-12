@@ -9,6 +9,7 @@ import { defaultPlan, PRESET_ROLES, readSettings, SETTINGS, type BalanceTerms, t
 import { addDays, todayIn } from "@kebo/utils";
 import type { PrismaClient } from "./client";
 import { nextReference } from "./counters";
+import { openPurchaseOrders } from "./purchase-orders";
 import { freezeOrderBuyer, freezeOrderMoney } from "./order-freeze";
 import { toDbDate } from "./convert";
 import { newCustomer, newSupplier } from "./parties";
@@ -403,13 +404,16 @@ export async function seedDemoData(
         },
       });
     }
-    // Each factory's ready date (one per factory; the order's is the latest of them).
+    // Its purchase orders (one per supplier on its lines), each with the supplier's ready date (the order's is
+    // the latest of them), placed with the supplier once production started.
+    const pos = await openPurchaseOrders(db, order.id, Number(orderedOn.slice(0, 4)));
     if (o.order.readyInDays !== undefined) {
       const readyOn = toDbDate(addDays(orderedOn, o.order.readyInDays));
-      const made = await db.orderLine.findMany({ where: { orderId: order.id }, select: { factoryId: true } });
-      const ids = [...new Set(made.flatMap((l) => (l.factoryId ? [l.factoryId] : [])))];
-      await db.orderFactory.createMany({ data: (ids.length ? ids : [null]).map((factoryId) => ({ orderId: order.id, factoryId, readyOn })) });
+      if (pos.length) await db.purchaseOrder.updateMany({ where: { orderId: order.id }, data: { readyOn } });
+      else await db.order.update({ where: { id: order.id }, data: { goodsReadyOn: readyOn } });
     }
+    if (o.order.stage !== "confirmed")
+      await db.purchaseOrder.updateMany({ where: { orderId: order.id }, data: { sentOn: toDbDate(addDays(orderedOn, 2)), sentById: people.manager.id } });
     // The customer's plan from the terms: the deposit on its date, the balance 14 days after the goods leave.
     for (const [k, p] of defaultPlan(accepted.total, 30, orderedOn, 7).entries()) {
       await db.invoice.create({

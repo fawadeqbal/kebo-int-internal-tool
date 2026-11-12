@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, fromDbDateOrNull, readyByOf, readySelect } from "@kebo/database";
+import { fromDbDate, fromDbDateOrNull, placedWith, readyByOf, readySelect } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
 import { can, type ShipmentStatus } from "@kebo/shared";
 import { ForbiddenError, type ISODate } from "@kebo/utils";
@@ -19,6 +19,12 @@ const UNDER_WAY: ShipmentStatus[] = ["planned", "booked", "loaded", "departed"];
  * (Fulfillment & logistics) and every purchase order, one per supplier on an order. Read-only: each row opens
  * the order's step where it is changed.
  */
+/** The supplier's purchase order on the order: its id and number. */
+const po = (o: { purchaseOrders: { id: string; number: string; supplierId: string }[] }, supplierId: string) => {
+  const p = o.purchaseOrders.find((x) => x.supplierId === supplierId);
+  return p ? { id: p.id, number: p.number } : null;
+};
+
 @Injectable()
 export class OperationsService {
   constructor(
@@ -79,8 +85,6 @@ export class OperationsService {
         refNo: true,
         stage: true,
         status: true,
-        factoryOrderedOn: true,
-        factoryOrderNo: true,
         customer: { select: { id: true, name: true } },
         lines: {
           select: {
@@ -113,8 +117,10 @@ export class OperationsService {
             order: { id: o.id, refNo: o.refNo, stage: o.stage, closed: o.status === "closed" },
             customer: o.customer,
             supplier: { id: f.factoryId, name: names.get(f.factoryId) ?? "Supplier" },
-            orderedOn: o.factoryOrderedOn ? fromDbDate(o.factoryOrderedOn) : null,
-            supplierRef: o.factoryOrderNo,
+            /** The purchase order (its own number, PO-2026-0001). */
+            purchaseOrder: po(o, f.factoryId),
+            orderedOn: placedWith(o, f.factoryId).orderedOn,
+            supplierRef: placedWith(o, f.factoryId).orderNo,
             readyOn,
             /** Ready date passed and the order not shipped yet. */
             late: !!readyOn && readyOn < today && (o.stage === "confirmed" || o.stage === "in_production"),

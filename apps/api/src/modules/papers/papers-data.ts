@@ -39,7 +39,7 @@ import { factoryPositionOf, fxOf, positionOf as orderPositionOf } from "../billi
 import { lcBalanceMinor, termsOf } from "../billing/api";
 import { quotedTermsPrinted } from "../orders/order-docs";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
-import { factoryReadyOf, readySelect } from "@kebo/database";
+import { factoryReadyOf, placedWith, readyInclude } from "@kebo/database";
 import { livePlanOfOrder } from "../billing/api";
 import { advanceOf } from "../billing/api";
 import { figuresOf, optionFigures } from "../quotations/revision-figures";
@@ -93,7 +93,7 @@ export const paperOrderInclude = {
   inquiry: { select: { id: true, contactId: true } },
   // Each factory's ready date (its purchase order prints its own), and the papers' day at the customer's bank
   // (an LC's instalment is due from it): what the plan's dates are worked out from.
-  ...readySelect,
+  ...readyInclude,
   bankSteps: { where: { step: "customer_bank_received" }, select: { doneOn: true }, orderBy: { doneOn: "asc" } },
 } satisfies Prisma.OrderInclude;
 
@@ -515,7 +515,7 @@ function purchaseOrder(c: PaperCtx): Built {
     ],
     doc: {
       party: { name: f?.name ?? "Factory", address: f?.address ?? null },
-      date: fromDbDateOrNull(c.o.factoryOrderedOn) ?? c.today,
+      date: (f ? placedWith(c.o, f.id).orderedOn : null) ?? c.today,
       meta: [
         { label: "Our order", value: c.o.refNo },
         { label: "Ready by", value: date(readyOn) ?? "to confirm" },

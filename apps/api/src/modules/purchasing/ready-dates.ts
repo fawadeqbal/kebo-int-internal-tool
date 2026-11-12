@@ -2,32 +2,36 @@ import { fromDbDateOrNull, readyByOf, readySelect, toDbDateOrNull } from "@kebo/
 import type { FactoryReadyRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
+import { openPurchaseOrdersNow } from "./purchase-orders";
 
 /* The readers (readySelect, readyOnOf, readyByOf, factoryReadyOf) are in @kebo/database: every module reads the dates. */
 
 type Db = PrismaService["db"] | Tx;
 
 /**
- * Set ready dates: each factory sent gets its date (factoryId null: the order's goods when no line names a
- * factory). Returns the dates before and after, for the history, or null when nothing changed.
+ * Set ready dates: each supplier's purchase order gets its date (factoryId null: the order's goods when no
+ * line names a supplier). Returns the dates before and after, for the history, or null when nothing changed.
  */
 export async function setReadyDates(tx: Db, orderId: string, changes: { factoryId: string | null; readyOn: ISODate | null }[]) {
-  const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { ...readySelect, lines: { select: { factoryId: true } } } });
+  const select = { ...readySelect, lines: { select: { factoryId: true } } };
+  const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select });
   const ids = [...new Set(o.lines.flatMap((l) => (l.factoryId ? [l.factoryId] : [])))];
   const before = readyByOf(o);
   let changed = false;
   for (const c of changes) {
-    // Only the order's own factories (or the goods' one date when the lines name none).
+    // Only the order's own suppliers (or the goods' one date when the lines name none).
     if (c.factoryId ? !ids.includes(c.factoryId) : ids.length > 0) continue;
-    const row = o.factories.find((f) => f.factoryId === c.factoryId);
-    if ((fromDbDateOrNull(row?.readyOn ?? null) ?? null) === c.readyOn) continue;
+    const was = c.factoryId ? (o.purchaseOrders.find((p) => p.supplierId === c.factoryId)?.readyOn ?? null) : o.goodsReadyOn;
+    if ((fromDbDateOrNull(was) ?? null) === c.readyOn) continue;
     changed = true;
-    const existing = await tx.orderFactory.findFirst({ where: { orderId, factoryId: c.factoryId }, select: { id: true } });
-    if (existing) await tx.orderFactory.update({ where: { id: existing.id }, data: { readyOn: toDbDateOrNull(c.readyOn) } });
-    else await tx.orderFactory.create({ data: { orderId, factoryId: c.factoryId, readyOn: toDbDateOrNull(c.readyOn) } });
+    if (c.factoryId) {
+      // A supplier on the lines always has its purchase order (made with the order); one made before then gets it now.
+      await openPurchaseOrdersNow(tx, orderId);
+      await tx.purchaseOrder.update({ where: { orderId_supplierId: { orderId, supplierId: c.factoryId } }, data: { readyOn: toDbDateOrNull(c.readyOn) } });
+    } else await tx.order.update({ where: { id: orderId }, data: { goodsReadyOn: toDbDateOrNull(c.readyOn) } });
   }
   if (!changed) return null;
-  const after = readyByOf(await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { ...readySelect, lines: { select: { factoryId: true } } } }));
+  const after = readyByOf(await tx.order.findUniqueOrThrow({ where: { id: orderId }, select }));
   return { before, after };
 }
 

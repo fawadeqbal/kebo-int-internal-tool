@@ -14,6 +14,7 @@ import { StagesService } from "../inquiries/stages.service";
 import { LedgerPosting, type LedgerRef } from "../ledger/posting.service";
 import { OrdersService } from "../orders/orders.service";
 import { checkAccount, fromCredit, refund, releaseOrder } from "../treasury/api";
+import { cancelPurchaseOrders } from "../purchasing/api";
 
 /**
  * Cancelling an order, as its own command (step 5): the order (Sales) and its money (Treasury) change together,
@@ -123,6 +124,8 @@ export class CancelOrderService {
         }
       }
       await tx.order.update({ where: { id }, data: { status: "cancelled" } });
+      // Its purchase orders are cancelled with it (Purchasing).
+      await cancelPurchaseOrders(tx, id);
       // Why and how: its own row (order_cancellations), written only here.
       await tx.orderCancellation.create({ data: { orderId: id, reason, customerMoney, factoryMoney } });
       await tx.quotationRevision.update({ where: { id: o.revisionId }, data: { status: "void" } });
