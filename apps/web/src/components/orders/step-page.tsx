@@ -11,9 +11,9 @@ import { GoToOnLoad } from "./go-to";
 /** Dates in a step's line ("Ordered 2026-11-08") as people read them. */
 export const readable = (line: string) => line.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d));
 
-export const STATE_TONE: Record<StepState, "ok" | "primary" | "bad" | "neutral"> = {
+export const STATE_TONE: Record<StepState, "ok" | "warn" | "bad" | "neutral"> = {
   done: "ok",
-  now: "primary",
+  now: "warn",
   late: "bad",
   todo: "neutral",
 };
@@ -38,7 +38,7 @@ export function ProgressBar({ done, total, state, className }: { done: number; t
       aria-label={`${done} of ${total} done`}
     >
       <div
-        className={cn("h-full rounded-full", state === "done" ? "bg-ok" : state === "late" ? "bg-bad" : "bg-primary")}
+        className={cn("h-full rounded-full", state === "done" ? "bg-ok" : state === "late" ? "bg-bad" : "bg-action-solid")}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -54,7 +54,7 @@ export function StepHeader({ step, action, line }: { step: StepHeaderData; actio
   return (
     <section
       aria-labelledby="step-title"
-      className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 shadow-card sm:flex-row sm:items-center sm:gap-4 sm:p-5"
+      className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5"
     >
       <span
         aria-hidden
@@ -63,7 +63,7 @@ export function StepHeader({ step, action, line }: { step: StepHeaderData; actio
           step.state === "done"
             ? "bg-ok text-white"
             : step.state === "now"
-              ? "bg-primary text-primary-fg"
+              ? "bg-action-solid text-white"
               : step.state === "late"
                 ? "bg-bad text-white"
                 : "bg-surface-3 text-text-2",
@@ -72,7 +72,7 @@ export function StepHeader({ step, action, line }: { step: StepHeaderData; actio
         {step.state === "done" ? <Check className="size-5" strokeWidth={3} /> : step.number}
       </span>
       <div className="min-w-0 flex-1">
-        <h2 id="step-title" className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-lg font-semibold">
+        <h2 id="step-title" className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-lg font-bold">
           <span>
             <span className="sm:hidden">{step.number} · </span>
             {step.label}

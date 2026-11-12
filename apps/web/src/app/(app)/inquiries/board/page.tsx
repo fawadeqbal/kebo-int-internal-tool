@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { List, Plus } from "lucide-react";
+import { LayoutGrid, List, Plus } from "lucide-react";
 import { can, INQUIRY_STAGE_LABEL, PRIORITY_LABEL, REVISION_STATUS_LABEL, type InquiryStage } from "@kebo/shared";
 import { buildHref, ButtonLink, LinkTabs, ListToolbar, PageHeader, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
@@ -108,6 +108,7 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
     <div>
       <PageHeader
         crumbs={[{ label: "Operations & trading" }, { label: "Inquiries", href: "/inquiries" }, { label: "Pipeline" }]}
+        icon={LayoutGrid}
         title="Inquiry pipeline"
         summary={`${plural(open, "open inquiry", "open inquiries")} · open a card to move it on`}
         actions={
