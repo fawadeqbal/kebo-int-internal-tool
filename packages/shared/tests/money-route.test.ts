@@ -8,6 +8,7 @@ import {
   defaultFactoryPlan,
   factoryDueOn,
   factoryPlanStatus,
+  customerMoney,
   lcChecks,
   lcChecksLine,
   planHow,
@@ -258,5 +259,26 @@ describe("money v2: the factory payment plan", () => {
     expect(factoryPlanStatus(rows, 300_000, "2026-11-08", "2026-11-01", "2026-11-02", 3)[1]!.status).toBe("late");
     // Part paid on the advance, due today.
     expect(factoryPlanStatus(rows, 100_000, "2026-11-02", null, "2026-11-02", 3)[0]).toMatchObject({ status: "due", paidMinor: 100_000, openMinor: 200_000 });
+  });
+});
+
+describe("customerMoney: what the person paying the factory sees of the customer's side", () => {
+  const at = (receivedMinor: number, depositMinor: number, route: "informal" | "bank_contract" | "letter_of_credit" | null = "informal") =>
+    customerMoney({ totalMinor: 1_000_000, receivedMinor, depositMinor, route });
+  it("warns while the deposit is not in, or only part of it", () => {
+    expect(at(0, 300_000)).toEqual({ state: "nothing", words: "Customer's deposit is not in yet", warn: true });
+    expect(at(100_000, 300_000)).toMatchObject({ state: "part_deposit", warn: true });
+  });
+  it("with the deposit in, says who pays the balance by the route", () => {
+    expect(at(300_000, 300_000).words).toBe("Deposit in · balance not paid yet");
+    expect(at(300_000, 300_000, "letter_of_credit").words).toBe("Deposit in · balance by LC");
+    expect(at(300_000, 300_000, "bank_contract").words).toBe("Deposit in · balance through the bank");
+  });
+  it("nothing in on a bank route without a deposit is as planned; directly from the customer it warns", () => {
+    expect(at(0, 0, "letter_of_credit")).toEqual({ state: "nothing", words: "Nothing in yet · paid by LC", warn: false });
+    expect(at(0, 0)).toMatchObject({ state: "nothing", warn: true });
+  });
+  it("paid in full", () => {
+    expect(at(1_000_000, 300_000)).toEqual({ state: "paid", words: "Customer paid in full", warn: false });
   });
 });

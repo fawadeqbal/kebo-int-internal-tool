@@ -35,6 +35,7 @@ import { UUID } from "@/lib/ids";
 import { FilterCard } from "@/components/common/filter-card";
 import { periodOf } from "@/components/common/period";
 import { RequestsTab } from "./requests-tab";
+import { ToPayTab } from "./to-pay-tab";
 import { opensPayments, paymentHref } from "./shared";
 
 export const metadata = { title: "Payments" };
@@ -43,6 +44,8 @@ const PAGE_SIZE = 50;
 type Search = { tab?: string; mine?: string; p?: string; dir?: string; status?: string; kind?: string; q?: string; order?: string; party?: string; account?: string; method?: string; page?: string };
 /** A link that filters the list of payments (an order's, a party's, a search) opens the Paid tab. */
 const LIST_FILTERS = ["p", "dir", "kind", "order", "party", "account", "method"] as const;
+
+type Tab = "requests" | "to-pay" | "paid";
 
 const STATUS_MEANING = { to_verify: "warn", sent_back: "bad", recorded: "ok", void: "neutral" } as const;
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -64,37 +67,42 @@ function statusOf(r: PaymentRow) {
 }
 
 /**
- * Treasury › Payments: what is asked for and what was paid, in one place. Two tabs: Payment requests (every
- * part of an order's plan still being asked for; open to everyone who sees orders) and Paid (every payment
+ * Treasury › Payments: what is asked for, what is to pay and what was paid, in one place. Payment requests (every
+ * part of an order's plan still being asked for; open to everyone who sees orders), To pay (every open part of a
+ * supplier's plan; for people who see factory costs) and Paid (every payment
  * recorded, with its receipt; for the people who see money).
  */
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const me = await requireUser();
   const sp = await searchParams;
   const seesMoney = opensPayments(me);
-  const tab: "requests" | "paid" =
+  const seesCosts = can(me, "sourcing.manage");
+  const tab: Tab =
     !seesMoney || sp.tab === "requests"
       ? "requests"
-      : sp.tab === "paid" || sp.status === "to_verify" || sp.status === "void" || LIST_FILTERS.some((k) => sp[k])
-        ? "paid"
-        : "requests";
-  if (tab === "requests") {
+      : sp.tab === "to-pay" && seesCosts
+        ? "to-pay"
+        : sp.tab === "paid" || sp.status === "to_verify" || sp.status === "void" || LIST_FILTERS.some((k) => sp[k])
+          ? "paid"
+          : "requests";
+  if (tab !== "paid") {
+    const out = tab === "to-pay";
     return (
       <div>
         <PageHeader
           crumbs={crumbsFor("/payments")}
           title="Payments"
-          summary="What is asked for and what was paid, in one place"
+          summary="What is asked for, what is to pay and what was paid, in one place"
           primary={
             can(me, "payments.record") ? (
-              <ButtonLink href="/payments/new?kind=in" variant="primary">
-                <Plus aria-hidden /> Record payment
+              <ButtonLink href={out ? "/payments/new?kind=out" : "/payments/new?kind=in"} variant="primary">
+                <Plus aria-hidden /> {out ? "Pay supplier" : "Record payment"}
               </ButtonLink>
             ) : undefined
           }
         />
-        {seesMoney && <Tabs tab="requests" />}
-        <RequestsTab sp={sp} />
+        {seesMoney && <Tabs tab={tab} toPay={seesCosts} />}
+        {out ? <ToPayTab sp={sp} /> : <RequestsTab sp={sp} />}
       </div>
     );
   }
@@ -171,7 +179,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           ) : undefined
         }
       />
-      {!order && !party && <Tabs tab="paid" />}
+      {!order && !party && <Tabs tab="paid" toPay={can(me, "sourcing.manage")} />}
       <StatRow className="mb-4">
         <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} value={top(t.in)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />
         <StatTile icon={ArrowUpFromLine} iconColor={2} label={`Out${when}`} value={top(t.out)} sub={`${t.outCount} payment${t.outCount === 1 ? "" : "s"} out`} />
@@ -279,14 +287,15 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   );
 }
 
-/** The page's two tabs. */
-function Tabs({ tab }: { tab: "requests" | "paid" }) {
+/** The page's tabs: what customers are asked for, what suppliers are owed (people who see costs), what was paid. */
+function Tabs({ tab, toPay }: { tab: Tab; toPay: boolean }) {
   return (
     <Segmented
       label="Show"
       className="mb-4"
       options={[
         { href: "/payments?tab=requests", label: "Payment requests", active: tab === "requests" },
+        ...(toPay ? [{ href: "/payments?tab=to-pay", label: "To pay", active: tab === "to-pay" }] : []),
         { href: "/payments?tab=paid", label: "Paid", active: tab === "paid" },
       ]}
     />

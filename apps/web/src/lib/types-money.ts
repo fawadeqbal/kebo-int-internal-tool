@@ -81,6 +81,8 @@ export interface OrderMoney {
   };
   factories: {
     rows: FactoryOwed[];
+    /** Where the customer's money for this order stands, for the person paying its suppliers. */
+    customer: { state: string; words: string; warn: boolean };
     payments: FactoryPaymentView[];
     canRecord: boolean;
     /** Each factory's payment plan with what is paid on each part. */
@@ -793,4 +795,32 @@ export interface RequestList {
   }[];
   canPay: boolean;
   canSend: boolean;
+}
+
+/** GET /billing/to-pay: the open parts of every supplier's plan (Payments › To pay). */
+export interface ToPayList {
+  rows: {
+    key: string;
+    ref: string | null;
+    label: string;
+    supplierRef: string | null;
+    part: "deposit" | "balance";
+    supplier: { id: string; name: string };
+    lookedAfterBy: Person | null;
+    order: { id: string; refNo: string };
+    customer: { id: string; name: string };
+    po: string | null;
+    currency: string;
+    amount: string;
+    paid: string;
+    open: string;
+    dueOn: string | null;
+    dueRule: FactoryDueRule;
+    late: number;
+    status: FactoryPlanStatus;
+    /** The order's route and what the customer has paid on it (in the order's currency). */
+    customerMoney: { route: PaymentRoute | null; currency: string; total: string; received: string; state: string; words: string; warn: boolean };
+  }[];
+  totals: { currency: string; open: string; late: string; count: number }[];
+  canPay: boolean;
 }
