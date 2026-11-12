@@ -1,10 +1,12 @@
 import { Suspense, type ReactNode } from "react";
+import Link from "next/link";
+import { Banknote, Factory, LayoutGrid, Printer, Target, TrendingUp, User, Users, type LucideIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
 import { Alert, buildHref, buttonClass, Card, CardHeader, Input, LinkTabs, PageHeader, Segmented } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { hasFeature, requirePermission } from "@/lib/session";
+import { hasFeature, requirePermission, requireUser } from "@/lib/session";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { SECTION_PATH, viewPath } from "@/lib/old-addresses";
 import { PlanOff } from "@/components/common/plan-off";
@@ -78,24 +80,61 @@ const REPORT_TITLE: Partial<Record<ReportKind, string>> = {
   funnel: "Sales funnel",
 };
 /** The reports as tabs under the title (they were sidebar items): the same period goes with you. */
-const REPORT_TABS: { key: ReportKind | "print"; href: string; label: string }[] = [
-  { key: "overview", href: "/reports", label: "Overview" },
-  { key: "customers", href: "/reports/customers", label: "Customers" },
-  { key: "factories", href: "/reports/factories", label: "Suppliers" },
-  { key: "people", href: "/reports/people", label: "People & targets" },
-  { key: "funnel", href: "/reports/funnel", label: "Sales funnel" },
-  { key: "print", href: "/reports/print", label: "Printable reports" },
+const REPORT_TABS: { key: ReportKind | "print"; href: string; label: string; icon: LucideIcon; money?: boolean }[] = [
+  { key: "overview", href: "/reports", label: "Overview", icon: LayoutGrid },
+  { key: "customers", href: "/reports/customers", label: "Customers", icon: Users },
+  { key: "factories", href: "/reports/factories", label: "Suppliers", icon: Factory },
+  { key: "funnel", href: "/reports/funnel", label: "Funnel", icon: Target },
+  { key: "profit", href: "/finance/profit", label: "Money", icon: Banknote, money: true },
+  { key: "people", href: "/reports/people", label: "People", icon: User },
+  { key: "targets", href: "/reports/people/targets", label: "Targets", icon: TrendingUp },
+  { key: "print", href: "/reports/print", label: "Print", icon: Printer },
 ];
 const REPORTS_CRUMBS = [...crumbsFor("/reports").slice(0, 1), { label: labelFor("/reports"), href: "/reports" }];
 
-function ReportTabs({ current, keep }: { current: ReportKind | "print"; keep: Record<string, string | undefined> }) {
-  const active = current === "targets" ? "people" : current;
+function ReportTabs({ current, keep, seeMoney }: { current: ReportKind | "print"; keep: Record<string, string | undefined>; seeMoney: boolean }) {
   return (
     <LinkTabs
       label="Reports"
       className="no-print mt-3"
-      tabs={REPORT_TABS.map((t) => ({ href: buildHref(t.href, keep, {}), label: t.label, active: t.key === active }))}
+      tabs={REPORT_TABS.filter((t) => seeMoney || (!t.money && t.key !== "targets")).map((t) => ({
+        href: buildHref(t.href, keep, {}),
+        label: (
+          <>
+            <t.icon aria-hidden /> {t.label}
+          </>
+        ),
+        active: t.key === current,
+      }))}
     />
+  );
+}
+
+/** Every report in one list (board ReportsHub "All reports"): what each answers, and where it is. */
+export function AllReports({ seeMoney }: { seeMoney: boolean }) {
+  const rows = [
+    { href: "/reports/customers", text: "Customers: who buys, who pays late", what: "Customers" },
+    { href: "/reports/factories", text: "Suppliers: price, speed, reliability", what: "Suppliers" },
+    { href: "/reports/funnel", text: "Funnel: where inquiries are lost", what: "Funnel" },
+    ...(seeMoney ? [{ href: "/finance/profit", text: "Money: cash in and out, by month", what: "Money" }] : []),
+    { href: "/reports/people", text: "People: who wins and handles what", what: "People" },
+    ...(seeMoney ? [{ href: "/reports/people/targets", text: "Targets per person", what: "Targets" }] : []),
+    { href: "/reports/print", text: "Print pack for the month", what: "PDF" },
+  ];
+  return (
+    <Card className="p-0">
+      <CardHeader title="All reports" />
+      <ul className="flex flex-col gap-2 px-5 py-4 text-sm">
+        {rows.map((r) => (
+          <li key={r.href} className="flex items-baseline justify-between gap-3">
+            <Link href={r.href} className="text-primary underline underline-offset-2 hover:opacity-80">
+              {r.text}
+            </Link>
+            <span className="text-text-2">{r.what}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 const DESCRIPTION: Record<ReportKind, string> = {
@@ -192,7 +231,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
           ) : undefined
         }
       >
-        {tabbed && <ReportTabs current={kind} keep={keep} />}
+        {(tabbed || kind === "profit") && <ReportTabs current={kind} keep={keep} seeMoney={seeMoney} />}
       </PageHeader>
       {periodic && (
         <div className="mb-4 md:hidden">
@@ -251,6 +290,9 @@ async function Body({
         <>
           <Missing rates={d.missingRates} />
           <Overview d={d} p={p} href={href} />
+          <div className="mt-4">
+            <AllReports seeMoney={seeMoney} />
+          </div>
         </>
       );
     }
@@ -342,7 +384,7 @@ export async function PrintableReports({ searchParams }: { searchParams: Promise
   return (
     <div>
       <PageHeader crumbs={crumbs} title="Printable reports" description="The sales report as a paper to print or send, and each report's tables as Excel, for the period you choose.">
-        <ReportTabs current="print" keep={{ period: p.kind === "quarter" ? undefined : p.kind, from: p.kind === "custom" ? p.from : undefined, to: p.kind === "custom" ? p.to : undefined }} />
+        <ReportTabs current="print" seeMoney={can(await requireUser(), "expenses.manage")} keep={{ period: p.kind === "quarter" ? undefined : p.kind, from: p.kind === "custom" ? p.from : undefined, to: p.kind === "custom" ? p.to : undefined }} />
       </PageHeader>
       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
         <Segmented

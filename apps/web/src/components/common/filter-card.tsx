@@ -8,6 +8,8 @@ export interface FilterSelect {
   label: string;
   value?: string;
   options: { value: string; label: string }[];
+  /** The empty choice's words ("All" by default). */
+  all?: string;
 }
 
 /**
@@ -47,7 +49,9 @@ export function FilterCard({
             {s.label}
           </label>
           <Select id={`filter-${s.name}`} name={s.name} defaultValue={s.value ?? ""} className="w-full text-[13px] sm:w-auto">
-            <option value="">{s.label}: All</option>
+            <option value="">
+              {s.label}: {s.all ?? "All"}
+            </option>
             {s.options.map((o) => (
               <option key={o.value} value={o.value}>
                 {s.label}: {o.label}

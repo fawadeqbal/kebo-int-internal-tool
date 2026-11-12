@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { FileText } from "lucide-react";
+import { Banknote, Check, FileText } from "lucide-react";
 import { can, PAYMENT_RECORD_KINDS, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
-import { ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader, StatusBadge } from "@kebo/ui";
+import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, dateTime, TZ } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
@@ -36,90 +36,87 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
   const order = p.for.find((f) => f.href?.startsWith("/orders/"));
   const { change, proof } = await recordTools(me, p);
 
+  const NOUN: Partial<Record<PaymentRecordKind, string>> = { customer: "Receipt", supplier: "Supplier payment", expense: "Expense", transfer: "Transfer", refund: "Refund", credit: "From credit" };
+  const title = p.number && NOUN[p.kind] ? `${NOUN[p.kind]} ${p.number}` : p.title;
+  const fieldItems = [
+    ...(p.number ? [{ label: NOUN[p.kind] ?? "Number", value: <RefCode>{p.number}</RefCode> }] : []),
+    ...(p.party
+      ? [
+          {
+            label: p.kind === "customer" ? "Customer" : p.direction === "in" ? "From" : "To",
+            value: p.party.href ? (
+              <Link href={p.party.href} className="text-primary underline underline-offset-2 hover:opacity-80">
+                {p.party.label}
+              </Link>
+            ) : (
+              p.party.label
+            ),
+          },
+        ]
+      : []),
+    ...p.fields
+      .filter((f) => !p.parts?.length || !f.href?.startsWith("/orders/"))
+      .map((f) => ({ ...f, value: ISO_DATE.test(f.value) ? date(f.value) : f.value }))
+      .map((f) => ({
+        label: f.label,
+        value: f.href ? (
+          <Link href={f.href} className="text-primary hover:underline">
+            {f.value}
+          </Link>
+        ) : (
+          f.value
+        ),
+      })),
+    { label: p.direction === "in" ? "Reached account" : "Account", value: p.account ?? "Not on an account yet" },
+    ...(p.reference ? [{ label: "Bank reference", value: p.reference }] : []),
+    { label: p.kind === "submission" ? "Sent by" : "Recorded by", value: `${p.recordedBy ?? "someone"} · ${dateTime(p.recordedAt)}` },
+  ];
+  const partsTotal = (p.parts ?? []).filter((x) => !x.released).reduce((t, x) => t + Number(x.amount), 0);
+
   return (
-    <div className="flex max-w-4xl flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <PageHeader
-        crumbs={[...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }]}
-        title={p.title}
+        icon={Banknote}
+        crumbs={[...crumbsFor("/payments").slice(0, 2), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }]}
+        title={title}
         badge={<StatusBadge meaning={STATUS_MEANING[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</StatusBadge>}
-        summary={
-          <>
-            {p.party ? (
-              p.party.href ? (
-                <Link href={p.party.href} className="font-medium text-primary hover:underline">
-                  {p.party.label}
-                </Link>
-              ) : (
-                p.party.label
-              )
-            ) : null}
-            {p.party && " · "}
-            {date(p.on)}
-            {p.number && ` · ${p.number}`}
-          </>
-        }
-        primary={
+        summary={[p.party?.label, p.for.map((f) => f.label).join(", ") || null, p.number ? null : date(p.on)].filter(Boolean).join(" · ")}
+        actions={
           order?.href ? (
-            <ButtonLink href={order.href} size="sm">
+            <ButtonLink href={order.href} variant="secondary">
               Open {order.label}
             </ButtonLink>
           ) : undefined
         }
       />
+      {p.status === "to_verify" && (
+        <section className="flex flex-col gap-3 rounded-2xl border border-warn/30 bg-warn-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            <strong className="block font-bold text-warn">Waiting for verification.</strong>
+            <span className="block text-sm text-text-2">
+              Check that {p.currency} {Number(p.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} reached{p.account ? ` ${p.account}` : " the account"} on {date(p.on)}.
+            </span>
+          </p>
+          <ButtonLink href="/approvals" variant="primary">
+            <Check aria-hidden /> Verify
+          </ButtonLink>
+        </section>
+      )}
       {p.voided && (
         <p className="rounded-lg bg-surface-2 px-4 py-3 text-sm">
           Removed {dateTime(p.voided.at)}
           {p.voided.reason && <>: {p.voided.reason}</>}
         </p>
       )}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex min-w-0 flex-col gap-3">
-          <Card>
-            <CardHeader title={p.what} />
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Card className="p-0">
+            <CardHeader title="Payment" />
             <CardBody>
-              <DetailList
-                items={[
-                  ...(p.party
-                    ? [
-                        {
-                          label: p.direction === "in" ? "From" : "To",
-                          value: p.party.href ? (
-                            <Link href={p.party.href} className="text-primary hover:underline">
-                              {p.party.label}
-                            </Link>
-                          ) : (
-                            p.party.label
-                          ),
-                        },
-                      ]
-                    : []),
-                  ...p.fields
-                    .map((f) => ({ ...f, value: ISO_DATE.test(f.value) ? date(f.value) : f.value }))
-                    .map((f) => ({
-                      label: f.label,
-                      value: f.href ? (
-                        <Link href={f.href} className="text-primary hover:underline">
-                          {f.value}
-                        </Link>
-                      ) : (
-                        f.value
-                      ),
-                    })),
-                  { label: "Account", value: p.account ?? "Not on an account yet" },
-                  ...(p.reference ? [{ label: "Bank reference", value: p.reference }] : []),
-                ]}
-              />
+              <DetailList columns={3} items={fieldItems} />
             </CardBody>
           </Card>
-          {(change || p.voidPath) && (
-            <div className="flex flex-wrap items-start gap-2">
-              {change}
-              {p.voidPath && <VoidForm action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-4">
-          <Card>
+          <Card className="p-0">
             <CardHeader title="Proof" />
             <CardBody>
               {proof ? (
@@ -133,21 +130,71 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
               )}
             </CardBody>
           </Card>
-          <Card>
-            <CardHeader title="Record" />
-            <CardBody className="flex flex-col gap-2 text-sm">
-              <p>
-                {p.kind === "submission" ? "Sent" : "Recorded"} by {p.recordedBy ?? "someone"}, {dateTime(p.recordedAt)}
-              </p>
-              {p.ledgerHref && (
-                <Link href={p.ledgerHref} className="font-medium text-primary hover:underline">
-                  View in the general ledger
-                </Link>
-              )}
-            </CardBody>
-          </Card>
+          {p.parts && p.parts.length > 0 && (
+            <Card className="p-0">
+              <CardHeader title="Where it goes" />
+              <Table>
+                <THead>
+                  <tr>
+                    <Th>Order</Th>
+                    <Th>Part</Th>
+                    <Th className="text-right">Amount</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {p.parts.map((x, i) => (
+                    <Tr key={i} className={x.released ? "text-muted line-through" : undefined}>
+                      <Td>
+                        <Link href={x.href}>
+                          <RefCode>{x.order}</RefCode>
+                        </Link>
+                      </Td>
+                      <Td>{x.part}</Td>
+                      <Td className="text-right tabular">{Number(x.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</Td>
+                    </Tr>
+                  ))}
+                  <Tr className="border-t-2 border-line font-semibold">
+                    <Td />
+                    <Td>Total</Td>
+                    <Td className="text-right tabular">{partsTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</Td>
+                  </Tr>
+                </tbody>
+              </Table>
+            </Card>
+          )}
+          {(change || p.voidPath) && (
+            <div className="flex flex-wrap items-start gap-2">
+              {change}
+              {p.voidPath && <VoidForm action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
+            </div>
+          )}
         </div>
+        <Card className="p-0">
+          <CardHeader title="History" />
+          <CardBody className="flex flex-col gap-3 text-sm">
+            <HistoryLine who={p.recordedBy} what={p.kind === "submission" ? "Sent for verification" : "Recorded"} at={p.recordedAt} />
+            {p.voided && <HistoryLine who={null} what={`Removed${p.voided.reason ? `: ${p.voided.reason}` : ""}`} at={p.voided.at} />}
+            {p.ledgerHref && (
+              <Link href={p.ledgerHref} className="font-medium text-primary hover:underline">
+                View in the general ledger
+              </Link>
+            )}
+          </CardBody>
+        </Card>
       </div>
+    </div>
+  );
+}
+
+/** One line of a payment's history: who (initials), what, when. */
+function HistoryLine({ who, what, at }: { who: string | null; what: string; at: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <Avatar name={who ?? "System"} size={28} />
+      <span>
+        <span className="block">{what}</span>
+        <span className="block text-xs text-muted">{dateTime(at)}</span>
+      </span>
     </div>
   );
 }

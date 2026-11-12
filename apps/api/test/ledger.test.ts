@@ -180,6 +180,15 @@ describe("the ledger", () => {
     expect(unbalanced[0]!.n).toBe(0);
   });
 
+  it("lists every customer, supplier, account and person with what came in, went out and the balance", async () => {
+    const rows = (await api(app, manager).get("/ledger/balances").expect(200)).body as { kind: string; in: string; out: string; balance: string; currency: string }[];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(["customer", "supplier", "account", "person"]).toContain(r.kind);
+      expect(Math.abs(Number(r.in) - Number(r.out) - Number(r.balance))).toBeLessThan(0.01);
+    }
+  });
+
   it("an order and what we owe its factory, from the day it is made", async () => {
     const orderId = await newOrder();
     const o = await db().order.findUniqueOrThrow({ where: { id: orderId } });

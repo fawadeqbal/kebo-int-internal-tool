@@ -105,6 +105,12 @@ export class LedgerController {
     return this.ledger.ageing(q.side);
   }
 
+  /** Each customer, supplier, account and person: charged / in, paid / out and the balance, per currency. */
+  @Get("balances")
+  balances() {
+    return this.ledger.balances();
+  }
+
   /** Every account's balance, grouped (Money, Customers, Factories, Staff, Sales…), and whether debits equal credits. */
   @Get("accounts")
   accounts(@Query(Validate(accountsQuery)) q: z.infer<typeof accountsQuery>) {

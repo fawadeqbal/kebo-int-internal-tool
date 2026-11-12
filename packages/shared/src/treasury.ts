@@ -69,6 +69,18 @@ export interface PaymentRow {
   status: PaymentStatus;
   /** Paid from the customer's credit: no money moved. */
   fromCredit: boolean;
+  /** How it was paid ("Bank transfer", "Cash", "Own money"). */
+  method: string | null;
+  /** Who recorded it (first name). */
+  by: string | null;
+  /** The account it went through (for the Account filter). */
+  accountId: string | null;
+}
+
+/** One total of a list, per currency. */
+export interface PaymentSum {
+  currency: string;
+  amount: string;
 }
 
 export interface PaymentList {
@@ -77,7 +89,12 @@ export interface PaymentList {
   page: number;
   pageSize: number;
   /** In the period and filters, before the direction and status chips. */
-  counts: { all: number; in: number; out: number; move: number; to_verify: number };
+  counts: { all: number; in: number; out: number; move: number; to_verify: number; expense: number };
+  /** The period's money in, out (to suppliers and refunds), to verify and spent on expenses, per currency, largest first; with their counts. */
+  totals: { in: PaymentSum[]; inCount: number; out: PaymentSum[]; outCount: number; toVerify: PaymentSum[]; expenses: PaymentSum[] };
+  /** The accounts and methods in the rows, for the filters. */
+  accounts: { id: string; name: string }[];
+  methods: string[];
   /** The order or party the list is for (?order=, ?party=): its number or name. */
   scope: string | null;
   /** What this person may record from the Record payment page. */
@@ -97,6 +114,8 @@ export interface PaymentView extends PaymentRow {
   partId?: string | null;
   /** Its posting in the general ledger. */
   ledgerHref: string | null;
+  /** Where a receipt goes: each order part it pays ("SO-2026-0035 · Deposit 30% · 15,720.00"), in the order's currency. */
+  parts?: { order: string; href: string; part: string; amount: string; currency: string; released: boolean }[];
   recordedBy: string | null;
   recordedAt: string;
   voided: { at: string; reason: string | null } | null;

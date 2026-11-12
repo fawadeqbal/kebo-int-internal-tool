@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import type { PaymentList } from "@kebo/shared";
-import { Alert, buildHref, ButtonLink, Card, CardBody, CardHeader, PageHeader, Segmented, Select } from "@kebo/ui";
+import type { ReactNode } from "react";
+import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote } from "lucide-react";
+import { Alert, buildHref, ButtonLink, Card, CardBody, CardHeader, LinkTabs, PageHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { AutoSelect } from "@/components/common/auto-select";
+import { date, money } from "@/lib/format";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { TZ } from "@/lib/format";
@@ -56,37 +60,119 @@ export default async function RecordPaymentPage({ searchParams }: { searchParams
       ? { factoryId: sp.factory!, amount: sp.amount!, kind: sp.part === "deposit" ? ("deposit" as const) : ("balance" as const) }
       : undefined;
 
+  const ICON: Record<Kind, ReactNode> = {
+    in: <ArrowDownToLine aria-hidden />,
+    out: <ArrowUpFromLine aria-hidden />,
+    expense: <Banknote aria-hidden />,
+    transfer: <ArrowLeftRight aria-hidden />,
+  };
+  const PREFIX: Record<Kind, string> = { in: "RC", out: "FP", expense: "EX", transfer: "TR" };
+  const side = await sideOf(kind, orderId);
+
   return (
-    <div className="flex max-w-3xl flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <PageHeader
-        crumbs={[...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: "Record payment" }]}
+        crumbs={[...crumbsFor("/payments").slice(0, 2), { label: "Payments", href: "/payments" }, { label: "Record payment" }]}
         title="Record payment"
+        summary={`Number given on save · ${PREFIX[kind]}-${today.slice(0, 4)}-…`}
         primary={
           back ? (
-            <ButtonLink href={back} size="sm">
+            <ButtonLink href={back} variant="secondary">
               Back
             </ButtonLink>
           ) : undefined
         }
       />
       {allowed.length > 1 && (
-        <Segmented
+        <LinkTabs
           label="What kind of payment"
-          options={allowed.map((k) => ({ href: href(k.kind), label: k.label, active: k.kind === kind }))}
+          tabs={allowed.map((k) => ({ href: href(k.kind), label: <>{ICON[k.kind]} {k.label}</>, active: k.kind === kind }))}
         />
       )}
-      {kind === "in" || kind === "out" ? (
-        customerId ? (
-          <FromCustomer customerId={customerId} today={today} />
-        ) : (
-          <OnOrder kind={kind} orderId={orderId} today={today} prefill={prefill} back={back} />
-        )
-      ) : kind === "expense" ? (
-        <Expense today={today} />
-      ) : (
-        <Transfer today={today} />
-      )}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-4">
+          {kind === "in" || kind === "out" ? (
+            customerId ? (
+              <FromCustomer customerId={customerId} today={today} />
+            ) : (
+              <OnOrder kind={kind} orderId={orderId} today={today} prefill={prefill} back={back} />
+            )
+          ) : kind === "expense" ? (
+            <Expense today={today} />
+          ) : (
+            <Transfer today={today} />
+          )}
+        </div>
+        <div className="flex flex-col gap-4">{side}</div>
+      </div>
     </div>
+  );
+}
+
+/** Beside the form (board PaymentIn): the order's payment plan, and what happens after saving. */
+async function sideOf(kind: Kind, orderId: string | undefined) {
+  const next: Record<Kind, ReactNode> = {
+    in: (
+      <>
+        After saving, a payment recorded by someone who cannot verify waits in the <b>verification queue</b> until a manager checks it against the bank.
+      </>
+    ),
+    out: <>The payment is posted to the supplier&rsquo;s account and the order&rsquo;s factory money at once.</>,
+    expense: <>The expense counts on its order or inquiry; one paid from someone&rsquo;s own money is owed back to them.</>,
+    transfer: <>Both accounts change at once; a transfer between currencies keeps the rate you enter.</>,
+  };
+  const plan = orderId && (kind === "in" || kind === "out") ? await orderMoneyOf(orderId).catch(() => null) : null;
+  return (
+    <>
+      {plan && kind === "in" && plan.plan.items.length > 0 && (
+        <Card className="p-0">
+          <CardHeader title={`${plan.refNo ?? "The order"} · payment plan`} />
+          <Table>
+            <THead>
+              <tr>
+                <Th>Part</Th>
+                <Th>Due</Th>
+                <Th className="text-right">Amount</Th>
+              </tr>
+            </THead>
+            <tbody>
+              {plan.plan.items.map((x) => (
+                <Tr key={x.id}>
+                  <Td>{x.label}</Td>
+                  <Td className="whitespace-nowrap">{x.dueOn ? date(x.dueOn) : (x.when ?? x.rule ?? "—")}</Td>
+                  <Td className="text-right tabular">{Number(x.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      )}
+      {plan && kind === "out" && plan.factories && plan.factories.rows.length > 0 && (
+        <Card className="p-0">
+          <CardHeader title={`${plan.refNo ?? "The order"} · we owe`} />
+          <Table>
+            <THead>
+              <tr>
+                <Th>Supplier</Th>
+                <Th className="text-right">Left to pay</Th>
+              </tr>
+            </THead>
+            <tbody>
+              {plan.factories.rows.map((r) => (
+                <Tr key={r.factory.id}>
+                  <Td>{r.factory.name}</Td>
+                  <Td className="text-right tabular">{money(r.toPay, r.currency)}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      )}
+      <Card className="p-0">
+        <CardHeader title="Next" />
+        <CardBody className="text-sm text-text-2">{next[kind]}</CardBody>
+      </Card>
+    </>
   );
 }
 
@@ -115,7 +201,7 @@ async function OnOrder({
         <form className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="kind" value={kind} />
           {back && <input type="hidden" name="back" value={back} />}
-          <Select name="order" defaultValue={orderId ?? ""} aria-label="Order" className="sm:w-96">
+          <AutoSelect name="order" defaultValue={orderId ?? ""} aria-label="Order" className="sm:w-96">
             <option value="" disabled>
               Choose an order
             </option>
@@ -124,10 +210,10 @@ async function OnOrder({
                 {o.refNo} · {o.customer.name}
               </option>
             ))}
-          </Select>
-          <button className="inline-flex h-9 items-center rounded-lg border border-line-strong px-3 text-sm font-medium hover:bg-surface-2">
-            Continue
-          </button>
+          </AutoSelect>
+          <noscript>
+            <button className="inline-flex h-9 items-center rounded-lg border border-line-strong px-3 text-sm font-medium hover:bg-surface-2">Continue</button>
+          </noscript>
         </form>
       </CardBody>
     </Card>
@@ -143,7 +229,7 @@ async function OnOrder({
           <form className="flex flex-wrap items-end gap-2">
             <input type="hidden" name="kind" value="in" />
             {back && <input type="hidden" name="back" value={back} />}
-            <Select name="customer" defaultValue="" aria-label="Customer" className="sm:w-96">
+            <AutoSelect name="customer" defaultValue="" aria-label="Customer" className="sm:w-96">
               <option value="" disabled>
                 Choose a customer
               </option>
@@ -154,10 +240,10 @@ async function OnOrder({
                     {c.name}
                   </option>
                 ))}
-            </Select>
-            <button className="inline-flex h-9 items-center rounded-lg border border-line-strong px-3 text-sm font-medium hover:bg-surface-2">
-              Continue
-            </button>
+            </AutoSelect>
+            <noscript>
+              <button className="inline-flex h-9 items-center rounded-lg border border-line-strong px-3 text-sm font-medium hover:bg-surface-2">Continue</button>
+            </noscript>
           </form>
         </CardBody>
       </Card>
