@@ -1,6 +1,6 @@
 import type { AttachedFileInfo } from "./types-money";
 import type { OfferFile } from "./types-deals";
-import type { BalanceTerms, Incoterm, LineCondition, LineType, OrderStage, OrderStatus, PaymentKind, PaymentMethod, RevisionStatus, ShipMode } from "@kebo/shared";
+import type { BalanceTerms, Incoterm, LineCondition, LineType, OrderStage, OrderStatus, OrderWord, PaymentKind, PaymentMethod, RevisionStatus, ShipMode } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for orders (four stages), their payments and the printed documents. Keep in step with apps/api/src/modules/orders. */
@@ -26,6 +26,8 @@ export interface OrderRow {
   refNo: string;
   status: OrderStatus;
   stage: OrderStage;
+  /** Where it stands in one word, worked out from what is stored: what every list, the board and its page show. */
+  word: OrderWord;
   stageSince: string;
   customer: { id: string; name: string; country: string };
   inquiry: { id: string; refNo: string; title: string; assigneeId: string | null; assignee: Person | null };
@@ -56,6 +58,8 @@ export interface OrderView {
   quotation?: { refNo: string; revisionId: string; number: number; acceptedOn: string | null; option: string | null; deliveryTerms: string | null };
   status: OrderStatus;
   stage: OrderStage;
+  /** Where it stands in one word, worked out from what is stored. */
+  word: OrderWord;
   stageSince: string;
   inquiry: { id: string; refNo: string; title: string; assigneeId: string | null; assignee: Person | null };
   customer: { id: string; name: string; country: string };

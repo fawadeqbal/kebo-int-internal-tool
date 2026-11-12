@@ -1,11 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { supplierOnly } from "./fields";
-import { isCustomer, newCustomer } from "@kebo/database";
+import { isCustomer, newCustomer, wordFactsOf, wordSelect } from "@kebo/database";
 import type { Prisma } from "@kebo/database";
-import { can, type CustomerImport, type CustomerInput, type ImportResult, type ListQuery } from "@kebo/shared";
+import { can, orderWord, type CustomerImport, type CustomerInput, type ImportResult, type ListQuery } from "@kebo/shared";
 import { DomainError, DuplicateError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
+import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { requireReason } from "../../common/audit/reason";
 
@@ -24,6 +25,7 @@ export class CustomersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly limits: LimitsService,
   ) {}
 
   names(user: SessionUser) {
@@ -118,11 +120,16 @@ export class CustomersService {
           take: 100,
         },
         // Staff see only the orders of deals they handle or created, like everywhere else.
-        orders: { where: mine ? { inquiry: mine } : {}, select: { id: true, refNo: true, status: true, total: true, currency: true, orderedOn: true }, orderBy: { orderedOn: "desc" }, take: 100 },
+        orders: { where: mine ? { inquiry: mine } : {}, select: { id: true, refNo: true, total: true, currency: true, orderedOn: true, ...wordSelect }, orderBy: { orderedOn: "desc" }, take: 100 },
       },
     });
     if (!c) throw new NotFoundError("Customer");
-    return c;
+    // Each order with where it stands in one word (orderWord), as on its own page; the facts it reads stay here.
+    const features = await this.limits.features();
+    return {
+      ...c,
+      orders: c.orders.map(({ factoryOrderedOn, shipments, delivery, ...o }) => ({ ...o, word: orderWord(wordFactsOf({ status: o.status, factoryOrderedOn, shipments, delivery }), features) })),
+    };
   }
 
   /**

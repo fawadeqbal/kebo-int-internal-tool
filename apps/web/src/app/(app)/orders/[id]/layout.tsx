@@ -72,7 +72,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
   // Where the order stands, read from its to-do items: the line of steps, the status in words and "Do next" agree.
   const todayIs = today();
   const progress = steps ? orderProgress(steps.items, steps.steps.map((s) => s.key)) : null;
-  const status = orderStatusLine(steps?.items ?? [], { cancelled: o.status === "cancelled", closed: o.status === "closed" }, todayIs);
+  const status = orderStatusLine(steps?.items ?? [], { cancelled: o.status === "cancelled", closed: o.status === "closed", word: o.word }, todayIs);
   const statusText = (
     <span className={cn("font-semibold whitespace-nowrap", status.tone === "bad" ? "text-bad" : status.tone === "ok" ? "text-ok" : "text-action")}>
       {status.stage}

@@ -33,6 +33,8 @@ import {
   type LineCondition,
   LINE_CONDITION_LABEL,
   type PaymentRoute,
+  orderWord,
+  orderWordColumn,
 } from "@kebo/shared";
 import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -55,7 +57,7 @@ import { freezeOrderDoc, packingFinalNow } from "./order-docs";
 import { LedgerPosting } from "../ledger/posting.service";
 import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
 import { readyWords, setReadyAll, setReadyDates } from "./ready";
-import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
+import { readyByOf, readyOnOf, readySelect, wordFactsOf } from "@kebo/database";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 /** Orders whose number, customer or inquiry (number, title) has the words. */
@@ -122,6 +124,8 @@ const orderInclude = {
   },
   // The shipments hold the B/L, the day the goods left and the container (Shipment 1 first).
   shipments: orderShipments,
+  // The delivery: with the shipments and the factory order day, what the order's one status word reads.
+  delivery: { select: { deliveredOn: true } },
   // Each factory's ready date (the order's is the latest of them).
   ...readySelect,
 } satisfies Prisma.OrderInclude;
@@ -518,6 +522,8 @@ export class OrdersService {
       },
       status: o.status,
       stage: o.stage,
+      /** Where it stands in one word, worked out from what is stored: the same in every list and on its page. */
+      word: orderWord(wordFactsOf(o), await this.limits.features()),
       stageSince: dateIn(o.stageSince, this.clock.timeZone),
       inquiry,
       customer: o.customer,
@@ -692,6 +698,7 @@ export class OrdersService {
     const days = settings.reminders;
     const fx = fxOf(settings, await this.limits.allows("expenses"));
     const today = this.clock.today();
+    const features = await this.limits.features();
     const items = rows.map((o) => {
       const p = positionOf(o, fx);
       return {
@@ -699,6 +706,8 @@ export class OrdersService {
         refNo: o.refNo,
         status: o.status,
         stage: o.stage,
+        /** Where it stands in one word (orderWord): what the lists, the board and the order's page all show. */
+        word: orderWord(wordFactsOf(o), features),
         stageSince: dateIn(o.stageSince, this.clock.timeZone),
         customer: o.customer,
         inquiry: o.inquiry,
@@ -750,12 +759,14 @@ export class OrdersService {
       this.list(user, { ...narrow, status: "open", limit: 1000 }),
     ]);
     const late = openRows.filter((o) => o.needs?.late);
-    const stages = Object.fromEntries(ORDER_STAGES.map((st) => [st, openRows.filter((o) => o.stage === st).length])) as Record<OrderStage, number>;
-    const counts = { open, late: late.length, closed, cancelled, all: open + closed + cancelled, ...stages, lateInProduction: openRows.filter((o) => o.stage === "in_production" && o.needs?.late).length };
+    // The chips count by the worked-out word (what each row shows), not the stored stage.
+    const at = (o: (typeof openRows)[number]) => orderWordColumn(o.word);
+    const stages = Object.fromEntries(ORDER_STAGES.map((st) => [st, openRows.filter((o) => at(o) === st).length])) as Record<OrderStage, number>;
+    const counts = { open, late: late.length, closed, cancelled, all: open + closed + cancelled, ...stages, lateInProduction: openRows.filter((o) => at(o) === "in_production" && o.needs?.late).length };
     const skip = (q.page - 1) * q.pageSize;
     const urgentFirst = (a: (typeof openRows)[number], b: (typeof openRows)[number]) =>
       Number(!!b.needs?.late) - Number(!!a.needs?.late) || (a.needs?.due ?? "9999").localeCompare(b.needs?.due ?? "9999");
-    const pick = q.status === "late" ? late : q.stage ? openRows.filter((o) => o.stage === q.stage) : openRows;
+    const pick = q.status === "late" ? late : q.stage ? openRows.filter((o) => at(o) === q.stage) : openRows;
     const rows =
       q.status === "open" || q.status === "late"
         ? pick.sort(urgentFirst).slice(skip, skip + q.pageSize)

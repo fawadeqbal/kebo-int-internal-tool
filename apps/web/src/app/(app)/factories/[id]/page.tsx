@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { can, ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type OrderStage } from "@kebo/shared";
+import { can, ORDER_WORD_TONE } from "@kebo/shared";
 import { todayIn } from "@kebo/utils";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { api } from "@/lib/api";
@@ -35,11 +35,9 @@ export const metadata = { title: "Supplier" };
 
 /** Where an order with the factory is: ready date passed, else the order's stage; closed or cancelled. */
 function poState(o: FactoryOrders["rows"][number], today: string): { label: string; meaning: StatusMeaning } {
-  if (o.status === "closed") return { label: "Closed", meaning: "ok" };
-  if (o.status === "cancelled") return { label: "Cancelled", meaning: "neutral" };
-  if (!o.ready && o.readyOn && o.readyOn < today && (o.stage === "confirmed" || o.stage === "in_production"))
-    return { label: "Ready date passed", meaning: "bad" };
-  return { label: ORDER_STAGE_LABEL[o.stage as OrderStage] ?? o.stage, meaning: ORDER_STAGE_TONE[o.stage as OrderStage] ?? "info" };
+  const word = o.word ?? (o.status === "closed" ? "Done" : o.status === "cancelled" ? "Cancelled" : "Confirmed");
+  if (!o.ready && o.readyOn && o.readyOn < today && (word === "Confirmed" || word === "In production")) return { label: "Ready date passed", meaning: "bad" };
+  return { label: word, meaning: ORDER_WORD_TONE[word] };
 }
 
 /** Old ?tab= links, ?offers=all and the history panel → the tab that has them now. */

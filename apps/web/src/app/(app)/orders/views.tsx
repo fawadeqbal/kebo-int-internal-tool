@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, Check, Download, Factory, FileText, LayoutGrid, List as ListIcon, Lock, MessageSquare, Package, PieChart, Ship, X } from "lucide-react";
-import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
+import { ORDER_STAGE_LABEL, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
 import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { DataTable } from "@/components/common/data-table";
@@ -30,8 +30,8 @@ type Status = (typeof STATUSES)[number];
  * ?stage=…): a column per step, each card with what it needs now.
  */
 function statusBadge(o: OrderRow) {
-  if (o.status === "cancelled") return <StatusBadge meaning="neutral">Cancelled</StatusBadge>;
-  return <StatusBadge meaning={ORDER_STAGE_TONE[o.stage]}>{ORDER_STAGE_LABEL[o.stage]}</StatusBadge>;
+  // The one word worked out from what is stored (orderWord): the same as on the order's own page.
+  return <StatusBadge meaning={ORDER_WORD_TONE[o.word]}>{o.word}</StatusBadge>;
 }
 
 export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
@@ -218,7 +218,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                   <Th className="text-right">Total</Th>
                   <Th className="text-right">They owe</Th>
                   <Th>Now</Th>
-                  <Th>Stage</Th>
+                  <Th>Status</Th>
                   <Th className="w-12">
                     <span className="sr-only">Actions</span>
                   </Th>
@@ -294,7 +294,7 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
     optional(() => api.get<{ items: { id: string; current: { key: FlowStep; label: string; sub: string } | null }[] }>("/order-board", { mine: q.mine })),
   ]);
   const at = new Map((flow?.items ?? []).map((i) => [i.id, i.current]));
-  const cols = STAGE_FLOW.map((stage) => ({ stage, rows: stage === "done" ? recentDone : openRows.filter((r) => r.stage === stage) }));
+  const cols = STAGE_FLOW.map((stage) => ({ stage, rows: stage === "done" ? recentDone : openRows.filter((r) => orderWordColumn(r.word) === stage) }));
   const valueOf = (rows: OrderRow[]) => {
     const cur = rows[0]?.currency;
     return cur && rows.every((r) => r.currency === cur) ? short(rows.reduce((t, r) => t + Number(r.total), 0), cur) : null;
@@ -302,10 +302,11 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
   // Each card's pill and line (board): where it stands now, in a word or two.
   const pill = (o: OrderRow): [string, "warn" | "info" | "bad" | "ok" | "neutral"] => {
     if (o.needs?.late) return ["Late", "bad"];
-    if (o.stage === "done" || o.status === "closed") return Number(o.due) > 0 ? ["To collect", "warn"] : ["Paid", "ok"];
-    if (o.stage === "shipped") return ["At sea", "info"];
+    if (o.word === "Done") return Number(o.due) > 0 ? ["To collect", "warn"] : ["Paid", "ok"];
+    if (o.word === "Shipped") return ["At sea", "info"];
+    if (o.word === "Arrived" || o.word === "Delivered") return [o.word, "info"];
     const cur = at.get(o.id);
-    if (o.stage === "confirmed") return cur?.key === "payment" ? ["Deposit", Number(o.received) > 0 ? "warn" : "neutral"] : ["PO", "warn"];
+    if (o.word === "Confirmed") return cur?.key === "payment" ? ["Deposit", Number(o.received) > 0 ? "warn" : "neutral"] : ["PO", "warn"];
     return [cur?.label ?? "Production", "info"];
   };
   const line = (o: OrderRow) => {

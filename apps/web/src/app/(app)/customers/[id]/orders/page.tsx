@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type OrderStage } from "@kebo/shared";
+import { ORDER_WORD_TONE } from "@kebo/shared";
 import {
   ButtonLink,
   Card,
@@ -38,10 +38,8 @@ const STATUS = [
 
 /** Where the order is, in a word: late money first, then its stage; closed or cancelled. */
 function statusOf(o: PayOrder, today: string): { label: string; meaning: StatusMeaning } {
-  if (o.status === "cancelled") return { label: "Cancelled", meaning: "neutral" };
-  if (o.status === "closed") return { label: "Closed", meaning: "ok" };
-  if (late(o, today)) return { label: o.payStatus === "unpaid" ? "Deposit late" : "Payment late", meaning: "bad" };
-  return { label: ORDER_STAGE_LABEL[o.stage as OrderStage] ?? "Open", meaning: ORDER_STAGE_TONE[o.stage as OrderStage] ?? "info" };
+  if (o.status === "open" && late(o, today)) return { label: o.payStatus === "unpaid" ? "Deposit late" : "Payment late", meaning: "bad" };
+  return { label: o.word, meaning: ORDER_WORD_TONE[o.word] };
 }
 
 /**

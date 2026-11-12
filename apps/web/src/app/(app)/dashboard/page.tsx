@@ -1,6 +1,6 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
-import { can, ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type InquiryStage, type Priority } from "@kebo/shared";
+import { can, ORDER_WORD_TONE, type InquiryStage, type Priority } from "@kebo/shared";
 import { Alert, Badge, ButtonLink, Card, CardBody, CardHeader, cn, RefCode, StatTile, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { ArrowRight, Coins, FileText, Package, PieChart, Plus, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
 import type { Aging, Funnel } from "@/lib/types-facts";
@@ -387,7 +387,7 @@ async function RecentOrders() {
               <Td className="text-right whitespace-nowrap tabular">{money(o.total, o.currency)}</Td>
               <Td className="text-right whitespace-nowrap tabular">{Number(o.due) > 0.005 ? money(o.due, o.currency) : "—"}</Td>
               <Td>
-                <StatusBadge meaning={ORDER_STAGE_TONE[o.stage]}>{ORDER_STAGE_LABEL[o.stage]}</StatusBadge>
+                <StatusBadge meaning={ORDER_WORD_TONE[o.word]}>{o.word}</StatusBadge>
               </Td>
             </Tr>
           ))}
