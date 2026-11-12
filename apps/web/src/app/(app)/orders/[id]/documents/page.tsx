@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BANK_STEP_LABEL, can, paperDone, type BankStepKind } from "@kebo/shared";
-import { buttonClass } from "@kebo/ui";
+import { buttonClass, StatRow, StatTile } from "@kebo/ui";
 import { orderFilesOf, orderPapersOf, orderPaymentsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { Checklist } from "@/components/orders/checklist";
@@ -162,6 +162,16 @@ export default async function OrderDocuments({
     .filter(Boolean)
     .join(" · ");
 
+  // The board's four tiles: papers ready (of every paper the order needs), drafts, missing ones, the B/L copy to the customer.
+  const needed = rows.filter((r) => r.state !== "else" || r.inSet);
+  const tiles = {
+    ready: needed.filter((r) => paperDone(r.state)).length,
+    of: needed.length,
+    draft: rows.filter((r) => r.state === "draft").length,
+    missing: rows.filter((r) => r.state === "miss").map((r) => r.label),
+  };
+  const copies = bankSteps.find((b) => b.step === "copies_to_customer") ?? null;
+
   // The checklist: only the company's own items for this step (papers and bank steps are the cards below).
   const own = d.items.filter((i) => !i.key?.startsWith("doc:") && !i.key?.startsWith("bank:"));
   // The B/L is the shipment's (Shipment 1's).
@@ -190,6 +200,22 @@ export default async function OrderDocuments({
       }
       side={<StepChangesCompact entries={d.changes} historyHref={d.historyHref} />}
     >
+      <StatRow>
+        <StatTile label="Papers ready" value={`${tiles.ready} of ${tiles.of}`} />
+        <StatTile label="Draft" value={tiles.draft} />
+        <StatTile
+          label="Missing"
+          value={tiles.missing.length}
+          sub={tiles.missing.length ? tiles.missing.slice(0, 2).join(", ").toLowerCase() : undefined}
+          tone={tiles.missing.length ? "bad" : undefined}
+        />
+        <StatTile
+          label="B/L copy to customer"
+          value={copies?.doneOn ? "Sent" : "Not sent"}
+          sub={copies?.doneOn ? date(copies.doneOn) : copies ? "unlocks the balance" : "not on this route"}
+          tone={copies && !copies.doneOn ? "warn" : undefined}
+        />
+      </StatRow>
       {own.length > 0 && (
         <Checklist
           payFor={await expensePayTools(o.id, own)}

@@ -545,3 +545,86 @@ export function PanelButton({
     </>
   );
 }
+
+/* ---------------------------------------------------------------- the whole form in the page */
+
+/**
+ * A card that is its own form (board OrderShipping "Shipment"): every value as
+ * an input in three columns, Save and Cancel (Cancel puts the saved values back).
+ * Without the right to change it, the read-only card shows instead.
+ */
+export function InlineFieldsCard({
+  id,
+  target,
+  title,
+  badge,
+  fields,
+  action,
+  canEdit,
+  save = "Save",
+}: {
+  id?: string;
+  target?: string;
+  title: ReactNode;
+  badge?: ReactNode;
+  fields: DetailField[];
+  action: Action;
+  canEdit: boolean;
+  save?: string;
+}) {
+  const uid = useId();
+  const router = useRouter();
+  const [round, setRound] = useState(0);
+  if (!canEdit) return <DetailsCard id={id} target={target} title={title} fields={fields} canEdit={false} actions={badge} />;
+  const editable = fields.filter((f) => f.name && !f.cardOnly);
+  return (
+    <Card id={id} data-target={target} data-target-card="" className="scroll-mt-24 p-0">
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
+        <h2 className="text-base font-semibold">{title}</h2>
+        {badge}
+      </div>
+      <ActionForm key={round} action={action} onDone={() => router.refresh()} className="flex flex-col gap-4 p-4 sm:p-5">
+        {(s) => (
+          <>
+            <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+              {editable.map((f) => (
+                <div key={f.name} data-target={target ? `${target}.${f.name}` : undefined} className={cn("scroll-mt-24", f.wide && "lg:col-span-1")}>
+                  <Field label={f.panelLabel ?? f.label} htmlFor={`${uid}-${f.name}`} hint={f.hint} error={s.errors?.[f.name!]}>
+                    <Control f={{ ...f, type: f.type === "textarea" ? "text" : f.type, value: s.values?.[f.name!] ?? f.value }} id={`${uid}-${f.name}`} />
+                  </Field>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <SubmitButton pendingText="Saving…">{save}</SubmitButton>
+              <Button type="button" variant="ghost" onClick={() => setRound((r) => r + 1)}>
+                Cancel
+              </Button>
+            </div>
+          </>
+        )}
+      </ActionForm>
+    </Card>
+  );
+}
+
+/** The way a thing moves through its states, as one bar: done ones filled, the one now in the accent, the rest plain. */
+export function StatusBar({ states, at }: { states: { key: string; label: string }[]; at: string }) {
+  const here = Math.max(0, states.findIndex((s) => s.key === at));
+  return (
+    <ol aria-label="Status" className="flex overflow-x-auto rounded-lg bg-surface-2 text-sm font-semibold">
+      {states.map((s, i) => (
+        <li
+          key={s.key}
+          aria-current={i === here ? "step" : undefined}
+          className={cn(
+            "min-w-28 flex-1 px-3.5 py-2.5 whitespace-nowrap first:rounded-l-lg last:rounded-r-lg",
+            i < here ? "bg-primary-solid text-primary-fg" : i === here ? "bg-action-solid text-white" : "text-text-2",
+          )}
+        >
+          {s.label}
+        </li>
+      ))}
+    </ol>
+  );
+}

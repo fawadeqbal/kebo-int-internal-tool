@@ -1,37 +1,13 @@
 import Link from "next/link";
-import { AlertTriangle, Check, Download, Factory, FileText, LayoutGrid, List as ListIcon, Lock, Package, PieChart, Ship, X } from "lucide-react";
+import { AlertTriangle, Check, Download, Factory, FileText, LayoutGrid, List as ListIcon, Lock, MessageSquare, Package, PieChart, Ship, X } from "lucide-react";
 import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
-import {
-  ButtonLink,
-  Card,
-  DataRow,
-  EmptyState,
-  LinkTabs,
-  ListToolbar,
-  OrderStageBadge,
-  PageHeader,
-  Pager,
-  PhoneList,
-  PhoneRow,
-  RefCode,
-  StatRow,
-  StatTile,
-  StatusBadge,
-  THead,
-  Td,
-  Th,
-  buildHref,
-  cn,
-  toPage,
-} from "@kebo/ui";
+import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { ExportLink } from "@/components/sheets/export-link";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
-import { hasFeature } from "@/lib/session";
 import { optional } from "@/components/print/data";
-import { crumbsFor, labelFor } from "@/lib/nav";
-import { date, money, plural, short } from "@/lib/format";
+import { crumbsFor } from "@/lib/nav";
+import { date, money, short } from "@/lib/format";
 import { FilterCard } from "@/components/common/filter-card";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { Paged } from "@/lib/types";
@@ -309,214 +285,112 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
  * what it needs now (late in red). On a phone, one column at a time.
  */
 export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
-  const keep = { mine: mine ? "1" : undefined };
-  const q = { mine: mine ? "true" : undefined };
-  // Done: only the latest few and how many there are (a company has thousands over the years).
-  const [openRows, recentDone, doneCount] = await Promise.all([
+  const q = { mine: mine ? "true" : undefined, q: sp.q || undefined, customer: sp.customer || undefined };
+  // Done: only the latest few (a company has thousands over the years).
+  const [openRows, recentDone, customers, flow] = await Promise.all([
     api.get<OrderRow[]>("/orders", { ...q, status: "open" }),
     api.get<OrderRow[]>("/orders", { ...q, status: "closed", recent: "true", limit: String(RECENT_DONE) }),
-    api.get<{ count: number }>("/orders/count", { ...q, status: "closed" }).then((r) => r.count),
+    api.get<Paged<{ id: string; name: string }>>("/customers", { status: "order", pageSize: 100 }).catch(() => null),
+    optional(() => api.get<{ items: { id: string; current: { key: FlowStep; label: string; sub: string } | null }[] }>("/order-board", { mine: q.mine })),
   ]);
-  const late = openRows.filter((o) => o.needs?.late).length;
-  const header = (
-    <>
+  const at = new Map((flow?.items ?? []).map((i) => [i.id, i.current]));
+  const cols = STAGE_FLOW.map((stage) => ({ stage, rows: stage === "done" ? recentDone : openRows.filter((r) => r.stage === stage) }));
+  const valueOf = (rows: OrderRow[]) => {
+    const cur = rows[0]?.currency;
+    return cur && rows.every((r) => r.currency === cur) ? short(rows.reduce((t, r) => t + Number(r.total), 0), cur) : null;
+  };
+  // Each card's pill and line (board): where it stands now, in a word or two.
+  const pill = (o: OrderRow): [string, "warn" | "info" | "bad" | "ok" | "neutral"] => {
+    if (o.needs?.late) return ["Late", "bad"];
+    if (o.stage === "done" || o.status === "closed") return Number(o.due) > 0 ? ["To collect", "warn"] : ["Paid", "ok"];
+    if (o.stage === "shipped") return ["At sea", "info"];
+    const cur = at.get(o.id);
+    if (o.stage === "confirmed") return cur?.key === "payment" ? ["Deposit", Number(o.received) > 0 ? "warn" : "neutral"] : ["PO", "warn"];
+    return [cur?.label ?? "Production", "info"];
+  };
+  const line = (o: OrderRow) => {
+    const who = o.customer.name.split(" ").slice(0, 2).join(" ");
+    const sub = o.needs ? (o.needs.late ? `was ${date(o.needs.due)}` : o.needs.title.toLowerCase()) : (at.get(o.id)?.sub ?? "");
+    return [who, sub.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d))].filter(Boolean).join(" · ");
+  };
+  return (
+    <div>
       <PageHeader
-        crumbs={crumbsFor("/orders/board")}
-        title={labelFor("/orders/board")}
-        summary={
-          <>
-            {plural(openRows.length, "open order")}
-            {late > 0 && <span className="text-bad"> · {late} late</span>}
-            <span className="max-sm:hidden"> · each card says what it needs now</span>
-          </>
-        }
-      />
-      <ListToolbar
-        chips={[
-          { key: "all", label: "Everyone's", href: "/orders/board", active: !mine },
-          { key: "mine", label: "Mine", href: "/orders/board?mine=1", active: mine },
-        ]}
-        label="Whose orders"
-        end={<ExportLink what="orders" query={{ mine: keep.mine }} />}
-      />
-    </>
-  );
-  const empty = (
-    <Card className="p-0">
-      <EmptyState
-        framed
-        title={mine ? "No orders of yours yet" : "No orders yet"}
-        description="An order appears here when a customer accepts a quotation, with what it needs next."
-        action={
-          <ButtonLink href="/inquiries?stage=quoted" size="sm">
-            Quoted inquiries
+        crumbs={[{ label: "Overview" }, { label: "Pipelines" }]}
+        icon={LayoutGrid}
+        title="Order pipeline"
+        description="Orders by stage. A card moves when its step is done."
+        actions={
+          <ButtonLink href={mine ? "/orders?mine=1" : "/orders"}>
+            <ListIcon aria-hidden /> List
           </ButtonLink>
         }
       />
-    </Card>
-  );
-
-  // With the orders board module, the columns are the steps after acceptance (the design's board); else the four stages.
-  const flow = (await hasFeature("orders_board")) ? await optional(() => api.get<{ items: { id: string; current: { key: FlowStep; label: string; sub: string } | null }[] }>("/order-board", q)) : null;
-  if (flow) {
-    const at = new Map(flow.items.map((i) => [i.id, i.current]));
-    const on = {
-      production: await hasFeature("production"),
-      shipping: await hasFeature("shipping"),
-      documents: await hasFeature("bank_documents"),
-      delivery: await hasFeature("delivery_sat"),
-    };
-    const flowCols: { key: string; label: string; steps: FlowStep[] }[] = [
-      { key: "payment", label: "Customer payment", steps: ["payment"] },
-      { key: "production", label: on.production ? "Factory & production" : "Factory order", steps: ["factory", "production"] },
-      ...(on.shipping ? [{ key: "shipping", label: "Shipping", steps: ["shipping"] as FlowStep[] }] : []),
-      ...(on.documents ? [{ key: "documents", label: "Documents & bank", steps: ["documents"] as FlowStep[] }] : []),
-      ...(on.delivery ? [{ key: "delivery", label: "Delivery & SAT", steps: ["delivery"] as FlowStep[] }] : []),
-    ];
-    const last = flowCols[flowCols.length - 1]!;
-    const cols: BoardCol[] = [
-      ...flowCols.map((c) => ({
-        key: c.key,
-        label: c.label,
-        rows: openRows
-          .filter((r) => {
-            const cur = at.get(r.id);
-            return cur ? c.steps.includes(cur.key) : c === last;
-          })
-          .map((r) => ({ ...r, flow: (at.get(r.id)?.sub ?? "Every step done: close the order").replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d)) })),
-      })),
-      { key: "done", label: "Done (recent)", rows: recentDone, count: doneCount, note: doneCount > RECENT_DONE ? `The latest ${RECENT_DONE} of ${doneCount}` : undefined },
-    ];
-    const phoneKey = cols.some((c) => c.key === sp.stage) ? sp.stage! : (cols.find((c) => c.key !== "done" && c.rows.length)?.key ?? "payment");
-    const phoneCol = cols.find((c) => c.key === phoneKey)!;
-    return (
-      <div>
-        {header}
-        {openRows.length + doneCount === 0 ? (
-          empty
-        ) : (
-          <>
-            <div className="xl:hidden">
-              <LinkTabs label="Step" className="mb-4" tabs={cols.map((c) => ({ href: buildHref("/orders/board", keep, { stage: c.key }), label: c.label, count: c.count ?? c.rows.length, active: c.key === phoneKey }))} />
-              <BoardColumn col={phoneCol} hideTitle />
-            </div>
-            <div className="hidden gap-3 xl:grid" style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))` }}>
-              {cols.map((c) => (
-                <BoardColumn key={c.key} col={c} />
-              ))}
-            </div>
-          </>
-        )}
+      <LinkTabs
+        label="Pipelines"
+        className="mb-4"
+        tabs={[
+          {
+            href: "/inquiries/board",
+            active: false,
+            label: (
+              <>
+                <MessageSquare aria-hidden /> Inquiries
+              </>
+            ),
+          },
+          {
+            href: "/orders/board",
+            active: true,
+            label: (
+              <>
+                <Package aria-hidden /> Orders
+              </>
+            ),
+          },
+        ]}
+      />
+      <FilterCard
+        search="Search…"
+        value={sp.q}
+        keep={{ mine: mine ? "1" : undefined }}
+        clearHref={mine ? "/orders/board?mine=1" : "/orders/board"}
+        selects={[{ name: "customer", label: "Customer", value: sp.customer, options: (customers?.rows ?? []).map((c) => ({ value: c.id, label: c.name })) }]}
+      />
+      <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
+        {cols.map((c) => {
+          const v = valueOf(c.rows);
+          return (
+            <section key={c.stage} aria-label={ORDER_STAGE_LABEL[c.stage]} className="flex w-[296px] min-w-[260px] flex-none flex-col gap-2.5 rounded-2xl bg-surface-3/60 p-3 lg:w-auto lg:flex-1">
+              <h2 className="flex items-baseline justify-between gap-2 px-1 text-sm">
+                <span className="font-bold">
+                  {c.stage === "done" ? "Done" : ORDER_STAGE_LABEL[c.stage]} <span className="font-normal text-muted">{c.rows.length}</span>
+                </span>
+                {v && <span className="text-xs text-muted">{v}</span>}
+              </h2>
+              {c.rows.slice(0, 40).map((o) => {
+                const [word, meaning] = pill(o);
+                return (
+                  <Link key={o.id} href={`/orders/${o.id}`} className="block rounded-xl border border-line bg-surface px-3 py-2.5 transition-shadow hover:shadow-card">
+                    <span className="flex items-center justify-between gap-2">
+                      <RefCode>{o.refNo}</RefCode>
+                      <StatusBadge meaning={meaning}>{word}</StatusBadge>
+                    </span>
+                    <strong className="mt-1.5 block truncate text-sm">{o.inquiry.title}</strong>
+                    <span className="block truncate text-xs text-muted">{line(o)}</span>
+                  </Link>
+                );
+              })}
+              {c.rows.length > 40 && (
+                <Link href={buildHref("/orders", {}, { stage: c.stage === "done" ? undefined : c.stage, status: c.stage === "done" ? "closed" : undefined })} className="px-1 text-xs font-semibold text-primary hover:underline">
+                  {c.rows.length - 40} more in the list →
+                </Link>
+              )}
+              {c.rows.length === 0 && <p className="rounded-xl border-2 border-dashed border-line-strong px-3 py-6 text-center text-xs text-muted">Nothing here</p>}
+            </section>
+          );
+        })}
       </div>
-    );
-  }
-
-  const columns: { stage: OrderStage; rows: OrderRow[]; note?: string; count?: number }[] = STAGE_FLOW.map((stage) => ({
-    stage,
-    rows: stage === "done" ? recentDone : openRows.filter((r) => r.stage === stage),
-    note: stage === "done" && doneCount > RECENT_DONE ? `The latest ${RECENT_DONE} of ${doneCount}` : undefined,
-    count: stage === "done" ? doneCount : undefined,
-  }));
-  const phoneStage: OrderStage = STAGE_FLOW.includes(sp.stage as OrderStage) ? (sp.stage as OrderStage) : (columns.find((c) => c.stage !== "done" && c.rows.length)?.stage ?? "confirmed");
-  const phone = columns.find((c) => c.stage === phoneStage)!;
-  return (
-    <div>
-      {header}
-      {openRows.length + doneCount === 0 ? (
-        empty
-      ) : (
-        <>
-          {/* Phones and small tablets: one stage at a time. */}
-          <div className="lg:hidden">
-            <LinkTabs
-              label="Stage"
-              className="mb-4"
-              tabs={columns.map((c) => ({ href: buildHref("/orders/board", keep, { stage: c.stage }), label: ORDER_STAGE_LABEL[c.stage], count: c.count ?? c.rows.length, active: c.stage === phoneStage }))}
-            />
-            <Column stage={phone.stage} rows={phone.rows} note={phone.note} hideTitle />
-          </div>
-          {/* Wide screens: the board. */}
-          <div className="hidden gap-4 lg:grid lg:grid-cols-4">
-            {columns.map((c) => (
-              <Column key={c.stage} stage={c.stage} rows={c.rows} note={c.note} count={c.count} />
-            ))}
-          </div>
-        </>
-      )}
     </div>
-  );
-}
-
-type BoardRow = OrderRow & { flow?: string };
-interface BoardCol {
-  key: string;
-  label: string;
-  rows: BoardRow[];
-  count?: number;
-  note?: string;
-}
-
-function BoardColumn({ col, hideTitle }: { col: BoardCol; hideTitle?: boolean }) {
-  return (
-    <section aria-label={col.label} className="flex min-w-0 flex-col gap-3">
-      {!hideTitle && (
-        <h2 className="flex items-center justify-between gap-2 text-sm font-semibold">
-          <span className="truncate">{col.label}</span> <span className="text-xs font-normal text-muted">{col.count ?? col.rows.length}</span>
-        </h2>
-      )}
-      {col.rows.map((o) => (
-        <OrderCard key={o.id} o={o} />
-      ))}
-      {col.rows.length === 0 && <p className="rounded-lg border border-dashed border-line p-3 text-xs text-muted">Nothing here</p>}
-      {col.note && <p className="text-xs text-muted">{col.note}</p>}
-    </section>
-  );
-}
-
-function Column({ stage, rows, note, count, hideTitle }: { stage: OrderStage; rows: OrderRow[]; note?: string; count?: number; hideTitle?: boolean }) {
-  return (
-    <section aria-label={ORDER_STAGE_LABEL[stage]} className="flex min-w-0 flex-col gap-3">
-      {!hideTitle && (
-        <h2 className="flex items-center justify-between text-sm font-semibold">
-          {stage === "done" ? "Done (recent)" : ORDER_STAGE_LABEL[stage]} <span className="text-xs font-normal text-muted">{count ?? rows.length}</span>
-        </h2>
-      )}
-      {rows.map((o) => (
-        <OrderCard key={o.id} o={o} />
-      ))}
-      {rows.length === 0 && <p className="rounded-lg border border-dashed border-line p-3 text-xs text-muted">Nothing here</p>}
-      {note && <p className="text-xs text-muted">{note}</p>}
-    </section>
-  );
-}
-
-function OrderCard({ o }: { o: BoardRow }) {
-  const late = o.needs?.late;
-  return (
-    <Link href={`/orders/${o.id}`} className="block min-w-0">
-      <Card className={cn("p-3 transition-colors hover:border-line-strong", late && "border-bad/40")}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold whitespace-nowrap">{o.refNo}</span>
-          {o.status === "cancelled" ? <span className="text-xs text-muted">Cancelled</span> : o.flow === undefined && <OrderStageBadge stage={o.stage} />}
-        </div>
-        <p className="mt-0.5 truncate text-sm">{o.customer.name}</p>
-        <p className="truncate text-xs text-muted">{o.inquiry.title}</p>
-        {o.flow && <p className="mt-1 text-xs font-medium text-primary">{o.flow}</p>}
-        <div className="mt-2 flex items-baseline justify-between gap-2 text-xs">
-          <span className="font-medium tabular">{money(o.total, o.currency)}</span>
-          {Number(o.due) > 0 && o.status !== "cancelled" ? <span className="text-muted tabular">{money(o.due, o.currency)} due</span> : o.status !== "cancelled" && <span className="text-ok">Paid</span>}
-        </div>
-        {o.needs && (
-          <div className={cn("mt-2 rounded-md px-2 py-1.5 text-xs", late ? "bg-bad-soft text-bad" : "bg-surface-2 text-text-2")}>
-            <span className="font-medium">{o.needs.title}</span>
-            <span className="block">
-              {late && <AlertTriangle className="mr-1 inline size-3" aria-hidden />}
-              {late ? `Late — was due ${date(o.needs.due)}` : `By ${date(o.needs.due)}`}
-            </span>
-          </div>
-        )}
-        {o.inquiry.assignee && <p className="mt-2 text-xs text-muted">{o.inquiry.assignee.name}</p>}
-      </Card>
-    </Link>
   );
 }

@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
-import { FLOW_STEP_LABEL, STEP_PATH, type FlowStep, type StepState } from "@kebo/shared";
+import { FLOW_STEP_LABEL, type FlowStep, type StepState } from "@kebo/shared";
 import { Badge, buttonClass, Card, CardHeader, cn } from "@kebo/ui";
 import { date, dateTime } from "@/lib/format";
 import type { HistoryEntry } from "@/lib/types";
 import type { OrderSteps, StepView } from "@/lib/types-checklist";
 import { GoToOnLoad } from "./go-to";
+import { HeaderSlot } from "./header-slot";
 
 /** Dates in a step's line ("Ordered 2026-11-08") as people read them. */
 export const readable = (line: string) => line.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d));
@@ -122,32 +123,21 @@ export function StepFrame({
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {header}
       {side ? (
-        <div className={cn("grid gap-5", SIDE_COLUMNS)}>
-          <div className="flex min-w-0 flex-col gap-5">{children}</div>
-          <aside aria-label="Beside the step" className="flex min-w-0 flex-col gap-5">{side}</aside>
+        <div className={cn("grid items-start gap-4", SIDE_COLUMNS)}>
+          <div className="flex min-w-0 flex-col gap-4">{children}</div>
+          <aside aria-label="Beside the step" className="flex min-w-0 flex-col gap-4">{side}</aside>
         </div>
       ) : (
-        <div className="flex min-w-0 flex-col gap-5">{children}</div>
+        <div className="flex min-w-0 flex-col gap-4">{children}</div>
       )}
       {prevNext}
     </div>
   );
 }
 
-/** ← previous step · next step → */
-function PrevNext({ base, steps, here }: { base: string; steps: StepView[]; here: FlowStep }) {
-  const at = steps.findIndex((s) => s.key === here);
-  const prev =
-    at > 0 ? { href: `${base}/${STEP_PATH[steps[at - 1]!.key]}`, label: steps[at - 1]!.label } : { href: base, label: "Overview" };
-  const next =
-    at < steps.length - 1
-      ? { href: `${base}/${STEP_PATH[steps[at + 1]!.key]}`, label: steps[at + 1]!.label }
-      : { href: `${base}/history`, label: "Notes" };
-  return <StepPrevNext prev={prev} next={next} />;
-}
 
 /**
  * Every step page (order v5): the header card, then the checklist and, under
@@ -158,17 +148,16 @@ function PrevNext({ base, steps, here }: { base: string; steps: StepView[]; here
 export function StepPage({
   steps,
   step,
-  base,
   action,
-  line,
   side,
   children,
 }: {
   steps: OrderSteps;
   step: FlowStep;
   base: string;
+  /** The step's main buttons: shown in the order's header (board). */
   action?: ReactNode;
-  /** The step's one line, when the page says it better than the checklist (Documents: papers ready, what is missing, the bank). */
+  /** Kept for callers: the step boxes say where it stands. */
   line?: string;
   side: ReactNode;
   children: ReactNode;
@@ -178,7 +167,9 @@ export function StepPage({
     <StepFrame
       header={
         view ? (
-          <StepHeader step={view} action={action} line={line} />
+          action ? (
+            <HeaderSlot>{action}</HeaderSlot>
+          ) : null
         ) : (
           <p className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
             {FLOW_STEP_LABEL[step]} is switched off for your company.
@@ -186,7 +177,6 @@ export function StepPage({
         )
       }
       side={side}
-      prevNext={<PrevNext base={base} steps={steps.steps} here={step} />}
     >
       {children}
       {/* A checklist link from another step ("#goto=…") lands here lit up. */}
@@ -197,13 +187,8 @@ export function StepPage({
 
 /** "What this step holds · view only, change with Edit": the line between the checklist and the step's view. */
 export function StepViewDivider() {
-  return (
-    <div className="flex items-center gap-3 pt-1" role="separator" aria-label="What this step holds">
-      <span className="text-[11px] font-semibold tracking-wide text-muted uppercase">What this step holds</span>
-      <span className="h-px flex-1 bg-line" aria-hidden />
-      <span className="text-xs text-muted">view only · change with Edit</span>
-    </div>
-  );
+  // Board: the step's own cards come first and the checklist after them, with no line between.
+  return null;
 }
 
 /** Who changed what in this step, newest first (the few latest), and the way to the whole history. */

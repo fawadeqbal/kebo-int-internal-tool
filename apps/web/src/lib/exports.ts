@@ -705,8 +705,21 @@ async function purchaseOrders(): Promise<SheetSpec> {
   };
 }
 
+/** Shipments (Operations › Shipments): every one, with its route, container and dates. */
+async function shipmentsSheet(): Promise<SheetSpec> {
+  type Row = { order: { refNo: string }; customer: { name: string }; mode: string; status: string; portOfLoading: string | null; portOfDischarge: string | null; containerNo: string | null; blNo: string | null; vessel: string | null; etd: string | null; eta: string | null; departedOn: string | null; arrivedOn: string | null };
+  const rows = await api.get<Row[]>("/operations/shipments", { all: "true" });
+  return {
+    name: `Shipments ${stamp()}`,
+    title: "Shipments",
+    columns: [text("Order", 16), text("Customer", 28), text("Mode", 8), text("From", 16), text("To", 16), text("Container", 18), text("B/L / AWB", 18), text("Vessel", 18), text("ETD"), text("ETA"), text("Left"), text("Arrived"), text("Status", 12)],
+    rows: rows.map((r): Cell[] => [r.order.refNo, r.customer.name, r.mode, r.portOfLoading, r.portOfDischarge, r.containerNo, r.blNo, r.vessel, day(r.etd), day(r.eta), day(r.departedOn), day(r.arrivedOn), r.status]),
+  };
+}
+
 export const EXPORTS = {
   "purchase-orders": purchaseOrders,
+  shipments: shipmentsSheet,
   inquiries: deals,
   orders,
   customers,

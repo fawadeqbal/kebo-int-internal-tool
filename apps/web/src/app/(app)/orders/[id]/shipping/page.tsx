@@ -1,18 +1,17 @@
 import { Plus } from "lucide-react";
 import { can, portsOf, SHIP_MODE_LABEL, SHIP_MODES, SHIPMENT_STATUS_LABEL, SHIPMENT_STATUSES, shipByVsLc } from "@kebo/shared";
-import { Badge, Card, CardHeader } from "@kebo/ui";
+import { Badge } from "@kebo/ui";
 import { date } from "@/lib/format";
 import type { ShipmentView } from "@/lib/types-flow";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
-import { DetailsCard, FieldsForm, PanelButton, type DetailField } from "@/components/orders/step-view";
+import { DetailsCard, FieldsForm, InlineFieldsCard, PanelButton, StatusBar, type DetailField } from "@/components/orders/step-view";
+import { HeaderTap } from "@/components/orders/header-slot";
 import { expensePayTools } from "@/components/orders/costs-card";
-import { packingAction, packingMarksAction } from "../../actions";
 import { fieldsAction, lightAction } from "../../light-actions";
 import { RecordPaymentLink } from "@/components/money/pay-links";
-import { PackingCard } from "../goods";
-import { docHref, goodsOf } from "../shared";
+import { goodsOf } from "../shared";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
 
@@ -104,6 +103,48 @@ function shipmentFields(s: Partial<ShipmentView>, shipBy: ShipBy): DetailField[]
   );
   // Dates show as people read them.
   return out.map((f) => (f.type === "date" && f.value && !f.show ? { ...f, show: date(f.value) } : f));
+}
+
+/** The shipment's form on the page, in the board's order (OrderShipping): mode, status, forwarder, booking, B/L, vessel, ports, container, dates, note. */
+function formFields(s: Partial<ShipmentView>): DetailField[] {
+  const air = s.mode === "air";
+  return [
+    { name: "mode", label: "Mode", value: s.mode ?? "sea", type: "select", options: SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] })) },
+    { name: "status", label: "Status", value: s.status ?? "planned", type: "select", options: SHIPMENT_STATUSES.map((m) => ({ value: m, label: SHIPMENT_STATUS_LABEL[m] })) },
+    { name: "forwarder", label: "Forwarder", value: s.forwarder },
+    { name: "bookingNo", label: "Booking no.", value: s.bookingNo },
+    { name: "blNo", label: air ? "AWB no." : "B/L no.", value: s.blNo, placeholder: air ? "e.g. 999-12345675" : "e.g. MEDU1234567" },
+    ...(air ? [] : [{ name: "vessel", label: "Vessel / voyage", value: s.vessel, placeholder: "e.g. MSC Aurora" } satisfies DetailField]),
+    { name: "portOfLoading", label: air ? "Airport of departure" : "Port of loading", value: s.portOfLoading },
+    { name: "portOfDischarge", label: air ? "Airport of arrival" : "Port of discharge", value: s.portOfDischarge },
+    ...(air
+      ? []
+      : ([
+          { name: "containerNo", label: "Container no.", value: s.containerNo },
+          { name: "containerType", label: "Container type", value: s.containerType, placeholder: "e.g. 1 × 40 HQ" },
+          { name: "sealNo", label: "Seal no.", value: s.sealNo },
+          { name: "vgmKg", label: "VGM kg", value: s.vgmKg, type: "number", hint: "container gross mass" },
+        ] satisfies DetailField[])),
+    { name: "loadedOn", label: air ? "Handed over on" : "Loaded on", value: s.loadedOn, type: "date" },
+    { name: "etd", label: "ETD", value: s.etd, type: "date" },
+    { name: "eta", label: "ETA", value: s.eta, type: "date" },
+    { name: "departedOn", label: air ? "Flown on" : "Departed on", value: s.departedOn, type: "date" },
+    { name: "arrivedOn", label: "Arrived on", value: s.arrivedOn, type: "date" },
+    { name: "note", label: "Note", value: s.note, type: "textarea" },
+  ];
+}
+
+const DAY = 86_400_000;
+/** "At sea · day 4 of 17", "Booked", "Arrived 8 Jan": where the shipment is, for its card. */
+function whereBadge(s: ShipmentView, now: string) {
+  if (s.status === "departed" && s.departedOn) {
+    const day = Math.max(1, Math.round((Date.parse(now) - Date.parse(s.departedOn)) / DAY) + 1);
+    const of = s.eta ? Math.max(day, Math.round((Date.parse(s.eta) - Date.parse(s.departedOn)) / DAY)) : null;
+    return <Badge tone="info" dot>{`${s.mode === "air" ? "In the air" : "At sea"} · day ${day}${of ? ` of ${of}` : ""}`}</Badge>;
+  }
+  if (s.status === "arrived" || s.status === "cleared")
+    return <Badge tone="ok" dot>{`${SHIPMENT_STATUS_LABEL[s.status]}${s.arrivedOn ? ` ${date(s.arrivedOn)}` : ""}`}</Badge>;
+  return <Badge tone="neutral" dot>{SHIPMENT_STATUS_LABEL[s.status]}</Badge>;
 }
 
 /** Step 4, Shipping: booking, loading, sailing and arrival of each shipment, the packing list, and the balance when it is paid before or against the B/L. */
@@ -200,7 +241,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       tools.arrived = { kind: "tap", tap: { label: "Arrived today", action: lightAction.bind(null, o.id, `arrived:${going.map((s) => s.id).join(",")}`), on: now } };
   }
   if (goods.length)
-    tools.packing_list = { kind: "link", label: o.goods.packed ? "See it" : canEdit ? "Make it" : "See it", href: canEdit ? "#edit-lines" : "#lines" };
+    tools.packing_list = { kind: "link", label: o.goods.packed ? "See it" : canEdit ? "Make it" : "See it", href: `/orders/${o.id}/packing` };
   if (canPay && Number(o.money.due) > 0)
     tools.balance_in = {
       kind: "node",
@@ -213,7 +254,6 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
   const close = stageTool(me, o, "done", now);
   if (close) tools.closed = { kind: "node", node: close };
 
-  const showPacking = o.goods.allReceived || o.stage !== "confirmed";
   // A new shipment starts from the ports the terms give: E/F terms load at the Incoterm place, C/D terms discharge there.
   const fresh: Partial<ShipmentView> = { mode: "sea", status: "planned", ...portsOf(o) };
   const addShipment =
@@ -228,12 +268,23 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       />
     ) : undefined;
 
+  const going = shipments.filter((s) => s.status !== "arrived" && s.status !== "cleared");
+  const lead = shipments.find((s) => s.status !== "cleared") ?? shipments[0];
+  const header = (
+    <>
+      {shipments.length > 0 && addShipment}
+      {canShip && going.some((s) => s.status === "departed") && (
+        <HeaderTap label="Mark arrived" action={lightAction.bind(null, o.id, `arrived:${going.map((s) => s.id).join(",")}`)} on={now} />
+      )}
+    </>
+  );
+
   return (
     <StepPage
       steps={d.steps}
       step="shipping"
       base={d.base}
-      action={shipments.length ? addShipment : undefined}
+      action={header}
       side={<StepSidePanel id={o.id} step="shipping" changes={d.changes} historyHref={d.historyHref} />}
     >
       <Checklist
@@ -254,18 +305,29 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       <StepViewDivider />
       {shipping ? (
         shipments.length ? (
-          shipments.map((s, i) => (
-            <DetailsCard
-              key={s.id}
-              target="shipment"
-              id={i === 0 ? "shipments" : undefined}
-              title={shipments.length > 1 ? `Shipment ${i + 1}` : "Shipment"}
-              fields={shipmentFields(s, shipBy)}
-              action={fieldsAction.bind(null, o.id, `shipment:${s.id}`)}
-              canEdit={canShip}
-              panelTitle={shipments.length > 1 ? `Edit shipment ${i + 1}` : "Edit the shipment"}
-            />
-          ))
+          <>
+            {lead && <StatusBar states={SHIPMENT_STATUSES.map((k) => ({ key: k, label: SHIPMENT_STATUS_LABEL[k] }))} at={lead.status} />}
+            {shipments.map((s, i) => (
+              <InlineFieldsCard
+                key={s.id}
+                target="shipment"
+                id={i === 0 ? "shipments" : undefined}
+                title={shipments.length > 1 ? `Shipment ${i + 1}` : "Shipment"}
+                badge={whereBadge(s, now)}
+                fields={canShip ? formFields(s) : shipmentFields(s, shipBy)}
+                action={fieldsAction.bind(null, o.id, `shipment:${s.id}`)}
+                canEdit={canShip}
+                save="Save shipment"
+              />
+            ))}
+            {shipBy.ours && (
+              <p className={shipBy.late ? "text-sm text-bad" : "text-sm text-text-2"}>
+                Ship by {date(shipBy.ours)}
+                {shipBy.lc && ` · LC latest shipment ${date(shipBy.lc)}`}
+                {shipBy.late && " · ours is later than the LC allows"}
+              </p>
+            )}
+          </>
         ) : (
           <DetailsCard
             id="shipments"
@@ -296,37 +358,6 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           panelTitle="Edit shipping"
         />
       )}
-      {goods.length > 0 &&
-        (showPacking ? (
-          <div id="lines" data-target="lines.packing" data-target-card="" className="scroll-mt-24 rounded-xl">
-            <PackingCard
-              toggle
-              title="Lines · packing"
-              description={o.goods.packed ? "The packing list paper is made from these lines." : "Packages, weights and volume for each line, before shipping."}
-              badge={o.goods.packed ? <Badge tone="ok">Done</Badge> : <Badge tone="warn">Not made yet</Badge>}
-              orderId={o.id}
-              lines={o.lines.filter((l) => l.type === "goods")}
-              goods={goods}
-              containerNo={o.goods.containerNo}
-              containerHref="#goto=shipment.containerNo"
-              shippingMarks={o.goods.shippingMarks}
-              canEdit={canEdit}
-              canUpload={canEdit && (o.stage === "confirmed" || o.stage === "in_production")}
-              action={packingAction.bind(null, o.id)}
-              marksAction={packingMarksAction.bind(null, o.id)}
-              links={o.goods.packed || o.goods.totals.packages > 0 ? docHref(o, { kind: "packing-list", label: "Packing list" }) : undefined}
-              today={now}
-            />
-          </div>
-        ) : (
-          <Card id="lines" data-target="lines.packing" data-target-card="" className="scroll-mt-24">
-            <CardHeader
-              title="Lines · packing"
-              description="Opens once production has started, for the packages, weights and volume of each line."
-              actions={<Badge tone="warn">Not made yet</Badge>}
-            />
-          </Card>
-        ))}
     </StepPage>
   );
 }

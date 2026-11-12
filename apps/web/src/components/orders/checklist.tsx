@@ -971,7 +971,8 @@ export function Checklist({
   const [chosen, setChosen] = useState<string | null | undefined>(undefined);
   const activeKey = chosen === undefined ? (canEdit && nowItem ? keyOf(nowItem) : null) : chosen;
   return (
-    <Card>
+    // Board: the checklist comes after the step's own cards.
+    <Card className="order-last">
       <CardHeader
         title={
           <>

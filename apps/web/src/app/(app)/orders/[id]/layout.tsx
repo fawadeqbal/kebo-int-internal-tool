@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Package, XCircle } from "lucide-react";
-import { PAYMENT_ROUTE_SHORT, STEP_PATH } from "@kebo/shared";
-import { cn, OrderStageBadge, PageHeader, RefCode, StatusBadge } from "@kebo/ui";
+import { Package, Printer, XCircle } from "lucide-react";
+import { PAYMENT_ROUTE_SHORT, STEP_PATH, type FlowStep, type StepState } from "@kebo/shared";
+import { buttonClass, cn, OrderStageBadge, PageHeader, RefCode, StatusBadge } from "@kebo/ui";
+import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
-import { date, money, whole } from "@/lib/format";
-import { FileActions } from "@/components/common/file-actions";
+import { date, whole } from "@/lib/format";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { ScrolledBar } from "@/components/orders/scrolled-bar";
 import { OrderTabs } from "@/components/orders/order-tabs";
@@ -27,12 +27,44 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const { id } = await params;
   await requireUser();
   const o = await orderOf(id);
-  const [steps, flow, costs, files] = await Promise.all([
+  const [steps, flow, costs, files, pos] = await Promise.all([
     optional(() => orderStepsOf(id)),
     optional(() => orderFlowOf(id)),
     orderCostsSetup(id),
     optional(() => orderFilesOf(id)),
+    optional(() => api.get<{ items: { number: string; sentOn: string | null }[] }>(`/orders/${id}/purchase-orders`)),
   ]);
+  // What each step box says (board): where it stands in a few words.
+  const statusOf = (key: FlowStep, state: StepState, line: string): string => {
+    if (key === "payment") {
+      const deposit = Number(o.money.deposit);
+      if (flow?.payment.depositIn || (deposit > 0 && Number(o.money.received) >= deposit)) return Number(o.money.due) <= 0 ? "Paid in full" : "Deposit received";
+      if (deposit > 0) return `Deposit ${whole(o.money.deposit, o.currency)} ${Number(o.money.received) > 0 ? "part in" : "due"}`;
+      return state === "done" ? "Done" : line;
+    }
+    if (key === "factory" && pos?.items.length) {
+      const unsent = pos.items.filter((p) => !p.sentOn);
+      if (!unsent.length) {
+        const last = pos.items.map((p) => p.sentOn!).sort().at(-1)!;
+        return `PO sent ${date(last)}`;
+      }
+      return unsent.length === 1 ? `${unsent[0]!.number} not sent` : `${unsent.length} POs not sent`;
+    }
+    if (key === "production") {
+      const list = flow?.production?.steps ?? [];
+      const ready = flow?.factory.readyOn ?? o.readyOn;
+      const head = list.length ? `${list.filter((x) => x.doneOn).length} of ${list.length} steps` : null;
+      if (head && ready) return `${head} · ready ${date(ready)}`;
+      if (ready) return `Ready ${date(ready)}`;
+      return head ?? (state === "todo" ? "—" : "Ready date not known");
+    }
+    if (key === "shipping") {
+      const sh = flow?.shipping?.shipments[0];
+      if (sh?.arrivedOn) return `Arrived ${date(sh.arrivedOn)}`;
+      if (sh?.departedOn) return sh.eta ? `At sea · ETA ${date(sh.eta)}` : `Left ${date(sh.departedOn)}`;
+    }
+    return state === "todo" ? "—" : line;
+  };
   const ship = flow?.shipping?.shipments[0];
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
@@ -41,28 +73,39 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const pdf = proforma ? docHref(o, proforma) : null;
   const now = steps?.doNow;
   // On a phone the paper buttons fold into ⋯ (design system: page header).
-  const paperItems: MenuEntry[] = pdf
+  const paperItems: MenuEntry[] = [{ label: "Papers", href: `${base}/documents` }];
+  const proformaItems: MenuEntry[] = pdf
     ? [
         { label: "View / Print the proforma", href: pdf.view, newTab: true },
         { label: "Download the proforma PDF", href: pdf.pdf, download: true },
       ]
     : [];
   const moreItems: MenuEntry[] = [
+    ...proformaItems,
     { label: `Open the inquiry ${o.inquiry.refNo}`, href: `/inquiries/${o.inquiry.id}` },
     { label: `Open the customer ${o.customer.name}`, href: `/customers/${o.customer.id}` },
     { label: "Copy link to this order", copy: base },
   ];
 
+  // Board: SO · customer · from RFQ · QUO R2 · CPT Kabul · USD 52,400 (route and who handles it after).
   const meta = [
     <RefCode key="no">{o.refNo}</RefCode>,
-    <Link key="c" href={`/customers/${o.customer.id}`} className="font-medium text-primary hover:underline">
+    <Link key="c" href={`/customers/${o.customer.id}`} className="text-primary underline underline-offset-2 hover:opacity-80">
       {o.customer.name}
     </Link>,
-    <Link key="i" href={`/inquiries/${o.inquiry.id}`} className="hover:underline">
-      from {o.inquiry.refNo}
+    <Link key="i" href={`/inquiries/${o.inquiry.id}`} className="hover:opacity-80">
+      from <RefCode>{o.inquiry.refNo}</RefCode>
     </Link>,
+    o.quotation && (
+      <Link key="q" href={`/inquiries/${o.inquiry.id}/quotation`} className="hover:opacity-80">
+        <RefCode>
+          {o.quotation.refNo} R{o.quotation.number}
+        </RefCode>
+      </Link>
+    ),
     <span key="t" className="tabular">
-      {money(o.total, o.currency)}
+      {o.incoterm}
+      {o.incotermPlace ? ` ${o.incotermPlace}` : ""} · {whole(o.total, o.currency)}
     </span>,
     route && <span key="r">{route}</span>,
     o.inquiry.assignee && <span key="a">{o.inquiry.assignee.name}</span>,
@@ -113,7 +156,15 @@ export default async function OrderLayout({ children, params }: { children: Reac
               ))}
             </p>
           }
-          papers={pdf ? <FileActions viewHref={pdf.view} pdfHref={pdf.pdf} /> : undefined}
+          papers={
+            <>
+              <Link href={`${base}/documents`} className={buttonClass("secondary", "md")}>
+                <Printer aria-hidden /> Papers
+              </Link>
+              {/* A tab's main button lands here (HeaderSlot). */}
+              <span id="order-header-slot" className="contents" />
+            </>
+          }
           more={<MoreMenu label={`More for ${o.refNo}`} phoneItems={paperItems} items={moreItems} />}
         />
 
@@ -137,11 +188,9 @@ export default async function OrderLayout({ children, params }: { children: Reac
             number: s.number,
             label: s.label,
             state: s.state,
-            done: s.done,
-            total: s.total,
+            status: statusOf(s.key, s.state, s.line),
             href: `${base}/${STEP_PATH[s.key]}`,
           }))}
-          items={o.lines.filter((l) => !l.no.includes(".")).length}
           costs={costs && { spent: whole(costs.costs.totals.spent, costs.costs.currency) }}
         />
       )}

@@ -34,6 +34,8 @@ const listQuery = z.object({
   /** The most recently moved first (the board's Done column), and at most this many. */
   recent: flag,
   limit: z.coerce.number().int().min(1).max(300).optional(),
+  q: z.string().trim().max(100).optional(),
+  customer: z.string().uuid().optional(),
 });
 
 const pageQuery = z.object({
@@ -60,7 +62,7 @@ export class OrdersController {
   /** Orders with their stage, money due and what each needs now. ?status=open|closed|cancelled&stage=&mine=true&late=true */
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(listQuery)) q: z.infer<typeof listQuery>) {
-    return this.orders.list(user, { mine: q.mine, status: q.status, stage: q.stage, lateOnly: q.late, recent: q.recent, limit: q.limit });
+    return this.orders.list(user, { mine: q.mine, status: q.status, stage: q.stage, lateOnly: q.late, recent: q.recent, limit: q.limit, q: q.q, customerId: q.customer });
   }
 
   /** The orders list, a page at a time, with each status's count: ?status=open|late|closed|cancelled|all&mine=true&q&page&pageSize */
