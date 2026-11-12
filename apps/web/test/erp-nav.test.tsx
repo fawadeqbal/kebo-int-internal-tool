@@ -177,34 +177,26 @@ describe("the top menu", () => {
     shell(everything());
     const treasury = menu().getByRole("button", { name: "Treasury & payments, 2 to look at" });
     expect(treasury.className).toContain("bg-primary-soft");
-    expect(treasury.querySelector("span.h-\\[3px\\]")).toBeTruthy();
+    expect(treasury.className).toContain("border-primary-solid");
     expect(menu().getByRole("button", { name: "Partners & CRM" }).className).not.toContain("bg-primary-soft");
   });
 
-  it("shows the current module's pages as chips under the menu, the page marked", () => {
-    at.path = "/finance/cash-book";
-    shell(everything());
-    const chips = within(screen.getByRole("navigation", { name: "Treasury & payments pages" }));
-    expect(chips.getAllByRole("link").map((a) => a.textContent)).toEqual(["Payments", "Verification queue2", "Multi-currency vault"]);
-    expect(chips.getByRole("link", { current: "page" }).textContent).toBe("Multi-currency vault");
-    expect(chips.getByLabelText("2 waiting").textContent).toBe("2");
-  });
-
-  it("marks Pipelines, not the list, on /orders/board; a record marks its list", () => {
+  it("marks the page in its module's menu: Pipelines on /orders/board, the list on a record", () => {
     at.path = "/orders/board";
     const { unmount } = shell(everything());
-    expect(within(screen.getByRole("navigation", { name: "Overview pages" })).getByRole("link", { current: "page" }).textContent).toBe("Pipelines");
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "Overview" }).closest("li")!);
+    expect(within(screen.getByRole("menu", { name: "Overview" })).getByRole("menuitem", { current: "page" }).textContent).toBe("Pipelines");
     unmount();
     at.path = "/orders/9a1b";
     shell(everything());
-    expect(within(screen.getByRole("navigation", { name: "Operations & trading pages" })).getByRole("link", { current: "page" }).textContent).toBe("Orders");
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "Operations & trading" }).closest("li")!);
+    expect(within(screen.getByRole("menu", { name: "Operations & trading" })).getByRole("menuitem", { current: "page" }).textContent).toBe("Orders");
   });
 
-  it("has no page chips on the dashboard", () => {
+  it("marks Dashboard on the dashboard", () => {
     at.path = "/dashboard";
     shell(everything());
     expect(menu().getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.queryByRole("navigation", { name: /pages$/ })).toBeNull();
   });
 });
 

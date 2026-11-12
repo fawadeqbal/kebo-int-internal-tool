@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { CalendarClock, Factory, FileText, LayoutGrid, MessageSquareText, Plus } from "lucide-react";
 import { can, CHANNEL_LABEL, INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE, PRIORITY_LABEL, REVISION_STATUS_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, toPage } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { ExportLink } from "@/components/sheets/export-link";
@@ -105,6 +105,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
     <div>
       <PageHeader
         crumbs={crumbsFor("/inquiries")}
+        icon={MessageSquareText}
         title={labelFor("/inquiries")}
         summary={
           <>
@@ -112,6 +113,11 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
             {count("overdue") > 0 && ` · ${count("overdue")} past needed-by`}
             <span className="max-sm:hidden"> · every RFQ from first message to won or lost</span>
           </>
+        }
+        actions={
+          <ButtonLink href="/inquiries/board" variant="secondary" className="max-sm:hidden">
+            <LayoutGrid aria-hidden /> Board
+          </ButtonLink>
         }
         primary={
           canCreate && (
@@ -123,6 +129,22 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
         }
         more={insights ? <MoreMenu items={[{ label: "Sales funnel in Reports", href: "/reports/funnel" }]} /> : undefined}
       />
+
+      <StatRow className="mb-4">
+        <StatTile icon={MessageSquareText} iconColor={1} label="Open" value={open} sub={`${count("new")} new · ${count("sourcing")} sourcing · ${count("quoted")} quoted`} href={href({ stage: undefined })} />
+        <StatTile icon={Plus} iconColor={3} label="New" value={count("new")} sub="not asked factories yet" href={href({ stage: "new" })} />
+        <StatTile icon={Factory} iconColor={5} label="Sourcing" value={count("sourcing")} sub="getting factory prices" href={href({ stage: "sourcing" })} />
+        <StatTile icon={FileText} iconColor={4} label="Quoted" value={count("quoted")} sub="waiting for an answer" href={href({ stage: "quoted" })} />
+        <StatTile
+          icon={CalendarClock}
+          iconColor={2}
+          label="Past needed-by"
+          value={count("overdue")}
+          tone={count("overdue") > 0 ? "bad" : undefined}
+          sub={count("overdue") > 0 ? "the customer's date has passed" : "none late"}
+          href={href({ stage: "overdue" })}
+        />
+      </StatRow>
 
       <ListToolbar
         search={{ placeholder: "Search RFQ no., customer, item, model…", value: sp.q, clearHref: href({ q: undefined }) }}
@@ -200,7 +222,8 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                 <tr>
                   <Th>Inquiry</Th>
                   <Th>Customer</Th>
-                  <Th>Status</Th>
+                  <Th>Category</Th>
+                  <Th>Stage</Th>
                   <Th>Quotation</Th>
                   <Th>Handled by</Th>
                   <Th className="text-right">Received</Th>
@@ -215,17 +238,19 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                   return (
                     <DataRow key={d.id} href={`/inquiries/${d.id}`}>
                       <Td>
-                        <Link href={`/inquiries/${d.id}`} className="font-semibold hover:text-primary">
+                        <Link href={`/inquiries/${d.id}`} className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-2 hover:text-primary">
                           {d.refNo}
                         </Link>
+                        <span className="mt-1 block max-w-80 truncate font-semibold">{d.title}</span>
                         <span className="block max-w-80 truncate text-xs text-text-2">
-                          {d.title} · {plural(d.items, "item")} · {CHANNEL_LABEL[d.channel]}
+                          {d.items ? plural(d.items, "item") : "written need"} · {CHANNEL_LABEL[d.channel]}
                         </span>
                       </Td>
                       <Td>
                         {d.customer.name}
                         {d.customer.country === UNKNOWN_COUNTRY && <span className="block text-xs text-warn">Country not set</span>}
                       </Td>
+                      <Td className="text-text-2">{d.category}</Td>
                       <Td>
                         {badge(d)}
                         {d.requiredBy && <span className={`block text-xs ${d.overdue ? "font-medium text-bad" : "text-text-2"}`}>needed by {date(d.requiredBy)}</span>}

@@ -1,8 +1,10 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
 import { can, ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
-import { Alert, Badge, ButtonLink, Card, CardBody, CardHeader, Meter, PriorityBadge, StageBadge, StatTile, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
-import { ArrowRight, FileText, PieChart, Plus, ReceiptText, TrendingUp, Wallet } from "lucide-react";
+import { Alert, Badge, ButtonLink, Card, CardBody, CardHeader, cn, Meter, PriorityBadge, RefCode, StageBadge, StatTile, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ArrowRight, Coins, FileText, Package, PieChart, Plus, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
+import type { Aging } from "@/lib/types-facts";
+import { getSettings } from "@/lib/loaders";
 import type { OrderRow } from "@/lib/types-orders";
 import type { Paged } from "@/lib/types";
 import { api } from "@/lib/api";
@@ -10,11 +12,11 @@ import { requireUser, hasFeature } from "@/lib/session";
 import { date, money, TZ, plural } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { Reminders } from "@/lib/types-insights";
-import { loadHome } from "@/lib/insights-data";
+import { loadHome, type AccountRow } from "@/lib/insights-data";
 import { amountCell, bigMoney, change, monthYearOf, percent } from "@/lib/insights-period";
 import { TargetRing } from "@/components/insights/kpi";
 import { TargetEditor } from "@/components/insights/targets";
-import { Delta, Tiles } from "@/components/insights/frame";
+import { Delta } from "@/components/insights/frame";
 import { ChartCard } from "@/components/insights/chart-card";
 import { SalesProfitChart } from "@/components/insights/facts-charts";
 import { ReminderList } from "@/components/insights/reminder-list";
@@ -70,26 +72,21 @@ function DealList({ rows, empty }: { rows: DealLine[]; empty: string }) {
 export default async function DashboardPage() {
   const me = await requireUser();
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  // Only the deal counts are waited for; the month's figures and "Needs attention" stream in as they come.
-  const d = await api.get<Dashboard>("/dashboard");
+  const seeMoney = can(me, "expenses.manage");
+  // Only the deal counts are waited for; the figures and lists stream in as they come.
+  const [d, settings] = await Promise.all([api.get<Dashboard>("/dashboard"), getSettings()]);
   const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: TZ }).format(new Date()));
   const hello = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const dayName = new Date(`${d.today}T00:00:00Z`).toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  });
 
   return (
-    <div>
-      {/* The welcome card (Kebo ERP look): who, what day, how much needs them, and the day's main actions. */}
-      <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary-line bg-primary-soft px-5 py-5 sm:px-6">
+    <div className="flex flex-col gap-4">
+      {/* Welcome (board: Dashboard) */}
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary-line bg-primary-soft px-[26px] py-[22px]">
         <div className="min-w-0">
           <p className="text-xs font-bold tracking-[0.08em] text-primary uppercase">{hello}</p>
-          <h1 className="mt-1 text-2xl leading-8 font-bold tracking-tight text-text sm:text-[28px] sm:leading-9">Welcome back, {me.name.split(" ")[0]}</h1>
-          <p className="mt-1 text-sm text-text-2">
-            {dayName}
+          <h1 className="my-1 text-[30px] leading-9 font-bold text-text">Welcome back, {me.name.split(" ")[0]}</h1>
+          <p className="text-text-2">
+            Here is how {settings.company.name} is doing today.
             <Suspense>
               <HowMany />
             </Suspense>
@@ -106,32 +103,64 @@ export default async function DashboardPage() {
               <Wallet aria-hidden /> Record payment
             </ButtonLink>
           )}
+          {can(me, "expenses.manage") && (
+            <ButtonLink href="/payments/new?kind=expense" variant="secondary">
+              <Coins aria-hidden /> New expense
+            </ButtonLink>
+          )}
         </div>
-      </header>
+      </section>
 
-      {insights && (
-        <Suspense fallback={<MonthSkeleton />}>
-          <MonthStrip today={d.today} />
+      {/* Figures: Sales, Gross profit, Receivable, Payable, Cash & bank, Open orders */}
+      <Suspense fallback={<FiguresSkeleton />}>
+        <Figures today={d.today} insights={insights} seeMoney={seeMoney} />
+      </Suspense>
+
+      {/* Recent sales orders · Sales and costs */}
+      <div className="grid items-start gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+        <Suspense fallback={<div className="h-[340px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
+          <RecentOrders />
         </Suspense>
-      )}
+        {insights && (
+          <Suspense fallback={<div className="h-[340px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
+            <SalesChart today={d.today} />
+          </Suspense>
+        )}
+      </div>
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] [&>*]:min-w-0">
-        <div className="flex flex-col gap-5">
+      {/* Inquiry pipeline · Needs you · Cash and bank */}
+      <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
+        <Pipeline counts={d.counts} />
+        <Suspense fallback={<div className="h-[240px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
+          <NeedsYou />
+        </Suspense>
+        {seeMoney && (
+          <Suspense fallback={<div className="h-[240px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
+            <CashAndBank />
+          </Suspense>
+        )}
+      </div>
+
+      {/* The rest of the day's work, in the same cards */}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] [&>*]:min-w-0">
+        <div className="flex flex-col gap-4">
           <Suspense fallback={<AttentionSkeleton />}>
             <Attention all={can(me, "inquiries.viewAll")} />
           </Suspense>
-          <Suspense>
-            <RecentOrders />
-          </Suspense>
+          <Card>
+            <CardHeader title="My open inquiries" description="Earliest needed-by first" />
+            <CardBody>
+              <DealList rows={d.myDeals} empty="No open inquiries assigned to you." />
+            </CardBody>
+          </Card>
         </div>
-
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
           <Suspense fallback={<div className="h-[140px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
             <FollowUpsToday />
           </Suspense>
           {insights && (
-            <Suspense fallback={<div className="h-[300px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
-              <SalesChart today={d.today} />
+            <Suspense>
+              <MonthTarget today={d.today} />
             </Suspense>
           )}
           <Suspense>
@@ -143,46 +172,14 @@ export default async function DashboardPage() {
           <Suspense>
             <ThisWeek today={d.today} />
           </Suspense>
-          <Card className="rounded-2xl">
-            <CardHeader title="Inquiries now" description="Open inquiries by stage" />
-            <CardBody className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  [
-                    "New",
-                    d.counts.new,
-                    "/inquiries?stage=new",
-                    d.counts.unassigned ? `${d.counts.unassigned} not assigned` : "Not started",
-                  ],
-                  ["Sourcing", d.counts.sourcing, "/inquiries?stage=sourcing", "Getting prices"],
-                  ["Quoted", d.counts.quoted, "/inquiries?stage=quoted", "Waiting for answers"],
-                ] as const
-              ).map(([label, value, href, hint]) => (
-                <Link key={label} href={href} className="rounded-xl border border-line bg-surface p-3 transition-colors hover:border-primary-line hover:bg-primary-soft/50">
-                  <p className="text-xs font-medium text-text-2">{label}</p>
-                  <p className="text-2xl font-bold text-primary tabular">{value}</p>
-                  <p className="truncate text-xs text-muted">{hint}</p>
-                </Link>
-              ))}
-            </CardBody>
-          </Card>
-          <Card className="rounded-2xl">
-            <CardHeader title="My open inquiries" description="Earliest needed-by first" />
-            <CardBody>
-              <DealList rows={d.myDeals} empty="No open inquiries assigned to you." />
-            </CardBody>
-          </Card>
           {d.workload && (
-            <Card className="rounded-2xl">
+            <Card>
               <CardHeader title="Team" description="Open inquiries and orders per person" />
               <CardBody>
                 <ul className="flex flex-col gap-2">
                   {d.workload.map((p) => (
                     <li key={p.id}>
-                      <Link
-                        href={`/inquiries?assignee=${p.id}`}
-                        className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-sm hover:border-line-strong"
-                      >
+                      <Link href={`/inquiries?assignee=${p.id}`} className="flex items-center justify-between rounded-[10px] border border-line px-3 py-2 text-sm hover:border-line-strong">
                         <span className="font-medium">{p.name}</span>
                         <span className="text-xs text-muted tabular">
                           {p.openDeals} {p.openDeals === 1 ? "inquiry" : "inquiries"} · {p.openOrders} order{p.openOrders === 1 ? "" : "s"}
@@ -204,101 +201,232 @@ export default async function DashboardPage() {
 const getHome = cache((today: string) => loadHome(today).catch(() => null));
 const getReminders = cache(() => api.get<Reminders>("/reminders"));
 
-/** " · 3 things need you, 1 urgent" after the date, once the list is in. */
+/** " 4 things need you." after the welcome line, once the list is in (bold, as on the board). */
 async function HowMany() {
   const r = await getReminders();
   const n = r.counts.total;
-  if (n === 0) return <> · nothing needs you right now</>;
+  if (n === 0) return <> Nothing needs you right now.</>;
   return (
     <>
       {" "}
-      · {n} thing{n === 1 ? "" : "s"} need{n === 1 ? "s" : ""} you
-      {r.counts.bad > 0 && <span className="font-medium text-bad">, {r.counts.bad} urgent</span>}
+      <strong className="font-semibold text-text">
+        {n} thing{n === 1 ? "" : "s"} need{n === 1 ? "s" : ""} you.
+      </strong>
+      {r.counts.bad > 0 && <span className="font-medium text-bad"> {r.counts.bad} urgent.</span>}
     </>
   );
 }
 
-/**
- * This month, as Insights › Overview shows it for "Month" (the same tiles, labels and endpoints): Sales,
- * Gross profit, To receive with what is overdue, Open quotes; and the month's target.
- */
-async function MonthStrip({ today }: { today: string }) {
-  const h = await getHome(today);
-  if (!h) return null;
-  const c = h.currency;
-  const vs = h.p.vsLabel;
-  const overdue = h.now.overdue;
-  const owed = Number(h.receivable.total);
+/** Six figures in a row (board): this month's sales and gross profit, what customers owe, what we owe factories, our cash and bank, open orders. */
+async function Figures({ today, insights, seeMoney }: { today: string; insights: boolean; seeMoney: boolean }) {
+  const [h, payable, accounts, orders] = await Promise.all([
+    insights ? getHome(today) : null,
+    insights && seeMoney ? api.get<Aging>("/insights/facts/aging", { side: "payable" }).catch(() => null) : null,
+    seeMoney ? api.get<AccountRow[]>("/money/accounts").catch(() => null) : null,
+    api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1, pageSize: 1 }).catch(() => null),
+  ]);
+  const c = h?.currency ?? "";
+  const overdue = h ? Number(h.now.overdue.amount) : 0;
+  const owed = h ? Number(h.receivable.total) : 0;
+  // The main currency's balance first (the one the other figures are in), then the others.
+  const cash = cashTotals(accounts ?? []).sort((x, y) => Number(y.currency === c) - Number(x.currency === c));
   return (
     <>
-      {h.missingRates.length > 0 && (
-        <Alert tone="warning" className="mb-4">
-          There is no exchange rate for {h.missingRates.join(", ")} in Settings, so amounts in {h.missingRates.length === 1 ? "it are" : "them are"} left
-          out of these figures.
+      {h && h.missingRates.length > 0 && (
+        <Alert tone="warning">
+          There is no exchange rate for {h.missingRates.join(", ")} in Settings, so amounts in {h.missingRates.length === 1 ? "it are" : "them are"} left out of these figures.
         </Alert>
       )}
-      <section aria-label="This month" className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Tiles>
+      <section aria-label="Figures" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
+        {h && (
           <StatTile
-            label="Sales"
             icon={TrendingUp}
             iconColor={1}
+            label="Sales this month"
             value={bigMoney(h.sales.now, c)}
-            delta={<Delta value={change(h.sales.now, h.sales.before)} vs={vs} />}
-            sub={`this month · ${plural(h.sales.orders, "order")}`}
+            sub={<Delta value={change(h.sales.now, h.sales.before)} vs={h.p.vsLabel} />}
             href="/reports?period=month"
           />
+        )}
+        {h && (
           <StatTile
-            label="Gross profit"
             icon={PieChart}
             iconColor={3}
+            label="Gross profit"
             value={bigMoney(h.profit.now, c)}
-            delta={<Delta value={change(h.profit.now, h.profit.before)} vs={vs} />}
-            sub={`margin ${percent(h.profit.margin)}${h.profit.marginBefore !== null ? ` · was ${percent(h.profit.marginBefore)}` : ""}`}
+            sub={`margin ${percent(h.profit.margin)}`}
             href="/reports?period=month"
           />
+        )}
+        {h && (
           <StatTile
-            label="Receivable"
             icon={FileText}
             iconColor={2}
-            tone={Number(overdue.amount) > 0 ? "bad" : undefined}
+            label="Receivable"
             value={bigMoney(owed, c)}
-            meter={owed > 0 ? { percent: (Number(overdue.amount) / owed) * 100, label: `${bigMoney(Number(overdue.amount), c)} of it overdue` } : undefined}
-            sub={
-              Number(overdue.amount) > 0 ? (
-                <span className="font-medium text-bad">
-                  {bigMoney(Number(overdue.amount), c)} overdue · {plural(overdue.customers, "customer")}
-                </span>
-              ) : (
-                "nothing overdue"
-              )
-            }
+            tone={overdue > 0.005 ? "bad" : undefined}
+            sub={overdue > 0.005 ? `${bigMoney(overdue, c)} late` : "nothing late"}
             href="/finance/to-receive"
           />
+        )}
+        {payable && (
           <StatTile
-            label="Open quotes"
-            icon={ReceiptText}
+            icon={ShoppingCart}
             iconColor={4}
-            value={bigMoney(Number(h.now.openQuotes.value), c)}
-            sub={`${plural(h.now.openQuotes.count, "quote")}${h.now.openQuotes.likely ? ` · likely ${bigMoney(Number(h.now.openQuotes.likely), c)}` : ""}`}
-            href="/inquiries?stage=quoted"
+            label="Payable"
+            value={bigMoney(Number(payable.total), payable.currency)}
+            sub={Number(payable.d30) + Number(payable.d60) + Number(payable.d90) + Number(payable.older) > 0.005 ? "some past its date" : "to factories"}
+            href="/purchasing/to-pay"
           />
-        </Tiles>
-        <Card className="rounded-2xl">
-          <CardHeader
-            title="This month's target"
-            actions={h.target.canSet ? <TargetEditor month={h.target.month} current={h.target.amount} currency={c} /> : undefined}
+        )}
+        {accounts && (
+          <StatTile
+            icon={Wallet}
+            iconColor={5}
+            label="Cash & bank"
+            value={cash[0] ? money(cash[0].amount, cash[0].currency) : "—"}
+            sub={cash.length > 1 ? cash.slice(1).map((x) => money(x.amount, x.currency)).join(" · ") : plural(accounts.filter((a) => !a.archived).length, "account")}
+            href="/finance/cash-book"
           />
-          <CardBody>
-            {h.target.amount && h.target.percent !== null ? (
-              <TargetRing percent={h.target.percent} reached={h.target.reached} amount={h.target.amount} currency={c} size={112} />
-            ) : (
-              <p className="text-sm text-muted">No target yet. Set one to see at a glance how the month is going.</p>
-            )}
-          </CardBody>
-        </Card>
+        )}
+        <StatTile icon={Package} iconColor={2} label="Open orders" value={orders?.total ?? "—"} sub="not closed yet" href="/orders" />
       </section>
     </>
+  );
+}
+
+/** Our accounts' balances added up per currency, the biggest first. */
+function cashTotals(accounts: AccountRow[]) {
+  const by = new Map<string, number>();
+  for (const a of accounts) if (!a.archived) by.set(a.currency, (by.get(a.currency) ?? 0) + Number(a.balance ?? 0));
+  return [...by].map(([currency, amount]) => ({ currency, amount })).sort((x, y) => y.amount - x.amount);
+}
+
+/** This month's company target (managers), in its own card. */
+async function MonthTarget({ today }: { today: string }) {
+  const h = await getHome(today);
+  if (!h) return null;
+  return (
+    <Card>
+      <CardHeader title="This month's target" actions={h.target.canSet ? <TargetEditor month={h.target.month} current={h.target.amount} currency={h.currency} /> : undefined} />
+      <CardBody>
+        {h.target.amount && h.target.percent !== null ? (
+          <TargetRing percent={h.target.percent} reached={h.target.reached} amount={h.target.amount} currency={h.currency} size={112} />
+        ) : (
+          <p className="text-sm text-muted">No target yet. Set one to see at a glance how the month is going.</p>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+/** Inquiry pipeline (board): open inquiries by stage, a bar each. */
+function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
+  const rows = [
+    { label: "New", n: counts.new, href: "/inquiries?stage=new", hint: counts.unassigned ? `${counts.unassigned} not assigned` : "not started" },
+    { label: "Sourcing", n: counts.sourcing, href: "/inquiries?stage=sourcing", hint: "getting prices" },
+    { label: "Quoted", n: counts.quoted, href: "/inquiries?stage=quoted", hint: "waiting for answers" },
+    { label: "Past needed-by", n: counts.overdue, href: "/inquiries?stage=overdue", hint: "late", late: true },
+  ];
+  const max = Math.max(1, ...rows.map((r) => r.n));
+  return (
+    <Card>
+      <CardHeader
+        title="Inquiry pipeline"
+        actions={
+          <Link href="/inquiries/board" className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline">
+            Board <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        }
+      />
+      <CardBody>
+        <ul className="flex flex-col gap-3">
+          {rows.map((r) => (
+            <li key={r.label}>
+              <Link href={r.href} className="flex flex-col gap-1.5 rounded-lg hover:text-primary">
+                <span className="flex justify-between text-[13px]">
+                  <span>
+                    {r.label} <span className="text-muted">· {r.hint}</span>
+                  </span>
+                  <strong className={cn("tabular", r.late && r.n > 0 && "text-bad")}>{r.n}</strong>
+                </span>
+                <span className="h-2 rounded bg-surface-3">
+                  <span className={cn("block h-2 rounded", r.late ? "bg-chart-2" : "bg-chart-1")} style={{ width: `${(r.n / max) * 100}%` }} />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-xs text-muted">On hold: {counts.onHold}</p>
+      </CardBody>
+    </Card>
+  );
+}
+
+/** Needs you (board): the four most urgent things, one line each, with when. */
+async function NeedsYou() {
+  const r = await getReminders().catch(() => null);
+  if (!r) return null;
+  const top = r.items.slice(0, 4);
+  const tone = (lvl: string) => (lvl === "bad" ? "bg-bad-soft text-bad" : lvl === "warn" ? "bg-warn-soft text-warn" : "bg-info-soft text-info");
+  return (
+    <Card>
+      <CardHeader title="Needs you" actions={r.counts.total ? <Badge tone={r.counts.bad ? "bad" : "info"}>{r.counts.total}</Badge> : undefined} />
+      <CardBody>
+        {top.length ? (
+          <ol className="flex flex-col gap-3">
+            {top.map((i) => (
+              <li key={i.key}>
+                <Link href={i.href} className="flex gap-2.5 hover:text-primary">
+                  <span className={cn("grid size-[30px] shrink-0 place-items-center rounded-full text-[11px] font-bold", tone(i.level))} aria-hidden>
+                    !
+                  </span>
+                  <span className="min-w-0 text-[13px]">
+                    <span className="block">{readableDates(i.title)}</span>
+                    {i.detail && <span className="block truncate text-xs text-muted">{readableDates(i.detail)}</span>}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-muted">Nothing needs you right now.</p>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+/** Cash and bank (board): each account's balance. */
+async function CashAndBank() {
+  const accounts = await api.get<(AccountRow & { id: string; name: string })[]>("/money/accounts").catch(() => null);
+  if (!accounts) return null;
+  const live = accounts.filter((a) => !a.archived);
+  return (
+    <Card>
+      <CardHeader
+        title="Cash and bank"
+        actions={
+          <Link href="/finance/cash-book" className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline">
+            Vault <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        }
+      />
+      <CardBody>
+        {live.length ? (
+          <ul className="flex flex-col gap-2.5 text-[13px]">
+            {live.map((a) => (
+              <li key={a.id} className="flex justify-between gap-3">
+                <span className="truncate">{a.name}</span>
+                <strong className="tabular">{money(a.balance ?? 0, a.currency)}</strong>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">No accounts yet.</p>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 
@@ -474,13 +602,11 @@ async function RecentOrders() {
           {rows.map((o) => (
             <Tr key={o.id}>
               <Td>
-                <Link href={`/orders/${o.id}`} className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-2 hover:text-primary">
-                  {o.refNo}
-                </Link>
+                <RefCode href={`/orders/${o.id}`}>{o.refNo}</RefCode>
               </Td>
               <Td className="max-w-56 truncate font-semibold">{o.customer.name}</Td>
-              <Td className="text-right tabular">{money(o.total, o.currency)}</Td>
-              <Td className="text-right tabular">{Number(o.due) > 0.005 ? money(o.due, o.currency) : "—"}</Td>
+              <Td className="text-right whitespace-nowrap tabular">{money(o.total, o.currency)}</Td>
+              <Td className="text-right whitespace-nowrap tabular">{Number(o.due) > 0.005 ? money(o.due, o.currency) : "—"}</Td>
               <Td>
                 <StatusBadge meaning={ORDER_STAGE_TONE[o.stage]}>{ORDER_STAGE_LABEL[o.stage]}</StatusBadge>
               </Td>
@@ -506,18 +632,16 @@ async function Attention({ all }: { all: boolean }) {
   );
 }
 
-function MonthSkeleton() {
+function FiguresSkeleton() {
   return (
-    <div className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]" aria-hidden>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[0, 1, 2, 3].map((k) => (
-          <div key={k} className="h-[118px] animate-pulse rounded-2xl bg-surface-2" />
-        ))}
-      </div>
-      <div className="h-[118px] animate-pulse rounded-2xl bg-surface-2" />
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]" aria-hidden>
+      {[0, 1, 2, 3, 4, 5].map((k) => (
+        <div key={k} className="h-[92px] animate-pulse rounded-[14px] bg-surface-2" />
+      ))}
     </div>
   );
 }
+
 
 function AttentionSkeleton() {
   return (

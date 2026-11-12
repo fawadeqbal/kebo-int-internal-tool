@@ -205,7 +205,7 @@ const ICON_BG = { 1: "bg-chart-1", 2: "bg-chart-2", 3: "bg-chart-3", 4: "bg-char
 
 /** Tiles in a row of 3–6. */
 export function StatRow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(170px,1fr))]", className)}>{children}</div>;
+  return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]", className)}>{children}</div>;
 }
 
 /**
@@ -250,14 +250,14 @@ export function StatTile({
   const figure = (
     <>
       <span className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium text-text-2">{label}</span>
+        <span className="text-xs text-muted">{label}</span>
         {delta}
       </span>
       <span
         title={typeof value === "string" ? value : undefined}
         className={cn(
-          "truncate font-semibold tracking-tight tabular",
-          size === "sm" ? "text-lg sm:text-xl" : "text-xl leading-7 sm:text-2xl",
+          "truncate font-bold tracking-tight tabular",
+          size === "sm" ? "text-lg sm:text-xl" : "text-xl leading-7 sm:text-[21px]",
           tone === "bad" && "text-bad",
           tone === "warn" && "text-warn",
           tone === "ok" && "text-ok",
@@ -276,7 +276,7 @@ export function StatTile({
   );
   const body = Icon ? (
     <span className="flex min-w-0 items-start gap-3">
-      <span className={cn("hidden size-11 shrink-0 place-items-center rounded-xl text-white sm:grid", ICON_BG[iconColor])} aria-hidden>
+      <span className={cn("hidden size-[42px] shrink-0 place-items-center rounded-xl text-white sm:grid", ICON_BG[iconColor])} aria-hidden>
         <Icon className="size-5" />
       </span>
       <span className={cn("flex min-w-0 flex-1 flex-col", size === "sm" ? "gap-0.5" : "gap-1")}>{figure}</span>
@@ -285,9 +285,9 @@ export function StatTile({
     figure
   );
   const cls = cn(
-    "flex h-full min-w-0 flex-col rounded-2xl border bg-surface shadow-card",
-    tone === "bad" ? "border-bad/30" : "border-line",
-    size === "sm" ? "gap-0.5 px-4 py-3" : "gap-1 px-4 py-4",
+    "flex h-full min-w-0 flex-col rounded-[14px] border bg-surface",
+    tone === "bad" ? "border-[#f3c7c2] dark:border-bad/40" : "border-line",
+    size === "sm" ? "gap-0.5 px-4 py-3" : "gap-0.5 px-4 py-3.5",
     className,
   );
   return href ? (

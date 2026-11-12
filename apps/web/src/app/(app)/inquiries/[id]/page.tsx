@@ -68,21 +68,16 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
   const latest = revisionsOf(d)[0];
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {(g.lead || g.text) && (
-        <section
-          aria-label="What next"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary-soft/50 px-4 py-3"
-        >
-          <p className="flex min-w-0 items-start gap-2 text-sm">
-            <ArrowRight className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-            <span>
-              {g.lead && <b className="font-semibold">{g.lead}</b>} {g.text}
-            </span>
+        <section aria-label="What next" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f6d3bd] bg-action-soft px-5 py-4 dark:border-action/30">
+          <p className="min-w-0">
+            {g.lead && <strong className="block font-bold text-[#8a3a07] dark:text-action">{g.lead}</strong>}
+            <span className="block text-sm text-text-2">{g.text}</span>
           </p>
           {g.href && (
-            <Link href={g.href} className={buttonClass("primary", "sm", "max-sm:w-full")}>
-              {g.label}
+            <Link href={g.href} className={buttonClass("primary", "md", "max-sm:w-full")}>
+              {g.label} <ArrowRight aria-hidden />
             </Link>
           )}
         </section>
@@ -282,7 +277,7 @@ function StepCard({
 }) {
   const now = step.state === "now";
   return (
-    <Card className={cn("relative flex flex-col gap-2 p-4", now && "border-primary ring-1 ring-primary")}>
+    <Card className={cn("relative flex flex-col gap-2 p-4", now && "border-2 border-action-solid bg-action-soft")}>
       <h2 className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-xs text-muted tabular">{step.number}</span>
         <Link href={href} className="font-semibold after:absolute after:inset-0 hover:text-primary">
@@ -304,7 +299,7 @@ function StepCard({
       {next && (
         <Link
           href={next.href}
-          className="relative z-10 mt-auto flex items-center gap-1.5 rounded-lg bg-primary-soft/60 px-3 py-2 text-xs font-medium text-primary hover:bg-primary-soft"
+          className="relative z-10 mt-auto flex items-center gap-1.5 rounded-[10px] bg-action-solid px-3 py-2 text-xs font-semibold text-white hover:bg-action-solid-hover"
         >
           <ArrowRight className="size-3.5" aria-hidden /> {next.label}
         </Link>

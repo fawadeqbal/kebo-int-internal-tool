@@ -38,7 +38,7 @@ export function StepMark({ state, number, size = "sm" }: { state: StepState; num
         "grid shrink-0 place-items-center rounded-full border-[1.5px] font-bold tabular",
         box,
         state === "now"
-          ? "border-primary bg-primary text-primary-fg"
+          ? "border-action-solid bg-action-solid text-white"
           : state === "late"
             ? "border-bad bg-bad text-white"
             : "border-line-strong bg-surface text-muted",
@@ -49,7 +49,47 @@ export function StepMark({ state, number, size = "sm" }: { state: StepState; num
   );
 }
 
-const SR: Record<StepState, string> = { done: "done", now: "now", late: "late", todo: "later" };
+const WORD: Record<StepState, string> = { done: "Done", now: "Now", late: "Late", todo: "Later" };
+
+/**
+ * The flow's steps as boxes (Kebo ERP look), from a tablet up: done soft green with a tick, now an
+ * orange edge, late a red edge, later plain; each box links to its step's page, the page you are on
+ * ringed in green. The word ("Done", "Now"…) is written; the colour only repeats it.
+ */
+export function StepBoxes({ steps, label, isHere }: { steps: StepNavStep[]; label: string; isHere: (href: string) => boolean }) {
+  return (
+    <nav aria-label={label} className="no-print hidden md:block">
+      <ol className="flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {steps.map((s) => {
+          const here = isHere(s.href);
+          return (
+            <li key={s.key} className="flex min-w-44 flex-1">
+              <Link
+                href={s.href}
+                aria-current={here ? "page" : undefined}
+                className={cn(
+                  "flex w-full flex-col gap-1 rounded-xl px-3 py-2.5 transition-shadow hover:shadow-card",
+                  s.state === "done" && "border border-primary-line bg-primary-soft",
+                  s.state === "now" && "border-2 border-action-solid bg-action-soft",
+                  s.state === "late" && "border-2 border-bad bg-bad-soft",
+                  s.state === "todo" && "border border-line bg-surface",
+                  here && "ring-2 ring-primary-solid ring-offset-2 ring-offset-bg",
+                )}
+              >
+                <span className="flex items-center gap-2 text-[13px] font-bold text-text">
+                  <StepMark state={s.state} number={s.number} />
+                  <span className="truncate">{s.label}</span>
+                  <span className={cn("ml-auto text-[11px] font-semibold", s.state === "late" ? "text-bad" : s.state === "now" ? "text-action" : "text-muted")}>{WORD[s.state]}</span>
+                </span>
+                <span className={cn("truncate text-xs", s.state === "late" ? "font-medium text-bad" : "text-text-2")}>{tagOf(s) || "—"}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
 
 /**
  * The order's (and the inquiry's) navigation: Overview, the steps (tick or
@@ -108,30 +148,17 @@ export function StepNav({
 
   return (
     <>
-      {/* From a tablet up: the design system's section navigation (its phone chips are replaced by the picker below). */}
-      <SectionNav
-        label={label}
-        phone="none"
-        className="mt-4"
-        items={links.map((l) => {
-          const s = "number" in l ? l : null;
-          return {
-            href: l.href,
-            label: l.label,
-            active: active(l.href),
-            mark: s ? <StepMark state={s.state} number={s.number} /> : undefined,
-            alert: s?.state === "late",
-            count: s ? (
-              <>
-                {tagOf(s)}
-                <span className="sr-only">
-                  {s.status === undefined && s.total !== undefined ? " done" : ""}, {SR[s.state]}
-                </span>
-              </>
-            ) : "tag" in l ? l.tag : undefined,
-          };
-        })}
-      />
+      {/* From a tablet up: the steps as boxes, then the record's other pages as chips (the phone has the picker below). */}
+      <div className="mt-4 flex flex-col gap-3 max-md:hidden">
+        <StepBoxes steps={steps} label={label} isHere={active} />
+        <SectionNav
+          label={`${label}: more`}
+          phone="none"
+          items={links
+            .filter((l) => !("number" in l))
+            .map((l) => ({ href: l.href, label: l.label, active: active(l.href), count: "tag" in l ? l.tag : undefined }))}
+        />
+      </div>
 
       <div ref={box} className="no-print relative mt-3 md:hidden">
         <button
@@ -165,7 +192,7 @@ export function StepNav({
                   key={s.key}
                   className={cn(
                     "size-2 rounded-full",
-                    s.state === "done" ? "bg-ok" : s.state === "now" ? "bg-primary" : s.state === "late" ? "bg-bad" : "bg-line-strong",
+                    s.state === "done" ? "bg-ok" : s.state === "now" ? "bg-action-solid" : s.state === "late" ? "bg-bad" : "bg-line-strong",
                   )}
                 />
               ))}
