@@ -38,6 +38,11 @@ const listQuery = z.object({
 
 const pageQuery = z.object({
   status: z.enum(["open", "late", "closed", "cancelled", "all"]).default("open"),
+  /** Open orders at this stage. */
+  stage: z.enum(ORDER_STAGES).optional(),
+  customer: z.string().uuid().optional(),
+  /** Who handles the order's inquiry. */
+  assignee: z.string().uuid().optional(),
   mine: flag,
   q: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),

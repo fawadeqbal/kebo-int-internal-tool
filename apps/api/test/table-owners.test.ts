@@ -12,6 +12,7 @@ const OWNERS: Record<string, string> = {
   moneyAccount: "treasury",
   invoice: "billing",
   orderDelivery: "flow",
+  purchaseOrder: "flow",
   orderCancellation: "cancellation",
   orderPaymentTerms: "orders",
   orderPaper: "documents",

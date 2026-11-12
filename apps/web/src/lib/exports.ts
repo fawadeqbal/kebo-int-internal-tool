@@ -680,7 +680,33 @@ async function factoryList(q: Q): Promise<SheetSpec> {
   };
 }
 
+/** Purchase orders (Operations › Purchase orders): every one, with what it costs and where it stands. */
+async function purchaseOrders(): Promise<SheetSpec> {
+  type Row = { po: { number: string } | null; status: string; supplier: { name: string }; order: { refNo: string }; customer: { name: string }; currency: string; owed: string; paid: string; toPay: string; readyOn: string | null; orderedOn: string | null; supplierRef: string | null };
+  const rows = await api.get<Row[]>("/operations/purchase-orders", { all: "true" });
+  return {
+    name: `Purchase orders ${stamp()}`,
+    title: "Purchase orders",
+    columns: [text("PO", 16), text("Supplier", 30), text("Sales order", 16), text("Customer", 28), text("Currency", 9), money("Total"), money("Paid"), money("To pay"), text("Ready"), text("Sent"), text("Their no.", 16), text("Status", 16)],
+    rows: rows.map((r): Cell[] => [
+      r.po?.number ?? null,
+      r.supplier.name,
+      r.order.refNo,
+      r.customer.name,
+      r.currency,
+      Number(r.owed),
+      Number(r.paid),
+      Number(r.toPay),
+      day(r.readyOn),
+      day(r.orderedOn),
+      r.supplierRef,
+      r.status.replace(/_/g, " "),
+    ]),
+  };
+}
+
 export const EXPORTS = {
+  "purchase-orders": purchaseOrders,
   inquiries: deals,
   orders,
   customers,

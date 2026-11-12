@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { livePart, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, routeOf, termsSelect, type WithTerms } from "@kebo/database";
+import { decimalToMinor, livePart, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, routeOf, termsSelect, type WithTerms } from "@kebo/database";
 import {
   bankStepsFor,
   BANK_STEP_LABEL,
@@ -45,7 +45,9 @@ import {
   type SatInput,
   type ShipmentInput,
   type ShipmentUpdateInput,
+  type SendPurchaseOrderInput,
 } from "@kebo/shared";
+import { fromMinor } from "@kebo/money";
 import { addDays, dateIn, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { setPaymentTerms } from "../orders/payment-terms";
@@ -67,7 +69,7 @@ import { addDocument, changeDocument, removeDocument } from "../documents/api";
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 
 type FlowAction =
-  "route" | "bank_contract" | "factory_order" | "production" | "shipment" | "document" | "bank_step" | "delivery" | "sat" | "claim";
+  "route" | "bank_contract" | "factory_order" | "purchase_order" | "production" | "shipment" | "document" | "bank_step" | "delivery" | "sat" | "claim";
 
 /** The production timeline is the checklist's own Production items. */
 const productionWhere = { step: "production", key: null } as const;
@@ -653,6 +655,116 @@ export class FlowService {
     });
     await this.orders.announce(event);
     return this.get(user, id);
+  }
+
+  /* ---------------------------------------------------------------- purchase orders */
+
+  /**
+   * The order's purchase orders (one per supplier on its lines, PO-2026-0044), each with its lines' total at the
+   * supplier's prices, the ready date, whether it was sent (or, before the step, the order's factory date), and
+   * whether the customer's deposit is verified: recorded payments of kind deposit covering the deposit asked.
+   */
+  async purchaseOrders(user: SessionUser, id: string) {
+    const o = await this.prisma.db.order.findFirst({
+      where: { id, ...orderAccess(user) },
+      select: {
+        id: true,
+        refNo: true,
+        currency: true,
+        factoryOrderedOn: true,
+        factoryOrderNo: true,
+        purchaseOrders: {
+          orderBy: { number: "asc" },
+          select: {
+            id: true,
+            number: true,
+            sentOn: true,
+            sentEarlyReason: true,
+            supplierRef: true,
+            supplier: { select: { id: true, name: true } },
+            sentBy: { select: { id: true, name: true } },
+          },
+        },
+        lines: { select: { factoryId: true, quantity: true, factoryUnitPrice: true, factoryCurrency: true } },
+        ...readySelect,
+      },
+    });
+    if (!o) throw new NotFoundError("Order");
+    const seeCosts = can(user, "sourcing.manage");
+    const ready = new Map(readyByOf(o).map((r) => [r.factoryId, r.readyOn] as const));
+    const deposit = await this.depositState(this.prisma.db, id);
+    return {
+      deposit,
+      items: o.purchaseOrders.map((p) => {
+        const lines = o.lines.filter((l) => l.factoryId === p.supplier.id);
+        const totalMinor = lines.reduce((t, l) => t + Math.round(decimalToMinor(l.factoryUnitPrice ?? 0) * Number(l.quantity)), 0);
+        const sentOn = p.sentOn ? fromDbDate(p.sentOn) : o.factoryOrderedOn ? fromDbDate(o.factoryOrderedOn) : null;
+        return {
+          id: p.id,
+          number: p.number,
+          supplier: p.supplier,
+          lines: lines.length,
+          currency: lines.find((l) => l.factoryCurrency)?.factoryCurrency ?? null,
+          total: seeCosts ? fromMinor(totalMinor) : null,
+          readyOn: ready.get(p.supplier.id) ?? null,
+          sentOn,
+          sentBy: p.sentBy,
+          supplierRef: p.supplierRef ?? (sentOn ? o.factoryOrderNo : null),
+          sentEarlyReason: p.sentEarlyReason,
+        };
+      }),
+    };
+  }
+
+  /** The deposit asked and how much of it the recorded deposit payments cover (verified when they cover it). */
+  private async depositState(db: Tx | PrismaService["db"], orderId: string) {
+    const [asked, paid] = await Promise.all([
+      db.invoice.findFirst({ where: { orderId, part: "deposit" }, select: { amount: true } }),
+      db.allocation.findMany({ where: { ...livePart, orderId, kind: "deposit" }, select: { amount: true, bankCharges: true } }),
+    ]);
+    const askedMinor = asked ? decimalToMinor(asked.amount) : 0;
+    const paidMinor = paid.reduce((t, p) => t + decimalToMinor(p.amount) + decimalToMinor(p.bankCharges), 0);
+    return { asked: fromMinor(askedMinor), paid: fromMinor(paidMinor), verified: askedMinor === 0 || paidMinor >= askedMinor };
+  }
+
+  /**
+   * Sends one purchase order: the day, the supplier's number, how. Before the customer's deposit is verified it
+   * needs a written reason (decided 12 Nov), kept on the purchase order and in the history. The first one sent
+   * is also the order's "ordered from the factory" day (the factory step, payment plans, in production).
+   */
+  async sendPurchaseOrder(user: SessionUser, id: string, poId: string, input: SendPurchaseOrderInput) {
+    await this.must(user, "orders.update", null, "change orders");
+    if (input.sentOn > this.clock.today()) throw new DomainError("The day it was sent cannot be in the future.");
+    const first = await this.prisma.tx(async (tx) => {
+      const o = await this.lockOrder(tx, user, id);
+      const po = await tx.purchaseOrder.findFirst({ where: { id: poId, orderId: id }, include: { supplier: { select: { name: true } } } });
+      if (!po) throw new NotFoundError("Purchase order");
+      const deposit = await this.depositState(tx, id);
+      const reason = input.reason?.trim() || null;
+      if (!deposit.verified && !reason)
+        throw new DomainError("The customer's deposit is not verified yet: write why the purchase order goes now.");
+      await tx.purchaseOrder.update({
+        where: { id: poId },
+        data: {
+          sentOn: toDbDate(input.sentOn),
+          sentById: user.id,
+          supplierRef: input.supplierRef?.trim() || po.supplierRef,
+          sentEarlyReason: deposit.verified ? null : reason,
+        },
+      });
+      await this.log(
+        tx,
+        user,
+        id,
+        "purchase_order",
+        `${po.number} sent to ${po.supplier.name}${input.how ? ` (${input.how})` : ""}${deposit.verified ? "" : `, before the deposit was verified: ${reason}`}`,
+        { sentOn: po.sentOn, supplierRef: po.supplierRef },
+        input,
+      );
+      return !o.factoryOrderedOn;
+    });
+    if (first) await this.setFactoryOrder(user, id, { factoryOrderedOn: input.sentOn, ...(input.supplierRef ? { factoryOrderNo: input.supplierRef } : {}) });
+    return this.purchaseOrders(user, id);
   }
 
   /* ---------------------------------------------------------------- production */

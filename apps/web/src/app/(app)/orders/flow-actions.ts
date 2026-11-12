@@ -125,3 +125,15 @@ export async function addClaimAction(orderId: string, _prev: ActionState, form: 
 export async function updateClaimAction(orderId: string, claimId: string, _prev: ActionState, form: FormData) {
   return run(orderId, form, () => api.patch(`/claims/${claimId}`, pick(form, ["status", "resolution"])), "Claim saved.");
 }
+
+/** Send one purchase order to its supplier (before the deposit is verified: with the reason). */
+export async function sendPurchaseOrderAction(orderId: string, poId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(
+    form,
+    () => api.post(`/orders/${orderId}/purchase-orders/${poId}/send`, { sentOn: v.sentOn, supplierRef: v.supplierRef?.trim() || null, how: v.how || null, reason: v.reason?.trim() || null }),
+    "Purchase order sent.",
+  );
+  if (r.ok) revalidatePath(`/orders/${orderId}`, "layout");
+  return r;
+}

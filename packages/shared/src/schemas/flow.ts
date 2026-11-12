@@ -81,6 +81,15 @@ export type BankContractInput = z.infer<typeof bankContractInput>;
 export const factoryOrderInput = z.object({ factoryOrderedOn: optionalDate.optional(), factoryOrderNo: optionalText(60).optional() });
 export type FactoryOrderInput = z.infer<typeof factoryOrderInput>;
 
+/** Send a purchase order to its supplier: the day, their order number, how, and why when the deposit is not verified yet. */
+export const sendPurchaseOrderInput = z.object({
+  sentOn: isoDate("When was it sent?"),
+  supplierRef: optionalText(60),
+  how: optionalText(40),
+  reason: optionalText(300),
+});
+export type SendPurchaseOrderInput = z.infer<typeof sendPurchaseOrderInput>;
+
 /* ---------------------------------------------------------------- production */
 
 /** The whole production timeline, in order: steps sent with an id are kept and changed, others are added, missing ones removed. */

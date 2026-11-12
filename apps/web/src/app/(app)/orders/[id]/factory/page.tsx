@@ -2,7 +2,10 @@ import { ArrowUpRight } from "lucide-react";
 import { can } from "@kebo/shared";
 import { Card, CardBody, CardHeader } from "@kebo/ui";
 import { orderMoneyOf } from "@/lib/order-data";
-import { date } from "@/lib/format";
+import { date, money } from "@/lib/format";
+import { api } from "@/lib/api";
+import { PurchaseOrderCard, type PurchaseOrderView } from "@/components/orders/purchase-order-card";
+import { sendPurchaseOrderAction } from "../../flow-actions";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
@@ -28,7 +31,10 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const d = await stepData(id, "factory");
   const { me, o, flow, now, defaults } = d;
-  const m = await orderMoneyOf(id);
+  const [m, pos] = await Promise.all([
+    orderMoneyOf(id),
+    api.get<{ deposit: { asked: string; paid: string; verified: boolean }; items: PurchaseOrderView[] }>(`/orders/${id}/purchase-orders`).catch(() => null),
+  ]);
   const canEdit = can(me, "orders.update") && d.open;
   const owing = m.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
   // Money out is recorded on Treasury › Payments (one form); here it is a link, with the plan's part filled in.
@@ -127,6 +133,25 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       action={payFactory("Pay the factory", false)}
       side={<StepSidePanel id={o.id} step="factory" changes={d.changes} historyHref={d.historyHref} />}
     >
+      {/* The purchase orders (board OrderFactory): one per supplier, numbered, sent with a reason before the deposit. */}
+      {pos?.items.map((po) => (
+        <PurchaseOrderCard
+          key={po.id}
+          po={po}
+          total={po.total && po.currency ? money(po.total, po.currency) : null}
+          ready={po.readyOn ? date(po.readyOn) : null}
+          sent={po.sentOn ? date(po.sentOn) : null}
+          printHref={`/orders/${o.id}/papers/purchase-order?ref=${po.supplier.id}`}
+          send={canEdit && !po.sentOn ? sendPurchaseOrderAction.bind(null, o.id, po.id) : null}
+          deposit={{
+            verified: pos.deposit.verified,
+            text: Number(pos.deposit.paid) > 0
+              ? `${money(pos.deposit.paid, o.currency)} of the deposit ${money(pos.deposit.asked, o.currency)} is recorded; the rest is not in yet.`
+              : `The deposit ${money(pos.deposit.asked, o.currency)} is not recorded yet.`,
+          }}
+          today={now}
+        />
+      ))}
       <Checklist
         payFor={await expensePayTools(o.id, d.items)}
         step="factory"

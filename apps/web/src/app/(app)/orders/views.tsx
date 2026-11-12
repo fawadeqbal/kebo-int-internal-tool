@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Package, XCircle } from "lucide-react";
+import { AlertTriangle, Check, Download, Factory, FileText, LayoutGrid, List as ListIcon, Lock, Package, PieChart, Ship, X } from "lucide-react";
 import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
 import {
   ButtonLink,
@@ -24,7 +24,6 @@ import {
   cn,
   toPage,
 } from "@kebo/ui";
-import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { ExportLink } from "@/components/sheets/export-link";
 import { DataTable } from "@/components/common/data-table";
@@ -32,7 +31,9 @@ import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { hasFeature } from "@/lib/session";
 import { optional } from "@/components/print/data";
 import { crumbsFor, labelFor } from "@/lib/nav";
-import { date, money, plural } from "@/lib/format";
+import { date, money, plural, short } from "@/lib/format";
+import { FilterCard } from "@/components/common/filter-card";
+import { getPeople, getSettings } from "@/lib/loaders";
 import type { Paged } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
 
@@ -43,7 +44,6 @@ const RECENT_DONE = 8;
 
 const STATUSES = ["open", "late", "closed", "cancelled", "all"] as const;
 type Status = (typeof STATUSES)[number];
-const STATUS_CHIP: Record<Status, string> = { open: "Open", late: "Late", closed: "Done", cancelled: "Cancelled", all: "All" };
 
 /**
  * Orders, two pages of the sidebar's Orders module. The list (design system: List frame): a chip
@@ -60,24 +60,46 @@ function statusBadge(o: OrderRow) {
 
 export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
   const status: Status = STATUSES.includes(sp.status as Status) ? (sp.status as Status) : sp.view === "cancelled" ? "cancelled" : "open";
-  const keep = { q: sp.q, mine: mine ? "1" : undefined, status: status === "open" ? undefined : status };
+  const stage = (["confirmed", "in_production", "shipped", "done"] as const).find((x) => x === sp.stage);
+  const keep = { q: sp.q, mine: mine ? "1" : undefined, status: status === "open" ? undefined : status, stage, customer: sp.customer, assignee: sp.assignee };
   const href = (patch: Params) => buildHref("/orders", keep, { page: undefined, ...patch });
-  const data = await api.get<Paged<OrderRow> & { counts: Record<Status, number> }>("/orders/page", {
-    status,
-    mine: mine ? "true" : undefined,
-    q: sp.q,
-    page: toPage(sp.page),
-  });
+  const year = new Date().getFullYear();
+  const [data, owed, facts, shipments, customers, people, settings] = await Promise.all([
+    api.get<Paged<OrderRow & { purchaseOrders?: string[] }> & { counts: Record<Status | OrderStage | "lateInProduction", number> }>("/orders/page", {
+      status,
+      stage,
+      customer: sp.customer,
+      assignee: mine ? undefined : sp.assignee,
+      mine: mine ? "true" : undefined,
+      q: sp.q,
+      page: toPage(sp.page),
+    }),
+    optional(() => api.get<{ currency: string; rows: { total: string; overdue: string }[] }>("/insights/facts/owed", { side: "receivable" })),
+    optional(() => api.get<{ currency: string; rows: { sales: string; profitExpected: string | null; margin: number | null }[] }>("/insights/facts/orders/groups", { from: `${year}-01-01`, to: `${year}-12-31`, period: "all" })),
+    optional(() => api.get<{ status: string; eta: string | null; arrivedOn: string | null }[]>("/operations/shipments", {})),
+    api.get<Paged<{ id: string; name: string }>>("/customers", { status: "order", pageSize: 100 }).catch(() => null),
+    getPeople().catch(() => []),
+    getSettings(),
+  ]);
   const c = data.counts;
-  const narrowed = !!(sp.q || mine);
+  const narrowed = !!(sp.q || mine || sp.customer || sp.assignee || stage);
+  const main = owed?.currency ?? settings.sales.currency;
+  const owedTotal = (owed?.rows ?? []).reduce((t, r) => t + Number(r.total), 0);
+  const owedLate = (owed?.rows ?? []).reduce((t, r) => t + Number(r.overdue), 0);
+  const yearRow = facts?.rows[0];
+  const atSea = (shipments ?? []).filter((x) => x.status === "departed");
+  const nextEta = atSea.map((x) => x.eta).filter((x): x is string => !!x).sort()[0];
 
-  const chips = STATUSES.filter((s) => s === status || s === "open" || s === "all" || c[s] > 0).map((s) => ({
-    key: s,
-    label: STATUS_CHIP[s],
-    count: c[s],
-    href: href({ status: s === "open" ? undefined : s }),
-    active: status === s,
-  }));
+  const chips = [
+    { key: "open", label: "Open", icon: ListIcon, n: c.open, href: href({ status: undefined, stage: undefined }), active: status === "open" && !stage },
+    { key: "confirmed", label: "Confirmed", icon: Check, n: c.confirmed, href: href({ status: undefined, stage: "confirmed" }), active: stage === "confirmed" },
+    { key: "in_production", label: "In production", icon: Factory, n: c.in_production, href: href({ status: undefined, stage: "in_production" }), active: stage === "in_production" },
+    { key: "shipped", label: "Shipped", icon: Ship, n: c.shipped, href: href({ status: undefined, stage: "shipped" }), active: stage === "shipped" },
+    { key: "done", label: "Done", icon: Package, n: 0, href: href({ status: undefined, stage: "done" }), active: stage === "done" },
+    { key: "late", label: "Late", icon: AlertTriangle, n: c.late, href: href({ status: "late", stage: undefined }), active: status === "late" },
+    { key: "closed", label: "Closed", icon: Lock, n: 0, href: href({ status: "closed", stage: undefined }), active: status === "closed" },
+    { key: "cancelled", label: "Cancelled", icon: X, n: 0, href: href({ status: "cancelled", stage: undefined }), active: status === "cancelled" },
+  ].filter((x) => x.key !== "late" || c.late > 0 || status === "late");
 
   const rowMenu = (o: OrderRow): MenuEntry[] => [
     { label: "Open", href: `/orders/${o.id}` },
@@ -87,7 +109,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
   ];
 
   const due = (o: OrderRow) =>
-    o.status === "cancelled" ? <span className="text-text-2">—</span> : Number(o.due) > 0 ? money(o.due, o.currency) : <span className="font-medium text-ok">Paid</span>;
+    o.status === "cancelled" ? <span className="text-text-2">—</span> : Number(o.due) > 0 ? money(o.due, o.currency) : <span className="text-text-2">—</span>;
 
   return (
     <div>
@@ -95,46 +117,79 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         crumbs={crumbsFor("/orders")}
         icon={Package}
         title="Sales orders"
-        summary={
+        description="An order is made when a customer accepts a quotation"
+        actions={
           <>
-            {plural(c.open, "open order")}
-            {c.late > 0 && <span className="text-bad"> · {c.late} late</span>}
-            <span className="max-sm:hidden"> · each says what it needs now</span>
+            <ButtonLink href="/orders/board">
+              <LayoutGrid aria-hidden /> Board
+            </ButtonLink>
+            <ButtonLink href={buildHref("/sheets/export/orders", { status, mine: keep.mine, q: sp.q, format: "csv" }, {})}>
+              <Download aria-hidden /> Export CSV
+            </ButtonLink>
           </>
         }
       />
 
       <StatRow className="mb-4">
-        <StatTile icon={Package} iconColor={1} label="Open orders" value={c.open} sub="not closed yet" href={href({ status: undefined })} />
+        <StatTile icon={Package} iconColor={1} label="Open orders" value={c.open} href={href({ status: undefined, stage: undefined })} />
         <StatTile
-          icon={AlertTriangle}
+          icon={FileText}
           iconColor={2}
-          label="Late"
-          value={c.late}
-          tone={c.late > 0 ? "bad" : undefined}
-          sub={c.late > 0 ? "a step is past its date" : "nothing late"}
-          href={href({ status: "late" })}
+          label="Customers owe"
+          value={short(owedTotal, main)}
+          tone={owedLate > 0 ? "bad" : undefined}
+          sub={owedLate > 0 ? `${short(owedLate, main)} late` : "nothing late"}
+          href="/finance/receivables"
         />
-        <StatTile icon={CheckCircle2} iconColor={3} label="Done" value={c.closed} sub="closed orders" href={href({ status: "closed" })} />
-        <StatTile icon={XCircle} iconColor={4} label="Cancelled" value={c.cancelled} sub="kept for the record" href={href({ status: "cancelled" })} />
+        <StatTile
+          icon={Factory}
+          iconColor={3}
+          label="In production"
+          value={c.in_production}
+          sub={c.lateInProduction ? `${c.lateInProduction} late` : undefined}
+          href={href({ status: undefined, stage: "in_production" })}
+        />
+        <StatTile icon={Ship} iconColor={4} label="At sea" value={atSea.length} sub={nextEta ? `next ETA ${date(nextEta)}` : undefined} href="/operations/shipments" />
+        {yearRow && (
+          <StatTile
+            icon={PieChart}
+            iconColor={5}
+            label="Profit this year"
+            value={short(yearRow.profitExpected ?? "0", facts!.currency)}
+            tone="ok"
+            sub={yearRow.margin !== null ? `margin ${yearRow.margin.toFixed(1)}%` : undefined}
+          />
+        )}
       </StatRow>
 
-      <ListToolbar
-        search={{ placeholder: "Search order no., customer, inquiry…", value: sp.q, clearHref: href({ q: undefined }) }}
-        keep={keep}
-        chips={chips}
-        label="Filter orders"
-        filters={
-          <form className="flex items-center gap-1.5">
-            {sp.q && <input type="hidden" name="q" value={sp.q} />}
-            {keep.status && <input type="hidden" name="status" value={keep.status} />}
-            <AutoSelect name="mine" defaultValue={mine ? "1" : ""} aria-label="Handled by" className="w-28">
-              <option value="">Anyone</option>
-              <option value="1">Mine</option>
-            </AutoSelect>
-          </form>
-        }
-        end={<ExportLink what="orders" query={{ status, mine: keep.mine, q: sp.q }} />}
+      <LinkTabs
+        label="Which orders"
+        className="mb-4"
+        tabs={chips.map((x) => {
+          const Icon = x.icon;
+          return {
+            href: x.href,
+            active: x.active,
+            label: (
+              <>
+                <Icon aria-hidden />
+                {x.label}
+                {x.n ? ` ${x.n}` : ""}
+              </>
+            ),
+          };
+        })}
+      />
+
+      <FilterCard
+        search="Search SO, PO, customer, container…"
+        value={sp.q}
+        keep={{ status: keep.status, stage: keep.stage, mine: keep.mine }}
+        clearHref={href({ q: undefined })}
+        selects={[
+          { name: "customer", label: "Customer", value: sp.customer, options: (customers?.rows ?? []).map((x) => ({ value: x.id, label: x.name })) },
+          ...(mine ? [] : [{ name: "assignee", label: "Handles", value: sp.assignee, options: people.map((p) => ({ value: p.id, label: p.name })) }]),
+        ]}
       />
 
       <Card className="overflow-clip p-0">
@@ -182,6 +237,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                 <tr>
                   <Th>Order</Th>
                   <Th>What · customer</Th>
+                  <Th>Purchase order</Th>
                   <Th>Date</Th>
                   <Th className="text-right">Total</Th>
                   <Th className="text-right">They owe</Th>
@@ -203,9 +259,20 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                       <span className="block max-w-56 truncate text-xs text-muted">{o.customer.name}</span>
                       {o.customer.country === UNKNOWN_COUNTRY && <span className="block text-xs text-warn">Country not set</span>}
                     </Td>
+                    <Td>
+                      {(o as OrderRow & { purchaseOrders?: string[] }).purchaseOrders?.length ? (
+                        <span className="flex flex-col items-start gap-1">
+                          {(o as OrderRow & { purchaseOrders?: string[] }).purchaseOrders!.map((n) => (
+                            <RefCode key={n}>{n}</RefCode>
+                          ))}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </Td>
                     <Td className="whitespace-nowrap">{date(o.orderedOn)}</Td>
                     <Td className="text-right whitespace-nowrap tabular">{money(o.total, o.currency)}</Td>
-                    <Td className="text-right font-bold whitespace-nowrap tabular">{due(o)}</Td>
+                    <Td className="text-right whitespace-nowrap tabular">{due(o)}</Td>
                     <Td>
                       {o.needs ? (
                         <>
@@ -230,8 +297,8 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
             </DataTable>
           </>
         )}
-        <Pager base="/orders" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} />
       </Card>
+      <Pager base="/orders" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
     </div>
   );
 }
