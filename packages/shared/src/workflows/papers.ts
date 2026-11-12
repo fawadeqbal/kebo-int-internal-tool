@@ -360,7 +360,7 @@ export function buyerChanges(onOrder: Partial<BuyerSnapshot> | null, now: Partia
 
 /* ---------------------------------------------------------------- options */
 
-export const PAPER_OPTIONS = ["prices", "showHs", "lcStatement", "stamp"] as const;
+export const PAPER_OPTIONS = ["prices", "showHs", "lcStatement", "advance", "stamp"] as const;
 export type PaperOption = (typeof PAPER_OPTIONS)[number];
 export type PaperOptions = Partial<Record<PaperOption, boolean>>;
 
@@ -368,12 +368,13 @@ export const PAPER_OPTION_LABEL: Record<PaperOption, string> = {
   prices: "Line amounts",
   showHs: "Show HS codes",
   lcStatement: "LC statement at the bottom",
+  advance: "Advance received and the balance",
   stamp: "Stamp and signature",
 };
 
 /** The options a kind has (the Make page's checkboxes). */
 export function paperOptionsOf(kind: PaperKind): PaperOption[] {
-  if (kind === "commercial-invoice") return ["prices", "showHs", "lcStatement", "stamp"];
+  if (kind === "commercial-invoice") return ["prices", "showHs", "lcStatement", "advance", "stamp"];
   if (kind === "sales-contract") return ["prices", "showHs", "stamp"];
   return ["stamp"];
 }
@@ -486,6 +487,8 @@ export interface PaperDoc {
   rows: Record<string, PaperCell>[];
   sums: { label: string; value: PaperCell }[];
   total: { label: string; amount: string; currency: string } | null;
+  /** Lines under the total: what was already received and what is left to pay (the commercial invoice). */
+  under?: { label: string; value: PaperCell }[];
   /** A totals row under the items (packages and weights). */
   foot: { label: string; cells: Record<string, PaperCell> } | null;
   boxTitle: string;

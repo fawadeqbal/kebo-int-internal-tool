@@ -196,7 +196,8 @@ export interface DocColumn<T> {
 }
 
 type Sum = { label: string; value: string };
-type Total = { label: string; words: string; amount: string };
+/** `under`: lines below the total (what was already received, then what is left to pay, in bold). */
+type Total = { label: string; words: string; amount: string; under?: Sum[] };
 
 export function KeboDoc<T>({
   company,
@@ -597,6 +598,21 @@ function Totals({ sums, total }: { sums: Sum[]; total: Total | null }) {
             <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: "18px", whiteSpace: "nowrap" }}>{total.amount}</span>
           </div>
         )}
+        {(total?.under ?? []).map((s, i, all) => (
+          <div
+            key={s.label}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "12px",
+              padding: i === 0 ? "9px 14px 5px" : "5px 14px",
+              ...(i === all.length - 1 ? { fontWeight: 700, borderTop: `1px solid ${RULE}`, marginTop: "4px", paddingTop: "8px" } : null),
+            }}
+          >
+            <span style={{ color: i === all.length - 1 ? undefined : TEXT_2 }}>{s.label}</span>
+            <span style={{ whiteSpace: "nowrap" }}>{s.value}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

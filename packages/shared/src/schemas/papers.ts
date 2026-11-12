@@ -8,7 +8,7 @@ export const paperKind = z.enum(PAPER_KINDS);
 
 const flag = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean()).optional();
 const options = z
-  .object({ prices: flag, showHs: flag, lcStatement: flag, stamp: flag } satisfies Record<(typeof PAPER_OPTIONS)[number], typeof flag>)
+  .object({ prices: flag, showHs: flag, lcStatement: flag, advance: flag, stamp: flag } satisfies Record<(typeof PAPER_OPTIONS)[number], typeof flag>)
   .default({});
 
 /** Save as draft: the options (and, for a purchase order, which factory). */

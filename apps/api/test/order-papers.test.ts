@@ -165,7 +165,7 @@ describe("order papers", () => {
     expect(c.state).toBe("wait");
     expect(c.checks.find((x) => x.key === "blNo")).toMatchObject({ ok: false, required: true, fix: "blNo" });
     expect(c.checks.find((x) => x.key === "lc")).toMatchObject({ ok: false, fix: "lcNo" });
-    expect(c.options.map((o) => o.key)).toEqual(["prices", "showHs", "lcStatement", "stamp"]);
+    expect(c.options.map((o) => o.key)).toEqual(["prices", "showHs", "lcStatement", "advance", "stamp"]);
     // The preview is a draft, with "needed" where data is missing.
     let d = await doc("commercial-invoice");
     expect(d.watermark).toBe("DRAFT");
@@ -318,6 +318,18 @@ describe("order papers", () => {
     // Kept when the payment was recorded: the copy, never a draft.
     expect(receiptDoc).toMatchObject({ live: false, kept: true, final: true, watermark: null });
     expect(receiptDoc.doc.total).toMatchObject({ label: "Received", amount: "1000.00" });
+    // The commercial invoice was made final before any money came in: it keeps what it said. Made now, it takes
+    // what was received off its total and says what is left to pay; the option switches that off.
+    expect((await doc("commercial-invoice")).doc.under ?? []).toEqual([]);
+    const invoiceNow = await doc("commercial-invoice", "?opts=prices,advance");
+    const invoiceTotal = Number(invoiceNow.doc.total.amount);
+    expect(invoiceNow.doc.under).toEqual([
+      { label: "Less: advance received", value: { money: "-1000.00", currency: invoiceNow.doc.total.currency } },
+      { label: "Balance payable", value: { money: (invoiceTotal - 1000).toFixed(2), currency: invoiceNow.doc.total.currency } },
+    ]);
+    expect((await doc("commercial-invoice", "?opts=prices")).doc.under).toEqual([]);
+    // Without the line amounts there is no total to take it from.
+    expect((await doc("commercial-invoice", "?opts=advance")).doc.under).toEqual([]);
     // Kept papers are never drafts.
     await api(app, sana).post(`/orders/${orderId}/papers/payment-receipt`, {}).expect(400);
   });

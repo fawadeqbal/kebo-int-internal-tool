@@ -257,6 +257,7 @@ export class PapersService implements OnModuleInit {
       prices: true,
       showHs: true,
       lcStatement: routeOf(o) === "letter_of_credit" || routeOf(o) === "bank_contract",
+      advance: true,
       stamp: true,
     };
     const keys = paperOptionsOf(kind);
