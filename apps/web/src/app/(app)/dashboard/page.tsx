@@ -1,8 +1,10 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
-import { can, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
-import { Alert, Badge, ButtonLink, Card, CardBody, CardHeader, Meter, PriorityBadge, StageBadge, StatTile } from "@kebo/ui";
-import { FileText, PieChart, Plus, ReceiptText, TrendingUp, Wallet } from "lucide-react";
+import { can, ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
+import { Alert, Badge, ButtonLink, Card, CardBody, CardHeader, Meter, PriorityBadge, StageBadge, StatTile, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ArrowRight, FileText, PieChart, Plus, ReceiptText, TrendingUp, Wallet } from "lucide-react";
+import type { OrderRow } from "@/lib/types-orders";
+import type { Paged } from "@/lib/types";
 import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
 import { date, money, TZ, plural } from "@/lib/format";
@@ -114,9 +116,14 @@ export default async function DashboardPage() {
       )}
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] [&>*]:min-w-0">
-        <Suspense fallback={<AttentionSkeleton />}>
-          <Attention all={can(me, "inquiries.viewAll")} />
-        </Suspense>
+        <div className="flex flex-col gap-5">
+          <Suspense fallback={<AttentionSkeleton />}>
+            <Attention all={can(me, "inquiries.viewAll")} />
+          </Suspense>
+          <Suspense>
+            <RecentOrders />
+          </Suspense>
+        </div>
 
         <div className="flex flex-col gap-5">
           <Suspense fallback={<div className="h-[140px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
@@ -433,6 +440,54 @@ async function ThisWeek({ today }: { today: string }) {
           </li>
         ))}
       </ul>
+    </Card>
+  );
+}
+
+/** The latest open sales orders (the board's "Recent sales orders"): what each is worth, what is still due, where it is. */
+async function RecentOrders() {
+  const data = await api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1 }).catch(() => null);
+  if (!data || !data.rows.length) return null;
+  const rows = data.rows.slice(0, 6);
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="Recent sales orders"
+        description={`${data.total} open`}
+        actions={
+          <ButtonLink href="/orders" variant="secondary" size="sm">
+            View all <ArrowRight aria-hidden />
+          </ButtonLink>
+        }
+      />
+      <Table>
+        <THead>
+          <tr>
+            <Th>Order</Th>
+            <Th>Customer</Th>
+            <Th className="text-right">Total</Th>
+            <Th className="text-right">Due</Th>
+            <Th>Status</Th>
+          </tr>
+        </THead>
+        <tbody>
+          {rows.map((o) => (
+            <Tr key={o.id}>
+              <Td>
+                <Link href={`/orders/${o.id}`} className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-2 hover:text-primary">
+                  {o.refNo}
+                </Link>
+              </Td>
+              <Td className="max-w-56 truncate font-semibold">{o.customer.name}</Td>
+              <Td className="text-right tabular">{money(o.total, o.currency)}</Td>
+              <Td className="text-right tabular">{Number(o.due) > 0.005 ? money(o.due, o.currency) : "—"}</Td>
+              <Td>
+                <StatusBadge meaning={ORDER_STAGE_TONE[o.stage]}>{ORDER_STAGE_LABEL[o.stage]}</StatusBadge>
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </Table>
     </Card>
   );
 }
