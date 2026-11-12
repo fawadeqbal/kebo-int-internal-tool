@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Injectable, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { can } from "@kebo/shared";
+import { can, editCardLabel } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { isSupplier } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
@@ -85,7 +85,11 @@ export class EditsService {
         action: input.kind === "edit" ? EDIT : FIRST,
         entityType: input.type,
         entityId: input.id,
-        summary: input.kind === "edit" ? `${input.card}: edit ${n} · ${input.changes.length} change${input.changes.length === 1 ? "" : "s"}` : `${input.card}: first saved`,
+        // "Lines from the factory edited (edit 2): 1 · Received 1 → 2, and 3 more"
+        summary:
+          input.kind === "edit"
+            ? `${editCardLabel(input.card)} edited (edit ${n})${input.changes.length ? `: ${input.changes[0]}${input.changes.length > 1 ? `, and ${input.changes.length - 1} more` : ""}` : ""}`
+            : `${editCardLabel(input.card)} first saved`,
         newValues: { card: input.card, n, changes: input.changes, keys: input.keys },
         reason: input.reason,
       });

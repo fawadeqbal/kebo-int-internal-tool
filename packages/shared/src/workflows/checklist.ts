@@ -780,6 +780,27 @@ export function stepLine(
 
 /* ---------------------------------------------------------------- history per step */
 
+/** A card key without its record ("shipment:<id>" → "shipment"). */
+const cardKey = (card: string) => card.split(":")[0]!;
+
+/** The cards that count their edits: how each reads in the history, and the order step it belongs to. */
+export const EDIT_CARDS: Record<string, { label: string; step?: FlowStep }> = {
+  needs: { label: "Items" },
+  lines: { label: "Offer lines" },
+  factory: { label: "Factory order", step: "factory" },
+  production: { label: "Production", step: "production" },
+  "production.steps": { label: "Production steps", step: "production" },
+  "lines.received": { label: "Lines from the factory", step: "production" },
+  "lines.packing": { label: "Packing lines", step: "shipping" },
+  "packing.marks": { label: "Shipping marks", step: "shipping" },
+  shipment: { label: "Shipment", step: "shipping" },
+  shipping: { label: "Shipping", step: "shipping" },
+  delivery: { label: "Delivery", step: "delivery" },
+  "lines.delivered": { label: "Lines delivered", step: "delivery" },
+};
+/** "Lines from the factory" for "lines.received"; the key itself when it is not a known card. */
+export const editCardLabel = (card: string) => EDIT_CARDS[cardKey(card)]?.label ?? card;
+
 /**
  * The step a change in the order's history belongs to, for "Changes in this
  * step" and the history's step filter. Null: the order as a whole.
@@ -788,6 +809,7 @@ export function STEP_OF_ACTION(action: string, newValues?: unknown): FlowStep | 
   const nv = (newValues && typeof newValues === "object" ? newValues : {}) as Record<string, unknown>;
   const step = typeof nv.step === "string" && (FLOW_STEPS as readonly string[]).includes(nv.step) ? (nv.step as FlowStep) : null;
   if (action.startsWith("checklist.") || action.startsWith("paper.") || action.startsWith("file.")) return step;
+  if (action === "card.edit" || action === "card.first") return typeof nv.card === "string" ? (EDIT_CARDS[cardKey(nv.card)]?.step ?? null) : null;
   if (action.startsWith("expense")) return step;
   if (action.startsWith("payment_out")) return "factory";
   if (action.startsWith("payment_") || action === "payment_plan") return "payment";

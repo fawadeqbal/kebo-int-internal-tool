@@ -83,7 +83,8 @@ export class HistoryService {
     const rows = await this.prisma.db.auditLog.findMany({
       where: {
         OR: scope.map((s) => ({ entityType: s.entityType, entityId: { in: s.ids } })),
-        ...(hidden.length ? { NOT: hidden.map((h) => ({ action: { startsWith: h } })) } : {}),
+        // A card's first save is kept for its "Edited n×" only: the change itself is already in the history.
+        NOT: [{ action: "card.first" }, ...hidden.map((h) => ({ action: { startsWith: h } }))],
       },
       orderBy: { createdAt: "desc" },
       take: 300,
