@@ -15,7 +15,7 @@ export default function FindCompanyPage() {
         </a>
       }
     >
-      <h1 className="text-lg font-semibold">Find your company&apos;s sign-in page</h1>
+      <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">Find your company&apos;s sign-in page</h1>
       <p className="mt-1 text-sm text-muted">
         Each company has its own address, like yourcompany.{process.env.BASE_DOMAIN ?? "rfq.example.com"}. Enter your work email and we will
         send you the link.

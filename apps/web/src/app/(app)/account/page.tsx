@@ -1,3 +1,4 @@
+import { UserRound } from "lucide-react";
 import { Avatar, Card, CardBody, CardHeader, PageHeader, SectionList, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -27,6 +28,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   return (
     <div>
       <PageHeader
+        crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "My account" }]}
+        icon={UserRound}
         title="My account"
         summary={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

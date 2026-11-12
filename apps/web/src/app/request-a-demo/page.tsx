@@ -23,7 +23,7 @@ export default async function RequestDemoPage({ searchParams }: { searchParams: 
         </>
       }
     >
-      <h1 className="text-lg font-semibold">See RFQ Desk with your own eyes</h1>
+      <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">See RFQ Desk with your own eyes</h1>
       <p className="mt-1 text-sm text-muted">
         Tell us a little about your company. We set up a demo with sample inquiries, quotations and orders for you to try for a few days.
       </p>

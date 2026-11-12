@@ -27,7 +27,7 @@ export default async function SetUpTwoStepPage() {
   if (!me.twoStepSetupRequired && !status.on) redirect("/dashboard");
   return (
     <AuthShell wide>
-      <h1 className="text-lg font-semibold">Set up two-step sign-in</h1>
+      <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">Set up two-step sign-in</h1>
       <p className="mt-1 mb-5 text-sm text-text-2">
         Hello {me.name}. Your role ({me.roleName}) needs a code from your phone as well as your password. Set it up now to carry on; it takes two minutes.
       </p>

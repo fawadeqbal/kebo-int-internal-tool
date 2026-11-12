@@ -136,7 +136,7 @@ const deleted = () => company({ status: "deleted", activity: null, profile: null
 
 /** Primary (purple) buttons, not switches: the page's one primary is in its header, so a section has none. */
 const primaries = (el: HTMLElement) =>
-  [...el.querySelectorAll("a.bg-primary-solid, button.bg-primary-solid")].filter((b) => b.getAttribute("role") !== "switch");
+  [...el.querySelectorAll("a.bg-action-solid, button.bg-action-solid")].filter((b) => b.getAttribute("role") !== "switch");
 
 // ⋯ menus ask whether this is a phone.
 // Wide tables fade at their scrolled edge.

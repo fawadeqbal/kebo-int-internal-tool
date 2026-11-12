@@ -131,6 +131,6 @@ describe("client inquiry: progress", () => {
     expect(within(steps[3]!).getByRole("button", { name: "Move to Client" })).toBeTruthy();
     expect(within(steps[4]!).getByRole("button", { name: "Lost…" }).getAttribute("aria-haspopup")).toBe("dialog");
     // No step is a primary button: the page's one primary is in its header.
-    expect(document.querySelectorAll("button.bg-primary-solid")).toHaveLength(0);
+    expect(document.querySelectorAll("button.bg-action-solid")).toHaveLength(0);
   });
 });

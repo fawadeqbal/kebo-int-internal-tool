@@ -28,7 +28,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
         </>
       }
     >
-      <h1 className="text-lg font-semibold">Try RFQ Desk for {LIFECYCLE.trialDays} days</h1>
+      <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">Try RFQ Desk for {LIFECYCLE.trialDays} days</h1>
       {open ? (
         <>
           <p className="mt-1 text-sm text-muted">

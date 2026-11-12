@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { buildModules, crumbsFor, moduleOf, pageOf, MODULE_PAGES, type NavModule } from "@/lib/nav";
 
-// The sidebar (ERP redesign: nine modules, standard names): modules with their pages, a collapsed rail with a menu per module.
+// The menu (ERP redesign: nine modules, standard names; Kebo ERP look): a top menu with a menu per module, the module's pages as chips, the phone drawer.
 const at = vi.hoisted(() => ({ path: "/finance/cash-book" }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
@@ -27,7 +27,7 @@ const staff = () =>
 const titles = (m: NavModule[]) => m.map((x) => x.title);
 const pages = (m: NavModule[], key: string) => m.find((x) => x.key === key)?.pages.map((p) => p.label);
 
-function shell(modules: NavModule[], opts: { rail?: boolean; open?: NavModule["key"][] } = {}) {
+function shell(modules: NavModule[], opts: { open?: NavModule["key"][] } = {}) {
   return render(
     <AppShell
       modules={modules}
@@ -35,18 +35,15 @@ function shell(modules: NavModule[], opts: { rail?: boolean; open?: NavModule["k
       user={{ name: "Fawad Iqbal", email: "fawad@example.com", role: "Super Admin" }}
       unread={5}
       canCreate
-      initialRail={opts.rail}
       initialOpen={opts.open}
     >
       <p>page</p>
     </AppShell>,
   );
 }
-const sidebar = () => within(screen.getByRole("complementary", { name: "Sidebar" }));
 
 beforeEach(() => {
   at.path = "/finance/cash-book";
-  document.cookie = "nav-rail=; max-age=0; path=/";
   document.cookie = "nav-open=; max-age=0; path=/";
 });
 afterEach(() => vi.useRealTimers());
@@ -162,136 +159,77 @@ describe("the modules", () => {
   });
 });
 
-describe("the sidebar", () => {
-  it("has Dashboard first on its own, then a button per module that opens and closes it", () => {
+describe("the top menu", () => {
+  const menu = () => within(screen.getByRole("navigation", { name: "Main" }));
+
+  it("has Dashboard first, then one item per module: its icon over a short name, its full name for screen readers", () => {
     shell(everything());
-    const nav = sidebar();
-    const main = within(nav.getByRole("navigation", { name: "Main" }));
-    const items = main.getAllByRole("listitem").filter((li) => li.parentElement?.parentElement?.tagName === "NAV");
+    const items = menu().getAllByRole("listitem").filter((li) => li.parentElement?.parentElement?.tagName === "NAV");
     expect(items[0]!.textContent).toBe("Dashboard");
-    expect(main.getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("/dashboard");
-    const treasury = main.getByRole("button", { name: /^Treasury/ });
-    expect(treasury.getAttribute("aria-expanded")).toBe("true");
-    const sales = main.getByRole("button", { name: /^Partners/ });
-    expect(sales.getAttribute("aria-expanded")).toBe("false");
-    const list = document.getElementById(sales.getAttribute("aria-controls")!)!;
-    expect(list.hidden).toBe(true);
-    fireEvent.click(sales);
-    expect(sales.getAttribute("aria-expanded")).toBe("true");
-    expect(list.hidden).toBe(false);
-    expect(within(list).getByRole("link", { name: "Customers" }).getAttribute("href")).toBe("/customers");
-    // Remembered for the next page load.
-    expect(document.cookie).toMatch(/nav-open=[^;]*partners/);
-    fireEvent.click(sales);
-    expect(sales.getAttribute("aria-expanded")).toBe("false");
+    expect(menu().getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("/dashboard");
+    const buttons = menu().getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual(["Overview", "Website", "Partners", "Operations", "Revenue", "Treasury", "Finance", "Admin"]);
+    expect(menu().getByRole("button", { name: /^Treasury & payments/ }).getAttribute("aria-haspopup")).toBe("menu");
   });
 
-  it("opens the current page's module by itself and marks the page: highlight, bar and aria-current", () => {
+  it("marks the current module: soft green with a green line under it", () => {
     at.path = "/finance/cash-book";
     shell(everything());
-    const current = sidebar().getByRole("link", { current: "page" });
-    expect(current.textContent).toBe("Multi-currency vault");
-    expect(current.className).toContain("bg-primary-soft");
-    expect(current.querySelector("span[aria-hidden]")?.className).toContain("w-[3px]");
-    expect(sidebar().getAllByRole("link", { current: "page" })).toHaveLength(1);
+    const treasury = menu().getByRole("button", { name: "Treasury & payments, 2 to look at" });
+    expect(treasury.className).toContain("bg-primary-soft");
+    expect(treasury.querySelector("span.h-\\[3px\\]")).toBeTruthy();
+    expect(menu().getByRole("button", { name: "Partners & CRM" }).className).not.toContain("bg-primary-soft");
   });
 
-  it("remembers only the modules the person opened; closing the current one keeps it closed on this page", () => {
+  it("shows the current module's pages as chips under the menu, the page marked", () => {
     at.path = "/finance/cash-book";
-    const { rerender } = shell(everything());
-    const finance = () => sidebar().getByRole("button", { name: /^Treasury/ });
-    expect(finance().getAttribute("aria-expanded")).toBe("true");
-    // Opened by itself: not written to the cookie.
-    expect(document.cookie).not.toMatch(/nav-open=[^;]*treasury/);
-    fireEvent.click(finance());
-    expect(finance().getAttribute("aria-expanded")).toBe("false");
-    // Another module's page: Treasury stays closed (it was only open because it was the current one).
-    at.path = "/settings/company";
-    rerender(
-      <AppShell modules={everything()} companyName="Kebo International" user={{ name: "Fawad Iqbal", email: "fawad@example.com", role: "Super Admin" }}>
-        <p>page</p>
-      </AppShell>,
-    );
-    expect(finance().getAttribute("aria-expanded")).toBe("false");
-    expect(sidebar().getByRole("button", { name: /^System/ }).getAttribute("aria-expanded")).toBe("true");
+    shell(everything());
+    const chips = within(screen.getByRole("navigation", { name: "Treasury & payments pages" }));
+    expect(chips.getAllByRole("link").map((a) => a.textContent)).toEqual(["Payments", "Verification queue2", "Multi-currency vault"]);
+    expect(chips.getByRole("link", { current: "page" }).textContent).toBe("Multi-currency vault");
+    expect(chips.getByLabelText("2 waiting").textContent).toBe("2");
   });
 
   it("marks Pipelines, not the list, on /orders/board; a record marks its list", () => {
     at.path = "/orders/board";
     const { unmount } = shell(everything());
-    expect(sidebar().getByRole("link", { current: "page" }).textContent).toBe("Pipelines");
+    expect(within(screen.getByRole("navigation", { name: "Overview pages" })).getByRole("link", { current: "page" }).textContent).toBe("Pipelines");
     unmount();
     at.path = "/orders/9a1b";
     shell(everything());
-    expect(sidebar().getByRole("link", { current: "page" }).textContent).toBe("Orders");
+    expect(within(screen.getByRole("navigation", { name: "Operations & trading pages" })).getByRole("link", { current: "page" }).textContent).toBe("Orders");
   });
 
-  it("keeps the modules left open (cookie), with the current one", () => {
-    at.path = "/settings/company";
-    shell(everything(), { open: ["partners"] });
-    expect(sidebar().getByRole("button", { name: /^Partners/ }).getAttribute("aria-expanded")).toBe("true");
-    expect(sidebar().getByRole("button", { name: /^System/ }).getAttribute("aria-expanded")).toBe("true");
-    expect(sidebar().getByRole("button", { name: /^Finance/ }).getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("shows counts on the pages, and a closed module shows its children's total", () => {
-    at.path = "/customers";
-    shell(everything(2));
-    const work = sidebar().getByRole("button", { name: /^Treasury/ });
-    expect(work.getAttribute("aria-expanded")).toBe("false");
-    expect(within(work).getByLabelText("2 to look at").textContent).toBe("2");
-    fireEvent.click(work);
-    // Open: the total goes, the page shows its own.
-    expect(within(work).queryByLabelText("2 to look at")).toBeNull();
-    expect(sidebar().getByLabelText("2 waiting").textContent).toBe("2");
-  });
-
-  it("collapses to an icon rail and back, remembered in a cookie", () => {
+  it("has no page chips on the dashboard", () => {
+    at.path = "/dashboard";
     shell(everything());
-    expect(screen.getByRole("complementary", { name: "Sidebar" }).className).toContain("w-60");
-    fireEvent.click(sidebar().getByRole("button", { name: "Collapse the sidebar" }));
-    expect(screen.getByRole("complementary", { name: "Sidebar" }).className).toContain("w-16");
-    expect(document.cookie).toContain("nav-rail=1");
-    // The page moves over with it.
-    expect(document.querySelector("[data-sidebar]")?.className).toContain("lg:pl-16");
-    expect(sidebar().queryByRole("button", { name: "Collapse the sidebar" })).toBeNull();
-    expect(sidebar().getByRole("button", { name: "Finance & general ledger" }).getAttribute("aria-haspopup")).toBe("menu");
-    fireEvent.click(sidebar().getByRole("button", { name: "Expand the sidebar" }));
-    expect(screen.getByRole("complementary", { name: "Sidebar" }).className).toContain("w-60");
-    expect(document.cookie).toContain("nav-rail=0");
-  });
-
-  it("starts collapsed when it was left so (no jump: the server knows from the cookie)", () => {
-    shell(everything(), { rail: true });
-    expect(screen.getByRole("complementary", { name: "Sidebar" }).className).toContain("w-16");
-    expect(document.querySelector("[data-sidebar]")?.getAttribute("data-sidebar")).toBe("rail");
-    // The current module's icon is marked; a module with counts says so.
-    expect(sidebar().getByRole("button", { name: "Treasury & payments, 2 to look at" }).className).toContain("bg-primary-soft");
+    expect(menu().getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("navigation", { name: /pages$/ })).toBeNull();
   });
 });
 
-describe("the rail's menus", () => {
+describe("the module menus", () => {
   it("open on hover and close after the mouse leaves", () => {
     vi.useFakeTimers();
-    shell(everything(), { rail: true });
-    const wrap = sidebar().getByRole("button", { name: "Partners & CRM" }).parentElement!;
-    fireEvent.mouseEnter(wrap);
-    const menu = screen.getByRole("menu", { name: "Partners & CRM" });
-    expect(within(menu).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["Customers", "Suppliers"]);
-    fireEvent.mouseLeave(wrap);
+    shell(everything());
+    const li = screen.getByRole("button", { name: "Partners & CRM" }).closest("li")!;
+    fireEvent.mouseEnter(li);
+    const m = screen.getByRole("menu", { name: "Partners & CRM" });
+    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["Customers", "Suppliers"]);
+    fireEvent.mouseLeave(li);
     act(() => vi.advanceTimersByTime(300));
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("work with the keyboard: focus opens it, ↓ goes in, ↑ ↓ move, Esc closes it back on the icon", () => {
+  it("work with the keyboard: focus opens it, ↓ goes in, ↑ ↓ move, Esc closes it back on the module", () => {
     at.path = "/finance/ledger";
-    shell(everything(), { rail: true });
-    const finance = sidebar().getByRole("button", { name: "Finance & general ledger" });
+    shell(everything());
+    const finance = screen.getByRole("button", { name: "Finance & general ledger" });
     act(() => finance.focus());
     expect(finance.getAttribute("aria-expanded")).toBe("true");
-    const menu = screen.getByRole("menu", { name: "Finance & general ledger" });
-    expect(finance.getAttribute("aria-controls")).toBe(menu.id);
-    const items = within(menu).getAllByRole("menuitem");
+    const m = screen.getByRole("menu", { name: "Finance & general ledger" });
+    expect(finance.getAttribute("aria-controls")).toBe(m.id);
+    const items = within(m).getAllByRole("menuitem");
     expect(items.map((a) => a.textContent)).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);
     expect(items[2]!.getAttribute("aria-current")).toBe("page");
     fireEvent.keyDown(finance, { key: "ArrowDown" });
@@ -306,27 +244,25 @@ describe("the rail's menus", () => {
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(finance);
-    // Focus put back by Esc does not open it again.
     expect(finance.getAttribute("aria-expanded")).toBe("false");
-    // Enter opens it on the first page.
     fireEvent.keyDown(finance, { key: "Enter" });
     expect(document.activeElement?.textContent).toBe("Receivables (AR)");
   });
 
   it("Tab in a menu closes it and moves on to the next module", () => {
-    shell(everything(), { rail: true });
-    const finance = sidebar().getByRole("button", { name: "Finance & general ledger" });
+    shell(everything());
+    const finance = screen.getByRole("button", { name: "Finance & general ledger" });
     act(() => finance.focus());
     fireEvent.keyDown(finance, { key: "ArrowDown" });
     fireEvent.keyDown(document.activeElement!, { key: "Tab" });
-    expect(document.activeElement).toBe(sidebar().getByRole("button", { name: "System & admin" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "System & admin" }));
     expect(screen.getByRole("menu", { name: "System & admin" })).toBeTruthy();
     expect(screen.getAllByRole("menu")).toHaveLength(1);
   });
 
   it("Esc closes a menu opened by hovering, wherever focus is", () => {
-    shell(everything(), { rail: true });
-    fireEvent.mouseEnter(sidebar().getByRole("button", { name: "Operations & trading" }).parentElement!);
+    shell(everything());
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "Operations & trading" }).closest("li")!);
     expect(screen.getByRole("menu", { name: "Operations & trading" })).toBeTruthy();
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();

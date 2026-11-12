@@ -23,7 +23,7 @@ describe("PageHeader", () => {
         more={<button aria-label="More actions">⋯</button>}
       />,
     );
-    expect(container.querySelectorAll(".bg-primary-solid")).toHaveLength(1);
+    expect(container.querySelectorAll(".bg-action-solid")).toHaveLength(1);
     expect(container.querySelectorAll("[data-slot=primary]")).toHaveLength(1);
     // Paper buttons fold away on a phone (they move into ⋯).
     expect(container.querySelector("[data-slot=papers]")?.className).toContain("max-sm:hidden");
@@ -35,7 +35,7 @@ describe("PageHeader", () => {
 
   it("without a primary there is none", () => {
     const { container } = render(<PageHeader title="Customers" summary="38 customers" />);
-    expect(container.querySelectorAll(".bg-primary-solid")).toHaveLength(0);
+    expect(container.querySelectorAll(".bg-action-solid")).toHaveLength(0);
     expect(container.querySelector("[data-slot=primary]")).toBeNull();
   });
 });

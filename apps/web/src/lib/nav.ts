@@ -1,5 +1,5 @@
 /**
- * The sidebar's modules and their pages (ERP redesign, 11 Nov 2026: nine modules, standard names).
+ * The menu's modules and their pages (ERP redesign, 11 Nov 2026: nine modules, standard names).
  * One address per page, the module's name in the breadcrumb above the title, the item's name as the
  * title. The layout keeps only the pages a person may open (each page's own permission and plan
  * checks); a module whose pages are all hidden is hidden. Addresses did not move: only the grouping
@@ -23,15 +23,18 @@ export interface NavPage {
 export interface NavModule {
   key: ModuleKey;
   title: string;
+  /** The module's one-word name in the top menu (its full title is its accessible name). */
+  short: string;
   icon: NavIcon;
   pages: NavPage[];
 }
 
 /** Every page of every module, in sidebar order (before anyone's permissions). */
-export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages: { href: string; label: string }[] }[] = [
+export const MODULE_PAGES: { key: ModuleKey; title: string; short: string; icon: NavIcon; pages: { href: string; label: string }[] }[] = [
   {
     key: "overview",
     title: "Overview",
+    short: "Overview",
     icon: "overview",
     pages: [
       { href: "/follow-ups", label: "Follow-ups" },
@@ -43,12 +46,14 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
   {
     key: "public",
     title: "Public landing page",
+    short: "Website",
     icon: "public",
     pages: [{ href: "/settings/website-form", label: "Website form" }],
   },
   {
     key: "partners",
     title: "Partners & CRM",
+    short: "Partners",
     icon: "partners",
     pages: [
       { href: "/customers", label: "Customers" },
@@ -58,6 +63,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
   {
     key: "operations",
     title: "Operations & trading",
+    short: "Operations",
     icon: "operations",
     pages: [
       { href: "/inquiries", label: "Inquiries (RFQs)" },
@@ -69,6 +75,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
   {
     key: "revenue",
     title: "Revenue & profitability",
+    short: "Revenue",
     icon: "revenue",
     pages: [
       { href: "/finance/profit", label: "Profit & loss" },
@@ -79,6 +86,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
   {
     key: "treasury",
     title: "Treasury & payments",
+    short: "Treasury",
     icon: "treasury",
     pages: [
       { href: "/payments", label: "Payments" },
@@ -89,6 +97,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
   {
     key: "finance",
     title: "Finance & general ledger",
+    short: "Finance",
     icon: "finance",
     pages: [
       { href: "/finance/to-receive", label: "Receivables (AR)" },
@@ -99,6 +108,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
   {
     key: "admin",
     title: "System & admin",
+    short: "Admin",
     icon: "admin",
     pages: [
       { href: "/settings/company", label: "Company settings" },
@@ -215,11 +225,11 @@ export function buildModules({
   return MODULE_PAGES.map((m) => ({
     key: m.key,
     title: m.title,
+    short: m.short,
     icon: m.icon,
     pages: m.pages.filter((p) => show[p.href] ?? true).map((p) => ({ ...p, ...badges[p.href] })),
   })).filter((m) => m.pages.length > 0);
 }
 
-/** Cookies that keep the sidebar as it was left (read by the layout, so the first paint is right). */
-export const RAIL_COOKIE = "nav-rail";
+/** The cookie that keeps the menu drawer's modules open as they were left (read by the layout, so the first paint is right). */
 export const OPEN_COOKIE = "nav-open";

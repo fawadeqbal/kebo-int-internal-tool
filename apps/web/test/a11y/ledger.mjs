@@ -50,7 +50,7 @@ async function noSideways(page, where) {
   else ok(`${where}: no sideways scroll`);
 }
 async function primaries(page, where, n) {
-  const count = await page.locator("main header").first().locator("a.bg-primary-solid, button.bg-primary-solid").count();
+  const count = await page.locator("main header").first().locator("a.bg-action-solid, button.bg-action-solid").count();
   if (count > n) fail(where, `${count} primary buttons in the header (want at most ${n})`);
   else ok(`${where}: ${count} primary`);
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { CalendarClock, Plus } from "lucide-react";
 import { Button, Card, EmptyState, Input, LinkTabs, ListToolbar, PageHeader, Pager, toPage } from "@kebo/ui";
 import { can } from "@kebo/shared";
 import { isISODate } from "@kebo/utils";
@@ -58,6 +58,7 @@ export default async function FollowUpsPage({
     <div className="max-w-4xl">
       <PageHeader
         crumbs={crumbsFor("/follow-ups")}
+        icon={CalendarClock}
         title="Follow-ups"
         summary={
           <>

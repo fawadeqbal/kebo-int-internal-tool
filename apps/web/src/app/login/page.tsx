@@ -26,7 +26,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           This is your company&apos;s new address. Sign in once more here, and bookmark it.
         </Alert>
       )}
-      <h1 className="text-lg font-semibold">Sign in</h1>
+      <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">Sign in</h1>
       <p className="mt-1 text-sm text-muted">
         {demoMode()
           ? "This is a demo with sample data. Pick a person below to look around."
