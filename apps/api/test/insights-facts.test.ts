@@ -249,6 +249,13 @@ describe("Insights data: order, inquiry and factory facts", () => {
       await api(app, manager).post(`/orders/${o.orderId}/factory-payments`, { factoryId: o.factoryId, kind: "deposit", amount: 3000, currency: "CNY", paidOn: today }).expect(201);
       const f = await factoryRow(o.orderId);
       expect([Number(f.owed), Number(f.paid), Number(f.toPay)]).toEqual([10000, 3000, 7000]);
+      // The supplier's "Purchase orders": the same figures, in the factory's currency, with the order's number.
+      const pos = (await api(app, manager).get(`/insights/facts/factory-orders?factoryId=${o.factoryId}`).expect(200)).body;
+      expect(pos.rows).toContainEqual(expect.objectContaining({ orderId: o.orderId, currency: "CNY", owed: "10000.00", paid: "3000.00", toPay: "7000.00", status: "open" }));
+      await api(app, sana).get(`/insights/facts/factory-orders?factoryId=${o.factoryId}`).expect(403);
+      // The factory's ledger: the payment row names the account it went out of.
+      const led = (await api(app, manager).get(`/ledger/parties/factory/${o.factoryId}?from=2000-01-01`).expect(200)).body;
+      expect(led.rows.some((r: { debit: string; counter: { label: string } | null }) => Number(r.debit) > 0 && r.counter?.label)).toBe(true);
     });
 
     it("the ready date, a shipment that left, and the delivery", async () => {

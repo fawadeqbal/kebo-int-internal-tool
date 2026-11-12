@@ -163,7 +163,7 @@ async function orders(q: Q): Promise<SheetSpec> {
 }
 
 async function customers(q: Q): Promise<SheetSpec> {
-  const rows = await allPages<CustomerRow>("/customers", { q: q.q, country: q.country });
+  const rows = await allPages<CustomerRow>("/customers", { q: q.q, country: q.country, currency: q.currency, type: q.type, status: q.status, archived: q.archived, ids: q.ids });
   return {
     name: `Customers ${stamp()}`,
     title: "Customers",
@@ -197,7 +197,7 @@ async function customers(q: Q): Promise<SheetSpec> {
 }
 
 async function factories(q: Q): Promise<SheetSpec> {
-  const rows = await allPages<FactoryRow>("/factories", { q: q.q, mine: q.mine === "1" ? "true" : undefined });
+  const rows = await allPages<FactoryRow>("/factories", { q: q.q, mine: q.mine === "1" ? "true" : undefined, city: q.city, owner: q.owner, status: q.status });
   return {
     name: `Factories ${stamp()}`,
     title: "Factories",

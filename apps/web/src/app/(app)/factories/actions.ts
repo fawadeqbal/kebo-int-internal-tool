@@ -9,7 +9,9 @@ import { attempt, formValues, type ActionState } from "@/lib/actions";
 /** Create or edit a factory (in the side panel): answers with its id and name, and the page updates in place. */
 export async function saveFactoryAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = formValues(form);
-  const r = await attempt(form, () => (id ? api.put<{ id: string }>(`/factories/${id}`, body) : api.post<{ id: string }>("/factories", body)));
+  const r = await attempt(form, () =>
+    id ? api.put<{ id: string }>(`/factories/${id}`, body) : api.post<{ id: string }>("/factories", body),
+  );
   if (!r.ok) return r;
   const savedId = id ?? (r.data as { id: string }).id;
   revalidatePath("/factories");
@@ -25,7 +27,10 @@ export async function removeFactoryAction(id: string, _prev: ActionState, _form:
 }
 
 /** New factories from an uploaded Excel file (checked on the page; the API checks again and leaves out any already there). */
-export async function importFactoriesAction(items: FactoryInput[], fileName: string): Promise<{ ok: true; result: ImportResult } | { ok: false; message: string }> {
+export async function importFactoriesAction(
+  items: FactoryInput[],
+  fileName: string,
+): Promise<{ ok: true; result: ImportResult } | { ok: false; message: string }> {
   try {
     const result = await api.post<ImportResult>("/factories/import", { factories: items, fileName });
     revalidatePath("/factories");

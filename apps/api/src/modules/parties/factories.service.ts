@@ -28,6 +28,12 @@ function withContact<T extends { contacts: MainContactRow[] }>(f: T) {
   return { ...rest, contactPerson: c?.name ?? null, phone: c?.phone ?? null, wechat: c?.wechat ?? null, email: c?.email ?? null };
 }
 
+/** "No. 18 Gongye Rd, Licheng, Jinan" → "Jinan": the last part of an address, its city. */
+export function cityOf(address: string | null | undefined): string | null {
+  const parts = (address ?? "").split(/[,，\n]/).map((p) => p.trim()).filter(Boolean);
+  return parts.length ? parts[parts.length - 1]!.slice(0, 60) : null;
+}
+
 type ContactFields = Pick<FactoryInput, "contactPerson" | "phone" | "wechat" | "email">;
 
 /**
@@ -42,16 +48,32 @@ export class FactoriesService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(user: SessionUser, q: ListQuery & { mine?: boolean }) {
+  async list(user: SessionUser, q: ListQuery & { mine?: boolean; owner?: string; city?: string; status?: "offers" | "none" }) {
+    const term = q.q?.trim();
     const where: Prisma.PartyWhereInput = {
       ...isSupplier,
       deletedAt: null,
-      ...(q.mine ? { ownerId: user.id } : {}),
-      ...(q.q
-        ? { OR: [{ name: { contains: q.q, mode: "insensitive" } }, { contacts: { some: { deletedAt: null, name: { contains: q.q, mode: "insensitive" } } } }] }
+      ...(q.mine ? { ownerId: user.id } : q.owner === "none" ? { ownerId: null } : q.owner ? { ownerId: q.owner } : {}),
+      ...(q.city ? { address: { contains: q.city, mode: "insensitive" } } : {}),
+      ...(q.status === "offers" ? { quotes: { some: { deletedAt: null } } } : q.status === "none" ? { quotes: { none: { deletedAt: null } } } : {}),
+      ...(term
+        ? {
+            OR: [
+              { name: { contains: term, mode: "insensitive" } },
+              { supplierCode: { equals: term, mode: "insensitive" } },
+              {
+                contacts: {
+                  some: {
+                    deletedAt: null,
+                    OR: [{ name: { contains: term, mode: "insensitive" } }, { wechat: { contains: term, mode: "insensitive" } }, { email: { contains: term, mode: "insensitive" } }, { phone: { contains: term } }],
+                  },
+                },
+              },
+            ],
+          }
         : {}),
     };
-    const [rows, total] = await Promise.all([
+    const [rows, total, places, waiting] = await Promise.all([
       this.prisma.db.party.findMany({
         where,
         omit: customerOnly,
@@ -61,8 +83,13 @@ export class FactoriesService {
         take: q.pageSize,
       }),
       this.prisma.db.party.count({ where }),
+      // The cities to choose from: the last part of every supplier's address.
+      this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null, address: { not: null } }, select: { address: true } }),
+      // Asked for a price and not answered yet (the "Offers waiting" figure).
+      this.prisma.db.factoryRequest.count({ where: { status: "sent", factory: { deletedAt: null } } }),
     ]);
-    return { total, page: q.page, pageSize: q.pageSize, rows: rows.map(withContact) };
+    const cities = [...new Set(places.map((p) => cityOf(p.address)).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b));
+    return { total, page: q.page, pageSize: q.pageSize, cities, waiting, rows: rows.map((r) => ({ ...withContact(r), city: cityOf(r.address) })) };
   }
 
   async get(id: string, user?: SessionUser) {
@@ -74,14 +101,41 @@ export class FactoriesService {
         contacts: mainContact,
         quotes: {
           where: { deletedAt: null },
-          select: { id: true, receivedOn: true, currency: true, inquiry: { select: { id: true, refNo: true, title: true } }, _count: { select: { lines: true } } },
+          select: {
+            id: true,
+            receivedOn: true,
+            validUntil: true,
+            currency: true,
+            reference: true,
+            basis: true,
+            basisPlace: true,
+            leadTime: true,
+            inquiry: { select: { id: true, refNo: true, title: true, stage: true, lostReason: true } },
+            lines: { where: { parentId: null }, select: { quantity: true, unitPrice: true, description: true, model: true } },
+            options: { select: { revision: { select: { number: true, status: true, quotation: { select: { refNo: true } } } } } },
+            _count: { select: { lines: true } },
+          },
           orderBy: { receivedOn: "desc" },
           take: 50,
         },
       },
     });
     if (!f) throw new NotFoundError("Factory");
-    return { ...withContact(f), record: await this.record(id, user) };
+    const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+    const quotes = f.quotes.map(({ lines, options, ...q }) => {
+      // Where the offer went: the quotation that used it (won when the customer accepted that revision).
+      const used = [...options].sort((a, b) => (a.revision.status === "accepted" ? -1 : 0) - (b.revision.status === "accepted" ? -1 : 0) || b.revision.number - a.revision.number)[0];
+      return {
+        ...q,
+        receivedOn: day(q.receivedOn),
+        validUntil: day(q.validUntil),
+        total: lines.reduce((t, l) => t + Number(l.quantity) * Number(l.unitPrice), 0).toFixed(2),
+        /** Models and descriptions of its lines, for searching. */
+        words: lines.map((l) => [l.model, l.description].filter(Boolean).join(" ")).join(" · ").slice(0, 500),
+        usedIn: used ? { refNo: used.revision.quotation.refNo, revision: used.revision.number, accepted: used.revision.status === "accepted" } : null,
+      };
+    });
+    return { ...withContact(f), quotes, record: await this.record(id, user) };
   }
 
   /**

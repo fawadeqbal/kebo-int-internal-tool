@@ -6,7 +6,12 @@ import { Button } from "@kebo/ui";
 
 const noop = () => () => {};
 /** True in the browser, false while rendering on the server. */
-export const useMounted = () => useSyncExternalStore(noop, () => true, () => false);
+export const useMounted = () =>
+  useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
@@ -16,7 +21,9 @@ const noLayout = () => typeof navigator !== "undefined" && navigator.userAgent.i
 
 /** What Tab can reach inside a box, in order (hidden ones left out). */
 export function focusables(box: HTMLElement): HTMLElement[] {
-  return [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest("[hidden],[inert]") && (el.getClientRects().length > 0 || noLayout()));
+  return [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (el) => !el.closest("[hidden],[inert]") && (el.getClientRects().length > 0 || noLayout()),
+  );
 }
 
 /**

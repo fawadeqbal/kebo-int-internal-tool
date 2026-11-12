@@ -4,7 +4,13 @@ import { todayIn } from "@kebo/utils";
 import { cn } from "@kebo/ui";
 import { TZ } from "@/lib/format";
 
-export const NOTE_ICON: Record<NoteKind, LucideIcon> = { note: StickyNote, call: Phone, visit: MapPin, whatsapp: MessageCircle, email: Mail };
+export const NOTE_ICON: Record<NoteKind, LucideIcon> = {
+  note: StickyNote,
+  call: Phone,
+  visit: MapPin,
+  whatsapp: MessageCircle,
+  email: Mail,
+};
 export const FOLLOW_UP_ICON: Record<FollowUpKind, LucideIcon> = { call: Phone, visit: MapPin, meeting: Users, other: CalendarClock };
 
 /** A kind's icon in a round tile, its name for screen readers (the row reads "Call. Ali says…"). */
@@ -19,7 +25,8 @@ export function KindIcon({ kind, of, className }: { kind: string; of: "note" | "
   );
 }
 
-const time = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "numeric", minute: "2-digit", hourCycle: "h23" }).format(d);
+const time = (d: Date) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "numeric", minute: "2-digit", hourCycle: "h23" }).format(d);
 const day = (d: Date, year: boolean) =>
   new Intl.DateTimeFormat("en-GB", { timeZone: TZ, day: "numeric", month: "short", ...(year ? { year: "numeric" } : {}) }).format(d);
 

@@ -88,13 +88,25 @@ export function NotesCard({
 }
 
 /** One follow-up as a row: its kind, what, when (late in the bad tone, with the word), for whom, where; Done / Reopen. */
-export function FollowUpRow({ f, showRecord, today, removable }: { f: FollowUp; showRecord?: boolean; today?: string; removable?: boolean }) {
+export function FollowUpRow({
+  f,
+  showRecord,
+  today,
+  removable,
+}: {
+  f: FollowUp;
+  showRecord?: boolean;
+  today?: string;
+  removable?: boolean;
+}) {
   const what = `${f.title}, ${dueText(f.dueOn, f.dueAt, today)}`;
   return (
     <li className="flex items-start gap-3 px-4 py-2.5">
       <KindIcon kind={f.kind} of="followUp" />
       <div className="min-w-0 flex-1">
-        <p className={cn("text-sm font-medium [overflow-wrap:anywhere]", f.done && "text-text-2 line-through decoration-text-2/50")}>{f.title}</p>
+        <p className={cn("text-sm font-medium [overflow-wrap:anywhere]", f.done && "text-text-2 line-through decoration-text-2/50")}>
+          {f.title}
+        </p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-text-2">
           {f.late && <StatusBadge meaning="bad">Late</StatusBadge>}
           {f.done && <StatusBadge meaning="ok">Done</StatusBadge>}
@@ -166,7 +178,9 @@ export function FollowUpsCard({
     <Card id="follow-ups" className="scroll-mt-32 overflow-clip">
       <CardHeader
         title={`Follow-ups · ${open.length}`}
-        description={late ? <span className="font-medium text-bad">{late} late</span> : open.length ? "Planned calls and visits" : "Nothing planned"}
+        description={
+          late ? <span className="font-medium text-bad">{late} late</span> : open.length ? "Planned calls and visits" : "Nothing planned"
+        }
         actions={
           <PanelButton
             variant="ghost"
@@ -189,7 +203,9 @@ export function FollowUpsCard({
           ))}
         </ul>
       ) : (
-        <p className="px-4 py-3 text-sm text-muted">No calls or visits planned. Add one and it shows on Home on its day, with a reminder.</p>
+        <p className="px-4 py-3 text-sm text-muted">
+          No calls or visits planned. Add one and it shows on Home on its day, with a reminder.
+        </p>
       )}
     </Card>
   );

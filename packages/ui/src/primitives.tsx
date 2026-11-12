@@ -580,7 +580,7 @@ export function LinkTabs({ tabs, className, label }: { tabs: { href: string; lab
         >
           {t.label}
           {t.count !== undefined && (
-            <span className={cn("rounded-md px-1.5 text-xs tabular", t.alert ? "bg-bad-soft font-semibold text-bad" : t.active ? "bg-surface text-primary" : "bg-surface-2 text-text-2")}>{t.count}</span>
+            <span className={cn("tabular", t.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{t.count}</span>
           )}
         </Link>
       ))}

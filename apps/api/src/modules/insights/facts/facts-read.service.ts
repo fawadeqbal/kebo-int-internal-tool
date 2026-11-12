@@ -403,6 +403,43 @@ export class FactsReadService {
   }
 
   /**
+   * One factory's orders (the supplier's "Purchase orders"): for each order, what we owe the factory on it, what we
+   * paid, when it is to be ready, and where the order is. In the factory's own currency when it has one.
+   */
+  async factoryOrders(user: SessionUser, q: { factoryId: string }) {
+    const { seeMoney, currency } = await this.open(user);
+    if (!seeMoney) throw new ForbiddenError("Only people who may see money see what we owe factories.");
+    const rows = await this.prisma.db.$queryRaw<
+      { orderId: string; refNo: string; orderedOn: Date; status: string; stage: string; currency: string | null; owed: string | null; paid: string | null; toPay: string | null; owedMain: string; paidMain: string; toPayMain: string; readyPromised: Date | null; readyActual: Date | null; daysLate: number | null }[]
+    >`
+      select f.order_id as "orderId", o.ref_no as "refNo", f.ordered_on as "orderedOn", f.status::text as status, o.stage::text as stage,
+             f.currency::text as currency, f.owed::text as owed, f.paid::text as paid, f.to_pay::text as "toPay",
+             f.owed_main::text as "owedMain", f.paid_main::text as "paidMain", f.to_pay_main::text as "toPayMain",
+             f.ready_promised as "readyPromised", f.ready_actual as "readyActual", f.days_late as "daysLate"
+      from factory_order_facts f join orders o on o.id = f.order_id
+      where f.factory_id = ${q.factoryId}::uuid and f.status <> 'cancelled'
+      order by f.ordered_on desc, o.ref_no desc limit 200`;
+    const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+    return {
+      currency,
+      rows: rows.map((r) => ({
+        orderId: r.orderId,
+        refNo: r.refNo,
+        orderedOn: day(r.orderedOn),
+        status: r.status,
+        stage: r.stage,
+        currency: r.currency ?? currency,
+        owed: amount(r.currency ? r.owed! : r.owedMain),
+        paid: amount(r.currency ? r.paid! : r.paidMain),
+        toPay: amount(r.currency ? r.toPay! : r.toPayMain),
+        readyOn: day(r.readyActual ?? r.readyPromised),
+        ready: r.readyActual !== null,
+        daysLate: r.daysLate,
+      })),
+    };
+  }
+
+  /**
    * What customers owe us (receivable) or we owe factories (payable) by how late it is today, from the open
    * parts of each plan: not due yet (or undated), 1–30, 31–60, 61–90 and over 90 days. `bucket` lists the orders.
    */

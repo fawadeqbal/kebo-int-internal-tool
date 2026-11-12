@@ -30,28 +30,43 @@ export class CustomersService {
     return this.prisma.db.party.findMany({ where: { ...isCustomer, deletedAt: null, ...customerAccess(user) }, select: { id: true, name: true }, orderBy: { name: "asc" } });
   }
 
-  async list(user: SessionUser, q: ListQuery & { country?: string; type?: "company" | "individual" }) {
+  async list(
+    user: SessionUser,
+    q: ListQuery & { country?: string; type?: "company" | "individual"; currency?: string; status?: "order" | "inquiry" | "none"; archived?: boolean; ids?: string[] },
+  ) {
     const term = q.q?.trim();
+    const open = ["new", "sourcing", "quoted"] as const;
     const where: Prisma.PartyWhereInput = {
       ...isCustomer,
-      deletedAt: null,
+      deletedAt: q.archived ? { not: null } : null,
       ...customerAccess(user),
       ...(q.country ? { country: q.country } : {}),
       ...(q.type ? { type: q.type } : {}),
+      ...(q.currency ? { defaultCurrency: q.currency } : {}),
+      ...(q.ids ? { id: { in: q.ids } } : {}),
+      ...(q.status === "order"
+        ? { orders: { some: { status: "open" } } }
+        : q.status === "inquiry"
+          ? { inquiries: { some: { deletedAt: null, stage: { in: [...open] } } } }
+          : q.status === "none"
+            ? { orders: { none: { status: { not: "cancelled" } } } }
+            : {}),
       ...(term
         ? {
             AND: [
               {
                 OR: [
                   { name: { contains: term, mode: "insensitive" } },
-                  { contacts: { some: { deletedAt: null, OR: [{ name: { contains: term, mode: "insensitive" } }, { email: { contains: term, mode: "insensitive" } }, { phone: { contains: term.replace(/[^\d+]/g, "") || term } }] } } },
+                  { taxNo: { contains: term, mode: "insensitive" } },
+                  { customerCode: { equals: term, mode: "insensitive" } },
+                  { contacts: { some: { deletedAt: null, OR: [{ name: { contains: term, mode: "insensitive" } }, { email: { contains: term, mode: "insensitive" } }, ...(term.replace(/\D/g, "").length >= 4 ? [{ phone: { contains: term.replace(/[^\d+]/g, "") } }] : [{ phone: { contains: term } }])] } } },
                 ],
               },
             ],
           }
         : {}),
     };
-    const [rows, total] = await Promise.all([
+    const [rows, total, newThisYear] = await Promise.all([
       this.prisma.db.party.findMany({
         where,
         omit: supplierOnly,
@@ -65,13 +80,17 @@ export class CustomersService {
         take: q.pageSize,
       }),
       this.prisma.db.party.count({ where }),
+      // Added since the first of January (the Customers figure's line).
+      this.prisma.db.party.count({ where: { ...isCustomer, deletedAt: null, ...customerAccess(user), createdAt: { gte: new Date(`${new Date().getUTCFullYear()}-01-01T00:00:00Z`) } } }),
     ]);
     return {
+      newThisYear,
       total,
       page: q.page,
       pageSize: q.pageSize,
       rows: rows.map((c) => ({
         id: c.id,
+        code: c.customerCode,
         name: c.name,
         type: c.type,
         country: c.country,
@@ -240,6 +259,15 @@ export class CustomersService {
         reason,
       });
       return updated;
+    });
+  }
+
+  async restore(user: SessionUser, id: string) {
+    const c = await this.prisma.db.party.findFirst({ where: { ...isCustomer, id, deletedAt: { not: null }, ...customerAccess(user) }, select: { name: true } });
+    if (!c) throw new NotFoundError("Customer");
+    await this.prisma.tx(async (tx) => {
+      await tx.party.update({ where: { ...isCustomer, id }, data: { deletedAt: null } });
+      await this.audit.record(tx, { userId: user.id, action: "update", entityType: "customer", entityId: id, summary: `Restored customer ${c.name}` });
     });
   }
 

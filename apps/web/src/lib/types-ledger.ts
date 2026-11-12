@@ -114,7 +114,7 @@ export interface LedgerParty {
   opening: { base: string };
   closing: { base: string };
   totals: { debit: string; credit: string; debitBase: string; creditBase: string };
-  rows: (LedgerRow & { balance: string; balanceBase: string; removed: boolean })[];
+  rows: (LedgerRow & { balance: string; balanceBase: string; removed: boolean; counter?: { account: string; label: string } | null })[];
   credit: { currency: string; amount: string }[];
   ageing: { total: string; buckets: AgeingBucketView[] };
 }

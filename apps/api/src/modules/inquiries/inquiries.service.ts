@@ -156,6 +156,7 @@ export class InquiriesService {
         priority: i.priority,
         stage: i.stage,
         onHold: i.onHold,
+        lostReason: i.lostReason,
         requiredBy: fromDbDateOrNull(i.requiredBy),
         overdue: isOpen(i.stage) && !!i.requiredBy && fromDbDateOrNull(i.requiredBy)! < today,
         customer: i.customer,

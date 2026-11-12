@@ -18,6 +18,8 @@ export interface DealRow {
   priority: Priority;
   stage: InquiryStage;
   onHold: boolean;
+  /** Why it was lost (lost ones). */
+  lostReason?: LostReason | null;
   requiredBy: string | null;
   overdue: boolean;
   customer: { id: string; name: string; country: string };

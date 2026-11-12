@@ -8,7 +8,16 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { FactoriesService } from "./factories.service";
 
 /** ?mine=true: the factories I look after. */
-const factoryList = listQuery.extend({ mine: z.enum(["true", "false"]).optional().transform((v) => v === "true") });
+const blank = (v: unknown) => (v === "" ? undefined : v);
+const factoryList = listQuery.extend({
+  mine: z.enum(["true", "false"]).optional().transform((v) => v === "true"),
+  /** Who looks after it ("none": nobody yet). */
+  owner: z.preprocess(blank, z.union([z.uuid(), z.literal("none")]).optional()),
+  /** Its city (the end of its address). */
+  city: z.preprocess(blank, z.string().trim().max(80).optional()),
+  /** offers: has sent prices; none: none yet. */
+  status: z.preprocess(blank, z.enum(["offers", "none"]).optional()),
+});
 
 @ApiTags("factories")
 @Controller("factories")

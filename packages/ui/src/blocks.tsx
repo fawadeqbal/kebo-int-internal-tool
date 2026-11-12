@@ -258,9 +258,6 @@ export function StatTile({
         className={cn(
           "truncate font-bold tracking-tight tabular",
           size === "sm" ? "text-lg sm:text-xl" : "text-xl leading-7 sm:text-[21px]",
-          tone === "bad" && "text-bad",
-          tone === "warn" && "text-warn",
-          tone === "ok" && "text-ok",
         )}
       >
         {value}
@@ -271,7 +268,7 @@ export function StatTile({
         </span>
       )}
       {bar}
-      {sub && <span className={cn("text-xs", tone === "bad" ? "font-medium text-bad" : "text-muted")}>{sub}</span>}
+      {sub && <span className={cn("text-xs", tone === "bad" ? "font-semibold text-bad" : tone === "warn" ? "font-semibold text-action" : tone === "ok" ? "font-semibold text-ok" : "text-muted")}>{sub}</span>}
     </>
   );
   const body = Icon ? (
@@ -498,7 +495,7 @@ export function SectionNav({
                 {l.mark}
                 <span>{l.label}</span>
                 {l.count !== undefined && l.count !== null && l.count !== "" && (
-                  <span className={cn("rounded-md px-1.5 text-[11px] font-semibold tabular", l.alert ? "bg-bad-soft text-bad" : l.active ? "bg-surface text-primary" : "bg-surface-2 text-text-2")}>{l.count}</span>
+                  <span className={cn("-ml-0.5 tabular", l.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{l.count}</span>
                 )}
               </Link>
             </li>

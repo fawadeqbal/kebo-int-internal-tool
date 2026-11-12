@@ -183,3 +183,22 @@ export interface FactsNow {
   lowMargin: { orders: number; costsOverPlan: string | null };
   byCurrency: { currency: string; toReceive: string; toPay: string }[] | null;
 }
+
+/** GET /insights/facts/factory-orders?factoryId: one factory's orders (the supplier's "Purchase orders"). */
+export interface FactoryOrders {
+  currency: string;
+  rows: {
+    orderId: string;
+    refNo: string;
+    orderedOn: string;
+    status: "open" | "closed" | "cancelled";
+    stage: string;
+    currency: string;
+    owed: string;
+    paid: string;
+    toPay: string;
+    readyOn: string | null;
+    ready: boolean;
+    daysLate: number | null;
+  }[];
+}

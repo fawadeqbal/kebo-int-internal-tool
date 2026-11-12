@@ -82,6 +82,13 @@ export class FactsController {
     return this.read.owed(user, q);
   }
 
+  /** ?factoryId → that factory's orders: owed, paid, to pay, ready date, stage (Suppliers › Overview). */
+  @RequireFeature("insights")
+  @Get("factory-orders")
+  factoryOrders(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ factoryId: z.string().uuid() }))) q: { factoryId: string }) {
+    return this.read.factoryOrders(user, q);
+  }
+
   /** Cash in and out by month, straight from payments, factory payments and expenses; expenses by kind. */
   @RequireFeature("insights")
   @Get("cash")

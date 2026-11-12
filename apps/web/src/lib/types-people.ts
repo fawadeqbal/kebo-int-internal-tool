@@ -1,4 +1,4 @@
-import type { PartyType, InquiryStage, OrderStatus, Permission, Role, SignInResult } from "@kebo/shared";
+import type { PartyType, InquiryStage, LostReason, OrderStatus, Permission, Role, SignInResult } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for customers, factories, people and administration (keep in step with apps/api). */
@@ -16,6 +16,8 @@ export interface Contact {
 
 export interface CustomerRow {
   id: string;
+  /** CUS-0012 */
+  code: string | null;
   name: string;
   type: PartyType;
   country: string;
@@ -29,6 +31,8 @@ export interface CustomerRow {
 
 export interface CustomerDetail {
   id: string;
+  /** CUS-0012 */
+  customerCode: string | null;
   type: PartyType;
   name: string;
   country: string;
@@ -56,6 +60,8 @@ export interface CustomerDetail {
 
 export interface Factory {
   id: string;
+  /** SUP-0007 */
+  supplierCode: string | null;
   name: string;
   contactPerson: string | null;
   phone: string | null;
@@ -78,8 +84,19 @@ export interface FactoryDetail extends Factory {
   quotes: {
     id: string;
     receivedOn: string;
+    validUntil: string | null;
     currency: string;
-    inquiry: { id: string; refNo: string; title: string };
+    /** Their own number for the offer. */
+    reference: string | null;
+    basis: string | null;
+    basisPlace: string | null;
+    leadTime: string | null;
+    inquiry: { id: string; refNo: string; title: string; stage: InquiryStage; lostReason: LostReason | null };
+    /** What its lines add up to. */
+    total: string;
+    words: string;
+    /** The quotation that used it (accepted: the customer took that revision). */
+    usedIn: { refNo: string; revision: number; accepted: boolean } | null;
     _count: { lines: number };
   }[];
   /** How it works with us: answers when asked for a price, and what it is making now. */

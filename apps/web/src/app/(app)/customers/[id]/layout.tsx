@@ -1,14 +1,12 @@
-import { Eye, Pencil, MessageSquare, Package, Plus, StickyNote, Users, Wallet } from "lucide-react";
+import { Eye, Pencil, MessageSquare, Package, Plus, Users, Wallet } from "lucide-react";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { ButtonLink, PageHeader } from "@kebo/ui";
+import { ButtonLink, PageHeader, RefCode } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { requireUser } from "@/lib/session";
-import { customerOf, customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
+import { customerOf, customerPaymentsOf } from "@/lib/party-data";
 import { TZ } from "@/lib/format";
 import { countryName } from "@/lib/countries";
-import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { RecordTabs } from "@/components/common/record-tabs";
-import { removeCustomerAction } from "../actions";
 import { late } from "./shared";
 
 /** "Mar 2025" */
@@ -23,36 +21,13 @@ const monthOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { mon
 export default async function CustomerLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
-  const [c, pay, notes] = await Promise.all([customerOf(id), customerPaymentsOf(id), partyNotesOf("customers", id)]);
+  const [c, pay] = await Promise.all([customerOf(id), customerPaymentsOf(id)]);
   const today = todayIn(TZ);
   const canAsk = can(me, "inquiries.create");
   const countryKnown = c.country !== UNKNOWN_COUNTRY;
   const base = `/customers/${c.id}`;
 
   const lateOrders = (pay?.orders ?? []).filter((o) => late(o, today)).length;
-
-  const ledger = can(me, "ledger.view") ? `/finance/ledger/customers/${c.id}` : null;
-  const more: MenuEntry[] = [
-    { label: "Payments", href: `/payments?party=${c.id}` },
-    ...(ledger ? [{ label: "Ledger and statement", href: ledger }] : []),
-    { label: "Their inquiries", href: `/inquiries?customer=${c.id}&stage=all` },
-    { label: "Copy link", copy: base },
-    ...(can(me, "customers.delete")
-      ? [
-          { separator: true as const },
-          {
-            label: "Remove…",
-            danger: true as const,
-            confirm: {
-              title: `Remove ${c.name}?`,
-              body: "They stay on past inquiries and orders, but no longer appear in lists and pickers. Not possible while an order is open.",
-              confirmLabel: "Remove",
-            },
-            action: removeCustomerAction.bind(null, c.id),
-          },
-        ]
-      : []),
-  ];
 
   return (
     <div>
@@ -62,6 +37,12 @@ export default async function CustomerLayout({ children, params }: { children: R
         title={c.name}
         summary={
           <>
+            {c.customerCode && (
+              <>
+                <RefCode>{c.customerCode}</RefCode>
+                {" · "}
+              </>
+            )}
             {c.type === "individual" ? PARTY_TYPE_LABEL.individual : "Company"}
             {" · "}
             {countryKnown ? countryName(c.country) : <span className="text-warn">Country not set</span>}
@@ -83,9 +64,7 @@ export default async function CustomerLayout({ children, params }: { children: R
             </ButtonLink>
           )
         }
-        more={<MoreMenu items={more} label={`More for ${c.name}`} />}
       />
-
 
       <RecordTabs
         className="mt-0"
@@ -97,7 +76,7 @@ export default async function CustomerLayout({ children, params }: { children: R
           { path: "inquiries", label: "Inquiries", count: c.inquiries.length, icon: <MessageSquare aria-hidden /> },
           { path: "money", label: "Money", icon: <Wallet aria-hidden /> },
           { path: "contacts", label: "Contacts", count: c.contacts.length, icon: <Users aria-hidden /> },
-          { path: "notes", label: "Notes", count: notes.length, icon: <StickyNote aria-hidden /> },
+          { path: "notes", label: "Notes", icon: <Pencil aria-hidden /> },
         ]}
       />
       <div className="mt-5">{children}</div>

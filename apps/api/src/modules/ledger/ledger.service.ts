@@ -609,7 +609,16 @@ export class LedgerService {
         (r) => r.reversesId!,
       ),
     );
-    const n = await this.names(list);
+    // The other side of each row (a payment: the bank or cash account it went to), as on the entries list.
+    const groupLines = await db.ledgerEntry.findMany({ where: { groupId: { in: [...new Set(list.map((r) => r.groupId))] }, account: { not: account } } });
+    const n = await this.names([...list, ...groupLines]);
+    const counterOf = (r: (typeof list)[number]) => {
+      const debit = minor(r.debit) > 0 || minor(r.debitBase) > 0;
+      const other = groupLines
+        .filter((g) => g.groupId === r.groupId && (minor(g.debit) > 0 || minor(g.debitBase) > 0) !== debit)
+        .sort((a, b) => minor(b.debitBase) + minor(b.creditBase) - (minor(a.debitBase) + minor(a.creditBase)))[0];
+      return other ? { account: other.account, label: ledgerAccountLabel(other.account, n) } : null;
+    };
     const opening = new Map(openingRows.map((r) => [r.currency, { minor: sign * minor(r.minor), base: sign * minor(r.base) }]));
     const running = new Map([...opening.entries()].map(([c, v]) => [c, { ...v }]));
     let runningBase = [...opening.values()].reduce((t, v) => t + v.base, 0);
@@ -627,7 +636,7 @@ export class LedgerService {
       totals.credit += minor(r.credit);
       totals.debitBase += minor(r.debitBase);
       totals.creditBase += minor(r.creditBase);
-      view.push({ ...this.rowView(r, n), balance: money(cur.minor), balanceBase: money(runningBase), removed: reversed.has(r.id) });
+      view.push({ ...this.rowView(r, n), counter: counterOf(r), balance: money(cur.minor), balanceBase: money(runningBase), removed: reversed.has(r.id) });
     }
     const currencies = [...new Set([...opening.keys(), ...running.keys()])].sort();
     const credit =
