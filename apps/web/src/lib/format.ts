@@ -38,3 +38,9 @@ export function dueText(i: { dueOn: string | null; rule?: string | null; when?: 
   if (i.dueOn) return date(i.dueOn);
   return i.when ? i.when.charAt(0).toUpperCase() + i.when.slice(1) : "No date yet";
 }
+
+/** "820 KB", "2.4 MB". */
+export const fileSize = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
+
+/** "PDF" from "quote.pdf": the little tile in front of a file's name. */
+export const extOf = (name: string) => (name.includes(".") ? name.split(".").pop()!.slice(0, 4).toUpperCase() : "FILE");

@@ -68,6 +68,7 @@ export default async function SourcingPage({
     canEdit ? (
       <AddOfferButton
         dealId={d.id}
+        refNo={d.refNo}
         items={s.items}
         today={today}
         mainCurrency={s.currency}
@@ -99,7 +100,7 @@ export default async function SourcingPage({
       )}
 
       {/* Requests (board): who was asked, how, when the answer is due, and where each stands. */}
-      {requests && (
+      {requests && !compare && (
         <Card className="overflow-clip">
           <CardHeader title="Requests" actions={<span className="flex flex-wrap gap-2">{ask?.button}{s.quotes.length > 0 && addOffer({ variant: "primary", label: "Enter an offer", open: sp.add === "1" })}</span>} />
           {requests.items.length === 0 ? (
@@ -171,6 +172,14 @@ export default async function SourcingPage({
           <Link href={base} className={buttonClass("ghost", "sm", "self-start px-1")}>
             <ArrowLeft aria-hidden /> Back to the offers
           </Link>
+          {requests && requests.counts.asked > 0 && (
+            <Alert tone={requests.counts.waiting ? "info" : "success"}>
+              <strong>
+                {requests.counts.quoted} of {requests.counts.asked} replied.
+              </strong>{" "}
+              {requests.counts.waiting ? `${requests.counts.waiting} still to answer.` : "Every factory asked has answered."}
+            </Alert>
+          )}
           <CompareView view={s} dealId={d.id} />
         </>
       ) : (
@@ -390,9 +399,13 @@ function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
         </Alert>
       )}
       <Card className="overflow-hidden">
-        <div className="border-b border-line px-4 py-3">
-          <h2 className="text-sm font-semibold">Compare side by side</h2>
-          <p className="text-xs text-muted">Our cost per unit in {view.currency}, after tax. The cheapest in each row is marked.</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
+          <h2 className="text-base font-bold">
+            Side by side<span className="text-xs font-normal text-muted"> · our cost per unit in {view.currency}, after tax; the cheapest in each row is marked</span>
+          </h2>
+          <ButtonLink href={`/inquiries/${dealId}/quotation`} variant="primary" size="sm">
+            <FileText aria-hidden /> Make quotation
+          </ButtonLink>
         </div>
         <div className="overflow-x-auto">
           <Table className="min-w-[640px]">
@@ -508,6 +521,38 @@ function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
             </tbody>
           </Table>
         </div>
+      </Card>
+      {/* Terms (board): each offer's basis, lead time, payment, validity and their reference. */}
+      <Card className="overflow-hidden">
+        <CardHeader title="Terms" />
+        <Table className="min-w-[560px]">
+          <THead>
+            <tr>
+              <Th className="w-40" />
+              {offers.map((q) => (
+                <Th key={q.id}>{q.factory.name}</Th>
+              ))}
+            </tr>
+          </THead>
+          <tbody>
+            {(
+              [
+                ["Basis", (q: FactoryQuoteView) => (q.basis ? basisText(q.basis, q.basisPlace) : "—")],
+                ["Lead time", (q: FactoryQuoteView) => q.leadTime ?? "—"],
+                ["Payment", (q: FactoryQuoteView) => q.paymentTerms ?? (q.advancePercent !== null ? `${q.advancePercent}% advance` : "—")],
+                ["Valid until", (q: FactoryQuoteView) => (q.validUntil ? date(q.validUntil) : "—")],
+                ["Their ref.", (q: FactoryQuoteView) => q.reference ?? "—"],
+              ] as const
+            ).map(([label, value]) => (
+              <Tr key={label}>
+                <Td className="text-text-2">{label}</Td>
+                {offers.map((q) => (
+                  <Td key={q.id}>{value(q)}</Td>
+                ))}
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
       </Card>
     </div>
   );

@@ -59,6 +59,9 @@ describe("customer account", () => {
     const a = (await api(app, manager).get(`/customers/${customerId}/account`).expect(200)).body;
     expect(a.deals).toEqual({ total: 2, won: 0, lost: 1, open: 1 });
     expect(a.winRate).toBe(0);
+    // No order yet: no margin, and no deposit paid to time.
+    expect(a.margin).toBeNull();
+    expect(a.depositDaysLate).toBeNull();
     expect(a.totals).toMatchObject({ sales: "0.00", lostDeals: "400.00", openDeals: "60.00", otherCosts: "40.00", spent: "500.00", net: "-500.00", sellingCostPerWin: null });
     expect(a.lostReasons).toEqual([{ reason: "price_too_high", deals: 1, spent: "400.00" }]);
     expect(a.rows.find((r: { id: string }) => r.id === lostDeal)).toMatchObject({ stage: "lost", spent: "400.00", lostReason: "price_too_high", order: null });

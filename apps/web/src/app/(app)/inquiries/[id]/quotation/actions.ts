@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { api } from "@/lib/api";
+import { cookies } from "next/headers";
+import { api, SESSION_COOKIE } from "@/lib/api";
+import { withChromium } from "@/app/pdf/render";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail } from "@/lib/types";
 import { LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
@@ -43,7 +45,7 @@ export async function moveRevisionAction(dealId: string, revisionId: string, _pr
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.post(`/revisions/${revisionId}/status`, { to: v.to, on: v.on || null, reason: reasonOf(form), optionId: v.optionId || null }),
+    () => api.post(`/revisions/${revisionId}/status`, { to: v.to, on: v.on || null, reason: reasonOf(form), optionId: v.optionId || null, ...(v.to === "accepted" ? { customerRef: v.customerRef?.trim() || null, route: v.route || undefined } : {}) }),
     DONE[v.to] ?? "Saved.",
   );
   if (!r.ok) return r;
@@ -106,4 +108,26 @@ export async function revisionFieldsAction(dealId: string, revisionId: string, _
   );
   if (r.ok) refresh(dealId);
   return r;
+}
+
+/** "Send email": the revision's PDF (its print page, as on Download PDF) goes with the message; a draft is then marked sent. */
+export async function emailRevisionAction(dealId: string, revisionId: string, fileName: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const list = (s: string | undefined) => (s ?? "").split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+  const to = list(v.to);
+  if (!to.length) return { ok: false, message: "Who is it to?", errors: { to: ["Write the customer's email"] }, values: v };
+  let pdf: string | null = null;
+  if (v.attach === "on") {
+    const session = (await cookies()).get(SESSION_COOKIE)?.value;
+    if (!session) return { ok: false, message: "Your session ended. Please sign in again.", values: v };
+    const made = await withChromium(session, (render) => render(`/print/revisions/${revisionId}`));
+    if (made instanceof Response) return { ok: false, message: `The PDF could not be made: ${await made.text()}`, values: v };
+    pdf = Buffer.from(made).toString("base64");
+  }
+  const r = await attempt(form, () =>
+    api.post(`/revisions/${revisionId}/email`, { to, cc: list(v.cc), subject: v.subject ?? "", message: v.message ?? "", pdf, fileName }),
+  );
+  if (!r.ok) return r;
+  refresh(dealId);
+  return { ok: true, message: `Sent to ${to.join(", ")}.` };
 }

@@ -4,10 +4,9 @@ import { useRef, useState, type DragEvent, type ReactNode } from "react";
 import { ArrowUpToLine } from "lucide-react";
 import { cn } from "@kebo/ui";
 
-/** "PDF" from "quote.pdf": the little tile in front of a file's name. */
-export const extOf = (name: string) => (name.includes(".") ? name.split(".").pop()!.slice(0, 4).toUpperCase() : "FILE");
+import { extOf } from "@/lib/format";
 
-export const fileSize = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
+export { fileSize } from "@/lib/format";
 
 /** One file in a list: its type tile, name, a line about it, a tag and its buttons. */
 export function FileRow({ name, meta, tag, actions, children }: { name: string; meta?: ReactNode; tag?: ReactNode; actions?: ReactNode; children?: ReactNode }) {

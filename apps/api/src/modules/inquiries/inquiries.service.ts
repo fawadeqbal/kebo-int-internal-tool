@@ -226,7 +226,7 @@ export class InquiriesService {
         },
         orders: {
           orderBy: { createdAt: "desc" },
-          select: { id: true, refNo: true, status: true, orderedOn: true, total: true, currency: true },
+          select: { id: true, refNo: true, status: true, orderedOn: true, total: true, currency: true, customerRef: true },
         },
         ...(seeCosts
           ? {

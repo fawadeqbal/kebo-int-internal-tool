@@ -3,11 +3,11 @@ import { ArrowRight } from "lucide-react";
 import { can, CHANNEL_LABEL, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, PRIORITY_LABEL } from "@kebo/shared";
 
 const STAGE_WORD = INQUIRY_STAGE_LABEL;
-import { Avatar, buttonClass, Card, CardBody, CardHeader } from "@kebo/ui";
+import { Avatar, Badge, buttonClass, Card, CardBody, CardHeader, RefCode } from "@kebo/ui";
 import { DetailsCard } from "@/components/common/record";
 import { requireUser } from "@/lib/session";
-import { date } from "@/lib/format";
-import { dealHistoryOf, dealOf } from "@/lib/deal-data";
+import { date, dateTime, money } from "@/lib/format";
+import { dealHistoryOf, dealOf, quotationOf } from "@/lib/deal-data";
 import { optional } from "@/components/print/data";
 import { PanelButton } from "@/components/orders/step-view";
 import { assignAction, holdAction, moveStageAction, noteAction } from "../actions";
@@ -71,6 +71,105 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
       )}
     </section>
   ) : null;
+
+  // Won (board InquiryWon): when and how fast, the deal (sale, planned cost and profit), what was made from it, and the activity.
+  const order = d.stage === "won" ? d.orders.find((o) => o.status !== "cancelled") : undefined;
+  if (order) {
+    const q = await optional(() => quotationOf(id));
+    const rev = q?.revisions.find((r) => r.status === "accepted");
+    const opt = rev?.options.find((o) => o.status === "accepted") ?? rev?.options[0];
+    const others = rev?.options.filter((o) => o.id !== opt?.id) ?? [];
+    const wonOn = rev?.answeredOn ?? order.orderedOn;
+    const days = Math.max(0, Math.round((Date.parse(wonOn) - Date.parse(d.createdAt.slice(0, 10))) / 86_400_000));
+    const costing = can(me, "sourcing.manage") ? opt?.costing : null;
+    const c = rev?.currency ?? order.currency;
+    const row = (label: string, value: React.ReactNode) => (
+      <div className="flex justify-between gap-3">
+        <span className="text-text-2">{label}</span>
+        <strong className="text-right tabular">{value}</strong>
+      </div>
+    );
+    return (
+      <div className="flex flex-col gap-4">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary-line bg-primary-soft/60 px-5 py-4">
+          <p className="min-w-0">
+            <strong className="block font-bold text-primary">
+              Won on {date(wonOn)} · {days === 0 ? "the day of the first message" : `${days} day${days === 1 ? "" : "s"} from first message`}.
+            </strong>
+            <span className="block text-sm text-text-2">
+              {rev ? `R${rev.number}${opt && rev.options.length > 1 ? ` Option ${opt.letter}` : ""} accepted. ` : ""}The work continues on the order.
+            </span>
+          </p>
+          <Link href={`/orders/${order.id}`} className={buttonClass("primary", "md", "max-sm:w-full")}>
+            <ArrowRight aria-hidden /> Open {order.refNo}
+          </Link>
+        </section>
+        <div className="grid items-start gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader title="The deal" />
+            <CardBody className="flex flex-col gap-2 text-sm">
+              {opt && row("Accepted", `Option ${opt.letter}${opt.factory ? ` · ${opt.factory.name.split(" ")[0]}` : ""}`)}
+              {row("Sale", money(opt?.total ?? order.total, c))}
+              {costing && row("Planned cost", money(costing.cost, c))}
+              {costing && row("Planned profit", `${money(costing.profit, c)}${costing.marginPercent != null ? ` · ${costing.marginPercent.toFixed(1)}%` : ""}`)}
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Made from it" />
+            <CardBody className="grid gap-4 text-sm sm:grid-cols-2">
+              <div>
+                <span className="block text-xs text-muted">Sales order</span>
+                <Link href={`/orders/${order.id}`} className="hover:opacity-80">
+                  <RefCode>{order.refNo}</RefCode>
+                </Link>
+              </div>
+              {opt?.factory && (
+                <div>
+                  <span className="block text-xs text-muted">Purchase order</span>
+                  <Link href={`/orders/${order.id}`} className="text-text hover:underline">
+                    {opt.factory.name}
+                  </Link>
+                </div>
+              )}
+              <div>
+                <span className="block text-xs text-muted">Customer ref.</span>
+                {order.customerRef ?? "—"}
+              </div>
+              {others.map((o) => (
+                <div key={o.id}>
+                  <span className="block text-xs text-muted">Option {o.letter}</span>
+                  <Badge>Not chosen</Badge>
+                </div>
+              ))}
+            </CardBody>
+          </Card>
+        </div>
+        <Card>
+          <CardHeader
+            title="Activity"
+            actions={
+              <Link href={`${base}/history`} className="text-[13px] font-semibold text-primary hover:underline">
+                History
+              </Link>
+            }
+          />
+          <CardBody>
+            <ol className="flex flex-col gap-3">
+              {(history ?? []).slice(0, 6).map((e) => (
+                <li key={e.id} className="flex gap-2.5">
+                  <Avatar name={e.by?.name ?? "System"} size={30} />
+                  <span className="min-w-0 text-[13px]">
+                    <span className="line-clamp-2">{e.summary ?? e.action}</span>
+                    <span className="block text-xs text-muted">{dateTime(e.at)}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">

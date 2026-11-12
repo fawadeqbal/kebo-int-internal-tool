@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { AlertTriangle, Check, CheckCircle2, Clock, Download, Eye, Pencil } from "lucide-react";
-import { BALANCE_TERMS_LABEL, BASIS_STEP_LABEL, can, type BasisStep } from "@kebo/shared";
+import { AlertTriangle, Check, CheckCircle2, Clock, Download, Eye, Pencil, Printer, Send } from "lucide-react";
+import { BALANCE_TERMS_LABEL, BASIS_STEP_LABEL, can, routeFromTerms, type BasisStep } from "@kebo/shared";
 import { Alert, Badge, buttonClass, ButtonLink, Card, CardBody, CardHeader, RefCode, RevisionBadge, StatusBadge, Td, Th, THead, Tr } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
 import { FollowUpForm } from "@/components/notes/note-forms";
@@ -16,7 +16,8 @@ import { DetailsCard, ViewCard, type DetailField } from "@/components/orders/ste
 import { StartRevision } from "@/components/deals/quotation-panels";
 import { AnswerCard, MarkSentButton, OptionsCard, TermsPanel } from "@/components/deals/quotation-step";
 import { PriceEditor } from "@/components/deals/price-editor";
-import { createRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
+import { createRevisionAction, emailRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
+import { SendQuoteCard } from "@/components/deals/send-quote";
 
 export const metadata = { title: "Quotation" };
 
@@ -45,7 +46,7 @@ export default async function QuotationPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ start?: string; edit?: string; option?: string; add?: string }>;
+  searchParams: Promise<{ start?: string; edit?: string; option?: string; add?: string; send?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -106,6 +107,47 @@ export default async function QuotationPage({
         openHref={props.empty ? "?start=1" : undefined}
       />
     ) : null;
+  // Send (board QuoteSend): the quotation as printed, beside the email to the customer.
+  const sending = sp.send && manage ? revs.find((r) => r.id === sp.send && (r.status === "draft" || r.status === "sent")) : undefined;
+  if (sending) {
+    const who = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
+    const copy = d.customer.contacts.filter((c) => c.email && c.id !== who?.id).map((c) => c.email);
+    const quoteRef = `${d.quotation?.refNo ?? d.refNo} R${sending.number}`;
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <ButtonLink href={`${base}/quotation`}>
+            <Pencil aria-hidden /> Back to edit
+          </ButtonLink>
+          <ButtonLink href={printHref(sending)} target="_blank">
+            <Printer aria-hidden /> Print
+          </ButtonLink>
+        </div>
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="min-w-0 flex-[999_1_640px] overflow-hidden rounded-2xl border border-line bg-surface">
+            <iframe title={`${quoteRef} as printed`} src={`${printHref(sending)}?embed=1`} className="h-[1100px] w-full border-0" />
+          </div>
+          <aside className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
+            <SendQuoteCard
+              number={sending.number}
+              action={emailRevisionAction.bind(null, d.id, sending.id, `${quoteRef}.pdf`)}
+              to={who?.email ?? ""}
+              cc={copy.slice(0, 2).join(", ")}
+              subject={`Quotation ${quoteRef} — ${d.title}`}
+              message={`Dear ${who?.name.split(" ")[0] ?? "Sir or Madam"}, please find our ${sending.number > 1 ? "revised " : ""}quotation for ${d.title}.`}
+              pdfHref={pdfHref(sending)}
+              backHref={`${base}/quotation`}
+              markSent={
+                sending.status === "draft" ? (
+                  <MarkSentButton number={sending.number} action={move(sending)} today={today} variant="ghost" label="Sent another way — mark as sent" icon={<Check aria-hidden />} />
+                ) : null
+              }
+            />
+          </aside>
+        </div>
+      </div>
+    );
+  }
   // The customer said no (or let it lapse) and nothing new is being drafted: the next step is a new revision.
   const closedLive = !draft && live && (live.status === "rejected" || live.status === "expired") ? live : null;
 
@@ -291,7 +333,11 @@ export default async function QuotationPage({
                   <Pencil aria-hidden /> Edit prices
                 </ButtonLink>
               )}
-              {manage && <MarkSentButton number={draft.number} action={move(draft)} today={today} className="w-full justify-start" />}
+              {manage && (
+                <ButtonLink href={`${base}/quotation?send=${draft.id}`} variant="primary" className="w-full justify-start">
+                  <Send aria-hidden /> Send R{draft.number}…
+                </ButtonLink>
+              )}
               <p className="text-xs text-muted">Each option is one factory&apos;s offer. Every line of that offer gets a price.</p>
             </CardBody>
           </Card>
@@ -309,6 +355,8 @@ export default async function QuotationPage({
           answerAction={live?.canAnswer && manage ? move(live) : null}
           lostAction={live?.canAnswer && manage && d.canWork ? lostAction.bind(null, d.id, live.id) : null}
           startNext={!draft && manage && q.canStartRevision ? start({ open: true, label: `Start R${(live?.number ?? 0) + 1} from R${live?.number ?? 1}` }) : null}
+          subtitle={`${d.quotation?.refNo ?? d.refNo} · ${d.customer.name}`}
+          route={live ? routeFromTerms(live.balanceTerms).route : null}
         />
       )}
 

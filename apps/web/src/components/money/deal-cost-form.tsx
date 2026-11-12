@@ -100,31 +100,31 @@ export function DealCostForm({
               <Field label="Spent on" htmlFor="dc-spentOn" required error={s.errors?.spentOn}>
                 <Input id="dc-spentOn" name="spentOn" type="date" max={today} defaultValue={s.values?.spentOn ?? today} />
               </Field>
-              <Field label="Amount" htmlFor="dc-amount" required error={s.errors?.amount ?? s.errors?.currency}>
+              <Field label="Amount" htmlFor="dc-amount" required error={s.errors?.amount}>
+                <Input id="dc-amount" name="amount" inputMode="decimal" className="text-right tabular" defaultValue={s.values?.amount ?? ""} />
+              </Field>
+              <Field label={`Rate to ${mainCurrency}`} htmlFor="dc-rate" error={s.errors?.rate ?? s.errors?.currency}>
                 <div className="flex">
                   <CurrencySelect
                     id="dc-currency"
                     name="currency"
-                    aria-label="Currency"
+                    aria-label="Currency of the amount"
                     short
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
-                    className="w-[4.75rem] flex-none rounded-r-none border-r-0 px-2"
+                    className="w-[4.6rem] flex-none rounded-r-none border-r-0 pr-6 pl-2"
                   />
-                  <Input id="dc-amount" name="amount" inputMode="decimal" className="min-w-0 rounded-l-none text-right tabular" defaultValue={s.values?.amount ?? ""} />
+                  <Input
+                    id="dc-rate"
+                    name="rate"
+                    inputMode="decimal"
+                    className="min-w-0 rounded-l-none tabular"
+                    value={currency === mainCurrency ? "1" : rate}
+                    placeholder={settingsRate ? rateText(settingsRate) : ""}
+                    onChange={(e) => setRate(e.target.value)}
+                    disabled={currency === mainCurrency}
+                  />
                 </div>
-              </Field>
-              <Field label={`Rate to ${mainCurrency}`} htmlFor="dc-rate" error={s.errors?.rate}>
-                <Input
-                  id="dc-rate"
-                  name="rate"
-                  inputMode="decimal"
-                  className="tabular"
-                  value={currency === mainCurrency ? "1" : rate}
-                  placeholder={settingsRate ? rateText(settingsRate) : ""}
-                  onChange={(e) => setRate(e.target.value)}
-                  disabled={currency === mainCurrency}
-                />
               </Field>
               <Field label="Paid by" htmlFor="dc-paidBy">
                 <Select id="dc-paidBy" name="paidById" defaultValue={s.values?.paidById ?? me ?? ""}>

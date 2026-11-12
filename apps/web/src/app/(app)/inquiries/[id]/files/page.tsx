@@ -2,10 +2,9 @@ import { Download, Eye, File as FileIcon } from "lucide-react";
 import { can } from "@kebo/shared";
 import { buttonClass, Card, CardBody, CardHeader, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
-import { date } from "@/lib/format";
+import { date, fileSize } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { optional } from "@/components/print/data";
-import { fileSize } from "@/components/common/file-zone";
 import { AddFilesCard, FilesTable } from "@/components/deals/inquiry-files";
 import { describeFileAction, removeFileAction } from "../../actions";
 

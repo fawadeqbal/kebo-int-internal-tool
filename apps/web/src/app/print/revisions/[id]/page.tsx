@@ -48,7 +48,7 @@ export default async function QuotationPrint({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ back?: string; copy?: string }>;
+  searchParams: Promise<{ back?: string; copy?: string; embed?: string }>;
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const r = await load(() => api.get<RevisionDoc>(`/revisions/${id}`));
@@ -116,17 +116,20 @@ export default async function QuotationPrint({
 
   return (
     <>
-      <PrintToolbar
-        title={`Quotation ${numberOf(r)}`}
-        backHref={backTo(sp.back, `/inquiries/${r.quotation.inquiryId}/quotation`)}
-        pdfHref={`/pdf/revisions/${r.id}${internal ? "?copy=internal" : ""}`}
-        excelHref={(await hasFeature("excel")) ? `/sheets/export/quotation?id=${r.id}${internal ? "&copy=internal" : ""}` : undefined}
-        copies={{
-          current: internal ? "internal" : "customer",
-          customer: copyHref(r.id, sp.back, false),
-          internal: copyHref(r.id, sp.back, true),
-        }}
-      />
+      {/* ?embed=1: shown inside the app (the Send page's preview), without the toolbar. */}
+      {sp.embed !== "1" && (
+        <PrintToolbar
+          title={`Quotation ${numberOf(r)}`}
+          backHref={backTo(sp.back, `/inquiries/${r.quotation.inquiryId}/quotation`)}
+          pdfHref={`/pdf/revisions/${r.id}${internal ? "?copy=internal" : ""}`}
+          excelHref={(await hasFeature("excel")) ? `/sheets/export/quotation?id=${r.id}${internal ? "&copy=internal" : ""}` : undefined}
+          copies={{
+            current: internal ? "internal" : "customer",
+            customer: copyHref(r.id, sp.back, false),
+            internal: copyHref(r.id, sp.back, true),
+          }}
+        />
+      )}
       <KeboDoc
         brand={await docBrand()}
         company={{ ...company, stamp: now.stamp ?? null }}

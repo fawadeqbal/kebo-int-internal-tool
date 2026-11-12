@@ -171,13 +171,21 @@ describe("a whole deal through the API", () => {
         .expect(201)
     ).body.id;
     await api(app, staff).post(`/revisions/${rev[1]}/status`, { to: "accepted" }).expect(409); // superseded: no answer possible
-    const accepted = await api(app, staff).post(`/revisions/${rev[2]}/status`, { to: "accepted" }).expect(200);
+    // Emailing needs SMTP: without it the person is told to send it themselves.
+    const mail = await api(app, staff).post(`/revisions/${rev[2]}/email`, { to: ["buyer@gulf.test"], subject: "Quotation" }).expect(400);
+    expect(mail.body.error).toMatch(/Email is not set up/);
+    await api(app, staff).post(`/revisions/${rev[2]}/email`, { to: ["not an email"], subject: "Quotation" }).expect(422);
+    const accepted = await api(app, staff)
+      .post(`/revisions/${rev[2]}/status`, { to: "accepted", customerRef: `GV-PO-${tag}`, route: "informal" })
+      .expect(200);
     expect(accepted.body.status).toBe("accepted");
     await api(app, staff).get(`/revisions/${rev[3]}`).expect(404);
 
     const deal = (await api(app, staff).get(`/inquiries/${inquiryId}`).expect(200)).body;
     expect(deal.stage).toBe("won");
     expect(deal.orders).toHaveLength(1);
+    // Their PO number is kept on the order.
+    expect(deal.orders[0].customerRef).toBe(`GV-PO-${tag}`);
     const order = (await api(app, staff).get(`/orders/${deal.orders[0].id}`).expect(200)).body;
     expect(order).toMatchObject({
       total: "23000.00",

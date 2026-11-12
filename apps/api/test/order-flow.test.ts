@@ -57,8 +57,10 @@ describe("order flow: from asking factories to SAT", () => {
     // Before asking: every factory is offered, none asked here yet.
     const before = (await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body;
     expect(before.items).toEqual([]);
-    expect(before.suggestions.find((f: { id: string }) => f.id === henan)).toMatchObject({ name: `Henan Pack ${tag}`, askedHere: false, lastAskedOn: null });
-    const asked = (await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan, wuxi], replyBy: day(7), channel: "wechat" }).expect(201)).body;
+    expect(before.suggestions.find((f: { id: string }) => f.id === henan)).toMatchObject({ name: `Henan Pack ${tag}`, askedHere: false, lastAskedOn: null, won: 0, goodAt: null, isNew: true });
+    // A day sent in the future is refused; one in the past is kept.
+    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan], sentOn: day(3) }).expect(400);
+    const asked = (await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan, wuxi], replyBy: day(7), channel: "wechat", sentOn: day(0) }).expect(201)).body;
     expect(asked.counts).toEqual({ asked: 2, quoted: 0, waiting: 2, late: 0 });
     expect(asked.items[0]).toMatchObject({ channel: "wechat", waitingDays: 0 });
     expect(asked.suggestions.find((f: { id: string }) => f.id === henan)).toMatchObject({ askedHere: true, lastAskedOn: expect.any(String) });

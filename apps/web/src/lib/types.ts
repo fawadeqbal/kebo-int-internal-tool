@@ -140,7 +140,7 @@ export interface DealDetail {
       sentOn: string | null;
     }[];
   } | null;
-  orders: { id: string; refNo: string; status: OrderStatus; orderedOn: string; total: string; currency: string }[];
+  orders: { id: string; refNo: string; status: OrderStatus; orderedOn: string; total: string; currency: string; customerRef?: string | null }[];
   people: Record<string, string>;
   canWork: boolean;
   allowed: { edit: boolean; quote: boolean; source: boolean; assign: boolean; hold: boolean; reopen: boolean };

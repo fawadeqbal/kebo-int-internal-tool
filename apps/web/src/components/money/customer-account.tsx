@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
-import { Alert, cn } from "@kebo/ui";
+import { Alert } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { money } from "@/lib/format";
 import type { CustomerAccount } from "@/lib/types-money";
 
 export const lostReasonLabel = (r: LostReason | "not_said") => (r === "not_said" ? "No reason given" : LOST_REASON_LABEL[r]);
