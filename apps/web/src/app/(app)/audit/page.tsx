@@ -1,3 +1,4 @@
+import { AdminTabs } from "@/components/common/admin-tabs";
 import Link from "next/link";
 import { can } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr } from "@kebo/ui";
@@ -156,7 +157,9 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
             <span className="max-sm:hidden"> · every change anyone made, newest first; entries cannot be edited or removed</span>
           </>
         }
-      />
+     >
+        {can(me, "security.manage") && <AdminTabs set="people" current="/audit" />}
+      </PageHeader>
       <ListToolbar
         chips={chips}
         label="Filter the audit log"

@@ -138,7 +138,8 @@ describe("order papers", () => {
     expect(ci).toMatchObject({ step: "shipping", state: "wait", number: refNo.replace(/^SO-/, "CI-"), makeable: true });
     // The route comes from the quotation's terms: the contract can be made at once.
     expect(l.papers.find((p) => p.kind === "sales-contract")).toMatchObject({ step: "payment", state: "can" });
-    expect(l.papers.find((p) => p.kind === "purchase-order")).toMatchObject({ step: "factory", number: refNo.replace(/^SO-/, "PO-") });
+    // A purchase order has its own number (PO-YYYY-NNNN, one per supplier), on the list and on the paper.
+    expect(l.papers.find((p) => p.kind === "purchase-order")).toMatchObject({ step: "factory", number: expect.stringMatching(/^PO-\d{4}-\d{4,}$/) });
     expect(l.papers.find((p) => p.kind === "proforma")).toMatchObject({ step: "payment" });
     // LC papers only on an LC order; receipts only for payments made.
     expect(l.papers.find((p) => p.kind === "bill-of-exchange")).toBeUndefined();
@@ -284,6 +285,7 @@ describe("order papers", () => {
     }
     const po = await doc("purchase-order");
     expect(po.doc.party.name).toBe(`Papers Works ${tag}`);
+    expect(po.doc.number).toBe(l.papers.find((p) => p.kind === "purchase-order")!.number);
     expect(po.doc.total).toMatchObject({ currency: "CNY", amount: "300000.00" });
     // The tax follows the prices frozen on the order: 0% says nothing about tax.
     const taxBullets = (d: { doc: { bullets: unknown[] } }) => d.doc.bullets.filter((b) => typeof b === "string" && /tax/i.test(b));

@@ -263,6 +263,10 @@ export class PapersService {
       ref,
       fileNames: new Map(files.map((f) => [f.id, f.fileName])),
       statement: kind === "customer-statement" ? await this.statementOf(user, o.customerId) : null,
+      number:
+        kind === "purchase-order" && /^[0-9a-f-]{36}$/i.test(ref)
+          ? ((await this.prisma.db.purchaseOrder.findFirst({ where: { orderId: o.id, supplierId: ref }, select: { number: true } }))?.number ?? null)
+          : null,
     };
   }
 
@@ -276,7 +280,7 @@ export class PapersService {
         kind,
         title: PAPER_TITLE[kind],
         numberLabel: PAPER_NUMBER_LABEL[kind],
-        number: paperNumber(c.o.refNo, kind, b.n),
+        number: c.number ?? paperNumber(c.o.refNo, kind, b.n),
         company: c.company,
         party: party ?? c.customer,
         ...rest,
@@ -594,6 +598,11 @@ export class PapersService {
       const docKind = PAPER_DOCUMENT[kind] ?? null;
       const refs = PER_FACTORY_PAPERS.includes(kind) ? factoriesOf(o).map((f) => ({ ref: f.id, name: f.name })) : [{ ref: "", name: "" }];
       if (PER_FACTORY_PAPERS.includes(kind) && !refs.length) continue;
+      // A purchase order prints its own number (PO-2026-0044), one per supplier.
+      const poNumbers =
+        kind === "purchase-order"
+          ? new Map((await this.prisma.db.purchaseOrder.findMany({ where: { orderId: o.id }, select: { supplierId: true, number: true } })).map((x) => [x.supplierId, x.number]))
+          : null;
       for (const r of refs) {
         const rows = this.rowsOf(o, kind, r.ref);
         const latest = rows.at(-1) ?? null;
@@ -613,7 +622,7 @@ export class PapersService {
             key: r.ref ? `${kind}:${r.ref}` : kind,
             label: r.name && refs.length > 1 ? `${PAPER_LABEL[kind]} · ${r.name}` : PAPER_LABEL[kind],
             state,
-            number: latest?.number ?? (recorded ? recorded.number : built.doc.number),
+            number: latest?.number ?? (recorded ? recorded.number : (poNumbers?.get(r.ref) ?? built.doc.number)),
             version: latest?.version ?? null,
             paperId: latest?.id ?? null,
             draft: latest?.status === "draft",

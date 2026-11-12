@@ -122,6 +122,8 @@ export interface PaperCtx {
   /** File names of the checklist's file fields. */
   fileNames: Map<string, string>;
   statement: StatementData | null;
+  /** The paper's own number when it has one: a purchase order's PO-2026-0044 (purchase_orders), not one made from the order's. */
+  number?: string | null;
 }
 
 /** What a builder makes: the Make page's checks and the paper itself (title, number and company are added after). */

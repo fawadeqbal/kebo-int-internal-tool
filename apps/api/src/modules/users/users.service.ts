@@ -254,13 +254,36 @@ export class UsersService {
   /* ---------------------------------------------------------------- my account */
 
   /** Your own name, as everyone sees it; recorded in the audit log. */
-  async renameSelf(actor: SessionUser, name: string) {
+  async renameSelf(actor: SessionUser, name: string, more: { phone?: string | null; language?: string; timeZone?: string | null } = {}) {
     const user = await this.prisma.db.user.findUniqueOrThrow({ where: { id: actor.id } });
+    const data = {
+      name,
+      ...(more.phone !== undefined ? { phone: more.phone || null } : {}),
+      ...(more.language !== undefined ? { language: more.language } : {}),
+      ...(more.timeZone !== undefined ? { timeZone: more.timeZone || null } : {}),
+    };
     return this.prisma.tx(async (tx) => {
-      const updated = await tx.user.update({ where: { id: actor.id }, data: { name }, select: publicUser });
-      await this.audit.record(tx, { userId: actor.id, action: "update", entityType: "user", entityId: actor.id, summary: `Changed own name`, oldValues: { name: user.name }, newValues: { name } });
+      const updated = await tx.user.update({ where: { id: actor.id }, data, select: publicUser });
+      const old = { name: user.name, phone: user.phone, language: user.language, timeZone: user.timeZone };
+      const changed = Object.keys(data).filter((k) => old[k as keyof typeof old] !== data[k as keyof typeof data]);
+      if (changed.length)
+        await this.audit.record(tx, {
+          userId: actor.id,
+          action: "update",
+          entityType: "user",
+          entityId: actor.id,
+          summary: changed.length === 1 && changed[0] === "name" ? "Changed own name" : "Changed own profile",
+          oldValues: Object.fromEntries(changed.map((k) => [k, old[k as keyof typeof old]])),
+          newValues: Object.fromEntries(changed.map((k) => [k, data[k as keyof typeof data]])),
+        });
       return updated;
     });
+  }
+
+  /** My account: the person's phone, language and time zone. */
+  async ownProfile(actor: SessionUser) {
+    const u = await this.prisma.db.user.findUniqueOrThrow({ where: { id: actor.id }, select: { phone: true, language: true, timeZone: true } });
+    return u;
   }
 
   async changeOwnPassword(actor: SessionUser, input: z.infer<typeof passwordChangeInput>) {

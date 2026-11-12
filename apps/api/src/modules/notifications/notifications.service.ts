@@ -32,13 +32,14 @@ export const links = {
  * events chosen in Settings. Nobody is notified about their own action.
  */
 /** The Alerts page's chips: the starts of the notification types each one shows. */
-export const NOTIFICATION_GROUPS = ["payments", "inquiries", "orders", "followUps"] as const;
+export const NOTIFICATION_GROUPS = ["payments", "inquiries", "orders", "followUps", "mentions"] as const;
 export type NotificationGroup = (typeof NOTIFICATION_GROUPS)[number];
 const GROUP_TYPES: Record<NotificationGroup, string[]> = {
   payments: ["payment.", "approval.", "reminder.instalment"],
   inquiries: ["inquiry.", "quotation.", "reminder.new", "reminder.sourcing", "reminder.overdue", "reminder.dueSoon", "reminder.quotation"],
   orders: ["order.", "reminder.order"],
   followUps: ["followUp."],
+  mentions: ["mention."],
 };
 
 @Injectable()

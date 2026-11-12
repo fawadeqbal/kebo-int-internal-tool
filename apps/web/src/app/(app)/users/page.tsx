@@ -1,3 +1,5 @@
+import { can } from "@kebo/shared";
+import { AdminTabs } from "@/components/common/admin-tabs";
 import Link from "next/link";
 import { Plus, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
@@ -97,7 +99,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             <span className="max-sm:hidden">Add a person</span>
           </OpenPanelButton>
         }
-      />
+     >
+        {can(me, "security.manage") && <AdminTabs set="people" current="/users" />}
+      </PageHeader>
       {without.length > 0 && (
         <Card className="mb-4 border-warn/30 bg-warn-soft/40 px-4 py-3">
           <p className="flex items-center gap-2 text-sm font-semibold text-warn">

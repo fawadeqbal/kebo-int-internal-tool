@@ -27,7 +27,11 @@ export const metadata = { title: "My account" };
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const me = await requireUser();
   const sp = await searchParams;
-  const [status, sessions] = await Promise.all([api.get<TwoStepStatus>("/me/two-step"), api.get<SessionRow[]>("/me/sessions")]);
+  const [status, sessions, profile] = await Promise.all([
+    api.get<TwoStepStatus>("/me/two-step"),
+    api.get<SessionRow[]>("/me/sessions"),
+    api.get<{ phone: string | null; language: string; timeZone: string | null }>("/me/profile").catch(() => null),
+  ]);
   const twoStep = (
     <TwoStepPanel
       status={status}
@@ -57,7 +61,15 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           <Card>
             <CardHeader title="Profile" />
             <div className="p-5">
-              <ProfileForm action={renameSelfAction} name={me.name} email={me.email} />
+              <ProfileForm
+                action={renameSelfAction}
+                name={me.name}
+                email={me.email}
+                phone={profile?.phone}
+                language={profile?.language}
+                timeZone={profile?.timeZone}
+                zones={Intl.supportedValuesOf("timeZone")}
+              />
             </div>
           </Card>
           <Card>

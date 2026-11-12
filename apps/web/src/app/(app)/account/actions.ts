@@ -64,7 +64,7 @@ export async function signOutOthersAction(_prev: ActionState, _form: FormData): 
 /** Your own name (the Profile card). */
 export async function renameSelfAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.patch("/me", { name: v.name }), "Saved.");
+  const r = await attempt(form, () => api.patch("/me", { name: v.name, phone: v.phone ?? null, language: v.language || undefined, timeZone: v.timeZone ?? null }), "Saved.");
   if (r.ok) revalidatePath("/", "layout");
   return r;
 }

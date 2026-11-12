@@ -151,7 +151,29 @@ export class NotesService {
         `${target.label}: ${user.name} ${VERB[kind]}${row.contact && kind !== "note" ? ` with ${row.contact.name}` : ""}: ${quote(row.body)}`,
         { new: { note: row.id, kind, at: row.at.toISOString(), ...(row.contact ? { contact: row.contact.name } : {}) } },
       );
+      await this.mentions(tx, user, type, id, target.label, row.body);
       return { row, target };
+    });
+  }
+
+  /**
+   * "@Fawad can we hold the PO?": everyone named after an @ (their first name or full name, any case) who
+   * can sign in gets an alert ("Mentioned you") that opens the record. Not the writer.
+   */
+  private async mentions(tx: Tx, user: SessionUser, type: RecordType, id: string, label: string, body: string) {
+    const asked = [...body.matchAll(/@([\p{L}][\p{L}\p{N}._-]*(?:\s[\p{L}][\p{L}\p{N}._-]*)?)/gu)].map((m) => m[1]!.toLowerCase());
+    if (!asked.length) return;
+    const people = await tx.user.findMany({ where: { isActive: true, platformAdminId: null, id: { not: user.id } }, select: { id: true, name: true } });
+    const named = people.filter((p) => {
+      const full = p.name.toLowerCase();
+      const first = full.split(/\s+/)[0]!;
+      return asked.some((a) => a === full || a === first || a.split(/\s+/)[0] === first);
+    });
+    if (!named.length) return;
+    const link = type === "inquiry" ? `/inquiries/${id}` : type === "order" ? `/orders/${id}/history` : type === "customer" ? `/customers/${id}/notes` : `/factories/${id}/notes`;
+    const text = body.length > 140 ? `${body.slice(0, 137)}…` : body;
+    await tx.notification.createMany({
+      data: named.map((p) => ({ userId: p.id, type: `mention.${type}`, title: `${user.name.split(" ")[0]}: ${text}`, body: label, link })),
     });
   }
 

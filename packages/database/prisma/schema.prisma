@@ -299,6 +299,10 @@ model User {
   platformAdminId String?   @map("platform_admin_id") @db.Uuid
   name            String    @db.VarChar(120)
   email           String    @db.VarChar(254)
+  /// Their own phone, language (en) and time zone (IANA; empty: the company's), set on My account.
+  phone           String?   @db.VarChar(40)
+  language        String    @default("en") @db.VarChar(10)
+  timeZone        String?   @map("time_zone") @db.VarChar(60)
   passwordHash    String    @map("password_hash")
   /// The role's key.
   role            String    @db.VarChar(40)
