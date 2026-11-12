@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
-import { Alert, Button, Field, Input } from "@kebo/ui";
+import { Alert, Button, Field, Input, Select } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
@@ -352,19 +352,56 @@ export function TwoStepPanel({
   );
 }
 
-/** The Profile card: your name (yours to change) and your email (who manages people changes it). */
-export function ProfileForm({ action, name, email }: { action: Action; name: string; email: string }) {
+/** The Profile card (board My account): your name, email (who manages people changes it), phone, language and time zone. */
+export function ProfileForm({
+  action,
+  name,
+  email,
+  phone,
+  language,
+  timeZone,
+  zones,
+}: {
+  action: Action;
+  name: string;
+  email: string;
+  phone?: string | null;
+  language?: string;
+  timeZone?: string | null;
+  /** The time zones to choose from (IANA names). */
+  zones?: string[];
+}) {
   return (
-    <ActionForm action={action} className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+    <ActionForm action={action} className="grid gap-4 sm:grid-cols-3">
       {(s) => (
         <>
-          <Field label="Name" required htmlFor="profile-name" error={s.errors?.name}>
+          <Field label="Name" required htmlFor="profile-name" error={s.errors?.name} className="sm:col-span-2">
             <Input id="profile-name" name="name" maxLength={120} required autoComplete="name" defaultValue={s.values?.name ?? name} />
           </Field>
           <Field label="Email" required htmlFor="profile-email" hint="A Super Admin changes it.">
             <Input id="profile-email" type="email" value={email} readOnly className="bg-surface-2 text-text-2" />
           </Field>
-          <div className="flex items-center gap-2 sm:col-span-2">
+          <Field label="Phone" htmlFor="profile-phone" error={s.errors?.phone}>
+            <Input id="profile-phone" name="phone" type="tel" maxLength={40} autoComplete="tel" placeholder="+92 300 1234567" defaultValue={s.values?.phone ?? phone ?? ""} />
+          </Field>
+          <Field label="Language" htmlFor="profile-language">
+            <Select id="profile-language" name="language" defaultValue={s.values?.language ?? language ?? "en"}>
+              <option value="en">English</option>
+              <option value="zh">中文 (Chinese)</option>
+              <option value="ur">اردو (Urdu)</option>
+            </Select>
+          </Field>
+          <Field label="Time zone" htmlFor="profile-tz" error={s.errors?.timeZone}>
+            <Select id="profile-tz" name="timeZone" defaultValue={s.values?.timeZone ?? timeZone ?? ""}>
+              <option value="">The company&rsquo;s</option>
+              {(zones ?? []).map((z) => (
+                <option key={z} value={z}>
+                  {z}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className="flex items-center gap-2 border-t border-line pt-4 sm:col-span-3">
             <SubmitButton pendingText="Saving…">
               <Check aria-hidden />
               Save changes

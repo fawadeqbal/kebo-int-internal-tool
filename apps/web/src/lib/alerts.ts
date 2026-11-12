@@ -6,6 +6,7 @@ export const ALERT_GROUPS = [
   { key: "inquiries", label: "Inquiries" },
   { key: "orders", label: "Orders" },
   { key: "followUps", label: "Follow-ups" },
+  { key: "mentions", label: "Mentions" },
 ] as const;
 export type AlertGroup = (typeof ALERT_GROUPS)[number]["key"];
 
@@ -37,6 +38,7 @@ const KINDS: [test: string, label: string, tone: Tone][] = [
   ["reminder.quotationDue", "Quotation ending", "warn"],
   ["followUp.assigned", "Follow-up for you", "neutral"],
   ["followUp.due", "Follow-up due", "warn"],
+  ["mention.", "Mentioned you", "neutral"],
   ["two_step", "Your account", "warn"],
 ];
 

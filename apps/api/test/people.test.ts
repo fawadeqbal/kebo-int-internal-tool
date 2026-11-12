@@ -43,6 +43,12 @@ describe("people: users, two-step sign-in, customers, factories", () => {
     expect(r.body).toMatchObject({ name: "New Name", email });
     expect((await api(app, token).get("/auth/me").expect(200)).body).toMatchObject({ name: "New Name", email, role: "staff" });
     await api(app, token).patch("/me", { name: " " }).expect(422);
+    // Their phone, language and time zone too (a time zone has to be a real one).
+    await api(app, token).patch("/me", { name: "New Name", phone: "+92 300 1234567", language: "en", timeZone: "Asia/Karachi" }).expect(200);
+    expect((await api(app, token).get("/me/profile").expect(200)).body).toEqual({ phone: "+92 300 1234567", language: "en", timeZone: "Asia/Karachi" });
+    await api(app, token).patch("/me", { name: "New Name", timeZone: "Mars/Olympus" }).expect(422);
+    await api(app, token).patch("/me", { name: "New Name", phone: "", timeZone: "" }).expect(200);
+    expect((await api(app, token).get("/me/profile").expect(200)).body).toMatchObject({ phone: null, timeZone: null });
   });
 
   it("switching someone off ends their sessions at once", async () => {
