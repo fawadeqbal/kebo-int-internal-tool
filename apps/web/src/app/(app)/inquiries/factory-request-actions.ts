@@ -14,7 +14,7 @@ export async function askFactoriesAction(dealId: string, _prev: ActionState, for
   const factoryIds = form.getAll("factoryId").filter((x): x is string => typeof x === "string");
   const r = await attempt(
     form,
-    () => api.post(`/inquiries/${dealId}/factory-requests`, { factoryIds, channel: v.channel || null, replyBy: v.replyBy || null, note: v.note || null }),
+    () => api.post(`/inquiries/${dealId}/factory-requests`, { factoryIds, channel: v.channel || null, sentOn: v.sentOn || null, replyBy: v.replyBy || null, note: v.note || null }),
     factoryIds.length === 1 ? "Marked as asked." : `${factoryIds.length} factories marked as asked.`,
   );
   if (r.ok) refresh(dealId);

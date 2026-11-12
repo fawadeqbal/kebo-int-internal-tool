@@ -1,4 +1,5 @@
 import { MessageSquareQuote } from "lucide-react";
+import { Table, Td, Th, THead, Tr } from "@kebo/ui";
 import type { HistoryEntry } from "@/lib/types";
 import { dateTime } from "@/lib/format";
 
@@ -93,5 +94,55 @@ export function HistoryList({
         </li>
       ))}
     </ol>
+  );
+}
+
+/** The words of one entry, for searching. */
+export const historyText = (e: HistoryEntry) =>
+  [e.summary ?? e.action, e.reason, ...e.changes.flatMap((c) => [fieldLabel(c.field), c.from, c.to])].filter(Boolean).join(" ").toLowerCase();
+
+/**
+ * The same history as a table (board InquiryHistory): When, Who, What changed —
+ * the summary, then each field's old → new, and the reason under it.
+ */
+export function HistoryTable({ entries, showArea = false, empty = "Nothing has changed yet." }: { entries: HistoryEntry[]; showArea?: boolean; empty?: string }) {
+  if (!entries.length) return <p className="px-4 py-6 text-sm text-muted sm:px-5">{empty}</p>;
+  return (
+    <Table className="min-w-[720px]">
+      <THead>
+        <tr>
+          <Th className="w-44">When</Th>
+          <Th className="w-36">Who</Th>
+          <Th>What changed</Th>
+        </tr>
+      </THead>
+      <tbody>
+        {entries.map((e) => (
+          <Tr key={e.id}>
+            <Td className="align-top whitespace-nowrap">{dateTime(e.at)}</Td>
+            <Td className="align-top">{e.by?.name ?? "System"}</Td>
+            <Td>
+              {showArea && AREA[e.entityType] && <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-text-2">{AREA[e.entityType]}</span>}
+              {e.summary ?? e.action.replace(/_/g, " ")}
+              {e.changes.slice(0, 8).map((c) => (
+                <span key={c.field}>
+                  {" · "}
+                  {fieldLabel(c.field)} {shown(c.from)} → <strong>{shown(c.to)}</strong>
+                </span>
+              ))}
+              {e.reason && (
+                <span className="mt-0.5 flex items-start gap-1.5 text-xs text-text-2">
+                  <MessageSquareQuote className="mt-0.5 size-3.5 shrink-0 text-info" aria-hidden />
+                  <span>
+                    <span className="sr-only">Reason: </span>
+                    {e.reason}
+                  </span>
+                </span>
+              )}
+            </Td>
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }

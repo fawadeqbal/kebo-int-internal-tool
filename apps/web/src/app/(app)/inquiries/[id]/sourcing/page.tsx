@@ -14,6 +14,8 @@ import { cheapestComplete, shortName } from "@/components/deals/offer-facts";
 import { AddOfferButton, OfferDetails, OfferLines } from "@/components/deals/offer-work";
 import { removeFileAction } from "../../actions";
 import { askFactories } from "../ask";
+import { RequestMore } from "@/components/deals/ask-window";
+import { factoryRequestStatusAction, removeFactoryRequestAction } from "../../factory-request-actions";
 import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, moveOfferLineAction, offerFieldsAction, removeFactoryQuoteAction, removeOfferLineAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
 import { getSettings } from "@/lib/loaders";
 
@@ -46,7 +48,7 @@ export default async function SourcingPage({
   const canEdit = d.allowed.source;
   const base = `/inquiries/${d.id}/sourcing`;
   const today = todayIn(TZ);
-  const ask = await askFactories(d, me, "ghost");
+  const ask = await askFactories(d, me, "secondary", { label: "Ask more factories", size: "sm" });
   const compare = sp.view === "compare";
   const cheapest = cheapestComplete(s.quotes);
   // Which quotation option each offer is, on the newest revision (a draft when one is open).
@@ -139,9 +141,19 @@ export default async function SourcingPage({
                           <ButtonLink href={`${base}?offer=${r.factoryQuoteId}#offer`} size="sm">
                             Open offer
                           </ButtonLink>
-                        ) : r.status === "sent" ? (
-                          addOffer({ variant: "primary", size: "sm", label: "Enter offer" })
-                        ) : null}
+                        ) : (
+                          <span className="inline-flex items-center gap-1">
+                            {r.status === "sent" && addOffer({ variant: "primary", size: "sm", label: "Enter offer" })}
+                            {canEdit && (
+                              <RequestMore
+                                name={r.factory.name}
+                                status={r.status}
+                                setStatus={factoryRequestStatusAction.bind(null, d.id, r.id)}
+                                remove={removeFactoryRequestAction.bind(null, d.id, r.id)}
+                              />
+                            )}
+                          </span>
+                        )}
                       </Td>
                     </Tr>
                   ))}

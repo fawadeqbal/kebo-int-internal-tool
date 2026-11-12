@@ -117,7 +117,8 @@ export async function expenseAction(
     customerId: orderId ? null : v.customerId || null,
     factoryId: v.factoryId || null,
     category: v.category,
-    description: v.description?.trim() ?? "",
+    // A form may name it after its kind when "What" is left empty.
+    description: v.description?.trim() || v.descriptionDefault?.trim() || "",
     amount: v.amount,
     currency: v.currency,
     rate: v.rate?.trim() || null,

@@ -140,12 +140,18 @@ export class AccountsService {
         where: { ...livePart, order: { customerId, status: { not: "cancelled" } } },
         select: {
           amount: true,
+          bankCharges: true,
           on: true,
           kind: true,
           order: { select: { id: true, refNo: true, currency: true, mainCurrency: true, mainRate: true } },
         },
       }),
     ]);
+    // When each order's deposit was asked for (its fixed due day).
+    const depositsDue = await this.prisma.db.invoice.findMany({
+      where: { part: "deposit", dueOn: { not: null }, order: { customerId, status: { not: "cancelled" } } },
+      select: { orderId: true, amount: true, dueOn: true },
+    });
     const costings = await costingsOf(
       this.prisma.db,
       deals.flatMap((d) => d.orders.map((o) => ({ id: o.id, totalMinor: decimalToMinor(o.total) }))),
@@ -266,6 +272,21 @@ export class AccountsService {
     for (const p of payments)
       t.received += fx.order(decimalToMinor(p.amount), p.order!);
 
+    // How late the deposits come: the day the deposit payments add up to the deposit, against its due day.
+    const lateDays: number[] = [];
+    for (const inv of depositsDue) {
+      const paid = payments.filter((p) => p.order!.id === inv.orderId && p.kind === "deposit").sort((a, b) => +a.on - +b.on);
+      const need = decimalToMinor(inv.amount);
+      let sum = 0;
+      for (const p of paid) {
+        sum += decimalToMinor(p.amount) + decimalToMinor(p.bankCharges);
+        if (sum >= need) {
+          lateDays.push(Math.round((+p.on - +inv.dueOn!) / 86_400_000));
+          break;
+        }
+      }
+    }
+
     const won = deals.filter((d) => d.orders.length > 0).length;
     const lostCount = deals.filter((d) => d.orders.length === 0 && d.stage === "lost").length;
     const spentTotal = t.orderCosts + t.beforeSale + t.lostDeals + t.openDeals + t.otherCosts;
@@ -337,6 +358,10 @@ export class AccountsService {
         cash: fromMinor(t.received - t.factoryPaid - spentTotal),
         uncostedRevenue: fromMinor(t.uncosted),
       },
+      /** Profit ÷ sales on their orders, in percent (one decimal); null before any order. */
+      margin: t.sales > 0 ? Math.round((t.profit / t.sales) * 1000) / 10 : null,
+      /** Average days their deposits came after the day asked (negative: early); null when none is paid yet. */
+      depositDaysLate: lateDays.length ? Math.round(lateDays.reduce((a, b) => a + b, 0) / lateDays.length) : null,
       lostReasons: [...lost.entries()]
         .map(([reason, r]) => ({ reason, deals: r.deals, spent: fromMinor(r.spent) }))
         .sort((a, b) => b.deals - a.deals),

@@ -97,11 +97,11 @@ export async function customerContactsAction(customerId: string): Promise<Contac
 
 /** A new inquiry, without leaving the page: the form then uploads the URS and documents and opens the deal. */
 export async function createDealAction(_prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.post<{ id: string }>("/inquiries", formBody(form)));
+  const r = await attempt(form, () => api.post<{ id: string; refNo: string }>("/inquiries", formBody(form)));
   if (!r.ok) return r;
-  const id = (r.data as { id: string }).id;
+  const { id, refNo } = r.data as { id: string; refNo: string };
   refresh(id);
-  return { ok: true, data: { id } };
+  return { ok: true, data: { id, refNo } };
 }
 
 export type QuickCustomer = { name: string; country: string; contact: string; email: string; phone: string; allowDuplicate?: boolean };

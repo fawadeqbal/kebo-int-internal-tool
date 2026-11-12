@@ -354,6 +354,8 @@ export interface CustomerAccount {
   currency: string;
   deals: { total: number; won: number; lost: number; open: number };
   winRate: number | null;
+  margin: number | null;
+  depositDaysLate: number | null;
   totals: {
     sales: string;
     goodsCost: string;

@@ -1,5 +1,7 @@
 import { can } from "@kebo/shared";
 import { PageHeader } from "@kebo/ui";
+import { MessageSquare } from "lucide-react";
+import { counterKey } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import type { ContactOption, CustomerOption, DealFormValues } from "@/lib/types-deals";
@@ -37,11 +39,12 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
     items: [],
   };
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="flex flex-col gap-4">
       <PageHeader
         crumbs={[{ label: "Operations & trading" }, { label: "Inquiries", href: "/inquiries" }, { label: "New" }]}
+        icon={MessageSquare}
         title="New inquiry"
-        description="What the customer asked for, with their URS. Factory prices and the quotation come next."
+        description={`Number is given on save · ${counterKey("inquiry", new Date().getFullYear())}-…`}
       />
       <DealForm
         mode="create"
@@ -57,6 +60,7 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
         searchCustomers={searchCustomersAction}
         loadContacts={customerContactsAction}
         cancelHref="/inquiries"
+        currency={settings.sales.currency}
       />
     </div>
   );
