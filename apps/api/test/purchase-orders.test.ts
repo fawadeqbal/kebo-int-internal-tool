@@ -25,7 +25,7 @@ describe("purchase orders", () => {
     const db = prisma.company(FIRST_COMPANY_ID);
     // An open order whose deposit is not paid, with a supplier on its lines and its PO not sent.
     const po = await db.purchaseOrder.findFirst({
-      where: { sentOn: null, order: { status: "open", factoryOrderedOn: null, allocations: { none: {} } } },
+      where: { sentOn: null, order: { status: "open", stage: { in: ["confirmed", "in_production"] }, factoryOrderedOn: null, allocations: { none: {} } } },
       include: { order: { select: { id: true } } },
     });
     if (!po) return; // the seed has none (nothing to check)
