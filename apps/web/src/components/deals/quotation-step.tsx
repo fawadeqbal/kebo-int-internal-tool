@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, CheckCircle2, ChevronRight, Eye, Lock, Pencil, Plus, Send } from "lucide-react";
 import { BASIS_STEP_LABEL, LINE_TYPE_LABEL, LOST_REASON_LABEL, LOST_REASONS, PAYMENT_ROUTES, SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type PaymentRoute, type SentVia } from "@kebo/shared";
 import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
@@ -286,12 +287,18 @@ function OptionLines({ o, currency, incoterm, single }: { o: OptionView; currenc
 const HOW = SENT_VIA.map((v) => ({ value: v, label: SENT_VIA_LABEL[v] }));
 
 /** Mark as sent: how and when (today unless said). Once sent the revision is frozen. */
-function SentForm({ number, action, today }: { number: number; action: Action; today: string }) {
+function SentForm({ number, action, today, doneHref }: { number: number; action: Action; today: string; doneHref?: string }) {
   const close = useClosePanel();
+  const router = useRouter();
   const [how, setHow] = useState<SentVia>("whatsapp");
+  // Marked from the send screen: back to the quotation, where the next step (the customer's answer) now is.
+  const done = () => {
+    close();
+    if (doneHref) router.push(doneHref);
+  };
   return (
     <PanelBody>
-      <ActionForm action={action} onDone={close} className={PANEL_FORM}>
+      <ActionForm action={action} onDone={done} className={PANEL_FORM}>
         {(s) => (
           <>
             <input type="hidden" name="to" value="sent" />
@@ -339,6 +346,7 @@ export function MarkSentButton({
   className,
   label = "Mark as sent",
   icon = <Send aria-hidden />,
+  doneHref,
 }: {
   number: number;
   action: Action;
@@ -348,6 +356,8 @@ export function MarkSentButton({
   className?: string;
   label?: string;
   icon?: ReactNode;
+  /** Where to go once it is marked (the send screen goes back to the quotation). */
+  doneHref?: string;
 }) {
   return (
     <PanelButton
@@ -358,7 +368,7 @@ export function MarkSentButton({
       variant={variant}
       title={`Mark R${number} as sent`}
       description="How and when it went to the customer."
-      body={<SentForm number={number} action={action} today={today} />}
+      body={<SentForm number={number} action={action} today={today} doneHref={doneHref} />}
     />
   );
 }

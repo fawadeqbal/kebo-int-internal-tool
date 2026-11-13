@@ -129,7 +129,7 @@ export default async function QuotationPage({
               backHref={`${base}/quotation`}
               markSent={
                 sending.status === "draft" ? (
-                  <MarkSentButton number={sending.number} action={move(sending)} today={today} variant="ghost" label="Sent another way — mark as sent" icon={<Check aria-hidden />} />
+                  <MarkSentButton number={sending.number} action={move(sending)} today={today} variant="ghost" label="Sent another way — mark as sent" icon={<Check aria-hidden />} doneHref={`${base}/quotation`} />
                 ) : null
               }
             />
