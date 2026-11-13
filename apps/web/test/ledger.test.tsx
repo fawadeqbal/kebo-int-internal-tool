@@ -201,7 +201,7 @@ describe("the entry in the side panel", () => {
     const s = entry.source;
     expect(sourceHref({ ...s, type: "expense", orderId: null })?.href).toBe("/finance/expenses");
     expect(sourceHref({ ...s, type: "movement", orderId: null, customerId: null })?.href).toBe("/finance/cash-book");
-    expect(sourceHref({ ...s, type: "movement", factoryId: "f1" })?.href).toBe("/orders/o1/money");
+    expect(sourceHref({ ...s, type: "movement", factoryId: "f1" })?.href).toBe("/orders/o1/factory");
     expect(sourceHref({ ...s, type: "purchase_order" })?.href).toBe("/orders/o1/factory");
     expect(sourceHref({ ...s, type: "allocation", orderId: null })?.href).toBe("/customers/c1");
   });

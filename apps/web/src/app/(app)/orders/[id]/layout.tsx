@@ -1,93 +1,65 @@
 import Link from "next/link";
 import { Package, XCircle } from "lucide-react";
-import { orderProgress, orderStatusLine, PAYMENT_ROUTE_SHORT, STEP_PATH, type FlowStep, type ProgressState } from "@kebo/shared";
+import { dayMonth, ORDER_TABS, ORDER_WORD_TONE, PAYMENT_ROUTE_SHORT, type FlowStep, type OrderTab } from "@kebo/shared";
 import { cn, PageHeader, RefCode } from "@kebo/ui";
-import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { orderFilesOf, orderFlowOf, orderOf, orderStepsOf } from "@/lib/order-data";
+import { orderFilesOf, orderFlowOf, orderOf, orderSectionsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date, whole } from "@/lib/format";
 import { today } from "@/components/orders/today";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { ScrolledBar } from "@/components/orders/scrolled-bar";
-import { DoNext, OrderNav } from "@/components/orders/order-nav";
-import { readable } from "@/components/orders/step-page";
+import { OrderTabs } from "@/components/order-sections/order-tabs";
 import { orderCostsSetup } from "@/components/orders/costs-data";
 import { FileToolsProvider } from "@/components/files/file-tools";
 import { OrderDrop } from "@/components/files/order-drop";
 import { docHref } from "./shared";
 
 /**
- * Every page of an order shares one top (design system: page header): ← Orders,
- * the order number with its stage, one summary line (customer · inquiry · total
- * · route · who handles it), the proforma's View / Print and Download PDF (the
- * papers; in ⋯ on a phone) and ⋯ more; then the order's tabs (Overview, Items,
- * Payment, Purchase, Shipping, Documents, Costs, Notes: the six steps inside
- * them). Each step's own header has that page's one primary.
+ * Every page of an order shares one top (design "the order, final"): the path, the order's name, one
+ * line (where it stands · number · customer · inquiry · incoterm and total · who handles it) and ⋯ more;
+ * then its nine tabs — Overview, the six stages each with one small word read from its data, Costs and
+ * History. No numbers, no ticks and no "do next": every tab is open from the first day. A tab's own
+ * main button lands in the header.
  */
 export default async function OrderLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireUser();
   const o = await orderOf(id);
-  const [steps, flow, costs, files, pos] = await Promise.all([
-    optional(() => orderStepsOf(id)),
+  const [sections, flow, costs, files] = await Promise.all([
+    optional(() => orderSectionsOf(id)),
     optional(() => orderFlowOf(id)),
     orderCostsSetup(id),
     optional(() => orderFilesOf(id)),
-    optional(() => api.get<{ items: { number: string; sentOn: string | null }[] }>(`/orders/${id}/purchase-orders`)),
   ]);
-  // What each step box says (board): where it stands in a few words.
-  const statusOf = (key: FlowStep, state: ProgressState, line: string): string => {
-    if (key === "payment") {
-      const deposit = Number(o.money.deposit);
-      if (flow?.payment.depositIn || (deposit > 0 && Number(o.money.received) >= deposit)) return Number(o.money.due) <= 0 ? "Paid in full" : "Deposit received";
-      if (deposit > 0) return `Deposit ${whole(o.money.deposit, o.currency)} ${Number(o.money.received) > 0 ? "part in" : "due"}`;
-      return state === "done" ? "Done" : line;
-    }
-    if (key === "factory" && pos?.items.length) {
-      const unsent = pos.items.filter((p) => !p.sentOn);
-      if (!unsent.length) {
-        const last = pos.items.map((p) => p.sentOn!).sort().at(-1)!;
-        return `PO sent ${date(last)}`;
-      }
-      return unsent.length === 1 ? `${unsent[0]!.number} not sent` : `${unsent.length} POs not sent`;
-    }
-    if (key === "production") {
-      const list = flow?.production?.steps ?? [];
-      const ready = flow?.factory.readyOn ?? o.readyOn;
-      const head = list.length ? `${list.filter((x) => x.doneOn).length} of ${list.length} steps` : null;
-      if (head && ready) return `${head} · ready ${date(ready)}`;
-      if (ready) return `Ready ${date(ready)}`;
-      return head ?? (state === "wait" ? "" : "Ready date not known");
-    }
-    if (key === "shipping") {
-      const sh = flow?.shipping?.shipments[0];
-      if (sh?.arrivedOn) return `Arrived ${date(sh.arrivedOn)}`;
-      if (sh?.departedOn) return sh.eta ? `At sea · ETA ${date(sh.eta)}` : `Left ${date(sh.departedOn)}`;
-    }
-    // The papers and bank steps: how many are in (their list is on the page).
-    if (key === "documents") return "";
-    return state === "wait" ? "" : readable(line);
-  };
-  // Where the order stands, read from its to-do items: the line of steps, the status in words and "Do next" agree.
-  const todayIs = today();
-  const progress = steps ? orderProgress(steps.items, steps.steps.map((s) => s.key)) : null;
-  const status = orderStatusLine(steps?.items ?? [], { cancelled: o.status === "cancelled", closed: o.status === "closed", word: o.word }, todayIs);
+  // Where the order stands, in words: the one word worked out from what is stored, then the next two dates.
+  const now = today();
+  const ready = flow?.factory.readyOn ?? o.readyOn;
+  const left = o.word !== "Confirmed" && o.word !== "In production";
+  const notes =
+    o.status !== "open"
+      ? []
+      : left
+        ? [o.money && Number(o.money.due) <= 0 ? "paid in full" : null]
+        : [ready ? `ready ${dayMonth(ready)}` : null, o.shipBy ? `ship by ${dayMonth(o.shipBy)}` : null];
+  const late = o.status === "open" && !left && !!o.shipBy && o.shipBy < now;
+  const tone = o.status === "cancelled" ? "bad" : o.status === "closed" ? "neutral" : late ? "bad" : ORDER_WORD_TONE[o.word];
   const statusText = (
-    <span className={cn("font-semibold whitespace-nowrap", status.tone === "bad" ? "text-bad" : status.tone === "ok" ? "text-ok" : "text-action")}>
-      {status.stage}
-      {status.note ? ` · ${status.note}` : ""}
+    <span
+      className={cn(
+        "font-semibold whitespace-nowrap",
+        tone === "bad" ? "text-bad" : tone === "ok" ? "text-ok" : tone === "neutral" ? "text-text-2" : tone === "info" ? "text-info" : "text-action",
+      )}
+    >
+      {o.status === "closed" ? `Closed${o.stageSince ? ` ${date(o.stageSince)}` : ""}` : o.word}
+      {notes.filter(Boolean).map((x) => ` · ${x}`)}
     </span>
   );
-  const next = progress?.open[0] ?? null;
-  const nextStep = next ? steps!.steps.find((s) => s.key === next.step) : null;
   const ship = flow?.shipping?.shipments[0];
   const base = `/orders/${o.id}`;
-  const open = o.status !== "cancelled";
   const route = flow?.payment.route ? PAYMENT_ROUTE_SHORT[flow.payment.route] : null;
   const proforma = o.documents.find((d) => d.kind === "proforma");
   const pdf = proforma ? docHref(o, proforma) : null;
-  const now = next && nextStep ? { step: next.step, title: next.title, late: next.late, dueOn: next.dueOn } : null;
   // On a phone the paper buttons fold into ⋯ (design system: page header).
   const paperItems: MenuEntry[] = [{ label: "Papers", href: `${base}/documents` }];
   const proformaItems: MenuEntry[] = pdf
@@ -137,15 +109,6 @@ export default async function OrderLayout({ children, params }: { children: Reac
               {o.refNo} <span className="text-xs">{statusText}</span>{" "}
               <span className="hidden font-normal text-muted sm:inline">{o.customer.name}</span>
             </span>
-            {now && open && (
-              <Link
-                href={`${base}/${STEP_PATH[now.step]}`}
-                className={cn("truncate text-xs hover:underline", now.late ? "text-bad" : "text-text-2")}
-              >
-                Now: {now.title}
-                {now.dueOn ? ` · ${now.late ? "was due" : "due"} ${date(now.dueOn)}` : ""}
-              </Link>
-            )}
           </div>
         }
       >
@@ -186,46 +149,15 @@ export default async function OrderLayout({ children, params }: { children: Reac
         )}
       </ScrolledBar>
 
-      {steps && progress && (
-        <OrderNav
-          base={base}
-          steps={steps.steps.map((s) => {
-            const p = progress.steps.find((x) => x.step === s.key)!;
-            return {
-              key: s.key,
-              number: s.number,
-              label: s.label,
-              state: p.state,
-              // A date or an amount when there is one; else what the step waits for.
-              fact: (p.state === "wait" ? p.waits : null) || statusOf(s.key, p.state, s.line) || p.waits || (p.state === "done" ? "Done" : `${p.done} of ${p.total} done`),
-              href: `${base}/${STEP_PATH[s.key]}`,
-            };
-          })}
-          pages={[
-            { href: `${base}/items`, label: "Items" },
-            { href: `${base}/money`, label: "Money" },
-            ...(costs ? [{ href: `${base}/costs`, label: "Costs" }] : []),
-            { href: `${base}/history`, label: "History" },
-          ]}
-        />
-      )}
-      {open && next && nextStep && (
-        <DoNext
-          base={base}
-          step={next.step}
-          stepLabel={nextStep.label}
-          late={next.late}
-          title={next.title}
-          meta={[
-            nextStep.label,
-            next.dueOn ? `${next.late ? "was due" : "due"} ${date(next.dueOn)}` : null,
-            next.assignee?.name ?? null,
-            next.needs ? `needs ${next.needs}` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        />
-      )}
+      <OrderTabs
+        base={base}
+        tabs={ORDER_TABS.filter((t) => {
+          if (t === "overview" || t === "history") return true;
+          if (t === "costs") return !!costs;
+          // A stage whose module the company switched off has no tab.
+          return !sections || sections.stages.includes(t as FlowStep);
+        }).map((t): { key: OrderTab; word?: string } => ({ key: t, word: sections?.tabs[t] || undefined }))}
+      />
       {/* Documents v3: the same file tools (viewer, menus, dialogs) on every page of the order, and drop anywhere. */}
       <FileToolsProvider
         orderId={o.id}

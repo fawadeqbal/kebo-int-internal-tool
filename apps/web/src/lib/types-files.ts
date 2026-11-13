@@ -1,4 +1,4 @@
-import type { AttachmentKind, FlowStep, OrderFileGroup, OrderFileLink, OrderFileSource } from "@kebo/shared";
+import type { AttachmentKind, FlowStep, OrderFileGroup, OrderFileLink, OrderFileSource, OrderSection } from "@kebo/shared";
 
 /** One file of GET /orders/:id/files (keep in step with apps/api/src/modules/files). */
 export interface OrderFile {
@@ -15,6 +15,9 @@ export interface OrderFile {
   attachedTo: { link: OrderFileLink; label: string; href: string };
   step: FlowStep | null;
   stepLabel: string;
+  /** The section of the order's page it belongs to (null: only its stage, or the inquiry). */
+  section: OrderSection | null;
+  sectionLabel: string | null;
   group: OrderFileGroup;
   by: { id: string; name: string } | null;
   at: string;
@@ -26,7 +29,7 @@ export interface OrderFile {
 }
 
 export interface AttachTarget {
-  to: "paper" | "checklist" | "step";
+  to: "paper" | "checklist" | "step" | "section";
   target: string;
   label: string;
   step: FlowStep;
