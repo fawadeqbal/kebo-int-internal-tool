@@ -1,5 +1,6 @@
 "use client";
 
+import { lockScroll } from "@/lib/scroll-lock";
 import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Check, X } from "lucide-react";
@@ -81,11 +82,7 @@ function StepBand({
       return;
     }
     head.current?.focus({ preventScroll: true });
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = overflow;
-    };
+    return lockScroll();
   }, [phone]);
   const band: Band = { close: onClose, error: onError, phone };
   const close = (
