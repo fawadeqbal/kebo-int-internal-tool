@@ -1,25 +1,23 @@
-import { can, FLOW_STEP_LABEL, FLOW_STEPS, type FlowStep } from "@kebo/shared";
-import { Card, CardBody, CardHeader } from "@kebo/ui";
-import { requireUser } from "@/lib/session";
-import { orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
-import { today } from "@/components/orders/today";
-import { HistoryTable, historyText } from "@/components/common/history-list";
-import { FilterCard } from "@/components/common/filter-card";
-import { optional } from "@/components/print/data";
+import Link from "next/link";
+import { can, FLOW_STEPS, ORDER_TAB_LABEL, type FlowStep } from "@kebo/shared";
 import { api } from "@/lib/api";
+import { requireUser } from "@/lib/session";
+import { getPeople } from "@/lib/loaders";
+import { orderHistoryOf, orderOf, orderSectionsOf } from "@/lib/order-data";
 import type { DealDetail } from "@/lib/types";
 import type { FollowUpList, Note } from "@/lib/types-notes";
+import { optional } from "@/components/print/data";
+import { HistoryTable, historyText } from "@/components/common/history-list";
+import { FilterCard } from "@/components/common/filter-card";
 import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
-import { getPeople } from "@/lib/loaders";
-import Link from "next/link";
-import { cancelOrderAction } from "../../actions";
-import { CancelOrderForm } from "../forms";
+import { OrderPage } from "@/components/order-sections/order-side";
 
-export const metadata = { title: "Order notes and history" };
+export const metadata = { title: "Order · history" };
 
 /**
- * The order's Notes tab (the record's activity): notes and follow-ups, then every change with its reason (or
- * one step's). Cancelling sits here, away from the everyday buttons.
+ * History (design "the order, final"): every change on the order with who made it, when, why and the
+ * stage it belongs to, with a search and stage and person filters; then the notes and the follow-ups.
+ * Nothing is edited here. Cancelling is in the order's ⋯ menu.
  */
 export default async function OrderHistory({
   params,
@@ -33,50 +31,40 @@ export default async function OrderHistory({
   const step = (FLOW_STEPS as readonly string[]).includes(sp.step ?? "") ? (sp.step as FlowStep) : undefined;
   const me = await requireUser();
   const o = await orderOf(id);
-  const manage = can(me, "orders.manage") && o.status !== "cancelled";
-  const [history, steps, m, notes, followUps, people, deal] = await Promise.all([
+  const [history, sections, notes, followUps, people, deal] = await Promise.all([
     orderHistoryOf(id, step),
-    optional(() => orderStepsOf(id)),
-    manage ? optional(() => orderMoneyOf(id)) : Promise.resolve(null),
+    optional(() => orderSectionsOf(id)),
     optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
     optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id })),
     optional(() => getPeople()),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
   ]);
-  const pos = manage ? await optional(() => api.get<{ items: { number: string }[] }>(`/orders/${id}/purchase-orders`)) : null;
-  const ended = [
-    o.quotation ? `The quotation R${o.quotation.number} becomes \u201cvoid\u201d` : null,
-    pos?.items.length ? `${pos.items.map((x) => x.number).join(", ")} ${pos.items.length === 1 ? "is" : "are"} cancelled` : null,
-  ].filter(Boolean);
-  const voids = ended.length ? `${ended.join(" and ")}.` : undefined;
-  const people2 = [...new Map(history.map((e) => [e.by?.id ?? "system", e.by?.name ?? "System"])).entries()].map(([value, label]) => ({ value, label }));
+  const who = [...new Map(history.map((e) => [e.by?.id ?? "system", e.by?.name ?? "System"])).entries()].map(([value, label]) => ({ value, label }));
   const q = sp.q?.trim().toLowerCase() ?? "";
   const rows = history.filter((e) => (!q || historyText(e).includes(q)) && (!sp.who || (e.by?.id ?? "system") === sp.who));
-  const factoryPaid = (m?.factories?.rows ?? [])
-    .filter((r) => Number(r.paid) > 0)
-    .map((r) => `${r.currency} ${Number(r.paid).toLocaleString("en-US", { minimumFractionDigits: 2 })} to ${r.factory.name}`);
-  const base = `/orders/${o.id}/history`;
-  const shown = steps?.steps.map((s) => s.key) ?? [...FLOW_STEPS];
+  const stages = sections?.stages ?? [...FLOW_STEPS];
+  const stageOf = Object.fromEntries(rows.map((e) => [e.id, e.step && (FLOW_STEPS as readonly string[]).includes(e.step) ? ORDER_TAB_LABEL[e.step as FlowStep] : ORDER_TAB_LABEL.overview]));
   return (
-    <div className="flex flex-col gap-5">
-      <div>
+    <OrderPage id={id}>
+      <section aria-label="History" className="min-w-0">
         <FilterCard
           search="Search history…"
           value={sp.q}
-          clearHref={base}
+          clearHref={`/orders/${o.id}/history`}
           selects={[
-            { name: "who", label: "Who", value: sp.who, options: people2 },
-            { name: "step", label: "Step", value: step, options: shown.map((s) => ({ value: s, label: FLOW_STEP_LABEL[s] })) },
+            { name: "step", label: "Stage", value: step, options: stages.map((s) => ({ value: s, label: ORDER_TAB_LABEL[s] })) },
+            { name: "who", label: "Who", value: sp.who, options: who },
           ]}
         />
-        <Card>
+        <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
           <HistoryTable
             entries={rows}
-            empty={q || sp.who ? "Nothing matches. Clear the search or choose everyone." : step ? "Nothing changed in this step yet." : "Nothing has changed yet."}
+            tags={{ label: "Stage", of: stageOf }}
+            empty={q || sp.who ? "Nothing matches. Clear the search or choose everyone." : step ? "Nothing changed in this stage yet." : "Nothing has changed yet."}
           />
-        </Card>
-      </div>
-      <div className="grid items-start gap-5 lg:grid-cols-2">
+        </div>
+      </section>
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
         <NotesCard
           on={{ key: "orderId", id: o.id }}
           notes={notes ?? []}
@@ -93,35 +81,8 @@ export default async function OrderHistory({
             ) : null
           }
         />
-        <FollowUpsCard
-          on={{ key: "orderId", id: o.id }}
-          label={`${o.refNo} · ${o.customer.name}`}
-          rows={followUps?.rows ?? []}
-          people={people ?? []}
-          meId={me.id}
-        />
+        <FollowUpsCard on={{ key: "orderId", id: o.id }} label={`${o.refNo} · ${o.customer.name}`} rows={followUps?.rows ?? []} people={people ?? []} meId={me.id} />
       </div>
-      {manage && (
-        <Card className="border-bad/25">
-          <CardHeader
-            title="Cancel the order"
-            description="Only if the customer called it off. The inquiry becomes lost and can be reopened. Money is never left hanging on a cancelled order."
-          />
-          <CardBody>
-            <CancelOrderForm
-              action={cancelOrderAction.bind(null, o.id)}
-              refNo={o.refNo}
-              customer={o.customer.name}
-              received={o.money.received}
-              currency={o.currency}
-              factoryPaid={factoryPaid}
-              today={today()}
-              total={o.money.total}
-              voids={voids}
-            />
-          </CardBody>
-        </Card>
-      )}
-    </div>
+    </OrderPage>
   );
 }

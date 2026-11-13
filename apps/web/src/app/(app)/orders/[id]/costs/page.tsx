@@ -1,33 +1,38 @@
 import Link from "next/link";
-import { can, FLOW_STEP_LABEL, type FlowStep } from "@kebo/shared";
-import { requireUser } from "@/lib/session";
+import { can, COST_ROW_STATUS_LABEL, ORDER_TAB_LABEL, type CostRowStatus, type FlowStep } from "@kebo/shared";
 import { PROFIT_LABEL } from "@kebo/money";
-import { Alert, buttonClass, Card, CardHeader, cn, Segmented } from "@kebo/ui";
-import { orderHistoryOf, orderOf } from "@/lib/order-data";
-import { money } from "@/lib/format";
-import { optional } from "@/components/print/data";
-import { StepChanges } from "@/components/orders/step-page";
+import { Alert, Badge, buttonClass, cn, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { money, whole } from "@/lib/format";
+import { OrderPage } from "@/components/order-sections/order-side";
+import { EmptySection, Section } from "@/components/order-sections/section";
+import { SectionFiles } from "@/components/order-sections/section-files";
+import { RepayWindow } from "@/components/order-sections/costs-windows";
 import { orderCostsSetup } from "@/components/orders/costs-data";
 import { AddOrderExpense } from "@/components/orders/expense-form";
-import { CostsExcel, ExpensesTable, PlannedTable, RepayButton } from "@/components/orders/costs-tables";
-import { today } from "@/components/orders/today";
+import { CostsExcel, ExpensesTable } from "@/components/orders/costs-tables";
+import { stageData } from "../stage-data";
 
 export const metadata = { title: "Order · costs" };
 
-/** A label / amount line of the profit card. */
-function Line({ label, value, tone, strong }: { label: string; value: string; tone?: string; strong?: boolean }) {
+const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const STATUS_TONE: Record<CostRowStatus, "neutral" | "ok" | "warn" | "bad" | "info"> = { not_spent: "neutral", within: "info", spent: "ok", over: "warn", not_planned: "warn" };
+const dash = <span className="text-muted">—</span>;
+
+/** One of the four figures at the top. */
+function Figure({ label, value, sub, tone, first }: { label: string; value: string; sub: string; tone?: "ok" | "warn" | "bad"; first?: boolean }) {
   return (
-    <div className={cn("flex items-baseline justify-between gap-3", strong && "border-t border-line pt-2.5")}>
-      <dt className={cn("text-xs", strong ? "font-semibold text-text" : "text-text-2")}>{label}</dt>
-      <dd className={cn("text-right tabular", strong ? "font-bold" : "font-medium", tone)}>{value}</dd>
+    <div className={cn("flex min-w-0 flex-col gap-0.5 px-[18px] py-3.5", !first && "border-line max-sm:border-t sm:border-l")}>
+      <span className="text-xs text-text-2">{label}</span>
+      <span className={cn("text-lg font-bold tabular", tone === "ok" && "text-ok", tone === "warn" && "text-warn", tone === "bad" && "text-bad")}>{value}</span>
+      <span className="text-xs text-text-2">{sub}</span>
     </div>
   );
 }
 
 /**
- * The order's costs (managers with the expenses feature): what the quote
- * planned against what was spent, every expense by step with its receipt,
- * the profit now expected, who to repay, and the changes.
+ * Costs (design "the order, final"; managers with the expenses feature): four figures, what was planned
+ * against what was spent with where each number comes from, every expense with its receipt, and who is
+ * still to be repaid. An expense is added here and nowhere else on the order.
  */
 export default async function OrderCostsPage({
   params,
@@ -38,218 +43,248 @@ export default async function OrderCostsPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const o = await orderOf(id);
+  const d = await stageData(id);
+  const { me, o, base, now } = d;
   const data = await orderCostsSetup(id);
-  const canLedger = can(await requireUser(), "ledger.view");
-  const base = `/orders/${o.id}`;
   if (!data)
     return (
-      <Card>
-        <CardHeader title="Costs" description="Only managers with expenses switched on for the company see an order's costs and profit." />
-      </Card>
+      <OrderPage id={id}>
+        <EmptySection title="Costs" text="Only managers with expenses switched on for the company see an order’s costs and profit." />
+      </OrderPage>
     );
   const { costs, setup, money: m } = data;
   const c = costs.currency;
+  const p = costs.profit;
   const steps = setup.steps;
   const step = steps.some((s) => s.key === sp.step) ? (sp.step as FlowStep) : null;
   const missing = sp.missing === "1";
   const shown = costs.expenses.filter((e) => (!step || e.step === step) && (!missing || (!e.receipt && !e.voided)));
   const href = (q: { step?: string | null; missing?: boolean }) => {
-    const p = new URLSearchParams();
-    if (q.step) p.set("step", q.step);
-    if (q.missing) p.set("missing", "1");
-    const s = p.toString();
+    const u = new URLSearchParams();
+    if (q.step) u.set("step", q.step);
+    if (q.missing) u.set("missing", "1");
+    const s = u.toString();
     return `${base}/costs${s ? `?${s}` : ""}#expenses`;
   };
-  const history = (await optional(() => orderHistoryOf(id, undefined, 60))) ?? [];
-  const changes = history.filter((h) => h.action.startsWith("expense")).slice(0, 4);
-  const p = costs.profit;
-  const kinds = costs.totals.notPlannedKinds.map((k) => k.toLowerCase());
-  const missingAmounts = costs.totals.receiptsMissingAmounts.map((a) => money(a.amount, a.currency)).join(" · ");
+
+  // The goods: what the factories charge (in the order's currency, as costed) and the share of it already paid.
+  const owed = p?.factoryOwed ?? [];
+  const one = owed.length === 1 && owed[0]!.toPay !== undefined && Number(owed[0]!.amount) > 0 ? owed[0]! : null;
+  const goodsPlanned = p ? Number(p.factory) : 0;
+  const goodsSpent = p && one ? Math.round(goodsPlanned * (1 - Number(one.toPay) / Number(one.amount)) * 100) / 100 : null;
+  const goodsState = goodsSpent === null ? null : goodsSpent <= 0 ? "Not paid yet" : goodsSpent < goodsPlanned ? "Part paid" : "Paid";
+
+  const ours = Number(costs.totals.borneByUs);
+  const planned = goodsPlanned + Number(costs.totals.planned);
+  const spent = (goodsSpent ?? 0) + ours;
+  const over = Number(costs.totals.notPlanned);
+  const dealSpent = (m?.dealExpenses ?? []).filter((e) => !e.voided);
 
   return (
-    <div className="flex flex-col gap-5">
-      <section
-        aria-label="Costs at a glance"
-        className="grid grid-cols-2 gap-4 rounded-xl border border-line bg-surface p-4 shadow-card sm:p-5 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto] lg:items-center"
-      >
-        <div>
-          <p className="text-xs text-text-2">Planned on the quote</p>
-          <p className="text-xl font-bold tabular">{money(costs.totals.planned, c)}</p>
-          <p className="text-xs text-muted">
-            {costs.planned
-              .filter((r) => r.planned !== null)
-              .map((r) => r.label.toLowerCase())
-              .join(", ") || "nothing planned"}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-text-2">Spent so far</p>
-          <p className="text-xl font-bold tabular">{money(costs.totals.spent, c)}</p>
-          <p className="text-xs text-muted">
-            {costs.totals.count} expense{costs.totals.count === 1 ? "" : "s"}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-text-2">Not planned</p>
-          <p className={cn("text-xl font-bold tabular", Number(costs.totals.notPlanned) > 0 && "text-bad")}>{money(costs.totals.notPlanned, c)}</p>
-          <p className="text-xs text-muted">{kinds.length ? kinds.join(", ") : "all within the plan"}</p>
-        </div>
-        <div>
-          <p className="text-xs text-text-2">Receipts missing</p>
-          <p className={cn("text-xl font-bold tabular", costs.totals.receiptsMissing > 0 && "text-warn")}>{costs.totals.receiptsMissing}</p>
-          <p className="text-xs text-muted">{missingAmounts || "all in"}</p>
-        </div>
-        <div className="col-span-2 flex flex-wrap gap-2 lg:col-span-1 lg:justify-end">
-          <CostsExcel costs={costs} />
-          <AddOrderExpense setup={setup} step={null} />
-        </div>
+    <OrderPage id={id}>
+      <section aria-label="Costs at a glance" className="grid min-w-0 overflow-hidden rounded-xl border border-line bg-surface shadow-card sm:grid-cols-2 xl:grid-cols-4">
+        {p ? (
+          <>
+            <Figure first label="Order total" value={whole(o.total, o.currency)} sub={Number(o.money.due) <= 0 ? "received in full" : `${whole(o.money.received, o.currency)} received`} />
+            <Figure label="Planned cost" value={whole(planned, c)} sub="from the quotation" />
+            <Figure
+              label="Spent so far"
+              value={whole(spent, c)}
+              sub={over > 0 ? `${money(over, c)} not planned` : planned > 0 ? `${Math.round((spent / planned) * 100)}% of the plan` : `${costs.totals.count} expense${costs.totals.count === 1 ? "" : "s"}`}
+              tone={over > 0 ? "warn" : undefined}
+            />
+            <Figure
+              label={PROFIT_LABEL.expected}
+              value={whole(p.expected, c)}
+              sub={[p.margin !== null ? `${p.margin.toFixed(1)}%` : null, p.onQuoteMargin !== null ? `planned ${p.onQuoteMargin.toFixed(1)}%` : null].filter(Boolean).join(" · ") || "—"}
+              tone={Number(p.expected) < 0 ? "bad" : "ok"}
+            />
+          </>
+        ) : (
+          <>
+            <Figure first label="Planned cost" value={whole(costs.totals.planned, c)} sub="from the quotation" />
+            <Figure label="Spent so far" value={whole(costs.totals.spent, c)} sub={`${costs.totals.count} expense${costs.totals.count === 1 ? "" : "s"}`} />
+          </>
+        )}
       </section>
 
-      {costs.missingRate && (
-        <Alert tone="warning">There is no exchange rate for {costs.missingRate} in Settings, so expenses cannot be turned into it.</Alert>
-      )}
+      {costs.missingRate && <Alert tone="warning">There is no exchange rate for {costs.missingRate} in Settings, so expenses cannot be turned into it.</Alert>}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-5">
-          <Card>
-            <CardHeader title="Planned and spent" />
-            <div className="flex flex-col gap-3 p-4">
-              <p className="text-xs text-text-2">
-                Planned costs come from the quote. Freight, transport to the port, insurance and customs count against them first.
-              </p>
-              <PlannedTable costs={costs} />
-            </div>
-          </Card>
+      <Section title="Planned and spent" state={over > 0 ? `${money(over, c)} over` : ours > 0 || (goodsSpent ?? 0) > 0 ? "As planned" : "Nothing spent yet"} tone={over > 0 ? "warn" : ours > 0 || (goodsSpent ?? 0) > 0 ? "ok" : "neutral"}>
+        <Table className="min-w-[640px]">
+          <THead>
+            <tr>
+              <Th>Cost</Th>
+              <Th className="text-right">Planned {c}</Th>
+              <Th className="text-right">Spent {c}</Th>
+              <Th className="text-right">Difference</Th>
+              <Th>From</Th>
+              <Th>Status</Th>
+            </tr>
+          </THead>
+          <tbody>
+            {p && goodsPlanned > 0 && (
+              <Tr>
+                <Td className="font-semibold">
+                  Goods from the factory
+                  {owed.some((f) => f.currency !== c) && <span className="block text-xs font-normal text-text-2">{owed.map((f) => money(f.amount, f.currency)).join(" + ")}</span>}
+                </Td>
+                <Td className="text-right tabular">{n2(goodsPlanned)}</Td>
+                <Td className="text-right tabular">{goodsSpent === null ? dash : n2(goodsSpent)}</Td>
+                <Td className="text-right tabular">{goodsSpent === null ? dash : `${n2(goodsPlanned - goodsSpent)} left`}</Td>
+                <Td>
+                  <Link href={`${base}/factory`} className="text-text-2 hover:text-primary hover:underline">
+                    {ORDER_TAB_LABEL.factory}
+                  </Link>
+                </Td>
+                <Td>{goodsState ? <Badge tone={goodsState === "Paid" ? "ok" : goodsState === "Part paid" ? "info" : "neutral"}>{goodsState}</Badge> : dash}</Td>
+              </Tr>
+            )}
+            {costs.planned.map((r) => (
+              <Tr key={r.key}>
+                <Td className="font-semibold">
+                  {r.label}
+                  {r.note && <span className="block text-xs font-normal text-text-2">{r.note}</span>}
+                </Td>
+                <Td className="text-right tabular">{r.planned ? n2(r.planned) : dash}</Td>
+                <Td className="text-right tabular">{Number(r.spent) ? n2(r.spent) : dash}</Td>
+                <Td className={cn("text-right whitespace-nowrap tabular", Number(r.difference) < 0 && "font-semibold text-warn")}>
+                  {!Number(r.spent) && !r.planned ? dash : Number(r.difference) >= 0 ? `${n2(r.difference)} left` : `${n2(-Number(r.difference))} over`}
+                </Td>
+                <Td className="text-text-2">Expenses</Td>
+                <Td>
+                  <Badge tone={STATUS_TONE[r.status]} className="whitespace-nowrap">
+                    {COST_ROW_STATUS_LABEL[r.status]}
+                  </Badge>
+                </Td>
+              </Tr>
+            ))}
+            {!costs.planned.length && !(p && goodsPlanned > 0) && (
+              <Tr>
+                <Td colSpan={6} className="text-text-2">
+                  Nothing was planned on the quotation and nothing spent yet.
+                </Td>
+              </Tr>
+            )}
+          </tbody>
+          {(costs.planned.length > 0 || (p && goodsPlanned > 0)) && (
+            <tfoot>
+              <tr className="border-t border-line bg-surface-2/60 text-[13px] font-semibold">
+                <Td>Total {c}</Td>
+                <Td className="text-right tabular">{n2(planned)}</Td>
+                <Td className="text-right tabular">{n2(spent)}</Td>
+                <Td className={cn("text-right whitespace-nowrap tabular", over > 0 && "text-warn")}>{over > 0 ? `${n2(over)} not planned` : ""}</Td>
+                <Td />
+                <Td />
+              </tr>
+            </tfoot>
+          )}
+        </Table>
+      </Section>
 
-          <Card id="expenses">
-            <CardHeader title="Expenses" actions={<AddOrderExpense setup={setup} step={step} variant="ghost" size="xs" />} />
-            <div className="flex flex-col gap-3 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Segmented
-                  label="Show the expenses of"
-                  options={[
-                    { href: href({ missing }), label: "All", active: !step },
-                    ...steps.map((s) => ({
-                      href: href({ step: s.key, missing }),
-                      label: s.key === "documents" ? "Docs & bank" : s.key === "delivery" ? "Delivery" : FLOW_STEP_LABEL[s.key],
-                      active: step === s.key,
-                    })),
-                  ]}
-                />
-                <Link
-                  href={href({ step, missing: !missing })}
-                  aria-current={missing ? "true" : undefined}
-                  className={cn("text-xs", missing ? "font-semibold text-primary" : "text-text-2 hover:text-text")}
-                >
+      <Section
+        id="expenses"
+        title="Expenses"
+        state={
+          costs.totals.count === 0
+            ? "No expense yet"
+            : `${costs.totals.count} expense${costs.totals.count === 1 ? "" : "s"}${costs.totals.receiptsMissing ? ` · ${costs.totals.receiptsMissing} receipt${costs.totals.receiptsMissing === 1 ? "" : "s"} missing` : ""}`
+        }
+        tone={costs.totals.receiptsMissing ? "warn" : "neutral"}
+        actions={
+          <>
+            <CostsExcel costs={costs} />
+            <AddOrderExpense setup={setup} step={step} label="Add an expense" />
+          </>
+        }
+        files={<SectionFiles orderId={o.id} section="expenses" canAdd={d.canFiles} />}
+      >
+        <div className="flex flex-col gap-3 border-t border-line px-[18px] py-3">
+          {costs.totals.count > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Segmented
+                label="Show the expenses of"
+                options={[{ href: href({ missing }), label: "All", active: !step }, ...steps.map((s) => ({ href: href({ step: s.key, missing }), label: s.label, active: step === s.key }))]}
+              />
+              {(costs.totals.receiptsMissing > 0 || missing) && (
+                <Link href={href({ step, missing: !missing })} aria-current={missing ? "true" : undefined} className={cn("text-xs", missing ? "font-semibold text-primary" : "text-text-2 hover:text-text")}>
                   Missing receipts ({costs.totals.receiptsMissing})
                 </Link>
-              </div>
-              <ExpensesTable costs={costs} expenses={shown} setup={setup} />
-            </div>
-          </Card>
-
-          {m?.dealExpenses && m.dealExpenses.length > 0 && (
-            <Card>
-              <CardHeader
-                title="Spent before the order"
-                description="Trips, samples and visits for the inquiry before it was won (not in the costs above)."
-                actions={
-                  <Link href={`/inquiries/${m.deal.id}`} className={buttonClass("ghost", "xs")}>
-                    Open the inquiry
-                  </Link>
-                }
-              />
-              <ul className="flex flex-col divide-y divide-line px-4">
-                {m.dealExpenses
-                  .filter((e) => !e.voided)
-                  .map((e) => (
-                    <li key={e.id} className="flex justify-between gap-3 py-2.5 text-sm">
-                      <span>{e.description}</span>
-                      <span className="tabular text-text-2">{money(e.amount, e.currency)}</span>
-                    </li>
-                  ))}
-              </ul>
-            </Card>
-          )}
-        </div>
-
-        <aside aria-label="Beside the costs" className="flex min-w-0 flex-col gap-5">
-          {p && (
-            <Card>
-              <CardHeader title="Profit on this order" />
-              <dl className="flex flex-col gap-2.5 px-4 py-3.5 text-sm">
-                <Line label={Number(p.uncosted) > 0 ? "Sale (lines with a cost)" : "Sale"} value={money(p.sale, c)} />
-                <Line
-                  label={
-                    p.factoryOwed.length === 1
-                      ? `Factory · ${money(p.factoryOwed[0]!.amount, p.factoryOwed[0]!.currency)}${p.factoryOwed[0]!.currency !== c && Number(p.factory) > 0 ? ` at ${(Number(p.factoryOwed[0]!.amount) / Number(p.factory)).toFixed(2)}` : ""}`
-                      : "Factory"
-                  }
-                  value={`− ${money(p.factory, c)}`}
-                />
-                <Line label="Costs planned on the quote" value={`− ${money(p.planned, c)}`} />
-                <Line label="Costs not planned, so far" value={`− ${money(p.notPlanned, c)}`} tone={Number(p.notPlanned) > 0 ? "text-bad" : undefined} />
-                {Number(p.bankCharges) > 0 && <Line label="Bank charges on payments" value={`− ${money(p.bankCharges, c)}`} />}
-                <Line
-                  strong
-                  label={PROFIT_LABEL.expected}
-                  value={`${money(p.expected, c)}${p.margin !== null ? ` · ${p.margin.toFixed(1)}%` : ""}`}
-                  tone={Number(p.expected) < 0 ? "text-bad" : undefined}
-                />
-              </dl>
-              <p className="px-4 pb-3.5 text-xs text-muted">
-                {PROFIT_LABEL.grossOnQuote}: {money(p.onQuote, c)}
-                {p.onQuoteMargin !== null ? ` · ${p.onQuoteMargin.toFixed(1)}%` : ""}
-                {Number(p.uncosted) > 0 ? ` · ${money(p.uncosted, c)} of the sale has no cost and is left out` : ""}
-                {/* Still to pay the factories after our payments and what they bear (as on the order's money). */}
-                {p.factoryOwed
-                  .filter((f) => f.toPay !== undefined)
-                  .map((f) => (
-                    <span key={f.currency} className="block">
-                      Still to pay the factory: {money(f.toPay!, f.currency)} of {money(f.amount, f.currency)}
-                    </span>
-                  ))}
-              </p>
-              {canLedger && (
-                <p className="border-t border-line px-4 py-2.5 text-sm">
-                  <Link href={`/finance/ledger?view=orders&order=${o.id}`} className="font-medium text-primary hover:underline">
-                    Ledger: this order&rsquo;s entries
-                  </Link>
-                </p>
               )}
-            </Card>
+            </div>
           )}
+          <ExpensesTable costs={costs} expenses={shown} setup={setup} />
+        </div>
+      </Section>
 
-          <Card>
-            <CardHeader title="To repay" />
-            {costs.toRepay.length ? (
-              <ul className="flex flex-col divide-y divide-line px-4">
-                {costs.toRepay.map((r) => (
-                  <li key={`${r.person.id}:${r.currency}`} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-                    <span className="text-xs text-text-2">
-                      {r.person.name} · own money
-                      <span className="block text-muted">
-                        {r.items.length} expense{r.items.length === 1 ? "" : "s"}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="font-semibold tabular">{money(r.amount, r.currency)}</span>
-                      {setup.canEdit && (
-                        <RepayButton orderId={o.id} ids={r.items.map((i) => i.id)} currency={r.currency} name={r.person.name} today={today()} />
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="px-4 py-3.5 text-xs text-muted">Nobody is waiting to be paid back.</p>
-            )}
-          </Card>
+      {costs.toRepay.length > 0 && (
+        <Section title="To repay" state={`${costs.toRepay.length} waiting`} tone="warn">
+          <ul className="flex flex-col divide-y divide-line border-t border-line px-[18px]">
+            {costs.toRepay.map((r) => (
+              <li key={`${r.person.id}:${r.currency}`} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-[13px]">
+                <span className="min-w-0">
+                  <span className="block font-semibold">{r.person.name} · own money</span>
+                  <span className="block text-xs text-text-2">{r.items.map((i) => i.description).join(" · ")}</span>
+                </span>
+                <span className="flex items-center gap-2.5">
+                  <span className="font-semibold tabular">{money(r.amount, r.currency)}</span>
+                  {setup.canEdit && (
+                    <RepayWindow orderId={o.id} ids={r.items.map((i) => i.id)} currency={r.currency} name={r.person.name} amount={money(r.amount, r.currency)} today={now} canFiles={d.canFiles} />
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
-          <StepChanges title="Changes" entries={changes} historyHref={`${base}/history`} />
-        </aside>
-      </div>
-    </div>
+      {p && (
+        <Section
+          title="Profit on this order"
+          state={p.margin !== null ? `${p.margin.toFixed(1)}%` : null}
+          tone={Number(p.expected) < 0 ? "bad" : "ok"}
+          cols={3}
+          actions={
+            can(me, "ledger.view") && (
+              <Link href={`/finance/ledger?view=orders&order=${o.id}`} className={buttonClass("ghost", "xs")}>
+                Ledger entries
+              </Link>
+            )
+          }
+          rows={[
+            { label: Number(p.uncosted) > 0 ? "Sale (lines with a cost)" : "Sale", value: money(p.sale, c) },
+            { label: "Goods from the factory", value: `− ${money(p.factory, c)}` },
+            { label: "Costs planned on the quotation", value: `− ${money(p.planned, c)}` },
+            { label: "Costs not planned, so far", value: <span className={cn(over > 0 && "text-warn")}>− {money(p.notPlanned, c)}</span> },
+            { label: "Bank charges on payments", value: `− ${money(p.bankCharges, c)}` },
+            { label: PROFIT_LABEL.expected, value: <span className={cn(Number(p.expected) < 0 && "text-bad")}>{money(p.expected, c)}</span> },
+            { label: PROFIT_LABEL.grossOnQuote, value: `${money(p.onQuote, c)}${p.onQuoteMargin !== null ? ` · ${p.onQuoteMargin.toFixed(1)}%` : ""}` },
+            ...(Number(p.uncosted) > 0 ? [{ label: "Sale without a cost, left out", value: money(p.uncosted, c) }] : []),
+            ...owed.filter((f) => f.toPay !== undefined).map((f) => ({ label: owed.length > 1 ? `Still to pay the factory, ${f.currency}` : "Still to pay the factory", value: `${money(f.toPay!, f.currency)} of ${money(f.amount, f.currency)}` })),
+          ]}
+        />
+      )}
+
+      {dealSpent.length > 0 && m && (
+        <Section
+          title="Spent before the order"
+          state={`${dealSpent.length} expense${dealSpent.length === 1 ? "" : "s"}`}
+          actions={
+            <Link href={`/inquiries/${m.deal.id}`} className={buttonClass("ghost", "xs")}>
+              Open the inquiry
+            </Link>
+          }
+        >
+          <ul className="flex flex-col divide-y divide-line border-t border-line px-[18px]">
+            {dealSpent.map((e) => (
+              <li key={e.id} className="flex justify-between gap-3 py-2.5 text-[13px]">
+                <span>{e.description}</span>
+                <span className="text-text-2 tabular">{money(e.amount, e.currency)}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </OrderPage>
   );
 }

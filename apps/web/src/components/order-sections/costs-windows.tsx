@@ -1,0 +1,61 @@
+"use client";
+
+import { Field, Input, Select } from "@kebo/ui";
+import { useAccounts } from "@/components/money/accounts";
+import { repayAction } from "@/app/(app)/money/actions";
+import { FieldRow, SectionWindow } from "./section-window";
+
+/**
+ * "Repay": pays back what one person paid from their own money on this order, on a day, from one of
+ * our accounts. The transfer slip is kept with the order's expenses.
+ */
+export function RepayWindow({
+  orderId,
+  ids,
+  currency,
+  name,
+  amount,
+  today,
+  canFiles,
+}: {
+  orderId: string;
+  /** The expenses repaid together. */
+  ids: string[];
+  currency: string;
+  name: string;
+  /** "USD 4,120.00". */
+  amount: string;
+  today: string;
+  canFiles: boolean;
+}) {
+  const accounts = useAccounts().filter((a) => a.currency === currency && !a.archived);
+  return (
+    <SectionWindow
+      button={{ label: "Repay", kind: "plain" }}
+      title="Repay"
+      sub={`${name} paid ${amount} from their own money`}
+      action={repayAction.bind(null, orderId, ids)}
+      submit="Repay"
+      whats={[ids.length === 1 ? "The expense shows the day it was repaid." : `The ${ids.length} expenses show the day they were repaid.`]}
+      files={canFiles ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
+    >
+      {(s) => (
+        <FieldRow>
+          <Field label="Repaid on" htmlFor={`repay-${ids[0]}`} error={s.errors?.repaidOn}>
+            <Input id={`repay-${ids[0]}`} name="repaidOn" type="date" max={today} defaultValue={s.values?.repaidOn ?? today} />
+          </Field>
+          <Field label="From account" htmlFor={`repay-acc-${ids[0]}`} optional error={s.errors?.accountId}>
+            <Select id={`repay-acc-${ids[0]}`} name="accountId" defaultValue={s.values?.accountId ?? ""}>
+              <option value="">Not said</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </FieldRow>
+      )}
+    </SectionWindow>
+  );
+}

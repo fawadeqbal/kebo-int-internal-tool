@@ -15,6 +15,8 @@ import { fieldsAction } from "../../light-actions";
 import { packingAction, packingMarksAction } from "../../actions";
 import { docHref, goodsOf } from "../shared";
 import { PackingCard } from "../goods";
+import { orderCostsSetup } from "@/components/orders/costs-data";
+import { AddOrderExpense } from "@/components/orders/expense-form";
 import { stageData } from "../stage-data";
 
 export const metadata = { title: "Order · shipping" };
@@ -32,7 +34,9 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const d = await stageData(id, "shipping");
   const { me, o, flow, now, defaults } = d;
-  const [papers, edits] = await Promise.all([optional(() => orderPapersOf(id)), editsOf("order", id)]);
+  const [papers, edits, costs] = await Promise.all([optional(() => orderPapersOf(id)), editsOf("order", id), orderCostsSetup(id)]);
+  // The freight typed on a shipment becomes a cost of the order once: "Add to costs" opens the expense with it filled in.
+  const freightInCosts = !!costs?.costs.expenses.some((e) => e.category === "freight" && !e.voided);
   const shipping = flow?.shipping ?? null;
   const canShip = can(me, "shipping.manage") && d.open;
   const canEdit = can(me, "orders.update") && d.open;
@@ -252,7 +256,21 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                   rows={[
                     {
                       label: "Freight",
-                      value: s.freightAmount ? `${money(s.freightAmount, s.freightCurrency ?? o.currency)}${s.freightTerms ? ` · ${FREIGHT_TERMS_LABEL[s.freightTerms as FreightTerms].toLowerCase()}` : ""}` : null,
+                      value: s.freightAmount ? (
+                        <span className="flex flex-col items-start gap-1.5">
+                          {`${money(s.freightAmount, s.freightCurrency ?? o.currency)}${s.freightTerms ? ` · ${FREIGHT_TERMS_LABEL[s.freightTerms as FreightTerms].toLowerCase()}` : ""}`}
+                          {costs && d.open && s.freightTerms !== "collect" && !freightInCosts && (
+                            <AddOrderExpense
+                              setup={costs.setup}
+                              step="shipping"
+                              label="Add to costs"
+                              variant="secondary"
+                              size="xs"
+                              prefill={{ category: "freight", step: "shipping", description: `Freight${s.forwarder ? `, ${s.forwarder}` : ""}`, amount: s.freightAmount, currency: s.freightCurrency ?? o.currency }}
+                            />
+                          )}
+                        </span>
+                      ) : null,
                     },
                     { label: "Insured with", value: s.insurer },
                     { label: "Policy no.", value: s.insurancePolicyNo },

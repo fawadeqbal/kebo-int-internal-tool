@@ -1,5 +1,5 @@
 import { MessageSquareQuote } from "lucide-react";
-import { Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import type { HistoryEntry } from "@/lib/types";
 import { dateTime } from "@/lib/format";
 
@@ -32,7 +32,10 @@ const FIELD: Record<string, string> = {
   deliveryTerms: "Delivery terms",
   warranty: "Warranty",
   sentVia: "Sent by",
+  step: "Stage",
 };
+/** Not for people: a record's id, and the "yes, save it anyway" a form sends. */
+const HIDDEN = /^(ask|id|.+Id)$/;
 const fieldLabel = (f: string) => FIELD[f] ?? f.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 const shown = (v: string | null) =>
   v === null ? "—" : v === "true" ? "yes" : v === "false" ? "no" : v.length > 80 ? `${v.slice(0, 80)}…` : v;
@@ -107,15 +110,27 @@ export const historyText = (e: HistoryEntry) =>
  * The same history as a table (board InquiryHistory): When, Who, What changed —
  * the summary, then each field's old → new, and the reason under it.
  */
-export function HistoryTable({ entries, showArea = false, empty = "Nothing has changed yet." }: { entries: HistoryEntry[]; showArea?: boolean; empty?: string }) {
+export function HistoryTable({
+  entries,
+  showArea = false,
+  empty = "Nothing has changed yet.",
+  tags,
+}: {
+  entries: HistoryEntry[];
+  showArea?: boolean;
+  empty?: string;
+  /** A last column with one word per change, by its id (an order: the stage it belongs to). */
+  tags?: { label: string; of: Record<string, string | undefined> };
+}) {
   if (!entries.length) return <p className="px-4 py-6 text-sm text-muted sm:px-5">{empty}</p>;
   return (
-    <Table className="min-w-[720px]">
+    <Table className={cn("min-w-[720px]", tags && "table-fixed")}>
       <THead>
         <tr>
-          <Th className="w-44">When</Th>
-          <Th className="w-36">Who</Th>
+          <Th className={tags ? "w-40" : "w-44"}>When</Th>
+          <Th className={tags ? "w-28" : "w-36"}>Who</Th>
           <Th>What changed</Th>
+          {tags && <Th className="w-36">{tags.label}</Th>}
         </tr>
       </THead>
       <tbody>
@@ -123,15 +138,18 @@ export function HistoryTable({ entries, showArea = false, empty = "Nothing has c
           <Tr key={e.id}>
             <Td className="align-top whitespace-nowrap">{dateTime(e.at)}</Td>
             <Td className="align-top">{e.by?.name ?? "System"}</Td>
-            <Td>
+            <Td className="[overflow-wrap:anywhere]">
               {showArea && AREA[e.entityType] && <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-text-2">{AREA[e.entityType]}</span>}
               {e.summary ?? e.action.replace(/_/g, " ")}
-              {e.changes.slice(0, 8).map((c) => (
-                <span key={c.field}>
-                  {" · "}
-                  {fieldLabel(c.field)} {shown(c.from)} → <strong>{shown(c.to)}</strong>
-                </span>
-              ))}
+              {e.changes
+                .filter((c) => !HIDDEN.test(c.field))
+                .slice(0, 8)
+                .map((c) => (
+                  <span key={c.field}>
+                    {" · "}
+                    {fieldLabel(c.field)} {shown(c.from)} → <strong>{shown(c.to)}</strong>
+                  </span>
+                ))}
               {e.reason && (
                 <span className="mt-0.5 flex items-start gap-1.5 text-xs text-text-2">
                   <MessageSquareQuote className="mt-0.5 size-3.5 shrink-0 text-info" aria-hidden />
@@ -142,6 +160,11 @@ export function HistoryTable({ entries, showArea = false, empty = "Nothing has c
                 </span>
               )}
             </Td>
+            {tags && (
+              <Td className="align-top">
+                {tags.of[e.id] && <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-text-2">{tags.of[e.id]}</span>}
+              </Td>
+            )}
           </Tr>
         ))}
       </tbody>

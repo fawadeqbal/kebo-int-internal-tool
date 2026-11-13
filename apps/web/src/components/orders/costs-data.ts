@@ -1,8 +1,8 @@
 import "server-only";
 import { cache } from "react";
-import { can } from "@kebo/shared";
+import { can, FLOW_STEPS, ORDER_TAB_LABEL } from "@kebo/shared";
 import { requireUser } from "@/lib/session";
-import { orderCostsOf, orderMoneyOf, orderStepsOf } from "@/lib/order-data";
+import { orderCostsOf, orderMoneyOf, orderSectionsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { today } from "./today";
 import type { ExpenseSetup } from "./expense-form";
@@ -17,10 +17,10 @@ export const orderCostsSetup = cache(async (id: string) => {
   if (!can(me, "expenses.manage")) return null;
   const costs = await optional(() => orderCostsOf(id));
   if (!costs) return null;
-  const [settings, people, steps, m] = await Promise.all([
+  const [settings, people, sections, m] = await Promise.all([
     getSettings(),
     optional(getPeople),
-    optional(() => orderStepsOf(id)),
+    optional(() => orderSectionsOf(id)),
     optional(() => orderMoneyOf(id)),
   ]);
   const factories = new Map<string, string>();
@@ -34,7 +34,8 @@ export const orderCostsSetup = cache(async (id: string) => {
     today: today(),
     people: (people ?? []).map((p) => ({ id: p.id, name: p.name })),
     me: (people ?? []).some((p) => p.id === me.id) ? me.id : null,
-    steps: (steps?.steps ?? []).map((s) => ({ key: s.key, number: s.number, label: s.label })),
+    // The stages the company uses, named as the order's tabs.
+    steps: (sections?.stages ?? [...FLOW_STEPS]).map((key, i) => ({ key, number: i + 1, label: ORDER_TAB_LABEL[key] })),
     factories: [...factories].map(([fid, name]) => ({ id: fid, name })),
     plan: costs.planned.map((r) => ({ label: r.label, categories: r.categories, planned: r.planned, difference: r.difference })),
     expected: costs.profit?.expected ?? null,
