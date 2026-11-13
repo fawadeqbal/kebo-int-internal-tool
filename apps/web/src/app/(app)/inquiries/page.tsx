@@ -142,14 +142,14 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
         tabs={[
           ...CHIPS.filter((s) => s !== "overdue" || count(s) > 0 || chip === s).map((s) => {
             const Icon = chipIcon[s];
-            const n = s === "won" || s === "lost" ? null : count(s);
+            // Every chip says how many it holds, 0 too, for the same search.
+            const n = count(s);
             return {
               href: href({ stage: s === "open" ? undefined : s, mine: undefined }),
               label: (
                 <>
                   <Icon aria-hidden />
-                  {chipLabel(s)}
-                  {n ? ` ${n}` : ""}
+                  {chipLabel(s)} {n}
                 </>
               ),
               active: chip === s && !mine,
@@ -160,7 +160,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
             label: (
               <>
                 <UserRound aria-hidden />
-                Mine
+                Mine {c.mine ?? 0}
               </>
             ),
             active: mine,

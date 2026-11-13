@@ -226,5 +226,11 @@ describe("a whole deal through the API", () => {
     expect(held.body.counts.on_hold).toBe(held.body.total);
     const one = await api(app, staff).get(`/inquiries?q=${encodeURIComponent(`Gulf Valves ${tag}`)}`).expect(200);
     expect(one.body.counts).toMatchObject({ sourcing: 1, on_hold: 1, overdue: 0 });
+    // "Mine": the open ones this person handles, for the same search, whoever the list is filtered by.
+    const all = (await api(app, staff).get("/inquiries").expect(200)).body;
+    const mine = (await api(app, staff).get("/inquiries?stage=open&assignee=me").expect(200)).body;
+    expect(all.counts.mine).toBe(mine.total);
+    expect(mine.counts.mine).toBe(mine.total);
+    expect(all.counts.mine).toBeGreaterThan(0);
   });
 });
