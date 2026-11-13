@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Button, cn } from "@kebo/ui";
 import { EditButton } from "@/components/common/edit-button";
 import { PanelBody, SidePanel } from "@/components/common/panel";
-import type { WindowButton } from "./section-window";
+import { ROW_LINK, type WindowButton } from "./section-window";
 
 /**
  * A section's window around a form that already exists (the route, the plan,
@@ -34,6 +34,10 @@ export function FormWindow({
     <>
       {kind === "edit" ? (
         <EditButton label={button.label} disabled={disabled} onClick={() => setOpen(true)} />
+      ) : kind === "link" ? (
+        <button type="button" disabled={disabled} className={ROW_LINK} onClick={() => setOpen(true)}>
+          {button.label}
+        </button>
       ) : (
         <Button size="sm" disabled={disabled} variant={kind === "main" ? "primary" : kind === "danger" ? "danger" : "secondary"} className="h-8 px-2.5 text-[13px]" onClick={() => setOpen(true)}>
           {button.label}

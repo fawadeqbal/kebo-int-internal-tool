@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { FACTORY_DUE_RULE_LABEL, FACTORY_PLAN_STATUS_LABEL, PAYMENT_ROUTE_SHORT, type PaymentRoute } from "@kebo/shared";
-import { buildHref, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import type { FactoryPlanView } from "@/lib/types-money";
 
@@ -121,13 +121,7 @@ export function SupplierParts({
           </tbody>
         </Table>
       </div>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 text-sm" data-target="factory.payments">
-        <Link
-          href={buildHref("/payments", {}, { tab: "paid", order: orderId, party: plan.factory.id })}
-          className="font-medium text-primary hover:underline"
-        >
-          All payments to {plan.factory.name}
-        </Link>
+      <div className="flex flex-wrap items-baseline justify-end gap-x-6 gap-y-2 text-sm" data-target="factory.payments">
         <dl className="flex flex-wrap gap-x-6 gap-y-1">
           <div className="flex gap-1.5">
             <dt className="text-muted">We owe</dt>
@@ -160,7 +154,7 @@ export function SupplierParts({
             {money(customer.received, orderCurrency)} of {money(customer.owed, orderCurrency)} in
           </span>
           <Link href={`/orders/${orderId}/payment`} className="ml-auto font-medium text-primary hover:underline">
-            Payment step
+            Payment
           </Link>
         </p>
       )}

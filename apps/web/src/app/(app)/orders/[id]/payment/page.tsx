@@ -1,16 +1,17 @@
-import Link from "next/link";
 import { BALANCE_TERMS_LABEL, can, PAYMENT_METHOD_LABEL, ROUTE_NAME, type PaymentRoute } from "@kebo/shared";
 import { Badge, RefCode, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderPaymentsOf } from "@/lib/order-data";
-import { date, money } from "@/lib/format";
+import { date, dateTime, money } from "@/lib/format";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
-import { ContractWindow, PlanWindow, RecordPaymentWindow, RouteWindow } from "@/components/order-sections/payment-windows";
+import { ChangePaymentWindow, ContractWindow, PlanWindow, RecordPaymentWindow, RouteWindow } from "@/components/order-sections/payment-windows";
+import { PaymentPlanTable } from "@/components/order-sections/payment-plan";
+import { ROW_LINK } from "@/components/order-sections/section-window";
 import { LcChecks, UseCredit } from "@/components/money/money-v2";
-import { PlanRequests } from "@/components/money/requests";
-import { savePlanAction, sendRequestAction } from "../../../money/actions";
+import { editPaymentAction, removePaymentFileAction, savePlanAction, sendRequestAction } from "../../../money/actions";
+import { voidPaymentAction } from "../../../payments/actions";
 import { bankContractAction, routeAction } from "../../flow-actions";
 import { paymentAction, useCreditAction } from "../../actions";
 import { stageData } from "../stage-data";
@@ -48,6 +49,15 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const live = p.payments.filter((x) => !x.voided);
   const paid = Number(p.due) <= 0;
   const balance = (Number(o.money.total) - Number(o.money.deposit)).toFixed(2);
+  // Money pays the plan's parts in order: the first open one offers "Record payment". Without one (no plan, or only charges left) the list below does.
+  const openPart = m.plan.items.some((i) => i.request.state !== "paid");
+  const pay = canPay && !paid ? { action: paymentAction.bind(null, o.id, c), customer: o.customer.name, refNo: o.refNo, due: p.due, depositDue: p.depositDue, fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates }, today: now } : null;
+  const record = pay && !openPart && <RecordPaymentWindow main {...pay} currency={c} forWhat={m.plan.next?.label ?? null} />;
+  /** The parts of the plan a payment paid ("Deposit 30%"), and its receipt. */
+  const paidFor = new Map<string, string[]>();
+  for (const i of m.plan.items) for (const r of i.request.receipts) paidFor.set(r.id, [...(paidFor.get(r.id) ?? []), i.label]);
+  const canRemove = can(me, "orders.manage");
+  const here = `/orders/${o.id}/payment`;
 
   return (
     <OrderPage id={id}>
@@ -121,15 +131,15 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
         tone={paid ? "ok" : "warn"}
         actions={m.plan.canEdit && d.open && <PlanWindow sub={sub} action={savePlanAction.bind(null, o.id)} plan={m.plan} currency={c} total={m.total} terms={m.terms} />}
       >
-        <div className="flex flex-col gap-3 px-[18px] pb-3.5">
+        <div className="flex flex-col gap-3 pb-3.5">
           {!m.plan.matchesTotal && (
-            <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
+            <p className="mx-[18px] rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
               The parts do not add up to the order total ({money(m.plan.difference, c)} {Number(m.plan.difference) > 0 ? "missing" : "too much"}).
             </p>
           )}
-          <PlanRequests orderId={o.id} plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} send={sendRequestAction.bind(null, o.id)} />
+          <PaymentPlanTable orderId={o.id} plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} send={sendRequestAction.bind(null, o.id)} pay={pay} />
           {m.charged.length > 0 && (
-            <ul aria-label="Charged to the customer" className="flex flex-col divide-y divide-line rounded-lg border border-line text-sm">
+            <ul aria-label="Charged to the customer" className="mx-[18px] flex flex-col divide-y divide-line rounded-lg border border-line text-sm">
               {m.charged.map((x) => (
                 <li key={x.id} className="flex items-baseline justify-between gap-3 px-3 py-2">
                   <span>
@@ -143,28 +153,8 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
         </div>
       </Section>
 
-      {live.length === 0 ? (
-        <EmptySection
-          title="Payments received"
-          text={paid ? "Paid in full." : "No payment yet."}
-          action={
-            canPay &&
-            !paid && (
-              <RecordPaymentWindow
-                main
-                action={paymentAction.bind(null, o.id, c)}
-                currency={c}
-                customer={o.customer.name}
-                refNo={o.refNo}
-                due={p.due}
-                depositDue={p.depositDue}
-                forWhat={m.plan.next?.label ?? null}
-                fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
-                today={now}
-              />
-            )
-          }
-        />
+      {live.length === 0 && p.payments.length === 0 ? (
+        <EmptySection title="Payments received" text={paid ? "Paid in full." : "No payment yet."} action={record} />
       ) : (
         <Section
           title="Payments received"
@@ -172,20 +162,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
           actions={
             <>
               {canPay && p.credit.canUse && <UseCredit action={useCreditAction.bind(null, o.id)} credit={p.credit.amount} due={p.due} currency={c} today={now} />}
-              {canPay && !paid && (
-                <RecordPaymentWindow
-                  main
-                  action={paymentAction.bind(null, o.id, c)}
-                  currency={c}
-                  customer={o.customer.name}
-                  refNo={o.refNo}
-                  due={p.due}
-                  depositDue={p.depositDue}
-                  forWhat={m.plan.next?.label ?? null}
-                  fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
-                  today={now}
-                />
-              )}
+              {record}
             </>
           }
           files={<SectionFiles orderId={o.id} section="payments" canAdd={false} />}
@@ -194,36 +171,72 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
             <THead>
               <tr>
                 <Th>Date</Th>
+                <Th>For</Th>
                 <Th>How</Th>
                 <Th>Into</Th>
                 <Th>Reference</Th>
+                <Th>Recorded by</Th>
                 <Th className="text-right">Amount</Th>
-                <Th className="text-right">Counts for</Th>
+                <Th>
+                  <span className="sr-only">Receipt and change</span>
+                </Th>
               </tr>
             </THead>
             <tbody>
               {p.payments.map((x) => (
-                <Tr key={x.id} className={x.voided ? "text-muted line-through" : undefined}>
-                  <Td className="whitespace-nowrap tabular">{date(x.paidOn)}</Td>
+                <Tr key={x.id} className={x.voided ? "text-muted" : undefined}>
+                  <Td className={`whitespace-nowrap tabular ${x.voided ? "line-through" : ""}`}>{date(x.paidOn)}</Td>
+                  <Td className="font-medium">{x.voided ? <span className="font-normal">{x.voided.reason ?? ""}</span> : (paidFor.get(x.id)?.join(", ") ?? <span className="font-normal text-muted">—</span>)}</Td>
                   <Td>{PAYMENT_METHOD_LABEL[x.method]}</Td>
                   <Td>{x.account?.name ?? <span className="text-muted">—</span>}</Td>
                   <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <span className="text-muted">—</span>}</Td>
-                  <Td className="text-right whitespace-nowrap tabular">{money(x.receivedAmount, x.receivedCurrency)}</Td>
+                  <Td className="text-[12.5px] text-text-2">
+                    {x.recordedBy?.name ?? "—"}
+                    <span className="block text-muted">{dateTime(x.recordedAt)}</span>
+                  </Td>
                   <Td className="text-right whitespace-nowrap tabular">
-                    {x.voided ? <Badge tone="neutral">Removed</Badge> : <span className="font-semibold">{money(x.counts, c)}</span>}
+                    {x.voided ? (
+                      <span className="line-through">{money(x.receivedAmount, x.receivedCurrency)}</span>
+                    ) : (
+                      <>
+                        <span className="font-semibold">{money(x.receivedAmount, x.receivedCurrency)}</span>
+                        {(x.receivedCurrency !== c || Number(x.bankCharges) > 0) && <span className="block text-xs text-muted">counts for {money(x.counts, c)}</span>}
+                      </>
+                    )}
+                  </Td>
+                  <Td className="text-right">
+                    {x.voided ? (
+                      <Badge tone="neutral">Removed</Badge>
+                    ) : (
+                      <span className="flex items-center justify-end gap-3">
+                        <a href={`/print/orders/${o.id}/payment-receipt?${new URLSearchParams({ ref: x.id, back: here })}`} className={ROW_LINK}>
+                          Receipt
+                        </a>
+                        {(canPay || canRemove) && (
+                          <ChangePaymentWindow
+                            sub={`${o.refNo} · ${date(x.paidOn)} · ${money(x.receivedAmount, x.receivedCurrency)}`}
+                            payment={x}
+                            currency={c}
+                            today={now}
+                            save={canPay ? editPaymentAction.bind(null, o.id, x.id, c) : null}
+                            remove={canRemove ? voidPaymentAction.bind(null, `/payments/${x.id}/void`) : null}
+                            removeFile={removePaymentFileAction.bind(null, "in", x.id, o.id)}
+                            customerId={o.customer.id}
+                          />
+                        )}
+                      </span>
+                    )}
                   </Td>
                 </Tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-line-strong font-bold">
-                <td className="px-3.5 py-3" colSpan={5}>
-                  Received{" "}
-                  <Link href={`/payments?order=${o.id}`} className="ml-2 text-[12.5px] font-medium text-primary hover:underline">
-                    Change or remove a payment
-                  </Link>
+                <td className="px-3.5 py-3" colSpan={6}>
+                  Received
                 </td>
                 <td className="px-3.5 py-3 text-right tabular">{money(p.received, c)}</td>
+                <td />
               </tr>
             </tfoot>
           </Table>

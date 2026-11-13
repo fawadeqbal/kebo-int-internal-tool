@@ -311,12 +311,12 @@ export function PaymentPlan({
 /* ---------------------------------------------------------------- shared bits */
 
 /** Remove a payment or an expense recorded by mistake, with a reason (it stays listed, crossed out). */
-export function VoidForm({ action, label }: { action: Action; label: string }) {
+export function VoidForm({ action, label, button = "Remove" }: { action: Action; label: string; /** The closed button's words ("Remove this payment"). */ button?: string }) {
   const [open, setOpen] = useState(false);
   if (!open)
     return (
-      <Button size="xs" variant="danger-ghost" onClick={() => setOpen(true)}>
-        Remove
+      <Button size="xs" variant="danger-ghost" className="w-fit" onClick={() => setOpen(true)}>
+        {button}
       </Button>
     );
   return (
@@ -344,6 +344,15 @@ export function VoidForm({ action, label }: { action: Action; label: string }) {
         </>
       )}
     </ActionForm>
+  );
+}
+
+/** "Why it changes", asked with the fields of a recorded payment that is changed in a window (kept in the history). */
+function WhyField({ id, error, value }: { id: string; error?: string[]; value?: string }) {
+  return (
+    <Field label="Why it changes" htmlFor={id} error={error}>
+      <Textarea id={id} name="reason" rows={2} className="min-h-0" maxLength={500} placeholder="e.g. the bank advice shows a different amount" defaultValue={value} />
+    </Field>
   );
 }
 
@@ -394,6 +403,7 @@ export function EditCustomerPayment({
   payment,
   currency,
   today,
+  onClose,
 }: {
   action: Action;
   payment: {
@@ -413,9 +423,12 @@ export function EditCustomerPayment({
   };
   currency: string;
   today: string;
+  /** In a window that already has the title: open at once, no frame, and "Why" is asked with the fields. */
+  onClose?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!onClose);
   const received = payment.receivedCurrency ?? currency;
+  const close = onClose ?? (() => setOpen(false));
   if (!open)
     return (
       <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
@@ -423,11 +436,11 @@ export function EditCustomerPayment({
       </Button>
     );
   return (
-    <ActionForm action={action} onDone={() => setOpen(false)} className={`${framed} mt-2 w-full`}>
+    <ActionForm action={action} onDone={close} showSuccess={!onClose} className={onClose ? "flex flex-col gap-3" : `${framed} mt-2 w-full`}>
       {(s) => (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="What for" htmlFor="ep-kind" hint="Worked out from what the money pays; choose “Other” only for money that is not for the plan">
+            <Field label="What for" htmlFor="ep-kind" hint={onClose ? undefined : "Worked out from what the money pays; choose “Other” only for money that is not for the plan"}>
               <Choice
                 id="ep-kind"
                 name="kind"
@@ -472,11 +485,12 @@ export function EditCustomerPayment({
           </div>
           <input type="hidden" name="paidByName" value={payment.paidByName ?? ""} />
           <input type="hidden" name="note" value={payment.note ?? ""} />
+          {onClose && <WhyField id="ep-reason" error={s.errors?.reason} value={s.values?.reason} />}
           <div className="flex gap-2">
             <SubmitButton size="sm" pendingText="Saving…">
               Save the change
             </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            <Button type="button" size="sm" variant="ghost" onClick={close}>
               Cancel
             </Button>
           </div>
@@ -724,6 +738,7 @@ export function FactoryPaymentForm({
           <Field label="Note" htmlFor="fp-note" optional>
             <Textarea id="fp-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? payment?.note ?? ""} />
           </Field>
+          {payment && bare && <WhyField id="fp-reason" error={s.errors?.reason} value={s.values?.reason} />}
           <div className="flex gap-2">
             <SubmitButton size="sm" pendingText={file ? "Saving, sending the file…" : "Saving…"} disabled={mismatch}>
               {payment ? "Save the change" : "Record the payment"}

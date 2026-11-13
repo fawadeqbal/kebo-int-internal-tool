@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Alert, Field, Input } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
-import type { FactoryOwed } from "@/lib/types-money";
+import type { FactoryOwed, FactoryPaymentView } from "@/lib/types-money";
 import type { Person } from "@/lib/types";
-import { FactoryPaymentForm } from "@/components/money/forms";
+import { FactoryPaymentForm, VoidForm } from "@/components/money/forms";
+import { AttachedFile } from "@/components/money/attachment";
 import { FormWindow } from "./form-window";
 import { FieldRow, SectionWindow } from "./section-window";
 
@@ -72,5 +73,43 @@ export function PayFactoryWindow({
       </FormWindow>
       {fileError && <Alert tone="error">{fileError}</Alert>}
     </>
+  );
+}
+
+/** "Change" on a payment to a factory: its fields with why it changes, its bank slip, and "Remove this payment". */
+export function ChangeFactoryPaymentWindow({
+  sub,
+  payment,
+  save,
+  remove,
+  removeFile,
+  ...p
+}: {
+  sub: string;
+  payment: FactoryPaymentView;
+  save: Action;
+  remove: Action;
+  removeFile: () => Promise<ActionState>;
+  factories: FactoryOwed[];
+  people: Person[];
+  orderCurrency: string;
+  fx: Fx;
+  today: string;
+}) {
+  return (
+    <FormWindow button={{ label: "Change", kind: "link" }} title="Change a payment" sub={sub} size="lg">
+      {(close) => (
+        <>
+          <FactoryPaymentForm {...p} action={save} payment={payment} bare onClose={close} />
+          <div className="flex flex-col gap-2 border-t border-line pt-4">
+            <p className="text-[13px] font-semibold">Bank slip</p>
+            <AttachedFile src={`/files/factory-payments/${payment.id}`} file={payment.file} what="Bank slip" canChange remove={removeFile} empty="No bank slip" />
+          </div>
+          <div className="border-t border-line pt-4">
+            <VoidForm action={remove} label="this payment" button="Remove this payment" />
+          </div>
+        </>
+      )}
+    </FormWindow>
   );
 }

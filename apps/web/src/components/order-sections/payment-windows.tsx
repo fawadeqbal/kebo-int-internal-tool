@@ -7,7 +7,8 @@ import type { ActionState } from "@/lib/actions";
 import type { OrderMoney } from "@/lib/types-money";
 import type { BankContract } from "@/lib/types-flow";
 import { BankContractForm, RouteForm, type RouteTermsValue } from "@/components/orders/flow-forms";
-import { PaymentPlan } from "@/components/money/forms";
+import { EditCustomerPayment, PaymentPlan, VoidForm } from "@/components/money/forms";
+import { AttachedFile } from "@/components/money/attachment";
 import { ReceivedFields } from "@/components/money/money-v2";
 import { FormWindow } from "./form-window";
 import { WindowFiles } from "./section-files";
@@ -63,14 +64,80 @@ export function RecordPaymentWindow({
   forWhat: string | null;
   fx: Fx;
   today: string;
+  /** Opened from a part of the plan: what is still to come on it, filled in. */
+  amount?: string;
 }) {
   const [fileError, setFileError] = useState<string | null>(null);
   return (
     <>
-      <FormWindow button={{ label: "Record payment", kind: main ? "main" : "plain" }} title="Record a payment" sub={`${p.refNo} · from ${p.customer}`} size="lg">
+      <FormWindow button={{ label: "Record payment", kind: main ? "main" : "plain" }} title="Record a payment" sub={`${p.refNo} · from ${p.customer}${p.forWhat ? ` · ${p.forWhat}` : ""}`} size="lg">
         {(close) => <ReceivedFields {...p} bare onClose={close} onFileError={setFileError} />}
       </FormWindow>
       {fileError && <Alert tone="error">{fileError}</Alert>}
     </>
+  );
+}
+
+type Payment = Parameters<typeof EditCustomerPayment>[0]["payment"] & { id: string; receiptId: string | null; file: Parameters<typeof AttachedFile>[0]["file"] };
+
+/**
+ * "Change" on a payment received: its fields with why it changes, its bank slip, and "Remove this payment".
+ * A payment that came from the customer's credit, or that is part of one transfer over several orders, has
+ * no fields of its own to change: the window says so and offers what can be done.
+ */
+export function ChangePaymentWindow({
+  sub,
+  payment,
+  currency,
+  today,
+  save,
+  remove,
+  removeFile,
+  customerId,
+}: {
+  sub: string;
+  payment: Payment;
+  currency: string;
+  today: string;
+  /** Null: this person may not change payments. */
+  save: Action | null;
+  /** Null: this person may not remove payments. */
+  remove: Action | null;
+  removeFile: () => Promise<ActionState>;
+  customerId: string;
+}) {
+  const fromCredit = payment.method === "credit";
+  const transfer = !!payment.receiptId;
+  return (
+    <FormWindow button={{ label: "Change", kind: "link" }} title="Change a payment" sub={sub} size="lg">
+      {(close) => (
+        <>
+          {transfer ? (
+            <p className="text-sm text-text-2">
+              This payment is part of one transfer over several orders. To change it, remove the transfer on{" "}
+              <a href={`/customers/${customerId}/money`} className="font-medium text-primary hover:underline">
+                the customer&apos;s money
+              </a>{" "}
+              and record it again.
+            </p>
+          ) : fromCredit ? (
+            <p className="text-sm text-text-2">This payment came from the customer&apos;s credit. Removing it puts the credit back.</p>
+          ) : (
+            save && <EditCustomerPayment action={save} payment={payment} currency={currency} today={today} onClose={close} />
+          )}
+          {!fromCredit && (
+            <div className="flex flex-col gap-2 border-t border-line pt-4">
+              <p className="text-[13px] font-semibold">Bank slip</p>
+              <AttachedFile src={`/files/payments/${payment.id}`} file={payment.file} what="Bank slip" canChange={!!save} remove={removeFile} empty="No bank slip" />
+            </div>
+          )}
+          {remove && !transfer && (
+            <div className="border-t border-line pt-4">
+              <VoidForm action={remove} label="this payment" button="Remove this payment" />
+            </div>
+          )}
+        </>
+      )}
+    </FormWindow>
   );
 }

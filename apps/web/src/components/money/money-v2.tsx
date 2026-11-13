@@ -91,6 +91,8 @@ export function ReceivedForm({
   quiet?: boolean;
   /** Open at once (the Record payment page), not behind its button. */
   startOpen?: boolean;
+  /** What arrived, filled in (a part of the plan: what is still to come on it). */
+  amount?: string;
 }) {
   const [open, setOpen] = useState(startOpen);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -141,9 +143,10 @@ export function ReceivedFields({
   onClose,
   onFileError,
   bare,
+  amount,
 }: Omit<Parameters<typeof ReceivedForm>[0], "label" | "quiet"> & { onClose: () => void; onFileError: (m: string) => void; /** In a window that already has the title: no frame, no heading. */ bare?: boolean }) {
   const dueMinor = toMinor(due);
-  const a = useArrival(fx, currency);
+  const a = useArrival(fx, currency, amount);
   const [charges, setCharges] = useState("");
   const [part, setPart] = useState<string | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("bank_transfer");
