@@ -53,8 +53,9 @@ Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up
 | Command | |
 |---|---|
 | `pnpm build` / `pnpm typecheck` / `pnpm lint` / `pnpm test` | Every package and app, through Turborepo (also run in CI) |
-| `pnpm db:migrate` | Create a migration after changing `packages/database/prisma/schema.prisma` |
-| `pnpm db:deploy` | Apply migrations |
+| `pnpm db:deploy` | Apply migrations (after every pull) |
+| `pnpm db:migrate` | Only for writing a new migration after changing `packages/database/prisma/schema.prisma`. Not for applying them: use `db:deploy` |
+| `pnpm db:check-drift` | The schema file and the database agree (CI runs it) |
 | `pnpm db:check-migrations [base]` | The migration rules below, against `origin/main` (or `base`); CI runs it |
 | `pnpm db:seed [--demo]` | Starting accounts and settings (`--demo` adds sample inquiries; refused on a non-local database) |
 | `pnpm db:reset` | Empty the local database, apply all migrations and seed it again with the demo data |

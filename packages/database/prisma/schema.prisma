@@ -2796,7 +2796,8 @@ model LedgerState {
 /// A purchase order: one per sales order × supplier named on its lines, numbered on its own (PO-2026-0001, made by
 /// the database when a line first names the supplier). The ready date stays in order_factories for now.
 model PurchaseOrder {
-  id              String    @id @default(uuid()) @db.Uuid
+  /// The database fills it (gen_random_uuid()): the order's trigger makes purchase orders in SQL, with no id.
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
   companyId       String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company         Company   @relation(fields: [companyId], references: [id])
