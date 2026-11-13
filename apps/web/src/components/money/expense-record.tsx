@@ -12,6 +12,7 @@ import { expenseAction, removeReceiptAction, voidExpenseAction } from "@/app/(ap
 import { PaymentRecord } from "./payment-record";
 import { AttachedFile } from "./attachment";
 import { EditExpense, NewExpense, VoidForm, type ExpenseChoices } from "./forms";
+import { StopRepeating } from "./company-costs";
 
 
 /** Who an expense was for, in a few words. */
@@ -63,6 +64,7 @@ export function ExpenseRecord({
         <span className="flex flex-wrap items-baseline gap-x-2">
           <span className={cn("font-medium tabular", removed && "line-through")}>{money(e.amount, e.currency)}</span>
           <span className="min-w-0 text-text-2">{e.description}</span>
+          {e.repeats && <span className="text-xs text-muted">· repeats</span>}
           {e.receipt && <Paperclip className="size-3.5 self-center text-muted" aria-label="Receipt kept" />}
           {removed && <Badge tone="bad">Removed</Badge>}
         </span>
@@ -157,6 +159,7 @@ export function ExpenseRecord({
               choices={choices}
               label="Add again"
             />
+            {e.repeats && e.repeatKey && <StopRepeating repeatKey={e.repeatKey} />}
             <VoidForm action={voidExpenseAction.bind(null, e.orderId, e.id)} label="the expense" />
           </>
         ) : undefined

@@ -65,7 +65,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
       { href: "/money/due", label: "To receive and to pay" },
       { href: "/payments", label: "Payments" },
       { href: "/finance/cash-book", label: "Cash & bank" },
-      { href: "/finance/expenses", label: "Expenses" },
+      { href: "/money/company-costs", label: "Company costs" },
     ],
   },
   {
@@ -187,7 +187,7 @@ export function buildModules({
     "/settings/website-form": settings,
     "/factories": sourcing,
     "/finance/profit": reports && managers,
-    "/finance/expenses": sourcing && managers && feature("expenses"),
+    "/money/company-costs": sourcing && managers && feature("expenses"),
     "/finance/leaks": reports && managers,
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
     "/operations/purchase-orders": sourcing,

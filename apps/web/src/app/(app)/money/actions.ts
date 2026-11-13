@@ -145,6 +145,9 @@ export async function expenseAction(
     // The order's cost form also says whether it is a bill to pay later, and who it is owed to.
     ...(form.has("payLater") ? { payLater: v.payLater === "on" || v.payLater === "true" } : {}),
     ...(form.has("payee") ? { payee: v.payee?.trim() || null } : {}),
+    // A company cost says whether it comes every month; confirming a proposed month names its chain.
+    ...(form.has("repeats") ? { repeats: v.repeats === "on" || v.repeats === "true" } : {}),
+    ...(form.has("repeatKey") ? { repeatKey: v.repeatKey || null } : {}),
     reason: reasonOf(form),
   };
   const r = await attempt(
@@ -164,6 +167,13 @@ export async function expenseAction(
 export async function removePaymentFileAction(side: "in" | "out", paymentId: string, orderId: string): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/${side === "in" ? "payments" : "factory-payments"}/${paymentId}/file`), "File removed.");
   if (r.ok) refresh(orderId);
+  return r;
+}
+
+/** A cost that comes every month: skip this month's, or stop it from repeating. */
+export async function repeatingAction(key: string, what: "skip" | "stop"): Promise<ActionState> {
+  const r = await attempt(null, () => api.post(`/expenses/repeating/${key}`, { what }));
+  if (r.ok) refresh();
   return r;
 }
 

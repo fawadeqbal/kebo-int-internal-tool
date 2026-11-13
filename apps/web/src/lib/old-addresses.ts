@@ -13,7 +13,7 @@ type Query = Record<string, string | undefined>;
 
 const MONEY_TAB: Record<string, string> = {
   cash: "/finance/cash-book",
-  expenses: "/finance/expenses",
+  expenses: "/money/company-costs",
   pnl: "/finance/profit",
 };
 
@@ -46,6 +46,12 @@ export function paymentsTabTarget(q: Query): string | null {
   if (q.tab === "requests") return dueTarget("customers", q);
   if (q.tab === "to-pay") return dueTarget("suppliers", q);
   return null;
+}
+
+/** Expenses was one list of every cost: what is not a cost of one order is Company costs, month by month (a year or a customer's filter is dropped). */
+export function companyCostsTarget(q: Query = {}): string {
+  const month = /^\d{4}-\d{2}$/.test(q.p ?? q.month ?? "") ? (q.p ?? q.month) : undefined;
+  return buildHref("/money/company-costs", {}, { p: month, kind: q.category });
 }
 
 /** A payment request and an order's invoice were pages of their own: the order's Payment tab holds them now. */

@@ -20,7 +20,7 @@ export function sourceHref(s: LedgerEntry["source"]): { href: string; label: str
     case "expense":
       return s.orderId
         ? { href: `/orders/${s.orderId}/costs`, label: "Open the expense" }
-        : { href: "/finance/expenses", label: "Open the expenses" };
+        : { href: "/money/company-costs", label: "Open the company costs" };
     case "account":
       return { href: "/finance/cash-book", label: "Open the cash book" };
     case "order":

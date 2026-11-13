@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Banknote, ChevronLeft, ChevronRight, Filter, Landmark, LayoutGrid, List, Users, Wallet, X } from "lucide-react";
-import { can, CURRENCIES, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, MONEY_ACCOUNT_KIND_LABEL, type ExpenseCategory } from "@kebo/shared";
-import { Alert, Badge, buildHref, buttonClass, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, LinkTabs, Segmented, Select, Table, Td, Th, THead, Tr, Pagination, toPage, StatRow, StatTile } from "@kebo/ui";
+import { Banknote, Landmark, Wallet } from "lucide-react";
+import { can, CURRENCIES, MONEY_ACCOUNT_KIND_LABEL } from "@kebo/shared";
+import { Alert, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile } from "@kebo/ui";
 import { convertAmount } from "@kebo/money";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -9,15 +9,11 @@ import { ExportLink } from "@/components/sheets/export-link";
 import { hasFeature } from "@/lib/session";
 import { PeriodBar, periodOf } from "@/components/common/period";
 import { date, money, TZ, whole } from "@/lib/format";
-import type { CashBook, CashRow, ExpenseList } from "@/lib/types-money";
-import { VoidForm, type ExpenseChoices } from "@/components/money/forms";
+import type { CashBook, CashRow } from "@/lib/types-money";
+import { VoidForm } from "@/components/money/forms";
 import { EditAccount, MoveMoney, NewAccount, PutOnAccount, type AccountRow } from "@/components/money/cash-forms";
-import { ExpenseRecord } from "@/components/money/expense-record";
 import { voidTransferAction } from "../money/actions";
-import { UUID } from "@/lib/ids";
-import { getSettings, getPeople } from "@/lib/loaders";
-
-const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+import { getSettings } from "@/lib/loaders";
 
 export type Search = {
   year?: string;
@@ -51,234 +47,6 @@ export async function moneyAccess(me: Parameters<typeof can>[0]) {
 }
 
 /* ---------------------------------------------------------------- expenses */
-
-const percent = (part: string, whole: string) => (Number(whole) > 0 ? Math.round((Number(part) / Number(whole)) * 100) : 0);
-
-/**
- * Every cost in a month or a year: what the company spends to run (rent,
- * salaries, bills) and what is spent on each customer (tickets, hotels,
- * dinners, samples, and their orders' freight and inspection), with totals by
- * kind and by customer. Clicking a kind or a customer narrows the list.
- */
-export async function ExpensesBody({ sp, today }: { sp: Search; today: string }) {
-  const thisMonth = today.slice(0, 7);
-  const asked = sp.p ?? sp.month ?? "";
-  const period = /^\d{4}(-\d{2})?$/.test(asked) && asked <= thisMonth ? asked : thisMonth;
-  const isYear = period.length === 4;
-  const from = isYear ? `${period}-01-01` : `${period}-01`;
-  const to = isYear ? `${period}-12-31` : addDays(`${addDays(`${period}-28`, 4).slice(0, 7)}-01`, -1);
-  const prev = isYear ? String(Number(period) - 1) : addDays(from, -1).slice(0, 7);
-  const next = isYear ? String(Number(period) + 1) : addDays(`${period}-28`, 4).slice(0, 7);
-  const hasNext = isYear ? next <= today.slice(0, 4) : next <= thisMonth;
-  const kind = sp.kind === "general" || sp.kind === "customer" ? sp.kind : undefined;
-  const customer = UUID.test(sp.customer ?? "") ? sp.customer : undefined;
-  const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.category ?? "") ? (sp.category as ExpenseCategory) : undefined;
-
-  const [list, people, choices, settings] = await Promise.all([
-    api.get<ExpenseList>("/expenses", { from, to, kind, customerId: customer, category, page: String(toPage(sp.page)), pageSize: "50" }),
-    getPeople(),
-    api.get<ExpenseChoices>("/expenses/targets"),
-    getSettings(),
-  ]);
-  const customers = choices.customers;
-  const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  const c = list.currency;
-  const keep = { p: period === thisMonth ? undefined : period, kind, customer, category };
-  const href = (change: Record<string, string | undefined>) => buildHref("/finance/expenses", keep, change);
-  const periodName = isYear ? period : MONTH_YEAR.format(new Date(`${period}-01T00:00:00Z`));
-  const customerName = customer ? (list.byCustomer.find((x) => x.customer.id === customer)?.customer.name ?? customers.find((x) => x.id === customer)?.name) : undefined;
-  const kindsTotal = list.byCategory.reduce((t, k) => t + Number(k.total), 0);
-  const customersTotal = list.byCustomer.reduce((t, k) => t + Number(k.total), 0);
-  const biggest = list.byCategory[0];
-
-  return (
-    <div className="flex flex-col gap-4">
-      <StatRow>
-        <StatTile label={isYear ? `In ${period}` : period === thisMonth ? "This month" : periodName} value={money(list.total, c)} sub={`${list.count} expense${list.count === 1 ? "" : "s"}`} />
-        <StatTile
-          label="On customers"
-          value={money(list.customers, c)}
-          sub={`${percent(list.customers, list.total)}% · ${list.byCustomer.length} customer${list.byCustomer.length === 1 ? "" : "s"}`}
-          href={kind === "customer" ? undefined : href({ kind: "customer" })}
-        />
-        <StatTile label="Company costs" value={money(list.company, c)} sub="rent, salaries, bills" href={kind === "general" ? undefined : href({ kind: "general", customer: undefined })} />
-        <StatTile
-          size="sm"
-          label="Biggest kind"
-          value={biggest ? EXPENSE_CATEGORY_LABEL[biggest.category] : "—"}
-          sub={biggest ? `${money(biggest.total, c)} · ${percent(biggest.total, String(kindsTotal))}%` : "Nothing spent yet"}
-          href={biggest && category !== biggest.category ? href({ category: biggest.category }) : undefined}
-        />
-      </StatRow>
-      <LinkTabs
-        label="Which expenses"
-        tabs={[
-          { href: href({ kind: undefined }), label: <><List aria-hidden /> All</>, active: !kind },
-          { href: href({ kind: "customer" }), label: <><Users aria-hidden /> On customers</>, active: kind === "customer" },
-          { href: href({ kind: "general", customer: undefined }), label: <><LayoutGrid aria-hidden /> Company</>, active: kind === "general" },
-        ]}
-      />
-      <form role="search" aria-label="Filter the list" className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3">
-        {kind && <input type="hidden" name="kind" value={kind} />}
-        {customer && <input type="hidden" name="customer" value={customer} />}
-        <label htmlFor="exp-category" className="sr-only">Category</label>
-        <Select id="exp-category" name="category" defaultValue={category ?? ""} className="w-full text-[13px] sm:w-auto">
-          <option value="">Category: All</option>
-          {EXPENSE_CATEGORIES.map((k) => (
-            <option key={k} value={k}>
-              Category: {EXPENSE_CATEGORY_LABEL[k]}
-            </option>
-          ))}
-        </Select>
-        <label htmlFor="exp-period" className="sr-only">Month</label>
-        <Select id="exp-period" name="p" defaultValue={period === thisMonth ? "" : period} className="w-full text-[13px] sm:w-auto">
-          <option value="">Month: {MONTH_YEAR.format(new Date(`${thisMonth}-01T00:00:00Z`))}</option>
-          {Array.from({ length: 11 }, (_, i) => addDays(`${thisMonth}-15`, -30 * (i + 1)).slice(0, 7)).map((m) => (
-            <option key={m} value={m}>
-              Month: {MONTH_YEAR.format(new Date(`${m}-01T00:00:00Z`))}
-            </option>
-          ))}
-          <option value={today.slice(0, 4)}>Month: all of {today.slice(0, 4)}</option>
-          <option value={String(Number(today.slice(0, 4)) - 1)}>Month: all of {Number(today.slice(0, 4)) - 1}</option>
-        </Select>
-        <button className={buttonClass("secondary")}>
-          <Filter aria-hidden /> Filter
-        </button>
-        <span className="ml-auto inline-flex items-center gap-1">
-          <Link href={href({ p: prev })} className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:text-text" aria-label={`Previous ${isYear ? "year" : "month"}`}>
-            <ChevronLeft className="size-4" aria-hidden />
-          </Link>
-          <span className="text-sm font-medium">{periodName}</span>
-          {hasNext && (
-            <Link href={href({ p: next === thisMonth ? undefined : next })} className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:text-text" aria-label={`Next ${isYear ? "year" : "month"}`}>
-              <ChevronRight className="size-4" aria-hidden />
-            </Link>
-          )}
-        </span>
-      </form>
-      {(customer || category) && (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted">Showing only</span>
-          {customerName && (
-            <FilterChip href={href({ customer: undefined })} active>
-              {customerName} <X className="size-3" aria-label="Show every customer" />
-            </FilterChip>
-          )}
-          {category && (
-            <FilterChip href={href({ category: undefined })} active>
-              {EXPENSE_CATEGORY_LABEL[category]} <X className="size-3" aria-label="Show every kind" />
-            </FilterChip>
-          )}
-          {customer && (
-            <Link href={`/customers/${customer}`} className="text-xs text-primary hover:underline">
-              Open the customer
-            </Link>
-          )}
-        </div>
-      )}
-
-      <Card className="overflow-hidden">
-        <CardHeader
-          title="Expenses"
-          description={`${list.count} in ${periodName}${customerName ? ` for ${customerName}` : ""}${category ? ` · ${EXPENSE_CATEGORY_LABEL[category]}` : ""}. Click one for its details and receipt.`}
-          actions={
-            <span className="flex items-center gap-3">
-              <span className="text-sm font-semibold tabular">{money(list.total, c)}</span>
-              {list.count > 0 && <ExportLink what="expenses" query={{ from, to, kind, customer, category }} />}
-            </span>
-          }
-        />
-        {list.rows.length === 0 ? (
-          <EmptyState
-            title={`No expenses in ${periodName}`}
-            description="Add tickets, hotels, dinners and samples on the customer they were for, and rent, salaries and bills on the company."
-          />
-        ) : (
-          <ul className="flex flex-col divide-y divide-line" aria-label="Expenses">
-            {list.rows.map((e) => (
-              <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} choices={choices} />
-            ))}
-          </ul>
-        )}
-        {list.listed > list.pageSize && (
-          <Pagination base="/finance/expenses" params={{ p: sp.p, month: sp.month, kind, customer, category }} page={list.page} pageSize={list.pageSize} total={list.listed} />
-        )}
-      </Card>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="By kind" description={customerName ? `Spent on ${customerName}` : "Click a kind to see only those"} />
-          {list.byCategory.length === 0 ? (
-            <CardBody>
-              <p className="text-sm text-muted">Nothing spent in {periodName}.</p>
-            </CardBody>
-          ) : (
-            <ul className="flex flex-col p-2">
-              {list.byCategory.map((k) => (
-                <BarRow
-                  key={k.category}
-                  href={href({ category: category === k.category ? undefined : k.category })}
-                  active={category === k.category}
-                  label={EXPENSE_CATEGORY_LABEL[k.category]}
-                  sub={`${k.count} expense${k.count === 1 ? "" : "s"}`}
-                  amount={money(k.total, c)}
-                  share={percent(k.total, String(kindsTotal))}
-                />
-              ))}
-            </ul>
-          )}
-        </Card>
-        <Card>
-          <CardHeader title="By customer" description={category ? `${EXPENSE_CATEGORY_LABEL[category]} only` : "Everything spent on each customer, with their orders"} />
-          {list.byCustomer.length === 0 ? (
-            <CardBody>
-              <p className="text-sm text-muted">{kind === "general" ? "Company costs are not on a customer." : `Nothing spent on a customer in ${periodName}.`}</p>
-            </CardBody>
-          ) : (
-            <ul className="flex flex-col p-2">
-              {list.byCustomer.slice(0, 10).map((x) => (
-                <BarRow
-                  key={x.customer.id}
-                  href={href({ customer: customer === x.customer.id ? undefined : x.customer.id, kind: kind === "general" ? undefined : kind })}
-                  active={customer === x.customer.id}
-                  label={x.customer.name}
-                  sub={`${x.count} expense${x.count === 1 ? "" : "s"}${x.orders ? ` · ${x.orders} order${x.orders === 1 ? "" : "s"}` : ""}`}
-                  amount={money(x.total, c)}
-                  share={percent(x.total, String(customersTotal))}
-                />
-              ))}
-              {list.byCustomer.length > 10 && <li className="px-2 py-1.5 text-xs text-muted">and {list.byCustomer.length - 10} more</li>}
-            </ul>
-          )}
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-/** A line with a share bar, that filters the list when clicked. */
-function BarRow({ href, active, label, sub, amount, share }: { href: string; active: boolean; label: string; sub: string; amount: string; share: number }) {
-  return (
-    <li>
-      <Link
-        href={href}
-        aria-current={active ? "true" : undefined}
-        className={cn("flex flex-col gap-1.5 rounded-lg px-2 py-2 transition-colors hover:bg-surface-2/70", active && "bg-primary-soft hover:bg-primary-soft")}
-      >
-        <span className="flex items-baseline justify-between gap-3 text-sm">
-          <span className="min-w-0 truncate">
-            <span className="font-medium">{label}</span> <span className="text-xs text-muted">{sub}</span>
-          </span>
-          <span className="shrink-0 tabular">
-            {amount} <span className="text-xs text-muted">{share}%</span>
-          </span>
-        </span>
-        <span className="h-1.5 rounded-full bg-surface-2" aria-hidden>
-          <span className="block h-1.5 rounded-full bg-primary" style={{ width: `${Math.max(share, 1)}%` }} />
-        </span>
-      </Link>
-    </li>
-  );
-}
 
 /* ---------------------------------------------------------------- cash book */
 

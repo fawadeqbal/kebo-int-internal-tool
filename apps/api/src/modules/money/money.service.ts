@@ -439,6 +439,9 @@ export class MoneyService {
       payLater: e.payLater,
       payee: e.payee,
       source: e.source,
+      /** A cost of the company that comes every month, and the chain its months share. */
+      repeats: e.repeats,
+      repeatKey: e.repeatKey,
       /** When what was owed (own money, or a bill) was paid, and from which account. */
       repaid: e.repaidOn ? { on: fromDbDate(e.repaidOn), account: e.repaidAccount ?? null } : null,
       recordedAt: e.createdAt,
@@ -463,7 +466,8 @@ export class MoneyService {
       factoryId?: string;
       customerId?: string;
       category?: string;
-      kind?: "order" | "customer" | "general";
+      /** company: everything that is not a cost of one order (the company's own, and what is spent on customers and deals). */
+      kind?: "order" | "customer" | "general" | "company";
       /** The list comes a page at a time; the totals are always for the whole period. */
       page?: number;
       pageSize?: number;
@@ -487,7 +491,9 @@ export class MoneyService {
               ? { customerId: { not: null } }
               : q.kind === "general"
                 ? { customerId: null, orderId: null }
-                : {}),
+                : q.kind === "company"
+                  ? { orderId: null }
+                  : {}),
         ...(q.from || q.to ? { spentOn: { ...(q.from ? { gte: toDbDate(q.from) } : {}), ...(q.to ? { lte: toDbDate(q.to) } : {}) } } : {}),
       },
       select: {
@@ -555,7 +561,7 @@ export class MoneyService {
     user: SessionUser,
     input: ExpenseInput,
     keepAccount?: string | null,
-    before?: { step: string | null; borneBy: string; ownMoney: boolean; payLater: boolean; payee: string | null; repaidOn: Date | null; repaidAccountId: string | null },
+    before?: { step: string | null; borneBy: string; ownMoney: boolean; payLater: boolean; payee: string | null; repeats: boolean; repeatKey: string | null; repaidOn: Date | null; repaidAccountId: string | null },
   ) {
     if (input.spentOn > this.clock.today()) throw new DomainError("The date cannot be in the future.");
     let order: { id: string; refNo: string } | null = null;
@@ -599,6 +605,14 @@ export class MoneyService {
     // Known and not paid yet (a bill): it counts from its day and is owed until it is paid. Saying "own money" ends that.
     const payLater = !ownMoney && (input.payLater ?? before?.payLater ?? false);
     const owed = ownMoney || payLater;
+    // Only a cost of the company itself (on no order, customer or deal) comes every month. Its chain is kept; a new one starts when it first repeats.
+    const repeats = !order && !customerId && !inquiryId && (input.repeats ?? before?.repeats ?? false);
+    let repeatKey = before?.repeatKey ?? null;
+    if (!before && input.repeatKey) {
+      if (!(await this.prisma.db.expense.count({ where: { repeatKey: input.repeatKey, voidedAt: null } }))) throw new DomainError("That repeating cost is not in the system any more.");
+      repeatKey = input.repeatKey;
+    }
+    if (repeats && !repeatKey) repeatKey = randomUUID();
     const { sales } = await this.settings.get();
     return {
       order,
@@ -608,6 +622,8 @@ export class MoneyService {
         ownMoney,
         payLater,
         payee: input.payee === undefined ? (before?.payee ?? null) : input.payee,
+        repeats,
+        repeatKey,
         // Owed (someone's own money, or a bill to pay later): no account of ours yet (paying it says which one).
         ...(owed ? {} : { repaidOn: null, repaidAccountId: null }),
         orderId: order?.id ?? null,
@@ -789,6 +805,70 @@ export class MoneyService {
       return updated;
     });
     return this.expenseView(row);
+  }
+
+  /* ---------------------------------------------------------------- costs that come every month */
+
+  /** The latest live expense of every chain that still repeats. */
+  private async repeatingLatest() {
+    const rows = await this.prisma.db.expense.findMany({
+      where: { repeatKey: { not: null }, voidedAt: null },
+      orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }],
+      include: { account: { select: { id: true, name: true, archivedAt: true } } },
+    });
+    const latest = new Map<string, (typeof rows)[number]>();
+    for (const e of rows) if (!latest.has(e.repeatKey!)) latest.set(e.repeatKey!, e);
+    return [...latest.values()].filter((e) => e.repeats);
+  }
+
+  /**
+   * The company's costs that come every month and are not in this month yet (money, step 4): each is proposed
+   * with last month's amount, account and day; one click confirms it (a new expense of the chain), or skips it.
+   */
+  async repeatingCosts(user: SessionUser) {
+    this.assertExpenses(user);
+    const today = this.clock.today();
+    const month = today.slice(0, 7);
+    const lastDay = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+    const latest = await this.repeatingLatest();
+    return {
+      month,
+      /** Every cost that repeats, whether this month's is in or not (to stop one). */
+      repeating: latest.length,
+      waiting: latest
+        .filter((e) => fromDbDate(e.spentOn).slice(0, 7) < month && e.repeatSkip !== month)
+        .map((e) => {
+          const day = Math.min(Number(fromDbDate(e.spentOn).slice(8, 10)), lastDay);
+          return {
+            key: e.repeatKey!,
+            category: e.category as ExpenseCategory,
+            description: e.description,
+            amount: e.amount.toFixed(2),
+            currency: e.currency,
+            /** The day of the month it comes on, and that day this month. */
+            day,
+            on: `${month}-${String(day).padStart(2, "0")}`,
+            account: e.account && !e.account.archivedAt ? { id: e.account.id, name: e.account.name } : null,
+            last: { on: fromDbDate(e.spentOn), amount: e.amount.toFixed(2) },
+          };
+        })
+        .sort((a, b) => a.day - b.day || a.description.localeCompare(b.description)),
+    };
+  }
+
+  /** Skip this month's (it is proposed again next month), or stop the cost from repeating at all. */
+  async repeatingChange(user: SessionUser, key: string, what: "skip" | "stop") {
+    this.assertExpenses(user);
+    const e = (await this.repeatingLatest()).find((x) => x.repeatKey === key);
+    if (!e) throw new NotFoundError("Repeating cost");
+    const month = this.clock.today().slice(0, 7);
+    await this.prisma.tx(async (tx) => {
+      await tx.expense.update({ where: { id: e.id }, data: what === "skip" ? { repeatSkip: month } : { repeats: false } });
+      await this.expenseAudit(tx, user, e.id, null, what === "skip" ? `skipped "${e.description}" for ${month}` : `"${e.description}" no longer repeats`, "expense_edit");
+      // No amount changes; posting again keeps the rule "every write to money goes through the ledger" (it finds nothing to change).
+      await this.ledger.post(tx, [{ type: "expense", id: e.id }], { userId: user.id });
+    });
+    return this.repeatingCosts(user);
   }
 
   /**
