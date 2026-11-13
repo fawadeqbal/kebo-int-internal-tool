@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type KeyboardEvent } from "react";
 import { Check, Download, Eye, Plus, Trash2, X } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, CHANNEL_LABEL, INQUIRY_CHANNELS, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type AttachmentKind, type InquiryChannel } from "@kebo/shared";
-import { Alert, Badge, Button, buttonClass, Card, CardBody, CardHeader, Field, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
+import { Alert, Button, buttonClass, Field, Input, Select, Textarea } from "@kebo/ui";
+import { SubmitButton, toast } from "@kebo/ui/client";
+import { ConfirmDialog } from "@/components/common/dialog";
+import { PANEL_FORM, PanelBody, PanelFooter, PanelSection, useClosePanel, WhatHappens } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
 import { CountrySelect } from "@/components/people/country-select";
 import type { ActionState } from "@/lib/actions";
@@ -15,8 +17,7 @@ import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/inquiries/a
 import { CustomerPicker } from "./customer-picker";
 import { send, type Staged } from "./documents-panel";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
-import { LineTable, type LineColumn } from "@/components/lines/line-table";
-import { localLineHandlers } from "@/components/lines/local-lines";
+import type { LineColumn } from "@/components/lines/line-table";
 import { rowKey } from "./form-bits";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -32,22 +33,8 @@ export const ITEM_COLUMNS: LineColumn[] = [
   { key: "targetPrice", label: "Target price", width: "6.5rem", input: "number", align: "right", placeholder: "Target", phoneHidden: true },
 ];
 
-/** Items with parts pointing at their item by position, as the API takes them. */
-function itemsPayload(items: DealFormValues["items"]) {
-  const at = new Map(items.map((it, n) => [it.key, n]));
-  return items.map((it) => ({
-    id: it.id,
-    partOf: it.parentKey ? (at.get(it.parentKey) ?? null) : null,
-    description: it.description,
-    model: it.model.trim() || null,
-    quantity: it.quantity.replace(/,/g, "").trim(),
-    unit: it.unit.trim() || "pcs",
-    targetPrice: it.targetPrice.replace(/,/g, "").trim() || null,
-  }));
-}
-
-/** The body the API's inquiry schema accepts. */
-function payload(v: DealFormValues, withAssignee: boolean) {
+/** What the window sends: the request's own values (its items are saved by their own editor). */
+function payload(v: DealFormValues) {
   return {
     customerId: v.customer?.id ?? "",
     contactId: v.contactId || null,
@@ -57,15 +44,24 @@ function payload(v: DealFormValues, withAssignee: boolean) {
     requirements: v.requirements.trim() || null,
     priority: v.priority,
     requiredBy: v.requiredBy || null,
-    ...(withAssignee ? { assigneeId: v.assigneeId || null } : {}),
-    items: itemsPayload(v.items),
+    assigneeId: v.assigneeId || null,
   };
 }
 
+/** A file the inquiry already has (the edit window lists them, with Remove). */
+export interface RequestFile {
+  id: string;
+  fileName: string;
+  /** "URS · 12 Nov 2026". */
+  meta: string;
+  /** Removes it (null: this person may not). */
+  remove: (() => Promise<ActionState>) | null;
+}
+
 /**
- * The inquiry form (new and edit): who asked and how, the items as a quick
- * table (parts under their item), the requirements and — for a new inquiry —
- * the URS and other files, uploaded once the inquiry is saved.
+ * The inquiry's window, the same for "New inquiry" and "Edit the request": who asked, what they need, and
+ * the customer's files, in that order. The items are not here: they have their own editor on the inquiry
+ * (Add items / Edit items). Files go up once the inquiry is saved.
  */
 export function DealForm({
   action,
@@ -80,20 +76,18 @@ export function DealForm({
   searchCustomers,
   loadContacts,
   addCustomer,
-  cancelHref,
   mode,
-  itemsFromExcel = true,
-  currency: _currency = "USD",
+  files = [],
+  hasItems = false,
+  onSaved,
 }: {
-  /** The main currency (the target price placeholder). */
-  currency?: string;
-  /** Edit: saves and opens the deal. Create: returns the new id ({ data: { id } }); the form uploads the files, then opens it. */
+  /** Saves and answers { data: { id, refNo } }; the window then sends the files and says it is saved. */
   action: Action;
   initial: DealFormValues;
   initialContacts: ContactOption[];
   categories: string[];
-  /** Handled-by choices; null on edit (reassigning is done on the deal page). */
-  people: PersonWithRole[] | null;
+  /** Who can handle it. */
+  people: PersonWithRole[];
   meId: string;
   canAssignOthers: boolean;
   canAddCustomer?: boolean;
@@ -101,14 +95,17 @@ export function DealForm({
   searchCustomers: (q: string) => Promise<CustomerOption[]>;
   loadContacts: (customerId: string) => Promise<ContactOption[]>;
   addCustomer?: (v: QuickCustomer) => Promise<QuickCustomerResult>;
-  cancelHref: string;
   mode: "create" | "edit";
-  /** Items can come from an Excel file (not once the deal is quoted). */
-  itemsFromExcel?: boolean;
+  /** Edit: the files it already has. */
+  files?: RequestFile[];
+  /** Edit: it has an item list, so "What they need" may be empty. */
+  hasItems?: boolean;
+  /** Saved (and the files are up): `another` when "Save & add another" was pressed. */
+  onSaved: (r: { id: string; refNo?: string; another: boolean }) => void;
 }) {
   const router = useRouter();
+  const close = useClosePanel();
   const [v, setV] = useState<DealFormValues>(initial);
-  const [itemsOpen, setItemsOpen] = useState(false);
   const [contacts, setContacts] = useState<ContactOption[]>(initialContacts);
   const [otherCategory, setOtherCategory] = useState(
     () => !!initial.category && !categories.some((c) => c.toLowerCase() === initial.category.toLowerCase()),
@@ -122,23 +119,9 @@ export function DealForm({
     stagedNow.current = staged;
   }, [staged]);
   const [created, setCreated] = useState<{ id: string; failed: string[] } | null>(null);
+  const [asking, setAsking] = useState<RequestFile | null>(null);
+  const [removing, startRemove] = useTransition();
   const set = <K extends keyof DealFormValues>(k: K, value: DealFormValues[K]) => setV((s) => ({ ...s, [k]: value }));
-  const itemHandlers = localLineHandlers(
-    v.items,
-    (fn) => setV((s) => ({ ...s, items: fn(s.items) })),
-    (values, parentKey) => ({
-      id: null,
-      key: rowKey(),
-      parentKey,
-      description: values.description ?? "",
-      model: values.model ?? "",
-      quantity: values.quantity ?? "",
-      unit: values.unit || (parentKey ? "sets" : "pcs"),
-      targetPrice: values.targetPrice ?? "",
-      priced: false,
-    }),
-    (row, values) => ({ ...row, ...values }),
-  );
 
   const chooseCustomer = async (c: CustomerOption | null, known?: ContactOption[]) => {
     set("customer", c);
@@ -150,17 +133,16 @@ export function DealForm({
     setV((s) => (s.customer?.id === c.id ? { ...s, contactId: (list.find((x) => x.isPrimary) ?? list[0])?.id ?? "" } : s));
   };
 
-  // A new inquiry is saved first, then its files go up one by one, then the deal opens
-  // ("Save & add another": the form empties for the next one instead).
+  // Saved first, then its new files go up one by one; only then the window says it is done.
   const submit: Action = async (prev, form) => {
     const r = await action(prev, form);
-    if (mode === "edit" || !r.ok) return r;
+    if (!r.ok) return r;
     const { id, refNo } = r.data as { id: string; refNo?: string };
-    const files = stagedNow.current;
-    if (files.length) {
+    const list = stagedNow.current;
+    if (list.length) {
       setUploading(true);
       const failed: string[] = [];
-      for (const s of files) {
+      for (const s of list) {
         setStaged((x) => x.map((y) => (y.key === s.key ? { ...y, progress: 0, error: null } : y)));
         const error = await send(id, s, (p) => setStaged((x) => x.map((y) => (y.key === s.key ? { ...y, progress: p } : y))));
         setStaged((x) => x.map((y) => (y.key === s.key ? { ...y, progress: error ? null : 100, error } : y)));
@@ -172,371 +154,280 @@ export function DealForm({
         return { ok: true };
       }
     }
-    if (form.get("another")) {
-      setV({ ...initial, customer: null, contactId: "", items: [] });
-      setContacts([]);
-      setStaged([]);
-      setOtherCategory(false);
-      window.scrollTo({ top: 0 });
-      return { ok: true, code: "another", message: `${refNo ?? "The inquiry"} is saved. Add the next one.` };
-    }
-    router.push(`/inquiries/${id}`);
-    return { ok: true, message: "Inquiry created." };
+    onSaved({ id, refNo, another: !!form.get("another") });
+    return { ok: true };
   };
 
   const contactLine = (c: ContactOption) => [c.name, c.email ?? c.whatsapp ?? c.phone].filter(Boolean).join(" · ");
-  const assignable = people ? (canAssignOthers ? people : people.filter((p) => p.id === meId)) : [];
+  const assignable = canAssignOthers ? people : people.filter((p) => p.id === meId || p.id === initial.assigneeId);
+  const create = mode === "create";
+  const required = !hasItems;
 
   if (created)
     return (
-      <Alert tone="warning">
-        <p className="font-medium">The inquiry was created, but some files did not upload:</p>
-        <ul className="mt-1 list-disc pl-5 text-sm">
-          {created.failed.map((f) => (
-            <li key={f}>{f}</li>
-          ))}
-        </ul>
-        <Link href={`/inquiries/${created.id}`} className={buttonClass("primary", "sm", "mt-3")}>
-          Open the inquiry and try them again
-        </Link>
-      </Alert>
+      <PanelBody>
+        <Alert tone="warning">
+          <p className="font-medium">The inquiry was saved, but some files did not upload:</p>
+          <ul className="mt-1 list-disc pl-5 text-sm">
+            {created.failed.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+          <Link href={`/inquiries/${created.id}/files`} className={buttonClass("primary", "sm", "mt-3")}>
+            Open the inquiry’s files and try them again
+          </Link>
+        </Alert>
+      </PanelBody>
     );
 
-  const create = mode === "create";
-  /** The item table is open: a new inquiry starts without one ("Add items now"). */
-  const listing = !create || v.items.length > 0 || itemsOpen;
-  const required = !v.items.length;
-  const footer = (
-    <div className="flex flex-wrap items-center gap-2.5">
-      <SubmitButton pendingText={uploading ? "Uploading files…" : "Saving…"}>
-        <Check aria-hidden /> {create ? "Save inquiry" : "Save changes"}
-      </SubmitButton>
-      {create && (
-        <SubmitButton variant="secondary" name="another" value="1" pendingText="Saving…">
-          <Plus aria-hidden /> Save &amp; add another
-        </SubmitButton>
-      )}
-      <Link href={cancelHref} className={buttonClass("ghost")}>
-        Cancel
-      </Link>
-    </div>
-  );
-
   return (
-    <ActionForm
-      action={submit}
-      keepFields
-      banner={(st) =>
-        st.message && (st.ok === false || st.code === "another") ? (
-          <Alert tone={st.ok ? "success" : "error"} className="mb-4">
-            {st.ok ? (
-              st.message
-            ) : (
-              <>
-                <strong>Not saved.</strong> {notSaved(st)}
-              </>
-            )}
-          </Alert>
-        ) : null
-      }
-    >
-      {(s) => (
-        <>
-          <input type="hidden" name="payload" value={JSON.stringify(payload(v, create))} />
-          <div className="flex flex-col gap-4">
-            <Card>
-              <CardBody className="flex flex-col gap-4">
-                <div className="grid gap-4 md:grid-cols-3">
-                  <Field label="Customer" htmlFor="customer" required error={s.errors?.customerId} className="md:col-span-2">
-                    {adding && addCustomer ? (
-                      <QuickCustomerForm
-                        add={addCustomer}
-                        search={searchCustomers}
-                        onCancel={() => setAdding(false)}
-                        onUse={(c, list) => {
-                          setAdding(false);
-                          void chooseCustomer(c, list);
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <CustomerPicker
-                            value={v.customer}
-                            onChange={(c) => void chooseCustomer(c)}
-                            search={searchCustomers}
-                            error={s.errors?.customerId}
-                            disabled={!!customerLocked}
-                            disabledReason={customerLocked}
-                          />
-                        </div>
-                        {canAddCustomer && addCustomer && !customerLocked && (
-                          <Button variant="secondary" onClick={() => setAdding(true)}>
-                            <Plus aria-hidden /> New
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </Field>
-                  <Field
-                    label="Contact"
-                    htmlFor="contactId"
-                    error={s.errors?.contactId}
-                    hint={v.customer && !contacts.length ? "This customer has no contacts yet." : undefined}
-                  >
-                    <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
-                      <option value="">{v.customer ? "Not specified" : "Choose the customer first"}</option>
-                      {contacts.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {contactLine(c)}
-                          {c.isPrimary ? " (main)" : ""}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <Field label="Came by" htmlFor="channel" required error={s.errors?.channel}>
-                    <Select id="channel" value={v.channel} onChange={(e) => set("channel", e.target.value as InquiryChannel)}>
-                      {INQUIRY_CHANNELS.map((c) => (
-                        <option key={c} value={c}>
-                          {CHANNEL_LABEL[c]}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <Field label="Category" htmlFor="category" required error={s.errors?.category}>
-                    <Select
-                      id="category"
-                      value={otherCategory ? OTHER : v.category}
-                      aria-invalid={!!s.errors?.category || undefined}
-                      onChange={(e) => {
-                        if (e.target.value === OTHER) {
-                          setOtherCategory(true);
-                          set("category", "");
-                        } else {
-                          setOtherCategory(false);
-                          set("category", e.target.value);
-                        }
-                      }}
-                    >
-                      <option value="" disabled>
-                        Choose…
-                      </option>
-                      {categories.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                      <option value={OTHER}>Other…</option>
-                    </Select>
-                    {otherCategory && (
-                      <Input
-                        aria-label="Category name"
-                        placeholder="Type the category"
-                        value={v.category}
-                        onChange={(e) => set("category", e.target.value)}
-                        maxLength={120}
-                        autoFocus
-                      />
-                    )}
-                  </Field>
-                  <Field label="Title" htmlFor="title" error={s.errors?.title}>
-                    <Input
-                      id="title"
-                      value={v.title}
-                      onChange={(e) => set("title", e.target.value)}
-                      maxLength={200}
-                      placeholder="Short name, e.g. “Tablet press”"
-                    />
-                  </Field>
-                  <Field label="Priority" htmlFor="priority" error={s.errors?.priority}>
-                    <Select id="priority" value={v.priority} onChange={(e) => set("priority", e.target.value)}>
-                      {PRIORITIES.map((p) => (
-                        <option key={p} value={p}>
-                          {PRIORITY_LABEL[p]}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <Field label="Needed by" htmlFor="requiredBy" error={s.errors?.requiredBy}>
-                    <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
-                  </Field>
-                  {people && (
-                    <Field label="Handles it" htmlFor="assigneeId" error={s.errors?.assigneeId}>
-                      <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
-                        {assignable.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.id === meId ? `${p.name} (me)` : p.name}
-                          </option>
-                        ))}
-                        <option value="">Nobody yet</option>
-                      </Select>
-                    </Field>
-                  )}
-                  <Field
-                    label="What they need"
-                    htmlFor="requirements"
-                    required={required}
-                    hint={required ? "Write it as the customer said it. You can add items now, or later from the factory offers." : undefined}
-                    error={s.errors?.requirements}
-                    className="md:col-span-3"
-                  >
-                    <Textarea
-                      id="requirements"
-                      rows={3}
-                      value={v.requirements}
-                      placeholder={required ? undefined : "Optional when you list the items"}
-                      onChange={(e) => set("requirements", e.target.value)}
-                    />
-                  </Field>
-                </div>
-                {!listing && <div className="border-t border-line pt-4">{footer}</div>}
-              </CardBody>
-            </Card>
-
-            {create ? (
-              <Card>
-                <CardHeader title={<TitleSub title="Items" sub={listing ? "a part (1.1) belongs to its main item" : "optional"} />} />
-                <CardBody>
-                  {listing ? (
-                    <LineTable
-                      rows={v.items.map((it) => ({
-                        key: it.key,
-                        parentKey: it.parentKey,
-                        values: { description: it.description, model: it.model, quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice },
-                      }))}
-                      columns={ITEM_COLUMNS}
-                      noun="item"
-                      sheet={{ name: "Customer items", upload: itemsFromExcel }}
-                      error={s.errors?.items?.[0]}
-                      empty="Type the first item below, or paste the customer's list from Excel."
-                      {...itemHandlers}
-                    />
-                  ) : (
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-text-2">
-                        <strong className="text-text">No item list yet.</strong> That is fine: the items come from the factory offers.
-                      </p>
-                      <Button size="sm" variant="secondary" onClick={() => setItemsOpen(true)}>
-                        <Plus aria-hidden /> Add items now
-                      </Button>
-                    </div>
-                  )}
-                </CardBody>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader title={<TitleSub title="Items" sub="a part (1.1) belongs to its main item" />} />
-                <CardBody>
-                  <LineTable
-                    rows={v.items.map((it) => ({
-                      key: it.key,
-                      parentKey: it.parentKey,
-                      values: { description: it.description, model: it.model, quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice },
-                      badge: it.priced ? (
-                        <span className="ml-1 align-middle" title="A factory has priced this: changing it will ask why">
-                          <Badge tone="info">Priced</Badge>
-                        </span>
-                      ) : undefined,
-                    }))}
-                    columns={ITEM_COLUMNS}
-                    noun="item"
-                    sheet={{ name: "Customer items", upload: itemsFromExcel }}
-                    error={s.errors?.items?.[0]}
-                    empty="No list: what they need above is enough."
-                    {...itemHandlers}
+    <PanelBody>
+      <ActionForm
+        action={submit}
+        keepFields
+        showSuccess={false}
+        className={PANEL_FORM}
+        banner={(st) =>
+          st.message && st.ok === false ? (
+            <Alert tone="error">
+              <strong>Not saved.</strong> {notSaved(st)}
+            </Alert>
+          ) : null
+        }
+      >
+        {(s) => (
+          <>
+            <input type="hidden" name="payload" value={JSON.stringify(payload(v))} />
+            <PanelSection title="Who asked" first className="md:grid-cols-3">
+              <Field label="Customer" htmlFor="customer" required error={s.errors?.customerId} className="md:col-span-2">
+                {adding && addCustomer ? (
+                  <QuickCustomerForm
+                    add={addCustomer}
+                    search={searchCustomers}
+                    onCancel={() => setAdding(false)}
+                    onUse={(c, list) => {
+                      setAdding(false);
+                      void chooseCustomer(c, list);
+                    }}
                   />
-                </CardBody>
-              </Card>
-            )}
+                ) : (
+                  <div className="flex flex-wrap items-start gap-2">
+                    <div className="min-w-56 flex-1">
+                      <CustomerPicker
+                        value={v.customer}
+                        onChange={(c) => void chooseCustomer(c)}
+                        search={searchCustomers}
+                        error={s.errors?.customerId}
+                        disabled={!!customerLocked}
+                        disabledReason={customerLocked}
+                      />
+                    </div>
+                    {canAddCustomer && addCustomer && !customerLocked && (
+                      <Button variant="secondary" onClick={() => setAdding(true)}>
+                        <Plus aria-hidden /> New customer
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </Field>
+              <Field
+                label="Contact"
+                htmlFor="contactId"
+                error={s.errors?.contactId}
+                hint={v.customer && !contacts.length ? "This customer has no contacts yet." : undefined}
+              >
+                <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
+                  <option value="">{v.customer ? "Not specified" : "Choose the customer first"}</option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {contactLine(c)}
+                      {c.isPrimary ? " (main)" : ""}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Came by" htmlFor="channel" required error={s.errors?.channel}>
+                <Select id="channel" value={v.channel} onChange={(e) => set("channel", e.target.value as InquiryChannel)}>
+                  {INQUIRY_CHANNELS.map((c) => (
+                    <option key={c} value={c}>
+                      {CHANNEL_LABEL[c]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Needed by" htmlFor="requiredBy" hint="If they gave a date" error={s.errors?.requiredBy}>
+                <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
+              </Field>
+              <Field label="Handles it" htmlFor="assigneeId" hint={create ? "Can be set later" : undefined} error={s.errors?.assigneeId}>
+                <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)} disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}>
+                  {assignable.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.id === meId ? `${p.name} (me)` : p.name}
+                    </option>
+                  ))}
+                  <option value="">Nobody yet</option>
+                </Select>
+              </Field>
+            </PanelSection>
+
+            <PanelSection title="What they need" className="md:grid-cols-3">
+              <Field label="Title" htmlFor="title" error={s.errors?.title}>
+                <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} placeholder="Short name, e.g. “Tablet press”" />
+              </Field>
+              <Field label="Category" htmlFor="category" required error={s.errors?.category}>
+                <Select
+                  id="category"
+                  value={otherCategory ? OTHER : v.category}
+                  aria-invalid={!!s.errors?.category || undefined}
+                  onChange={(e) => {
+                    if (e.target.value === OTHER) {
+                      setOtherCategory(true);
+                      set("category", "");
+                    } else {
+                      setOtherCategory(false);
+                      set("category", e.target.value);
+                    }
+                  }}
+                >
+                  <option value="" disabled>
+                    Choose…
+                  </option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  <option value={OTHER}>Other…</option>
+                </Select>
+                {otherCategory && (
+                  <Input aria-label="Category name" placeholder="Type the category" value={v.category} onChange={(e) => set("category", e.target.value)} maxLength={120} autoFocus />
+                )}
+              </Field>
+              <Field label="Priority" htmlFor="priority" error={s.errors?.priority}>
+                <Select id="priority" value={v.priority} onChange={(e) => set("priority", e.target.value)}>
+                  {PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      {PRIORITY_LABEL[p]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="What they need" htmlFor="requirements" required={required} error={s.errors?.requirements} className="md:col-span-3">
+                <Textarea
+                  id="requirements"
+                  rows={4}
+                  value={v.requirements}
+                  placeholder={required ? "Write it as the customer said it." : "Optional: the items are listed"}
+                  onChange={(e) => set("requirements", e.target.value)}
+                />
+              </Field>
+            </PanelSection>
+
+            <PanelSection title="Files from the customer" className="sm:grid-cols-1">
+              {files.map((f) => (
+                <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-[13px]">
+                  <span className="min-w-0 truncate">
+                    <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
+                      {f.fileName}
+                    </a>
+                    <span className="text-text-2"> · {f.meta}</span>
+                  </span>
+                  {f.remove && (
+                    <button type="button" onClick={() => setAsking(f)} className="shrink-0 font-semibold text-bad hover:underline">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+              <FileZone
+                label="Add files"
+                hint="Their URS, drawings, photos of the old machine… PDF, images, Excel, Word · up to 25 MB each"
+                disabled={uploading}
+                onFiles={(list) => setStaged((x) => [...x, ...list.map((file) => ({ key: rowKey(), file, kind: kindNext, note: "", progress: null, error: null }))])}
+                kind={
+                  <Select aria-label="What kind of file" value={kindNext} onChange={(e) => setKindNext(e.target.value as AttachmentKind)} className="h-[34px] w-auto text-[13px]">
+                    {NEW_KINDS.map((k) => (
+                      <option key={k} value={k}>
+                        {KIND_WORD[k]}
+                      </option>
+                    ))}
+                  </Select>
+                }
+              >
+                {staged.length > 0 &&
+                  staged.map((f) => (
+                    <FileRow
+                      key={f.key}
+                      name={f.file.name}
+                      meta={
+                        f.error ? (
+                          <span className="text-bad">{f.error}</span>
+                        ) : (
+                          `${ATTACHMENT_KIND_LABEL[f.kind]} · ${fileSize(f.file.size)} · ${f.progress === null ? "goes up when you save" : `uploading ${f.progress}%`}`
+                        )
+                      }
+                      actions={
+                        <>
+                          <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, false)} aria-label={`View ${f.file.name}`}>
+                            <Eye aria-hidden />
+                          </Button>
+                          <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, true)} aria-label={`Download ${f.file.name}`}>
+                            <Download aria-hidden />
+                          </Button>
+                          <Button size="icon-xs" variant="ghost" disabled={uploading} onClick={() => setStaged((x) => x.filter((y) => y.key !== f.key))} aria-label={`Remove ${f.file.name}`}>
+                            <Trash2 aria-hidden />
+                          </Button>
+                        </>
+                      }
+                    />
+                  ))}
+              </FileZone>
+            </PanelSection>
 
             {create && (
-              <Card>
-                <CardHeader title={<TitleSub title="Files" sub="optional" />} />
-                <CardBody>
-                  <FileZone
-                    label="Files from the customer"
-                    hint="Their URS, drawings, photos of the old machine… PDF, images, Excel, Word · up to 25 MB each"
-                    disabled={uploading}
-                    onFiles={(files) =>
-                      setStaged((x) => [
-                        ...x,
-                        ...files.map((file) => ({ key: rowKey(), file, kind: kindNext, note: "", progress: null, error: null })),
-                      ])
-                    }
-                    kind={
-                      <Select
-                        aria-label="What kind of file"
-                        value={kindNext}
-                        onChange={(e) => setKindNext(e.target.value as AttachmentKind)}
-                        className="h-[34px] w-auto text-[13px]"
-                      >
-                        {NEW_KINDS.map((k) => (
-                          <option key={k} value={k}>
-                            {KIND_WORD[k]}
-                          </option>
-                        ))}
-                      </Select>
-                    }
-                  >
-                    {staged.length > 0 &&
-                      staged.map((f) => (
-                        <FileRow
-                          key={f.key}
-                          name={f.file.name}
-                          meta={
-                            f.error ? (
-                              <span className="text-bad">{f.error}</span>
-                            ) : (
-                              `${ATTACHMENT_KIND_LABEL[f.kind]} · ${fileSize(f.file.size)} · ${f.progress === null ? "added now" : `uploading ${f.progress}%`}`
-                            )
-                          }
-                          actions={
-                            <>
-                              <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, false)} aria-label={`View ${f.file.name}`}>
-                                <Eye aria-hidden />
-                              </Button>
-                              <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, true)} aria-label={`Download ${f.file.name}`}>
-                                <Download aria-hidden />
-                              </Button>
-                              <Button
-                                size="icon-xs"
-                                variant="ghost"
-                                disabled={uploading}
-                                onClick={() => setStaged((x) => x.filter((y) => y.key !== f.key))}
-                                aria-label={`Remove ${f.file.name}`}
-                              >
-                                <Trash2 aria-hidden />
-                              </Button>
-                            </>
-                          }
-                        />
-                      ))}
-                  </FileZone>
-                </CardBody>
-              </Card>
+              <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">
+                The items come next. On the inquiry, <strong className="text-text">Add items</strong> opens the items editor: type them, paste them from Excel, or leave it
+                empty and take them from the first factory offer.
+              </p>
             )}
 
-            {listing && (
-              <Card>
-                <CardBody>
-                  <div className="border-t border-line pt-4">{footer}</div>
-                </CardBody>
-              </Card>
-            )}
-          </div>
-        </>
+            <PanelFooter start={create ? undefined : "Each changed value is kept in History."}>
+              <Button type="button" variant="ghost" onClick={() => close()}>
+                Cancel
+              </Button>
+              {create && (
+                <SubmitButton variant="secondary" name="another" value="1" pendingText="Saving…">
+                  <Plus aria-hidden /> Save &amp; add another
+                </SubmitButton>
+              )}
+              <SubmitButton pendingText={uploading ? "Uploading files…" : "Saving…"}>
+                <Check aria-hidden /> {create ? "Save inquiry" : "Save changes"}
+              </SubmitButton>
+            </PanelFooter>
+          </>
+        )}
+      </ActionForm>
+      {asking && (
+        <ConfirmDialog
+          title={`Remove ${asking.fileName}?`}
+          confirmLabel="Remove the file"
+          cancelLabel="Keep it"
+          danger
+          busy={removing}
+          onCancel={() => setAsking(null)}
+          onConfirm={() =>
+            startRemove(async () => {
+              const r = await asking.remove!();
+              setAsking(null);
+              if (r.ok) router.refresh();
+              else toast(r.message ?? "The file was not removed.");
+            })
+          }
+        >
+          <WhatHappens lines={["The file leaves this inquiry. Nothing else changes."]} />
+        </ConfirmDialog>
       )}
-    </ActionForm>
-  );
-}
-
-/** "Items · optional": a card title with its small grey note. */
-function TitleSub({ title, sub }: { title: string; sub: string }) {
-  return (
-    <>
-      {title}
-      <span className="text-xs font-normal text-muted"> · {sub}</span>
-    </>
+    </PanelBody>
   );
 }
 

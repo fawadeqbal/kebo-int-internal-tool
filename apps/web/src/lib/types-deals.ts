@@ -44,22 +44,6 @@ export interface SalesSettings {
 
 /* ---------------------------------------------------------------- inquiry form */
 
-/** What the inquiry form edits (strings, as typed). */
-export interface DealFormItem {
-  id: string | null;
-  /** Client-only key for React lists. */
-  key: string;
-  description: string;
-  model: string;
-  quantity: string;
-  unit: string;
-  targetPrice: string;
-  /** A part of another item: that row's key. Parts come right after their item and are numbered under it ("2.1"). */
-  parentKey: string | null;
-  /** A factory has priced it: changing or removing it asks why. */
-  priced: boolean;
-}
-
 export interface DealFormValues {
   customer: CustomerOption | null;
   contactId: string;
@@ -70,7 +54,6 @@ export interface DealFormValues {
   priority: string;
   requiredBy: string;
   assigneeId: string;
-  items: DealFormItem[];
 }
 
 /* ---------------------------------------------------------------- sourcing */

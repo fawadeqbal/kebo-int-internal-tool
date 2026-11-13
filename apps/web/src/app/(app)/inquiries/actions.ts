@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail, Paged } from "@/lib/types";
@@ -56,6 +55,11 @@ export async function removeFileAction(dealId: string, fileId: string, _prev: Ac
 }
 
 /** What a file is (URS, drawing…) and its note. */
+/** "Remove" on a file in the Edit the request window (called directly: that window is one form already). */
+export async function removeRequestFileAction(dealId: string, fileId: string): Promise<ActionState> {
+  return removeFileAction(dealId, fileId, {}, new FormData());
+}
+
 export async function describeFileAction(dealId: string, fileId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const r = await attempt(form, () => api.patch(`/files/${fileId}`, { kind: v.kind, note: v.note?.trim() || null }), "Saved.");
@@ -127,16 +131,35 @@ export async function quickCustomerAction(v: QuickCustomer): Promise<QuickCustom
   return { ok: true, customer: { id: c.id, name: c.name, country: c.country, primaryContact: primary && { id: primary.id, name: primary.name } }, contacts };
 }
 
-/** Create or edit a deal (the form sends JSON in `payload`, with its line items). */
-export async function saveDealAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const body = formBody(form);
-  const r = await attempt(form, () =>
-    id ? api.put<{ id: string }>(`/inquiries/${id}`, body) : api.post<{ id: string }>("/inquiries", body),
+/**
+ * "Edit the request": the request's own values (customer, contact, how it came, category, title, what they
+ * need, priority, needed by) and who handles it. The items are left as they are: they have their own editor.
+ * Answers { id, refNo } so the window can send its new files, as a new inquiry does.
+ */
+export async function saveRequestAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(
+    form,
+    async () => {
+      const { assigneeId, reason, ...fields } = formBody(form) as { assigneeId?: string | null; reason?: string } & Record<string, unknown>;
+      const d = await api.get<DealDetail>(`/inquiries/${id}`);
+      const at = new Map(d.items.map((it, n) => [it.id, n]));
+      const items = d.items.map((it) => ({
+        id: it.id,
+        partOf: it.parentId ? (at.get(it.parentId) ?? null) : null,
+        description: it.description,
+        model: it.model,
+        quantity: it.quantity,
+        unit: it.unit,
+        targetPrice: it.targetPrice,
+      }));
+      await api.put(`/inquiries/${id}`, { ...fields, items, reason });
+      if ((assigneeId ?? null) !== (d.assignee?.id ?? null)) await api.post(`/inquiries/${id}/assign`, { assigneeId: assigneeId ?? null, reason });
+      return { id, refNo: d.refNo };
+    },
+    "Saved.",
   );
-  if (!r.ok) return r;
-  const newId = id ?? (r.data as { id: string }).id;
-  refresh(newId);
-  redirect(`/inquiries/${newId}`);
+  if (r.ok) refresh(id);
+  return r;
 }
 
 /** The fields the inquiry's own cards change one at a time (Needs: "+ Add" in place, Edit, Edit lines). */

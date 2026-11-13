@@ -219,6 +219,33 @@ export function PanelActions({ children, end, className }: { children: ReactNode
   );
 }
 
+/**
+ * The footer of a window that makes or edits a record (inquiry, factory offer, quotation), the same in each:
+ * a note or the red "Remove…" on the left; Cancel, the quiet saves, then the one orange save on the right.
+ */
+export function PanelFooter({ start, children }: { start?: ReactNode; children: ReactNode }) {
+  return (
+    <PanelActions className="justify-end">
+      {start && <span className="mr-auto min-w-0 text-[12.5px] text-text-2">{start}</span>}
+      {children}
+    </PanelActions>
+  );
+}
+
+/** "What happens": said above the button of a window that changes a status or removes something. */
+export function WhatHappens({ lines }: { lines: ReactNode[] }) {
+  return (
+    <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2 [&_strong]:text-text">
+      <strong className="block">What happens</strong>
+      {lines.filter(Boolean).map((l, n) => (
+        <span key={n} className="block">
+          · {l}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** "Ctrl+Enter saves · Esc closes", beside a panel's buttons (not on a phone). */
 export function PanelKeys() {
   return <span className="text-xs text-muted max-md:hidden">Ctrl+Enter saves · Esc closes</span>;

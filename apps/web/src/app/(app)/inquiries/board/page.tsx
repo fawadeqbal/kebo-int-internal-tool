@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { OpenPanelButton } from "@/components/common/panel";
+import { NewInquiryWindow } from "../inquiry-windows";
 import { LayoutGrid, List, MessageSquareText, Package, Plus } from "lucide-react";
 import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, REVISION_STATUS_LABEL, type InquiryStage } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, LinkTabs, PageHeader, RefCode, StatusBadge } from "@kebo/ui";
@@ -139,9 +141,9 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
         }
         primary={
           can(me, "inquiries.create") && (
-            <ButtonLink href="/inquiries/new" variant="primary">
+            <OpenPanelButton panel="new-inquiry" variant="primary">
               <Plus aria-hidden /> New inquiry
-            </ButtonLink>
+            </OpenPanelButton>
           )
         }
       />
@@ -171,6 +173,8 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
         {column(cols.find((c) => c.key === phoneKey)!, true)}
       </div>
       <div className="hidden items-start gap-3 xl:grid xl:grid-cols-5">{cols.map((c) => column(c))}</div>
+
+      {sp.panel === "new-inquiry" && <NewInquiryWindow customerId={sp.for} />}
     </div>
   );
 }

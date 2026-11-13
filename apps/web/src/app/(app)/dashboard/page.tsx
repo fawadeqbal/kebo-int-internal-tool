@@ -64,7 +64,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {can(me, "inquiries.create") && (
-            <ButtonLink href="/inquiries/new" variant="primary">
+            <ButtonLink href="/inquiries?panel=new-inquiry" variant="primary">
               <Plus aria-hidden /> New inquiry
             </ButtonLink>
           )}

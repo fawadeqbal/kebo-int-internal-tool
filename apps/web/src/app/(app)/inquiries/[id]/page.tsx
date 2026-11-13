@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EditRequestWindow } from "../inquiry-windows";
 import { can, CHANNEL_LABEL, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, PRIORITY_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
 import { Badge, Card, CardBody, CardHeader, cn, RefCode } from "@kebo/ui";
 import { DetailsCard } from "@/components/common/record";
@@ -21,7 +22,7 @@ export const metadata = { title: "Inquiry" };
  * order: each a link to its tab), the request as the customer made it, and the items they asked for. Once
  * won: the deal that was made. Beside it, the panel every tab has.
  */
-export default async function DealOverview({ params }: { params: Promise<{ id: string }> }) {
+export default async function DealOverview({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ panel?: string }> }) {
   const { id } = await params;
   const me = await requireUser();
   const d = await dealOf(id);
@@ -206,10 +207,11 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
           { label: "Needed by", value: d.requiredBy ? date(d.requiredBy) : null },
           { label: "What they need", value: d.requirements && <span className="whitespace-pre-line">{d.requirements}</span>, wide: true },
         ]}
-        editHref={d.allowed.edit ? `${base}/edit` : undefined}
+        edit={d.allowed.edit ? { panel: "edit-request", label: "Edit the request" } : null}
       />
 
       <ItemsCard id={id} />
+      {(await searchParams).panel === "edit-request" && <EditRequestWindow d={d} />}
     </WithSide>
   );
 }
