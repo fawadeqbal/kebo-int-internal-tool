@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ATTACHMENT_KINDS } from "../enums";
 import { FLOW_STEPS, type FlowStep } from "./flow";
+import { ORDER_SECTIONS } from "./order-sections";
 
 /**
  * Documents v3: every file of an order in one list (GET /orders/:id/files),
@@ -36,7 +37,7 @@ export const STEP_FILE_GROUP: Record<FlowStep, OrderFileGroup> = {
 };
 
 /** What a file is attached to: a paper, a checklist item, a step, the deal (inquiry), a payment, a factory payment, an expense or a factory offer. */
-export const ORDER_FILE_LINKS = ["paper", "checklist", "step", "inquiry", "payment", "factory_payment", "expense", "offer"] as const;
+export const ORDER_FILE_LINKS = ["paper", "checklist", "section", "step", "inquiry", "payment", "factory_payment", "expense", "offer"] as const;
 export type OrderFileLink = (typeof ORDER_FILE_LINKS)[number];
 
 /** "attachment:<uuid>" — one file of the list, as the list and the zip name it. */
@@ -73,12 +74,16 @@ export const orderFileAttachInput = z.discriminatedUnion("to", [
   z.object({ to: z.literal("paper"), target: z.string().trim().min(1).max(80) }),
   z.object({ to: z.literal("checklist"), target: z.string().trim().min(1).max(80) }),
   z.object({ to: z.literal("step"), target: z.enum(FLOW_STEPS) }),
+  // A section of the order's page (booking, vessel, fat…): the file is kept as one of that section's files.
+  z.object({ to: z.literal("section"), target: z.enum(ORDER_SECTIONS) }),
 ]);
 export type OrderFileAttachInput = z.infer<typeof orderFileAttachInput>;
 
 /** multipart fields with the file: the step it belongs to, what it is, and (optionally) where to attach it. */
 export const orderFileUploadInput = z.object({
   step: z.preprocess(blankToUndefined, z.enum(FLOW_STEPS).optional()),
+  /** The section whose window the file was added in; its stage follows from it. */
+  section: z.preprocess(blankToUndefined, z.enum(ORDER_SECTIONS).optional()),
   kind: z.preprocess(blankToUndefined, z.enum(ATTACHMENT_KINDS).optional()),
   note: z
     .string()

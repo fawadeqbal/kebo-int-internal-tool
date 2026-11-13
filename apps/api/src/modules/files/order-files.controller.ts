@@ -58,7 +58,7 @@ export class OrderFilesController {
     return this.files.list(user, id);
   }
 
-  /** multipart/form-data: one `file`, and `step`, `kind`, `note`, `attachTo` ("paper:<kind or doc:id>", "checklist:<item id or key>"). */
+  /** multipart/form-data: one `file`, and `step` or `section` (a section of the order page: its stage follows), `kind`, `note`, `attachTo` ("paper:<kind or doc:id>", "checklist:<item id or key>"). */
   @Post()
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   upload(

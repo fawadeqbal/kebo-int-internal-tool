@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, fromDbDateOrNull, toDbDate, routeOf, termsSelect } from "@kebo/database";
+import { fromDbDate, fromDbDateOrNull, readyOnOf, toDbDate, routeOf, termsSelect } from "@kebo/database";
 import {
   BANK_STEP_LABEL,
   bankStepsFor,
@@ -10,6 +10,8 @@ import {
   ORDER_DOCUMENT_LABEL,
   documentDone,
   documentsInUse,
+  ORDER_TAB_LABEL,
+  sectionReminders,
   STEP_PATH,
 } from "@kebo/shared";
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
@@ -354,6 +356,58 @@ export class RemindersListService {
         action: "Open the step",
         who: c.who,
       });
+    }
+
+    // What the order's sections say is late: the ready date passed and the goods not all in, a factory
+    // test planned and not done (both with the production module), our ship-by date passed and nothing left.
+    const [withProduction, withShipping] = [await on("production"), await on("shipping")];
+    if (withProduction || withShipping) {
+      const before = { lt: toDbDate(today) };
+      const lateOrders = await this.prisma.db.order.findMany({
+        where: {
+          ...orders,
+          OR: [
+            ...(withProduction ? [{ factories: { some: { OR: [{ readyOn: before }, { fatPlannedOn: before, fatDoneOn: null }] } } }] : []),
+            ...(withShipping ? [{ shipBy: before }] : []),
+          ],
+        },
+        select: {
+          id: true,
+          refNo: true,
+          shipBy: true,
+          ...handler,
+          factories: { select: { factoryId: true, readyOn: true, fatPlannedOn: true, fatDoneOn: true, factory: { select: { name: true } } } },
+          lines: { where: { type: "goods" }, select: { quantity: true, receivedQty: true, factoryId: true } },
+          shipments: { select: { status: true, departedOn: true } },
+        },
+        take: 200,
+      });
+      for (const o of lateOrders) {
+        const found = sectionReminders(
+          {
+            readyOn: readyOnOf(o),
+            goods: { lines: o.lines.length, received: o.lines.filter((l) => Number(l.receivedQty) >= Number(l.quantity)).length },
+            fat: o.factories.map((f) => ({ factory: f.factory?.name ?? null, plannedOn: fromDbDateOrNull(f.fatPlannedOn), doneOn: fromDbDateOrNull(f.fatDoneOn), result: null })),
+            shipments: o.shipments.map((sh) => ({ status: sh.status, departedOn: fromDbDateOrNull(sh.departedOn) })),
+            shipBy: fromDbDateOrNull(o.shipBy),
+          },
+          today,
+        ).filter((r) => (r.tab === "shipping" ? withShipping : withProduction));
+        for (const r of found) {
+          const late = days(r.due);
+          out.push({
+            key: `section:${o.id}:${r.key}:${r.due}`,
+            kind: r.tab === "shipping" ? "ship" : "order",
+            level: late >= 3 ? "bad" : "warn",
+            title: `${o.refNo}: ${r.text}`,
+            detail: `${ORDER_TAB_LABEL[r.tab]} · ${late} day${late === 1 ? "" : "s"} late`,
+            due: r.due,
+            href: `/orders/${o.id}/${r.tab}`,
+            action: `Open ${ORDER_TAB_LABEL[r.tab]}`,
+            who: nameOf(o.inquiry.assignee),
+          });
+        }
+      }
     }
 
     // The LC or contract: the last day to ship, and the expiry date.

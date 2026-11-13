@@ -7,6 +7,11 @@ import {
   autoTitle,
   can,
   FLOW_STEP_LABEL,
+  isOrderSection,
+  ORDER_SECTION_LABEL,
+  ORDER_SECTION_TAB,
+  sectionStep,
+  type OrderSection,
   ORDER_DOCUMENT_KINDS,
   ORDER_DOCUMENT_LABEL,
   ORDER_FILE_GROUP_LABEL,
@@ -59,6 +64,9 @@ export interface OrderFileView {
   attachedTo: { link: OrderFileLink; label: string; href: string };
   step: FlowStep | null;
   stepLabel: string;
+  /** The section of the order's page it belongs to (null: only its stage, or the inquiry). */
+  section: OrderSection | null;
+  sectionLabel: string | null;
   group: OrderFileGroup;
   by: { id: string; name: string } | null;
   at: string;
@@ -74,7 +82,7 @@ export interface OrderFileView {
 
 /** Where a file can be attached ("Attach to…"). */
 export interface AttachTarget {
-  to: "paper" | "checklist" | "step";
+  to: "paper" | "checklist" | "step" | "section";
   target: string;
   label: string;
   step: FlowStep;
@@ -228,15 +236,16 @@ export class OrderFilesService {
     for (const a of attachments.filter((x) => !x.replacedById)) {
       const paper = paperOf.get(a.id);
       const item = itemOf.get(a.id);
+      const section = isOrderSection(a.section) ? a.section : null;
       const step = (paper?.step ?? item?.step ?? (a.step as FlowStep | null)) || null;
-      const link: OrderFileLink = paper ? "paper" : item ? "checklist" : a.orderId ? "step" : "inquiry";
+      const link: OrderFileLink = paper ? "paper" : item ? "checklist" : section ? "section" : a.orderId ? "step" : "inquiry";
       const mayChange =
         open &&
         (link === "paper"
           ? can(user, "documents.manage")
           : link === "checklist"
             ? can(user, "orders.update")
-            : link === "step"
+            : link === "step" || link === "section"
               ? can(user, "orders.update") || isMine(a.uploadedById)
               : dealRule || isMine(a.uploadedById));
       files.push({
@@ -254,6 +263,8 @@ export class OrderFilesService {
             ? { link, label: `Paper · ${paper!.label}`, href: `${base}/documents?tab=all#papers` }
             : link === "checklist"
               ? { link, label: `Checklist · ${item!.title}`, href: stepHref(item!.step) }
+              : link === "section"
+                ? { link, label: ORDER_SECTION_LABEL[section!], href: `${base}/${ORDER_SECTION_TAB[section!] === "overview" ? "" : ORDER_SECTION_TAB[section!]}`.replace(/\/$/, "") }
               : link === "step"
                 ? {
                     link,
@@ -267,6 +278,8 @@ export class OrderFilesService {
                   },
         step,
         stepLabel: step ? FLOW_STEP_LABEL[step] : "Inquiry",
+        section,
+        sectionLabel: section ? ORDER_SECTION_LABEL[section] : null,
         group: step ? STEP_FILE_GROUP[step] : "customer",
         by: a.uploadedBy,
         at: a.createdAt.toISOString(),
@@ -296,6 +309,8 @@ export class OrderFilesService {
         },
         step: null,
         stepLabel: "Inquiry",
+        section: null,
+        sectionLabel: null,
         group: "factory",
         by: a.uploadedBy,
         at: a.createdAt.toISOString(),
@@ -327,6 +342,8 @@ export class OrderFilesService {
         },
         step: "payment",
         stepLabel: FLOW_STEP_LABEL.payment,
+        section: "payments",
+        sectionLabel: ORDER_SECTION_LABEL.payments,
         group: "money",
         by: p.recordedBy,
         at: p.createdAt.toISOString(),
@@ -352,6 +369,8 @@ export class OrderFilesService {
         attachedTo: { link: "factory_payment", label: `Paid to ${p.factory.name} · ${day(p.paidOn)}`, href: stepHref("factory") },
         step: "factory",
         stepLabel: FLOW_STEP_LABEL.factory,
+        section: "factory_payments",
+        sectionLabel: ORDER_SECTION_LABEL.factory_payments,
         group: "money",
         by: p.recordedBy,
         at: p.createdAt.toISOString(),
@@ -379,6 +398,8 @@ export class OrderFilesService {
         attachedTo: { link: "expense", label: `Expense · ${e.description}`, href: step ? stepHref(step) : `${base}/costs` },
         step,
         stepLabel: step ? FLOW_STEP_LABEL[step] : "Costs",
+        section: "expenses",
+        sectionLabel: ORDER_SECTION_LABEL.expenses,
         group: "money",
         by: e.recordedBy,
         at: e.createdAt.toISOString(),
@@ -458,11 +479,15 @@ export class OrderFilesService {
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
     if (!(can(user, "orders.update") || can(user, "documents.manage"))) throw new ForbiddenError("You cannot add files to this order.");
     const row = await this.inquiries.upload(user, o.inquiryId, file, { kind: meta.kind ?? "other", note: meta.note });
-    const step = meta.step ?? null;
+    // Added in a section's window: the file is that section's, under the section's stage.
+    const section = meta.section ?? null;
+    const step = (section ? sectionStep(section) : null) ?? meta.step ?? null;
     await this.prisma.tx(async (tx) => {
-      await tx.attachment.update({ where: { id: row.id }, data: { orderId, step } });
-      await this.log(tx, user, o, "upload", `added ${row.fileName}${step ? ` to ${FLOW_STEP_LABEL[step]}` : ""}`, step, {
+      await tx.attachment.update({ where: { id: row.id }, data: { orderId, step, section } });
+      const where = section ? ORDER_SECTION_LABEL[section] : step ? FLOW_STEP_LABEL[step] : null;
+      await this.log(tx, user, o, "upload", `added ${row.fileName}${where ? ` to ${where}` : ""}`, step, {
         file: row.fileName,
+        ...(section ? { section } : {}),
       });
     });
     if (meta.attachTo) {
@@ -576,10 +601,15 @@ export class OrderFilesService {
         label = autoTitle(input.target);
         step = null;
       }
+    } else if (input.to === "section") {
+      step = sectionStep(input.target);
+      label = ORDER_SECTION_LABEL[input.target];
+      await this.prisma.db.attachment.update({ where: { id: fileId }, data: { orderId, step, section: input.target } });
     } else {
+      // Moved to a stage as a whole: it is no longer one section's file.
       step = input.target;
       label = FLOW_STEP_LABEL[step];
-      await this.prisma.db.attachment.update({ where: { id: fileId }, data: { orderId, step } });
+      await this.prisma.db.attachment.update({ where: { id: fileId }, data: { orderId, step, section: null } });
     }
     await this.prisma.tx((tx) =>
       this.log(tx, user, o, "attach", `attached ${f.name} to ${input.to === "step" ? `${label} (files)` : label}`, step ?? f.step, {
