@@ -190,6 +190,10 @@ export interface ExpenseView {
   step: FlowStep | null;
   borneBy: ExpenseBearer;
   ownMoney: boolean;
+  /** A bill known before it is paid, who it is owed to, and what made it ("shipment:<id>:freight"). */
+  payLater: boolean;
+  payee: string | null;
+  source: string | null;
   repaid: { on: string; account: { id: string; name: string } | null } | null;
   voided: { at: string; reason: string | null } | null;
 }
@@ -211,6 +215,10 @@ export interface CostExpense {
   paidBy: Person | null;
   account: { id: string; name: string } | null;
   ownMoney: boolean;
+  /** A bill known before it is paid, who it is owed to, and what made it ("shipment:<id>:freight"). */
+  payLater: boolean;
+  payee: string | null;
+  source: string | null;
   repaid: { on: string; account: { id: string; name: string } | null } | null;
   reference: string | null;
   note: string | null;
@@ -269,6 +277,43 @@ export interface OrderCosts {
     onQuoteMargin: number | null;
   } | null;
   toRepay: { person: Person; currency: string; amount: string; items: { id: string; description: string; amount: string; spentOn: string }[] }[];
+  /** The cost sheet: every cost of the order in one list, with its four figures (in the order's currency; null without a rate). */
+  sheet: {
+    rows: CostSheetRow[];
+    total: string;
+    costs: string | null;
+    paid: string | null;
+    toPay: string | null;
+    profit: string | null;
+    margin: number | null;
+    /** Order value on lines without a cost: left out of profit. */
+    uncosted: string;
+  };
+}
+
+/** One cost of an order, known or paid. */
+export interface CostSheetRow {
+  key: string;
+  kind: "goods" | "cost" | "bank" | "estimate";
+  label: string;
+  category: ExpenseCategory | null;
+  owedTo: string | null;
+  /** Where it comes from: the factory order, a shipment, the customer's payments, the quotation, or typed on the sheet. */
+  from: "factory" | "shipment" | "payment" | "quotation" | "typed";
+  amount: string;
+  currency: string;
+  inOrder: string | null;
+  /** In its own currency. */
+  paid: string;
+  toPay: string;
+  /** In the order's currency (null: not ours to bear, or no rate). */
+  paidInOrder: string | null;
+  toPayInOrder: string | null;
+  state: "paid" | "part_paid" | "to_pay" | "to_repay" | "estimate";
+  borneBy: ExpenseBearer;
+  expenseId: string | null;
+  /** The day it was paid, or the day it is dated while it waits. */
+  on: string | null;
 }
 
 /** GET /expenses: what is shown, with its totals (in the main currency). */

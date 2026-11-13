@@ -491,6 +491,8 @@ export class LedgerPosting {
               accountId: e.accountId,
               borneBy: e.borneBy,
               ownMoney: e.ownMoney,
+              payLater: e.payLater,
+              payee: e.payee,
               repaidOn: fromDbDateOrNull(e.repaidOn),
               repaidAccountId: e.repaidAccountId,
               order: e.order && {

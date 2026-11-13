@@ -15,13 +15,14 @@ import { fieldsAction } from "../../light-actions";
 import { packingAction, packingMarksAction } from "../../actions";
 import { docHref, goodsOf } from "../shared";
 import { PackingCard } from "../goods";
-import { orderCostsSetup } from "@/components/orders/costs-data";
-import { AddOrderExpense } from "@/components/orders/expense-form";
 import { RemoveButton } from "@/components/orders/flow-forms";
 import { removeShipmentAction } from "../../flow-actions";
 import { stageData } from "../stage-data";
 
 export const metadata = { title: "Order · shipping" };
+
+/** What saving the freight and the insurance does to the order's costs. */
+const COST_WHATS = ["Freight we pay (not “collect”) and the premium become costs of this order by themselves."];
 
 const SMALL = "h-8 px-2.5 text-[13px]";
 const has = (...v: (string | null | undefined)[]) => v.some((x) => x !== null && x !== undefined && x !== "");
@@ -36,9 +37,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const d = await stageData(id, "shipping");
   const { me, o, flow, now, defaults } = d;
-  const [papers, edits, costs] = await Promise.all([optional(() => orderPapersOf(id)), editsOf("order", id), orderCostsSetup(id)]);
-  // The freight typed on a shipment becomes a cost of the order once: "Add to costs" opens the expense with it filled in.
-  const freightInCosts = !!costs?.costs.expenses.some((e) => e.category === "freight" && !e.voided);
+  const [papers, edits] = await Promise.all([optional(() => orderPapersOf(id)), editsOf("order", id)]);
   const shipping = flow?.shipping ?? null;
   const canShip = can(me, "shipping.manage") && d.open;
   const canEdit = can(me, "orders.update") && d.open;
@@ -147,6 +146,8 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           { name: "insurer", label: "Insured with", value: s.insurer },
           { name: "insurancePolicyNo", label: "Policy no.", value: s.insurancePolicyNo },
           { name: "insuredValue", label: `Insured value, ${o.currency}`, type: "number", value: s.insuredValue },
+          { name: "insurancePremium", label: "Premium", type: "number", value: s.insurancePremium },
+          { name: "insuranceCurrency", label: "Premium currency", value: s.insuranceCurrency ?? (s.insurancePremium ? null : o.currency), placeholder: "e.g. USD" },
         ];
         const arrival: DetailField[] = [
           { name: "arrivedOn", label: "Arrived on", type: "date", value: s.arrivedOn, max: now },
@@ -157,7 +158,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         const booked = has(s.forwarder, s.bookingNo);
         const loaded = has(s.containerNo, s.sealNo, s.loadedOn, s.vgmKg);
         const sailed = has(s.vessel, s.blNo, s.departedOn, s.trackingNo);
-        const paidFreight = has(s.freightAmount, s.insurer, s.insurancePolicyNo, s.insuredValue);
+        const paidFreight = has(s.freightAmount, s.insurer, s.insurancePolicyNo, s.insuredValue, s.insurancePremium);
         const arrived = has(s.arrivedOn, s.customsBroker, s.customsDeclarationNo, s.clearedOn);
         const leaves = air ? "Flown" : "Sailed";
 
@@ -264,31 +265,18 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                   rows={[
                     {
                       label: "Freight",
-                      value: s.freightAmount ? (
-                        <span className="flex flex-col items-start gap-1.5">
-                          {`${money(s.freightAmount, s.freightCurrency ?? o.currency)}${s.freightTerms ? ` · ${FREIGHT_TERMS_LABEL[s.freightTerms as FreightTerms].toLowerCase()}` : ""}`}
-                          {costs && d.open && s.freightTerms !== "collect" && !freightInCosts && (
-                            <AddOrderExpense
-                              setup={costs.setup}
-                              step="shipping"
-                              label="Add to costs"
-                              variant="secondary"
-                              size="xs"
-                              prefill={{ category: "freight", step: "shipping", description: `Freight${s.forwarder ? `, ${s.forwarder}` : ""}`, amount: s.freightAmount, currency: s.freightCurrency ?? o.currency }}
-                            />
-                          )}
-                        </span>
-                      ) : null,
+                      value: s.freightAmount ? `${money(s.freightAmount, s.freightCurrency ?? o.currency)}${s.freightTerms ? ` · ${FREIGHT_TERMS_LABEL[s.freightTerms as FreightTerms].toLowerCase()}` : ""}` : null,
                     },
                     { label: "Insured with", value: s.insurer },
                     { label: "Policy no.", value: s.insurancePolicyNo },
                     { label: "Insured value", value: s.insuredValue ? money(s.insuredValue, o.currency) : null },
+                    { label: "Premium", value: s.insurancePremium ? money(s.insurancePremium, s.insuranceCurrency ?? o.currency) : null },
                   ]}
-                  actions={win("Freight and insurance", freight, true, filesOf("freight", "the policy, the freight invoice"))}
+                  actions={win("Freight and insurance", freight, true, filesOf("freight", "the policy, the freight invoice"), COST_WHATS)}
                   files={row("freight")}
                 />
               ) : (
-                <EmptySection title={`Freight and insurance${of}`} text="No freight or insurance yet." action={win("Freight and insurance", freight, false, filesOf("freight", "the policy, the freight invoice"))} />
+                <EmptySection title={`Freight and insurance${of}`} text="No freight or insurance yet." action={win("Freight and insurance", freight, false, filesOf("freight", "the policy, the freight invoice"), COST_WHATS)} />
               )}
               {arrived ? (
                 <Section

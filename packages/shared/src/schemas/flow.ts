@@ -136,6 +136,12 @@ const shipmentFields = {
     (v) => (v === "" || v === null ? null : typeof v === "string" ? v.replace(/,/g, "").trim() : v),
     z.coerce.number().min(0, "Cannot be negative").max(999_999_999_999).nullable(),
   ),
+  /** What the insurance costs us (the premium) and its currency: a cost of the order by itself. */
+  insurancePremium: z.preprocess(
+    (v) => (v === "" || v === null ? null : typeof v === "string" ? v.replace(/,/g, "").trim() : v),
+    z.coerce.number().min(0, "Cannot be negative").max(999_999_999).nullable(),
+  ),
+  insuranceCurrency: z.preprocess((v) => (v === "" || v === null ? null : typeof v === "string" ? v.trim().toUpperCase() : v), z.string().length(3, "A currency like USD").nullable()),
   /** Customs at the destination. */
   customsDeclarationNo: optionalText(60),
   clearedOn: optionalDate,
@@ -156,7 +162,7 @@ export const shipmentInput = z
     status: shipmentFields.status.default("planned"),
     vgmKg: shipmentFields.vgmKg.optional().transform((v) => v ?? null),
     ...Object.fromEntries(
-      (["forwarderContact", "forwarderPhone", "customsBroker", "trackingNo", "freightAmount", "freightCurrency", "insurer", "insurancePolicyNo", "freightTerms", "insuredValue", "customsDeclarationNo", "clearedOn"] as const).map((k) => [
+      (["forwarderContact", "forwarderPhone", "customsBroker", "trackingNo", "freightAmount", "freightCurrency", "insurer", "insurancePolicyNo", "freightTerms", "insuredValue", "insurancePremium", "insuranceCurrency", "customsDeclarationNo", "clearedOn"] as const).map((k) => [
         k,
         shipmentFields[k].optional(),
       ]),

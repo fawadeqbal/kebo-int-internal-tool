@@ -9,7 +9,6 @@ import {
   EXPENSE_BEARERS,
   expenseShort,
   ORDER_EXPENSE_CHIPS,
-  STEP_OF_CATEGORY,
   type ExpenseBearer,
   type ExpenseCategory,
   type FlowStep,
@@ -40,12 +39,8 @@ export interface ExpenseSetup {
   /** Who is adding it: "Paid by" starts with them. */
   me: string | null;
   steps: { key: FlowStep; number: number; label: string }[];
-  /** The factories on the order (one of them can bear an expense). */
+  /** The factories on the order (one of them can bear a cost). */
   factories: { id: string; name: string }[];
-  /** The quote's planned costs, for "counts against the plan" / "not planned" before saving. */
-  plan: { label: string; categories: ExpenseCategory[]; planned: string | null; difference: string }[];
-  /** The profit now expected (order currency), or null when unknown. */
-  expected: string | null;
   canEdit: boolean;
 }
 
@@ -75,11 +70,18 @@ const PLACEHOLDER: Partial<Record<ExpenseCategory, string>> = {
 const num = (v: string) => Number(v.replace(/,/g, "").trim());
 const rateText = (r: number) => String(Number(r.toFixed(4)));
 
+/** How a cost stands when it is added: a bill to pay later, paid now from one of our accounts, or paid by someone from their own money. */
+type PaidHow = "later" | "now" | "own";
+const PAID_LABEL: Record<PaidHow, string> = { later: "Not yet", now: "Paid now", own: "By someone, from their own money" };
+
+const chip = (on: boolean) =>
+  cn("h-8 rounded-full border px-3 text-sm transition-colors", on ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line bg-surface hover:border-line-strong");
+
 /**
- * An expense on one order (OrderV3AddExpense): what for as chips, the amount
- * in any currency with the rate that turns it into the order's, the step, who
- * paid and from where (an account, or their own money: we repay them), who
- * bears it, the receipt. On a phone the receipt photo comes first.
+ * A cost of one order (design "money, simple", board OCostWin): what for as chips, who we owe, the amount in
+ * any currency with the rate that turns it into the order's, their bill number and date, and how it stands:
+ * not paid yet (it waits under "to pay"), paid now from an account, or paid by someone from their own money
+ * (we repay them). On a phone the photo of the bill comes first.
  */
 export function OrderExpenseForm({
   setup,
@@ -102,16 +104,13 @@ export function OrderExpenseForm({
   const accounts = useAccounts();
   const router = useRouter();
   const [category, setCategory] = useState<ExpenseCategory>(expense?.category ?? prefill?.category ?? (step === "payment" ? "bank_charges" : "freight"));
-  const [stepValue, setStepValue] = useState<string>(
-    expense ? (expense.step ?? "") : (prefill?.step ?? step ?? STEP_OF_CATEGORY[prefill?.category ?? "freight"] ?? ""),
-  );
-  const [stepTouched, setStepTouched] = useState(Boolean(expense || step || prefill?.step));
   const [currency, setCurrencyRaw] = useState(expense?.currency ?? prefill?.currency ?? s0.mainCurrency);
   const [amount, setAmount] = useState(expense?.amount ?? prefill?.amount ?? "");
   const settingsRate = (c: string) => (c === s0.mainCurrency ? 1 : rateOf(s0.fx, c, s0.mainCurrency));
   const [rate, setRate] = useState(expense ? rateText(expense.rate) : "");
+  const [paid, setPaid] = useState<PaidHow>(expense ? (expense.ownMoney ? "own" : expense.payLater ? "later" : "now") : "later");
   const [paidBy, setPaidBy] = useState(expense?.paidBy?.id ?? s0.me ?? "");
-  const [from, setFrom] = useState(expense ? (expense.ownMoney ? "own" : (expense.account?.id ?? "")) : "");
+  const [from, setFrom] = useState(expense?.account?.id ?? "");
   const [bearer, setBearer] = useState<ExpenseBearer>(expense?.borneBy ?? "us");
   const [factoryId, setFactoryId] = useState(expense?.factory?.id ?? (s0.factories.length === 1 ? s0.factories[0]!.id : ""));
   const [file, setFileRaw] = useState<File | null>(null);
@@ -127,11 +126,7 @@ export function OrderExpenseForm({
   const setCurrency = (c: string) => {
     setCurrencyRaw(c);
     setRate("");
-    if (from && from !== "own") setFrom("");
-  };
-  const pick = (c: ExpenseCategory) => {
-    setCategory(c);
-    if (!stepTouched) setStepValue(STEP_OF_CATEGORY[c] ?? step ?? "");
+    setFrom("");
   };
 
   // What it counts as on this order: into the main currency at the rate, then into the order's at today's rate.
@@ -140,34 +135,11 @@ export function OrderExpenseForm({
   const orderPerMain = s0.orderCurrency === s0.mainCurrency ? 1 : rateOf(s0.fx, s0.orderCurrency, s0.mainCurrency);
   const inOrder = inMain !== null && orderPerMain ? inMain * orderPerMain : null;
 
-  // Before saving: does it fit what the quote planned, or does it cut the expected profit?
-  let warning: ReactNode = null;
-  if (!expense && bearer === "us" && inOrder !== null && inOrder > 0) {
-    const row = s0.plan.find((r) => r.planned !== null && r.categories.includes(category));
-    const room = row ? Math.max(Number(row.difference), 0) : 0;
-    const extra = Math.max(inOrder - room, 0);
-    const c = s0.orderCurrency;
-    if (extra > 0.004 && s0.expected !== null) {
-      const to = Number(s0.expected) - extra;
-      warning = (
-        <Alert tone="warning">
-          {row ? `Over the planned ${row.label.toLowerCase()}` : "Not planned on the quote"}: expected profit goes from{" "}
-          <span className="tabular">{money(s0.expected, c)}</span> to <span className="tabular">{money(to, c)}</span>.
-        </Alert>
-      );
-    } else if (row)
-      warning = (
-        <Alert tone="info">
-          Counts against the planned {row.label.toLowerCase()} ({money(room, c)} left): the expected profit does not change.
-        </Alert>
-      );
-  }
-
   const fits = accounts.filter((a) => a.currency === currency && (!a.archived || a.id === from));
-  const payer = s0.people.find((p) => p.id === paidBy);
   const chips = ORDER_EXPENSE_CHIPS.includes(category) ? ORDER_EXPENSE_CHIPS : [...ORDER_EXPENSE_CHIPS.slice(0, -1), category, "other" as const];
-  const stepOptions = s0.steps;
   const action = expenseAction.bind(null, s0.orderId, expense?.id ?? null);
+  // Paid after it was added (a bill paid, or a person paid back): that stands; it is not chosen again here.
+  const settled = expense?.repaid ?? null;
   // Only while the receipt is sent: otherwise the button keeps its own "saving" state.
   const busy = sending ? { disabled: true } : {};
 
@@ -179,7 +151,7 @@ export function OrderExpenseForm({
       const error = await uploadReceipt(id, file);
       setSending(false);
       router.refresh();
-      if (error) notice = `The expense is saved, but the receipt was not: ${error} Open it to add the receipt again.`;
+      if (error) notice = `The cost is saved, but the file was not: ${error} Open it to add the file again.`;
     }
     onSaved(again.current, notice);
   };
@@ -195,12 +167,12 @@ export function OrderExpenseForm({
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="The receipt" className="h-24 rounded-md object-contain sm:h-10" />
+          <img src={preview} alt="The bill" className="h-24 rounded-md object-contain sm:h-10" />
         ) : (
           <Camera className="size-4" aria-hidden />
         )}
         <span className="truncate">
-          {file ? file.name : expense?.receipt ? "Replace the receipt" : <><span className="sm:hidden">Take a photo of the receipt</span><span className="hidden sm:inline">+ Receipt photo or PDF</span></>}
+          {file ? file.name : expense?.receipt ? "Replace the bill" : <><span className="sm:hidden">Take a photo of the bill</span><span className="hidden sm:inline">+ Their bill or receipt</span></>}
         </span>
       </label>
       <input
@@ -216,9 +188,7 @@ export function OrderExpenseForm({
           <X aria-hidden /> Do not attach
         </Button>
       ) : (
-        <span className="text-xs text-muted">
-          {expense?.receipt ? `Kept: ${expense.receipt.name}` : "or add it later; it shows as missing until then"}
-        </span>
+        expense?.receipt && <span className="text-xs text-muted">Kept: {expense.receipt.name}</span>
       )}
     </div>
   );
@@ -228,9 +198,10 @@ export function OrderExpenseForm({
       {(st) => (
         <>
           <input type="hidden" name="category" value={category} />
-          <input type="hidden" name="ownMoney" value={from === "own" ? "on" : "off"} />
-          <input type="hidden" name="accountId" value={from === "own" ? "" : from} />
-          <input type="hidden" name="reference" value={expense?.reference ?? ""} />
+          <input type="hidden" name="payLater" value={paid === "later" ? "on" : "off"} />
+          <input type="hidden" name="ownMoney" value={paid === "own" ? "on" : "off"} />
+          <input type="hidden" name="accountId" value={paid === "now" ? from : ""} />
+          {paid !== "own" && <input type="hidden" name="paidById" value={expense?.paidBy?.id ?? ""} />}
           <input type="hidden" name="note" value={expense?.note ?? ""} />
           {bearer !== "factory" && <input type="hidden" name="factoryId" value={expense?.factory?.id ?? ""} />}
 
@@ -240,16 +211,7 @@ export function OrderExpenseForm({
             <legend className="mb-2 text-xs font-medium text-text-2">What for</legend>
             <div className="flex flex-wrap gap-1.5">
               {chips.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  aria-pressed={category === c}
-                  onClick={() => pick(c)}
-                  className={cn(
-                    "h-8 rounded-full border px-3 text-sm transition-colors",
-                    category === c ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line bg-surface hover:border-line-strong",
-                  )}
-                >
+                <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)} className={chip(category === c)}>
                   {expenseShort(c)}
                 </button>
               ))}
@@ -257,15 +219,20 @@ export function OrderExpenseForm({
             {st.errors?.category && <p className="text-xs text-bad">{st.errors.category}</p>}
           </fieldset>
 
-          <Field label="Description" htmlFor="oe-description" error={st.errors?.description} className="sm:order-none">
-            <Input
-              id="oe-description"
-              name="description"
-              maxLength={200}
-              defaultValue={st.values?.description ?? expense?.description ?? prefill?.description ?? ""}
-              placeholder={PLACEHOLDER[category] ?? "Say what it was for"}
-            />
-          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Description" htmlFor="oe-description" error={st.errors?.description}>
+              <Input
+                id="oe-description"
+                name="description"
+                maxLength={200}
+                defaultValue={st.values?.description ?? expense?.description ?? prefill?.description ?? ""}
+                placeholder={PLACEHOLDER[category] ?? "Say what it is for"}
+              />
+            </Field>
+            <Field label="Who we owe" htmlFor="oe-payee" optional error={st.errors?.payee}>
+              <Input id="oe-payee" name="payee" maxLength={120} defaultValue={st.values?.payee ?? expense?.payee ?? ""} placeholder="e.g. the forwarder, the trucking company" />
+            </Field>
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1fr)]">
@@ -282,7 +249,7 @@ export function OrderExpenseForm({
                 className="max-sm:hidden"
                 hint={
                   currency === s0.mainCurrency
-                    ? "The main currency"
+                    ? undefined
                     : settingsRate(currency)
                       ? `today's · 1 ${s0.mainCurrency} = ${rateText(settingsRate(currency)!)} ${currency}`
                       : `No rate for ${currency} in Settings: enter it`
@@ -300,94 +267,76 @@ export function OrderExpenseForm({
                 />
               </Field>
             </div>
-            {inOrder !== null && (
+            {inOrder !== null && currency !== s0.orderCurrency && (
               <p className="text-xs text-text-2">
-                <span className="sm:hidden">
-                  = <span className="font-semibold tabular">{money(inOrder, s0.orderCurrency)}</span>
-                  {currency !== s0.mainCurrency && used ? ` at ${rateText(used)}` : ""}
-                </span>
-                <span className="hidden sm:inline">
-                  Counts as <span className="font-semibold tabular">{money(inOrder, s0.orderCurrency)}</span> on this order.
-                </span>
+                = <span className="font-semibold tabular">{money(inOrder, s0.orderCurrency)}</span> on this order
               </p>
             )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Spent on" htmlFor="oe-spentOn" error={st.errors?.spentOn}>
+            <Field label="Their bill no." htmlFor="oe-reference" optional error={st.errors?.reference}>
+              <Input id="oe-reference" name="reference" maxLength={120} defaultValue={st.values?.reference ?? expense?.reference ?? ""} />
+            </Field>
+            <Field label="Date" htmlFor="oe-spentOn" error={st.errors?.spentOn}>
               <Input id="oe-spentOn" name="spentOn" type="date" max={s0.today} defaultValue={st.values?.spentOn ?? expense?.spentOn ?? s0.today} />
-            </Field>
-            <Field label="Stage" htmlFor="oe-step" error={st.errors?.step}>
-              <Select
-                id="oe-step"
-                name="step"
-                value={stepValue}
-                onChange={(e) => {
-                  setStepValue(e.target.value);
-                  setStepTouched(true);
-                }}
-              >
-                <option value="">No stage</option>
-                {stepOptions.map((o) => (
-                  <option key={o.key} value={o.key}>
-                    {o.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Paid by" htmlFor="oe-paidBy" optional={from !== "own"} error={st.errors?.paidById}>
-              <Select id="oe-paidBy" name="paidById" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
-                <option value="">Not said</option>
-                {s0.people.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="From" htmlFor="oe-from" error={st.errors?.accountId} hint={from === "own" ? "Shows under To repay until it is repaid" : undefined}>
-              <Select id="oe-from" value={from} onChange={(e) => setFrom(e.target.value)}>
-                <option value="">Not said</option>
-                {fits.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-                <option value="own">{payer ? `${payer.name}'s own money · we repay` : "Own money · we repay them"}</option>
-              </Select>
             </Field>
           </div>
 
-          <fieldset>
-            <legend className="mb-2 text-xs font-medium text-text-2">Who bears it</legend>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {EXPENSE_BEARERS.map((b) => (
-                <label
-                  key={b}
-                  className={cn(
-                    "flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 text-sm",
-                    bearer === b ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong",
-                    b === "factory" && !s0.factories.length && "cursor-not-allowed opacity-60",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="borneBy"
-                    value={b}
-                    checked={bearer === b}
-                    disabled={b === "factory" && !s0.factories.length}
-                    onChange={() => setBearer(b)}
-                    className="mt-0.5 accent-[var(--color-primary)]"
-                  />
-                  <span>
-                    <span className="block font-semibold">{EXPENSE_BEARER_LABEL[b]}</span>
-                    <span className="block text-xs text-text-2">{EXPENSE_BEARER_HINT[b]}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-2 text-xs font-medium text-text-2">Paid</legend>
+            {settled ? (
+              <p className="text-sm">
+                {paid === "own" ? "Paid back" : "Paid"} {date(settled.on)}
+                {settled.account ? ` from ${settled.account.name}` : ""}
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.keys(PAID_LABEL) as PaidHow[]).map((k) => (
+                  <button key={k} type="button" aria-pressed={paid === k} onClick={() => setPaid(k)} className={chip(paid === k)}>
+                    {PAID_LABEL[k]}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!settled && paid === "now" && (
+              <Field label="From" htmlFor="oe-from" optional error={st.errors?.accountId} className="mt-1 sm:max-w-[50%]">
+                <Select id="oe-from" value={from} onChange={(e) => setFrom(e.target.value)}>
+                  <option value="">Not said</option>
+                  {fits.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+            {paid === "own" && (
+              <Field label="Who paid" htmlFor="oe-paidBy" error={st.errors?.paidById} className="mt-1 sm:max-w-[50%]">
+                <Select id="oe-paidBy" name="paidById" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
+                  <option value="">Choose the person…</option>
+                  {s0.people.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+          </fieldset>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Who bears it" htmlFor="oe-bearer" error={st.errors?.borneBy}>
+              <Select id="oe-bearer" name="borneBy" value={bearer} onChange={(e) => setBearer(e.target.value as ExpenseBearer)}>
+                {EXPENSE_BEARERS.filter((b) => b !== "factory" || s0.factories.length > 0 || bearer === "factory").map((b) => (
+                  <option key={b} value={b}>
+                    {EXPENSE_BEARER_LABEL[b]} · {EXPENSE_BEARER_HINT[b]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
             {bearer === "factory" && (
-              <Field label="Which factory" htmlFor="oe-factory" className="mt-3" error={st.errors?.factoryId}>
+              <Field label="Which factory" htmlFor="oe-factory" error={st.errors?.factoryId}>
                 <Select id="oe-factory" name="factoryId" value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
                   <option value="">Choose the factory…</option>
                   {s0.factories.map((f) => (
@@ -398,17 +347,15 @@ export function OrderExpenseForm({
                 </Select>
               </Field>
             )}
-          </fieldset>
-
-          {warning && <div className="sm:order-[95]">{warning}</div>}
+          </div>
 
           <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-4 py-3 sm:static sm:order-[100] sm:mx-0 sm:border-0 sm:p-0">
             <SubmitButton className="max-sm:flex-1" pendingText="Saving…" {...busy} onClick={() => (again.current = false)}>
-              {sending ? "Sending the receipt…" : expense ? "Save the change" : "Save"}
+              {sending ? "Sending the file…" : expense ? "Save the change" : "Add the cost"}
             </SubmitButton>
             {!expense && (
               <SubmitButton variant="secondary" className="max-sm:hidden" pendingText="Saving…" {...busy} onClick={() => (again.current = true)}>
-                Save and add another
+                Add and add another
               </SubmitButton>
             )}
             <Button type="button" variant="ghost" onClick={onClose} disabled={sending} className="max-sm:hidden">
@@ -462,7 +409,7 @@ export function AddOrderExpense({
   setup,
   step,
   prefill,
-  label = "Add expense",
+  label = "Add a cost",
   variant = "primary",
   size = "sm",
 }: {
@@ -488,7 +435,7 @@ export function AddOrderExpense({
           {notice}
         </Alert>
       )}
-      <ExpenseDialog title="Add an expense" sub={`${setup.refNo}${stepLabel ? ` · ${stepLabel}` : ""}`} open={open} onClose={() => setOpen(false)}>
+      <ExpenseDialog title="Add a cost" sub={`${setup.refNo}${stepLabel ? ` · ${stepLabel}` : ""}`} open={open} onClose={() => setOpen(false)}>
         <OrderExpenseForm
           key={round}
           setup={setup}
@@ -516,11 +463,11 @@ export function EditOrderExpense({ setup, expense }: { setup: ExpenseSetup; expe
       <Button type="button" size="xs" variant="ghost" onClick={() => setOpen(true)} aria-label={`Change ${expense.description}`}>
         <Pencil aria-hidden />
       </Button>
-      <ExpenseDialog title="Change the expense" sub={`${setup.refNo} · ${date(expense.spentOn)}`} open={open} onClose={() => setOpen(false)}>
+      <ExpenseDialog title="Change the cost" sub={`${setup.refNo} · ${date(expense.spentOn)}`} open={open} onClose={() => setOpen(false)}>
         {notice && <Alert tone="warning">{notice}</Alert>}
         {expense.receipt && (
           <a href={`/files/${expense.receipt.id}?view=1`} target="_blank" rel="noreferrer" className="w-fit text-sm text-primary hover:underline">
-            Open the receipt ({expense.receipt.name})
+            Open the bill ({expense.receipt.name})
           </a>
         )}
         <OrderExpenseForm
@@ -534,7 +481,7 @@ export function EditOrderExpense({ setup, expense }: { setup: ExpenseSetup; expe
           }}
         />
         <div className="border-t border-line pt-3 pb-4">
-          <VoidForm action={voidExpenseAction.bind(null, setup.orderId, expense.id)} label="the expense" />
+          <VoidForm action={voidExpenseAction.bind(null, setup.orderId, expense.id)} label="the cost" button="Remove this cost" />
         </div>
       </ExpenseDialog>
     </>

@@ -48,6 +48,8 @@ const SHIPMENT = [
   "insurancePolicyNo",
   "freightTerms",
   "insuredValue",
+  "insurancePremium",
+  "insuranceCurrency",
   "customsDeclarationNo",
   "clearedOn",
 ];

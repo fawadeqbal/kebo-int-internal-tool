@@ -53,7 +53,8 @@ export const LEDGER_SOURCES = [
 export type LedgerSource = (typeof LEDGER_SOURCES)[number];
 
 /** The fixed accounts that are not one per record. */
-export const LEDGER_FIXED_ACCOUNTS = ["sales", "goods_cost", "bank_charges", "fx_diff", "expenses_recovered", "opening"] as const;
+/** `bills`: costs known and not paid yet (what we owe forwarders, insurers and the like until each bill is paid). */
+export const LEDGER_FIXED_ACCOUNTS = ["sales", "goods_cost", "bank_charges", "fx_diff", "expenses_recovered", "bills", "opening"] as const;
 export type LedgerFixedAccount = (typeof LEDGER_FIXED_ACCOUNTS)[number];
 
 export const LEDGER_FIXED_ACCOUNT_LABEL: Record<LedgerFixedAccount, string> = {
@@ -62,6 +63,7 @@ export const LEDGER_FIXED_ACCOUNT_LABEL: Record<LedgerFixedAccount, string> = {
   bank_charges: "Bank charges",
   fx_diff: "Exchange difference",
   expenses_recovered: "Expenses recovered",
+  bills: "Bills to pay",
   opening: "Opening balances",
 };
 
@@ -123,6 +125,7 @@ export const LEDGER_ACCOUNT_GROUP: Record<LedgerAccountKind, string> = {
   bank_charges: "Expenses",
   fx_diff: "Exchange difference",
   expenses_recovered: "Expenses recovered",
+  bills: "Bills to pay",
   opening: "Opening balances",
 };
 

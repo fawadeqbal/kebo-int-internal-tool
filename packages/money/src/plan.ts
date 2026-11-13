@@ -114,8 +114,10 @@ export interface OrderMoneyFacts {
   basisCostMinor?: Minor;
   receivedMinor: Minor;
   factoryPaidMinor: Minor;
-  /** All the order's expenses. */
+  /** All the order's expenses: every cost known, paid or not. */
   expensesMinor: Minor;
+  /** Of those, the bills known and not paid yet: a cost already, cash only once paid. */
+  expensesUnpaidMinor?: Minor;
   /** Of those, freight, transport and customs: they pay for the planned basis costs. */
   basisPaidMinor?: Minor;
   /** Taken by banks from the customer's payments. */
@@ -133,7 +135,7 @@ export interface OrderMoneyFacts {
  * - net, "After the deal's costs": expected less what was spent on the deal
  *   before it became the order (`beforeSaleMinor`);
  * - cash, "Cash so far": what came in less what we paid the factories and every
- *   expense paid so far.
+ *   expense paid so far (a bill known and not paid yet is a cost, not cash).
  */
 export function orderMoney(f: OrderMoneyFacts & { beforeSaleMinor?: Minor }) {
   const basis = Math.max(f.basisCostMinor ?? 0, 0);
@@ -147,7 +149,7 @@ export function orderMoney(f: OrderMoneyFacts & { beforeSaleMinor?: Minor }) {
     grossOnQuoteMinor: grossOnQuote,
     expectedMinor: expected,
     netMinor: expected - Math.max(f.beforeSaleMinor ?? 0, 0),
-    cashMinor: f.receivedMinor - f.factoryPaidMinor - f.expensesMinor,
+    cashMinor: f.receivedMinor - f.factoryPaidMinor - (f.expensesMinor - Math.max(f.expensesUnpaidMinor ?? 0, 0)),
     uncostedRevenueMinor: f.revenueMinor - f.costedRevenueMinor,
     /** Expenses counted in the expected profit: those not already in the planned basis costs. */
     expensesCountedMinor: expenses,

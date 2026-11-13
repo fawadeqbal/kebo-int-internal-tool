@@ -66,7 +66,17 @@ This is the outcome of the single-source-of-truth refactor (audit:
 | `QuotationRevision.customerSnapshot / companySnapshot` | the revision is sent | the quotation PDF |
 | `Order.buyerSnapshot` | the order is made (or refreshed with a reason) | "Buyer as on the order · refresh from customer" |
 | `OrderPaper.snapshot` | a paper is made final | the paper's version list ("final", "version 2") |
-| `Payment.receivedAmount / rate`, `FactoryPayment.rate`, `Expense.rate` | the money moved | cash facts, at their own rate |
+| `Payment.receivedAmount / rate`, `FactoryPayment.rate`, `Expense.rate` | the money moved (an expense: the day the cost is dated) | cash facts, at their own rate |
+
+## One record made from another, on purpose
+
+| Record | Made from | Kept in step by | Until |
+|---|---|---|---|
+| The order's freight and insurance costs (`Expense` with `source` = `shipment:<id>:freight` or `shipment:<id>:insurance`, `payLater`) | the shipment's `freightAmount` (unless the terms are "collect") and `insurancePremium` | `ShipmentCosts.sync` (`apps/api/src/modules/money/shipment-costs.service.ts`), called in the same transaction as every shipment save and removal; nothing else writes these rows, and the API refuses to change or remove one by hand | it is paid: from then on it is a cash fact (what was paid, at its rate) and the shipment no longer moves it |
+
+Why this one exists: a cost counts in the order's profit, the reports, the cash book and the ledger through one
+path, the expenses. Reading freight from the shipment in each of those would be several second truths; one
+record made in one place is the smaller risk. `test/cost-sheet.test.ts` holds the two equal.
 
 ## Gone (do not bring back)
 

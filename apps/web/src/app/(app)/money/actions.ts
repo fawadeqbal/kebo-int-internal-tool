@@ -141,6 +141,9 @@ export async function expenseAction(
     ...(form.has("step") ? { step: v.step || null } : {}),
     ...(form.has("borneBy") ? { borneBy: v.borneBy } : {}),
     ...(form.has("ownMoney") ? { ownMoney: v.ownMoney === "on" || v.ownMoney === "true" } : {}),
+    // The order's cost form also says whether it is a bill to pay later, and who it is owed to.
+    ...(form.has("payLater") ? { payLater: v.payLater === "on" || v.payLater === "true" } : {}),
+    ...(form.has("payee") ? { payee: v.payee?.trim() || null } : {}),
     reason: reasonOf(form),
   };
   const r = await attempt(

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { liveFile, livePart, decimalToMinor, fromDbDate, type Prisma } from "@kebo/database";
-import { fromMinor, orderCosting, orderMoney, roundHalfAway, type Minor } from "@kebo/money";
+import { fromMinor, multiplyMinor, orderCosting, orderMoney, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   can,
   FLOW_STEPS,
@@ -94,11 +94,15 @@ export class CostsService {
     );
     // The same position and profit as the order's money: one function each.
     const position = positionOf(o, fx);
+    // A bill known and not paid yet, or paid by someone and not paid back: a cost already, not our cash yet.
+    const owing = (e: (typeof live)[number]) => (e.payLater || e.ownMoney) && !e.repaidOn;
+    const goodsPaidMinor = o.supplierPaid.filter((p) => !p.voidedAt).reduce((t, p) => t + convert(decimalToMinor(p.share), Number(p.movement.rate)), 0);
     const m = orderMoney({
       ...costing,
       receivedMinor: position.receivedMinor,
-      factoryPaidMinor: 0,
+      factoryPaidMinor: goodsPaidMinor,
       expensesMinor: plan.spentMinor,
+      expensesUnpaidMinor: sum(ours.filter((e) => e.payLater && !e.repaidOn)),
       basisPaidMinor: plan.coveredMinor,
       bankChargesMinor: position.bankChargesMinor,
     });
@@ -107,7 +111,8 @@ export class CostsService {
     // What the factories charge for the goods, in their own currencies (prices frozen on the lines, with tax on top unless
     // included), and what is still to pay them after our payments and the expenses they bear: factoryPosition.
     const factoryOwed = new Map<string, { owed: Minor; toPay: Minor }>();
-    for (const r of factoryPositionOf(o, fx).filter((x) => x.lines > 0)) {
+    const factoryRows = factoryPositionOf(o, fx).filter((x) => x.lines > 0);
+    for (const r of factoryRows) {
       const cur = factoryOwed.get(r.currency) ?? { owed: 0, toPay: 0 };
       factoryOwed.set(r.currency, { owed: cur.owed + r.owedMinor, toPay: cur.toPay + r.toPayMinor });
     }
@@ -135,6 +140,165 @@ export class CostsService {
     ) as Record<FlowStep, { count: number; spent: string }>;
 
     const bearer = (b: ExpenseBearer) => fromMinor(sum(live.filter((e) => e.borneBy === b)));
+
+    /* ----- The cost sheet (money, step 2): every cost the order has, known or paid, in one list. */
+    const factoryNames = new Map(
+      (await this.prisma.db.party.findMany({ where: { id: { in: [...new Set(factoryRows.map((r) => r.factoryId))] } }, select: { id: true, name: true } })).map((f) => [f.id, f.name]),
+    );
+    // What each factory's goods cost in the order's currency (the lines' cost, as profit counts it).
+    const goodsOf = new Map<string, Minor>();
+    for (const l of o.lines)
+      if (l.unitCost !== null) goodsOf.set(l.factoryId ?? "", (goodsOf.get(l.factoryId ?? "") ?? 0) + multiplyMinor(decimalToMinor(l.unitCost), l.quantity.toString()));
+    type Row = {
+      key: string;
+      kind: "goods" | "cost" | "bank" | "estimate";
+      label: string;
+      category: ExpenseCategory | null;
+      owedTo: string | null;
+      /** Where it comes from: the factory order, a shipment, the customer's payments, the quotation, or typed here. */
+      from: "factory" | "shipment" | "payment" | "quotation" | "typed";
+      amount: string;
+      currency: string;
+      /** In the order's currency (null: no rate). */
+      inOrder: string | null;
+      /** Paid and still to pay, in its own currency. */
+      paid: string;
+      toPay: string;
+      /** The same two in the order's currency, as the sheet adds them up (null: not ours to bear, or no rate). */
+      paidInOrder: string | null;
+      toPayInOrder: string | null;
+      state: "paid" | "part_paid" | "to_pay" | "to_repay" | "estimate";
+      /** Counted in the order's profit: ours to bear. The others are charged to the customer or taken off a factory. */
+      borneBy: ExpenseBearer;
+      expenseId: string | null;
+      on: string | null;
+    };
+    const rows: Row[] = [];
+    const seen = new Set<string>();
+    // What was paid to each factory (per currency), in the order's currency at each payment's own rate.
+    const paidTo = new Map<string, Minor>();
+    for (const p of o.supplierPaid.filter((x) => !x.voidedAt)) {
+      const k = `${p.movement.partyId}:${p.movement.currency}`;
+      paidTo.set(k, (paidTo.get(k) ?? 0) + convert(decimalToMinor(p.share), Number(p.movement.rate)));
+    }
+    for (const r of factoryRows) {
+      // A factory owed in two currencies: its goods cost in the order's currency shows once, on its first row.
+      const first = !seen.has(r.factoryId);
+      seen.add(r.factoryId);
+      const cost = first ? (goodsOf.get(r.factoryId) ?? null) : null;
+      // Settled in the factory's currency is paid in full here too, whatever the rates did between the payments.
+      const paidHere = cost === null ? null : r.toPayMinor <= 0 ? cost : Math.min(paidTo.get(r.key) ?? 0, cost);
+      rows.push({
+        key: `goods:${r.key}`,
+        kind: "goods",
+        label: "Goods",
+        category: null,
+        owedTo: factoryNames.get(r.factoryId) ?? "The factory",
+        from: "factory",
+        amount: fromMinor(r.owedMinor),
+        currency: r.currency,
+        inOrder: first && goodsOf.has(r.factoryId) ? fromMinor(goodsOf.get(r.factoryId)!) : null,
+        paid: fromMinor(Math.min(r.settledMinor, r.owedMinor)),
+        toPay: fromMinor(r.toPayMinor),
+        paidInOrder: paidHere === null ? null : fromMinor(paidHere),
+        toPayInOrder: paidHere === null ? null : fromMinor(cost! - paidHere),
+        state: r.toPayMinor <= 0 ? "paid" : r.settledMinor > 0 ? "part_paid" : "to_pay",
+        borneBy: "us",
+        expenseId: null,
+        on: null,
+      });
+    }
+    // Goods with a cost and no factory price to pay (a line costed by hand): counted, nothing to pay here.
+    const goodsListed = [...seen].reduce((t, id) => t + (goodsOf.get(id) ?? 0), 0);
+    if (costing.goodsCostMinor - goodsListed > 0)
+      rows.push({
+        key: "goods:other",
+        kind: "goods",
+        label: "Goods",
+        category: null,
+        owedTo: null,
+        from: "factory",
+        amount: fromMinor(costing.goodsCostMinor - goodsListed),
+        currency: o.currency,
+        inOrder: fromMinor(costing.goodsCostMinor - goodsListed),
+        paid: "0.00",
+        toPay: "0.00",
+        paidInOrder: "0.00",
+        toPayInOrder: "0.00",
+        state: "estimate",
+        borneBy: "us",
+        expenseId: null,
+        on: null,
+      });
+    for (const e of live) {
+      const open = owing(e);
+      const counted = e.borneBy === "us" && perMain !== null;
+      rows.push({
+        key: e.id,
+        kind: "cost",
+        label: e.description,
+        category: e.category as ExpenseCategory,
+        owedTo: e.payee ?? e.factory?.name ?? (e.ownMoney ? (e.paidBy?.name ?? null) : null),
+        from: e.source?.startsWith("shipment:") ? "shipment" : "typed",
+        amount: e.amount.toFixed(2),
+        currency: e.currency,
+        inOrder: perMain === null ? null : fromMinor(inOrder(e)),
+        paid: open ? "0.00" : e.amount.toFixed(2),
+        toPay: open ? e.amount.toFixed(2) : "0.00",
+        paidInOrder: counted ? fromMinor(open ? 0 : inOrder(e)) : null,
+        toPayInOrder: counted ? fromMinor(open ? inOrder(e) : 0) : null,
+        state: !open ? "paid" : e.ownMoney ? "to_repay" : "to_pay",
+        borneBy: e.borneBy as ExpenseBearer,
+        expenseId: e.id,
+        on: fromDbDate(e.repaidOn ?? e.spentOn),
+      });
+    }
+    if (position.bankChargesMinor > 0)
+      rows.push({
+        key: "bank",
+        kind: "bank",
+        label: "Bank charges on the customer's payments",
+        category: "bank_charges",
+        owedTo: null,
+        from: "payment",
+        amount: fromMinor(position.bankChargesMinor),
+        currency: o.currency,
+        inOrder: fromMinor(position.bankChargesMinor),
+        paid: fromMinor(position.bankChargesMinor),
+        toPay: "0.00",
+        paidInOrder: fromMinor(position.bankChargesMinor),
+        toPayInOrder: "0.00",
+        state: "paid",
+        borneBy: "us",
+        expenseId: null,
+        on: null,
+      });
+    // What the quotation set aside to reach the price basis and no real cost has taken the place of yet: counted until one does.
+    const estimateMinor = Math.max(plan.plannedMinor - plan.coveredMinor, 0);
+    if (estimateMinor > 0)
+      rows.push({
+        key: "estimate",
+        kind: "estimate",
+        label: plan.rows.filter((r) => r.plannedMinor !== null && (r.status === "not_spent" || r.status === "within")).map((r) => r.label).join(", ") || "Costs to reach the price basis",
+        category: null,
+        owedTo: null,
+        from: "quotation",
+        amount: fromMinor(estimateMinor),
+        currency: o.currency,
+        inOrder: fromMinor(estimateMinor),
+        paid: "0.00",
+        toPay: "0.00",
+        paidInOrder: "0.00",
+        toPayInOrder: "0.00",
+        state: "estimate",
+        borneBy: "us",
+        expenseId: null,
+        on: null,
+      });
+    // Everything the profit takes off the sale, and what of it is paid: goods, our costs, bank charges.
+    const costsMinor = costing.costedRevenueMinor - expected;
+    const added = (k: "paidInOrder" | "toPayInOrder") => rows.reduce((t, r) => t + (r.borneBy === "us" && r[k] !== null ? toMinor(r[k]!) : 0), 0);
+    const paidMinor = added("paidInOrder");
 
     return {
       orderId: o.id,
@@ -188,6 +352,9 @@ export class CostsService {
         paidBy: e.paidBy,
         account: e.account,
         ownMoney: e.ownMoney,
+        payLater: e.payLater,
+        payee: e.payee,
+        source: e.source,
         repaid: e.repaidOn ? { on: fromDbDate(e.repaidOn), account: e.repaidAccount } : null,
         reference: e.reference,
         note: e.note,
@@ -215,6 +382,18 @@ export class CostsService {
               onQuoteMargin: percent(onQuote, costing.costedRevenueMinor),
             },
       toRepay: [...repay.values()].map((r) => ({ person: r.person, currency: r.currency, amount: fromMinor(r.minor), items: r.items })),
+      /** The cost sheet: every cost of the order in one list, with the four figures above it (in the order's currency). */
+      sheet: {
+        rows,
+        total: fromMinor(totalMinor),
+        costs: perMain === null ? null : fromMinor(costsMinor),
+        paid: perMain === null ? null : fromMinor(paidMinor),
+        toPay: perMain === null ? null : fromMinor(added("toPayInOrder")),
+        profit: perMain === null ? null : fromMinor(expected),
+        margin: perMain === null ? null : percent(expected, costing.costedRevenueMinor),
+        /** Order value on lines without a cost: left out of profit. */
+        uncosted: fromMinor(costing.uncostedRevenueMinor),
+      },
     };
   }
 }
