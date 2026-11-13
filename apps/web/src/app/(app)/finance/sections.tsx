@@ -32,7 +32,7 @@ export type Search = {
 /**
  * The company's money records, one page each (they were the tabs of Cash & accounts): the cash
  * book (where the money is), expenses, what customers still owe us (Finance) and what we still
- * owe the factories (Purchasing). The numbers and charts are on Profit & loss and Reports.
+ * owe the factories (Purchasing). The numbers and charts are on Reports.
  */
 
 /** Who may open which: the pages check it, the sidebar hides what they may not. */

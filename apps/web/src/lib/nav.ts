@@ -4,8 +4,8 @@
  * page: addresses did not move, only the grouping and the names changed. The group's name is the
  * first part of the path above a page's title ("Sales / Inquiries"), the page's name is its title.
  * The layout keeps only the pages a person may open (each page's own permission and plan checks);
- * a group whose pages are all hidden is hidden. The reports share one item (All reports) and switch
- * with tabs on the page; notifications open from the bell.
+ * a group whose pages are all hidden is hidden. Reports is one page (its reports are tabs on it), so
+ * it is a link of its own like Home; notifications open from the bell.
  */
 
 export type ModuleKey = "sales" | "purchasing" | "money" | "reports" | "settings";
@@ -72,11 +72,8 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     key: "reports",
     title: "Reports",
     icon: "reports",
-    pages: [
-      { href: "/finance/profit", label: "Profit & loss" },
-      { href: "/finance/leaks", label: "Planned vs spent" },
-      { href: "/reports", label: "All reports" },
-    ],
+    // Money, simple (14 Nov 2026): one page with tabs (Overview, Profit, Customers, Suppliers, Cash, People, Funnel).
+    pages: [{ href: "/reports", label: "Reports" }],
   },
   {
     key: "settings",
@@ -106,7 +103,7 @@ const ALL_PAGES = MODULE_PAGES.flatMap((m) => m.pages.map((p) => ({ ...p, module
 
 /**
  * The page of the menu an address belongs to: the longest page address it is or is under
- * (/orders/board is Order board, /orders/123 is Orders, /reports/people/targets is All reports).
+ * (/orders/board is Order board, /orders/123 is Orders, /reports/people/targets is Reports).
  */
 export function pageOf<T extends { href: string }>(pathname: string, pages: T[]): T | undefined {
   let best: T | undefined;
@@ -128,8 +125,13 @@ export function moduleOf(pathname: string, modules: { key: ModuleKey; pages: { h
 export function crumbsFor(href: string): { label: string; href?: string }[] {
   const p = ALL_PAGES.find((x) => x.href === href);
   if (!p) return [];
+  // A group that is one page of the same name (Reports) says its name once.
+  if (isSingle(p.module)) return [{ label: p.label }];
   return [{ label: p.module.title }, { label: p.label }];
 }
+
+/** A group that is one page with the group's own name: the menu shows it as a link, not as a group to open. */
+export const isSingle = (m: { title: string; pages: { label: string }[] }) => m.pages.length === 1 && m.pages[0]!.label === m.title;
 
 /** The item's name, for the page's title. */
 export function labelFor(href: string): string {
@@ -186,9 +188,7 @@ export function buildModules({
     "/audit": can("audit.view") && feature("audit_log"),
     "/settings/website-form": settings,
     "/factories": sourcing,
-    "/finance/profit": reports && managers,
     "/money/company-costs": sourcing && managers && feature("expenses"),
-    "/finance/leaks": reports && managers,
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
     "/operations/purchase-orders": sourcing,
     "/settings/company": settings,

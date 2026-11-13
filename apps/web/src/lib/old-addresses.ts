@@ -14,7 +14,7 @@ type Query = Record<string, string | undefined>;
 const MONEY_TAB: Record<string, string> = {
   cash: "/finance/cash-book",
   expenses: "/money/company-costs",
-  pnl: "/finance/profit",
+  pnl: "/reports/profit",
 };
 
 /** Cash & accounts' tabs. Without a tab: the first this person may open, as the old page did. */
@@ -59,12 +59,13 @@ export const orderPaymentTarget = (orderId: string) => `/orders/${orderId}/payme
 
 /* ------------------------------------------------------------------ /insights?section=&view= */
 
-/** Insights' sections as pages: Reports, and Finance for the money ones. */
+/** Insights' sections as pages: the tabs of Reports. */
 export const SECTION_PATH = {
   overview: "/reports",
-  money: "/finance/profit",
+  money: "/reports/profit",
   customers: "/reports/customers",
   factories: "/reports/factories",
+  cash: "/reports/cash",
   people: "/reports/people",
   funnel: "/reports/funnel",
 } as const;
@@ -72,8 +73,8 @@ export type SectionKey = keyof typeof SECTION_PATH;
 
 /** A section's sub-view (?view=) as its own page. */
 export function viewPath(section: string | undefined, view: string | undefined): string | undefined {
-  if (section === "money" && view === "pnl") return "/finance/profit";
-  if (section === "money" && view === "leaks") return "/finance/leaks";
+  // Profit and loss by month and "where money leaks" were views of Money: Reports › Profit holds both answers now.
+  if (section === "money" && (view === "pnl" || view === "leaks")) return "/reports/profit";
   if (section === "people" && view === "targets") return "/reports/people/targets";
   return undefined;
 }
@@ -87,18 +88,32 @@ export function insightsTarget(q: Query): string {
   if (old) {
     section = old.section;
     view = old.view ?? (tab === "profit" && sub ? (sub === "pnl" ? "pnl" : "leaks") : undefined);
-    if (view === "leaks" && sub) rest.leak = sub;
     // The oldest links gave from and to without saying they were a custom period.
     if (rest.from && rest.to && !rest.period) rest.period = "custom";
   }
-  const sub_ = viewPath(section, view);
-  return buildHref(sub_ ?? SECTION_PATH[section], {}, rest);
+  const target = viewPath(section, view) ?? SECTION_PATH[section];
+  // Profit and loss had a year and a cash view, Planned vs spent its own lists: Reports › Profit has neither.
+  if (target === SECTION_PATH.money) for (const k of ["year", "pl", "leak"]) delete rest[k];
+  return buildHref(target, {}, rest);
 }
 
-/** /reports/money: "Where we lose money", now Finance › Leaks. */
-export function reportsMoneyTarget(q: Query): string {
-  const { view, from, to, ...rest } = q;
-  return buildHref("/finance/leaks", {}, { ...rest, leak: view, ...(from && to ? { period: "custom", from, to } : {}) });
+/** The period of a report link, and nothing else (the old pages' own filters do not exist on the new ones). */
+function periodOnly(q: Query): Query {
+  if (q.from && q.to && (!q.period || q.period === "custom")) return { period: "custom", from: q.from, to: q.to };
+  return { period: q.period === "quarter" ? undefined : q.period };
+}
+
+/**
+ * Profit & loss (/finance/profit), Planned vs spent (/finance/leaks) and "Where we lose money" (/reports/money)
+ * are one tab now: Reports › Profit, for the same period.
+ */
+export function profitTarget(q: Query): string {
+  return buildHref("/reports/profit", {}, periodOnly(q));
+}
+
+/** The Print tab (/reports/print): every report has View / Print and PDF in its header, so the overview. */
+export function reportsPrintTarget(q: Query): string {
+  return buildHref("/reports", {}, periodOnly(q));
 }
 
 /** /reports?from&to (the oldest report links, a period): the overview for that period. */
