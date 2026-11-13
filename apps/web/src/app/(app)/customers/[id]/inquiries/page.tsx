@@ -89,8 +89,7 @@ export default async function CustomerInquiries({
                 />
               ))}
             </PhoneList>
-            <DataTable label="Inquiries" className="max-sm:hidden">
-              <table className="w-full min-w-[980px] text-[13px]">
+            <DataTable label="Inquiries" className="max-sm:hidden" tableClassName="min-w-[980px] text-[13px]">
                 <THead>
                   <tr>
                     <Th>Inquiry</Th>
@@ -122,7 +121,6 @@ export default async function CustomerInquiries({
                     </DataRow>
                   ))}
                 </tbody>
-              </table>
             </DataTable>
           </>
         )}

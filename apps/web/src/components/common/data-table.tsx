@@ -13,7 +13,7 @@ const OWN = "a,button,input,select,textarea,label,summary,[role=menu],[role=menu
  * keyboard (Enter), and its ⋯ (RowMenu) sits in the last cell. The header
  * stays in view while the page scrolls (from 1280px up; on smaller screens
  * a wide table scrolls sideways instead). Not for tables of lines you edit
- * (LineTable).
+ * (LineTable). This is the <table>: give it <thead>/<tbody>, never another table.
  *
  * `clearParam`: a parameter that only lights a row once (?saved=…), taken out
  * of the URL after the 2-second highlight.
@@ -23,11 +23,14 @@ export function DataTable({
   children,
   clearParam,
   className,
+  tableClassName,
 }: {
   label: string;
   children: ReactNode;
   clearParam?: string;
   className?: string;
+  /** For the table itself, e.g. the width below which it scrolls sideways (`min-w-[1000px]`). */
+  tableClassName?: string;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -66,7 +69,7 @@ export function DataTable({
         else router.push(href);
       }}
     >
-      <table aria-label={label} className="w-full border-collapse text-sm">
+      <table aria-label={label} className={cn("w-full border-collapse text-sm", tableClassName)}>
         {children}
       </table>
     </div>

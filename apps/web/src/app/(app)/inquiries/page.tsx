@@ -212,8 +212,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                 <PhoneRow key={d.id} href={`/inquiries/${d.id}`} title={d.title} line={`${d.refNo} · ${d.customer.name}`} status={<Stage d={d} />} figure={whereItIs(d)} />
               ))}
             </PhoneList>
-            <DataTable label="Inquiries" className="max-sm:hidden">
-              <table className="w-full min-w-[1120px] text-[13px]">
+            <DataTable label="Inquiries" className="max-sm:hidden" tableClassName="min-w-[1120px] text-[13px]">
                 <THead>
                   <tr>
                     <Th>Inquiry</Th>
@@ -261,7 +260,6 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                     </DataRow>
                   ))}
                 </tbody>
-              </table>
             </DataTable>
           </>
         )}
