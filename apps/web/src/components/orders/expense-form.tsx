@@ -18,7 +18,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { MoneyInput } from "@/components/common/money-input";
-import { useAccounts } from "@/components/money/accounts";
+import { AccountSelect, RecordedBy } from "@/components/money/accounts";
 import { uploadReceipt, VoidForm } from "@/components/money/forms";
 import { expenseAction, voidExpenseAction } from "@/app/(app)/money/actions";
 import type { ActionState } from "@/lib/actions";
@@ -101,7 +101,6 @@ export function OrderExpenseForm({
   onSaved: (again: boolean, notice: string | null) => void;
 }) {
   const s0 = setup;
-  const accounts = useAccounts();
   const router = useRouter();
   const [category, setCategory] = useState<ExpenseCategory>(expense?.category ?? prefill?.category ?? (step === "payment" ? "bank_charges" : "freight"));
   const [currency, setCurrencyRaw] = useState(expense?.currency ?? prefill?.currency ?? s0.mainCurrency);
@@ -110,7 +109,6 @@ export function OrderExpenseForm({
   const [rate, setRate] = useState(expense ? rateText(expense.rate) : "");
   const [paid, setPaid] = useState<PaidHow>(expense ? (expense.ownMoney ? "own" : expense.payLater ? "later" : "now") : "later");
   const [paidBy, setPaidBy] = useState(expense?.paidBy?.id ?? s0.me ?? "");
-  const [from, setFrom] = useState(expense?.account?.id ?? "");
   const [bearer, setBearer] = useState<ExpenseBearer>(expense?.borneBy ?? "us");
   const [factoryId, setFactoryId] = useState(expense?.factory?.id ?? (s0.factories.length === 1 ? s0.factories[0]!.id : ""));
   const [file, setFileRaw] = useState<File | null>(null);
@@ -126,7 +124,6 @@ export function OrderExpenseForm({
   const setCurrency = (c: string) => {
     setCurrencyRaw(c);
     setRate("");
-    setFrom("");
   };
 
   // What it counts as on this order: into the main currency at the rate, then into the order's at today's rate.
@@ -135,7 +132,6 @@ export function OrderExpenseForm({
   const orderPerMain = s0.orderCurrency === s0.mainCurrency ? 1 : rateOf(s0.fx, s0.orderCurrency, s0.mainCurrency);
   const inOrder = inMain !== null && orderPerMain ? inMain * orderPerMain : null;
 
-  const fits = accounts.filter((a) => a.currency === currency && (!a.archived || a.id === from));
   const chips = ORDER_EXPENSE_CHIPS.includes(category) ? ORDER_EXPENSE_CHIPS : [...ORDER_EXPENSE_CHIPS.slice(0, -1), category, "other" as const];
   const action = expenseAction.bind(null, s0.orderId, expense?.id ?? null);
   // Paid after it was added (a bill paid, or a person paid back): that stands; it is not chosen again here.
@@ -200,7 +196,8 @@ export function OrderExpenseForm({
           <input type="hidden" name="category" value={category} />
           <input type="hidden" name="payLater" value={paid === "later" ? "on" : "off"} />
           <input type="hidden" name="ownMoney" value={paid === "own" ? "on" : "off"} />
-          <input type="hidden" name="accountId" value={paid === "now" ? from : ""} />
+          {/* The account is asked only when it is paid now (below); otherwise none is kept. */}
+          {(settled || paid !== "now") && <input type="hidden" name="accountId" value={settled ? (expense?.account?.id ?? "") : ""} />}
           {paid !== "own" && <input type="hidden" name="paidById" value={expense?.paidBy?.id ?? ""} />}
           <input type="hidden" name="note" value={expense?.note ?? ""} />
           {bearer !== "factory" && <input type="hidden" name="factoryId" value={expense?.factory?.id ?? ""} />}
@@ -300,16 +297,7 @@ export function OrderExpenseForm({
               </div>
             )}
             {!settled && paid === "now" && (
-              <Field label="From" htmlFor="oe-from" optional error={st.errors?.accountId} className="mt-1 sm:max-w-[50%]">
-                <Select id="oe-from" value={from} onChange={(e) => setFrom(e.target.value)}>
-                  <option value="">Not said</option>
-                  {fits.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
+              <AccountSelect key={currency} id="oe-from" label="From account" currency={currency} defaultValue={expense?.account?.id} error={st.errors?.accountId} className="mt-1 sm:max-w-[50%]" />
             )}
             {paid === "own" && (
               <Field label="Who paid" htmlFor="oe-paidBy" error={st.errors?.paidById} className="mt-1 sm:max-w-[50%]">
@@ -349,6 +337,7 @@ export function OrderExpenseForm({
             )}
           </div>
 
+          {!expense && <RecordedBy />}
           <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-4 py-3 sm:static sm:order-[100] sm:mx-0 sm:border-0 sm:p-0">
             <SubmitButton className="max-sm:flex-1" pendingText="Saving…" {...busy} onClick={() => (again.current = false)}>
               {sending ? "Sending the file…" : expense ? "Save the change" : "Add the cost"}

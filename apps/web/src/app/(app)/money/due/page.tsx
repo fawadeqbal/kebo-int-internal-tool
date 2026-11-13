@@ -18,7 +18,7 @@ import { FilterCard } from "@/components/common/filter-card";
 import { PayCostWindow, RepayWindow } from "@/components/order-sections/costs-windows";
 import { PayFactoryInList, PlanInList } from "@/components/money/due-windows";
 import { factoryPaymentAction, sendRequestAction } from "../actions";
-import { paymentAction } from "../../orders/actions";
+import { paymentAction, submitPaymentAction } from "../../orders/actions";
 
 export const metadata = { title: "To receive and to pay" };
 
@@ -201,7 +201,7 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
                           {o.daysLate > 0 ? `${days(o.daysLate)} late` : o.next?.dueOn ? `${date(o.next.dueOn)}${o.next.dueOn >= today ? ` · in ${days(daysBetween(today, o.next.dueOn))}` : ""}` : (o.next?.when ?? "No date yet")}
                         </Td>
                         <Td className="text-right">
-                          {can(me, "payments.record") && !open && (
+                          {(can(me, "payments.record") || can(me, "money.submit")) && !open && (
                             <Link href={href({ open: o.id, do: "pay" })} scroll={false} className={buttonClass("secondary", "sm", SMALL)}>
                               Record payment
                             </Link>
@@ -234,9 +234,11 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
 async function OrderParts({ id, me, today, back, auto }: { id: string; me: Me; today: string; back: string; auto?: "pay" }) {
   const [o, m, p, settings] = await Promise.all([orderOf(id), orderMoneyOf(id), orderPaymentsOf(id), getSettings()]);
   const c = o.currency;
+  // Someone who records money records it; Staff send it for a manager to verify (the same window).
+  const records = can(me, "payments.record");
   const pay =
-    can(me, "payments.record") && o.status !== "cancelled" && Number(p.due) > 0
-      ? { action: paymentAction.bind(null, o.id, c), customer: o.customer.name, refNo: o.refNo, due: p.due, depositDue: p.depositDue, fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates }, today }
+    (records || can(me, "money.submit")) && o.status !== "cancelled" && Number(p.due) > 0
+      ? { action: (records ? paymentAction : submitPaymentAction).bind(null, o.id, c), customer: o.customer.name, refNo: o.refNo, due: p.due, depositDue: p.depositDue, fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates }, today, verify: !records }
       : null;
   return (
     <div className="flex flex-col gap-2">

@@ -8,7 +8,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { MoneyInput } from "@/components/common/money-input";
-import { useAccounts } from "@/components/money/accounts";
+import { AccountSelect, RecordedBy } from "@/components/money/accounts";
 import { FilePicker } from "@/components/money/attachment";
 import { uploadReceipt } from "@/components/money/forms";
 import { FormWindow } from "@/components/order-sections/form-window";
@@ -28,13 +28,11 @@ type Waiting = RepeatingCosts["waiting"][number];
  * it comes every month. Confirming a proposed month: last month's values filled in, and the chain it belongs to.
  */
 function CostFields({ mainCurrency, today, confirm, onClose }: { mainCurrency: string; today: string; confirm?: Waiting; onClose: () => void }) {
-  const accounts = useAccounts();
   const router = useRouter();
   const [category, setCategory] = useState<ExpenseCategory>(confirm?.category ?? "rent");
   const [currency, setCurrency] = useState(confirm?.currency ?? mainCurrency);
   const [file, setFile] = useState<File | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const fits = accounts.filter((a) => a.currency === currency && !a.archived);
   // A proposed month is paid on its day once that day has come; before it, today.
   const paidOn = confirm ? (confirm.on <= today ? confirm.on : today) : today;
   const done = async (st: ActionState) => {
@@ -85,16 +83,7 @@ function CostFields({ mainCurrency, today, confirm, onClose }: { mainCurrency: s
             <Field label="Paid on" htmlFor="cc-spentOn" error={s.errors?.spentOn}>
               <Input id="cc-spentOn" name="spentOn" type="date" max={today} defaultValue={s.values?.spentOn ?? paidOn} />
             </Field>
-            <Field label="Paid from" htmlFor="cc-account" optional error={s.errors?.accountId}>
-              <Select id="cc-account" name="accountId" defaultValue={s.values?.accountId ?? (confirm?.account && fits.some((a) => a.id === confirm.account!.id) ? confirm.account.id : "")} key={currency}>
-                <option value="">Not said</option>
-                {fits.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <AccountSelect key={currency} id="cc-account" label="From account" currency={currency} defaultValue={s.values?.accountId ?? confirm?.account?.id} error={s.errors?.accountId} />
           </div>
           {!confirm && (
             <Field label="Repeats" htmlFor="cc-repeats">
@@ -105,6 +94,7 @@ function CostFields({ mainCurrency, today, confirm, onClose }: { mainCurrency: s
             </Field>
           )}
           <FilePicker id="cc-file" label={confirm ? "Bank slip" : "Receipt"} hint="Photo or PDF" file={file} onChange={setFile} />
+          <RecordedBy />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel

@@ -72,7 +72,8 @@ export function PaymentPlanTable({
   due: string;
   send: Send;
   /** Null: this person may not record payments, or the order takes none. */
-  pay: { action: Action; customer: string; refNo: string; due: string; depositDue: string; fx: Parameters<typeof RecordPaymentWindow>[0]["fx"]; today: string } | null;
+  /** `verify`: the person sends the payment for a manager to verify (it does not count until then). */
+  pay: { action: Action; customer: string; refNo: string; due: string; depositDue: string; fx: Parameters<typeof RecordPaymentWindow>[0]["fx"]; today: string; verify?: boolean } | null;
 }) {
   // The dialog lives here, not in the row: once sent, the row's button changes and the dialog still says what to do next.
   const [sending, setSending] = useState<Sending | null>(null);

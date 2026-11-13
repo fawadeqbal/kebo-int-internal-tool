@@ -13,7 +13,7 @@ import { MoneyInput } from "@/components/common/money-input";
 import { rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
 import type { CustomerCreditView, FactoryPlanView } from "@/lib/types-money";
-import { AccountSelect } from "./accounts";
+import { AccountSelect, RecordedBy } from "./accounts";
 import { FilePicker, useSaveThenSend } from "./attachment";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -144,7 +144,15 @@ export function ReceivedFields({
   onFileError,
   bare,
   amount,
-}: Omit<Parameters<typeof ReceivedForm>[0], "label" | "quiet"> & { onClose: () => void; onFileError: (m: string) => void; /** In a window that already has the title: no frame, no heading. */ bare?: boolean }) {
+  verify,
+}: Omit<Parameters<typeof ReceivedForm>[0], "label" | "quiet"> & {
+  onClose: () => void;
+  onFileError: (m: string) => void;
+  /** In a window that already has the title: no frame, no heading. */
+  bare?: boolean;
+  /** The person only sends money for a manager to verify: it is kept waiting, with its slip, and counts once verified. */
+  verify?: boolean;
+}) {
   const dueMinor = toMinor(due);
   const a = useArrival(fx, currency, amount);
   const [charges, setCharges] = useState("");
@@ -157,7 +165,7 @@ export function ReceivedFields({
   const leftMinor = a.countsMinor - partMinor;
   const tooMuch = partMinor + chargesMinor > dueMinor;
   // The slip goes with the save itself: the page re-draws once the payment is saved.
-  const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", onFileError);
+  const save = useSaveThenSend(action, file, (id) => (verify ? `/files/submissions/${id}` : `/files/payments/${id}`), verify ? "The payment is sent to verify" : "The payment is recorded", onFileError);
   const done = () => onClose();
   return (
     <ActionForm action={save} onDone={done} keepFields className={bare ? "flex flex-col gap-3" : framed}>
@@ -268,14 +276,15 @@ export function ReceivedFields({
           <Field label="Note" htmlFor="r-note" optional error={s.errors?.note}>
             <Textarea id="r-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
           </Field>
+          <RecordedBy verify={verify} />
           <div className="flex flex-wrap items-end justify-between gap-2">
             <FilePicker id="r-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} className="min-w-0 flex-1 basis-56" />
             <div className="flex gap-2">
               <Button type="button" size="sm" variant="ghost" onClick={onClose}>
                 Cancel
               </Button>
-              <SubmitButton size="sm" pendingText={file ? "Recording, sending the file…" : "Recording…"} disabled={a.countsMinor <= 0 || tooMuch || leftMinor < 0}>
-                Record the payment
+              <SubmitButton size="sm" pendingText={file ? "Sending, with the file…" : verify ? "Sending…" : "Recording…"} disabled={a.countsMinor <= 0 || tooMuch || leftMinor < 0}>
+                {verify ? "Send to verify" : "Record the payment"}
               </SubmitButton>
             </div>
           </div>

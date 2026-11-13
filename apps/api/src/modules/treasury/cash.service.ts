@@ -82,11 +82,11 @@ export class CashService {
   }
 
   /**
-   * Our accounts. Anyone who records payments gets the list to choose from;
-   * managers also see each one's balance today.
+   * Our accounts. Anyone who records money, or sends it for a manager to verify, gets the list to choose
+   * from (names only); managers also see each one's balance today.
    */
   async accounts(user: SessionUser) {
-    if (!can(user, "payments.record") && !can(user, "expenses.manage")) throw new ForbiddenError("You do not record money.");
+    if (!can(user, "payments.record") && !can(user, "expenses.manage") && !can(user, "money.submit")) throw new ForbiddenError("You do not record money.");
     const rows = await this.prisma.db.moneyAccount.findMany({ orderBy: [{ archivedAt: { sort: "asc", nulls: "first" } }, { name: "asc" }] });
     const managers = can(user, "expenses.manage");
     const sums = managers ? await this.movements(rows.map((r) => r.id), this.clock.today()) : null;
