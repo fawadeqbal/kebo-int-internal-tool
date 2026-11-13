@@ -10,7 +10,7 @@ import { crumbsFor } from "@/lib/nav";
 import { requirePermission } from "@/lib/session";
 import { InvoicesBody, moneyAccess, ReceiveBody } from "../sections";
 
-export const metadata = { title: "Receivables (AR)" };
+export const metadata = { title: "To receive" };
 
 /**
  * Finance & general ledger › Receivables (AR): what customers still owe us, invoice by invoice (each instalment

@@ -1,4 +1,3 @@
-import { AdminTabs } from "@/components/common/admin-tabs";
 import Link from "next/link";
 import { History } from "lucide-react";
 import { buildHref, ButtonLink, Card, EmptyState, FilterBar, FilterChip, Pagination, SearchField, toPage } from "@kebo/ui";
@@ -27,9 +26,7 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
   const filtered = !!(sp.person || failed || sp.q);
   return (
     <div>
-      <PageHeader crumbs={crumbsFor("/access/sign-ins")} title="Sign-ins" description="Every sign-in attempt for a year, right and wrong.">
-        <AdminTabs set="people" current="/access/sign-ins" />
-      </PageHeader>
+      <PageHeader crumbs={crumbsFor("/access/sign-ins")} title="Sign-ins" description="Every sign-in attempt for a year, right and wrong." />
     <Card className="overflow-hidden p-0">
       <FilterBar end={<span className="text-xs text-muted tabular">{data.total.toLocaleString("en-US")} attempts</span>}>
         <FilterChip href={buildHref("/access/sign-ins", keep, { failed: undefined, page: undefined })} active={!failed}>

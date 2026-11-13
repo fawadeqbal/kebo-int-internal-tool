@@ -10,7 +10,7 @@ import { Landmark } from "lucide-react";
 import { api } from "@/lib/api";
 import { MoveMoney, NewAccount, type AccountRow } from "@/components/money/cash-forms";
 
-export const metadata = { title: "Multi-currency vault" };
+export const metadata = { title: "Cash & bank" };
 
 /** Treasury & payments › Multi-currency vault (the cash book): where our money is (each account), and every amount in and out in a month or a year. */
 export default async function CashBookPage({ searchParams }: { searchParams: Promise<Search> }) {

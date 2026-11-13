@@ -1,19 +1,22 @@
 /**
- * The menu's modules and their pages (ERP redesign, 11 Nov 2026: nine modules, standard names).
- * One address per page, the module's name in the breadcrumb above the title, the item's name as the
- * title. The layout keeps only the pages a person may open (each page's own permission and plan
- * checks); a module whose pages are all hidden is hidden. Addresses did not move: only the grouping
- * and the names changed. The reports share one item (Analytics & reports) and switch with tabs on
- * the page; notifications open from the bell. Currency & FX has no page yet, so it is not listed.
+ * The menu: Home, then five groups and their pages (13 Nov 2026: two levels, plain names).
+ * A group has one name; a page sits in one group; nothing opens under a page. One address per
+ * page: addresses did not move, only the grouping and the names changed. The group's name is the
+ * first part of the path above a page's title ("Sales / Inquiries"), the page's name is its title.
+ * The layout keeps only the pages a person may open (each page's own permission and plan checks);
+ * a group whose pages are all hidden is hidden. The reports share one item (All reports) and switch
+ * with tabs on the page; notifications open from the bell.
  */
 
-export type ModuleKey = "overview" | "public" | "partners" | "operations" | "revenue" | "treasury" | "finance" | "admin";
+export type ModuleKey = "sales" | "purchasing" | "money" | "reports" | "settings";
 
 export type NavIcon = "home" | ModuleKey;
 
 export interface NavPage {
   href: string;
   label: string;
+  /** A thin line above this page: it starts the group's second kind of page (not a level, no name). */
+  lineBefore?: boolean;
   /** What needs looking at (payments waiting to be verified); 0 or none: no count. */
   badge?: number;
   /** What the count is, for screen readers ("3 waiting"); default "unread". */
@@ -22,107 +25,79 @@ export interface NavPage {
 
 export interface NavModule {
   key: ModuleKey;
+  /** The group's one name: in the menu and in the path above a page's title. */
   title: string;
-  /** The module's one-word name in the top menu (its full title is its accessible name). */
-  short: string;
   icon: NavIcon;
   pages: NavPage[];
 }
 
-/** Every page of every module, in sidebar order (before anyone's permissions). */
-export const MODULE_PAGES: { key: ModuleKey; title: string; short: string; icon: NavIcon; pages: { href: string; label: string }[] }[] = [
+/** Every page of every group, in menu order (before anyone's permissions). */
+export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages: { href: string; label: string; lineBefore?: boolean }[] }[] = [
   {
-    key: "overview",
-    title: "Overview",
-    short: "Overview",
-    icon: "overview",
+    key: "sales",
+    title: "Sales",
+    icon: "sales",
     pages: [
+      { href: "/inquiries", label: "Inquiries" },
+      { href: "/orders", label: "Orders" },
+      { href: "/orders/board", label: "Order board" },
+      { href: "/operations/shipments", label: "Shipments" },
+      { href: "/customers", label: "Customers" },
       { href: "/follow-ups", label: "Follow-ups" },
-      { href: "/orders/board", label: "Pipelines" },
-      { href: "/reports", label: "Analytics & reports" },
-      { href: "/audit", label: "Audit log" },
     ],
   },
   {
-    key: "public",
-    title: "Public landing page",
-    short: "Website",
-    icon: "public",
-    pages: [{ href: "/settings/website-form", label: "Website form" }],
-  },
-  {
-    key: "partners",
-    title: "Partners & CRM",
-    short: "Partners",
-    icon: "partners",
+    key: "purchasing",
+    title: "Purchasing",
+    icon: "purchasing",
     pages: [
-      { href: "/customers", label: "Customers" },
+      { href: "/operations/purchase-orders", label: "Purchase orders" },
       { href: "/factories", label: "Suppliers" },
     ],
   },
   {
-    key: "operations",
-    title: "Operations & trading",
-    short: "Operations",
-    icon: "operations",
-    pages: [
-      { href: "/inquiries", label: "Inquiries (RFQs)" },
-      { href: "/orders", label: "Orders" },
-      { href: "/operations/purchase-orders", label: "Purchase orders" },
-      { href: "/operations/shipments", label: "Fulfillment & logistics" },
-    ],
-  },
-  {
-    key: "revenue",
-    title: "Revenue & profitability",
-    short: "Revenue",
-    icon: "revenue",
-    pages: [
-      { href: "/finance/profit", label: "Profit & loss" },
-      { href: "/finance/expenses", label: "Cost & expense allocation" },
-      { href: "/finance/leaks", label: "Variance analysis" },
-    ],
-  },
-  {
-    key: "treasury",
-    title: "Treasury & payments",
-    short: "Treasury",
-    icon: "treasury",
+    key: "money",
+    title: "Money",
+    icon: "money",
     pages: [
       { href: "/payments", label: "Payments" },
-      { href: "/approvals", label: "Verification queue" },
-      { href: "/finance/cash-book", label: "Multi-currency vault" },
+      { href: "/approvals", label: "To verify" },
+      { href: "/finance/cash-book", label: "Cash & bank" },
+      { href: "/finance/expenses", label: "Expenses" },
+      { href: "/finance/invoices", label: "Invoices", lineBefore: true },
+      { href: "/finance/to-receive", label: "To receive" },
+      { href: "/purchasing/to-pay", label: "To pay" },
+      { href: "/finance/ledger", label: "Ledger" },
     ],
   },
   {
-    key: "finance",
-    title: "Finance & general ledger",
-    short: "Finance",
-    icon: "finance",
+    key: "reports",
+    title: "Reports",
+    icon: "reports",
     pages: [
-      { href: "/finance/invoices", label: "Invoices" },
-      { href: "/finance/to-receive", label: "Receivables (AR)" },
-      { href: "/purchasing/to-pay", label: "Payables (AP)" },
-      { href: "/finance/ledger", label: "General ledger" },
+      { href: "/finance/profit", label: "Profit & loss" },
+      { href: "/finance/leaks", label: "Planned vs spent" },
+      { href: "/reports", label: "All reports" },
+      { href: "/audit", label: "Activity log" },
     ],
   },
   {
-    key: "admin",
-    title: "System & admin",
-    short: "Admin",
-    icon: "admin",
+    key: "settings",
+    title: "Settings",
+    icon: "settings",
     pages: [
-      { href: "/settings/company", label: "Company settings" },
+      { href: "/settings/company", label: "Company" },
+      { href: "/settings/address", label: "Company address" },
       { href: "/settings/sales", label: "Sales & quotations" },
-      { href: "/settings/reminders", label: "Reminders" },
-      { href: "/settings/emails", label: "Emails" },
       { href: "/settings/order-checklist", label: "Order checklist" },
       { href: "/settings/papers", label: "Document templates" },
-      { href: "/settings/address", label: "Company address" },
-      { href: "/users", label: "Users" },
+      { href: "/settings/reminders", label: "Reminders" },
+      { href: "/settings/emails", label: "Emails" },
+      { href: "/settings/website-form", label: "Website form" },
+      { href: "/users", label: "People", lineBefore: true },
       { href: "/access/roles", label: "Roles" },
-      { href: "/access/sessions", label: "Sessions" },
       { href: "/access/sign-ins", label: "Sign-ins" },
+      { href: "/access/sessions", label: "Sessions" },
     ],
   },
 ];
@@ -133,8 +108,8 @@ export const HOME_HREF = "/dashboard";
 const ALL_PAGES = MODULE_PAGES.flatMap((m) => m.pages.map((p) => ({ ...p, module: m })));
 
 /**
- * The page of the sidebar an address belongs to: the longest page address it is or is under
- * (/orders/board is Pipelines, /orders/123 is Orders, /reports/people/targets is Analytics & reports).
+ * The page of the menu an address belongs to: the longest page address it is or is under
+ * (/orders/board is Order board, /orders/123 is Orders, /reports/people/targets is All reports).
  */
 export function pageOf<T extends { href: string }>(pathname: string, pages: T[]): T | undefined {
   let best: T | undefined;
@@ -146,13 +121,13 @@ export function pageOf<T extends { href: string }>(pathname: string, pages: T[])
   return best;
 }
 
-/** The module an address is in, by the same rule (none for the dashboard, the account page…). */
+/** The group an address is in, by the same rule (none for the dashboard, the account page…). */
 export function moduleOf(pathname: string, modules: { key: ModuleKey; pages: { href: string }[] }[]): ModuleKey | undefined {
   const all = modules.flatMap((m) => m.pages.map((p) => ({ href: p.href, key: m.key })));
   return pageOf(pathname, all)?.key;
 }
 
-/** "Treasury & payments › Multi-currency vault": the breadcrumb above a module page's title (its title is the item's name). */
+/** "Money / Cash & bank": the path above a page's title (its title is the page's name). */
 export function crumbsFor(href: string): { label: string; href?: string }[] {
   const p = ALL_PAGES.find((x) => x.href === href);
   if (!p) return [];
@@ -164,12 +139,28 @@ export function labelFor(href: string): string {
   return ALL_PAGES.find((x) => x.href === href)?.label ?? "";
 }
 
-/** The sum of a module's counts, shown on it while it is closed. */
+/** The sum of a group's counts, shown on it while it is closed. */
 export const moduleTotal = (m: { pages: { badge?: number }[] }) => m.pages.reduce((t, p) => t + (p.badge ?? 0), 0);
 
 /**
- * The modules this person sees: each page with the same permission and plan checks as the page
- * itself; a module with no page left is left out. Count: payments waiting to be verified (or sent
+ * The pages that pass, keeping the group's thin line: when the page that carries it is hidden the
+ * next one shown carries it, and it is never above the first page shown.
+ */
+function visible<T extends { lineBefore?: boolean }>(pages: T[], ok: (p: T) => boolean): T[] {
+  const out: T[] = [];
+  let line = false;
+  for (const p of pages) {
+    line ||= !!p.lineBefore;
+    if (!ok(p)) continue;
+    out.push({ ...p, lineBefore: line && out.length > 0 });
+    line = false;
+  }
+  return out;
+}
+
+/**
+ * The groups this person sees: each page with the same permission and plan checks as the page
+ * itself; a group with no page left is left out. Count: payments waiting to be verified (or sent
  * back to the person who sent them). Unread notifications show on the bell, not here.
  */
 export function buildModules({
@@ -184,7 +175,7 @@ export function buildModules({
   /** Payments waiting for an approver (or sent back to someone who sends them); null: not theirs. */
   approvals: number | null;
   approves: boolean;
-  /** Companies have their own addresses (BASE_DOMAIN): System & admin › Company address. */
+  /** Companies have their own addresses (BASE_DOMAIN): Settings › Company address. */
   companyAddresses: boolean;
 }): NavModule[] {
   const managers = can("expenses.manage");
@@ -225,11 +216,12 @@ export function buildModules({
   return MODULE_PAGES.map((m) => ({
     key: m.key,
     title: m.title,
-    short: m.short,
     icon: m.icon,
-    pages: m.pages.filter((p) => show[p.href] ?? true).map((p) => ({ ...p, ...badges[p.href] })),
+    pages: visible(m.pages, (p) => show[p.href] ?? true).map((p) => ({ ...p, ...badges[p.href] })),
   })).filter((m) => m.pages.length > 0);
 }
 
-/** The cookie that keeps the menu drawer's modules open as they were left (read by the layout, so the first paint is right). */
+/** The cookie that keeps the menu's groups open as they were left (read by the layout, so the first paint is right). */
 export const OPEN_COOKIE = "nav-open";
+/** The cookie that keeps the menu folded to its strip of icons ("1") or open ("0"); none: open on a wide screen. */
+export const FOLD_COOKIE = "nav-fold";

@@ -26,7 +26,7 @@ import type { DealRow, Paged } from "@/lib/types";
 import type { Funnel } from "@/lib/types-facts";
 import { crumbsFor, labelFor } from "@/lib/nav";
 
-export const metadata = { title: "Inquiries (RFQs)" };
+export const metadata = { title: "Inquiries" };
 
 type Params = Record<string, string | undefined>;
 
@@ -212,13 +212,14 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                 <PhoneRow key={d.id} href={`/inquiries/${d.id}`} title={d.title} line={`${d.refNo} · ${d.customer.name}`} status={<Stage d={d} />} figure={whereItIs(d)} />
               ))}
             </PhoneList>
-            <DataTable label="Inquiries" className="max-sm:hidden" tableClassName="min-w-[1120px] text-[13px]">
+            <DataTable label="Inquiries" className="max-sm:hidden" tableClassName="min-w-[960px] text-[13px] roomy:min-w-[1120px]">
                 <THead>
                   <tr>
                     <Th>Inquiry</Th>
                     <Th>What · customer</Th>
-                    <Th>Category</Th>
-                    <Th>Came by</Th>
+                    {/* Shown only where the page has room for them (roomy): the list fits beside the open menu without them. */}
+                    <Th className="hidden roomy:table-cell">Category</Th>
+                    <Th className="hidden roomy:table-cell">Came by</Th>
                     <Th>Received</Th>
                     <Th>Handles</Th>
                     <Th>Priority</Th>
@@ -241,8 +242,8 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                           {d.customer.country === UNKNOWN_COUNTRY && <span className="text-warn"> · country not set</span>}
                         </span>
                       </Td>
-                      <Td>{d.category}</Td>
-                      <Td>
+                      <Td className="hidden roomy:table-cell">{d.category}</Td>
+                      <Td className="hidden roomy:table-cell">
                         <Badge>{CHANNEL_LABEL[d.channel].replace(" form", "")}</Badge>
                       </Td>
                       <Td className="whitespace-nowrap">{date(d.createdAt)}</Td>

@@ -29,7 +29,8 @@ function DealCard({ d }: { d: DealRow }) {
   return (
     <li>
       <Link href={`/inquiries/${d.id}`} className="flex flex-col gap-1.5 rounded-xl border border-line bg-surface p-3 shadow-card transition-colors hover:border-primary-line">
-        <span className="flex items-center justify-between gap-2">
+        {/* A long status wraps under the number in a narrow column instead of sticking out of the card. */}
+        <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <RefCode>{d.refNo}</RefCode>
           {d.onHold ? (
             <Badge tone="primary" dot>
@@ -130,9 +131,9 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
   return (
     <div>
       <PageHeader
-        crumbs={[{ label: "Overview" }, { label: "Pipelines" }]}
+        crumbs={[{ label: "Sales" }, { label: "Inquiry board" }]}
         icon={LayoutGrid}
-        title="Inquiry pipeline"
+        title="Inquiry board"
         summary={`${plural(open, "open inquiry", "open inquiries")} · open a card to move its stage. Won and lost ask for the details first.`}
         actions={
           <ButtonLink href="/inquiries" variant="secondary">

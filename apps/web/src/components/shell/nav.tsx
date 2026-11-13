@@ -5,44 +5,37 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   Bell,
-  BookOpen,
   Building2,
   ChevronRight,
   ClipboardList,
-  Globe,
   House,
-  LayoutDashboard,
   LogOut,
   Menu as MenuIcon,
-  Monitor,
-  Moon,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Search,
   Settings,
-  Sun,
+  ShoppingCart,
   TrendingUp,
   User,
-  Users,
   Wallet,
   X,
 } from "lucide-react";
 import { Avatar, buttonClass, cn, Kbd } from "@kebo/ui";
 import { logoutAction } from "@/app/login/actions";
-import { HOME_HREF, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
+import { FOLD_COOKIE, HOME_HREF, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
 
 export type { NavModule, NavPage } from "@/lib/nav";
 
 const ICONS: Record<NavIcon, typeof House> = {
   home: House,
-  overview: LayoutDashboard,
-  public: Globe,
-  partners: Users,
-  operations: Package,
-  revenue: TrendingUp,
-  treasury: Wallet,
-  finance: BookOpen,
-  admin: Settings,
+  sales: Package,
+  purchasing: ShoppingCart,
+  money: Wallet,
+  reports: TrendingUp,
+  settings: Settings,
 };
 
 const isActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -78,7 +71,7 @@ function Menu({ trigger, label, children, className }: { trigger: ReactNode; lab
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((o) => !o)}
-        className="flex rounded-full"
+        className="flex rounded-xl"
       >
         {trigger}
       </button>
@@ -89,8 +82,9 @@ function Menu({ trigger, label, children, className }: { trigger: ReactNode; lab
             "absolute top-full right-0 z-50 mt-2 min-w-44 animate-in rounded-xl border border-line bg-surface p-1 shadow-pop",
             className,
           )}
-          // Close after a choice, but not for a form button: removing the form before it submits cancels the submit (Sign out).
-          onClick={(e) => !(e.target as HTMLElement).closest("form") && setOpen(false)}
+          // Close after a choice, but not for a form button (removing the form before it submits cancels the submit: Sign out)
+          // nor for a setting chosen in place (the look).
+          onClick={(e) => !(e.target as HTMLElement).closest("form,[data-keep-open]") && setOpen(false)}
         >
           {children}
         </div>
@@ -111,84 +105,79 @@ function applyTheme(mode: Mode) {
   document.documentElement.classList.toggle("dark", dark);
 }
 
-function ThemeMenu() {
-  const [mode, setMode] = useState<Mode>("system");
-  const [dark, setDark] = useState(false);
+const savedMode = (): Mode => {
+  try {
+    return (localStorage.getItem("theme") as Mode) || "system";
+  } catch {
+    // storage blocked: keep the default
+    return "system";
+  }
+};
+
+/** While the look is "Auto", the page follows the computer when it changes between light and dark. */
+function useFollowSystemLook() {
   useEffect(() => {
-    let saved: Mode = "system";
-    try {
-      saved = (localStorage.getItem("theme") as Mode) || "system";
-    } catch {
-      // storage blocked: keep the default
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- read the saved choice once on mount
-    setMode(saved);
-    setDark(document.documentElement.classList.contains("dark"));
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      let m: Mode = "system";
-      try {
-        m = (localStorage.getItem("theme") as Mode) || "system";
-      } catch {
-        // storage blocked: keep the default
-      }
-      if (m === "system") {
-        applyTheme("system");
-        setDark(mq.matches);
-      }
-    };
+    const onChange = () => savedMode() === "system" && applyTheme("system");
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
+  }, []);
+}
+
+/** The look: light, dark, or what the computer uses. Chosen in the account menu, kept in this browser. */
+function LookChoice() {
+  const [mode, setMode] = useState<Mode>("system");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read the saved choice once on mount
+    setMode(savedMode());
   }, []);
   const choose = (m: Mode) => {
     try {
       localStorage.setItem("theme", m);
     } catch {
-      // storage blocked: keep the default
+      // storage blocked: the choice lasts until the page is left
     }
     setMode(m);
     applyTheme(m);
-    setDark(document.documentElement.classList.contains("dark"));
   };
-  const options: [Mode, string, typeof Sun][] = [
-    ["light", "Light", Sun],
-    ["dark", "Dark", Moon],
-    ["system", "System", Monitor],
+  const options: [Mode, string][] = [
+    ["light", "Light"],
+    ["dark", "Dark"],
+    ["system", "Auto"],
   ];
   return (
-    <Menu
-      label="Theme"
-      trigger={<span className={cn(buttonClass("ghost", "icon"), "size-[42px]")}>{dark ? <Moon aria-hidden /> : <Sun aria-hidden />}</span>}
-    >
-      {options.map(([m, label, Icon]) => (
-        <button
-          key={m}
-          type="button"
-          role="menuitemradio"
-          aria-checked={mode === m}
-          onClick={() => choose(m)}
-          className={cn(menuItem, mode === m && "font-medium text-primary [&_svg]:text-primary")}
-        >
-          <Icon aria-hidden />
-          {label}
-        </button>
-      ))}
-    </Menu>
+    <div data-keep-open className="flex h-9 items-center justify-between gap-2 px-2 text-sm text-text-2">
+      <span id="look-label">Look</span>
+      <div role="radiogroup" aria-labelledby="look-label" className="inline-flex overflow-hidden rounded-lg border border-line-strong">
+        {options.map(([m, label]) => (
+          <button
+            key={m}
+            type="button"
+            role="radio"
+            aria-checked={mode === m}
+            onClick={() => choose(m)}
+            className={cn("h-7 px-2.5 text-xs text-text-2 hover:bg-surface-2", mode === m && "bg-primary-soft font-semibold text-text hover:bg-primary-soft")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
-/* ------------------------------------------------------------------ Account */
+/* ------------------------------------------------------------------ Account, New */
 
-function AccountMenu({ user }: { user: { name: string; email: string; role: string } }) {
+function AccountMenu({ user, companyName }: { user: { name: string; email: string; role: string }; companyName: string }) {
   return (
     <Menu
       label="Account"
-      className="w-60"
+      className="w-64"
       trigger={
         <span className="flex items-center gap-2.5 rounded-xl lg:py-1 lg:pr-2 lg:pl-1 lg:hover:bg-surface-2">
-          <Avatar name={user.name} size={36} className="font-bold" />
+          <Avatar name={user.name} size={34} className="font-bold" />
           <span className="hidden text-left leading-tight lg:block">
-            <span className="block max-w-36 truncate text-sm font-semibold text-text">{user.name}</span>
+            <span className="block max-w-36 truncate text-[13px] font-semibold text-text">{user.name}</span>
             <span className="block max-w-36 truncate text-xs text-muted">{user.role}</span>
           </span>
         </span>
@@ -197,12 +186,17 @@ function AccountMenu({ user }: { user: { name: string; email: string; role: stri
       <div className="px-2 py-1.5 text-xs text-muted">
         <span className="block truncate text-sm font-medium text-text">{user.name}</span>
         <span className="block truncate">{user.email}</span>
+        <span className="mt-1 block text-text-2">
+          {user.role} · {companyName}
+        </span>
       </div>
       <div className="-mx-1 my-1 h-px bg-line" />
       <Link href="/account" role="menuitem" className={menuItem}>
         <User aria-hidden />
-        Your account & password
+        My account
       </Link>
+      <LookChoice />
+      <div className="-mx-1 my-1 h-px bg-line" />
       <form action={logoutAction}>
         <button type="submit" role="menuitem" className={menuItem}>
           <LogOut aria-hidden />
@@ -213,18 +207,35 @@ function AccountMenu({ user }: { user: { name: string; email: string; role: stri
   );
 }
 
-/* ------------------------------------------------------------------ Sidebar */
+/** What can be made from anywhere: each opens the same window as its own page's button. */
+export type NewItem = { href: string; label: string };
 
-/** A count on a page or a closed module: what waits for this person (payments to verify). */
-function Count({ n, label, tone = "warn" }: { n: number; label: string; tone?: "warn" | "neutral" }) {
+function NewMenu({ items }: { items: NewItem[] }) {
   return (
-    <span
-      className={cn(
-        "inline-grid h-[18px] min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-semibold tabular",
-        tone === "warn" ? "bg-warn-soft text-warn" : "bg-surface-2 text-text-2",
-      )}
-      aria-label={`${n} ${label}`}
+    <Menu
+      label="New"
+      className="w-52"
+      trigger={
+        <span className={cn(buttonClass("secondary", "md"), "h-9 px-3")}>
+          <Plus aria-hidden /> New
+        </span>
+      }
     >
+      {items.map((it) => (
+        <Link key={it.href} href={it.href} role="menuitem" className={menuItem}>
+          {it.label}
+        </Link>
+      ))}
+    </Menu>
+  );
+}
+
+/* ------------------------------------------------------------------ The menu */
+
+/** A count on a page or a closed group: what waits for this person (payments to verify). */
+function Count({ n, label }: { n: number; label: string }) {
+  return (
+    <span className="inline-grid h-[18px] min-w-5 place-items-center rounded-full bg-warn-soft px-1.5 text-[11px] font-semibold text-warn tabular" aria-label={`${n} ${label}`}>
       {n > 99 ? "99+" : n}
     </span>
   );
@@ -234,34 +245,37 @@ function writeCookie(name: string, value: string) {
   try {
     document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=31536000; samesite=lax`;
   } catch {
-    // cookies blocked: the sidebar just isn't remembered
+    // cookies blocked: the menu just isn't remembered
   }
 }
 
-/** The page link inside an open module (expanded sidebar and phone drawer). */
+/** A page under its group (the menu, and the menu over the page on a phone). */
 function PageLink({ page, active, big }: { page: NavPage; active: boolean; big?: boolean }) {
   return (
     <Link
       href={page.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex items-center gap-2 rounded-lg pr-2 pl-9 text-sm text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+        "flex items-center gap-2 rounded-lg pr-2 pl-9 text-[13.5px] text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
         big ? "min-h-11" : "h-8",
         active && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
       )}
     >
-      {active && <span className="absolute inset-y-1.5 -left-3 w-[3px] rounded-full bg-primary-solid" aria-hidden />}
       <span className="flex-1 truncate">{page.label}</span>
       {!!page.badge && <Count n={page.badge} label={page.badgeLabel ?? "unread"} />}
     </Link>
   );
 }
 
-/** Dashboard, then each module: a button that opens and closes its pages (aria-expanded); a closed one shows its total. */
-function ModuleTree({
+/**
+ * Home, then each group: a button that opens and closes its pages (aria-expanded). Two levels and no
+ * more. A closed group shows the total of what waits in it; the group the current page is in is bold.
+ */
+function GroupTree({
   modules,
   pathname,
   activeHref,
+  current,
   open,
   toggle,
   big,
@@ -269,6 +283,7 @@ function ModuleTree({
   modules: NavModule[];
   pathname: string;
   activeHref: string | undefined;
+  current: ModuleKey | undefined;
   open: Set<ModuleKey>;
   toggle: (key: ModuleKey) => void;
   big?: boolean;
@@ -283,14 +298,13 @@ function ModuleTree({
           href={HOME_HREF}
           aria-current={home ? "page" : undefined}
           className={cn(
-            "relative flex items-center gap-2.5 rounded-lg px-2 text-sm font-semibold text-text transition-colors hover:bg-surface-2",
+            "flex items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-semibold text-text transition-colors hover:bg-surface-2",
             row,
             home && "bg-primary-soft text-primary hover:bg-primary-soft",
           )}
         >
-          {home && <span className="absolute inset-y-1.5 -left-3 w-[3px] rounded-full bg-primary-solid" aria-hidden />}
-          <House className="size-4 shrink-0" aria-hidden />
-          <span className="flex-1 truncate">Dashboard</span>
+          <House className="size-[17px] shrink-0" aria-hidden />
+          <span className="flex-1 truncate">Home</span>
         </Link>
       </li>
       {modules.map((m) => {
@@ -305,17 +319,21 @@ function ModuleTree({
               aria-expanded={isOpen}
               aria-controls={listId}
               onClick={() => toggle(m.key)}
-              className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 text-left text-sm font-semibold text-text transition-colors hover:bg-surface-2", row)}
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] text-text transition-colors hover:bg-surface-2",
+                m.key === current ? "font-bold" : "font-semibold",
+                row,
+              )}
             >
-              <Icon className="size-4 shrink-0 text-text-2" aria-hidden />
+              <Icon className="size-[17px] shrink-0 text-text-2" aria-hidden />
               <span className="flex-1 truncate">{m.title}</span>
-              {!isOpen && total > 0 && <Count n={total} label="to look at" tone="neutral" />}
+              {!isOpen && total > 0 && <Count n={total} label="to look at" />}
               <ChevronRight className={cn("size-3.5 shrink-0 text-muted transition-transform", isOpen && "rotate-90")} aria-hidden />
             </button>
             {/* Closed: still in the page (hidden), so its addresses are there for the browser and the checks. */}
             <ul id={listId} hidden={!isOpen} className="mt-0.5 mb-1 space-y-0.5">
               {m.pages.map((p) => (
-                <li key={p.href}>
+                <li key={p.href} className={cn(p.lineBefore && "relative mt-1.5 pt-1.5 before:absolute before:top-0 before:right-2 before:left-9 before:h-px before:bg-line")}>
                   <PageLink page={p} active={p.href === activeHref} big={big} />
                 </li>
               ))}
@@ -328,35 +346,68 @@ function ModuleTree({
 }
 
 /** The company's logo, or its first letter on the green brand tile. */
-function Logo({ companyName, logo }: { companyName: string; logo?: string }) {
+function Logo({ companyName, logo, size = 40 }: { companyName: string; logo?: string; size?: 32 | 40 }) {
+  const box = size === 32 ? "size-8 rounded-lg" : "size-10 rounded-xl";
   return logo ? (
     // eslint-disable-next-line @next/next/no-img-element -- a small static logo
-    <img src={logo} alt="" width={40} height={40} className="size-10 shrink-0 rounded-xl object-contain" />
+    <img src={logo} alt="" width={size} height={size} className={cn("shrink-0 object-contain", box)} />
   ) : (
     <span
-      className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-solid text-lg font-bold text-primary-fg before:content-[attr(data-letter)]"
+      className={cn("grid shrink-0 place-items-center bg-primary-solid font-bold text-primary-fg before:content-[attr(data-letter)]", box, size === 32 ? "text-base" : "text-lg")}
       data-letter={(companyName.trim()[0] ?? "K").toUpperCase()}
       aria-hidden
     />
   );
 }
 
+/** The open menu's contents: the logo, Home and the groups. The same on a desktop and over the page on a phone. */
+function MenuContent({
+  modules,
+  companyName,
+  logo,
+  open,
+  toggle,
+  big,
+}: {
+  modules: NavModule[];
+  companyName: string;
+  logo?: string;
+  open: Set<ModuleKey>;
+  toggle: (key: ModuleKey) => void;
+  big?: boolean;
+}) {
+  const pathname = usePathname();
+  const activeHref = pageOf(pathname, modules.flatMap((m) => m.pages))?.href;
+  return (
+    <>
+      <div className="flex h-14 shrink-0 items-center px-4">
+        <Link href={HOME_HREF} className={cn("flex min-w-0 items-center gap-2.5 rounded-lg", big && "pr-10")} aria-label={`Kebo ERP, ${companyName}, home`}>
+          <Logo companyName={companyName} logo={logo} size={32} />
+          <span className="truncate text-[15.5px] font-bold tracking-tight text-text">Kebo ERP</span>
+        </Link>
+      </div>
+      <nav className="flex-1 overflow-y-auto px-3 pt-1 pb-4" aria-label="Main">
+        <GroupTree modules={modules} pathname={pathname} activeHref={activeHref} current={moduleOf(pathname, modules)} open={open} toggle={toggle} big={big} />
+      </nav>
+    </>
+  );
+}
+
 /**
- * One module in the top menu: its icon above its one-word name. Hovering, focusing or clicking it
- * shows its pages in a small menu under it; ↓, Enter or Space moves into the menu, ↑ ↓ Home End move
- * in it, Esc closes it (back on the module), Tab moves on to the next module. The current module is
- * a soft green tile with a green line under it.
+ * One group in the folded menu: its icon. Hovering, focusing or clicking it shows the group's name
+ * and its pages beside it; ↓, Enter or Space moves into them, ↑ ↓ Home End move, Esc closes (back on
+ * the icon), Tab moves on to the next icon. The group the current page is in is marked.
  */
-function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean; activeHref: string | undefined }) {
+function StripGroup({ m, current, activeHref }: { m: NavModule; current: boolean; activeHref: string | undefined }) {
   const Icon = ICONS[m.icon];
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const wrap = useRef<HTMLDivElement>(null);
+  const wrap = useRef<HTMLLIElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLUListElement>(null);
   const timer = useRef<number | undefined>(undefined);
   const focusAt = useRef<number | null>(null);
-  // Focus put back on the module by Esc does not open the menu again.
+  // Focus put back on the icon by Esc does not open its pages again.
   const quiet = useRef(false);
   const menuId = useId();
   const total = moduleTotal(m);
@@ -370,9 +421,10 @@ function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean;
   const place = useCallback(() => {
     const r = btn.current?.getBoundingClientRect();
     if (!r) return;
-    // Under the module, kept inside the window.
-    setPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 248)) });
-  }, []);
+    // Beside the icon, kept inside the window (a long group, Settings, moves up to fit).
+    const height = 52 + m.pages.length * 36 + (m.pages.some((p) => p.lineBefore) ? 13 : 0);
+    setPos({ top: Math.max(8, Math.min(r.top - 6, window.innerHeight - height - 8)), left: r.right + 10 });
+  }, [m.pages]);
   const show = () => {
     window.clearTimeout(timer.current);
     place();
@@ -383,7 +435,7 @@ function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean;
     timer.current = window.setTimeout(() => setOpen(false), delay);
   };
   useEffect(() => () => window.clearTimeout(timer.current), []);
-  // Esc closes it wherever focus is (hovered with the mouse, or in the menu: focus goes back to the module).
+  // Esc closes it wherever focus is (hovered with the mouse, or in the pages: focus goes back to the icon).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -395,17 +447,17 @@ function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean;
         btn.current?.focus();
       }
     };
-    const onScroll = () => setOpen(false);
+    const onResize = () => setOpen(false);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }, [open]);
 
   const items = () => [...(menu.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
-  // Into the menu once it is drawn.
+  // Into the pages once they are drawn.
   useEffect(() => {
     if (!open || focusAt.current === null) return;
     const list = items();
@@ -424,7 +476,7 @@ function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean;
   };
 
   const onButtonKey = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+    if (e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       enter(0);
     } else if (e.key === "ArrowUp") {
@@ -444,14 +496,14 @@ function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean;
     else if (e.key === "Home") go(0);
     else if (e.key === "End") go(list.length - 1);
     else if (e.key === "Tab") {
-      // On to the next module (or back to this one): the menu closes.
+      // On to the next icon (or back to this one): the pages close.
       e.preventDefault();
       setOpen(false);
       if (e.shiftKey) {
         quiet.current = true;
         btn.current?.focus();
       } else {
-        const all = [...(btn.current?.closest("nav")?.querySelectorAll<HTMLElement>("[data-module-item]") ?? [])];
+        const all = [...(btn.current?.closest("nav")?.querySelectorAll<HTMLElement>("[data-strip-item]") ?? [])];
         const next = all[all.indexOf(btn.current!) + 1];
         (next ?? btn.current)?.focus();
       }
@@ -460,6 +512,7 @@ function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean;
 
   return (
     <li
+      ref={wrap}
       className="relative flex"
       onMouseEnter={show}
       onMouseLeave={() => hide()}
@@ -467,149 +520,112 @@ function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean;
         if (!wrap.current?.contains(e.relatedTarget as Node)) hide(0);
       }}
     >
-      <div ref={wrap} className="flex">
-        <button
-          ref={btn}
-          type="button"
-          data-module-item
-          aria-label={`${m.title}${total ? `, ${total} to look at` : ""}`}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          aria-controls={open ? menuId : undefined}
-          onFocus={() => {
-            if (quiet.current) quiet.current = false;
-            else show();
-          }}
-          onClick={show}
-          onKeyDown={onButtonKey}
-          className={cn(
-            "relative flex min-w-[104px] flex-col items-center gap-1 rounded-t-xl border-b-[3px] border-transparent px-2.5 pt-2.5 pb-2 text-[13px] font-medium whitespace-nowrap text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
-            open && "bg-surface-2 text-text",
-            current && "border-primary-solid bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
-          )}
-        >
-          <Icon className="size-5" strokeWidth={2} aria-hidden />
-          <span>{m.short}</span>
-          {total > 0 && <span className="absolute top-2 right-6 size-2 rounded-full bg-action-solid ring-2 ring-surface" aria-hidden />}
-        </button>
-        {open && pos && (
-          <div
-            className="fixed z-50 w-60 animate-in rounded-2xl border border-line bg-surface p-2 shadow-pop"
-            style={{ top: pos.top, left: pos.left }}
-            onMouseEnter={show}
-            onMouseLeave={() => hide()}
-          >
-            <p id={`${menuId}-t`} className="px-2.5 pt-1 pb-2 text-[13px] font-bold text-text">
-              {m.title}
-            </p>
-            <ul ref={menu} id={menuId} role="menu" aria-labelledby={`${menuId}-t`} onKeyDown={onMenuKey}>
-              {m.pages.map((p) => {
-                const active = p.href === activeHref;
-                return (
-                  <li key={p.href} role="none">
-                    <Link
-                      href={p.href}
-                      role="menuitem"
-                      tabIndex={-1}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "flex h-9 items-center justify-between gap-2 rounded-lg px-2.5 text-sm text-text-2 hover:bg-surface-2 hover:text-text focus-visible:bg-surface-2",
-                        active && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
-                      )}
-                    >
-                      <span className="truncate">{p.label}</span>
-                      {!!p.badge && <Count n={p.badge} label={p.badgeLabel ?? "unread"} />}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+      <button
+        ref={btn}
+        type="button"
+        data-strip-item
+        aria-label={`${m.title}${total ? `, ${total} to look at` : ""}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onFocus={() => {
+          if (quiet.current) quiet.current = false;
+          else show();
+        }}
+        onClick={show}
+        onKeyDown={onButtonKey}
+        className={cn(
+          "relative grid size-10 place-items-center rounded-lg text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+          open && "bg-surface-2 text-text",
+          current && "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary",
         )}
-      </div>
+      >
+        <Icon className="size-[19px]" aria-hidden />
+        {total > 0 && <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-action-solid ring-2 ring-surface" aria-hidden />}
+      </button>
+      {open && pos && (
+        <div className="fixed z-50 w-56 animate-in rounded-xl border border-line bg-surface p-1.5 shadow-pop" style={{ top: pos.top, left: pos.left }} onMouseEnter={show} onMouseLeave={() => hide()}>
+          <p id={`${menuId}-t`} className="px-2.5 pt-1.5 pb-1.5 text-xs font-bold text-text-2">
+            {m.title}
+          </p>
+          <ul ref={menu} id={menuId} role="menu" aria-labelledby={`${menuId}-t`} onKeyDown={onMenuKey}>
+            {m.pages.map((p) => {
+              const active = p.href === activeHref;
+              return (
+                <li key={p.href} role="none" className={cn(p.lineBefore && "mt-1.5 border-t border-line pt-1.5")}>
+                  <Link
+                    href={p.href}
+                    role="menuitem"
+                    tabIndex={-1}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "flex h-9 items-center justify-between gap-2 rounded-lg px-2.5 text-[13.5px] text-text-2 hover:bg-surface-2 hover:text-text focus-visible:bg-surface-2",
+                      active && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
+                    )}
+                  >
+                    <span className="truncate">{p.label}</span>
+                    {!!p.badge && <Count n={p.badge} label={p.badgeLabel ?? "unread"} />}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </li>
   );
 }
 
-/** Dashboard, then one TopModule per module: the top menu (tablet and desktop). */
-function TopMenu({ modules }: { modules: NavModule[] }) {
+/** The folded menu: the logo, Home and one icon per group. */
+function Strip({ modules, companyName, logo }: { modules: NavModule[]; companyName: string; logo?: string }) {
   const pathname = usePathname();
   const activeHref = pageOf(pathname, modules.flatMap((m) => m.pages))?.href;
   const current = moduleOf(pathname, modules);
   const home = isActive(pathname, HOME_HREF);
   return (
-    <nav aria-label="Main" className="no-print hidden border-b border-line bg-surface md:block">
-      <ul className="mx-auto flex max-w-[1440px] items-end gap-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <li className="flex">
-          <Link
-            href={HOME_HREF}
-            data-module-item
-            aria-current={home ? "page" : undefined}
-            className={cn(
-              "relative flex min-w-[104px] flex-col items-center gap-1 rounded-t-xl border-b-[3px] border-transparent px-2.5 pt-2.5 pb-2 text-[13px] font-medium whitespace-nowrap text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
-              home && "border-primary-solid bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
-            )}
-          >
-            <House className="size-5" strokeWidth={2} aria-hidden />
-            <span>Dashboard</span>
-          </Link>
-        </li>
-        {modules.map((m) => (
-          <TopModule key={m.key} m={m} current={m.key === current} activeHref={activeHref} />
-        ))}
-      </ul>
-    </nav>
-  );
-}
-
-/** The phone drawer's contents: the company at the top, the modules, who is signed in. */
-function SidebarContent({
-  modules,
-  companyName,
-  roleLabel,
-  logo,
-  open,
-  toggle,
-  big,
-}: {
-  modules: NavModule[];
-  companyName: string;
-  roleLabel: string;
-  logo?: string;
-  open: Set<ModuleKey>;
-  toggle: (key: ModuleKey) => void;
-  big?: boolean;
-}) {
-  const pathname = usePathname();
-  const activeHref = pageOf(pathname, modules.flatMap((m) => m.pages))?.href;
-  return (
     <>
-      <div className="flex h-14 shrink-0 items-center gap-1 border-b border-line pr-2 pl-4">
-        <Link href={HOME_HREF} className={cn("flex min-w-0 flex-1 items-center gap-2.5 rounded-lg", big && "pr-10")}>
-          <Logo companyName={companyName} logo={logo} />
-          <span className="min-w-0 leading-tight">
-            <span className="block truncate text-sm font-semibold text-text">{companyName}</span>
-            <span className="block text-[11px] text-muted">Kebo ERP</span>
-          </span>
+      <div className="grid h-14 shrink-0 place-items-center">
+        <Link href={HOME_HREF} className="rounded-lg" aria-label={`Kebo ERP, ${companyName}, home`}>
+          <Logo companyName={companyName} logo={logo} size={32} />
         </Link>
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Main">
-        <ModuleTree modules={modules} pathname={pathname} activeHref={activeHref} open={open} toggle={toggle} big={big} />
+      <nav aria-label="Main" className="flex-1 px-2.5 pt-1">
+        <ul className="flex flex-col items-center gap-0.5">
+          <li className="flex">
+            <Link
+              href={HOME_HREF}
+              data-strip-item
+              aria-label="Home"
+              title="Home"
+              aria-current={home ? "page" : undefined}
+              className={cn(
+                "grid size-10 place-items-center rounded-lg text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+                home && "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary",
+              )}
+            >
+              <House className="size-[19px]" aria-hidden />
+            </Link>
+          </li>
+          {modules.map((m) => (
+            <StripGroup key={m.key} m={m} current={m.key === current} activeHref={activeHref} />
+          ))}
+        </ul>
       </nav>
-      <div className="border-t border-line p-3 text-[11px] text-muted">
-        Signed in as <span className="font-medium text-text-2">{roleLabel}</span>
-      </div>
     </>
   );
 }
 
 /* ------------------------------------------------------------------ Shell */
 
+/** From this width the menu is open beside the page unless it was folded; below it, it is the strip of icons. */
+const WIDE = "(min-width: 1280px)";
+
 /**
- * The frame around every signed-in screen (Kebo ERP look). Phone first: a top bar (menu, logo,
- * alerts, account), the module drawer, a bottom tab bar with the main action in the middle.
- * Tablet and desktop add the search and the top menu: one item per module, icon above its name,
- * and the current module's pages as chips under it.
+ * The frame around every signed-in screen. Desktop: the menu down the left (Home and the groups with
+ * their pages: two levels), which folds to a strip of icons, and one row above the page (search, New,
+ * alerts, the account). The fold is remembered; on a screen under 1280 px the menu is the strip and
+ * its button opens the whole menu over the page. Phone: the row at the top, the menu over the page,
+ * and a bottom bar with the main action in the middle.
  */
 export function AppShell({
   modules,
@@ -617,26 +633,34 @@ export function AppShell({
   user,
   unread = 0,
   canCreate = false,
+  newItems = [],
   logo,
   initialOpen = [],
+  initialFold = null,
   children,
 }: {
-  /** The modules and pages this person may open (the layout leaves out the rest). */
+  /** The groups and pages this person may open (the layout leaves out the rest). */
   modules: NavModule[];
   companyName: string;
-  /** The company's logo (none: its initials). */
+  /** The company's logo (none: its initial). */
   logo?: string;
   user: { name: string; email: string; role: string };
   unread?: number;
   canCreate?: boolean;
-  /** The drawer's modules left open (their cookie). */
+  /** What "New" offers this person (none: no New button). */
+  newItems?: NewItem[];
+  /** The groups left open (their cookie). */
   initialOpen?: ModuleKey[];
+  /** The menu left folded (true) or open (false); null: never chosen. */
+  initialFold?: boolean | null;
   children: ReactNode;
 }) {
+  useFollowSystemLook();
   const [drawer, setDrawer] = useState(false);
+  const [fold, setFold] = useState(initialFold);
   const pathname = usePathname();
   const current = moduleOf(pathname, modules);
-  // The drawer's modules the person opened (remembered in a cookie); the current page's module opens by itself on top,
+  // The groups the person opened (remembered in a cookie); the current page's group opens by itself on top,
   // unless they closed it on this page.
   const [opened, setOpened] = useState<Set<ModuleKey>>(() => new Set(initialOpen));
   const [shut, setShut] = useState(false);
@@ -660,8 +684,15 @@ export function AppShell({
     setOpened(next);
     writeCookie(OPEN_COOKIE, [...next].join("."));
   };
+  const folded = fold === true;
+  // On a wide screen the button folds and opens the menu beside the page; on a smaller one it opens it over the page.
+  const onFoldButton = () => {
+    if (!window.matchMedia(WIDE).matches) return setDrawer(true);
+    setFold(!folded);
+    writeCookie(FOLD_COOKIE, folded ? "0" : "1");
+  };
 
-  const tab = (href: string, label: string, Icon: typeof LayoutDashboard, badge?: number) => {
+  const tab = (href: string, label: string, Icon: typeof House, badge?: number) => {
     const active = isActive(pathname, href);
     return (
       <Link
@@ -681,7 +712,8 @@ export function AppShell({
   };
 
   return (
-    <div className="min-h-dvh">
+    // data-menu: lists read it to know how much width the page has (DataTable).
+    <div className="group/shell min-h-dvh md:flex" data-menu={folded ? "folded" : "open"}>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-pop"
@@ -689,77 +721,95 @@ export function AppShell({
         Skip to content
       </a>
 
-      {/* Phone: the drawer with every module, rows easy to tap */}
+      {/* Desktop: the menu beside the page (from 1280 px, unless folded) */}
+      <aside aria-label="Menu" className={cn("no-print sticky top-0 h-dvh w-[232px] shrink-0 flex-col border-r border-line bg-surface", folded ? "hidden" : "hidden xl:flex")}>
+        <MenuContent modules={modules} companyName={companyName} logo={logo} open={open} toggle={toggle} />
+      </aside>
+      {/* Desktop: the menu folded to a strip of icons (always under 1280 px) */}
+      <aside aria-label="Menu, folded" className={cn("no-print sticky top-0 h-dvh w-[60px] shrink-0 flex-col border-r border-line bg-surface", folded ? "hidden md:flex" : "hidden md:flex xl:hidden")}>
+        <Strip modules={modules} companyName={companyName} logo={logo} />
+      </aside>
+
+      {/* Phone and small screens: the whole menu over the page, rows easy to tap */}
       {drawer && (
-        <div className="no-print fixed inset-0 z-50 md:hidden">
+        <div className="no-print fixed inset-0 z-50 xl:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} aria-hidden />
           <aside aria-label="Menu" className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] animate-slide-in flex-col border-r border-line bg-surface shadow-pop">
             <button className="absolute top-2 right-2 grid size-10 place-items-center rounded-md text-muted hover:bg-surface-2" onClick={() => setDrawer(false)} aria-label="Close menu">
               <X className="size-4" />
             </button>
-            <SidebarContent modules={modules} companyName={companyName} roleLabel={user.role} logo={logo} open={open} toggle={toggle} big />
+            <MenuContent modules={modules} companyName={companyName} logo={logo} open={open} toggle={toggle} big />
           </aside>
         </div>
       )}
 
-      <div className="no-print sticky top-0 z-30">
-        <header className="border-b border-line bg-surface">
-          <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-4 py-2.5 sm:px-6">
+      <div className="min-w-0 flex-1">
+        <header className="no-print sticky top-0 z-30 border-b border-line bg-surface">
+          <div className="flex h-14 items-center gap-2 px-4 sm:px-6 md:pl-3">
             <button type="button" className={cn(buttonClass("ghost", "icon"), "-ml-2 md:hidden")} onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer}>
               <MenuIcon aria-hidden />
             </button>
-            <Link href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg md:min-w-[220px]" aria-label={`Kebo ERP, ${companyName}, dashboard`}>
-              <Logo companyName={companyName} logo={logo} />
-              <span className="hidden min-w-0 flex-col leading-tight sm:flex">
-                <span className="text-[17px] font-bold text-text">Kebo ERP</span>
-                <span className="max-w-56 truncate text-xs text-muted">{companyName}</span>
-              </span>
+            <Link href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg md:hidden" aria-label={`Kebo ERP, ${companyName}, home`}>
+              <Logo companyName={companyName} logo={logo} size={32} />
+              <span className="text-[15.5px] font-bold tracking-tight text-text max-[380px]:hidden">Kebo ERP</span>
             </Link>
-            <form action="/inquiries" role="search" aria-label="Search inquiries" className="relative mx-auto hidden max-w-[560px] flex-[1_1_320px] md:block">
+            {/* Under 1280 px the menu is the strip: the button opens the whole menu over the page. */}
+            <button type="button" className={cn(buttonClass("ghost", "icon"), "hidden md:inline-flex xl:hidden")} onClick={() => setDrawer(true)} aria-label="Open the menu" aria-expanded={drawer}>
+              <PanelLeftOpen aria-hidden />
+            </button>
+            <button type="button" className={cn(buttonClass("ghost", "icon"), "hidden xl:inline-flex")} onClick={onFoldButton} aria-label={folded ? "Open the menu" : "Fold the menu"} aria-pressed={folded}>
+              {folded ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
+            </button>
+            <form action="/inquiries" role="search" aria-label="Search inquiries" className="relative hidden max-w-[380px] flex-1 md:block">
               <label htmlFor="global-search" className="sr-only">
                 Search inquiries
               </label>
-              <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
               <input
                 id="global-search"
                 name="q"
                 type="search"
                 placeholder="Search inquiries, customers, numbers…"
-                className="h-[42px] w-full rounded-xl border border-line-strong bg-[#f8faf9] pr-12 pl-10 text-sm text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none dark:bg-surface-2"
+                className="h-9 w-full rounded-[10px] border border-line-strong bg-[#f8faf9] pr-10 pl-9 text-[13px] text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none dark:bg-surface-2"
               />
               <input type="hidden" name="status" value="all" />
-              <span className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 lg:inline-flex">
+              <span className="pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 lg:inline-flex">
                 <Kbd>/</Kbd>
               </span>
             </form>
-            <div className="ml-auto flex items-center gap-2 md:ml-0">
+            <div className="ml-auto flex items-center gap-1.5">
               <Link href="/inquiries" className={cn(buttonClass("ghost", "icon"), "md:hidden")} aria-label="Search inquiries">
                 <Search aria-hidden />
               </Link>
-              <ThemeMenu />
-              <Link href="/notifications" className={cn(buttonClass("ghost", "icon"), "relative size-[42px]")} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
+              {newItems.length > 0 && (
+                <span className="hidden md:block">
+                  <NewMenu items={newItems} />
+                </span>
+              )}
+              <Link href="/notifications" className={cn(buttonClass("ghost", "icon"), "relative")} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
                 <Bell aria-hidden />
                 {!!unread && (
-                  <span className="absolute top-1 right-0.5 min-w-[18px] rounded-full bg-action-solid px-1 text-center text-[10px] leading-[18px] font-bold text-white" aria-hidden>
+                  <span className="absolute top-0.5 right-0 min-w-[18px] rounded-full bg-action-solid px-1 text-center text-[10px] leading-[18px] font-bold text-white" aria-hidden>
                     {unread > 9 ? "9+" : unread}
                   </span>
                 )}
               </Link>
-              <AccountMenu user={user} />
+              <AccountMenu user={user} companyName={companyName} />
             </div>
           </div>
         </header>
-        <TopMenu modules={modules} />
-      </div>
 
-      <main id="main" className="mx-auto w-full max-w-[1440px] px-4 pt-[18px] pb-28 sm:px-6 md:pb-10">
-        {children}
-        <p className="no-print mt-6 text-xs text-muted">© {new Date().getFullYear()} Kebo ERP · {companyName}</p>
-      </main>
+        <main id="main" className="mx-auto w-full max-w-[1440px] px-4 pt-[18px] pb-28 sm:px-6 md:pb-10">
+          {children}
+          <p className="no-print mt-6 text-xs text-muted">
+            © {new Date().getFullYear()} Kebo ERP · {companyName}
+          </p>
+        </main>
+      </div>
 
       {/* Phone: bottom tab bar, thumb-reachable, with the main action in the middle */}
       <nav aria-label="Quick" className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        {tab("/dashboard", "Dashboard", LayoutDashboard)}
+        {tab(HOME_HREF, "Home", House)}
         {tab("/inquiries", "Inquiries", ClipboardList)}
         {canCreate ? (
           <div className="flex flex-1 items-start justify-center">

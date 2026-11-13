@@ -495,8 +495,8 @@ async function expenses(q: Q): Promise<SheetSpec> {
 async function audit(q: Q): Promise<SheetSpec> {
   const rows = (await allPages<AuditRow>("/audit", { entityType: q.type, userId: q.person })).slice(0, 10_000);
   return {
-    name: `Audit log ${stamp()}`,
-    title: "Audit log",
+    name: `Activity log ${stamp()}`,
+    title: "Activity log",
     columns: [text("When (UTC)", 17), text("Who", 18), text("Action", 12), text("What", 14), text("Summary", 70)],
     rows: rows.map((r): Cell[] => [when(r.createdAt), r.userName, r.action, r.entityType, r.summary]),
   };

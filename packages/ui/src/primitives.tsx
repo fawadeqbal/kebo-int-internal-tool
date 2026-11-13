@@ -1,18 +1,7 @@
 import Link from "next/link";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
-import {
-  BookOpen,
-  Globe,
-  House,
-  LayoutDashboard,
-  Package,
-  Settings,
-  TrendingUp,
-  Users,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+import { House, Package, Settings, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 
 /* ---------------------------------------------------------------- Button */
@@ -197,17 +186,14 @@ export function CardFooter({ className, ...props }: ComponentProps<"div">) {
  * `actions` and `description` are the older form (a free row of buttons, a
  * line of text), kept for the pages not yet moved to the frame.
  */
-/** The icon of each module (the menu's), shown in the title's tile when the page names no icon of its own. */
+/** The icon of each group of the menu, shown in the title's tile when the page names no icon of its own. */
 export const MODULE_ICONS: Record<string, LucideIcon> = {
-  Dashboard: House,
-  Overview: LayoutDashboard,
-  "Public landing page": Globe,
-  "Partners & CRM": Users,
-  "Operations & trading": Package,
-  "Revenue & profitability": TrendingUp,
-  "Treasury & payments": Wallet,
-  "Finance & general ledger": BookOpen,
-  "System & admin": Settings,
+  Home: House,
+  Sales: Package,
+  Purchasing: ShoppingCart,
+  Money: Wallet,
+  Reports: TrendingUp,
+  Settings: Settings,
 };
 
 export function PageHeader({
@@ -230,7 +216,7 @@ export function PageHeader({
   title: ReactNode;
   /** The icon in the green tile before the title (default: the module's, from the crumbs; none without crumbs). */
   icon?: LucideIcon | null;
-  /** Where the page is in the menu, above the title: "Dashboard / Finance / Cash book" (the last is this page). */
+  /** Where the page is in the menu, above the title: "Money / Cash & bank" (the last is this page). */
   crumbs?: { label: string; href?: string }[];
   /** On a phone, the buttons go under the title (record pages, whose names are long). */
   phoneStack?: boolean;
@@ -255,7 +241,8 @@ export function PageHeader({
   const framed = badge !== undefined || summary !== undefined || primary !== undefined || papers !== undefined || more !== undefined || views !== undefined;
   const right = actions || papers || views || primary || more;
   const Icon = icon === null ? null : (icon ?? (crumbs?.[0] ? MODULE_ICONS[crumbs[0].label] : undefined));
-  const trail = crumbs && crumbs.length > 0 ? (crumbs[0]!.label === "Dashboard" ? crumbs : [{ label: "Dashboard", href: "/dashboard" }, ...crumbs]) : null;
+  // The path is the menu's two levels (and the record, on a record's page): "Sales / Inquiries / RFQ-2026-0001".
+  const trail = crumbs && crumbs.length > 0 ? crumbs : null;
   return (
     <header className="mb-4">
       {trail && <Breadcrumb items={trail} />}
@@ -300,7 +287,7 @@ export function PageHeader({
   );
 }
 
-/** "Dashboard / Finance / Cash book" above a page's title: where it is in the menu. The last part is this page. */
+/** "Money / Cash & bank" above a page's title: where it is in the menu. The last part is this page. */
 export function Breadcrumb({ items, className }: { items: { label: string; href?: string }[]; className?: string }) {
   return (
     <nav aria-label="Breadcrumb" className={cn("mb-2 text-xs font-medium text-muted", className)}>

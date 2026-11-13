@@ -4,6 +4,36 @@
 @source "../../../../packages/ui/src";
 
 /*
+ * How much room the page has beside the menu (AppShell sets data-menu on its frame):
+ *   fits   about 1,150 px or more: from 1432 px, or from 1280 px with the menu folded to its strip.
+ *          Every list fits its card, so its header row can stay in view while the page scrolls.
+ *   roomy  about 1,300 px or more: from 1580 px, or from 1408 px with the menu folded.
+ *          The widest lists show their extra columns and the side panel of a record is full width.
+ * Narrower than "fits", a wide list scrolls sideways in its card.
+ */
+@custom-variant fits {
+  @media (min-width: 1432px) {
+    @slot;
+  }
+  @media (min-width: 1280px) {
+    [data-menu="folded"] & {
+      @slot;
+    }
+  }
+}
+@custom-variant roomy {
+  @media (min-width: 1580px) {
+    @slot;
+  }
+  @media (min-width: 1408px) {
+    [data-menu="folded"] & {
+      @slot;
+    }
+  }
+}
+
+
+/*
  * A read-only table of lines that can be edited (EditableRows): a hovered row
  * lights up and shows a pencil at its end; a click opens it for editing.
  */

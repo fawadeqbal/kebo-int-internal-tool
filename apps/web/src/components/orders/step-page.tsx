@@ -108,7 +108,8 @@ export function StepPrevNext({ prev, next }: { prev: { href: string; label: stri
 }
 
 /** The work area beside the side panel: 380px from 1024, 420px from 1280; under the page below that. */
-export const SIDE_COLUMNS = "lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]";
+// The side panel is 420 px where the page has room (roomy); beside the open menu on a laptop it is 340 px, so the middle keeps about 800 px.
+export const SIDE_COLUMNS = "lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_340px] roomy:grid-cols-[minmax(0,1fr)_420px]";
 
 /** A step page's frame: the header, then its work area beside the side cards, then the way to the step before and after. */
 export function StepFrame({

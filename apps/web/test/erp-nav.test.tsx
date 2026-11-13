@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { buildModules, crumbsFor, moduleOf, pageOf, MODULE_PAGES, type NavModule } from "@/lib/nav";
 
-// The menu (ERP redesign: nine modules, standard names; Kebo ERP look): a top menu with a menu per module, the module's pages as chips, the phone drawer.
+// The menu (13 Nov 2026): Home and five groups with plain names, two levels; down the left on a desktop, folding
+// to a strip of icons; over the page on a phone.
 const at = vi.hoisted(() => ({ path: "/finance/cash-book" }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
@@ -11,23 +12,26 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/app/login/actions", () => ({ logoutAction: vi.fn() }));
 
-// The theme menu listens to the system's light or dark.
-window.matchMedia ??= ((q: string) => ({ matches: false, media: q, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+// The shell asks the window whether it is wide (the fold button) and light or dark (the look).
+const wide = { on: true };
+window.matchMedia = ((q: string) => ({ matches: q.includes("min-width") ? wide.on : false, media: q, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
 
 const { AppShell } = await import("@/components/shell/nav");
 
 const everything = (approvals: number | null = 2) =>
   buildModules({ can: () => true, feature: () => true, approvals, approves: true, companyAddresses: false });
 
-/** A staff member: no money, no reports, no admin (the demo's Staff role). */
+/** A staff member: no money, no reports, no settings (the demo's Staff role). */
 const STAFF = new Set(["inquiries.create", "money.submit"]);
 const staff = () =>
   buildModules({ can: (p) => STAFF.has(p), feature: () => true, approvals: 1, approves: false, companyAddresses: false });
 
 const titles = (m: NavModule[]) => m.map((x) => x.title);
 const pages = (m: NavModule[], key: string) => m.find((x) => x.key === key)?.pages.map((p) => p.label);
+/** The pages that carry the thin line above them. */
+const lines = (m: NavModule[], key: string) => m.find((x) => x.key === key)?.pages.filter((p) => p.lineBefore).map((p) => p.label);
 
-function shell(modules: NavModule[], opts: { open?: NavModule["key"][] } = {}) {
+function shell(modules: NavModule[], opts: { open?: NavModule["key"][]; fold?: boolean | null; newItems?: { href: string; label: string }[] } = {}) {
   return render(
     <AppShell
       modules={modules}
@@ -36,243 +40,363 @@ function shell(modules: NavModule[], opts: { open?: NavModule["key"][] } = {}) {
       unread={5}
       canCreate
       initialOpen={opts.open}
+      initialFold={opts.fold ?? null}
+      newItems={opts.newItems}
     >
       <p>page</p>
     </AppShell>,
   );
 }
 
+/** The open menu beside the page, and the folded strip (both are in the page; the screen's width shows one). */
+const menu = () => within(screen.getByRole("complementary", { name: "Menu" }));
+const strip = () => within(screen.getByRole("complementary", { name: "Menu, folded" }));
+
 beforeEach(() => {
   at.path = "/finance/cash-book";
+  wide.on = true;
   document.cookie = "nav-open=; max-age=0; path=/";
+  document.cookie = "nav-fold=; max-age=0; path=/";
 });
 afterEach(() => vi.useRealTimers());
 
-describe("the modules", () => {
-  it("are the brief's, top to bottom, for someone who may open everything (Currency & FX has no page yet)", () => {
+describe("the groups", () => {
+  it("are five, with plain names, for someone who may open everything", () => {
     const m = everything();
-    expect(titles(m)).toEqual([
-      "Overview",
-      "Public landing page",
-      "Partners & CRM",
-      "Operations & trading",
-      "Revenue & profitability",
-      "Treasury & payments",
-      "Finance & general ledger",
-      "System & admin",
-    ]);
-    expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines", "Analytics & reports", "Audit log"]);
-    expect(pages(m, "public")).toEqual(["Website form"]);
-    expect(pages(m, "partners")).toEqual(["Customers", "Suppliers"]);
-    expect(pages(m, "operations")).toEqual(["Inquiries (RFQs)", "Orders", "Purchase orders", "Fulfillment & logistics"]);
-    expect(pages(m, "revenue")).toEqual(["Profit & loss", "Cost & expense allocation", "Variance analysis"]);
-    expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue", "Multi-currency vault"]);
-    expect(pages(m, "finance")).toEqual(["Invoices", "Receivables (AR)", "Payables (AP)", "General ledger"]);
-    expect(pages(m, "admin")).toEqual(["Company settings", "Sales & quotations", "Reminders", "Emails", "Order checklist", "Document templates", "Users", "Roles", "Sessions", "Sign-ins"]);
+    expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Settings"]);
+    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Shipments", "Customers", "Follow-ups"]);
+    expect(pages(m, "purchasing")).toEqual(["Purchase orders", "Suppliers"]);
+    expect(pages(m, "money")).toEqual(["Payments", "To verify", "Cash & bank", "Expenses", "Invoices", "To receive", "To pay", "Ledger"]);
+    expect(pages(m, "reports")).toEqual(["Profit & loss", "Planned vs spent", "All reports", "Activity log"]);
+    expect(pages(m, "settings")).toEqual(["Company", "Sales & quotations", "Order checklist", "Document templates", "Reminders", "Emails", "Website form", "People", "Roles", "Sign-ins", "Sessions"]);
   });
 
-  it("each page keeps its address, none of the pages not built yet is listed, and the reports share one item", () => {
+  it("have one name each, and two levels: a group and its pages", () => {
+    for (const m of MODULE_PAGES) {
+      expect(Object.keys(m).sort()).toEqual(["icon", "key", "pages", "title"]);
+      for (const p of m.pages) expect(Object.keys(p).filter((k) => k !== "lineBefore").sort()).toEqual(["href", "label"]);
+    }
+  });
+
+  it("each page keeps its address, and no page is listed twice", () => {
     const hrefs = MODULE_PAGES.flatMap((m) => m.pages.map((p) => p.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    const labels = MODULE_PAGES.flatMap((m) => m.pages.map((p) => p.label));
-    for (const later of ["Sourcing desk", "Quotations", "Work orders", "Documentation", "Currency registry", "Exchange rates", "Operating expenses"])
-      expect(labels).not.toContain(later);
-    expect(hrefs).toEqual(
-      expect.arrayContaining([
-        "/follow-ups",
+    expect([...hrefs].sort()).toEqual(
+      [
+        "/inquiries",
+        "/orders",
         "/orders/board",
-        "/reports",
-        "/audit",
+        "/operations/shipments",
+        "/customers",
+        "/follow-ups",
+        "/operations/purchase-orders",
+        "/factories",
+        "/payments",
+        "/approvals",
         "/finance/cash-book",
         "/finance/expenses",
+        "/finance/invoices",
         "/finance/to-receive",
+        "/purchasing/to-pay",
         "/finance/ledger",
         "/finance/profit",
         "/finance/leaks",
-        "/purchasing/to-pay",
-        "/operations/purchase-orders",
-        "/operations/shipments",
-        "/approvals",
+        "/reports",
+        "/audit",
         "/settings/company",
+        "/settings/address",
+        "/settings/sales",
+        "/settings/order-checklist",
         "/settings/papers",
+        "/settings/reminders",
+        "/settings/emails",
+        "/settings/website-form",
         "/users",
         "/access/roles",
-        "/access/sessions",
         "/access/sign-ins",
-      ]),
+        "/access/sessions",
+      ].sort(),
     );
-    // Tabs on the page now, and the bell: not sidebar items.
+    // Tabs on the page, and the bell: not menu items.
     for (const tab of ["/reports/customers", "/reports/factories", "/reports/people", "/reports/funnel", "/reports/print", "/notifications"]) expect(hrefs).not.toContain(tab);
   });
 
   it("Company address shows only when companies have their own addresses", () => {
-    expect(pages(everything(), "admin")).not.toContain("Company address");
+    expect(pages(everything(), "settings")).not.toContain("Company address");
     const m = buildModules({ can: () => true, feature: () => true, approvals: 0, approves: true, companyAddresses: true });
-    expect(pages(m, "admin")?.slice(5, 7)).toEqual(["Document templates", "Company address"]);
+    expect(pages(m, "settings")?.slice(0, 2)).toEqual(["Company", "Company address"]);
   });
 
-  it("hide the pages a person may not open, and a module with none left", () => {
+  it("hide the pages a person may not open, and a group with none left", () => {
     const m = staff();
     // Payments (its Payment requests tab) and Invoices are open to everyone who sees orders.
-    expect(titles(m)).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Treasury & payments", "Finance & general ledger"]);
-    expect(pages(m, "finance")).toEqual(["Invoices"]);
-    expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines"]);
-    expect(pages(m, "partners")).toEqual(["Customers"]);
-    // Staff who send money for approval see their payments and the queue.
-    expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue"]);
-    // No verification queue for someone who neither verifies nor sends money for it.
+    expect(titles(m)).toEqual(["Sales", "Money"]);
+    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Shipments", "Customers", "Follow-ups"]);
+    // Staff who send money for approval see their payments and what was sent back.
+    expect(pages(m, "money")).toEqual(["Payments", "To verify", "Invoices"]);
+    // Nothing to verify for someone who neither verifies nor sends money for it.
     const none = buildModules({ can: () => false, feature: () => true, approvals: null, approves: false, companyAddresses: false });
-    expect(titles(none)).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Treasury & payments", "Finance & general ledger"]);
-    expect(pages(none, "treasury")).toEqual(["Payments"]);
+    expect(titles(none)).toEqual(["Sales", "Money"]);
+    expect(pages(none, "money")).toEqual(["Payments", "Invoices"]);
   });
 
-  it("follow the plan: no vault, costs, reports or audit log when the plan leaves them out", () => {
+  it("follow the plan: no cash and bank, expenses, reports or activity log when the plan leaves them out", () => {
     const m = buildModules({ can: () => true, feature: (f) => !["cash_book", "expenses", "insights", "audit_log"].includes(f), approvals: 0, approves: true, companyAddresses: false });
-    expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue"]);
-    expect(pages(m, "finance")).toEqual(["Invoices", "Receivables (AR)", "Payables (AP)", "General ledger"]);
-    expect(titles(m)).not.toContain("Revenue & profitability");
-    expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines"]);
+    expect(pages(m, "money")).toEqual(["Payments", "To verify", "Invoices", "To receive", "To pay", "Ledger"]);
+    expect(titles(m)).not.toContain("Reports");
   });
 
-  it("a manager sees money and reports, and of System & admin only what their permissions allow", () => {
+  it("a manager sees money and reports, and of Settings only what their permissions allow", () => {
     const MANAGER = new Set(["sourcing.manage", "expenses.manage", "payments.record", "reports.view", "users.manage", "inquiries.create"]);
     const m = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 4, approves: true, companyAddresses: false });
-    expect(titles(m)).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Revenue & profitability", "Treasury & payments", "Finance & general ledger", "System & admin"]);
-    expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines", "Analytics & reports"]);
-    expect(pages(m, "admin")).toEqual(["Users"]);
-    // A recorder without expenses: receivables and payables, no money reports (they need expenses.manage).
+    expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Settings"]);
+    expect(pages(m, "reports")).toEqual(["Profit & loss", "Planned vs spent", "All reports"]);
+    expect(pages(m, "settings")).toEqual(["People"]);
+    // A recorder without expenses: what is to receive and to pay, no money reports (they need expenses.manage).
     const recorder = buildModules({ can: (p) => ["sourcing.manage", "payments.record", "reports.view"].includes(p), feature: () => true, approvals: 0, approves: true, companyAddresses: false });
-    expect(pages(recorder, "finance")).toEqual(["Invoices", "Receivables (AR)", "Payables (AP)"]);
-    expect(pages(recorder, "revenue")).toBeUndefined();
+    expect(pages(recorder, "money")).toEqual(["Payments", "To verify", "Invoices", "To receive", "To pay"]);
+    expect(pages(recorder, "reports")).toEqual(["All reports"]);
   });
 
-  it("know which page and module an address is in (the longest address wins)", () => {
+  it("keep the thin line between a group's two kinds of page, whatever is hidden", () => {
+    expect(lines(everything(), "money")).toEqual(["Invoices"]);
+    expect(lines(everything(), "settings")).toEqual(["People"]);
+    // Invoices is the page that carries it; Payments is above, so the line stays.
+    expect(lines(staff(), "money")).toEqual(["Invoices"]);
+    // Only People is left in Settings: no line above the first page.
+    const onlyPeople = buildModules({ can: (p) => p === "users.manage", feature: () => true, approvals: null, approves: false, companyAddresses: false });
+    expect(pages(onlyPeople, "settings")).toEqual(["People"]);
+    expect(lines(onlyPeople, "settings")).toEqual([]);
+    // People is hidden: the next page of that part carries the line.
+    const security = buildModules({ can: (p) => p === "settings.manage" || p === "security.manage", feature: () => true, approvals: null, approves: false, companyAddresses: false });
+    expect(lines(security, "settings")).toEqual(["Roles"]);
+  });
+
+  it("know which page and group an address is in (the longest address wins)", () => {
     const all = everything();
     const flat = all.flatMap((m) => m.pages);
-    expect(pageOf("/orders/board", flat)?.label).toBe("Pipelines");
+    expect(pageOf("/orders/board", flat)?.label).toBe("Order board");
     expect(pageOf("/orders/0b6c", flat)?.label).toBe("Orders");
-    expect(pageOf("/reports/people/targets", flat)?.label).toBe("Analytics & reports");
-    expect(pageOf("/reports", flat)?.label).toBe("Analytics & reports");
+    expect(pageOf("/reports/people/targets", flat)?.label).toBe("All reports");
     expect(pageOf("/access/roles/manager", flat)?.label).toBe("Roles");
-    expect(moduleOf("/finance/leaks", all)).toBe("revenue");
-    expect(moduleOf("/orders/board", all)).toBe("overview");
-    expect(moduleOf("/purchasing/to-pay", all)).toBe("finance");
+    expect(moduleOf("/finance/leaks", all)).toBe("reports");
+    expect(moduleOf("/orders/board", all)).toBe("sales");
+    expect(moduleOf("/purchasing/to-pay", all)).toBe("money");
+    expect(moduleOf("/factories/9a1b", all)).toBe("purchasing");
     expect(moduleOf("/dashboard", all)).toBeUndefined();
-    expect(crumbsFor("/finance/cash-book")).toEqual([{ label: "Treasury & payments" }, { label: "Multi-currency vault" }]);
+    // The path above a page's title: the group, then the page. Two levels.
+    expect(crumbsFor("/finance/cash-book")).toEqual([{ label: "Money" }, { label: "Cash & bank" }]);
+    expect(crumbsFor("/inquiries")).toEqual([{ label: "Sales" }, { label: "Inquiries" }]);
   });
 });
 
-describe("the top menu", () => {
-  const menu = () => within(screen.getByRole("navigation", { name: "Main" }));
-
-  it("has Dashboard first, then one item per module: its icon over a short name, its full name for screen readers", () => {
-    shell(everything());
-    const items = menu().getAllByRole("listitem").filter((li) => li.parentElement?.parentElement?.tagName === "NAV");
-    expect(items[0]!.textContent).toBe("Dashboard");
-    expect(menu().getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("/dashboard");
-    const buttons = menu().getAllByRole("button");
-    expect(buttons.map((b) => b.textContent)).toEqual(["Overview", "Website", "Partners", "Operations", "Revenue", "Treasury", "Finance", "Admin"]);
-    expect(menu().getByRole("button", { name: /^Treasury & payments/ }).getAttribute("aria-haspopup")).toBe("menu");
-  });
-
-  it("marks the current module: soft green with a green line under it", () => {
+describe("the menu down the left", () => {
+  it("has Home first, then one button per group; the group of the current page is open and its page marked", () => {
     at.path = "/finance/cash-book";
     shell(everything());
-    const treasury = menu().getByRole("button", { name: "Treasury & payments, 2 to look at" });
-    expect(treasury.className).toContain("bg-primary-soft");
-    expect(treasury.className).toContain("border-primary-solid");
-    expect(menu().getByRole("button", { name: "Partners & CRM" }).className).not.toContain("bg-primary-soft");
+    expect(menu().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
+    expect(menu().getAllByRole("button").map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Purchasing", "Money", "Reports", "Settings"]);
+    expect(menu().getByRole("button", { name: "Money" }).getAttribute("aria-expanded")).toBe("true");
+    expect(menu().getByRole("button", { name: "Sales" }).getAttribute("aria-expanded")).toBe("false");
+    expect(menu().getByRole("link", { current: "page" }).textContent).toBe("Cash & bank");
+    // Its group's name is bold; the others are not.
+    expect(menu().getByRole("button", { name: "Money" }).className).toContain("font-bold");
+    expect(menu().getByRole("button", { name: "Sales" }).className).not.toContain("font-bold");
   });
 
-  it("marks the page in its module's menu: Pipelines on /orders/board, the list on a record", () => {
-    at.path = "/orders/board";
-    const { unmount } = shell(everything());
-    fireEvent.mouseEnter(screen.getByRole("button", { name: "Overview" }).closest("li")!);
-    expect(within(screen.getByRole("menu", { name: "Overview" })).getByRole("menuitem", { current: "page" }).textContent).toBe("Pipelines");
-    unmount();
+  it("marks the list on a record's page, and Home on the dashboard", () => {
     at.path = "/orders/9a1b";
-    shell(everything());
-    fireEvent.mouseEnter(screen.getByRole("button", { name: "Operations & trading" }).closest("li")!);
-    expect(within(screen.getByRole("menu", { name: "Operations & trading" })).getByRole("menuitem", { current: "page" }).textContent).toBe("Orders");
-  });
-
-  it("marks Dashboard on the dashboard", () => {
+    const { unmount } = shell(everything());
+    expect(menu().getByRole("link", { current: "page" }).textContent).toBe("Orders");
+    unmount();
     at.path = "/dashboard";
     shell(everything());
-    expect(menu().getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBe("page");
+    expect(menu().getByRole("link", { name: "Home" }).getAttribute("aria-current")).toBe("page");
+    for (const b of menu().getAllByRole("button")) expect(b.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("a click on a group opens or closes it, and it is remembered", () => {
+    at.path = "/inquiries";
+    shell(everything());
+    const purchasing = menu().getByRole("button", { name: "Purchasing" });
+    fireEvent.click(purchasing);
+    expect(purchasing.getAttribute("aria-expanded")).toBe("true");
+    expect(menu().getByRole("link", { name: "Suppliers" })).toBeTruthy();
+    // Sales stays open: two groups can be open at once.
+    expect(menu().getByRole("button", { name: "Sales" }).getAttribute("aria-expanded")).toBe("true");
+    expect(document.cookie).toContain("nav-open=purchasing");
+    fireEvent.click(purchasing);
+    expect(purchasing.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("shows what waits: on the page when its group is open, on the group when it is closed", () => {
+    at.path = "/inquiries";
+    const { unmount } = shell(everything(3));
+    expect(menu().getByRole("button", { name: /^Money/ }).textContent).toBe("Money3");
+    unmount();
+    at.path = "/payments";
+    shell(everything(3));
+    expect(menu().getByRole("button", { name: "Money" }).textContent).toBe("Money");
+    expect(menu().getByRole("link", { name: /To verify/ }).textContent).toBe("To verify3");
+  });
+
+  it("draws the thin line above the group's second kind of page", () => {
+    at.path = "/payments";
+    shell(everything());
+    const li = (name: string) => menu().getByRole("link", { name: new RegExp(`^${name}`) }).closest("li")!;
+    expect(li("Invoices").className).toContain("before:bg-line");
+    expect(li("Expenses").className).not.toContain("before:bg-line");
   });
 });
 
-describe("the module menus", () => {
-  it("open on hover and close after the mouse leaves", () => {
+describe("the fold button", () => {
+  it("folds the menu to the strip and opens it again, and it is remembered", () => {
+    shell(everything());
+    const open = screen.getByRole("complementary", { name: "Menu" });
+    const folded = screen.getByRole("complementary", { name: "Menu, folded" });
+    // Not chosen yet: the open menu from 1280 px, the strip under it.
+    expect(open.className).toContain("xl:flex");
+    expect(folded.className).toContain("xl:hidden");
+    fireEvent.click(screen.getByRole("button", { name: "Fold the menu" }));
+    expect(open.className.split(" ")).toContain("hidden");
+    expect(open.className).not.toContain("xl:flex");
+    expect(folded.className).not.toContain("xl:hidden");
+    expect(document.cookie).toContain("nav-fold=1");
+    // The lists read this to know how much room the page has.
+    expect(open.closest("[data-menu]")!.getAttribute("data-menu")).toBe("folded");
+    fireEvent.click(screen.getByRole("button", { name: "Open the menu", pressed: true }));
+    expect(open.className).toContain("xl:flex");
+    expect(document.cookie).toContain("nav-fold=0");
+    expect(open.closest("[data-menu]")!.getAttribute("data-menu")).toBe("open");
+  });
+
+  it("starts folded when it was left folded", () => {
+    shell(everything(), { fold: true });
+    expect(screen.getByRole("complementary", { name: "Menu" }).className.split(" ")).toContain("hidden");
+    expect(screen.getByRole("button", { name: "Open the menu", pressed: true })).toBeTruthy();
+  });
+
+  it("on a screen under 1280 px opens the whole menu over the page instead", () => {
+    wide.on = false;
+    shell(everything());
+    expect(screen.getAllByRole("complementary", { name: "Menu" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Open the menu", pressed: undefined }));
+    expect(screen.getAllByRole("complementary", { name: "Menu" })).toHaveLength(2);
+    expect(document.cookie).not.toContain("nav-fold");
+  });
+});
+
+describe("the folded strip", () => {
+  it("has Home and one icon per group, named for screen readers, the current group marked", () => {
+    at.path = "/finance/cash-book";
+    shell(everything(2));
+    expect(strip().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
+    expect(strip().getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Sales", "Purchasing", "Money, 2 to look at", "Reports", "Settings"]);
+    expect(strip().getByRole("button", { name: /^Money/ }).className).toContain("bg-primary-soft");
+    expect(strip().getByRole("button", { name: "Sales" }).className).not.toContain("bg-primary-soft");
+  });
+
+  it("an icon shows its group's name and pages beside it on hover, and hides them after the mouse leaves", () => {
     vi.useFakeTimers();
     shell(everything());
-    const li = screen.getByRole("button", { name: "Partners & CRM" }).closest("li")!;
+    const li = strip().getByRole("button", { name: "Purchasing" }).closest("li")!;
     fireEvent.mouseEnter(li);
-    const m = screen.getByRole("menu", { name: "Partners & CRM" });
-    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["Customers", "Suppliers"]);
+    const m = screen.getByRole("menu", { name: "Purchasing" });
+    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["Purchase orders", "Suppliers"]);
     fireEvent.mouseLeave(li);
     act(() => vi.advanceTimersByTime(300));
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("work with the keyboard: focus opens it, ↓ goes in, ↑ ↓ move, Esc closes it back on the module", () => {
+  it("works with the keyboard: focus opens it, ↓ goes in, ↑ ↓ move, Esc closes it back on the icon", () => {
     at.path = "/finance/ledger";
     shell(everything());
-    const finance = screen.getByRole("button", { name: "Finance & general ledger" });
-    act(() => finance.focus());
-    expect(finance.getAttribute("aria-expanded")).toBe("true");
-    const m = screen.getByRole("menu", { name: "Finance & general ledger" });
-    expect(finance.getAttribute("aria-controls")).toBe(m.id);
+    const money = strip().getByRole("button", { name: /^Money/ });
+    act(() => money.focus());
+    expect(money.getAttribute("aria-expanded")).toBe("true");
+    const m = screen.getByRole("menu", { name: "Money" });
+    expect(money.getAttribute("aria-controls")).toBe(m.id);
     const items = within(m).getAllByRole("menuitem");
-    expect(items.map((a) => a.textContent)).toEqual(["Invoices", "Receivables (AR)", "Payables (AP)", "General ledger"]);
-    expect(items[3]!.getAttribute("aria-current")).toBe("page");
-    fireEvent.keyDown(finance, { key: "ArrowDown" });
+    expect(items.map((a) => a.textContent?.replace(/\d+/g, ""))).toEqual(["Payments", "To verify", "Cash & bank", "Expenses", "Invoices", "To receive", "To pay", "Ledger"]);
+    expect(items[7]!.getAttribute("aria-current")).toBe("page");
+    fireEvent.keyDown(money, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(items[0]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(items[1]!, { key: "ArrowUp" });
     fireEvent.keyDown(items[0]!, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(items[3]);
-    fireEvent.keyDown(items[3]!, { key: "Home" });
+    expect(document.activeElement).toBe(items[7]);
+    fireEvent.keyDown(items[7]!, { key: "Home" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();
-    expect(document.activeElement).toBe(finance);
-    expect(finance.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.keyDown(finance, { key: "Enter" });
-    expect(document.activeElement?.textContent).toBe("Invoices");
+    expect(document.activeElement).toBe(money);
+    expect(money.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.keyDown(money, { key: "Enter" });
+    expect(document.activeElement?.textContent).toBe("Payments");
   });
 
-  it("Tab in a menu closes it and moves on to the next module", () => {
+  it("Tab in a group's pages closes them and moves on to the next icon", () => {
     shell(everything());
-    const finance = screen.getByRole("button", { name: "Finance & general ledger" });
-    act(() => finance.focus());
-    fireEvent.keyDown(finance, { key: "ArrowDown" });
+    const money = strip().getByRole("button", { name: /^Money/ });
+    act(() => money.focus());
+    fireEvent.keyDown(money, { key: "ArrowDown" });
     fireEvent.keyDown(document.activeElement!, { key: "Tab" });
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "System & admin" }));
-    expect(screen.getByRole("menu", { name: "System & admin" })).toBeTruthy();
+    expect(document.activeElement).toBe(strip().getByRole("button", { name: "Reports" }));
+    expect(screen.getByRole("menu", { name: "Reports" })).toBeTruthy();
     expect(screen.getAllByRole("menu")).toHaveLength(1);
-  });
-
-  it("Esc closes a menu opened by hovering, wherever focus is", () => {
-    shell(everything());
-    fireEvent.mouseEnter(screen.getByRole("button", { name: "Operations & trading" }).closest("li")!);
-    expect(screen.getByRole("menu", { name: "Operations & trading" })).toBeTruthy();
-    fireEvent.keyDown(document.body, { key: "Escape" });
-    expect(screen.queryByRole("menu")).toBeNull();
   });
 });
 
-describe("the phone drawer", () => {
-  it("holds the same modules, with rows at least 44 px tall", () => {
+describe("the row at the top", () => {
+  it("New lists what this person may make; without anything, there is no New", () => {
+    const { unmount } = shell(everything(), {
+      newItems: [
+        { href: "/inquiries?panel=new-inquiry", label: "Inquiry" },
+        { href: "/payments/new", label: "Payment received" },
+      ],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+    const m = within(screen.getByRole("menu"));
+    expect(m.getAllByRole("menuitem").map((a) => `${a.textContent} ${a.getAttribute("href")}`)).toEqual(["Inquiry /inquiries?panel=new-inquiry", "Payment received /payments/new"]);
+    unmount();
     shell(staff());
-    fireEvent.click(screen.getAllByRole("button", { name: /Open menu|Menu/ })[0]!);
-    const drawer = within(screen.getByRole("complementary", { name: "Menu" }));
-    expect(drawer.getAllByRole("button", { expanded: false }).map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Treasury & payments", "Finance & general ledger"]);
+    expect(screen.queryByRole("button", { name: "New" })).toBeNull();
+  });
+
+  it("the account menu has the name, the role with the company's full name, My account, the look and Sign out", () => {
+    shell(everything());
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    const m = screen.getByRole("menu");
+    expect(m.textContent).toContain("Super Admin · Kebo International");
+    expect(within(m).getByRole("menuitem", { name: "My account" }).getAttribute("href")).toBe("/account");
+    expect(within(m).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Light", "Dark", "Auto"]);
+    // Choosing a look does not close the menu.
+    fireEvent.click(within(m).getByRole("radio", { name: "Dark" }));
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(within(screen.getByRole("menu")).getByRole("radio", { name: "Dark" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(within(screen.getByRole("menu")).getByRole("radio", { name: "Light" }));
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Sign out" })).toBeTruthy();
+  });
+});
+
+describe("the menu over the page (phone)", () => {
+  it("holds the same groups, with rows at least 44 px tall", () => {
+    at.path = "/dashboard";
+    shell(staff());
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    const drawer = within(screen.getAllByRole("complementary", { name: "Menu" })[1]!);
+    expect(drawer.getAllByRole("button", { expanded: false }).map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Money"]);
     for (const b of drawer.getAllByRole("button", { expanded: false })) expect(b.className).toContain("min-h-11");
-    expect(drawer.getByRole("link", { name: "Dashboard" }).className).toContain("min-h-11");
-    fireEvent.click(drawer.getByRole("button", { name: /^Partners/ }));
+    expect(drawer.getByRole("link", { name: "Home" }).className).toContain("min-h-11");
+    fireEvent.click(drawer.getByRole("button", { name: /^Sales/ }));
     expect(drawer.getByRole("link", { name: "Customers" }).className).toContain("min-h-11");
+  });
+
+  it("the bottom bar starts with Home", () => {
+    shell(everything());
+    const bar = within(screen.getByRole("navigation", { name: "Quick" }));
+    expect(bar.getAllByRole("link").map((a) => a.textContent || a.getAttribute("aria-label"))).toEqual(["Home", "Inquiries", "New inquiry", "Alerts5"]);
   });
 });

@@ -17,7 +17,7 @@ import type { LedgerAccounts, LedgerAgeing, LedgerEntries, LedgerEntry } from "@
 import type { OrderRow } from "@/lib/types-orders";
 import { TZ } from "../sections";
 
-export const metadata = { title: "General ledger" };
+export const metadata = { title: "Ledger" };
 
 type Search = {
   view?: string;

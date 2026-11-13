@@ -3,7 +3,7 @@ import { buildHref } from "@kebo/ui";
 import { ReportPage, type ReportSearch } from "@/components/insights/report-page";
 import { reportsOverviewQuery } from "@/lib/old-addresses";
 
-export const metadata = { title: "Analytics & reports" };
+export const metadata = { title: "All reports" };
 
 /** Overview › Analytics & reports: how the business is doing. (Old links with only ?from&to open that period.) */
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<ReportSearch> }) {

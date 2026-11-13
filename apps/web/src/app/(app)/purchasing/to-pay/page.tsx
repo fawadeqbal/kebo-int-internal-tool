@@ -7,7 +7,7 @@ import { crumbsFor } from "@/lib/nav";
 import { requirePermission } from "@/lib/session";
 import { InvoicesBody, OweBody } from "../../finance/sections";
 
-export const metadata = { title: "Payables (AP)" };
+export const metadata = { title: "To pay" };
 
 /**
  * Finance & general ledger › Payables (AP): what we still owe the suppliers for the goods on our orders, invoice

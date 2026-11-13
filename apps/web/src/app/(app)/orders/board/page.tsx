@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/session";
 import { Board, type Params } from "../views";
 
-export const metadata = { title: "Pipelines" };
+export const metadata = { title: "Order board" };
 
 /** Overview › Pipelines (the order board): a column per step, each card with what it needs now; ?mine=1 for mine, ?stage=… a step on a phone. */
 export default async function OrderBoardPage({ searchParams }: { searchParams: Promise<Params> }) {

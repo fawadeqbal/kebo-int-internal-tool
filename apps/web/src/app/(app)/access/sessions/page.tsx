@@ -1,4 +1,3 @@
-import { AdminTabs } from "@/components/common/admin-tabs";
 import Link from "next/link";
 import { MonitorSmartphone } from "lucide-react";
 import { Card, CardHeader, EmptyState, FilterBar } from "@kebo/ui";
@@ -22,9 +21,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
   const byPerson = new Set(sessions.map((s) => s.user.id)).size;
   return (
     <div>
-      <PageHeader crumbs={crumbsFor("/access/sessions")} title="Sessions" description="Every browser and phone signed in now. Sign one out, or someone everywhere.">
-        <AdminTabs set="people" current="/access/sessions" />
-      </PageHeader>
+      <PageHeader crumbs={crumbsFor("/access/sessions")} title="Sessions" description="Every browser and phone signed in now. Sign one out, or someone everywhere." />
     <Card className="overflow-hidden p-0">
       <CardHeader
         title={who ? `${who.name}: signed in on ${sessions.length} device${sessions.length === 1 ? "" : "s"}` : `${sessions.length} device${sessions.length === 1 ? "" : "s"} signed in, ${byPerson} ${byPerson === 1 ? "person" : "people"}`}

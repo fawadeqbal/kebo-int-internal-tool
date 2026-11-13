@@ -9,7 +9,6 @@ import { saveSettingsAction } from "./actions";
 import { SettingsCards } from "./cards";
 import { SETTING_GROUPS } from "./groups";
 import { getSettings } from "@/lib/loaders";
-import { AdminTabs } from "@/components/common/admin-tabs";
 
 /**
  * One page of Settings (design system: Settings frame, design page 33: each section is a page in
@@ -21,9 +20,7 @@ export async function SettingsPage({ href, description, children }: { href: stri
   await requirePermission("settings.manage");
   return (
     <div>
-      <PageHeader crumbs={crumbsFor(href)} title={labelFor(href)} description={description}>
-        <AdminTabs set="settings" current={href} />
-      </PageHeader>
+      <PageHeader crumbs={crumbsFor(href)} title={labelFor(href)} description={description} />
       {children}
     </div>
   );

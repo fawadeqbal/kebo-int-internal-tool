@@ -1,6 +1,6 @@
 import { GroupPage } from "../section";
 
-export const metadata = { title: "Company settings" };
+export const metadata = { title: "Company" };
 
 /** System & admin › Company settings. */
 export default function Page() {

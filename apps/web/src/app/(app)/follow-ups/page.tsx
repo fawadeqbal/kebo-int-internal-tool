@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { crumbsFor } from "@/lib/nav";
 import { Check, Clock, Filter, Pencil, Plus, TriangleAlert, User, Users } from "lucide-react";
 import {
   Badge,
@@ -130,7 +131,7 @@ export default async function FollowUpsPage({
   return (
     <>
       <PageHeader
-        crumbs={[{ label: "Follow-ups" }]}
+        crumbs={crumbsFor("/follow-ups")}
         icon={Clock}
         title="Follow-ups"
         summary="Your reminders to call, visit or chase"
