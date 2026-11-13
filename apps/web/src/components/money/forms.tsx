@@ -71,7 +71,10 @@ export function PaymentPlan({
   action,
   buttonOnly,
   startOpen = false,
+  onDone,
 }: {
+  /** In a window of its own: called once the parts are saved, or the editing is left. */
+  onDone?: () => void;
   /** Inside the Edit panel: the parts are open for editing at once. */
   startOpen?: boolean;
   plan: OrderMoney["plan"];
@@ -189,7 +192,7 @@ export function PaymentPlan({
     })),
   };
   return (
-    <ActionForm action={action} onDone={() => setEditing(false)} className={framed}>
+    <ActionForm action={action} onDone={() => (onDone ? onDone() : setEditing(false))} className={framed}>
       {(s) => (
         <>
           <input type="hidden" name="payload" value={JSON.stringify(body)} />
@@ -292,7 +295,7 @@ export function PaymentPlan({
               <Plus aria-hidden /> {startOpen ? "Add a part" : "Add an instalment"}
             </Button>
             <span className="flex-1" />
-            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+            <Button size="sm" variant="ghost" onClick={() => (onDone ? onDone() : setEditing(false))}>
               Cancel
             </Button>
             <SubmitButton size="sm" pendingText="Saving…" disabled={diff !== 0}>
@@ -537,7 +540,10 @@ export function FactoryPaymentForm({
   onClose,
   onFileError,
   prefill,
+  bare,
 }: {
+  /** In a window that already has the title: no frame, no heading. */
+  bare?: boolean;
   action: Action;
   factories: FactoryOwed[];
   people: Person[];
@@ -579,10 +585,10 @@ export function FactoryPaymentForm({
   );
   const done = () => onClose();
   return (
-    <ActionForm action={save} onDone={done} className={framed}>
+    <ActionForm action={save} onDone={done} className={bare ? "flex flex-col gap-3" : framed}>
       {(s) => (
         <>
-          <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.factory.name}` : "Payment to a factory"}</p>
+          {!bare && <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.factory.name}` : "Payment to a factory"}</p>}
           <input type="hidden" name="factoryId" value={chosen?.factory.id ?? payment?.factory.id ?? ""} />
           <div className="grid gap-3 sm:grid-cols-3">
             <Field

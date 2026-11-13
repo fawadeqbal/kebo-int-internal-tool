@@ -1,253 +1,228 @@
-import { can } from "@kebo/shared";
-import { Card, CardBody } from "@kebo/ui";
-import { orderMoneyOf } from "@/lib/order-data";
-import { date, money } from "@/lib/format";
+import Link from "next/link";
+import { Mail, Printer } from "lucide-react";
+import { can, PAYMENT_METHOD_LABEL } from "@kebo/shared";
+import { Badge, ButtonLink, RefCode, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { PurchaseOrderCard, type PurchaseOrderView } from "@/components/orders/purchase-order-card";
-import { sendPurchaseOrderAction } from "../../flow-actions";
+import { getPeople, getSettings } from "@/lib/loaders";
+import { orderMoneyOf } from "@/lib/order-data";
+import { optional } from "@/components/print/data";
+import { date, money } from "@/lib/format";
+import { OrderPage } from "@/components/order-sections/order-side";
+import { EmptySection, Section } from "@/components/order-sections/section";
+import { SectionFiles } from "@/components/order-sections/section-files";
+import { FactoryOrderWindow, PayFactoryWindow } from "@/components/order-sections/factory-windows";
+import { SendForm, type PurchaseOrderView } from "@/components/orders/purchase-order-card";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
-import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepPage, StepViewDivider } from "@/components/orders/step-page";
-import { StepSidePanel } from "@/components/orders/side-panel";
-import { editsOf } from "@/lib/edit-data";
-import { DetailsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
-import { expensePayTools } from "@/components/orders/costs-card";
-import { RecordPaymentLink } from "@/components/money/pay-links";
+import { PanelButton } from "@/components/orders/step-view";
 import { FactoryPlanForm } from "@/components/money/money-v2";
 import { SupplierParts, supplierPlanWords } from "@/components/money/supplier-plan";
-import { TodoFold } from "@/components/orders/todo-fold";
-import { factoryPlanAction } from "../../../money/actions";
-import { fieldsAction, lightAction } from "../../light-actions";
-import { stepData } from "../step-data";
+import { factoryPaymentAction, factoryPlanAction } from "../../../money/actions";
+import { sendPurchaseOrderAction } from "../../flow-actions";
+import { fieldsAction } from "../../light-actions";
+import { stageData } from "../stage-data";
 
 export const metadata = { title: "Order · factory order" };
 
+const SMALL = "h-8 px-2.5 text-[13px]";
+
 /**
- * Step 2, Factory order: the checklist (ordered, advance paid), then the view:
- * the factory and their order no., the lines at factory prices and what we pay
- * each factory (people who see factory money), the papers and the costs.
+ * Factory order (design "the order, final"): the purchase order to each factory, the lines we ordered at
+ * the factory's prices, the plan for paying it and the payments made. Money to a factory is recorded
+ * here and nowhere else on the order. Factory prices show only to people who may see them.
  */
 export default async function OrderFactory({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const d = await stepData(id, "factory");
+  const d = await stageData(id, "factory");
   const { me, o, flow, now, defaults } = d;
-  const [m, pos] = await Promise.all([
+  const seesMoney = can(me, "sourcing.manage");
+  const [m, pos, people, settings] = await Promise.all([
     orderMoneyOf(id),
-    api.get<{ deposit: { asked: string; paid: string; verified: boolean }; items: PurchaseOrderView[] }>(`/orders/${id}/purchase-orders`).catch(() => null),
+    optional(() => api.get<{ deposit: { asked: string; paid: string; verified: boolean }; items: PurchaseOrderView[] }>(`/orders/${id}/purchase-orders`)),
+    optional(() => getPeople()),
+    getSettings(),
   ]);
   const canEdit = can(me, "orders.update") && d.open;
+  const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   const owing = m.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
-  // Money out is recorded on Treasury › Payments (one form); here it is a link, with the plan's part filled in.
-  const payFactory = (label: string, quiet = true, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" }) =>
-    m.factories?.canRecord && owing.length && d.open ? (
-      <RecordPaymentLink
-        kind="out"
-        order={o.id}
-        factory={prefill?.factoryId}
-        amount={prefill?.amount}
-        part={prefill?.kind}
-        back={`/orders/${o.id}/factory`}
-        label={label}
-        quiet={quiet}
-      />
-    ) : null;
-
-  const factories = flow?.factory.factories ?? [];
-  const names = factories.map((f) => f.name).join(", ");
+  const canPay = !!m.factories?.canRecord && owing.length > 0 && o.status !== "cancelled";
   const orderedOn = flow?.factory.orderedOn ?? null;
   const orderNo = flow?.factory.orderNo ?? null;
-  const readyBy = (flow?.factory.readyBy ?? []).filter((r) => r.factoryId);
-
-  const tools: Record<string, AutoTool> = {};
-  if (canEdit)
-    tools.factory_ordered = {
-      kind: "light",
-      label: "Add their order no.",
-      action: lightAction.bind(null, o.id, "ordered"),
-      fields: [
-        { name: "factoryOrderNo", label: "Their order no.", value: orderNo, required: true, placeholder: "e.g. HP-2026-118" },
-        { name: "factoryOrderedOn", label: "Ordered on", type: "date", value: orderedOn ?? now, max: now, required: true },
-      ],
-      chips: [
-        { label: "Their PI or our PO", field: { name: "attachmentId", label: "Their PI or our PO (copy)", type: "file" } },
-        { label: "Note", field: { name: "itemNote", label: "Note", type: "textarea" } },
-      ],
-      hint: names ? `${names}, at the prices of the quote.` : "The factory and prices come from the quote.",
-      tap: orderedOn ? undefined : { label: "Ordered today", action: lightAction.bind(null, o.id, "ordered"), on: now },
-    };
-  // The advance: the factory payment form filled in with the plan's part due when we order.
-  const advancePart = m.factories?.plans.find((p) => p.rows.some((r) => r.dueRule === "on_order" && r.status !== "paid")) ?? null;
-  const advanceRow = advancePart?.rows.find((r) => r.dueRule === "on_order" && r.status !== "paid");
-  const advance = payFactory(
-    "Pay the factory",
-    true,
-    advancePart && advanceRow ? { factoryId: advancePart.factory.id, amount: advanceRow.open, kind: "deposit" } : undefined,
-  );
-  if (advance) tools.factory_advance = { kind: "node", node: advance };
-
-  // Factory prices come only to people who see them.
+  const basis = defaults.priceBasis ? `${defaults.priceBasis.basis}${defaults.priceBasis.place ? ` ${defaults.priceBasis.place}` : ""}` : null;
   const goodsLines = o.lines.filter((l) => l.type === "goods");
   const priced = goodsLines.some((l) => l.factoryPrice) ? goodsLines : [];
-  const basis = defaults.priceBasis ? `${defaults.priceBasis.basis}${defaults.priceBasis.place ? ` ${defaults.priceBasis.place}` : ""}` : null;
-  const fields: DetailField[] = [
-    { label: factories.length > 1 ? "Factories" : "Factory", value: names || null },
-    { name: "factoryOrderNo", label: "Their order no.", value: orderNo, group: "The order with the factory" },
-    { name: "factoryOrderedOn", label: "Ordered on", value: orderedOn, type: "date", max: now, group: "The order with the factory" },
-    ...(can(me, "sourcing.manage") ? [{ label: "Price basis", value: basis, uncounted: !basis }] : []),
-    // One ready date per factory (each factory's PO, plan and production read its own); the order's is the latest.
-    ...(readyBy.length > 1
-      ? [
-          ...readyBy.map((r) => ({
-            name: `readyOn__${r.factoryId}`,
-            label: `Ready · ${r.name ?? "factory"}`,
-            value: r.readyOn,
-            type: "date" as const,
-            group: "Ready date, each factory's",
-            hint: defaults.leadTime ? `Lead time on the quote: ${defaults.leadTime.text}` : undefined,
-          })),
-          {
-            label: "Order ready (the latest)",
-            value: flow?.factory.readyOn ? date(flow.factory.readyOn) : null,
-            uncounted: true,
-            cardOnly: true,
-            group: "Ready date, each factory's",
-          },
-        ]
-      : [
-          {
-            name: "readyOn",
-            label: "Ready (factory says)",
-            value: o.readyOn,
-            type: "date" as const,
-            group: "Ready date",
-            hint: defaults.leadTime ? `Lead time on the quote: ${defaults.leadTime.text}` : undefined,
-          },
-        ]),
-  ];
+  const payments = m.factories?.payments ?? [];
+  const live = payments.filter((x) => !x.voided);
+  const sub = `${o.refNo} · ${(flow?.factory.factories ?? []).map((f) => f.name).join(", ") || "the factory"}`;
+  const pay = (label: string, main: boolean, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" }) =>
+    canPay ? (
+      <PayFactoryWindow
+        label={label}
+        main={main}
+        sub={sub}
+        action={factoryPaymentAction.bind(null, o.id, null)}
+        factories={owing}
+        people={people ?? []}
+        orderCurrency={o.currency}
+        fx={fx}
+        today={now}
+        prefill={prefill}
+      />
+    ) : null;
+  const depositText = pos
+    ? Number(pos.deposit.paid) > 0
+      ? `${money(pos.deposit.paid, o.currency)} of the deposit ${money(pos.deposit.asked, o.currency)} is recorded; the rest is not in yet.`
+      : `The deposit ${money(pos.deposit.asked, o.currency)} is not recorded yet.`
+    : "";
 
   return (
-    <StepPage
-      steps={d.steps}
-      step="factory"
-      base={d.base}
-      action={payFactory("Pay the factory", false)}
-      side={<StepSidePanel id={o.id} step="factory" changes={d.changes} historyHref={d.historyHref} />}
-    >
-      {/* The purchase orders (board OrderFactory): one per supplier, numbered, sent with a reason before the deposit. */}
-      {pos?.items.map((po) => (
-        <PurchaseOrderCard
+    <OrderPage id={id}>
+      {(pos?.items ?? []).map((po, n) => (
+        <Section
           key={po.id}
-          po={po}
-          total={po.total && po.currency ? money(po.total, po.currency) : null}
-          ready={po.readyOn ? date(po.readyOn) : null}
-          sent={po.sentOn ? date(po.sentOn) : null}
-          printHref={`/orders/${o.id}/papers/purchase-order?ref=${po.supplier.id}`}
-          send={canEdit && !po.sentOn ? sendPurchaseOrderAction.bind(null, o.id, po.id) : null}
-          deposit={{
-            verified: pos.deposit.verified,
-            text: Number(pos.deposit.paid) > 0
-              ? `${money(pos.deposit.paid, o.currency)} of the deposit ${money(pos.deposit.asked, o.currency)} is recorded; the rest is not in yet.`
-              : `The deposit ${money(pos.deposit.asked, o.currency)} is not recorded yet.`,
-          }}
-          today={now}
+          title={(pos?.items.length ?? 0) > 1 ? `Purchase order · ${po.supplier.name}` : "Purchase order"}
+          state={po.sentOn ? (po.sentEarlyReason ? `Sent ${date(po.sentOn)} · before the deposit` : `Sent ${date(po.sentOn)}`) : "Not sent"}
+          tone={po.sentOn ? (po.sentEarlyReason ? "warn" : "ok") : "neutral"}
+          cols={3}
+          rows={[
+            { label: "PO no.", value: <RefCode>{po.number}</RefCode> },
+            {
+              label: "Factory",
+              value: (
+                <Link href={`/factories/${po.supplier.id}`} className="text-primary hover:underline">
+                  {po.supplier.name}
+                </Link>
+              ),
+            },
+            ...(seesMoney ? [{ label: "Total", value: po.total && po.currency ? money(po.total, po.currency) : null }] : []),
+            ...(seesMoney ? [{ label: "Price basis", value: basis }] : []),
+            { label: "Sent on", value: po.sentOn ? `${date(po.sentOn)}${po.sentBy ? ` · ${po.sentBy.name}` : ""}` : null },
+            { label: "Their order no.", value: po.supplierRef ?? orderNo },
+            ...(po.sentEarlyReason ? [{ label: "Why before the deposit", value: po.sentEarlyReason }] : []),
+          ]}
+          actions={
+            <>
+              <ButtonLink href={`/orders/${o.id}/papers/purchase-order?ref=${po.supplier.id}`} size="sm" variant="secondary" className={SMALL}>
+                <Printer aria-hidden /> View / print
+              </ButtonLink>
+              {canEdit && n === 0 && <FactoryOrderWindow orderId={o.id} sub={`${po.number} · ${po.supplier.name}`} action={fieldsAction.bind(null, o.id, "factory")} today={now} orderNo={orderNo} orderedOn={orderedOn} canFiles={d.canFiles} />}
+              {canEdit && !po.sentOn && (
+                <PanelButton
+                  variant="primary"
+                  size="sm"
+                  className={SMALL}
+                  icon={<Mail aria-hidden />}
+                  label="Send to the factory"
+                  title={`Send ${po.number} to ${po.supplier.name}`}
+                  description={[po.total && po.currency && seesMoney ? money(po.total, po.currency) : null, po.readyOn ? `ready by ${date(po.readyOn)}` : null].filter(Boolean).join(" · ") || undefined}
+                  panelClassName="md:w-[760px]"
+                  body={<SendForm action={sendPurchaseOrderAction.bind(null, o.id, po.id)} deposit={{ verified: pos!.deposit.verified, text: depositText }} today={now} supplierRef={po.supplierRef} />}
+                />
+              )}
+            </>
+          }
+          files={n === 0 ? <SectionFiles orderId={o.id} section="purchase_order" canAdd={d.canFiles} /> : undefined}
         />
       ))}
-      {/* The to-do list as one thin line; it opens when there is something to do in it now. */}
-      <TodoFold label="Factory order" items={d.items} waits={d.waits} open={d.current}>
-        <Checklist
-          payFor={await expensePayTools(o.id, d.items)}
-          step="factory"
-          label="Factory order"
-          items={d.items}
-          current={d.current}
-          nowKey={d.nowKey}
-          waits={d.waits}
-          canEdit={d.steps.canEdit}
-          run={d.run}
-          dealId={o.inquiry.id}
-          people={d.people}
-          tools={tools}
-          payNode={payFactory("Pay")}
-          listHref={d.listHref}
-          me={me.name}
-          today={now}
-        />
-      </TodoFold>
-      <StepViewDivider />
-      <DetailsCard
-        target="factory"
-        title="Factory"
-        fields={fields.map((f) => (f.type === "date" && f.value ? { ...f, show: date(f.value) } : f))}
-        action={fieldsAction.bind(null, o.id, "factory")}
-        canEdit={canEdit}
-        panelTitle="Edit the factory order"
-        panelDescription="Their number, the day we ordered and the ready date they gave. Saving updates the checklist."
-        edits={{ ref: { type: "order", id: o.id, card: "factory" }, card: (await editsOf("order", o.id)).cards.factory }}
-      />
+      {pos && pos.items.length === 0 && <EmptySection title="Purchase order" text="No line of this order was quoted from a factory, so there is no purchase order." />}
+
       {priced.length > 0 && (
-        <LinesCard
-          target="lines.factory"
-          title="Lines · to the factory"
-          description="What we bought from the factory for each line, at its price (internal)."
-          canEdit={false}
-          view={<OrderLines set="factory" orderId={o.id} lines={priced} canEdit={false} today={now} />}
-          phone={<PhoneLines set="factory" lines={priced} />}
-        />
+        <Section title="Lines to the factory" state={`${priced.length} line${priced.length === 1 ? "" : "s"}`}>
+          <div className="px-[18px] pb-3.5">
+            <div className="max-md:hidden">
+              <OrderLines set="factory" orderId={o.id} lines={priced} canEdit={false} today={now} />
+            </div>
+            <div className="md:hidden">
+              <PhoneLines set="factory" lines={priced} />
+            </div>
+          </div>
+        </Section>
       )}
-      {/* One card per supplier for the money: its plan in the heading, the parts with what is paid, the totals, the customer's side. */}
+
       {m.factories?.plans.map((plan) => {
-        const paidInOrder = m.factories!.payments
-          .filter((x) => !x.voided && x.factory.id === plan.factory.id && x.currency === plan.currency)
-          .reduce((t, x) => t + Number(x.inOrderCurrency), 0);
+        const paidInOrder = live.filter((x) => x.factory.id === plan.factory.id && x.currency === plan.currency).reduce((t, x) => t + Number(x.inOrderCurrency), 0);
         const owed = m.factories!.rows.find((r) => r.factory.id === plan.factory.id && r.currency === plan.currency);
+        const toPay = Number(owed?.toPay ?? 0);
         return (
-          <ViewCard
+          <Section
             key={`${plan.factory.id}:${plan.currency}`}
-            id={`plan-${plan.factory.id}`}
-            target="factory.plan"
-            title={
-              <>
-                Payments to {plan.factory.name}
-                <span className="font-normal text-text-2"> · {supplierPlanWords(plan)}</span>
-              </>
+            title={m.factories!.plans.length > 1 ? `Paying ${plan.factory.name}` : "Paying the factory"}
+            state={owed ? (toPay <= 0 && Number(owed.paid) > 0 ? "Paid in full" : `${money(owed.toPay, plan.currency)} to pay`) : supplierPlanWords(plan)}
+            tone={owed && toPay <= 0 && Number(owed.paid) > 0 ? "ok" : Number(owed?.paid ?? 0) > 0 ? "warn" : "neutral"}
+            actions={
+              m.factories?.canPlan &&
+              d.open && (
+                <PanelButton
+                  size="sm"
+                  className={SMALL}
+                  label="Edit plan"
+                  title={`What we pay ${plan.factory.name}`}
+                  description={`${o.refNo} · agreed once per factory on the order`}
+                  panelClassName="md:w-[640px]"
+                  body={<FactoryPlanForm plan={plan} action={factoryPlanAction.bind(null, o.id)} />}
+                />
+              )
             }
-            canEdit={!!m.factories?.canPlan && d.open}
-            editLabel="Edit the plan"
-            panel={{
-              title: `What we pay ${plan.factory.name}`,
-              description: `${o.refNo} · agreed once per supplier on the order`,
-              body: <FactoryPlanForm plan={plan} action={factoryPlanAction.bind(null, o.id)} />,
-              className: "md:w-[640px]",
-            }}
           >
-            <SupplierParts
-              orderId={o.id}
-              plan={plan}
-              pay={(r) =>
-                Number(r.open) > 0
-                  ? payFactory("Pay", true, { factoryId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance" })
-                  : null
-              }
-              paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
-              orderCurrency={o.currency}
-              overpaid={owed?.overpaid ?? null}
-              customer={{
-                route: m.route.route,
-                ...m.factories!.customer,
-                received: m.received,
-                owed: (Number(m.received) + Number(m.due)).toFixed(2),
-              }}
-            />
-          </ViewCard>
+            <div className="px-[18px] pb-3.5">
+              <SupplierParts
+                orderId={o.id}
+                plan={plan}
+                pay={(r) => (Number(r.open) > 0 ? pay("Pay", false, { factoryId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance" }) : null)}
+                paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
+                orderCurrency={o.currency}
+                overpaid={owed?.overpaid ?? null}
+                customer={{ route: m.route.route, ...m.factories!.customer, received: m.received, owed: (Number(m.received) + Number(m.due)).toFixed(2) }}
+              />
+            </div>
+          </Section>
         );
       })}
-      {m.factories && m.factories.plans.length === 0 && (
-        <Card>
-          <CardBody>
-            <p className="text-sm text-muted">No line on this order was quoted from a factory price, so there is nothing to work out what we owe.</p>
-          </CardBody>
-        </Card>
-      )}
-    </StepPage>
+
+      {m.factories &&
+        (payments.length === 0 ? (
+          <EmptySection title="Payments to the factory" text="No payment yet." action={pay("Pay the factory", true)} />
+        ) : (
+          <Section
+            title="Payments to the factory"
+            state={`${live.length} payment${live.length === 1 ? "" : "s"}`}
+            actions={pay("Pay the factory", true)}
+            files={<SectionFiles orderId={o.id} section="factory_payments" canAdd={false} />}
+          >
+            <Table>
+              <THead>
+                <tr>
+                  <Th>Date</Th>
+                  <Th>Factory</Th>
+                  <Th>How</Th>
+                  <Th>From</Th>
+                  <Th>Reference</Th>
+                  <Th className="text-right">Amount</Th>
+                </tr>
+              </THead>
+              <tbody>
+                {payments.map((x) => (
+                  <Tr key={x.id} className={x.voided ? "text-muted line-through" : undefined}>
+                    <Td className="whitespace-nowrap tabular">{date(x.paidOn)}</Td>
+                    <Td>{x.factory.name}</Td>
+                    <Td>{PAYMENT_METHOD_LABEL[x.method]}</Td>
+                    <Td>{x.account?.name ?? <span className="text-muted">—</span>}</Td>
+                    <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <span className="text-muted">—</span>}</Td>
+                    <Td className="text-right whitespace-nowrap tabular">{x.voided ? <Badge tone="neutral">Removed</Badge> : <span className="font-semibold">{money(x.amount, x.currency)}</span>}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-line">
+                  <td className="px-3.5 py-2.5" colSpan={6}>
+                    <Link href={`/payments?order=${o.id}`} className="text-[12.5px] font-medium text-primary hover:underline">
+                      Change or remove a payment
+                    </Link>
+                  </td>
+                </tr>
+              </tfoot>
+            </Table>
+          </Section>
+        ))}
+    </OrderPage>
   );
 }
