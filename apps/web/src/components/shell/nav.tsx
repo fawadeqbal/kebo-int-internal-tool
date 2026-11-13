@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { Avatar, buttonClass, cn, Kbd } from "@kebo/ui";
 import { logoutAction } from "@/app/login/actions";
-import { FOLD_COOKIE, HOME_HREF, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
+import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
 
 export type { NavModule, NavPage } from "@/lib/nav";
 
@@ -312,6 +312,27 @@ function GroupTree({
         const isOpen = open.has(m.key);
         const total = moduleTotal(m);
         const listId = `${id}-${m.key}`;
+        // One page with the group's name (Reports): a link like Home, nothing to open.
+        if (isSingle(m)) {
+          const on = m.key === current;
+          return (
+            <li key={m.key}>
+              <Link
+                href={m.pages[0]!.href}
+                aria-current={on ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-semibold text-text transition-colors hover:bg-surface-2",
+                  row,
+                  on && "bg-primary-soft text-primary hover:bg-primary-soft",
+                )}
+              >
+                <Icon className={cn("size-[17px] shrink-0", !on && "text-text-2")} aria-hidden />
+                <span className="flex-1 truncate">{m.title}</span>
+                {total > 0 && <Count n={total} label="to look at" />}
+              </Link>
+            </li>
+          );
+        }
         return (
           <li key={m.key}>
             <button
@@ -606,9 +627,28 @@ function Strip({ modules, companyName, logo }: { modules: NavModule[]; companyNa
               <House className="size-[19px]" aria-hidden />
             </Link>
           </li>
-          {modules.map((m) => (
-            <StripGroup key={m.key} m={m} current={m.key === current} activeHref={activeHref} />
-          ))}
+          {modules.map((m) => {
+            if (!isSingle(m)) return <StripGroup key={m.key} m={m} current={m.key === current} activeHref={activeHref} />;
+            const Icon = ICONS[m.icon];
+            const on = m.key === current;
+            return (
+              <li key={m.key} className="flex">
+                <Link
+                  href={m.pages[0]!.href}
+                  data-strip-item
+                  aria-label={m.title}
+                  title={m.title}
+                  aria-current={on ? "page" : undefined}
+                  className={cn(
+                    "grid size-10 place-items-center rounded-lg text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+                    on && "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary",
+                  )}
+                >
+                  <Icon className="size-[19px]" aria-hidden />
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </nav>
     </>

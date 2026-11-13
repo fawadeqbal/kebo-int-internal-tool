@@ -270,7 +270,7 @@ export class RemindersListService {
           title: w.text,
           detail: null,
           due: null,
-          href: w.href ?? "/finance/profit",
+          href: w.href ?? "/reports/profit",
           action: "Open",
           who: null,
         });

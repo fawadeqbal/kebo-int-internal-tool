@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { buildModules, crumbsFor, moduleOf, pageOf, MODULE_PAGES, type NavModule } from "@/lib/nav";
+import { buildModules, crumbsFor, isSingle, moduleOf, pageOf, MODULE_PAGES, type NavModule } from "@/lib/nav";
 
 // The menu (13 Nov 2026): Home and five groups with plain names, two levels; down the left on a desktop, folding
 // to a strip of icons; over the page on a phone.
@@ -68,7 +68,9 @@ describe("the groups", () => {
     expect(pages(m, "purchasing")).toEqual(["Purchase orders", "Suppliers"]);
     // Money, simple (14 Nov 2026): four pages. To verify and the Ledger keep their addresses and left the menu.
     expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments", "Cash & bank", "Company costs"]);
-    expect(pages(m, "reports")).toEqual(["Profit & loss", "Planned vs spent", "All reports"]);
+    // Reports is one page (its reports are tabs on it): the menu shows it as a link, like Home.
+    expect(pages(m, "reports")).toEqual(["Reports"]);
+    expect(m.filter(isSingle).map((x) => x.key)).toEqual(["reports"]);
     expect(pages(m, "settings")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form", "People", "Roles", "Sign-ins", "Sessions", "Activity log"]);
   });
 
@@ -96,8 +98,6 @@ describe("the groups", () => {
         "/payments",
         "/finance/cash-book",
         "/money/company-costs",
-        "/finance/profit",
-        "/finance/leaks",
         "/reports",
         "/audit",
         "/settings/company",
@@ -114,7 +114,7 @@ describe("the groups", () => {
       ].sort(),
     );
     // Tabs on the page, the bell, and the pages that left the menu: not menu items.
-    for (const tab of ["/reports/customers", "/reports/factories", "/reports/people", "/reports/funnel", "/reports/print", "/notifications", "/approvals", "/finance/ledger", "/finance/invoices", "/finance/to-receive", "/purchasing/to-pay"])
+    for (const tab of ["/reports/profit", "/reports/customers", "/reports/factories", "/reports/cash", "/reports/people", "/reports/funnel", "/reports/print", "/finance/profit", "/finance/leaks", "/notifications", "/approvals", "/finance/ledger", "/finance/invoices", "/finance/to-receive", "/purchasing/to-pay"])
       expect(hrefs).not.toContain(tab);
   });
 
@@ -146,12 +146,12 @@ describe("the groups", () => {
     const MANAGER = new Set(["sourcing.manage", "expenses.manage", "payments.record", "reports.view", "users.manage", "inquiries.create"]);
     const m = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 4, approves: true, companyAddresses: false });
     expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Settings"]);
-    expect(pages(m, "reports")).toEqual(["Profit & loss", "Planned vs spent", "All reports"]);
+    expect(pages(m, "reports")).toEqual(["Reports"]);
     expect(pages(m, "settings")).toEqual(["People"]);
-    // A recorder without expenses: what is to receive and to pay, no money reports (they need expenses.manage).
+    // A recorder without expenses: what is to receive and to pay; Reports opens without its Profit and Cash tabs.
     const recorder = buildModules({ can: (p) => ["sourcing.manage", "payments.record", "reports.view"].includes(p), feature: () => true, approvals: 0, approves: true, companyAddresses: false });
     expect(pages(recorder, "money")).toEqual(["To receive and to pay", "Payments"]);
-    expect(pages(recorder, "reports")).toEqual(["All reports"]);
+    expect(pages(recorder, "reports")).toEqual(["Reports"]);
   });
 
   it("keep the thin line between a group's two kinds of page, whatever is hidden", () => {
@@ -172,9 +172,11 @@ describe("the groups", () => {
     const flat = all.flatMap((m) => m.pages);
     expect(pageOf("/orders/board", flat)?.label).toBe("Order board");
     expect(pageOf("/orders/0b6c", flat)?.label).toBe("Orders");
-    expect(pageOf("/reports/people/targets", flat)?.label).toBe("All reports");
+    expect(pageOf("/reports/people/targets", flat)?.label).toBe("Reports");
+    // One name, said once above the title.
+    expect(crumbsFor("/reports")).toEqual([{ label: "Reports" }]);
     expect(pageOf("/access/roles/manager", flat)?.label).toBe("Roles");
-    expect(moduleOf("/finance/leaks", all)).toBe("reports");
+    expect(moduleOf("/reports/cash", all)).toBe("reports");
     expect(moduleOf("/orders/board", all)).toBe("sales");
     expect(moduleOf("/money/due", all)).toBe("money");
     expect(moduleOf("/audit", all)).toBe("settings");
@@ -191,7 +193,9 @@ describe("the menu down the left", () => {
     at.path = "/finance/cash-book";
     shell(everything());
     expect(menu().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
-    expect(menu().getAllByRole("button").map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Purchasing", "Money", "Reports", "Settings"]);
+    // Reports is one page: a link, not a group to open.
+    expect(menu().getAllByRole("button").map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Purchasing", "Money", "Settings"]);
+    expect(menu().getByRole("link", { name: "Reports" }).getAttribute("href")).toBe("/reports");
     expect(menu().getByRole("button", { name: "Money" }).getAttribute("aria-expanded")).toBe("true");
     expect(menu().getByRole("button", { name: "Sales" }).getAttribute("aria-expanded")).toBe("false");
     expect(menu().getByRole("link", { current: "page" }).textContent).toBe("Cash & bank");
@@ -288,7 +292,8 @@ describe("the folded strip", () => {
     at.path = "/finance/cash-book";
     shell(everything(2));
     expect(strip().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
-    expect(strip().getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Sales", "Purchasing", "Money, 2 to look at", "Reports", "Settings"]);
+    expect(strip().getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Sales", "Purchasing", "Money, 2 to look at", "Settings"]);
+    expect(strip().getByRole("link", { name: "Reports" }).getAttribute("href")).toBe("/reports");
     expect(strip().getByRole("button", { name: /^Money/ }).className).toContain("bg-primary-soft");
     expect(strip().getByRole("button", { name: "Sales" }).className).not.toContain("bg-primary-soft");
   });
@@ -339,9 +344,9 @@ describe("the folded strip", () => {
     act(() => money.focus());
     fireEvent.keyDown(money, { key: "ArrowDown" });
     fireEvent.keyDown(document.activeElement!, { key: "Tab" });
-    expect(document.activeElement).toBe(strip().getByRole("button", { name: "Reports" }));
-    expect(screen.getByRole("menu", { name: "Reports" })).toBeTruthy();
-    expect(screen.getAllByRole("menu")).toHaveLength(1);
+    // Reports is a link (one page): nothing opens beside it.
+    expect(document.activeElement).toBe(strip().getByRole("link", { name: "Reports" }));
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 });
 

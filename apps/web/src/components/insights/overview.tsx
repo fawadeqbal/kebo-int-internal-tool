@@ -1,181 +1,125 @@
 import Link from "next/link";
-import { Card, CardHeader, cn, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
-import { date, money, plural } from "@/lib/format";
-import { amountCell, bigMoney, change, compactMoney, monthYearOf, percent, type Period } from "@/lib/insights-period";
+import { Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { date, money, plural, whole } from "@/lib/format";
+import { amountCell, bigMoney, change, monthYearOf, percent, type Period } from "@/lib/insights-period";
 import type { loadOverview } from "@/lib/insights-data";
 import { ChartCard } from "./chart-card";
 import { SalesProfitChart } from "./facts-charts";
-import { Delta, Tiles } from "./frame";
+import { Delta } from "./frame";
 
 type Data = Awaited<ReturnType<typeof loadOverview>>;
 
-/** Insights › Overview: eight tiles, sales and gross profit for 12 months, what needs attention, the top five each side. */
+const MORE = "text-sm font-medium text-primary underline-offset-2 hover:underline";
+
+/**
+ * Reports › Overview (design "money, simple", board ROverview): four figures against the period before,
+ * sold and profit by month beside the cash we hold, and three short lists that each open the page behind
+ * them: who owes us, what we pay this week, which orders make too little.
+ */
 export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Record<string, string | undefined>) => string }) {
   const c = d.currency;
   const vs = p.vsLabel;
-  const overdue = d.now.overdue;
-  const recvTotal = Number(d.receivable.total);
-  const attention = [
-    overdue.customers > 0 && {
-      key: "overdue",
-      meaning: "bad" as const,
-      title: `${plural(overdue.customers, "customer")} overdue · ${bigMoney(Number(overdue.amount), c)}`,
-      sub: overdue.list[0] ? `oldest ${plural(overdue.list[0].days, "day")}: ${overdue.list[0].name}` : null,
-      link: { href: `${href({ section: "money" })}#owed`, label: "Money" },
-    },
-    d.now.lateFactories.length > 0 && {
-      key: "late",
-      meaning: "warn" as const,
-      title: `${plural(d.now.lateFactories.length, "factory", "factories")} late on ready dates`,
-      sub: d.now.lateFactories
-        .slice(0, 2)
-        .map((f) => `${f.name} ${plural(f.days, "day")}`)
-        .join(" · "),
-      link: { href: href({ section: "factories" }), label: "Factories" },
-    },
-    d.now.lowMargin.orders > 0 && {
-      key: "margin",
-      meaning: "warn" as const,
-      title: `Margin under 10% on ${plural(d.now.lowMargin.orders, "order")}`,
-      sub:
-        d.now.lowMargin.costsOverPlan && Number(d.now.lowMargin.costsOverPlan) > 0
-          ? `costs over plan by ${bigMoney(Number(d.now.lowMargin.costsOverPlan), c)}`
-          : `ordered ${p.name}`,
-      link: d.seeMoney
-        ? { href: href({ section: "money" }), label: "Money" }
-        : { href: href({ section: "customers" }), label: "Customers" },
-    },
-    d.now.expiring.count > 0 && {
-      key: "expiring",
-      meaning: "info" as const,
-      title: `${plural(d.now.expiring.count, "quotation")} expire${d.now.expiring.count === 1 ? "s" : ""} this week`,
-      sub: `${bigMoney(Number(d.now.expiring.value), c)} in total`,
-      link: { href: "/inquiries?stage=quoted", label: "Quotations" },
-    },
-  ].filter(Boolean) as {
-    key: string;
-    meaning: "bad" | "warn" | "info";
-    title: string;
-    sub: string | null;
-    link: { href: string; label: string };
-  }[];
-
   const monthHref = Object.fromEntries(d.months.map((m) => [m.month, `${href({ month: m.month })}#month-orders`]));
+  const profitName = d.seeProfit ? "Profit" : "Gross profit";
+  const totals = (xs: { currency: string; amount: number }[]) => (xs.length ? xs.map((x) => whole(x.amount, x.currency)).join(" + ") : null);
+  /** A loss with a real minus sign in front of the currency, so it is not read as a dash. */
+  const signed = (v: number) => (v < 0 ? `− ${whole(-v, c)}` : whole(v, c));
 
   return (
     <div className="flex flex-col gap-4">
-      <Tiles>
+      <StatRow>
         <StatTile
-          label="Sales"
-          value={bigMoney(d.sales.now, c)}
-          delta={<Delta value={change(d.sales.now, d.sales.before)} vs={vs} />}
-          sub={`${plural(d.sales.orders, "order")}${d.sales.orders ? ` · avg ${bigMoney(d.sales.now / d.sales.orders, c)}` : ""}`}
+          label="Sold"
+          value={bigMoney(d.sold.now, c)}
+          delta={<Delta value={change(d.sold.now, d.sold.before)} vs={vs} />}
+          sub={plural(d.sold.orders, "order")}
         />
         <StatTile
-          label="Gross profit"
-          value={bigMoney(d.profit.now, c)}
-          delta={<Delta value={change(d.profit.now, d.profit.before)} vs={vs} />}
-          sub={`margin ${percent(d.profit.margin)}${d.profit.marginBefore !== null ? ` · was ${percent(d.profit.marginBefore)}` : ""}`}
-        />
-        <StatTile
-          className="max-sm:hidden"
-          label="Cash in"
-          value={bigMoney(d.cashIn.now, c)}
-          delta={<Delta value={change(d.cashIn.now, d.cashIn.before)} vs={vs} />}
+          label="Collected"
+          value={bigMoney(d.collected.now, c)}
+          delta={<Delta value={change(d.collected.now, d.collected.before)} vs={vs} />}
           sub="from customers"
+          href={d.paidOut ? href({ section: "cash" }) : undefined}
         />
-        {d.cashOut ? (
+        {d.paidOut ? (
           <StatTile
-            className="max-sm:hidden"
-            label="Cash out"
-            value={bigMoney(d.cashOut.now, c)}
-            delta={<Delta value={change(d.cashOut.now, d.cashOut.before)} goodWhenUp={false} vs={vs} />}
-            sub="factories + costs"
+            label="Paid out"
+            value={bigMoney(d.paidOut.now, c)}
+            delta={<Delta value={change(d.paidOut.now, d.paidOut.before)} goodWhenUp={false} vs={vs} />}
+            sub="suppliers, bills and company costs"
+            href={href({ section: "cash" })}
           />
         ) : (
           <StatTile
-            className="max-sm:hidden"
-            label="Shipped on time"
-            value={percent(d.shipped?.percent)}
-            sub={d.shipped?.withDate ? `${d.shipped.onTime} of ${d.shipped.withDate} by the date promised` : "none shipped with a date yet"}
+            label="Win rate"
+            value={percent(d.winRate.now)}
+            delta={<Delta value={d.winRate.now !== null && d.winRate.before !== null ? Math.round((d.winRate.now - d.winRate.before) * 10) / 10 : null} points vs={vs} />}
+            sub={`won ${d.winRate.won} · lost ${d.winRate.lost}`}
+            href={href({ section: "funnel" })}
           />
         )}
         <StatTile
-          label="Receivable"
-          value={bigMoney(recvTotal, c)}
-          meter={
-            recvTotal > 0
-              ? { percent: (Number(overdue.amount) / recvTotal) * 100, label: `${bigMoney(Number(overdue.amount), c)} of it overdue` }
-              : undefined
-          }
-          sub={
-            Number(overdue.amount) > 0
-              ? `${bigMoney(Number(overdue.amount), c)} overdue · ${plural(overdue.customers, "customer")}`
-              : "nothing overdue"
-          }
-          href={href({ section: "money" })}
+          label={profitName}
+          value={bigMoney(d.profit.now, c)}
+          tone={d.profit.now < 0 ? "bad" : d.seeProfit && d.profit.now > 0 ? "ok" : undefined}
+          delta={<Delta value={change(d.profit.now, d.profit.before)} vs={vs} />}
+          sub={d.seeProfit ? `${percent(d.profit.margin)} · after company costs` : `${percent(d.profit.margin)} of what was sold`}
+          href={d.seeProfit ? href({ section: "money" }) : undefined}
         />
-        {d.payable ? (
-          <StatTile
-            className="max-sm:hidden"
-            label="Payable"
-            value={bigMoney(Number(d.payable.total), c)}
-            sub={[
-              ...d.payOwn
-                .filter(([cur]) => cur !== c)
-                .slice(0, 1)
-                .map(([cur, v]) => bigMoney(v, cur)),
-              plural(d.payFactories, "factory", "factories"),
-            ].join(" · ")}
-            href={href({ section: "money" })}
-          />
-        ) : (
-          <StatTile
-            className="max-sm:hidden"
-            label="Orders"
-            value={String(d.sales.orders)}
-            delta={<Delta value={change(d.sales.orders, d.sales.ordersBefore)} vs={vs} />}
-            sub={`was ${d.sales.ordersBefore}`}
-          />
-        )}
-        <StatTile
-          className="max-sm:hidden"
-          label="Open quotes"
-          value={bigMoney(Number(d.now.openQuotes.value), c)}
-          sub={`${plural(d.now.openQuotes.count, "quote")}${d.now.openQuotes.likely ? ` · likely ${bigMoney(Number(d.now.openQuotes.likely), c)}` : ""}`}
-          href="/inquiries?stage=quoted"
-        />
-        <StatTile
-          label="Win rate"
-          value={percent(d.winRate.now)}
-          delta={
-            <Delta
-              value={d.winRate.now !== null && d.winRate.before !== null ? Math.round((d.winRate.now - d.winRate.before) * 10) / 10 : null}
-              points
-              vs={vs}
-            />
-          }
-          sub={`won ${d.winRate.won} · lost ${d.winRate.lost}${d.winRate.before !== null ? ` · was ${percent(d.winRate.before)}` : ""}`}
-          href={href({ section: "funnel" })}
-        />
-      </Tiles>
+      </StatRow>
 
-      <ChartCard
-        title="Sales and gross profit, last 12 months"
-        description={`${c} · hover a month for its figures · click it to see its orders`}
-        table={{
-          columns: ["Month", "Orders", `Sales ${c}`, `Gross profit ${c}`, "Margin"],
-          rows: d.months.map((m) => [monthYearOf(m.month), m.orders, amountCell(m.sales), amountCell(m.profit), percent(m.margin)]),
-        }}
-      >
-        <SalesProfitChart rows={d.months} currency={c} monthHref={monthHref} />
-      </ChartCard>
+      <div className={cn("grid gap-4", d.cash && "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]")}>
+        <ChartCard
+          title={`Sold and ${profitName.toLowerCase()}, by month`}
+          description={`${c} · a month opens its orders`}
+          table={{
+            columns: ["Month", "Orders", `Sold ${c}`, `${profitName} ${c}`],
+            rows: d.months.map((m) => [monthYearOf(m.month), m.orders, amountCell(m.sales), amountCell(m.profit)]),
+          }}
+        >
+          <SalesProfitChart rows={d.months} currency={c} monthHref={monthHref} names={["Sold", profitName]} />
+        </ChartCard>
+        {d.cash && (
+          <Card className="self-start">
+            <CardHeader
+              title={
+                <>
+                  Cash now <span className="font-normal text-text-2">· ≈ {whole(d.cash.total, c)}</span>
+                </>
+              }
+              actions={
+                <Link href="/finance/cash-book" className={MORE}>
+                  Cash &amp; bank →
+                </Link>
+              }
+            />
+            {d.cash.byCurrency.length === 0 ? (
+              <p className="p-4 text-sm text-muted">No account yet. Add the first one on Cash &amp; bank.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {d.cash.byCurrency.map((x) => (
+                  <li key={x.currency} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{x.currency}</span>
+                      <span className="block text-xs text-text-2">
+                        {plural(x.accounts, "account")}
+                        {x.currency !== c && ` · ≈ ${whole(x.inMain, c)}`}
+                      </span>
+                    </span>
+                    <span className={cn("shrink-0 text-sm font-semibold tabular", Number(x.amount) < 0 && "text-bad")}>{money(x.amount, x.currency).replace(`${x.currency} `, "")}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
+      </div>
 
       {d.month && (
         <Card id="month-orders" className="scroll-mt-20">
           <CardHeader
             title={`Orders · ${new Date(`${d.month.month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}`}
-            description="the orders behind the month's bar · click one to open it"
+            description="the orders behind the month's bar"
             actions={
               <Link href={href({ month: undefined })} scroll={false} className="text-sm font-medium text-text-2 hover:text-text">
                 Close
@@ -191,8 +135,8 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
                   <Th>Order</Th>
                   <Th>Customer</Th>
                   <Th>Ordered</Th>
-                  <Th className="text-right">Sales {c}</Th>
-                  <Th className="text-right">Margin</Th>
+                  <Th className="text-right">Sold {c}</Th>
+                  <Th className="text-right">%</Th>
                 </tr>
               </THead>
               <tbody>
@@ -206,7 +150,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
                     <Td>{o.customer}</Td>
                     <Td className="whitespace-nowrap">{date(o.orderedOn)}</Td>
                     <Td className="text-right tabular">{amountCell(Number(o.sales))}</Td>
-                    <Td className="text-right tabular">{percent(o.marginQuote)}</Td>
+                    <Td className="text-right tabular">{percent(d.seeProfit ? o.margin : o.marginQuote)}</Td>
                   </Tr>
                 ))}
               </tbody>
@@ -216,87 +160,81 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
       )}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader title="Needs attention" />
-          {attention.length === 0 ? (
-            <p className="p-4 text-sm text-muted">
-              Nothing needs attention: no customer overdue, no factory late, no thin margin, no quotation running out this week.
-            </p>
-          ) : (
-            <ul className="divide-y divide-line px-4">
-              {attention.map((a) => (
-                <li key={a.key} className="flex items-start gap-3 py-3">
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "mt-1.5 size-2.5 shrink-0 rounded-full",
-                      a.meaning === "bad" ? "bg-bad" : a.meaning === "warn" ? "bg-warn" : "bg-info",
-                    )}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium">
-                      <span className="sr-only">{a.meaning === "bad" ? "Late: " : a.meaning === "warn" ? "Check: " : "Soon: "}</span>
-                      {a.title}
-                    </span>
-                    {a.sub && <span className="block text-xs text-muted">{a.sub}</span>}
-                  </span>
-                  <Link href={a.link.href} className="shrink-0 text-sm font-medium text-primary underline-offset-2 hover:underline">
-                    {a.link.label} →
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-        <TopList
-          title="Top customers"
-          all={{ href: href({ section: "customers" }), label: "All customers" }}
-          empty={`No order ${p.name}.`}
-          rows={d.topCustomers.map((r) => ({
-            key: r.key,
-            href: `/customers/${r.key}`,
-            name: r.label,
-            sub: `${plural(r.orders, "order")} · ${percent(r.marginQuote)}`,
-            value: compactMoney(Number(r.sales), c),
-            exact: money(r.sales, c),
-          }))}
-        />
-        <TopList
-          title="Top factories"
-          all={{ href: href({ section: "factories" }), label: "All factories" }}
-          empty={`No order from a factory ${p.name}.`}
-          rows={d.topFactories.map((r) => ({
-            key: r.key,
-            href: `/factories/${r.key}`,
-            name: r.label,
-            sub: `${plural(r.orders, "order")} · on time ${percent(r.ready.percent)}`,
-            value: r.spend === null ? plural(r.orders, "order") : compactMoney(Number(r.spend), c),
-            exact: r.spend === null ? undefined : money(r.spend, c),
-          }))}
-        />
+        {d.owe && (
+          <ShortList
+            title="Customers owe us"
+            total={totals(d.owe.totals.map((x) => ({ currency: x.currency, amount: Number(x.due) })))}
+            all={{ href: "/money/due", label: `All ${d.owe.count}` }}
+            empty="No customer owes anything."
+            rows={d.owe.rows.map((r) => ({
+              key: r.id,
+              href: `/orders/${r.id}/payment`,
+              name: r.customer.name,
+              sub: `${r.refNo} · ${r.daysLate > 0 ? `${plural(r.daysLate, "day")} late` : r.next?.dueOn ? `due ${date(r.next.dueOn)}` : "no date yet"}`,
+              value: whole(r.due, r.currency),
+              tone: r.daysLate > 0 ? ("bad" as const) : undefined,
+            }))}
+          />
+        )}
+        {d.pay && (
+          <ShortList
+            title="To pay in the next 7 days"
+            total={totals(d.pay.totals.map(([currency, amount]) => ({ currency, amount })))}
+            all={{ href: "/money/due?side=suppliers", label: `All ${d.pay.count}` }}
+            empty="Nothing to pay this week."
+            rows={d.pay.rows.map((r) => ({
+              key: r.key,
+              href: "/money/due?side=suppliers",
+              name: r.name,
+              sub: `${r.what} · ${r.late > 0 ? `${plural(r.late, "day")} late` : r.dueOn ? date(r.dueOn) : "no date"}`,
+              value: whole(r.amount, r.currency),
+              tone: r.late > 0 ? ("bad" as const) : undefined,
+            }))}
+          />
+        )}
+        {d.thin && (
+          <ShortList
+            title="Thin or no profit"
+            total="under 10%"
+            all={{ href: href({ section: "money" }), label: "Profit by order" }}
+            empty={`Every running order of ${p.name} makes 10% or more.`}
+            rows={d.thin.rows.map((r) => ({
+              key: r.orderId,
+              href: `/orders/${r.orderId}/costs`,
+              name: `${r.refNo} · ${r.customer}`,
+              sub: r.profit < 0 ? `costs are over what was sold` : `profit ${percent(r.margin)} of the order`,
+              value: signed(r.profit),
+              tone: r.profit < 0 ? ("bad" as const) : ("warn" as const),
+            }))}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-function TopList({
+/** A card with at most four lines and a link to the whole list. */
+function ShortList({
   title,
+  total,
   all,
   rows,
   empty,
 }: {
   title: string;
+  total: string | null;
   all: { href: string; label: string };
-  rows: { key: string; href: string; name: string; sub: string; value: string; exact?: string }[];
+  rows: { key: string; href: string; name: string; sub: string; value: string; tone?: "bad" | "warn" }[];
   empty: string;
 }) {
   return (
     <Card>
       <CardHeader
         title={title}
+        description={total}
         actions={
-          <Link href={all.href} className="text-sm font-medium text-text-2 hover:text-text">
-            {all.label}
+          <Link href={all.href} className={cn(MORE, "whitespace-nowrap")}>
+            {all.label} →
           </Link>
         }
       />
@@ -306,14 +244,12 @@ function TopList({
         <ul className="divide-y divide-line">
           {rows.map((r) => (
             <li key={r.key}>
-              <Link href={r.href} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2/60">
+              <Link href={r.href} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2/60 sm:px-5">
                 <span className="min-w-0">
-                  <span className="block truncate text-sm">{r.name}</span>
-                  <span className="block text-xs text-muted">{r.sub}</span>
+                  <span className="block truncate text-sm font-semibold">{r.name}</span>
+                  <span className="block truncate text-xs text-text-2">{r.sub}</span>
                 </span>
-                <span className="shrink-0 text-sm font-semibold tabular" title={r.exact}>
-                  {r.value}
-                </span>
+                <span className={cn("shrink-0 text-sm font-semibold tabular", r.tone === "bad" && "text-bad", r.tone === "warn" && "text-warn")}>{r.value}</span>
               </Link>
             </li>
           ))}

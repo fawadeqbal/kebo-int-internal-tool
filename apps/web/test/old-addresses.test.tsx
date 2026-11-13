@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { companyCostsTarget, dueTarget, insightsTarget, moneyTarget, orderPaymentTarget, ordersBoardTarget, paymentsTabTarget, reportsMoneyTarget, reportsOverviewQuery, securityTarget, settingsTarget } from "@/lib/old-addresses";
+import { companyCostsTarget, dueTarget, insightsTarget, moneyTarget, orderPaymentTarget, ordersBoardTarget, paymentsTabTarget, profitTarget, reportsOverviewQuery, reportsPrintTarget, securityTarget, settingsTarget } from "@/lib/old-addresses";
 
 // Every old address keeps working (design page 33): old → new, with the rest of the query.
 
@@ -9,7 +9,7 @@ describe("/money?tab=…", () => {
     ["expenses", "/money/company-costs"],
     ["receive", "/money/due"],
     ["owe", "/money/due?side=suppliers"],
-    ["pnl", "/finance/profit"],
+    ["pnl", "/reports/profit"],
   ])("tab=%s → %s", (tab, to) => expect(moneyTarget({ tab })).toBe(to));
 
   it("keeps the filters", () => {
@@ -60,9 +60,10 @@ describe("/insights?section=…&view=…", () => {
   it.each([
     [{}, "/reports"],
     [{ section: "overview" }, "/reports"],
-    [{ section: "money" }, "/finance/profit"],
-    [{ section: "money", view: "pnl" }, "/finance/profit"],
-    [{ section: "money", view: "leaks" }, "/finance/leaks"],
+    [{ section: "money" }, "/reports/profit"],
+    [{ section: "money", view: "pnl" }, "/reports/profit"],
+    [{ section: "money", view: "leaks" }, "/reports/profit"],
+    [{ section: "cash" }, "/reports/cash"],
     [{ section: "customers" }, "/reports/customers"],
     [{ section: "factories" }, "/reports/factories"],
     [{ section: "people" }, "/reports/people"],
@@ -75,29 +76,35 @@ describe("/insights?section=…&view=…", () => {
     expect(insightsTarget({ section: "customers", period: "year", chip: "late" })).toBe("/reports/customers?period=year&chip=late");
     expect(insightsTarget({ period: "month" })).toBe("/reports?period=month");
     expect(insightsTarget({ period: "custom", from: "2026-10-01", to: "2026-10-31" })).toBe("/reports?period=custom&from=2026-10-01&to=2026-10-31");
-    expect(insightsTarget({ section: "money", view: "pnl", year: "2025", pl: "cash" })).toBe("/finance/profit?year=2025&pl=cash");
-    expect(insightsTarget({ section: "money", view: "leaks", leak: "orders" })).toBe("/finance/leaks?leak=orders");
+    // Profit and loss had a year and a cash view, Planned vs spent its lists: the Profit tab has neither.
+    expect(insightsTarget({ section: "money", view: "pnl", year: "2025", pl: "cash", period: "year" })).toBe("/reports/profit?period=year");
+    expect(insightsTarget({ section: "money", view: "leaks", leak: "orders" })).toBe("/reports/profit");
   });
 
   it.each([
     [{ tab: "sales" }, "/reports/funnel"],
     [{ tab: "customers" }, "/reports/customers"],
     [{ tab: "factories" }, "/reports/factories"],
-    [{ tab: "profit" }, "/finance/profit"],
-    [{ tab: "profit", sub: "pnl" }, "/finance/profit"],
-    [{ tab: "profit", sub: "orders" }, "/finance/leaks?leak=orders"],
+    [{ tab: "profit" }, "/reports/profit"],
+    [{ tab: "profit", sub: "pnl" }, "/reports/profit"],
+    [{ tab: "profit", sub: "orders" }, "/reports/profit"],
     [{ tab: "targets" }, "/reports/people/targets"],
     [{ tab: "overview" }, "/reports"],
     [{ tab: "sales", from: "2026-01-01", to: "2026-03-31" }, "/reports/funnel?from=2026-01-01&to=2026-03-31&period=custom"],
   ])("the older ?tab= form %o → %s", (q, to) => expect(insightsTarget(q)).toBe(to));
 });
 
-describe("/reports/money and /reports", () => {
-  it("Where we lose money → Finance › Leaks", () => {
-    expect(reportsMoneyTarget({})).toBe("/finance/leaks");
-    expect(reportsMoneyTarget({ view: "customers", from: "2026-01-01", to: "2026-06-30" })).toBe(
-      "/finance/leaks?leak=customers&period=custom&from=2026-01-01&to=2026-06-30",
-    );
+describe("the old report pages", () => {
+  it("Profit & loss, Planned vs spent and Where we lose money → Reports › Profit, for the same period", () => {
+    expect(profitTarget({})).toBe("/reports/profit");
+    expect(profitTarget({ period: "year", year: "2025", pl: "cash", leak: "orders" })).toBe("/reports/profit?period=year");
+    expect(profitTarget({ period: "quarter" })).toBe("/reports/profit");
+    expect(profitTarget({ view: "customers", from: "2026-01-01", to: "2026-06-30" })).toBe("/reports/profit?period=custom&from=2026-01-01&to=2026-06-30");
+  });
+  it("the Print tab → the overview, for the same period", () => {
+    expect(reportsPrintTarget({})).toBe("/reports");
+    expect(reportsPrintTarget({ period: "month", staff: "abc" })).toBe("/reports?period=month");
+    expect(reportsPrintTarget({ period: "custom", from: "2026-10-01", to: "2026-10-31" })).toBe("/reports?period=custom&from=2026-10-01&to=2026-10-31");
   });
   it("the oldest /reports?from&to opens that period on the overview", () => {
     expect(reportsOverviewQuery({ from: "2026-01-01", to: "2026-01-31" })).toEqual({ from: "2026-01-01", to: "2026-01-31", period: "custom" });

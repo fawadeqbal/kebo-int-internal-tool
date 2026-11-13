@@ -1,8 +1,7 @@
-import { PrintableReports, type ReportSearch } from "@/components/insights/report-page";
+import { redirect } from "next/navigation";
+import { reportsPrintTarget } from "@/lib/old-addresses";
 
-export const metadata = { title: "Printable reports" };
-
-/** Reports › Printable reports: the sales report to print or download, and the reports' tables in Excel. */
-export default function Page({ searchParams }: { searchParams: Promise<ReportSearch & { staff?: string }> }) {
-  return <PrintableReports searchParams={searchParams} />;
+/** The Print tab is gone: every report has View / Print and PDF in its header (old links open the overview). */
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  redirect(reportsPrintTarget(await searchParams));
 }

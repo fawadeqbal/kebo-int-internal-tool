@@ -1,103 +1,77 @@
-import { Suspense, type ReactNode } from "react";
-import Link from "next/link";
-import { Banknote, Factory, LayoutGrid, Printer, Target, TrendingUp, User, Users, type LucideIcon } from "lucide-react";
+import { Suspense } from "react";
+import { Banknote, Factory, LayoutGrid, Target, TrendingUp, User, Users, type LucideIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
-import { Alert, buildHref, buttonClass, Card, CardHeader, Input, LinkTabs, PageHeader, Segmented } from "@kebo/ui";
+import { Alert, buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
-import { api } from "@/lib/api";
-import { hasFeature, requirePermission, requireUser } from "@/lib/session";
+import { hasFeature, requirePermission } from "@/lib/session";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { SECTION_PATH, viewPath } from "@/lib/old-addresses";
 import { PlanOff } from "@/components/common/plan-off";
 import { FileActions } from "@/components/common/file-actions";
 import { PERIOD_KINDS, PERIOD_LABEL, periodOf, type Period, type Section } from "@/lib/insights-period";
-import { CUSTOMER_CHIPS, loadCustomers, loadFactories, loadFunnel, loadMoney, loadOverview, loadPeople, type CustomerChip } from "@/lib/insights-data";
-import type { LeaksReport } from "@/lib/types-money";
-import type { AgeBucket } from "@/lib/types-facts";
+import { CUSTOMER_CHIPS, loadCash, loadCustomers, loadFactories, loadFunnel, loadOverview, loadPeople, loadProfit, PROFIT_SORTS, type CustomerChip, type ProfitSort } from "@/lib/insights-data";
 import { Overview } from "./overview";
-import { MoneySection } from "./money-section";
+import { ProfitSection } from "./profit-section";
+import { CashSection } from "./cash-section";
 import { CustomersSection, FactoriesSection, FunnelSection, PeopleSection } from "./parties-sections";
 import { TargetsView } from "./targets-view";
-import { LEAK_VIEWS, LeaksBody, type LeakView } from "./leaks";
-import { ProfitTable } from "./pnl";
 import { TZ } from "@/lib/format";
 
 export type ReportSearch = {
   period?: string;
   from?: string;
   to?: string;
-  leak?: string;
-  year?: string;
-  pl?: string;
   chip?: string;
   page?: string;
   month?: string;
-  age?: string;
-  side?: string;
+  sort?: string;
+  /** Targets: the year shown. */
+  year?: string;
 };
 
-/** What each page is: Insights' sections (and the money ones' sub-views), each at its own address now. */
-export type ReportKind = "overview" | "customers" | "factories" | "people" | "targets" | "funnel" | "profit" | "leaks";
+/** The tabs of Reports (each has its own address, so a link or a bookmark opens the tab it means). */
+export type ReportKind = "overview" | "profit" | "customers" | "factories" | "cash" | "people" | "targets" | "funnel";
 
 const SECTION_OF: Record<ReportKind, Section> = {
   overview: "overview",
+  profit: "money",
   customers: "customers",
   factories: "factories",
+  cash: "cash",
   people: "people",
   targets: "people",
   funnel: "funnel",
-  profit: "money",
-  leaks: "money",
 };
 const PATH_OF: Record<ReportKind, string> = {
   overview: "/reports",
+  profit: "/reports/profit",
   customers: "/reports/customers",
   factories: "/reports/factories",
+  cash: "/reports/cash",
   people: "/reports/people",
   targets: "/reports/people/targets",
   funnel: "/reports/funnel",
-  profit: "/finance/profit",
-  leaks: "/finance/leaks",
 };
-/** The sidebar item each page is under: the reports share Overview › Analytics & reports; the money ones have their own. */
-const ITEM_OF: Record<ReportKind, string> = {
-  overview: "/reports",
-  customers: "/reports",
-  factories: "/reports",
-  people: "/reports",
-  targets: "/reports",
-  funnel: "/reports",
-  profit: "/finance/profit",
-  leaks: "/finance/leaks",
-};
-/** A report's own title (the overview and the money pages take their sidebar item's name). */
-const REPORT_TITLE: Partial<Record<ReportKind, string>> = {
-  customers: "Customers",
-  factories: "Suppliers",
-  people: "People & targets",
-  targets: "Targets",
-  funnel: "Sales funnel",
-};
-/** The reports as tabs under the title (they were sidebar items): the same period goes with you. */
-const REPORT_TABS: { key: ReportKind | "print"; href: string; label: string; icon: LucideIcon; money?: boolean }[] = [
+/** One page, its reports as tabs under the title: the same period goes with you. Profit and Cash are for people who see money. */
+const REPORT_TABS: { key: ReportKind; href: string; label: string; icon: LucideIcon; money?: boolean }[] = [
   { key: "overview", href: "/reports", label: "Overview", icon: LayoutGrid },
+  { key: "profit", href: "/reports/profit", label: "Profit", icon: TrendingUp, money: true },
   { key: "customers", href: "/reports/customers", label: "Customers", icon: Users },
   { key: "factories", href: "/reports/factories", label: "Suppliers", icon: Factory },
-  { key: "funnel", href: "/reports/funnel", label: "Funnel", icon: Target },
-  { key: "profit", href: "/finance/profit", label: "Money", icon: Banknote, money: true },
+  { key: "cash", href: "/reports/cash", label: "Cash", icon: Banknote, money: true },
   { key: "people", href: "/reports/people", label: "People", icon: User },
-  { key: "targets", href: "/reports/people/targets", label: "Targets", icon: TrendingUp },
-  { key: "print", href: "/reports/print", label: "Print", icon: Printer },
+  { key: "funnel", href: "/reports/funnel", label: "Funnel", icon: Target },
 ];
-const REPORTS_CRUMBS = [...crumbsFor("/reports").slice(0, 1), { label: labelFor("/reports"), href: "/reports" }];
+/** Targets is a view of People (it opens from there), so People stays the tab. */
+const TAB_OF = (kind: ReportKind): ReportKind => (kind === "targets" ? "people" : kind);
 
-function ReportTabs({ current, keep, seeMoney }: { current: ReportKind | "print"; keep: Record<string, string | undefined>; seeMoney: boolean }) {
+function ReportTabs({ current, keep, seeMoney }: { current: ReportKind; keep: Record<string, string | undefined>; seeMoney: boolean }) {
   return (
     <LinkTabs
       label="Reports"
       className="no-print mt-3"
-      tabs={REPORT_TABS.filter((t) => seeMoney || (!t.money && t.key !== "targets")).map((t) => ({
+      tabs={REPORT_TABS.filter((t) => seeMoney || !t.money).map((t) => ({
         href: buildHref(t.href, keep, {}),
         label: (
           <>
@@ -110,61 +84,31 @@ function ReportTabs({ current, keep, seeMoney }: { current: ReportKind | "print"
   );
 }
 
-/** Every report in one list (board ReportsHub "All reports"): what each answers, and where it is. */
-export function AllReports({ seeMoney }: { seeMoney: boolean }) {
-  const rows = [
-    { href: "/reports/customers", text: "Customers: who buys, who pays late", what: "Customers" },
-    { href: "/reports/factories", text: "Suppliers: price, speed, reliability", what: "Suppliers" },
-    { href: "/reports/funnel", text: "Funnel: where inquiries are lost", what: "Funnel" },
-    ...(seeMoney ? [{ href: "/finance/profit", text: "Money: cash in and out, by month", what: "Money" }] : []),
-    { href: "/reports/people", text: "People: who wins and handles what", what: "People" },
-    ...(seeMoney ? [{ href: "/reports/people/targets", text: "Targets per person", what: "Targets" }] : []),
-    { href: "/reports/print", text: "Print pack for the month", what: "PDF" },
-  ];
-  return (
-    <Card className="p-0">
-      <CardHeader title="All reports" />
-      <ul className="flex flex-col gap-2 px-5 py-4 text-sm">
-        {rows.map((r) => (
-          <li key={r.href} className="flex items-baseline justify-between gap-3">
-            <Link href={r.href} className="text-primary underline underline-offset-2 hover:opacity-80">
-              {r.text}
-            </Link>
-            <span className="text-text-2">{r.what}</span>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
 const DESCRIPTION: Record<ReportKind, string> = {
-  overview: "How the business is doing · every figure is from the orders and money themselves",
+  overview: "How the business is doing",
+  profit: "What was sold, what it cost, and what is left",
   customers: "Who buys, how much, how well they pay",
   factories: "Who supplies on time and wins our orders",
+  cash: "What came in, what went out, and what each account holds",
   people: "Who sells, how fast, and against their targets",
   targets: "Monthly sales targets for the company and each person",
   funnel: "Where inquiries go, and why we lose them",
-  profit: "Cash, what we're owed, what we owe, costs and profit, then the profit and loss month by month",
-  leaks: "Where we lose money: deals, orders, customers and spending",
 };
 
 /**
- * One of the reports (Dashboard frame, without its section list: the sidebar has the pages now):
- * one period for every figure in the header with the period before to compare, tiles, one chart
- * per question, short lists. All figures come from the Insights tables (GET /insights/facts/*).
- * Overview › Analytics & reports (tabs: Overview, Customers, Suppliers, People & targets, Sales funnel, Printable reports);
- * Revenue & profitability › Profit & loss, Variance analysis.
+ * Reports (design "money, simple", boards ROverview to RCash): one page in the menu, its reports as tabs,
+ * one period for every figure with the period before to compare. Excel, View / Print and PDF are in the
+ * header of every tab. Figures come from the Insights tables (GET /insights/facts/*) and, for cash, from
+ * the cash book's own rows (GET /money/cash-report).
  */
 export async function ReportPage({ kind, searchParams }: { kind: ReportKind; searchParams: Promise<ReportSearch> }) {
   const me = await requirePermission("reports.view");
-  const item = ITEM_OF[kind];
-  const tabbed = item === "/reports";
-  const crumbs = tabbed && kind !== "overview" ? REPORTS_CRUMBS : crumbsFor(item);
-  const title = REPORT_TITLE[kind] ?? labelFor(item);
+  const crumbs = crumbsFor("/reports");
+  const title = labelFor("/reports");
   if (!(await hasFeature("insights"))) return <PlanOff title={title} what="Insights (sales, profit and team reports)" crumbs={crumbs} />;
   const seeMoney = can(me, "expenses.manage");
-  // Money (profit, leaks) and setting targets: for people who may see money, as on Insights.
-  if ((kind === "profit" || kind === "leaks" || kind === "targets") && !seeMoney) redirect(kind === "targets" ? "/reports/people" : "/forbidden");
+  // Profit, cash and setting targets: for people who may see money.
+  if ((kind === "profit" || kind === "cash" || kind === "targets") && !seeMoney) redirect(kind === "targets" ? "/reports/people" : "/forbidden");
   const sp = await searchParams;
   const section = SECTION_OF[kind];
   const path = PATH_OF[kind];
@@ -186,7 +130,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
   };
   // The printable report (unchanged), for the period up to today.
   const reportTo = p.to < today ? p.to : today;
-  const excel = kind === "targets" || kind === "leaks" ? undefined : buildHref("/sheets/export/insights", {}, { section, period: p.kind, from: p.from, to: p.to });
+  const excel = kind === "targets" ? undefined : buildHref("/sheets/export/insights", {}, { section, period: p.kind, from: p.from, to: p.to });
 
   const periodPicker = (
     <Segmented
@@ -197,9 +141,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
           period: k === "quarter" ? undefined : k,
           from: k === "custom" ? p.from : undefined,
           to: k === "custom" ? p.to : undefined,
-          year: sp.year,
-          pl: sp.pl,
-          leak: sp.leak,
+          sort: sp.sort,
         }),
         label: PERIOD_LABEL[k],
         active: p.kind === k,
@@ -231,7 +173,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
           ) : undefined
         }
       >
-        {(tabbed || kind === "profit") && <ReportTabs current={kind} keep={keep} seeMoney={seeMoney} />}
+        <ReportTabs current={TAB_OF(kind)} keep={keep} seeMoney={seeMoney} />
       </PageHeader>
       {periodic && (
         <div className="mb-4 md:hidden">
@@ -290,37 +232,29 @@ async function Body({
         <>
           <Missing rates={d.missingRates} />
           <Overview d={d} p={p} href={href} />
-          <div className="mt-4">
-            <AllReports seeMoney={seeMoney} />
-          </div>
         </>
       );
     }
     case "profit": {
-      const age =
-        sp.age && sp.side && ["notDue", "d30", "d60", "over60"].includes(sp.age) && ["receivable", "payable"].includes(sp.side)
-          ? { side: sp.side as "receivable" | "payable", bucket: sp.age as AgeBucket | "over60" }
-          : undefined;
-      const d = await loadMoney(p, age);
+      const sort: ProfitSort = (PROFIT_SORTS as readonly string[]).includes(sp.sort ?? "") ? (sp.sort as ProfitSort) : "low";
+      const d = await loadProfit(p, sort);
+      const params = { ...keep, sort: sort === "low" ? undefined : sort };
       return (
-        <div className="flex flex-col gap-6">
-          <div>
-            <Missing rates={d.missingRates} />
-            <MoneySection d={d} p={p} href={href} />
-          </div>
-          <section id="pnl" aria-labelledby="pnl-title" className="flex scroll-mt-20 flex-col gap-4">
-            <h2 id="pnl-title" className="text-base font-semibold">
-              Profit and loss, month by month
-            </h2>
-            <ProfitTable year={sp.year} cash={sp.pl === "cash"} href={(change) => `${buildHref(path, { ...keep, year: sp.year, pl: sp.pl }, change)}#pnl`} />
-          </section>
-        </div>
+        <>
+          <Missing rates={d.missingRates} />
+          <ProfitSection d={d} p={p} sort={sort} page={toPage(sp.page)} base={path} params={params} href={(patch) => buildHref(path, params, patch)} />
+        </>
       );
     }
-    case "leaks": {
-      const r = await api.get<LeaksReport>("/reports/leaks", { from: p.from, to: p.to < today ? p.to : today });
-      const view: LeakView = (LEAK_VIEWS as readonly string[]).includes(sp.leak ?? "") ? (sp.leak as LeakView) : "attention";
-      return <LeaksBody r={r} view={view} href={(v) => buildHref(path, keep, { leak: v })} />;
+    case "cash": {
+      const { report } = await loadCash(p);
+      if (!report) return <Alert tone="info">Cash &amp; bank is not switched on for the company, so there are no accounts to report on.</Alert>;
+      return (
+        <>
+          <Missing rates={report.missingRates} />
+          <CashSection r={report} p={p} />
+        </>
+      );
     }
     case "customers": {
       const chip: CustomerChip = (CUSTOMER_CHIPS as readonly string[]).includes(sp.chip ?? "") ? (sp.chip as CustomerChip) : "all";
@@ -360,89 +294,5 @@ function SectionSkeleton() {
       </div>
       <div className="h-72 animate-pulse rounded-xl bg-surface-2" />
     </div>
-  );
-}
-
-/** Overview › Analytics & reports › Printable reports: the sales report as a paper (view, print, PDF) and each report's tables as Excel, for a period. */
-export async function PrintableReports({ searchParams }: { searchParams: Promise<ReportSearch & { staff?: string }> }) {
-  await requirePermission("reports.view");
-  const crumbs = REPORTS_CRUMBS;
-  if (!(await hasFeature("insights"))) return <PlanOff title="Printable reports" what="Insights (sales, profit and team reports)" crumbs={crumbs} />;
-  const sp = await searchParams;
-  const today = todayIn(TZ);
-  const p = periodOf(sp, today);
-  const path = "/reports/print";
-  const reportTo = p.to < today ? p.to : today;
-  const q = { from: p.from, to: reportTo, staff: sp.staff };
-  const sheets: { section: Section; title: string; what: string }[] = [
-    { section: "overview", title: "Overview", what: "The overview's tiles and tables" },
-    { section: "customers", title: "Customers", what: "Every customer's sales, profit and payments" },
-    { section: "factories", title: "Factories", what: "Every factory's orders and how they delivered" },
-    { section: "people", title: "People", what: "Each person's inquiries, quotes, wins and sales" },
-    { section: "funnel", title: "Sales funnel", what: "Inquiries by stage, channel and lost reason" },
-  ];
-  return (
-    <div>
-      <PageHeader crumbs={crumbs} title="Printable reports" description="The sales report as a paper to print or send, and each report's tables as Excel, for the period you choose.">
-        <ReportTabs current="print" seeMoney={can(await requireUser(), "expenses.manage")} keep={{ period: p.kind === "quarter" ? undefined : p.kind, from: p.kind === "custom" ? p.from : undefined, to: p.kind === "custom" ? p.to : undefined }} />
-      </PageHeader>
-      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Segmented
-          label="Period"
-          className="bg-surface-2"
-          options={PERIOD_KINDS.map((k) => ({
-            href: buildHref(path, {}, { period: k === "quarter" ? undefined : k, from: k === "custom" ? p.from : undefined, to: k === "custom" ? p.to : undefined }),
-            label: PERIOD_LABEL[k],
-            active: p.kind === k,
-          }))}
-        />
-        <span className="text-xs text-text-2">{p.label}</span>
-      </div>
-      {p.kind === "custom" && (
-        <form action={path} className="no-print mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
-          <input type="hidden" name="period" value="custom" />
-          <label className="text-xs text-text-2">
-            From
-            <Input name="from" type="date" defaultValue={p.from} className="mt-1 h-9 w-40" />
-          </label>
-          <label className="text-xs text-text-2">
-            To
-            <Input name="to" type="date" defaultValue={p.to} className="mt-1 h-9 w-40" />
-          </label>
-          <button className={buttonClass("secondary", "sm")}>Show</button>
-        </form>
-      )}
-      <div className="flex flex-col gap-4">
-        <Card>
-          <CardHeader
-            title="Sales report"
-            description={`${p.label}: inquiries, quotations, wins and losses, sales, profit and each person, on the company's paper.`}
-            actions={<FileActions viewHref={buildHref("/print/report", {}, q)} pdfHref={buildHref("/pdf/report/summary", {}, q)} of="sales report" />}
-          />
-        </Card>
-        <Card className="overflow-hidden">
-          <CardHeader title="Tables in Excel" description={`${p.label} · one file per report, a sheet per table`} />
-          <ul className="flex flex-col divide-y divide-line">
-            {sheets.map((s) => (
-              <Row key={s.section} title={s.title} what={s.what}>
-                <FileActions excelHref={buildHref("/sheets/export/insights", {}, { section: s.section, period: p.kind, from: p.from, to: p.to })} of={`${s.title.toLowerCase()} report`} />
-              </Row>
-            ))}
-          </ul>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function Row({ title, what, children }: { title: string; what: string; children: ReactNode }) {
-  return (
-    <li className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-      <span className="min-w-0">
-        <span className="font-medium">{title}</span>
-        <span className="block text-xs text-muted">{what}</span>
-      </span>
-      {children}
-    </li>
   );
 }

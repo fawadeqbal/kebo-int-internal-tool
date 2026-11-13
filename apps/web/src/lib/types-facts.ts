@@ -135,7 +135,8 @@ export interface CashFacts {
   to: string;
   seeMoney: boolean;
   seeExpenses: boolean;
-  months: { month: string; in: string; out: string | null; factories: string | null; expenses: string | null; net: string | null }[];
+  /** `company`: the company's own costs dated in the month (no order), what comes off the orders' profit. */
+  months: { month: string; in: string; out: string | null; factories: string | null; expenses: string | null; company: string | null; net: string | null }[];
   byKind: { category: string; amount: string; orders: number }[] | null;
   missingRates: string[];
 }
@@ -204,4 +205,23 @@ export interface FactoryOrders {
     ready: boolean;
     daysLate: number | null;
   }[];
+}
+
+/** GET /money/cash-report?from&to (managers): Reports › Cash. Amounts in the main currency unless an account's own. */
+export interface CashReport {
+  currency: string;
+  from: string;
+  to: string;
+  today: string;
+  months: { month: string; customers: string; suppliers: string; bills: string; company: string; net: string; cashEnd: string }[];
+  total: { customers: string; suppliers: string; bills: string; company: string; net: string };
+  in: { amount: string; entries: number };
+  out: { amount: string; entries: number };
+  cashNow: string;
+  byCurrency: { currency: string; accounts: number; amount: string; inMain: string }[];
+  /** Each account in its own currency: at the start of the period, in, out, at its end, and today. */
+  accounts: { id: string; name: string; currency: string; archived: boolean; openedOn: string | null; start: string; in: string; out: string; end: string; now: string }[];
+  /** Payments and costs of the period recorded without an account (in the months, in no balance). */
+  offAccount: number;
+  missingRates: string[];
 }

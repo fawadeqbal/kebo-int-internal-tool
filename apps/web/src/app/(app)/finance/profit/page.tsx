@@ -1,8 +1,7 @@
-import { ReportPage, type ReportSearch } from "@/components/insights/report-page";
+import { redirect } from "next/navigation";
+import { profitTarget } from "@/lib/old-addresses";
 
-export const metadata = { title: "Profit & loss" };
-
-/** Revenue & profitability › Profit & loss: the money figures for a period, then the profit and loss month by month. */
-export default function Page({ searchParams }: { searchParams: Promise<ReportSearch> }) {
-  return <ReportPage kind="profit" searchParams={searchParams} />;
+/** Profit & loss, Planned vs spent and "Where we lose money" are one tab now: Reports › Profit (old links keep working). */
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  redirect(profitTarget(await searchParams));
 }

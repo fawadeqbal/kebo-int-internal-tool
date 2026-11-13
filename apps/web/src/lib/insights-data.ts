@@ -2,13 +2,15 @@ import "server-only";
 import { api } from "./api";
 import { countryName } from "./countries";
 import { can, type Permission } from "@kebo/shared";
-import { todayIn } from "@kebo/utils";
+import { addDays, todayIn } from "@kebo/utils";
 import { lastMonths, monthEnd, monthStart, periodOf, SECTIONS, type Period, type Section } from "./insights-period";
 import type { SheetSpec } from "./sheet-spec";
+import type { Receivables } from "./types-insights";
+import type { OpenBills, ToPayList } from "./types-money";
 import type {
   Aging,
-  AgeBucket,
   CashFacts,
+  CashReport,
   FactoryGroups,
   FactOrders,
   FactsNow,
@@ -34,14 +36,6 @@ const xl = (v: number | null | undefined) => (v === null || v === undefined || !
 /** One company row (period "all") of a grouping, or zeros. */
 const totalOf = (g: OrderGroups) => g.rows[0] ?? null;
 
-export const BUCKETS: { key: AgeBucket | "over60"; label: string }[] = [
-  { key: "notDue", label: "Not due yet" },
-  { key: "d30", label: "1–30 days" },
-  { key: "d60", label: "31–60 days" },
-  { key: "over60", label: "Over 60" },
-];
-export const bucketValue = (a: Aging, k: AgeBucket | "over60") => n(k === "over60" ? a.over60 : a[k]);
-
 /* ------------------------------------------------------------------------------------------- Overview */
 
 export async function loadOverview(p: Period, money: boolean, month?: string) {
@@ -49,66 +43,101 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
   const prev = { from: p.prevFrom, to: p.prevTo };
   const twelve = { from: monthStart(p.to, -11), to: p.to };
   const drill = month && /^\d{4}-\d{2}$/.test(month) ? { from: `${month}-01`, to: monthEnd(`${month}-01`) } : null;
-  const [cur, before, cashNow, cashBefore, now, recv, pay, funnelNow, funnelBefore, monthly, customers, factories, owing, monthOrders] =
-    await Promise.all([
-      facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
-      facts<OrderGroups>("orders/groups", { ...prev, period: "all" }),
-      facts<CashFacts>("cash", span),
-      facts<CashFacts>("cash", prev),
-      facts<FactsNow>("now", span),
-      facts<Aging>("aging", { side: "receivable" }),
-      money ? facts<Aging>("aging", { side: "payable" }) : Promise.resolve(null),
-      facts<Funnel>("funnel", span),
-      facts<Funnel>("funnel", prev),
-      facts<OrderGroups>("orders/groups", { ...twelve, period: "month" }),
-      facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "customer" }),
-      facts<FactoryGroups>("factories/groups", { ...span, period: "all", by: "factory" }),
-      money ? facts<FactoryGroups>("factories/groups", { period: "all", by: "factory" }) : Promise.resolve(null),
-      drill ? facts<FactOrders>("orders", { ...drill, limit: 200 }) : Promise.resolve(null),
-    ]);
+  /** A list that is only there for some people or plans: without it, its card is left out. */
+  const maybe = <T>(get: () => Promise<T>) => get().catch(() => null);
+  const [cur, before, cashNow, cashBefore, monthly, monthlyCash, orders, owed, toPay, bills, report, reportBefore, funnelNow, funnelBefore, monthOrders] = await Promise.all([
+    facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
+    facts<OrderGroups>("orders/groups", { ...prev, period: "all" }),
+    facts<CashFacts>("cash", span),
+    facts<CashFacts>("cash", prev),
+    facts<OrderGroups>("orders/groups", { ...twelve, period: "month" }),
+    facts<CashFacts>("cash", twelve),
+    facts<FactOrders>("orders", { ...span, limit: 1000 }),
+    maybe(() => api.get<Receivables>("/money/receivables")),
+    money ? maybe(() => api.get<ToPayList>("/billing/to-pay")) : null,
+    money ? maybe(() => api.get<OpenBills>("/money/bills")) : null,
+    money ? maybe(() => api.get<CashReport>("/money/cash-report", span)) : null,
+    money ? maybe(() => api.get<CashReport>("/money/cash-report", prev)) : null,
+    facts<Funnel>("funnel", span),
+    facts<Funnel>("funnel", prev),
+    drill ? facts<FactOrders>("orders", { ...drill, limit: 200 }) : Promise.resolve(null),
+  ]);
   const c = cur.currency;
   const t = totalOf(cur);
   const b = totalOf(before);
-  const cashIn = sum(cashNow.months, (m) => n(m.in));
-  const cashInBefore = sum(cashBefore.months, (m) => n(m.in));
-  const cashOut = cashNow.seeMoney ? sum(cashNow.months, (m) => n(m.out)) : null;
-  const cashOutBefore = cashBefore.seeMoney ? sum(cashBefore.months, (m) => n(m.out)) : null;
+  const seeProfit = cur.seeExpenses;
+  // Profit is the company's: what the orders make now, less the company's own costs of the same days.
+  const company = (x: CashFacts) => sum(x.months, (m) => n(m.company));
+  const profitOf = (g: OrderGroupRow | null, x: CashFacts) => (seeProfit ? n(g?.profitExpected) - company(x) : n(g?.profitQuote));
+  // Managers: the money that moved (Reports › Cash). Others: what was paid on orders.
+  const collected = { now: report ? n(report.in.amount) : sum(cashNow.months, (m) => n(m.in)), before: reportBefore ? n(reportBefore.in.amount) : sum(cashBefore.months, (m) => n(m.in)) };
+  const paidOut = report ? { now: n(report.out.amount), before: reportBefore ? n(reportBefore.out.amount) : 0 } : null;
   const months = lastMonths(p.to).map((m) => {
     const r = monthly.rows.find((x) => x.period === m);
-    return { month: m, sales: n(r?.sales), profit: n(r?.profitQuote), orders: r?.orders ?? 0, margin: r?.marginQuote ?? null };
+    const own = n(monthlyCash.months.find((x) => x.month === m)?.company);
+    return { month: m, sales: n(r?.sales), profit: seeProfit ? n(r?.profitExpected) - own : n(r?.profitQuote), orders: r?.orders ?? 0, margin: seeProfit ? (r?.margin ?? null) : (r?.marginQuote ?? null) };
   });
-  const owingFactories = owing?.rows.filter((r) => n(r.toPay) > 0) ?? [];
-  const own = new Map<string, number>();
-  for (const r of owingFactories) for (const o of r.own ?? []) own.set(o.currency, (own.get(o.currency) ?? 0) + n(o.toPay));
-  const topCustomers = [...customers.rows].sort((x, y) => n(y.sales) - n(x.sales)).slice(0, 5);
-  const topFactories = [...factories.rows.filter((r) => r.orders > 0)]
-    .sort((x, y) => (money ? n(y.spend) - n(x.spend) : y.orders - x.orders))
-    .slice(0, 5);
+
+  // Customers owe us: late first (the oldest first), then by the day the next part is due.
+  const owe = (owed?.rows ?? [])
+    .filter((r) => n(r.due) > 0)
+    .sort((x, y) => y.daysLate - x.daysLate || (x.next?.dueOn ?? "9999").localeCompare(y.next?.dueOn ?? "9999"));
+  const oweTotals = (owed?.totals ?? []).filter((x) => n(x.due) > 0);
+
+  // To pay in the next 7 days: the factories' parts late or due by then, and the bills that wait.
+  const soon = addDays(todayIn(TZ), 7);
+  const pay = [
+    ...(toPay?.rows ?? [])
+      .filter((r) => n(r.open) > 0 && r.dueOn !== null && r.dueOn <= soon)
+      .map((r) => ({ key: `f-${r.key}`, name: r.supplier.name, what: `Goods · ${r.part === "deposit" ? "advance" : "balance"} · ${r.order.refNo}`, dueOn: r.dueOn, late: r.late, amount: n(r.open), currency: r.currency, side: "suppliers" })),
+    ...(bills?.rows ?? []).map((r) => ({
+      key: `b-${r.id}`,
+      name: r.owedTo ?? r.description,
+      what: [r.kind === "repay" ? "To pay back" : r.owedTo ? r.description : "Bill", r.order?.refNo].filter(Boolean).join(" · "),
+      dueOn: r.on as string | null,
+      late: r.days,
+      amount: n(r.amount),
+      currency: r.currency,
+      side: "suppliers",
+    })),
+  ].sort((x, y) => y.late - x.late || (x.dueOn ?? "").localeCompare(y.dueOn ?? ""));
+  const payTotals = new Map<string, number>();
+  for (const x of pay) payTotals.set(x.currency, (payTotals.get(x.currency) ?? 0) + x.amount);
+
+  // Thin or no profit: orders of the period still running whose profit now is under 10% of what was sold.
+  const thin = seeProfit
+    ? orders.rows
+        .filter((r) => r.status === "open" && r.margin !== null && r.margin < 10)
+        .sort((x, y) => (x.margin ?? 0) - (y.margin ?? 0))
+        .map((r) => ({ orderId: r.orderId, refNo: r.refNo, customer: r.customer, sales: n(r.sales), profit: n(r.profitExpected), margin: r.margin }))
+    : null;
+
   const data = {
     currency: c,
     seeMoney: cur.seeMoney,
-    seeExpenses: cur.seeExpenses,
-    sales: { now: n(t?.sales), before: n(b?.sales), orders: t?.orders ?? 0, ordersBefore: b?.orders ?? 0 },
-    profit: { now: n(t?.profitQuote), before: n(b?.profitQuote), margin: t?.marginQuote ?? null, marginBefore: b?.marginQuote ?? null },
-    shipped: t?.shipped ?? null,
-    cashIn: { now: cashIn, before: cashInBefore },
-    cashOut: cashOut === null ? null : { now: cashOut, before: cashOutBefore ?? 0 },
-    receivable: recv,
-    payable: pay,
-    payOwn: [...own.entries()].sort((x, y) => y[1] - x[1]),
-    payFactories: owingFactories.length,
-    now,
+    seeProfit,
+    sold: { now: n(t?.sales), before: n(b?.sales), orders: t?.orders ?? 0, ordersBefore: b?.orders ?? 0 },
+    collected,
+    paidOut,
+    profit: {
+      now: profitOf(t, cashNow),
+      before: profitOf(b, cashBefore),
+      margin: seeProfit ? pct(profitOf(t, cashNow), n(t?.costed)) : (t?.marginQuote ?? null),
+      company: seeProfit ? company(cashNow) : null,
+    },
     winRate: { now: funnelNow.winRate, before: funnelBefore.winRate, won: funnelNow.won, lost: funnelNow.lost },
     months,
-    topCustomers,
-    topFactories,
+    cash: report ? { total: n(report.cashNow), byCurrency: report.byCurrency } : null,
+    owe: owed ? { rows: owe.slice(0, 4), count: owe.length, totals: oweTotals } : null,
+    pay: toPay || bills ? { rows: pay.slice(0, 4), count: pay.length, totals: [...payTotals.entries()].sort((x, y) => y[1] - x[1]) } : null,
+    thin: thin ? { rows: thin.slice(0, 4), count: thin.length } : null,
     month: drill ? { month: month!, orders: monthOrders!.rows } : null,
-    missingRates: cashNow.missingRates,
-    missingRateOrders: t?.missingRate ?? 0,
+    missingRates: [...new Set([...cur.missingRates, ...cashNow.missingRates, ...(report?.missingRates ?? [])])].sort(),
   };
+  const profitName = seeProfit ? "Profit" : "Gross profit";
   const sheets: SheetSpec[] = [
     {
-      name: `Insights overview ${p.from} to ${p.to}`,
+      name: `Reports overview ${p.from} to ${p.to}`,
       title: "Overview",
       columns: [
         { header: "Figure", width: 28 },
@@ -116,52 +145,58 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
         { header: `Before (${p.vsLabel})`, kind: "number", width: 18 },
       ],
       rows: [
-        [`Sales (${c})`, xl(data.sales.now), xl(data.sales.before)],
-        ["Orders", data.sales.orders, data.sales.ordersBefore],
-        [`Gross profit (${c})`, xl(data.profit.now), xl(data.profit.before)],
-        ["Gross margin %", xl(data.profit.margin), xl(data.profit.marginBefore)],
-        [`Cash in (${c})`, xl(cashIn), xl(cashInBefore)],
-        ...(data.cashOut ? [[`Cash out (${c})`, xl(data.cashOut.now), xl(data.cashOut.before)] as (string | number | null)[]] : []),
-        [`To receive today (${c})`, xl(n(recv.total)), null],
-        ...(pay ? [[`To pay factories today (${c})`, xl(n(pay.total)), null] as (string | number | null)[]] : []),
-        [`Open quotations (${c})`, xl(n(now.openQuotes.value)), null],
+        [`Sold (${c})`, xl(data.sold.now), xl(data.sold.before)],
+        ["Orders", data.sold.orders, data.sold.ordersBefore],
+        [`Collected (${c})`, xl(collected.now), xl(collected.before)],
+        ...(paidOut ? [[`Paid out (${c})`, xl(paidOut.now), xl(paidOut.before)] as (string | number | null)[]] : []),
+        [`${profitName} (${c})`, xl(data.profit.now), xl(data.profit.before)],
+        ...(data.cash ? [[`Cash now (${c})`, xl(data.cash.total), null] as (string | number | null)[]] : []),
         ["Win rate %", xl(funnelNow.winRate), xl(funnelBefore.winRate)],
       ],
     },
     {
-      name: "Sales by month",
-      title: "Sales by month",
+      name: "Sold and profit by month",
+      title: "Sold and profit by month",
       columns: [
         { header: "Month", width: 12 },
         { header: "Orders", kind: "number" },
-        { header: `Sales (${c})`, kind: "number", width: 16 },
-        { header: `Gross profit (${c})`, kind: "number", width: 16 },
-        { header: "Margin %", kind: "number" },
+        { header: `Sold (${c})`, kind: "number", width: 16 },
+        { header: `${profitName} (${c})`, kind: "number", width: 16 },
       ],
-      rows: months.map((m) => [m.month, m.orders, xl(m.sales), xl(m.profit), xl(m.margin)]),
+      rows: months.map((m) => [m.month, m.orders, xl(m.sales), xl(m.profit)]),
     },
-    {
-      name: "Top customers",
-      title: "Top customers",
-      columns: [
-        { header: "Customer", width: 30 },
-        { header: "Orders", kind: "number" },
-        { header: `Sales (${c})`, kind: "number", width: 16 },
-        { header: "Margin %", kind: "number" },
-      ],
-      rows: topCustomers.map((r) => [r.label, r.orders, xl(n(r.sales)), xl(r.marginQuote)]),
-    },
-    {
-      name: "Top factories",
-      title: "Top factories",
-      columns: [
-        { header: "Factory", width: 30 },
-        { header: "Orders", kind: "number" },
-        ...(money ? [{ header: `Spend (${c})`, kind: "number" as const, width: 16 }] : []),
-        { header: "Ready on time %", kind: "number" },
-      ],
-      rows: topFactories.map((r) => [r.label, r.orders, ...(money ? [xl(n(r.spend))] : []), xl(r.ready.percent)]),
-    },
+    ...(owed
+      ? [
+          {
+            name: "Customers owe us",
+            title: "Customers owe us",
+            columns: [
+              { header: "Customer", width: 30 },
+              { header: "Order", width: 16 },
+              { header: "Days late", kind: "number" as const },
+              { header: "Currency", width: 10 },
+              { header: "Still to pay", kind: "number" as const, width: 16 },
+            ],
+            rows: owe.map((r) => [r.customer.name, r.refNo, r.daysLate, r.currency, xl(n(r.due))]),
+          },
+        ]
+      : []),
+    ...(data.pay
+      ? [
+          {
+            name: "To pay in 7 days",
+            title: "To pay in the next 7 days",
+            columns: [
+              { header: "Who", width: 30 },
+              { header: "What for", width: 34 },
+              { header: "Due", width: 12 },
+              { header: "Currency", width: 10 },
+              { header: "Amount", kind: "number" as const, width: 16 },
+            ],
+            rows: pay.map((r) => [r.name, r.what, r.dueOn, r.currency, xl(r.amount)]),
+          },
+        ]
+      : []),
   ];
   return { ...data, sheets };
 }
@@ -211,153 +246,143 @@ export async function loadHome(today: string) {
   };
 }
 
-/* ------------------------------------------------------------------------------------------- Money */
-
 export interface AccountRow {
   currency: string;
   archived: boolean;
   balance?: string;
 }
 
-export async function loadMoney(p: Period, age?: { side: "receivable" | "payable"; bucket: AgeBucket | "over60" }) {
+/* ------------------------------------------------------------------------------------------- Profit */
+
+export const PROFIT_SORTS = ["low", "high", "big"] as const;
+export type ProfitSort = (typeof PROFIT_SORTS)[number];
+export const PROFIT_SORT_LABEL: Record<ProfitSort, string> = { low: "Lowest profit first", high: "Highest profit first", big: "Biggest orders first" };
+
+/**
+ * Reports › Profit: what was sold in the period, what those orders cost so far, the company's own costs of the
+ * same months, and what is left. By month and by order. An order counts in the month it was ordered; its costs
+ * are the ones known today (as on its Costs tab).
+ */
+export async function loadProfit(p: Period, sort: ProfitSort = "low") {
   const span = { from: p.from, to: p.to };
   const prev = { from: p.prevFrom, to: p.prevTo };
-  const six = { from: monthStart(p.to, -5), to: p.to };
-  const twelve = { from: monthStart(p.to, -11), to: p.to };
-  const buckets: AgeBucket[] = age ? (age.bucket === "over60" ? ["d90", "older"] : [age.bucket]) : [];
-  const [cur, before, cashNow, cashBefore, cash12, recv, pay, monthly, now, accounts, orders, ...lists] = await Promise.all([
+  const [cur, before, monthly, cash, cashBefore, orders] = await Promise.all([
     facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
     facts<OrderGroups>("orders/groups", { ...prev, period: "all" }),
+    facts<OrderGroups>("orders/groups", { ...span, period: "month" }),
     facts<CashFacts>("cash", span),
     facts<CashFacts>("cash", prev),
-    facts<CashFacts>("cash", twelve),
-    facts<Aging>("aging", { side: "receivable" }),
-    facts<Aging>("aging", { side: "payable" }),
-    facts<OrderGroups>("orders/groups", { ...six, period: "month" }),
-    facts<FactsNow>("now", span),
-    api.get<AccountRow[]>("/money/accounts").catch(() => [] as AccountRow[]),
     facts<FactOrders>("orders", { ...span, limit: 1000 }),
-    ...buckets.map((bucket) => facts<Aging>("aging", { side: age!.side, bucket })),
   ]);
   const c = cur.currency;
-  const t = totalOf(cur);
-  const b = totalOf(before);
-  const net = (x: CashFacts) => sum(x.months, (m) => n(m.net));
-  const inOf = (x: CashFacts) => sum(x.months, (m) => n(m.in));
-  const outOf = (x: CashFacts) => sum(x.months, (m) => n(m.out));
-  const cashMonths = lastMonths(p.to).map((m) => {
-    const r = cash12.months.find((x) => x.month === m);
-    return { month: m, in: n(r?.in), out: n(r?.out), net: n(r?.net) };
-  });
-  const profitMonths = lastMonths(p.to, 6).map((m) => {
-    const r = monthly.rows.find((x) => x.period === m);
-    return { month: m, a: n(r?.profitQuote), b: n(r?.profitExpected) };
-  });
-  const inHand = new Map<string, number>();
-  for (const a of accounts)
-    if (!a.archived && a.balance !== undefined) inHand.set(a.currency, (inHand.get(a.currency) ?? 0) + n(a.balance));
-  const currencies = [...new Set([...(now.byCurrency ?? []).map((x) => x.currency), ...inHand.keys()])].map((cur) => {
-    const x = now.byCurrency?.find((y) => y.currency === cur);
-    return { currency: cur, toReceive: n(x?.toReceive), toPay: n(x?.toPay), inHand: inHand.has(cur) ? inHand.get(cur)! : null };
-  });
-  const leaks = orders.rows
-    .filter((r) => n(r.costsOverPlan) > 0)
-    .sort((x, y) => n(y.costsOverPlan) - n(x.costsOverPlan))
-    .slice(0, 5)
+  /** One line of the table: an order's "costs" are what takes its sold-with-a-cost down to its profit now. */
+  const line = (g: { orders: number; sales: string; costed: string; profitExpected: string | null } | null | undefined, company: number) => {
+    const sold = n(g?.sales);
+    const costed = n(g?.costed);
+    const fromOrders = n(g?.profitExpected);
+    const profit = fromOrders - company;
+    return { orders: g?.orders ?? 0, sold, uncosted: sold - costed, costs: costed - fromOrders, fromOrders, company, profit, margin: pct(profit, costed) };
+  };
+  const companyOf = (x: CashFacts, m?: string) => sum(x.months.filter((y) => !m || y.month === m), (y) => n(y.company));
+  const today = todayIn(TZ);
+  const lastMonth = (p.to < today ? p.to : today).slice(0, 7);
+  const monthKeys: string[] = [];
+  for (let d = monthStart(p.from); d.slice(0, 7) <= lastMonth; d = monthStart(d, 1)) monthKeys.push(d.slice(0, 7));
+  const months = monthKeys.map((m) => ({ month: m, ...line(monthly.rows.find((x) => x.period === m), companyOf(cash, m)) }));
+  const total = line(totalOf(cur), companyOf(cash));
+  const totalBefore = line(totalOf(before), companyOf(cashBefore));
+  const rows = orders.rows
+    .filter((r) => r.status !== "cancelled")
     .map((r) => ({
       orderId: r.orderId,
       refNo: r.refNo,
       customer: r.customer,
-      planned: n(r.cost),
-      actual: n(r.cost) + n(r.costsOverPlan),
-      over: n(r.costsOverPlan),
+      customerId: r.customerId,
+      status: r.status,
+      stage: r.stage,
+      orderedOn: r.orderedOn,
+      sold: n(r.sales),
+      costs: n(r.costed) - n(r.profitExpected),
+      profit: n(r.profitExpected),
       margin: r.margin,
-    }));
-  const ageList = age ? lists.flatMap((l) => l.orders ?? []).sort((x, y) => n(y.amount) - n(x.amount)) : null;
-  const data = {
-    currency: c,
-    netCash: { now: net(cashNow), before: net(cashBefore), in: inOf(cashNow), out: outOf(cashNow) },
-    profitExpected: { now: n(t?.profitExpected), before: n(b?.profitExpected), margin: t?.margin ?? null },
-    profitDone: { now: n(t?.profitDone), before: n(b?.profitDone) },
-    overPlan: { now: n(t?.costsOverPlan), before: n(b?.costsOverPlan), orders: t?.ordersOverPlan ?? 0 },
-    cashMonths,
-    receivable: recv,
-    payable: pay,
-    age: age ? { ...age, orders: ageList ?? [] } : null,
-    profitMonths,
-    byKind: cashNow.byKind ?? [],
-    currencies,
-    leaks,
-    missingRates: [...new Set([...cashNow.missingRates, ...cash12.missingRates])],
-  };
+      uncosted: n(r.sales) - n(r.costed),
+    }))
+    .sort((x, y) => (sort === "big" ? y.sold - x.sold : sort === "high" ? (y.margin ?? -Infinity) - (x.margin ?? -Infinity) : (x.margin ?? Infinity) - (y.margin ?? Infinity)) || x.refNo.localeCompare(y.refNo));
+  const data = { currency: c, months, total, totalBefore, orders: rows, missingRates: [...new Set([...cur.missingRates, ...cash.missingRates])].sort() };
   const sheets: SheetSpec[] = [
     {
-      name: `Insights money ${p.from} to ${p.to}`,
-      title: "Cash by month",
-      columns: [
-        { header: "Month", width: 12 },
-        { header: `Cash in (${c})`, kind: "number", width: 16 },
-        { header: `Cash out (${c})`, kind: "number", width: 16 },
-        { header: `Net (${c})`, kind: "number", width: 16 },
-      ],
-      rows: cashMonths.map((m) => [m.month, xl(m.in), xl(m.out), xl(m.net)]),
-    },
-    {
-      name: "Owed by age",
-      title: "Owed by age",
-      columns: [
-        { header: "Age", width: 16 },
-        { header: `Owed to us (${c})`, kind: "number", width: 18 },
-        { header: `We owe factories (${c})`, kind: "number", width: 20 },
-      ],
-      rows: BUCKETS.map((k) => [k.label, xl(bucketValue(recv, k.key)), xl(bucketValue(pay, k.key))]),
-    },
-    {
-      name: "Profit by month",
+      name: `Profit ${p.from} to ${p.to}`,
       title: "Profit by month",
       columns: [
         { header: "Month", width: 12 },
-        { header: `Expected at order (${c})`, kind: "number", width: 20 },
-        { header: `Now (${c})`, kind: "number", width: 16 },
-      ],
-      rows: profitMonths.map((m) => [m.month, xl(m.a), xl(m.b)]),
-    },
-    {
-      name: "Costs by kind",
-      title: "Costs by kind",
-      columns: [
-        { header: "Kind", width: 22 },
-        { header: `Amount (${c})`, kind: "number", width: 16 },
         { header: "Orders", kind: "number" },
+        { header: `Sold (${c})`, kind: "number", width: 16 },
+        { header: `Costs of the orders (${c})`, kind: "number", width: 22 },
+        { header: `Profit from orders (${c})`, kind: "number", width: 22 },
+        { header: `Company costs (${c})`, kind: "number", width: 18 },
+        { header: `Profit (${c})`, kind: "number", width: 16 },
+        { header: "%", kind: "number" },
       ],
-      rows: data.byKind.map((k) => [k.category, xl(n(k.amount)), k.orders]),
+      rows: [...months.map((m) => [m.month, m.orders, xl(m.sold), xl(m.costs), xl(m.fromOrders), xl(m.company), xl(m.profit), xl(m.margin)]), ["Total", total.orders, xl(total.sold), xl(total.costs), xl(total.fromOrders), xl(total.company), xl(total.profit), xl(total.margin)]],
     },
     {
-      name: "Money by currency",
-      title: "By currency",
-      columns: [
-        { header: "Currency", width: 10 },
-        { header: "To receive", kind: "number", width: 16 },
-        { header: "To pay", kind: "number", width: 16 },
-        { header: "In hand", kind: "number", width: 16 },
-      ],
-      rows: currencies.map((x) => [x.currency, xl(x.toReceive), xl(x.toPay), xl(x.inHand)]),
-    },
-    {
-      name: "Where money leaks",
-      title: "Costs over plan",
+      name: "Profit by order",
+      title: "Profit by order",
       columns: [
         { header: "Order", width: 16 },
-        { header: "Customer", width: 28 },
-        { header: `Planned cost (${c})`, kind: "number", width: 16 },
-        { header: `Cost now (${c})`, kind: "number", width: 16 },
-        { header: `Over (${c})`, kind: "number" },
-        { header: "Margin now %", kind: "number" },
+        { header: "Customer", width: 30 },
+        { header: "Ordered", width: 12 },
+        { header: `Sold (${c})`, kind: "number", width: 16 },
+        { header: `Costs so far (${c})`, kind: "number", width: 18 },
+        { header: `Profit now (${c})`, kind: "number", width: 16 },
+        { header: "%", kind: "number" },
       ],
-      rows: leaks.map((l) => [l.refNo, l.customer, xl(l.planned), xl(l.actual), xl(l.over), xl(l.margin)]),
+      rows: rows.map((r) => [r.refNo, r.customer, r.orderedOn, xl(r.sold), xl(r.costs), xl(r.profit), xl(r.margin)]),
     },
   ];
   return { ...data, sheets };
+}
+
+/* ------------------------------------------------------------------------------------------- Cash */
+
+/** Reports › Cash: the money that moved in the period, by month and by account (GET /money/cash-report). */
+export async function loadCash(p: Period) {
+  const report = await api.get<CashReport>("/money/cash-report", { from: p.from, to: p.to }).catch(() => null);
+  if (!report) return { report: null, sheets: [] as SheetSpec[] };
+  const c = report.currency;
+  const sheets: SheetSpec[] = [
+    {
+      name: `Cash ${report.from} to ${report.to}`,
+      title: "In and out by month",
+      columns: [
+        { header: "Month", width: 12 },
+        { header: `From customers (${c})`, kind: "number", width: 20 },
+        { header: `To suppliers (${c})`, kind: "number", width: 18 },
+        { header: `Freight and other bills (${c})`, kind: "number", width: 24 },
+        { header: `Company costs (${c})`, kind: "number", width: 18 },
+        { header: `Net (${c})`, kind: "number", width: 16 },
+        { header: `Cash at the end (${c})`, kind: "number", width: 20 },
+      ],
+      rows: [
+        ...report.months.map((m) => [m.month, xl(n(m.customers)), xl(n(m.suppliers)), xl(n(m.bills)), xl(n(m.company)), xl(n(m.net)), xl(n(m.cashEnd))]),
+        ["Total", xl(n(report.total.customers)), xl(n(report.total.suppliers)), xl(n(report.total.bills)), xl(n(report.total.company)), xl(n(report.total.net)), null],
+      ],
+    },
+    {
+      name: "By account",
+      title: "By account",
+      columns: [
+        { header: "Account", width: 28 },
+        { header: "Currency", width: 10 },
+        { header: "At the start", kind: "number", width: 16 },
+        { header: "In", kind: "number", width: 16 },
+        { header: "Out", kind: "number", width: 16 },
+        { header: "At the end", kind: "number", width: 16 },
+      ],
+      rows: report.accounts.map((a) => [a.name, a.currency, xl(n(a.start)), xl(n(a.in)), xl(n(a.out)), xl(n(a.end))]),
+    },
+  ];
+  return { report, sheets };
 }
 
 /* ------------------------------------------------------------------------------------------- Customers */
@@ -719,7 +744,9 @@ export async function insightsSheets(q: Record<string, string | undefined>): Pro
     case "overview":
       return (await loadOverview(p, money)).sheets;
     case "money":
-      return (await loadMoney(p)).sheets;
+      return (await loadProfit(p)).sheets;
+    case "cash":
+      return (await loadCash(p)).sheets;
     case "customers":
       return (await loadCustomers(p, today)).sheets;
     case "factories":

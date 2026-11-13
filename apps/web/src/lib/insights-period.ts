@@ -1,13 +1,14 @@
 import { addDays, daysBetween } from "@kebo/utils";
 
 /** Insights' sections, in the order of the list on the left. */
-export const SECTIONS = ["overview", "money", "customers", "factories", "people", "funnel"] as const;
+export const SECTIONS = ["overview", "money", "customers", "factories", "cash", "people", "funnel"] as const;
 export type Section = (typeof SECTIONS)[number];
 export const SECTION_LABEL: Record<Section, string> = {
   overview: "Overview",
-  money: "Money",
+  money: "Profit",
   customers: "Customers",
-  factories: "Factories",
+  factories: "Suppliers",
+  cash: "Cash",
   people: "People",
   funnel: "Funnel",
 };

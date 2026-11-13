@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { reportsMoneyTarget } from "@/lib/old-addresses";
+import { profitTarget } from "@/lib/old-addresses";
 
-/** "Where we lose money" is Finance › Leaks now (old links and bookmarks keep working). */
-export default async function MoneyReportPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  redirect(reportsMoneyTarget(await searchParams));
+/** Profit & loss, Planned vs spent and "Where we lose money" are one tab now: Reports › Profit (old links keep working). */
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  redirect(profitTarget(await searchParams));
 }

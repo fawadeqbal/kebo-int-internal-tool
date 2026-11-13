@@ -524,10 +524,10 @@ export class FactsReadService {
             from expenses e where e.voided_at is null and e.spent_on between ${from}::date and ${to}::date`
         : Promise.resolve([]),
     ]);
-    const months = new Map<string, { in: number; factories: number; expenses: number }>();
+    const months = new Map<string, { in: number; factories: number; expenses: number; company: number }>();
     const month = (m: string) => {
       let x = months.get(m);
-      if (!x) months.set(m, (x = { in: 0, factories: 0, expenses: 0 }));
+      if (!x) months.set(m, (x = { in: 0, factories: 0, expenses: 0, company: 0 }));
       return x;
     };
     for (const p of payments) month(p.m).in += fx.order(Math.round(Number(p.minor)), p);
@@ -536,6 +536,8 @@ export class FactsReadService {
     for (const e of expenses) {
       const v = convert(Math.round(Number(e.minor)), Number(e.rate));
       month(e.m).expenses += v;
+      // The company's own costs (no order): what comes off the orders' profit (Reports › Profit).
+      if (!e.orderId) month(e.m).company += v;
       const k = kinds.get(e.category) ?? { minor: 0, orders: new Set<string>() };
       k.minor += v;
       if (e.orderId) k.orders.add(e.orderId);
@@ -555,6 +557,7 @@ export class FactsReadService {
           out: seeMoney ? fromMinor(x.factories + x.expenses) : null,
           factories: seeMoney ? fromMinor(x.factories) : null,
           expenses: seeExpenses ? fromMinor(x.expenses) : null,
+          company: seeExpenses ? fromMinor(x.company) : null,
           net: seeMoney ? fromMinor(x.in - x.factories - x.expenses) : null,
         })),
       byKind: seeExpenses

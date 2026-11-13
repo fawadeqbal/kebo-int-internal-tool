@@ -30,6 +30,7 @@ import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { CashService } from "./cash.service";
+import { CashReportService } from "./cash-report.service";
 import { PaymentFilesService, type PaymentSide } from "./payment-files.service";
 import { SupplierPaymentsService } from "./supplier-payments.service";
 
@@ -46,12 +47,18 @@ const cashBookQuery = z.object({
   removed: flag,
 });
 
+const cashReportQuery = z.object({
+  from: z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)"),
+  to: z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)"),
+});
+
 /** Treasury: our accounts and the cash book, moves between accounts, supplier payments and every payment's proof. */
 @ApiTags("treasury")
 @Controller()
 class CashController {
   constructor(
     private readonly cash: CashService,
+    private readonly report: CashReportService,
     private readonly paymentFiles: PaymentFilesService,
     private readonly supplierPayments: SupplierPaymentsService,
     private readonly limits: LimitsService,
@@ -95,6 +102,13 @@ class CashController {
   @Get("money/cash-book")
   cashBook(@CurrentUser() user: SessionUser, @Query(Validate(cashBookQuery)) q: z.infer<typeof cashBookQuery>) {
     return this.cash.cashBook(user, q);
+  }
+
+  /** Managers: Reports › Cash. What came in and went out by month, and each account at the start and the end. */
+  @RequireFeature("cash_book")
+  @Get("money/cash-report")
+  cashReport(@CurrentUser() user: SessionUser, @Query(Validate(cashReportQuery)) q: z.infer<typeof cashReportQuery>) {
+    return this.report.report(user, q);
   }
 
   /** Put a payment, a factory payment or an expense on an account afterwards: { accountId | null }. */

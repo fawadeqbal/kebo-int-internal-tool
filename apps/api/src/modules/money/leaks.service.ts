@@ -319,7 +319,7 @@ export class LeaksService {
       warnings.push({
         level: "warn",
         text: `Expenses in ${monthName(last.month)} (${show(last.expMinor)}) are ${Math.round((last.expMinor / avg) * 100 - 100)}% above the monthly average.`,
-        href: "/finance/expenses",
+        href: "/money/company-costs",
       });
 
     /* ----- factories: what visits and costs there came to */

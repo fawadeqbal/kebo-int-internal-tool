@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, CartesianGrid, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 /*
  * Insights charts (dataviz method): one axis per chart, thin marks (bars ≤ 24px, 4px rounded at the data
@@ -17,8 +17,6 @@ const monthLong = (m: string) =>
 export const compact = (v: number) =>
   Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v).replace("K", "k");
 const full = (v: number, c: string) => `${c} ${Math.round(v).toLocaleString("en-US")}`;
-const signed = (v: number) => (v > 0 ? `+${compact(v)}` : compact(v));
-
 const axisTick = { fill: "var(--muted)", fontSize: 11 };
 const grid = <CartesianGrid vertical={false} stroke="var(--line)" />;
 
@@ -81,9 +79,12 @@ export function SalesProfitChart({
   rows,
   currency,
   monthHref,
+  names = ["Sales", "Gross profit"],
 }: {
   rows: { month: string; sales: number; profit: number; orders: number }[];
   currency: string;
+  /** What the bars and the line are called (Reports: "Sold" and "Profit"). */
+  names?: [string, string];
   /** Where a click on a month goes (its orders). */
   monthHref?: Record<string, string>;
 }) {
@@ -94,8 +95,8 @@ export function SalesProfitChart({
     <div>
       <Legend
         keys={[
-          { name: "Sales", color: "var(--chart-1)", kind: "bar" },
-          { name: "Gross profit", color: "var(--chart-2)", kind: "line" },
+          { name: names[0], color: "var(--chart-1)", kind: "bar" },
+          { name: names[1], color: "var(--chart-2)", kind: "line" },
         ]}
       />
       <div className="h-56 w-full sm:h-72">
@@ -126,7 +127,7 @@ export function SalesProfitChart({
                 extra: (r) => `${r.orders} order${r.orders === 1 ? "" : "s"}${monthHref ? " · click for them" : ""}`,
               })}
             />
-            <Bar dataKey="sales" name="Sales" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false}>
+            <Bar dataKey="sales" name={names[0]} fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false}>
               <LabelList
                 dataKey="sales"
                 content={(p) => {
@@ -149,7 +150,7 @@ export function SalesProfitChart({
             </Bar>
             <Line
               dataKey="profit"
-              name="Gross profit"
+              name={names[1]}
               stroke="var(--chart-2)"
               strokeWidth={2}
               dot={dot("var(--chart-2)")}
@@ -163,93 +164,3 @@ export function SalesProfitChart({
   );
 }
 
-/** Cash in above the line, cash out below it, and what was left (net) as a dark line: one axis. */
-export function CashChart({ rows, currency }: { rows: { month: string; in: number; out: number; net: number }[]; currency: string }) {
-  const data = rows.map((r) => ({ ...r, label: monthShort(r.month), outNeg: -r.out }));
-  return (
-    <div>
-      <Legend
-        keys={[
-          { name: "Cash in", color: "var(--chart-1)", kind: "bar" },
-          { name: "Cash out", color: "var(--chart-3)", kind: "bar" },
-          { name: "Net", color: "var(--text)", kind: "line" },
-        ]}
-      />
-      <div className="h-60 w-full sm:h-80">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }} barCategoryGap="22%" stackOffset="sign">
-            {grid}
-            <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} interval={0} />
-            <YAxis tick={axisTick} tickLine={false} axisLine={false} width={48} tickFormatter={signed} />
-            <ReferenceLine y={0} stroke="var(--line-strong)" />
-            <Tooltip cursor={{ fill: "var(--surface-2)" }} content={tip(currency, { abs: false })} />
-            <Bar
-              dataKey="in"
-              name="Cash in"
-              stackId="cash"
-              fill="var(--chart-1)"
-              radius={[4, 4, 0, 0]}
-              maxBarSize={24}
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="outNeg"
-              name="Cash out"
-              stackId="cash"
-              fill="var(--chart-3)"
-              radius={[4, 4, 0, 0]}
-              maxBarSize={24}
-              isAnimationActive={false}
-            />
-            <Line
-              dataKey="net"
-              name="Net"
-              stroke="var(--text)"
-              strokeWidth={2}
-              dot={dot("var(--text)")}
-              activeDot={{ ...dot("var(--text)"), r: 5 }}
-              isAnimationActive={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
-/** Two figures per month side by side (profit expected when ordered, and now). */
-export function PairBars({
-  rows,
-  currency,
-  a,
-  b,
-}: {
-  rows: { month: string; a: number; b: number }[];
-  currency: string;
-  a: string;
-  b: string;
-}) {
-  const data = rows.map((r) => ({ ...r, label: monthShort(r.month) }));
-  return (
-    <div>
-      <Legend
-        keys={[
-          { name: a, color: "var(--chart-5)", kind: "bar" },
-          { name: b, color: "var(--chart-1)", kind: "bar" },
-        ]}
-      />
-      <div className="h-52 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }} barCategoryGap="28%" barGap={2}>
-            {grid}
-            <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: "var(--line-strong)" }} interval={0} />
-            <YAxis tick={axisTick} tickLine={false} axisLine={false} width={44} tickFormatter={compact} />
-            <Tooltip cursor={{ fill: "var(--surface-2)" }} content={tip(currency)} />
-            <Bar dataKey="a" name={a} fill="var(--chart-5)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
-            <Bar dataKey="b" name={b} fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
