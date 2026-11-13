@@ -317,7 +317,13 @@ describe("order flow: from asking factories to SAT", () => {
 
     f = (await api(app, sana).post(`/orders/${orderId}/claims`, { title: "Dented guard door", detail: "Arrived bent; factory to send a new one." }).expect(201)).body;
     const claim = f.delivery.claims[0];
-    expect(claim).toMatchObject({ status: "open", title: "Dented guard door" });
+    expect(claim).toMatchObject({ status: "open", title: "Dented guard door", amount: null, bearer: null });
+    // What it costs and who pays: the amount is in the order's currency.
+    f = (await api(app, sana).patch(`/claims/${claim.id}`, { amount: "180", bearer: "factory" }).expect(200)).body;
+    expect(f.delivery.claims[0]).toMatchObject({ amount: "180.00", currency: f.currency ?? expect.any(String), bearer: "factory", status: "open" });
+    await api(app, sana).patch(`/claims/${claim.id}`, { bearer: "nobody" }).expect(422);
+    f = (await api(app, sana).patch(`/claims/${claim.id}`, { amount: "" }).expect(200)).body;
+    expect(f.delivery.claims[0]).toMatchObject({ amount: null, currency: null, bearer: "factory" });
     f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: day(-9), satSignedBy: "Mr. Ali, QA head" }).expect(200)).body;
     // Installed on and the warranty (months, from the SAT).
     const installed = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { installedOn: day(-9), warrantyMonths: "12" }).expect(200)).body;

@@ -12,7 +12,7 @@ import {
   SHIPMENT_STATUSES,
 } from "../enums";
 import { REQUEST_CHANNELS } from "../workflows/flow";
-import { FREIGHT_TERMS } from "../workflows/order-sections";
+import { CLAIM_BEARERS, FREIGHT_TERMS } from "../workflows/order-sections";
 import { BALANCE_WHENS, LC_TERMS } from "../workflows/money-route";
 import { id, isoDate, optionalAmount, optionalDate, optionalId, optionalText, text } from "./common";
 
@@ -265,10 +265,14 @@ export type DeliveryAllGoodInput = z.infer<typeof deliveryAllGoodInput>;
 export const satAllPassedInput = z.object({ satDoneOn: optionalDate.optional(), satSignedBy: optionalText(120).optional() });
 export type SatAllPassedInput = z.infer<typeof satAllPassedInput>;
 
+/** What a claim is worth (in the order's currency) and who bears it: the factory, us or the customer. */
+const claimMoney = { amount: maybe(optionalAmount), bearer: maybe(optionalEnum(CLAIM_BEARERS)) };
+
 export const claimInput = z.object({
   title: text(160, "Say what is wrong"),
   detail: optionalText(4000),
   openedOn: optionalDate,
+  ...claimMoney,
 });
 export type ClaimInput = z.infer<typeof claimInput>;
 
@@ -278,5 +282,6 @@ export const claimUpdateInput = z.object({
   status: maybe(z.enum(CLAIM_STATUSES)),
   resolution: maybe(optionalText(4000)),
   resolvedOn: maybe(optionalDate),
+  ...claimMoney,
 });
 export type ClaimUpdateInput = z.infer<typeof claimUpdateInput>;

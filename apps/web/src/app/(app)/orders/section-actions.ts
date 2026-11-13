@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { attempt, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { OrderView } from "@/lib/types-orders";
+import { paymentAction } from "./actions";
 
 /**
  * What the windows of an order's sections send (the order without checklists) where no action existed:
@@ -78,4 +79,13 @@ export async function goodsReceivedAction(orderId: string, factoryId: string | n
   );
   if (r.ok) refresh(orderId);
   return r;
+}
+
+/**
+ * "Bank paid us" on Documents (bank contract and LC): the payment itself, recorded with the same form as
+ * on Payment; recording it marks the bank's last step.
+ */
+export async function bankPaidAction(orderId: string, currency: string, prev: ActionState, form: FormData): Promise<ActionState> {
+  form.set("bankStep", "bank_paid_us");
+  return paymentAction(orderId, currency, prev, form);
 }

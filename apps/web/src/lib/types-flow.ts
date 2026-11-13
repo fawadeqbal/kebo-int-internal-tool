@@ -164,6 +164,10 @@ export interface ClaimView {
   openedOn: string;
   resolvedOn: string | null;
   resolution: string | null;
+  /** What it is worth, and who bears it: factory | us | customer. */
+  amount?: string | null;
+  currency?: string | null;
+  bearer?: string | null;
 }
 
 export interface DeliveryView {
