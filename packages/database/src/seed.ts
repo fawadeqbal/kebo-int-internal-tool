@@ -37,24 +37,17 @@ export async function ensureUser(db: SeedDb, p: SeedPerson, log: (m: string) => 
   return user;
 }
 
-/**
- * Preset roles, the company's admin (and optionally a manager and staff), the
- * website-form account and every setting with its default. Safe to run again.
- * companyName: a new company's own name on its documents (the rest starts blank).
- * profile: the company details to start with instead (the seed script's Kebo).
- */
-export async function seedCompanyBase(
-  db: SeedDb,
-  opts: {
-    admin: SeedPerson;
-    manager?: SeedPerson;
-    staff?: SeedPerson;
-    companyName?: string;
-    profile?: Record<string, unknown>;
-    log?: (m: string) => void;
-  },
-) {
-  const log = opts.log ?? (() => undefined);
+/** What a company starts with apart from its people. */
+interface CompanyDefaults {
+  /** A new company's own name on its documents (the rest starts blank). */
+  companyName?: string;
+  /** The company details to start with instead (the seed script's Kebo). */
+  profile?: Record<string, unknown>;
+  log?: (m: string) => void;
+}
+
+/** The preset roles. Safe to run again. */
+async function seedRoles(db: SeedDb) {
   for (const [key, r] of Object.entries(PRESET_ROLES)) {
     if (await db.role.findFirst({ where: { key }, select: { key: true } })) continue;
     await db.role.create({
@@ -67,9 +60,10 @@ export async function seedCompanyBase(
       },
     });
   }
-  const admin = await ensureUser(db, opts.admin, log);
-  const manager = opts.manager ? await ensureUser(db, opts.manager, log) : admin;
-  const staff = opts.staff ? await ensureUser(db, opts.staff, log) : admin;
+}
+
+/** The website-form account and every setting with its default. Safe to run again. */
+async function seedSettings(db: SeedDb, opts: CompanyDefaults) {
   // The account website inquiries are recorded under; it can never sign in.
   if (!(await db.user.findFirst({ where: { email: "website-form@system.local" }, select: { id: true } }))) {
     await db.user.create({
@@ -86,6 +80,37 @@ export async function seedCompanyBase(
     else if (key === "company" && opts.companyName) value = companyProfile(opts.companyName, value as Record<string, unknown>);
     await db.setting.create({ data: { key, value: value as object } });
   }
+}
+
+/**
+ * A company with nobody in it yet: the preset roles, the website-form account
+ * and every setting with its default. A platform admin opens it (through their
+ * own hidden account) and adds its people. Safe to run again.
+ */
+export async function seedCompanyDefaults(db: SeedDb, opts: CompanyDefaults = {}) {
+  await seedRoles(db);
+  await seedSettings(db, opts);
+  opts.log?.("roles and settings ready, no people");
+}
+
+/**
+ * Preset roles, the company's admin (and optionally a manager and staff), the
+ * website-form account and every setting with its default. Safe to run again.
+ */
+export async function seedCompanyBase(
+  db: SeedDb,
+  opts: CompanyDefaults & {
+    admin: SeedPerson;
+    manager?: SeedPerson;
+    staff?: SeedPerson;
+  },
+) {
+  const log = opts.log ?? (() => undefined);
+  await seedRoles(db);
+  const admin = await ensureUser(db, opts.admin, log);
+  const manager = opts.manager ? await ensureUser(db, opts.manager, log) : admin;
+  const staff = opts.staff ? await ensureUser(db, opts.staff, log) : admin;
+  await seedSettings(db, opts);
   return { admin, manager, staff } satisfies SeedPeople;
 }
 

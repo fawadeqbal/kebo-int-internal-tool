@@ -149,4 +149,13 @@ Then sign in, open a few inquiries and orders, and download a file and a PDF.
 cd /opt/kebo-desk && sudo bash deploy/server/clean-start.sh
 ```
 
-To undo it, restore those two backups as above.
+Two options, for an installation that only holds test data and is handed over empty:
+
+```bash
+cd /opt/kebo-desk && sudo bash deploy/server/clean-start.sh --platform-only --no-backup
+```
+
+- `--platform-only`: nobody is made in the company Kebo (no Super Admin, Manager or Staff). It asks only for the platform admin's email and name and prints the link to set the password. The platform admin signs in at `/platform/login` (two-step sign-in is set up at the first sign-in), opens Kebo with **Open company** and adds its people under Admin › Users.
+- `--no-backup`: the backup step is skipped. Nothing can be undone.
+
+To undo it, restore those two backups as above (not possible after `--no-backup`).

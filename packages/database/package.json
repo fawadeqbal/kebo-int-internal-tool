@@ -29,6 +29,7 @@
     "lint": "eslint src",
     "test": "vitest run",
     "db:reset": "prisma migrate reset --force && tsx scripts/seed.ts --demo",
+    "db:fresh": "prisma migrate reset --force && tsx scripts/seed.ts --no-people",
     "db:check-migrations": "tsx scripts/check-migrations.ts",
     "db:check-drift": "prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code"
   },

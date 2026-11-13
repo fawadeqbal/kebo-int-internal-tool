@@ -2,21 +2,27 @@
  * Seed: the starting accounts and settings; with --demo, sample deals at every
  * stage (for development only — refused against a non-local database).
  *
- *   pnpm db:seed            accounts + settings (safe to run again)
- *   pnpm db:seed --demo     plus sample customers, factories and deals
+ *   pnpm db:seed               accounts + settings (safe to run again)
+ *   pnpm db:seed --demo        plus sample customers, factories and deals
+ *   pnpm db:seed --no-people   settings only, nobody in the company: a platform admin opens it and adds its people
  *
  * In production (NODE_ENV=production) SEED_ADMIN_PASSWORD, SEED_MANAGER_PASSWORD
  * and SEED_STAFF_PASSWORD are required: the default passwords are refused there.
  */
 import "./env";
 import bcrypt from "bcryptjs";
-import { createPrismaClient, scriptCompanyUrl, seedCompanyBase, seedDemoData } from "../src";
+import { createPrismaClient, scriptCompanyUrl, seedCompanyBase, seedCompanyDefaults, seedDemoData } from "../src";
 import { seedPeople } from "./seed-people";
 import { KEBO_PROFILE } from "./kebo-profile";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
 const demo = process.argv.includes("--demo");
+const noPeople = process.argv.includes("--no-people");
+if (demo && noPeople) {
+  console.error("[seed] --demo needs the starting accounts: leave --no-people out.");
+  process.exit(1);
+}
 const slugArg = process.argv.indexOf("--company");
 /** Which company to seed (its short name); the first company by default. */
 const slug = slugArg > 0 ? process.argv[slugArg + 1] : process.env.SEED_COMPANY;
@@ -39,14 +45,20 @@ async function main() {
   log(`company ${company.slug} (${company.name})`);
   const db = createPrismaClient({ url: await scriptCompanyUrl(url!), poolSize: 2, companyId: company.id });
   try {
+    // The first company, Kebo, gets its real details; any other starts blank with its own name.
+    const details = company.slug === "kebo" ? { profile: KEBO_PROFILE } : { companyName: company.name };
+    if (noPeople) {
+      await seedCompanyDefaults(db, { ...details, log });
+      log("done");
+      return;
+    }
     const hash = (p: string) => bcrypt.hash(p, 12);
     const who = seedPeople(process.env);
     const people = await seedCompanyBase(db, {
       admin: { email: who.admin.email, name: who.admin.name, role: "admin", passwordHash: await hash(who.admin.password) },
       manager: { email: who.manager.email, name: who.manager.name, role: "manager", passwordHash: await hash(who.manager.password) },
       staff: { email: who.staff.email, name: who.staff.name, role: "staff", passwordHash: await hash(who.staff.password) },
-      // The first company, Kebo, gets its real details; any other starts blank with its own name.
-      ...(company.slug === "kebo" ? { profile: KEBO_PROFILE } : { companyName: company.name }),
+      ...details,
       log,
     });
     if (demo) {
