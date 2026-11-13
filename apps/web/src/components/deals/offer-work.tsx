@@ -206,14 +206,13 @@ export function OfferDetails({
 
 /**
  * The offer's window, the same for "Enter factory offer" (no offer yet) and "Edit the offer": the four
- * sections of OfferHeaderForm, the factory's own files, and the buttons. A new offer saved opens its lines
- * editor ("Save and add lines") or empties the window ("Save & enter another"); an edit closes. Removing
+ * sections of OfferHeaderForm, the factory's own files, and the buttons. A new offer saved shows on the
+ * page, opened ("Save offer"), or empties the window ("Save & enter another"); an edit closes. Removing
  * the offer, or one of its files, asks first and says what happens.
  */
 function OfferWindow({
   dealId,
   q,
-  itemCount = 0,
   today,
   mainCurrency,
   rates,
@@ -228,7 +227,6 @@ function OfferWindow({
   /** The offer being edited; null: a new one. */
   q: FactoryQuoteView | null;
   /** A new offer: how many items the customer listed (its lines can start from them). */
-  itemCount?: number;
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
@@ -275,7 +273,8 @@ function OfferWindow({
     }
     // Saved: close without asking "Discard changes?".
     close(st);
-    if (!q) router.push(`/inquiries/${dealId}/sourcing?offer=${id}#edit-lines`);
+    // One button, one action: the offer opens on the page; its lines editor waits for "Add lines".
+    if (!q) router.push(`/inquiries/${dealId}/sourcing?offer=${id}`);
   };
 
   const confirm = () =>
@@ -359,8 +358,7 @@ function OfferWindow({
               <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
                 <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
                 <span>
-                  Their lines and prices come next: <strong>Save and add lines</strong> opens this offer&rsquo;s lines editor
-                  {itemCount ? `, starting from the customer’s ${itemCount === 1 ? "item" : `${itemCount} items`}` : ""}.
+                  Their lines and prices come next: after saving, press <strong>Add lines</strong> on the offer.
                 </span>
               </p>
             )}
@@ -394,7 +392,7 @@ function OfferWindow({
                 <Plus aria-hidden /> Save &amp; enter another
               </SubmitButton>
               <SubmitButton pendingText="Saving…" onClick={() => (another.current = false)}>
-                <Check aria-hidden /> Save and add lines
+                <Check aria-hidden /> Save offer
               </SubmitButton>
             </PanelFooter>
           )
@@ -941,12 +939,11 @@ function OfferLinesEditor({
 
 /**
  * "Enter an offer": a short window for the offer itself (the factory, its reference, dates, currency, price
- * basis, tax, lead time and terms, notes, their files). Its lines are not entered here: saving opens the
- * offer with its lines editor, the same one "Edit lines" opens.
+ * basis, tax, lead time and terms, notes, their files). Its lines are not entered here: saving shows the
+ * offer on the page, and "Add lines" there opens its lines editor.
  */
 export function AddOfferButton({
   dealId,
-  items,
   today,
   mainCurrency,
   rates,
@@ -962,7 +959,6 @@ export function AddOfferButton({
   /** The inquiry's number, in the window's line under the title. */
   refNo?: string;
   dealId: string;
-  items: Items;
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
@@ -995,7 +991,6 @@ export function AddOfferButton({
           <OfferWindow
             dealId={dealId}
             q={null}
-            itemCount={items.length}
             today={today}
             mainCurrency={mainCurrency}
             rates={rates}

@@ -70,7 +70,6 @@ export default async function SourcingPage({
       <AddOfferButton
         dealId={d.id}
         refNo={d.refNo}
-        items={s.items}
         today={today}
         mainCurrency={s.currency}
         rates={settings.sales.exchangeRates}
