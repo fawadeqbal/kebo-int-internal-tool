@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ORDER_SECTIONS, ORDER_SECTION_LABEL, ORDER_SECTION_TAB, ORDER_FLOW_STAGES, ORDER_TABS, sectionReminders, sectionStep, stageWords, type SectionFacts } from "../src/workflows/order-sections";
+import { ORDER_SECTIONS, ORDER_SECTION_LABEL, ORDER_SECTION_TAB, ORDER_FLOW_STAGES, ORDER_TABS, sectionReminders, sectionStep, stageStands, stageWords, type SectionFacts } from "../src/workflows/order-sections";
 
 /** An order just made: bank transfer, 30% deposit, nothing done. */
 const fresh = (more: Partial<SectionFacts> = {}): SectionFacts => ({
@@ -163,6 +163,70 @@ describe("where each stage stands", () => {
     expect(stageWords({ ...off, documents: [{ kind: "packing_list", status: "ready", number: null, issuedOn: null }] }, TODAY).documents.tab).toBe("2 of 5");
     const extra = fresh({ documents: [{ kind: "other", status: "ready", number: null, issuedOn: null }] });
     expect(stageWords(extra, TODAY).documents.tab).toBe("2 of 6");
+  });
+});
+
+describe("the Overview's lines", () => {
+  const line = (f: SectionFacts, stage: string) => stageStands(f, TODAY).find((s) => s.stage === stage)!;
+
+  it("come in the tabs' order with their label and word", () => {
+    const all = stageStands(fresh(), TODAY);
+    expect(all.map((s) => s.label)).toEqual(["Payment", "Factory order", "Production", "Shipping", "Delivery & SAT", "Documents"]);
+    expect(all[0]).toMatchObject({ word: "Nothing in", tone: "warn", fact: "Bank transfer (T/T) · deposit 30% USD 55,260 to come", missing: "" });
+    expect(all[1]!.fact).toBe("Jiangsu Filling Machinery · CNY 950,000");
+    expect(all[2]!.fact).toBe("No ready date yet");
+    expect(line(fresh({ shipBy: "2026-12-12" }), "shipping").fact).toBe("Ship by 12 Dec");
+    expect(all[4]!.fact).toBe("After arrival");
+    expect(all[5]).toMatchObject({ fact: "Proforma ready", missing: "4 to come" });
+  });
+
+  it("say what happened, and what is still empty", () => {
+    const f = fresh({
+      depositIn: true,
+      depositOn: "2026-11-16",
+      due: "128940.00",
+      factoryOrderedOn: "2026-11-16",
+      factoryOrderNo: "JF-26-1107",
+      factories: [{ name: "Jiangsu Filling Machinery", currency: "CNY", owed: "950000.00", paid: "380000.00", toPay: "570000.00" }],
+      readyOn: "2026-12-05",
+      fat: [{ factory: null, plannedOn: "2026-12-03", doneOn: null, result: null }],
+      shipments: [ship({ status: "booked", forwarder: "Sino-Africa Logistics", bookingNo: "SAL-88213", etd: "2026-12-14", eta: "2027-01-18" })],
+      documents: [{ kind: "packing_list", status: "ready", number: "PL-0412", issuedOn: null }],
+    });
+    expect(line(f, "payment").fact).toBe("Bank transfer (T/T) · 30% USD 55,260 in on 16 Nov · balance USD 128,940");
+    expect(line(f, "factory").fact).toBe("Jiangsu Filling Machinery · ordered 16 Nov · their no. JF-26-1107 · CNY 380,000 paid of CNY 950,000");
+    expect(line(f, "production")).toMatchObject({ fact: "10 days left · factory test planned 3 Dec", missing: "" });
+    expect(line(f, "shipping")).toMatchObject({ fact: "Sino-Africa Logistics · SAL-88213 · sails 14 Dec · arrives 18 Jan", missing: "container, B/L empty" });
+    expect(line(f, "documents")).toMatchObject({ fact: "Proforma and packing list ready", missing: "B/L, invoice, origin to come" });
+  });
+
+  it("a finished order reads as a record", () => {
+    const f = fresh({
+      depositIn: true,
+      depositOn: "2026-11-16",
+      due: "0.00",
+      paidInFullOn: "2026-12-10",
+      factoryOrderedOn: "2026-11-16",
+      factories: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "950000.00", toPay: "0.00" }],
+      readyOn: "2026-12-05",
+      goods: { lines: 4, received: 4 },
+      fat: [{ factory: null, plannedOn: "2026-12-03", doneOn: "2026-12-03", result: "passed" }],
+      shipments: [ship({ status: "cleared", forwarder: "Sino-Africa Logistics", vessel: "MSC Aurora", blNo: "MEDUSH887120", containerNo: "MSCU 448120 7", departedOn: "2026-12-14", arrivedOn: "2027-01-19" })],
+      deliveredOn: "2027-01-26",
+      satDoneOn: "2027-02-04",
+      satSignedBy: "Mr Ade Bello",
+      claims: { open: 0, total: 1 },
+    });
+    expect(line(f, "payment").fact).toBe("Deposit 16 Nov · paid in full 10 Dec");
+    expect(line(f, "factory").fact).toBe("Jiangsu · ordered 16 Nov · CNY 950,000 paid");
+    expect(line(f, "production").fact).toBe("Ready 5 Dec · factory test passed 3 Dec · 4 of 4 lines received");
+    expect(line(f, "shipping")).toMatchObject({ fact: "Sino-Africa Logistics · MSC Aurora · B/L MEDUSH887120 · sailed 14 Dec · arrived 19 Jan", missing: "" });
+    expect(line(f, "delivery")).toMatchObject({ fact: "Delivered 26 Jan · SAT signed 4 Feb by Mr Ade Bello · 1 claim settled", missing: "" });
+  });
+
+  it("the ready date passed without the goods, and a delivery without its SAT, are named", () => {
+    expect(line(fresh({ readyOn: "2026-11-20" }), "production")).toMatchObject({ fact: "5 days late", missing: "goods not received" });
+    expect(line(fresh({ deliveredOn: "2026-11-24" }), "delivery").missing).toBe("SAT not signed");
   });
 });
 

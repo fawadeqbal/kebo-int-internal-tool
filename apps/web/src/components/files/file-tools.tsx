@@ -66,7 +66,7 @@ export function guessKind(name: string, type: string): AttachmentKind {
 export async function uploadToOrder(
   orderId: string,
   file: File,
-  meta: { step?: string | null; kind?: AttachmentKind; note?: string; attachTo?: string } = {},
+  meta: { step?: string | null; section?: string | null; kind?: AttachmentKind; note?: string; attachTo?: string } = {},
 ): Promise<{ id?: string; sourceId?: string; error?: string }> {
   const body = new FormData();
   body.set("file", file, file.name);

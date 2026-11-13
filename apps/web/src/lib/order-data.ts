@@ -9,6 +9,7 @@ import type { OrderSteps } from "./types-checklist";
 import type { HistoryEntry } from "./types";
 import type { OrderPapers } from "./types-papers";
 import type { OrderFiles } from "./types-files";
+import type { OrderSectionsView } from "./types-sections";
 
 /**
  * An order's data, fetched once per request: the order layout (steps, Now
@@ -43,3 +44,6 @@ export const orderHistoryOf = cache((id: string, step?: string, limit?: number) 
 export const orderPapersOf = cache((id: string) => api.get<OrderPapers>(`/orders/${id}/papers`));
 /** Every file of the order in one list (Documents v3). */
 export const orderFilesOf = cache((id: string) => api.get<OrderFiles>(`/orders/${id}/files`));
+
+/** Where each stage stands (its word, a line of facts, what is empty), read from the order's data. */
+export const orderSectionsOf = cache((id: string) => api.get<OrderSectionsView>(`/orders/${id}/sections`));

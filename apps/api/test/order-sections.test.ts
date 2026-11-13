@@ -56,6 +56,24 @@ describe("order sections: files and reminders", () => {
     await app?.close();
   });
 
+  it("says where each stage of a new order stands, in the tabs' order", async () => {
+    const v = (await api(app, sana).get(`/orders/${orderId}/sections`).expect(200)).body as {
+      stages: string[];
+      tabs: Record<string, string>;
+      stands: { stage: string; label: string; word: string; tone: string; fact: string; missing: string }[];
+    };
+    expect(v.stages).toEqual(["payment", "factory", "production", "shipping", "delivery", "documents"]);
+    expect(v.stands.map((s) => s.label)).toEqual(["Payment", "Factory order", "Production", "Shipping", "Delivery & SAT", "Documents"]);
+    expect(v.stands[0]).toMatchObject({ word: "Nothing in", tone: "warn" });
+    expect(v.stands[1]).toMatchObject({ word: "Not sent", tone: "neutral" });
+    expect(v.stands[1]!.fact).toContain(`Sections Works ${tag}`);
+    expect(v.stands[2]).toMatchObject({ word: "Not started", fact: "No ready date yet" });
+    expect(v.stands[4]).toMatchObject({ word: "Not yet", fact: "After arrival" });
+    expect(v.tabs).toMatchObject({ payment: "nothing in", factory: "not sent", production: "", shipping: "" });
+    // Someone who may not see the order gets nothing.
+    await api(app, bilal).get(`/orders/${orderId}/sections`).expect(404);
+  });
+
   it("a file added in a section's window is that section's file, under the section's stage", async () => {
     await upload(sana, `/orders/${orderId}/files`)
       .field("section", "booking")

@@ -11,7 +11,7 @@ export function sourceHref(s: LedgerEntry["source"]): { href: string; label: str
     // order it pays, else the customer; a move between our accounts, the cash book.
     case "movement":
     case "allocation":
-      if (s.factoryId) return s.orderId ? { href: `/orders/${s.orderId}/money`, label: "Open the factory payment" } : null;
+      if (s.factoryId) return s.orderId ? { href: `/orders/${s.orderId}/factory`, label: "Open the factory payment" } : null;
       return s.orderId
         ? { href: `/orders/${s.orderId}/payment`, label: "Open the payment" }
         : s.customerId

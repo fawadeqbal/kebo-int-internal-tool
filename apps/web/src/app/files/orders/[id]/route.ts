@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 /**
- * A file added on the order (multipart: file, step, kind, note, attachTo), sent
+ * A file added on the order (multipart: file, step or section, kind, note, attachTo), sent
  * from the browser; server actions cap request bodies at 1 MB, so files come here.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!(file instanceof File) || file.size === 0) return Response.json({ error: "Choose a file to upload." }, { status: 400 });
   const body = new FormData();
   body.set("file", file, file.name);
-  for (const k of ["step", "kind", "note", "attachTo"]) {
+  for (const k of ["step", "section", "kind", "note", "attachTo"]) {
     const v = form.get(k);
     if (typeof v === "string" && v.trim()) body.set(k, v.trim());
   }

@@ -1,6 +1,8 @@
 import type { ISODate } from "@kebo/utils";
+import type { OrderDocumentKind, PaymentRoute } from "../enums";
 import type { Tone } from "../labels";
 import type { ChecklistFacts } from "./checklist";
+import { daysBetween } from "@kebo/utils";
 import { documentDone, FLOW_STEPS, type FlowStep } from "./flow";
 import { documentsInUse } from "./papers";
 
@@ -233,6 +235,139 @@ export function stageWords(f: SectionFacts, today: ISODate): Record<(typeof ORDE
   const documents: StageWord = { word: `${ready} of ${total} papers`, tone: ready >= total ? "ok" : "neutral", tab: `${ready} of ${total}` };
 
   return { payment, factory, production, shipping, delivery, documents };
+}
+
+/** How the customer pays, as the order's page says it. */
+export const ROUTE_NAME: Record<PaymentRoute, string> = {
+  informal: "Bank transfer (T/T)",
+  bank_contract: "Bank contract",
+  letter_of_credit: "Letter of credit (LC)",
+};
+
+const amount = (currency: string | null | undefined, value: string | null | undefined) => {
+  const n = Number(value ?? 0);
+  return `${currency ?? ""} ${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`.trim();
+};
+const join = (...parts: (string | null | false | undefined)[]) => parts.filter(Boolean).join(" · ");
+const many = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+const list = (names: string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
+
+/** A paper's short name inside a sentence. */
+const PAPER_SHORT: Record<OrderDocumentKind, string> = {
+  bill_of_lading: "B/L",
+  airway_bill: "AWB",
+  packing_list: "packing list",
+  commercial_invoice: "invoice",
+  proforma_invoice: "proforma",
+  sales_contract: "sales contract",
+  certificate_of_origin: "origin",
+  insurance: "insurance",
+  inspection: "inspection",
+  other: "other paper",
+};
+
+export interface StageStand extends StageWord {
+  stage: (typeof ORDER_FLOW_STAGES)[number];
+  label: string;
+  /** One sentence of facts: "Sino-Africa Logistics · SAL-88213 · sails 14 Dec". */
+  fact: string;
+  /** What is still empty, as a reminder (never a block): "container, B/L empty". */
+  missing: string;
+}
+
+/**
+ * The Overview's "Where it stands": one line per stage, in the tabs' order —
+ * its word, a sentence of facts, and what is still empty.
+ */
+export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
+  const w = stageWords(f, today);
+  const cur = f.currency;
+
+  // Payment
+  const route = f.route ? ROUTE_NAME[f.route] : "Route not chosen";
+  const through = f.route === "letter_of_credit" ? " through the LC" : f.route === "bank_contract" ? " through the banks" : "";
+  const paid = Number(f.due) === 0 && !!f.paidInFullOn;
+  const payment = paid
+    ? join(f.depositPercent > 0 && f.depositOn ? `Deposit ${dayMonth(f.depositOn)}` : null, `paid in full ${dayMonth(f.paidInFullOn!)}`)
+    : f.depositIn && f.depositPercent > 0
+      ? join(route, `${f.depositPercent}% ${amount(cur, f.deposit)} in${f.depositOn ? ` on ${dayMonth(f.depositOn)}` : ""}`, `balance ${amount(cur, f.due)}${through}`)
+      : join(route, f.depositPercent > 0 ? `deposit ${f.depositPercent}% ${amount(cur, f.deposit)} to come` : `${amount(cur, f.due)} to come${through}`);
+
+  // Factory order
+  const fac = f.factories ?? [];
+  const names = list(fac.map((x) => x.name));
+  const factory = !f.factoryOrderedOn
+    ? join(names || "Not ordered from the factory yet", fac.length === 1 ? amount(fac[0]!.currency, fac[0]!.owed) : null)
+    : join(
+        names,
+        `ordered ${dayMonth(f.factoryOrderedOn)}`,
+        f.factoryOrderNo ? `their no. ${f.factoryOrderNo}` : null,
+        fac.length === 1 ? (Number(fac[0]!.toPay) === 0 ? `${amount(fac[0]!.currency, fac[0]!.paid)} paid` : `${amount(fac[0]!.currency, fac[0]!.paid)} paid of ${amount(fac[0]!.currency, fac[0]!.owed)}`) : null,
+      );
+
+  // Production
+  const received = f.goods.lines > 0 && f.goods.received >= f.goods.lines;
+  const test = (f.fat ?? []).find((t) => t.doneOn || t.plannedOn);
+  const fat = test?.doneOn
+    ? `factory test ${test.result ? FAT_RESULT_LABEL[test.result].toLowerCase() : "done"} ${dayMonth(test.doneOn)}`
+    : test?.plannedOn
+      ? `factory test planned ${dayMonth(test.plannedOn)}`
+      : null;
+  const left = f.readyOn ? daysBetween(today, f.readyOn) : 0;
+  const goods = f.goods.lines > 0 && f.goods.received > 0 ? `${f.goods.received} of ${many(f.goods.lines, "line")} received` : null;
+  const production = received
+    ? join(f.readyOn ? `Ready ${dayMonth(f.readyOn)}` : null, fat, `${f.goods.received} of ${many(f.goods.lines, "line")} received`)
+    : f.readyOn
+      ? join(left > 0 ? `${many(left, "day")} left` : left === 0 ? "ready today" : `${many(-left, "day")} late`, fat, goods)
+      : join("No ready date yet", fat);
+  const productionMissing = !received && f.readyOn && left < 0 ? "goods not received" : "";
+
+  // Shipping (the first shipment speaks; more are counted)
+  const sh = f.shipments[0];
+  const shipping = !sh || !(sh.forwarder || sh.bookingNo || sh.departedOn)
+    ? f.shipBy
+      ? `Ship by ${dayMonth(f.shipBy)}`
+      : "Nothing booked yet"
+    : join(
+        sh.forwarder,
+        sh.bookingNo,
+        sh.vessel,
+        sh.blNo ? `B/L ${sh.blNo}` : null,
+        sh.departedOn ? `${sh.mode === "sea" ? "sailed" : "left"} ${dayMonth(sh.departedOn)}` : sh.etd ? `${sh.mode === "sea" ? "sails" : "leaves"} ${dayMonth(sh.etd)}` : null,
+        sh.arrivedOn ? `arrived ${dayMonth(sh.arrivedOn)}` : sh.eta ? `arrives ${dayMonth(sh.eta)}` : null,
+        f.shipments.length > 1 ? `${f.shipments.length} shipments` : null,
+      );
+  const empty = sh && (sh.forwarder || sh.bookingNo) && !sh.arrivedOn ? [!sh.containerNo && sh.mode === "sea" ? "container" : null, !sh.blNo ? (sh.mode === "air" ? "AWB" : "B/L") : null].filter(Boolean) : [];
+  const shippingMissing = empty.length ? `${empty.join(", ")} empty` : "";
+
+  // Delivery & SAT
+  const delivery =
+    join(
+      f.deliveredOn ? `Delivered ${dayMonth(f.deliveredOn)}` : null,
+      f.satDoneOn ? `SAT signed ${dayMonth(f.satDoneOn)}${f.satSignedBy ? ` by ${f.satSignedBy}` : ""}` : null,
+      f.claims.open ? `${many(f.claims.open, "open claim")}` : f.claims.total ? `${many(f.claims.total, "claim")} settled` : null,
+    ) || "After arrival";
+  const deliveryMissing = f.deliveredOn && !f.satDoneOn ? "SAT not signed" : "";
+
+  // Documents
+  const done = (kind: string) => f.documents.some((d) => d.kind === kind && documentDone(d.status));
+  const asked = documentsInUse(f.route, f.shipMode, f.papersOff, done).filter((k) => k !== "proforma_invoice");
+  const hasProforma = !!f.proforma || done("proforma_invoice");
+  const made = [...(hasProforma ? ["proforma"] : []), ...asked.filter(done).map((k) => PAPER_SHORT[k])];
+  const toCome = [...(hasProforma ? [] : ["proforma"]), ...asked.filter((k) => !done(k)).map((k) => PAPER_SHORT[k])];
+  const sentence = list(made);
+  const documents = made.length ? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)} ready` : "No paper yet";
+  const documentsMissing = toCome.length ? (toCome.length <= 3 ? `${toCome.join(", ")} to come` : `${toCome.length} to come`) : "";
+
+  const row = (stage: (typeof ORDER_FLOW_STAGES)[number], fact: string, missing = ""): StageStand => ({ stage, label: ORDER_TAB_LABEL[stage], ...w[stage], fact, missing });
+  return [
+    row("payment", payment),
+    row("factory", factory),
+    row("production", production, productionMissing),
+    row("shipping", shipping, shippingMissing),
+    row("delivery", delivery, deliveryMissing),
+    row("documents", documents, documentsMissing),
+  ];
 }
 
 /** What the sections' reminders read (an order's whole facts fit). */
