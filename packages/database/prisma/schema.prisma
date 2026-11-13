@@ -351,6 +351,7 @@ model User {
   relAuditUser             AuditLog[]           @relation("AuditUser")
   relFactoryRequestCreator FactoryRequest[]     @relation("FactoryRequestCreator")
   relOrderSatEngineer      OrderDelivery[]      @relation("OrderSatEngineer")
+  relOrderFatAttendee      OrderFactory[]       @relation("OrderFatAttendee")
   relPersonTarget          PersonTarget[]       @relation("PersonTargetOwner")
   relPersonTargetUpdater   PersonTarget[]       @relation("PersonTargetUpdater")
   relChecklistAssignee     OrderChecklistItem[] @relation("ChecklistAssignee")
@@ -802,6 +803,8 @@ model Attachment {
   order          Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
   /// payment | factory | production | shipping | documents | delivery
   step           String?          @db.VarChar(20)
+  /// The section of the order's page the file belongs to (see @kebo/shared ORDER_SECTIONS): booking, vessel, fat…
+  section        String?          @db.VarChar(30)
   /// "Replace with a newer one": the newer file. The old one is kept (as an earlier version), out of the lists.
   replacedById   String?          @map("replaced_by") @db.Uuid
   replacedBy     Attachment?      @relation("AttachmentVersions", fields: [replacedById], references: [id], onDelete: SetNull)
@@ -814,6 +817,7 @@ model Attachment {
 
   @@index([inquiryId])
   @@index([orderId])
+  @@index([orderId, section])
   @@index([replacedById])
   @@index([factoryQuoteId])
   @@index([movementId])
@@ -1144,6 +1148,11 @@ model Order {
   /// The factory's own number for our order ("their order no.").
   factoryOrderNo      String?           @map("factory_order_no") @db.VarChar(60)
   closedAt            DateTime?         @map("closed_at") @db.Timestamptz
+  /// The original papers couriered to the customer (routes without a bank; with one, the bank's steps say it).
+  originalsCourier    String?           @map("originals_courier") @db.VarChar(60)
+  originalsTrackingNo String?           @map("originals_tracking_no") @db.VarChar(80)
+  originalsSentOn     DateTime?         @map("originals_sent_on") @db.Date
+  originalsNote       String?           @map("originals_note") @db.VarChar(500)
   /// When the company's checklist was copied into the order (null: not yet; it is copied on first read).
   checklistSeededAt   DateTime?         @map("checklist_seeded_at") @db.Timestamptz
   createdById         String            @map("created_by") @db.Uuid
@@ -1550,6 +1559,9 @@ model Shipment {
   freightCurrency      String?   @map("freight_currency") @db.Char(3)
   insurer              String?   @db.VarChar(120)
   insurancePolicyNo    String?   @map("insurance_policy_no") @db.VarChar(60)
+  /// prepaid | collect
+  freightTerms         String?   @map("freight_terms") @db.VarChar(10)
+  insuredValue         Decimal?  @map("insured_value") @db.Decimal(14, 2)
   /// Customs at the destination.
   customsDeclarationNo String?   @map("customs_declaration_no") @db.VarChar(60)
   clearedOn            DateTime? @map("cleared_on") @db.Date
@@ -1584,6 +1596,9 @@ model OrderDocument {
   note         String?             @db.VarChar(500)
   /// Kept elsewhere (status elsewhere): where it is — a shelf, a person, a bank, an email. No file in the app.
   keptWhere    String?             @map("kept_where") @db.VarChar(200)
+  /// A paper both sides sign (the sales contract): the day we signed, the day they signed.
+  signedByUsOn   DateTime?         @map("signed_by_us_on") @db.Date
+  signedByThemOn DateTime?         @map("signed_by_them_on") @db.Date
   /// Made by the app: the final paper this row is.
   paperId      String?             @map("paper_id") @db.Uuid
   paper        OrderPaper?         @relation(fields: [paperId], references: [id], onDelete: SetNull)
@@ -1684,6 +1699,10 @@ model OrderClaim {
   openedOn   DateTime    @map("opened_on") @db.Date
   resolvedOn DateTime?   @map("resolved_on") @db.Date
   resolution String?
+  /// What the claim is worth, and who bears it: factory | us | customer.
+  amount     Decimal?    @db.Decimal(14, 2)
+  currency   String?     @db.Char(3)
+  bearer     String?     @db.VarChar(10)
   createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt  DateTime    @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1992,6 +2011,20 @@ model OrderFactory {
   factoryId String?   @map("factory_id") @db.Uuid
   factory   Party?    @relation("OrderFactoryFactory", fields: [factoryId], references: [id], onDelete: Restrict)
   readyOn   DateTime? @map("ready_on") @db.Date
+  /// When the factory told us the ready date, and how (wechat, email, phone, visit, other).
+  readyToldOn  DateTime? @map("ready_told_on") @db.Date
+  readyToldVia String?   @map("ready_told_via") @db.VarChar(20)
+  readyNote    String?   @map("ready_note") @db.VarChar(500)
+  /// The factory test (FAT): planned, who of ours attends, the day it was done, how it went.
+  fatPlannedOn    DateTime? @map("fat_planned_on") @db.Date
+  fatAttendedById String?   @map("fat_attended_by") @db.Uuid
+  fatAttendedBy   User?     @relation("OrderFatAttendee", fields: [fatAttendedById], references: [id], onDelete: SetNull)
+  fatDoneOn       DateTime? @map("fat_done_on") @db.Date
+  /// passed | passed_with_remarks | failed
+  fatResult       String?   @map("fat_result") @db.VarChar(20)
+  fatRemarks      String?   @map("fat_remarks") @db.VarChar(1000)
+  /// Where the goods of this factory were received (the forwarder's warehouse, our warehouse…).
+  goodsReceivedAt String?   @map("goods_received_at") @db.VarChar(160)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 

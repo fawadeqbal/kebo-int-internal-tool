@@ -1,11 +1,11 @@
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, type Prisma, routeOf } from "@kebo/database";
+import { fromDbDate, fromDbDateOrNull, livePart, type Prisma, routeOf } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
-import { routeFromQuotation, type ChecklistFacts } from "@kebo/shared";
+import { routeFromQuotation, type ChecklistFacts, type FatResult, type SectionFacts } from "@kebo/shared";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
 import { lcChecksOf, termsOf } from "../billing/api";
 import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
-import { chargedExpenses, positionOf, type MoneyCtx } from "../billing/api";
-import { dateIn, type ISODate } from "@kebo/utils";
+import { chargedExpenses, positionOf, reachedOn, type MoneyCtx } from "../billing/api";
+import { dateIn } from "@kebo/utils";
 
 /** What one order's checklist is worked out from, read in one query. */
 export const checklistOrderInclude = {
@@ -28,27 +28,18 @@ export const checklistOrderInclude = {
   lines: {
     select: { type: true, quantity: true, receivedQty: true, packages: true, grossWeightKg: true, cbm: true, factoryId: true, factory: { select: { name: true } } },
   },
-  // Each factory's ready date (the order's is the latest of them).
+  // Each factory's ready date (the order's is the latest of them), and its factory test.
   ...readySelect,
+  factories: { select: { ...readySelect.factories.select, fatPlannedOn: true, fatDoneOn: true, fatResult: true, factory: { select: { name: true } } } },
 } satisfies Prisma.OrderInclude;
 
 export type ChecklistOrderRow = Prisma.OrderGetPayload<{ include: typeof checklistOrderInclude }>;
-
-/** The first payment date by which the money (with the bank charges) reached `targetMinor` (payments in date order). */
-export function reachedOn(payments: readonly { amount: Prisma.Decimal; bankCharges: Prisma.Decimal; on: Date }[], targetMinor: number): ISODate | null {
-  let sum = 0;
-  for (const p of payments) {
-    sum += decimalToMinor(p.amount) + decimalToMinor(p.bankCharges);
-    if (sum >= targetMinor) return fromDbDate(p.on);
-  }
-  return null;
-}
 
 /**
  * The checklist's facts for one order. `factories` comes from the order's money
  * (null when the person may not see factory money).
  */
-export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts["factories"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): ChecklistFacts {
+export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts["factories"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): SectionFacts {
   // Where the order stands with the customer, as everywhere: the plan's deposit, what was charged to them.
   const position = positionOf(o, fx);
   const percent = position.depositPercent;
@@ -128,5 +119,16 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
     satSignedBy: o.delivery?.satSignedBy ?? null,
     claims: { open: o.claims.filter((c) => c.status === "open" || c.status === "with_factory").length, total: o.claims.length },
     closedOn: o.status === "closed" ? (o.closedAt ? dateIn(o.closedAt, timeZone) : fromDbDate(o.orderedOn)) : null,
+    // What the sections added.
+    shipBy: fromDbDateOrNull(o.shipBy),
+    fat: o.factories
+      .filter((f) => f.fatPlannedOn || f.fatDoneOn || f.fatResult)
+      .map((f) => ({
+        factory: f.factory?.name ?? null,
+        plannedOn: fromDbDateOrNull(f.fatPlannedOn),
+        doneOn: fromDbDateOrNull(f.fatDoneOn),
+        result: (f.fatResult as FatResult | null) ?? null,
+      })),
+    originalsSentOn: fromDbDateOrNull(o.originalsSentOn),
   };
 }

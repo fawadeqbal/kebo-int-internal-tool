@@ -13,7 +13,7 @@ import {
 } from "@kebo/shared";
 import { daysBetween, dateIn, type ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../../database/prisma.service";
-import { reachedOn } from "../../checklist/checklist-facts";
+import { reachedOn } from "../../billing/api";
 import { factoryPlansOf } from "../../billing/api";
 import { convert, MainMoney, orderRate } from "../../money/order-money";
 import { livePlansOf } from "../../billing/api";

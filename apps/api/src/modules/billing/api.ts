@@ -21,3 +21,4 @@ export { createPlan, lcBalanceMinor, lcChecksOf, rebuildRoutePlan, termsOf } fro
 export { advanceOf, factoryPlansOf, owedByFactory, seedFactoryPlans, type FactoryPlanView } from "./factory-plan";
 export { factoryPositionsSql, ordersOwingFactories, ordersWithMoneyDue, owedLineSql, positionsSql } from "./due";
 export { requestsOf, requestsOfOrder, requestViewOf, type KeptCopy, type OrderRequests, type RequestView, type RowReceipt, type SentWith } from "./requests";
+export { reachedOn } from "./reached-on";
