@@ -340,8 +340,8 @@ function ProfitBody({
           <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing spent on them yet.</p>
         )}
         {list.rows.length > shown.length && (
-          <Link href={`/finance/expenses?p=${today.slice(0, 4)}&customer=${customerId}`} className="text-sm text-primary hover:underline">
-            See all {list.rows.length} on the Money page
+          <Link href={`/payments?party=${customerId}&kind=expense`} className="text-sm text-primary hover:underline">
+            See all {list.rows.length} in Payments
           </Link>
         )}
       </section>

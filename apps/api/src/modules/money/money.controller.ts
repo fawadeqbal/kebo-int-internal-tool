@@ -51,7 +51,7 @@ const expenseQuery = z.object({
   factoryId: z.uuid().optional(),
   customerId: z.uuid().optional(),
   category: z.enum(EXPENSE_CATEGORIES).optional(),
-  kind: z.enum(["order", "customer", "general"]).optional(),
+  kind: z.enum(["order", "customer", "general", "company"]).optional(),
   page: z.coerce.number().int().min(1).max(10_000).optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 });
@@ -83,6 +83,21 @@ export class MoneyController {
   @Get("money/bills")
   openBills(@CurrentUser() user: SessionUser) {
     return this.money.openBills(user);
+  }
+
+  /** Managers only: the company's costs that come every month and are not in this month yet. */
+  @RequireFeature("expenses")
+  @Get("expenses/repeating")
+  repeating(@CurrentUser() user: SessionUser) {
+    return this.money.repeatingCosts(user);
+  }
+
+  /** { what: skip | stop }: skip this month's, or stop the cost from repeating. */
+  @RequireFeature("expenses")
+  @Post("expenses/repeating/:key")
+  @HttpCode(200)
+  repeatingChange(@CurrentUser() user: SessionUser, @Param("key", ParseUUIDPipe) key: string, @Body(Validate(z.object({ what: z.enum(["skip", "stop"]) }))) body: { what: "skip" | "stop" }) {
+    return this.money.repeatingChange(user, key, body.what);
   }
 
   /** Managers only: what an expense can be for (customers, deals, orders, factories). */

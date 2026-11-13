@@ -1728,6 +1728,12 @@ model Expense {
   payee           String?       @db.VarChar(120)
   /// Made by the system from another record and kept in step with it: "shipment:<id>:freight", "shipment:<id>:insurance".
   source          String?       @db.VarChar(80)
+  /// A cost of the company that comes every month (rent, salaries): the next month's is proposed from the latest of its chain.
+  repeats         Boolean       @default(false)
+  /// The chain of a repeating cost: the same on every month's expense of it.
+  repeatKey       String?       @map("repeat_key") @db.Uuid
+  /// On the latest of a chain: the month ("2026-11") that was skipped, so it is not proposed again that month.
+  repeatSkip      String?       @map("repeat_skip") @db.Char(7)
   /// The day the person was paid back (own money), or the bill was paid (pay later).
   repaidOn        DateTime?     @map("repaid_on") @db.Date
   /// The account that money left from.
@@ -1750,6 +1756,7 @@ model Expense {
   @@index([accountId])
   @@index([repaidAccountId])
   @@index([source])
+  @@index([repeatKey])
   @@index([companyId])
   @@map("expenses")
 }

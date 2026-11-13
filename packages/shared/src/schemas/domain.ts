@@ -751,6 +751,10 @@ export const expenseInput = z.object({
   payLater: optionalBool,
   /** Who we owe it to, in words (the forwarder, the insurer). Left out on a change: kept. */
   payee: optionalText(120).optional(),
+  /** A cost of the company that comes every month: next month's is proposed by itself. Left out on a change: kept. */
+  repeats: optionalBool,
+  /** Confirming a proposed month: the chain it belongs to. */
+  repeatKey: optionalId,
   reason: optionalText(500).optional(),
 });
 export type ExpenseInput = z.infer<typeof expenseInput>;

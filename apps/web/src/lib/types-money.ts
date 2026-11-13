@@ -194,6 +194,9 @@ export interface ExpenseView {
   payLater: boolean;
   payee: string | null;
   source: string | null;
+  /** A cost of the company that comes every month, and the chain its months share. */
+  repeats: boolean;
+  repeatKey: string | null;
   repaid: { on: string; account: { id: string; name: string } | null } | null;
   voided: { at: string; reason: string | null } | null;
 }
@@ -845,6 +848,25 @@ export interface RequestList {
   }[];
   canPay: boolean;
   canSend: boolean;
+}
+
+/** GET /expenses/repeating: the company's costs that come every month and are not in this month yet. */
+export interface RepeatingCosts {
+  month: string;
+  /** How many costs repeat, whether this month's is in or not. */
+  repeating: number;
+  waiting: {
+    key: string;
+    category: ExpenseCategory;
+    description: string;
+    amount: string;
+    currency: string;
+    /** The day of the month it comes on, and that day this month. */
+    day: number;
+    on: string;
+    account: { id: string; name: string } | null;
+    last: { on: string; amount: string };
+  }[];
 }
 
 /** GET /money/bills: the bills known and not paid yet, and the people to pay back, across the company. */

@@ -1,26 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
-import { dueTarget, insightsTarget, moneyTarget, orderPaymentTarget, ordersBoardTarget, paymentsTabTarget, reportsMoneyTarget, reportsOverviewQuery, securityTarget, settingsTarget } from "@/lib/old-addresses";
+import { companyCostsTarget, dueTarget, insightsTarget, moneyTarget, orderPaymentTarget, ordersBoardTarget, paymentsTabTarget, reportsMoneyTarget, reportsOverviewQuery, securityTarget, settingsTarget } from "@/lib/old-addresses";
 
 // Every old address keeps working (design page 33): old → new, with the rest of the query.
 
 describe("/money?tab=…", () => {
   it.each([
     ["cash", "/finance/cash-book"],
-    ["expenses", "/finance/expenses"],
+    ["expenses", "/money/company-costs"],
     ["receive", "/money/due"],
     ["owe", "/money/due?side=suppliers"],
     ["pnl", "/finance/profit"],
   ])("tab=%s → %s", (tab, to) => expect(moneyTarget({ tab })).toBe(to));
 
   it("keeps the filters", () => {
-    expect(moneyTarget({ tab: "expenses", p: "2026", customer: "c1" })).toBe("/finance/expenses?p=2026&customer=c1");
+    expect(moneyTarget({ tab: "expenses", p: "2026-10" })).toBe("/money/company-costs?p=2026-10");
     expect(moneyTarget({ tab: "cash", acct: "none" })).toBe("/finance/cash-book?acct=none");
     expect(moneyTarget({ tab: "owe", q: "jiangsu" })).toBe("/money/due?side=suppliers&q=jiangsu");
   });
 
   it("without a tab: the first page this person may open, as the old page did", () => {
     expect(moneyTarget({}, { cashBook: true, expenses: true, recorders: true })).toBe("/finance/cash-book");
-    expect(moneyTarget({}, { cashBook: false, expenses: true, recorders: true })).toBe("/finance/expenses");
+    expect(moneyTarget({}, { cashBook: false, expenses: true, recorders: true })).toBe("/money/company-costs");
     expect(moneyTarget({}, { cashBook: false, expenses: false, recorders: true })).toBe("/money/due");
     expect(moneyTarget({}, { cashBook: false, expenses: false, recorders: false })).toBe("/money/due?side=suppliers");
   });
@@ -43,6 +43,12 @@ describe("the Money pages that became “To receive and to pay”", () => {
     expect(paymentsTabTarget({ tab: "to-pay", q: "pack" })).toBe("/money/due?side=suppliers&q=pack");
     expect(paymentsTabTarget({ tab: "paid" })).toBeNull();
     expect(paymentsTabTarget({ order: "o1" })).toBeNull();
+  });
+
+  it("Expenses is Company costs: a month and a kind are kept; a year or a customer is not a filter there", () => {
+    expect(companyCostsTarget()).toBe("/money/company-costs");
+    expect(companyCostsTarget({ p: "2026-10", category: "rent" })).toBe("/money/company-costs?p=2026-10&kind=rent");
+    expect(companyCostsTarget({ p: "2026", customer: "c1", kind: "general" })).toBe("/money/company-costs");
   });
 
   it("a payment request and an order's invoice open the order's Payment tab", () => {

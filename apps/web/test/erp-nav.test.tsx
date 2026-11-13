@@ -67,7 +67,7 @@ describe("the groups", () => {
     expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Shipments", "Customers", "Follow-ups"]);
     expect(pages(m, "purchasing")).toEqual(["Purchase orders", "Suppliers"]);
     // Money, simple (14 Nov 2026): four pages. To verify and the Ledger keep their addresses and left the menu.
-    expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments", "Cash & bank", "Expenses"]);
+    expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments", "Cash & bank", "Company costs"]);
     expect(pages(m, "reports")).toEqual(["Profit & loss", "Planned vs spent", "All reports"]);
     expect(pages(m, "settings")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form", "People", "Roles", "Sign-ins", "Sessions", "Activity log"]);
   });
@@ -95,7 +95,7 @@ describe("the groups", () => {
         "/money/due",
         "/payments",
         "/finance/cash-book",
-        "/finance/expenses",
+        "/money/company-costs",
         "/finance/profit",
         "/finance/leaks",
         "/reports",
@@ -306,7 +306,7 @@ describe("the folded strip", () => {
   });
 
   it("works with the keyboard: focus opens it, ↓ goes in, ↑ ↓ move, Esc closes it back on the icon", () => {
-    at.path = "/finance/expenses";
+    at.path = "/money/company-costs";
     shell(everything());
     const money = strip().getByRole("button", { name: /^Money/ });
     act(() => money.focus());
@@ -314,7 +314,7 @@ describe("the folded strip", () => {
     const m = screen.getByRole("menu", { name: "Money" });
     expect(money.getAttribute("aria-controls")).toBe(m.id);
     const items = within(m).getAllByRole("menuitem");
-    expect(items.map((a) => a.textContent?.replace(/\d+/g, ""))).toEqual(["To receive and to pay", "Payments", "Cash & bank", "Expenses"]);
+    expect(items.map((a) => a.textContent?.replace(/\d+/g, ""))).toEqual(["To receive and to pay", "Payments", "Cash & bank", "Company costs"]);
     expect(items[3]!.getAttribute("aria-current")).toBe("page");
     fireEvent.keyDown(money, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[0]);
