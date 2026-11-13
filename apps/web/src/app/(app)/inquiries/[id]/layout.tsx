@@ -50,7 +50,7 @@ export default async function DealLayout({ children, params }: { children: React
     { href: `${base}/history`, label: "History" },
   ];
   const more: MenuEntry[] = [
-    ...(d.allowed.edit ? [{ label: "Edit the request", href: `${base}/edit` }] : []),
+    ...(d.allowed.edit ? [{ label: "Edit the request", href: `${base}?panel=edit-request` }] : []),
     { label: "All files", href: `${base}/files` },
     { label: `Open the customer ${d.customer.name}`, href: `/customers/${d.customer.id}` },
     { label: "Copy link to this inquiry", copy: base },

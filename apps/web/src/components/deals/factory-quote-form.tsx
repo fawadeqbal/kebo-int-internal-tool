@@ -5,14 +5,13 @@ import { ChevronDown, Factory, Loader2, Plus } from "lucide-react";
 import { fxRate } from "@kebo/money";
 import { INCOTERMS, type Incoterm } from "@kebo/shared";
 import { Button, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
-import { PANEL_FORM, PanelActions, PanelSection } from "@/components/common/panel";
+import { PANEL_FORM, PanelSection } from "@/components/common/panel";
 
 /** The usual Chinese ports, offered under the Port field (any other can be typed). */
 const PORTS = ["Qingdao", "Shanghai", "Ningbo", "Tianjin", "Shenzhen", "Guangzhou", "Xiamen", "Dalian"];
@@ -426,9 +425,9 @@ export function FactoryPicker({
 }
 
 /**
- * One factory's offer: who, their reference, currency, dates, price basis,
- * lead time and terms. Saving a new one opens its line table, where the lines
- * are typed, pasted or copied from another factory's offer.
+ * The offer's window, the same for "Enter factory offer" and "Edit the offer": four sections in the same
+ * order (Who, Price, Terms, Notes and their quotation). Its lines are not here: they have their own editor.
+ * `files` is the right half of the last section; `footer` the window's buttons (inside the form).
  */
 export function OfferHeaderForm({
   action,
@@ -438,11 +437,10 @@ export function OfferHeaderForm({
   rates,
   searchFactories,
   onDone,
-  onCancel,
-  compact = false,
-  extra,
-  submitLabel,
-  panel,
+  defaults,
+  files,
+  note,
+  footer,
 }: {
   action: Action;
   quote: FactoryQuoteView | null;
@@ -451,20 +449,18 @@ export function OfferHeaderForm({
   rates: Record<string, number>;
   searchFactories: (q: string) => Promise<FactoryOption[]>;
   onDone: (state: ActionState) => void;
-  onCancel?: () => void;
-  /** A new offer with just the factory and currency: the rest is filled in on the offer afterwards. */
-  compact?: boolean;
-  /** Shown above the buttons (e.g. where the new offer's lines start from). */
-  extra?: ReactNode;
-  submitLabel?: string;
-  /**
-   * In the Edit side panel: the fields in sections (who, price, terms), two
-   * columns at most, and Save / Cancel in the panel's footer with `end` on
-   * its right (Remove this offer).
-   */
-  panel?: { end?: ReactNode };
+  /** A new offer's tax: the company's default (Settings). */
+  defaults?: { taxIncluded: boolean; taxRate: number };
+  /** The factory's own quotation files: the ones it has, and the place to add more. */
+  files: ReactNode;
+  /** Said above the buttons (a new offer: its lines come next). */
+  note?: ReactNode;
+  footer: ReactNode;
 }) {
-  const [s, setS] = useState<QuoteState>(() => initialState(quote, today));
+  const [s, setS] = useState<QuoteState>(() => ({
+    ...initialState(quote, today),
+    ...(!quote && defaults ? { taxIncluded: defaults.taxIncluded, taxRate: String(defaults.taxRate) } : {}),
+  }));
   const set = <K extends keyof QuoteState>(k: K, v: QuoteState[K]) => setS((st) => ({ ...st, [k]: v }));
   const currency = s.currency.trim().toUpperCase();
   const fx = { main: mainCurrency, rates };
@@ -478,7 +474,7 @@ export function OfferHeaderForm({
 
   const recurrencyBox = (st: ActionState) =>
     recurrency && (
-      <fieldset className="flex flex-col gap-2 rounded-lg border border-warn/30 bg-warn-soft/40 p-3 sm:col-span-2">
+      <fieldset className="flex flex-col gap-2 rounded-lg border border-warn/30 bg-warn-soft/40 p-3 sm:col-span-2 md:col-span-3">
         <legend className="sr-only">What to do with the prices</legend>
         <p className="text-sm font-medium">
           Its {priced.length} price{priced.length === 1 ? " is" : "s are"} in {quote!.currency}. What should happen to {priced.length === 1 ? "it" : "them"}?
@@ -508,27 +504,26 @@ export function OfferHeaderForm({
       </fieldset>
     );
 
-  if (panel)
-    return (
-      <ActionForm action={action} onDone={onDone} className={PANEL_FORM} keepFields>
+  return (
+      <ActionForm action={action} onDone={onDone} className={PANEL_FORM} keepFields showSuccess={false}>
         {(st) => (
           <>
             <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
-            <PanelSection title="Who" first>
-              <Field label="Factory" htmlFor="factory" error={st.errors?.factoryId ?? st.errors?.newFactoryName}>
+            <PanelSection title="Who" first className="md:grid-cols-3">
+              <Field label="Factory" htmlFor="factory" required error={st.errors?.factoryId ?? st.errors?.newFactoryName} className="md:col-span-2">
                 <FactoryPicker value={s.factory} search={searchFactories} error={st.errors?.factoryId} onChange={(f) => set("factory", f)} />
               </Field>
               <Field label="Their reference" htmlFor="reference" optional error={st.errors?.reference}>
-                <Input id="reference" value={s.reference} onChange={(e) => set("reference", e.target.value)} maxLength={80} placeholder="e.g. RA-2610-88" />
+                <Input id="reference" value={s.reference} onChange={(e) => set("reference", e.target.value)} maxLength={80} placeholder="Their quote no." />
               </Field>
-              <Field label="Received on" htmlFor="receivedOn" error={st.errors?.receivedOn}>
+              <Field label="Received on" htmlFor="receivedOn" required error={st.errors?.receivedOn}>
                 <Input id="receivedOn" type="date" value={s.receivedOn} max={today} onChange={(e) => set("receivedOn", e.target.value)} />
               </Field>
               <Field label="Valid until" htmlFor="validUntil" optional error={st.errors?.validUntil}>
                 <Input id="validUntil" type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
               </Field>
             </PanelSection>
-            <PanelSection title="Price">
+            <PanelSection title="Price" className="md:grid-cols-3">
               <Field
                 label="Currency"
                 htmlFor="currency"
@@ -553,13 +548,10 @@ export function OfferHeaderForm({
                   ))}
                 </Select>
               </Field>
-              {recurrencyBox(st)}
               <Field label={s.basis === "EXW" ? "Town" : "Port"} htmlFor="basisPlace" optional error={st.errors?.basisPlace}>
                 <PortPicker id="basisPlace" value={s.basisPlace} onChange={(v) => set("basisPlace", v)} exw={s.basis === "EXW"} />
               </Field>
-              <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq}>
-                <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} placeholder="e.g. 1 set" />
-              </Field>
+              {recurrencyBox(st)}
               <TaxBox
                 idPrefix="fq"
                 className="sm:col-span-2"
@@ -570,8 +562,11 @@ export function OfferHeaderForm({
                 error={st.errors?.taxRate ?? st.errors?.taxIncluded}
                 note={quote ? taxRateNote(quote.lines, quote.taxRate, s.taxRate) : undefined}
               />
+              <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq}>
+                <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} placeholder="e.g. 1 set" />
+              </Field>
             </PanelSection>
-            <PanelSection title="Terms">
+            <PanelSection title="Terms" className="md:grid-cols-3">
               <Field label="Lead time" htmlFor="leadTime" optional error={st.errors?.leadTime}>
                 <Input id="leadTime" value={s.leadTime} onChange={(e) => set("leadTime", e.target.value)} maxLength={120} placeholder="e.g. 25 days after deposit" />
               </Field>
@@ -588,194 +583,23 @@ export function OfferHeaderForm({
                   <span className="text-sm text-text-2">%</span>
                 </div>
               </Field>
-              <Field label="Payment terms (note)" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms}>
-                <Input id="paymentTerms" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} placeholder="e.g. 70% before shipment, by T/T" />
-              </Field>
               <Field label="Warranty" htmlFor="fq-warranty" optional error={st.errors?.warranty}>
                 <Input id="fq-warranty" value={s.warranty} onChange={(e) => set("warranty", e.target.value)} maxLength={300} placeholder="e.g. 12 months from commissioning" />
               </Field>
-            </PanelSection>
-            <PanelSection className="sm:grid-cols-1">
-              <Field label="Notes" htmlFor="fq-notes" optional error={st.errors?.notes}>
-                <Textarea id="fq-notes" rows={3} className="min-h-0" value={s.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Packing, samples, anything to remember about this offer" />
+              <Field label="Payment terms (note)" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms} className="md:col-span-3">
+                <Input id="paymentTerms" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} placeholder="e.g. 30% advance, 70% before shipping, by T/T" />
               </Field>
             </PanelSection>
-            {extra}
-            <PanelActions end={panel.end}>
-              <SubmitButton size="sm" pendingText="Saving…">
-                {submitLabel ?? (quote ? "Save the details" : "Start this offer")}
-              </SubmitButton>
-              {onCancel && (
-                <Button size="sm" variant="ghost" onClick={onCancel}>
-                  Cancel
-                </Button>
-              )}
-            </PanelActions>
+            <PanelSection title="Notes and their quotation">
+              <Field label="Notes" htmlFor="fq-notes" optional error={st.errors?.notes}>
+                <Textarea id="fq-notes" rows={4} className="min-h-0" value={s.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Packing, samples, anything to remember about this offer" />
+              </Field>
+              <div className="min-w-0">{files}</div>
+            </PanelSection>
+            {note}
+            {footer}
           </>
         )}
       </ActionForm>
     );
-
-  return (
-    <ActionForm action={action} onDone={onDone} className="flex flex-col gap-4" keepFields>
-      {(st) => (
-        <>
-          <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
-          <div className={cn("grid gap-4", compact ? "sm:grid-cols-2" : "md:grid-cols-3")}>
-            <Field label="Factory" htmlFor="factory" error={st.errors?.factoryId ?? st.errors?.newFactoryName} className={compact ? undefined : "md:col-span-2"}>
-              <FactoryPicker value={s.factory} search={searchFactories} error={st.errors?.factoryId} onChange={(f) => set("factory", f)} />
-            </Field>
-            {!compact && (
-            <Field label="Their reference" htmlFor="reference" optional error={st.errors?.reference}>
-              <Input
-                id="reference"
-                value={s.reference}
-                onChange={(e) => set("reference", e.target.value)}
-                maxLength={80}
-                placeholder="Quote no."
-              />
-            </Field>
-            )}
-            <Field
-              label="Currency"
-              htmlFor="currency"
-              error={st.errors?.currency}
-              hint={rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined)}
-            >
-              <CurrencySelect id="currency" value={s.currency} onChange={(e) => set("currency", e.target.value)} />
-            </Field>
-            {recurrency && (
-              <fieldset className="flex flex-col gap-2 rounded-lg border border-warn/30 bg-warn-soft/40 p-3 md:col-span-3">
-                <legend className="sr-only">What to do with the prices</legend>
-                <p className="text-sm font-medium">
-                  Its {priced.length} price{priced.length === 1 ? " is" : "s are"} in {quote!.currency}. What should happen to {priced.length === 1 ? "it" : "them"}?
-                </p>
-                <label className={cn("flex items-start gap-2 text-sm", !canConvert && "text-muted")}>
-                  <input type="radio" name="fq-convert" className="mt-1" checked={canConvert && s.convertPrices} disabled={!canConvert} onChange={() => set("convertPrices", true)} />
-                  <span>
-                    Convert them to {currency}
-                    {canConvert ? (
-                      <span className="block text-xs text-text-2">
-                        At {rateSentence(fx, quote!.currency, currency)}: {sample!.description.split("\n")[0]} {quote!.currency} {Number(sample!.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })} → {currency}{" "}
-                        {Number(sampleTo).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                      </span>
-                    ) : (
-                      <span className="block text-xs">Add the exchange rate in Settings first.</span>
-                    )}
-                  </span>
-                </label>
-                <label className="flex items-start gap-2 text-sm">
-                  <input type="radio" name="fq-convert" className="mt-1" checked={!canConvert || !s.convertPrices} onChange={() => set("convertPrices", false)} />
-                  <span>
-                    Keep the numbers
-                    <span className="block text-xs text-text-2">They were typed in {currency} already; only the currency was wrong.</span>
-                  </span>
-                </label>
-              </fieldset>
-            )}
-            {!compact && (
-              <>
-            <Field label="Received on" htmlFor="receivedOn" error={st.errors?.receivedOn}>
-              <Input id="receivedOn" type="date" value={s.receivedOn} max={today} onChange={(e) => set("receivedOn", e.target.value)} />
-            </Field>
-            <Field label="Valid until" htmlFor="validUntil" optional error={st.errors?.validUntil}>
-              <Input id="validUntil" type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
-            </Field>
-            <Field
-              label="Price basis"
-              htmlFor="basis"
-              error={st.errors?.basis ?? st.errors?.basisPlace}
-              hint={s.basis ? BASIS_HINT[s.basis] : "What their prices already pay for: needed to work out freight and the like"}
-            >
-              <div className="flex gap-2">
-                <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")} className="w-28 shrink-0">
-                  <option value="">Not said</option>
-                  {INCOTERMS.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </Select>
-                <Input
-                  id="basisPlace"
-                  aria-label="Basis place"
-                  value={s.basisPlace}
-                  onChange={(e) => set("basisPlace", e.target.value)}
-                  maxLength={60}
-                  list="fq-basis-place"
-                  placeholder={s.basis === "EXW" ? "Factory town" : "Port, e.g. Qingdao"}
-                />
-                <datalist id="fq-basis-place">
-                  {["Qingdao", "Shanghai", "Ningbo", "Tianjin", "Shenzhen", "Guangzhou", "Xiamen"].map((b) => (
-                    <option key={b} value={b} />
-                  ))}
-                </datalist>
-              </div>
-            </Field>
-            <Field label="Lead time" htmlFor="leadTime" optional error={st.errors?.leadTime}>
-              <Input
-                id="leadTime"
-                value={s.leadTime}
-                onChange={(e) => set("leadTime", e.target.value)}
-                maxLength={120}
-                placeholder="e.g. 25 days after deposit"
-              />
-            </Field>
-            <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq}>
-              <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} />
-            </Field>
-<Field label="Advance when we order" htmlFor="advancePercent" optional hint="Starts the factory's payment plan; printed on the PO" error={st.errors?.advancePercent}>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  id="advancePercent"
-                  inputMode="decimal"
-                  className="w-24 tabular"
-                  value={s.advancePercent}
-                  onChange={(e) => set("advancePercent", e.target.value.replace(/[^0-9.]/g, ""))}
-                  placeholder="default"
-                />
-                <span className="text-sm text-text-2">%</span>
-              </div>
-            </Field>
-            <Field label="Payment terms (note)" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms} className="md:col-span-2">
-              <Input
-                id="paymentTerms"
-                value={s.paymentTerms}
-                onChange={(e) => set("paymentTerms", e.target.value)}
-                maxLength={2000}
-                placeholder="e.g. 30% deposit, 70% before delivery"
-              />
-            </Field>
-            <Field label="Warranty" htmlFor="fq-warranty" optional error={st.errors?.warranty} className="md:col-span-2">
-              <Input id="fq-warranty" value={s.warranty} onChange={(e) => set("warranty", e.target.value)} maxLength={300} placeholder="e.g. 12 months from commissioning" />
-            </Field>
-              </>
-            )}
-          </div>
-
-          {!compact && (
-          <Field label="Notes" htmlFor="fq-notes" optional error={st.errors?.notes}>
-            <Textarea
-              id="fq-notes"
-              rows={2}
-              className="min-h-0"
-              value={s.notes}
-              onChange={(e) => set("notes", e.target.value)}
-              placeholder="Packing, samples, anything to remember about this offer"
-            />
-          </Field>
-          )}
-          {extra}
-          <div className="flex flex-wrap gap-2">
-            <SubmitButton pendingText="Saving…">{submitLabel ?? (quote ? "Save the details" : "Start this offer")}</SubmitButton>
-            {onCancel && (
-              <Button variant="ghost" onClick={onCancel}>
-                Cancel
-              </Button>
-            )}
-          </div>
-        </>
-      )}
-    </ActionForm>
-  );
 }

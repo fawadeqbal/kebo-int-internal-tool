@@ -1,17 +1,17 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Download, Eye, FileText, Info, ListPlus, Plus, Trash2 } from "lucide-react";
-import { formatMinor, fxRate, toMinor } from "@kebo/money";
-import { ATTACHMENT_KIND_LABEL, basisText, INCOTERMS, offerTaxText, type AttachmentKind, type Incoterm } from "@kebo/shared";
-import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { formatMinor, toMinor } from "@kebo/money";
+import { ATTACHMENT_KIND_LABEL, basisText, INCOTERMS, offerTaxText, type AttachmentKind } from "@kebo/shared";
+import { Badge, Button, cn, Field, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { CurrencySelect } from "@/components/common/currency-select";
 import { type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
-import { PanelActions, PanelBody, SidePanel, useClosePanel } from "@/components/common/panel";
+import { PanelBody, PanelFooter, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { ConfirmDialog } from "@/components/common/dialog";
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, money as amount } from "@/lib/format";
 import { rateSentence } from "@/lib/fx";
@@ -20,7 +20,7 @@ import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/action
 import { FileDrop, send, type Staged } from "./documents-panel";
 import { FileRow, FileZone } from "@/components/common/file-zone";
 import { fileSize } from "@/lib/format";
-import { BASIS_HINT, FactoryPicker, OfferHeaderForm, PortPicker, type QuoteState } from "./factory-quote-form";
+import { OfferHeaderForm } from "./factory-quote-form";
 import { LinesExcel, LinesView } from "./lines-view";
 import { BatchLines } from "@/components/edits/batch-lines";
 import { editedMark } from "@/components/edits/edits";
@@ -178,10 +178,12 @@ export function OfferDetails({
       fields={fields}
       action={fieldsAction}
       canEdit={canEdit}
-      panelTitle={`Edit ${q.factory.name}'s offer`}
-      panelDescription="Who, their reference, currency, dates, price basis, lead time and terms. The lines are changed in the lines card."
+      panelTitle={`Edit ${q.factory.name}’s offer`}
+      panelDescription="The factory and its terms. Internal, never shown to the customer. Its lines are changed with Edit lines."
+      panelClassName="md:w-[860px]"
       panelBody={
-        <OfferForm
+        <OfferWindow
+          dealId={dealId}
           q={q}
           today={today}
           mainCurrency={mainCurrency}
@@ -189,6 +191,7 @@ export function OfferDetails({
           searchFactories={searchFactories}
           saveAction={saveAction}
           removeAction={removeAction}
+          removeFile={removeFile}
         />
       }
       footer={
@@ -201,8 +204,14 @@ export function OfferDetails({
   );
 }
 
-/** The Edit panel: today's offer form, and Remove. */
-function OfferForm({
+/**
+ * The offer's window, the same for "Enter factory offer" (no offer yet) and "Edit the offer": the four
+ * sections of OfferHeaderForm, the factory's own files, and the buttons. A new offer saved shows on the
+ * page, opened ("Save offer"), or empties the window ("Save & enter another"); an edit closes. Removing
+ * the offer, or one of its files, asks first and says what happens.
+ */
+function OfferWindow({
+  dealId,
   q,
   today,
   mainCurrency,
@@ -210,23 +219,129 @@ function OfferForm({
   searchFactories,
   saveAction,
   removeAction,
+  removeFile,
+  taxDefault,
+  onAnother,
 }: {
-  q: FactoryQuoteView;
+  dealId: string;
+  /** The offer being edited; null: a new one. */
+  q: FactoryQuoteView | null;
+  /** A new offer: how many items the customer listed (its lines can start from them). */
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
   searchFactories: (q: string) => Promise<FactoryOption[]>;
   saveAction: Action;
-  removeAction: Action;
+  removeAction?: Action;
+  removeFile?: OfferLineActions["removeFile"];
+  taxDefault?: { included: boolean; rate: number };
+  /** "Save & enter another": the window starts again, empty. */
+  onAnother?: () => void;
 }) {
+  const router = useRouter();
   const close = useClosePanel();
-  const removeId = `remove-offer-${q.id}`;
+  const [files, setFiles] = useState<File[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [asking, setAsking] = useState<"offer" | OfferFile | null>(null);
+  const [why, setWhy] = useState("");
+  const [askError, setAskError] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  const another = useRef(false);
+  const used = q?.lines.some((l) => l.used) ?? false;
+
+  // Saved: its new files go up, then the window closes (a new offer opens its lines editor).
+  const done = async (st: ActionState) => {
+    const id = q?.id ?? (st.data as { id?: string } | undefined)?.id;
+    if (!id) return;
+    setError(null);
+    const problems: string[] = [];
+    for (const file of files) {
+      const staged: Staged = { key: file.name, file, kind: guessOfferKind(file.name, file.type), note: "", progress: 0, error: null };
+      const e = await send(dealId, staged, () => {}, { factoryQuoteId: id });
+      if (e) problems.push(`${file.name} did not upload: ${e}`);
+    }
+    router.refresh();
+    if (problems.length) {
+      setFiles([]);
+      setError(`The offer was saved, but: ${problems.join(" ")}`);
+      return;
+    }
+    if (!q && another.current) {
+      another.current = false;
+      onAnother?.();
+      return;
+    }
+    // Saved: close without asking "Discard changes?".
+    close(st);
+    // One button, one action: the offer opens on the page; its lines editor waits for "Add lines".
+    if (!q) router.push(`/inquiries/${dealId}/sourcing?offer=${id}`);
+  };
+
+  const confirm = () =>
+    start(async () => {
+      setAskError(null);
+      const form = new FormData();
+      if (why.trim()) form.set("reason", why.trim());
+      if (asking === "offer") {
+        const r = await removeAction!({}, form);
+        if (!r.ok) return setAskError(r.message ?? "The offer was not removed.");
+        setAsking(null);
+        close(r);
+        router.push(`/inquiries/${dealId}/sourcing`);
+        return;
+      }
+      if (asking) {
+        const r = await removeFile!(asking.id, {}, form);
+        if (!r.ok) return setAskError(r.message ?? "The file was not removed.");
+        setAsking(null);
+        router.refresh();
+      }
+    });
+
+  const fileRows = (
+    <div className="flex flex-col gap-2">
+      {(q?.files ?? []).map((f) => (
+        <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-[13px]">
+          <span className="min-w-0 truncate">
+            <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
+              {f.fileName}
+            </a>
+            <span className="text-text-2">
+              {" "}
+              · {ATTACHMENT_KIND_LABEL[f.kind]} · {dateText(f.uploadedOn)}
+            </span>
+          </span>
+          {removeFile && (
+            <button type="button" onClick={() => (setAskError(null), setAsking(f))} className="shrink-0 font-semibold text-bad hover:underline">
+              Remove
+            </button>
+          )}
+        </div>
+      ))}
+      <FileZone
+        label="The factory’s own quotation"
+        hint="Their PDF, Excel or screenshots · seen only by people who see factory prices"
+        onFiles={(list) => setFiles((x) => [...x, ...list])}
+      >
+        {files.length > 0 &&
+          files.map((file, n) => (
+            <FileRow
+              key={`${file.name}-${n}`}
+              name={file.name}
+              meta={`${ATTACHMENT_KIND_LABEL[guessOfferKind(file.name, file.type)]} · ${fileSize(file.size)} · goes up when you save`}
+              actions={
+                <Button size="icon-xs" variant="ghost" onClick={() => setFiles((x) => x.filter((_, k) => k !== n))} aria-label={`Remove ${file.name}`}>
+                  <Trash2 aria-hidden />
+                </Button>
+              }
+            />
+          ))}
+      </FileZone>
+    </div>
+  );
+
   return (
     <PanelBody>
-      {/* Remove this offer (its button sits in the footer): only its error shows here. */}
-      <ActionForm id={removeId} action={removeAction} showSuccess={false} onDone={close}>
-        {null}
-      </ActionForm>
       <OfferHeaderForm
         action={saveAction}
         quote={q}
@@ -234,23 +349,88 @@ function OfferForm({
         mainCurrency={mainCurrency}
         rates={rates}
         searchFactories={searchFactories}
-        onDone={close}
-        onCancel={close}
-        panel={{
-          // Its own form (below): a form inside a form is not allowed, so the button points at it.
-          end: (
-            <ConfirmSubmit
-              form={removeId}
-              size="sm"
-              variant="danger-ghost"
-              pendingText="Removing…"
-              message={`Remove the offer from ${q.factory.name} with its ${q.lines.length} lines?`}
+        onDone={(st) => void done(st)}
+        defaults={taxDefault ? { taxIncluded: taxDefault.included, taxRate: taxDefault.rate } : undefined}
+        files={fileRows}
+        note={
+          <>
+            {!q && (
+              <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
+                <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
+                <span>
+                  Their lines and prices come next: after saving, press <strong>Add lines</strong> on the offer.
+                </span>
+              </p>
+            )}
+            {error && <p className="text-sm text-bad">{error}</p>}
+          </>
+        }
+        footer={
+          q ? (
+            <PanelFooter
+              start={
+                removeAction ? (
+                  <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline">
+                    <Trash2 className="size-4" aria-hidden /> Remove this offer
+                  </button>
+                ) : undefined
+              }
             >
-              <Trash2 aria-hidden /> Remove this offer
-            </ConfirmSubmit>
-          ),
-        }}
+              <Button type="button" variant="ghost" onClick={() => close()}>
+                Cancel
+              </Button>
+              <SubmitButton pendingText="Saving…">
+                <Check aria-hidden /> Save the details
+              </SubmitButton>
+            </PanelFooter>
+          ) : (
+            <PanelFooter>
+              <Button type="button" variant="ghost" onClick={() => close()}>
+                Cancel
+              </Button>
+              <SubmitButton variant="secondary" pendingText="Saving…" onClick={() => (another.current = true)}>
+                <Plus aria-hidden /> Save &amp; enter another
+              </SubmitButton>
+              <SubmitButton pendingText="Saving…" onClick={() => (another.current = false)}>
+                <Check aria-hidden /> Save offer
+              </SubmitButton>
+            </PanelFooter>
+          )
+        }
       />
+      {asking && q && (
+        <ConfirmDialog
+          title={asking === "offer" ? `Remove ${q.factory.name}’s offer?` : `Remove ${asking.fileName}?`}
+          confirmLabel={asking === "offer" ? "Remove the offer" : "Remove the file"}
+          cancelLabel={asking === "offer" ? "Keep the offer" : "Keep it"}
+          danger
+          busy={busy}
+          onCancel={() => setAsking(null)}
+          onConfirm={() => (asking === "offer" && used && !why.trim() ? setAskError("Say why: a quotation is priced from this offer.") : confirm())}
+        >
+          <div className="flex flex-col gap-3">
+            {asking === "offer" ? (
+              <WhatHappens
+                lines={[
+                  q.lines.length
+                    ? `The offer, its ${q.lines.length === 1 ? "line" : `${q.lines.length} lines`} and its files are removed from this inquiry.`
+                    : "The offer and its files are removed from this inquiry.",
+                  "If the factory was asked, its line goes back to “Waiting”; if not, it leaves the list.",
+                  used ? "The quotation made from it keeps its own copy of the lines and prices." : null,
+                ]}
+              />
+            ) : (
+              <WhatHappens lines={["The file leaves this offer. Nothing else changes."]} />
+            )}
+            {asking === "offer" && used && (
+              <Field label="Why" htmlFor="remove-offer-why" hint="Kept in History: a quotation is priced from this offer">
+                <Textarea id="remove-offer-why" rows={2} value={why} onChange={(e) => setWhy(e.target.value)} maxLength={500} />
+              </Field>
+            )}
+            {askError && <p className="text-sm text-bad">{askError}</p>}
+          </div>
+        </ConfirmDialog>
+      )}
     </PanelBody>
   );
 }
@@ -550,9 +730,10 @@ export function OfferLines({
           ? q.taxIncluded
             ? `Tax included · ${q.taxRate}%: the tax inside the price is shown, not added again`
             : `Without tax · ${q.taxRate}%: ${q.taxRate > 0 ? "the tax is added on top for our cost" : "our cost is the factory's price"}`
-          : "No lines yet: Edit lines to type, paste or upload them, or start from the customer's list."
+          : "No lines yet: Add lines to type, paste or upload them, or start from the customer’s list."
       }
       canEdit={canEdit}
+      editLabel={q.lines.length ? "Edit lines" : "Add lines"}
       actions={<LinesExcel name={sheet.name} rows={rows} columns={columns} numbers={q.lines.map((l) => l.no)} />}
       view={
         q.lines.length ? (
@@ -758,12 +939,11 @@ function OfferLinesEditor({
 
 /**
  * "Enter an offer": a short window for the offer itself (the factory, its reference, dates, currency, price
- * basis, tax, lead time and terms, notes, their files). Its lines are not entered here: saving opens the
- * offer with its lines editor, the same one "Edit lines" opens.
+ * basis, tax, lead time and terms, notes, their files). Its lines are not entered here: saving shows the
+ * offer on the page, and "Add lines" there opens its lines editor.
  */
 export function AddOfferButton({
   dealId,
-  items,
   today,
   mainCurrency,
   rates,
@@ -779,7 +959,6 @@ export function AddOfferButton({
   /** The inquiry's number, in the window's line under the title. */
   refNo?: string;
   dealId: string;
-  items: Items;
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
@@ -794,6 +973,8 @@ export function AddOfferButton({
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  // "Save & enter another": the window starts again, empty.
+  const [round, setRound] = useState(0);
   return (
     <>
       <Button size={size} variant={variant} onClick={() => setOpen(true)}>
@@ -801,242 +982,26 @@ export function AddOfferButton({
       </Button>
       {open && (
         <SidePanel
+          key={round}
           title="Enter factory offer"
-          description={`${refNo ? `${refNo} · ` : ""}the factory and its terms. Their lines and prices come next, when this is saved.`}
+          description={`${refNo ? `${refNo} · ` : ""}The factory and its terms. Internal, never shown to the customer.`}
           className="md:w-[860px]"
           onClose={() => setOpen(false)}
         >
-          <AddOfferForm
+          <OfferWindow
             dealId={dealId}
-            items={items}
+            q={null}
             today={today}
             mainCurrency={mainCurrency}
             rates={rates}
             searchFactories={searchFactories}
-            createAction={createAction}
+            saveAction={createAction}
             taxDefault={taxDefault}
+            onAnother={() => setRound((n) => n + 1)}
           />
         </SidePanel>
       )}
     </>
-  );
-}
-
-/**
- * The offer's details in three columns, notes and the factory's own quotation files. Saving makes the offer
- * and opens it with its lines editor ("Start this offer": from the customer's list, or copy another factory's).
- */
-function AddOfferForm({
-  dealId,
-  items,
-  today,
-  mainCurrency,
-  rates,
-  searchFactories,
-  createAction,
-  taxDefault,
-}: {
-  dealId: string;
-  items: Items;
-  today: string;
-  mainCurrency: string;
-  rates: Record<string, number>;
-  searchFactories: (q: string) => Promise<FactoryOption[]>;
-  createAction: Action;
-  taxDefault: { included: boolean; rate: number };
-}) {
-  const router = useRouter();
-  const close = useClosePanel();
-  const blank = {
-    reference: "",
-    receivedOn: today,
-    validUntil: "",
-    basisPlace: "",
-    leadTime: "",
-    moq: "",
-    paymentTerms: "",
-    advancePercent: "",
-    warranty: "",
-    notes: "",
-  };
-  const [round, setRound] = useState(0);
-  const [factory, setFactory] = useState<QuoteState["factory"]>(null);
-  const [basis, setBasis] = useState<Incoterm | "">("");
-  const [currency, setCurrency] = useState("CNY");
-  const [taxIncluded, setTaxIncluded] = useState(taxDefault.included);
-  const [taxRate, setTaxRate] = useState(String(taxDefault.rate));
-  const [f, setF] = useState(blank);
-  const [files, setFiles] = useState<File[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const another = useRef(false);
-  const set = (k: keyof typeof blank, v: string) => setF((x) => ({ ...x, [k]: v }));
-  const rate = fxRate(currency, mainCurrency, mainCurrency, rates);
-  const fx = { main: mainCurrency, rates };
-  const payload = {
-    factoryId: factory?.id ?? null,
-    newFactoryName: factory && !factory.id ? factory.name : null,
-    reference: f.reference,
-    receivedOn: f.receivedOn || today,
-    validUntil: f.validUntil || null,
-    currency,
-    basis: basis || null,
-    basisPlace: f.basisPlace,
-    leadTime: f.leadTime,
-    moq: f.moq,
-    paymentTerms: f.paymentTerms,
-    ...(f.advancePercent.trim() ? { advancePercent: f.advancePercent.trim() } : {}),
-    warranty: f.warranty,
-    notes: f.notes,
-    taxIncluded,
-    taxRate: taxRate.trim() || "0",
-  };
-
-  return (
-    <ActionForm
-      key={round}
-      action={createAction}
-      keepFields
-      showSuccess={false}
-      className="flex min-h-0 flex-1 flex-col"
-      onDone={async (st) => {
-        const id = (st.data as { id?: string } | undefined)?.id;
-        if (!id) return;
-        setError(null);
-        const problems: string[] = [];
-        for (const file of files) {
-          const staged: Staged = { key: file.name, file, kind: guessOfferKind(file.name, file.type), note: "", progress: 0, error: null };
-          const e = await send(dealId, staged, () => {}, { factoryQuoteId: id });
-          if (e) problems.push(`${file.name} did not upload: ${e}`);
-        }
-        router.refresh();
-        if (another.current && !problems.length) {
-          another.current = false;
-          setFactory(null);
-          setF(blank);
-          setFiles([]);
-          setRound((n) => n + 1);
-          return;
-        }
-        if (problems.length) {
-          setError(`The offer was saved, but: ${problems.join(" ")}`);
-          return;
-        }
-        // Saved: close without asking "Discard changes?".
-        close(st);
-        // The offer, opened, with its lines editor ready for their lines and prices.
-        router.push(`/inquiries/${dealId}/sourcing?offer=${id}#edit-lines`);
-      }}
-    >
-      {(s) => (
-        <>
-          <input type="hidden" name="payload" value={JSON.stringify(payload)} />
-          <PanelBody className="flex flex-col gap-5">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Field label="Factory" htmlFor="factory" required error={s.errors?.factoryId ?? s.errors?.newFactoryName} className="md:col-span-2">
-                <FactoryPicker value={factory} search={searchFactories} error={s.errors?.factoryId} onChange={(x) => setFactory(x)} />
-              </Field>
-              <Field label="Their reference" htmlFor="add-ref" error={s.errors?.reference}>
-                <Input id="add-ref" value={f.reference} onChange={(e) => set("reference", e.target.value)} maxLength={80} placeholder="Their quote no." />
-              </Field>
-              <Field label="Received on" htmlFor="add-received" required error={s.errors?.receivedOn}>
-                <Input id="add-received" type="date" max={today} value={f.receivedOn} onChange={(e) => set("receivedOn", e.target.value)} />
-              </Field>
-              <Field label="Valid until" htmlFor="add-valid" error={s.errors?.validUntil}>
-                <Input id="add-valid" type="date" value={f.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
-              </Field>
-              <Field
-                label="Currency"
-                htmlFor="add-currency"
-                error={s.errors?.currency}
-                hint={rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined)}
-              >
-                <CurrencySelect id="add-currency" value={currency} short onChange={(e) => setCurrency(e.target.value)} />
-              </Field>
-              <Field label="Basis" htmlFor="add-basis" error={s.errors?.basis} hint={basis ? BASIS_HINT[basis] : undefined}>
-                <Select id="add-basis" value={basis} onChange={(e) => setBasis(e.target.value as Incoterm | "")}>
-                  <option value="">Not said</option>
-                  {INCOTERMS.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Place" htmlFor="add-port" error={s.errors?.basisPlace}>
-                <PortPicker id="add-port" value={f.basisPlace} onChange={(v) => set("basisPlace", v)} exw={basis === "EXW"} />
-              </Field>
-              <Field label="Lead time" htmlFor="add-lead" error={s.errors?.leadTime}>
-                <Input id="add-lead" value={f.leadTime} onChange={(e) => set("leadTime", e.target.value)} maxLength={120} placeholder="e.g. 40 days" />
-              </Field>
-              <label className="flex items-center gap-2.5 self-end py-2.5 text-sm">
-                <input type="checkbox" checked={taxIncluded} onChange={(e) => setTaxIncluded(e.target.checked)} className="size-[18px] accent-primary" />
-                Prices include tax
-              </label>
-              <Field label="Tax rate %" htmlFor="add-tax" error={s.errors?.taxRate ?? s.errors?.taxIncluded}>
-                <Input id="add-tax" inputMode="decimal" className="tabular" value={taxRate} onChange={(e) => setTaxRate(e.target.value.replace(/[^0-9.]/g, ""))} />
-              </Field>
-              <Field label="MOQ" htmlFor="add-moq" error={s.errors?.moq}>
-                <Input id="add-moq" value={f.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} placeholder="e.g. 1 set" />
-              </Field>
-              <Field label="Payment terms" htmlFor="add-pay" error={s.errors?.paymentTerms} className="md:col-span-2">
-                <Input id="add-pay" value={f.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} placeholder="e.g. 30% advance, 70% before shipping" />
-              </Field>
-              <Field label="Advance %" htmlFor="add-adv" error={s.errors?.advancePercent}>
-                <Input id="add-adv" inputMode="decimal" className="tabular" value={f.advancePercent} onChange={(e) => set("advancePercent", e.target.value.replace(/[^0-9.]/g, ""))} placeholder="default" />
-              </Field>
-              <Field label="Warranty" htmlFor="add-warranty" error={s.errors?.warranty} className="md:col-span-3">
-                <Input id="add-warranty" value={f.warranty} onChange={(e) => set("warranty", e.target.value)} maxLength={300} placeholder="e.g. 12 months from commissioning" />
-              </Field>
-            </div>
-
-            <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
-              <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
-              <span>
-                Their lines and prices come next: saving opens this offer&rsquo;s lines
-                {items.length ? `, starting from the customer’s ${items.length === 1 ? "item" : `${items.length} items`}` : ""}.
-              </span>
-            </p>
-
-            <div className="grid items-start gap-4 md:grid-cols-2">
-              <Field label="Notes" htmlFor="add-notes" error={s.errors?.notes}>
-                <Textarea id="add-notes" rows={3} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Packing, samples, anything to remember about this offer" />
-              </Field>
-              <FileZone
-                label="The factory’s own quotation"
-                hint="Their PDF, Excel, or WeChat screenshots · kept with this offer, seen only by people who see factory prices"
-                onFiles={(list) => setFiles((x) => [...x, ...list])}
-              >
-                {files.length > 0 &&
-                  files.map((file, n) => (
-                    <FileRow
-                      key={`${file.name}-${n}`}
-                      name={file.name}
-                      meta={`${ATTACHMENT_KIND_LABEL[guessOfferKind(file.name, file.type)]} · ${fileSize(file.size)}`}
-                      actions={
-                        <Button size="icon-xs" variant="ghost" onClick={() => setFiles((x) => x.filter((_, k) => k !== n))} aria-label={`Remove ${file.name}`}>
-                          <Trash2 aria-hidden />
-                        </Button>
-                      }
-                    />
-                  ))}
-              </FileZone>
-            </div>
-            {error && <p className="text-sm text-bad">{error}</p>}
-          </PanelBody>
-          <PanelActions className="static mx-0 mb-0 justify-end">
-            <Button type="button" variant="ghost" onClick={close}>
-              Cancel
-            </Button>
-            <SubmitButton variant="secondary" pendingText="Saving…" onClick={() => (another.current = true)}>
-              <Plus aria-hidden /> Save &amp; enter another
-            </SubmitButton>
-            <SubmitButton pendingText="Saving…" onClick={() => (another.current = false)}>
-              <Check aria-hidden /> Save and add lines
-            </SubmitButton>
-          </PanelActions>
-        </>
-      )}
-    </ActionForm>
   );
 }
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, Download, Eye, Pencil, Printer, Send } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, Download, Eye, Send } from "lucide-react";
 import { BALANCE_TERMS_LABEL, BASIS_STEP_LABEL, can, routeFromTerms, SENT_VIA_TEXT, type BasisStep } from "@kebo/shared";
 import { Alert, Badge, buttonClass, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
@@ -14,11 +14,11 @@ import { dealOf, quotationOf } from "@/lib/deal-data";
 import type { QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
 import { DetailsCard, type DetailField } from "@/components/orders/step-view";
 import { StartRevision } from "@/components/deals/quotation-panels";
-import { MarkSentButton, OptionsCard, QuotationNext, TermsPanel } from "@/components/deals/quotation-step";
+import { OptionsCard, QuotationNext, TermsPanel } from "@/components/deals/quotation-step";
 import { WithSide } from "../side";
 import { PriceEditor } from "@/components/deals/price-editor";
-import { createRevisionAction, emailRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
-import { SendQuoteCard } from "@/components/deals/send-quote";
+import { createRevisionAction, deleteRevisionAction, emailRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
+import { DeleteDraftButton, SendWindow } from "@/components/deals/send-quote";
 
 export const metadata = { title: "Quotation" };
 
@@ -74,7 +74,7 @@ export default async function QuotationPage({
       {offers!.offers.length > 1 ? " Add more offers as Options B, C… for the customer to choose from." : ""}
     </>
   ) : undefined;
-  const start = (props: { open?: boolean; label?: string; empty?: boolean }) =>
+  const start = (props: { open?: boolean; label?: string; empty?: boolean; variant?: "primary" | "secondary" }) =>
     quoter ? (
       <StartRevision
         key={props.open ? "open" : "closed"}
@@ -88,88 +88,59 @@ export default async function QuotationPage({
         first={revs.length === 0}
         defaultOpen={props.open}
         label={props.label}
+        variant={props.variant}
         note={revs.length === 0 ? startNote : undefined}
         empty={
           props.empty
             ? { title: "No quotation yet", description: "Each option you offer is one factory's offer from Factory offers, with your prices. The customer accepts one option." }
             : undefined
         }
-        openHref={props.empty ? "?start=1" : undefined}
       />
     ) : null;
-  // Send (board QuoteSend): the quotation as printed, beside the email to the customer.
-  const sending = sp.send && manage ? revs.find((r) => r.id === sp.send && (r.status === "draft" || r.status === "sent")) : undefined;
-  if (sending) {
-    const who = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
-    const copy = d.customer.contacts.filter((c) => c.email && c.id !== who?.id).map((c) => c.email);
-    const quoteRef = `${d.quotation?.refNo ?? d.refNo} R${sending.number}`;
+  // "Send R1…": one window with two choices (email it from here, or I sent it myself). A sent one can only be emailed again.
+  const who = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
+  const copy = d.customer.contacts.filter((c) => c.email && c.id !== who?.id).map((c) => c.email);
+  const sendWindow = (r: RevisionView) => {
+    const quoteRef = `${d.quotation?.refNo ?? d.refNo} R${r.number}`;
     return (
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <ButtonLink href={`${base}/quotation`}>
-            <Pencil aria-hidden /> Back to edit
-          </ButtonLink>
-          <ButtonLink href={printHref(sending)} target="_blank">
-            <Printer aria-hidden /> Print
-          </ButtonLink>
-        </div>
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="min-w-0 flex-[999_1_640px] overflow-hidden rounded-2xl border border-line bg-surface">
-            <iframe title={`${quoteRef} as printed`} src={`${printHref(sending)}?embed=1`} className="h-[1100px] w-full border-0" />
-          </div>
-          <aside className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
-            <SendQuoteCard
-              number={sending.number}
-              action={emailRevisionAction.bind(null, d.id, sending.id, `${quoteRef}.pdf`)}
-              to={who?.email ?? ""}
-              cc={copy.slice(0, 2).join(", ")}
-              subject={`Quotation ${quoteRef} — ${d.title}`}
-              message={`Dear ${who?.name.split(" ")[0] ?? "Sir or Madam"}, please find our ${sending.number > 1 ? "revised " : ""}quotation for ${d.title}.`}
-              pdfHref={pdfHref(sending)}
-              backHref={`${base}/quotation`}
-              markSent={
-                sending.status === "draft" ? (
-                  <MarkSentButton number={sending.number} action={move(sending)} today={today} variant="ghost" label="Sent another way — mark as sent" icon={<Check aria-hidden />} doneHref={`${base}/quotation`} />
-                ) : null
-              }
-            />
-          </aside>
-        </div>
-      </div>
+      <SendWindow
+        number={r.number}
+        customer={d.customer.name}
+        emailAction={emailRevisionAction.bind(null, d.id, r.id, `${quoteRef}.pdf`)}
+        markAction={r.status === "draft" ? move(r) : null}
+        to={who?.email ?? ""}
+        cc={copy.slice(0, 2).join(", ")}
+        subject={`Quotation ${quoteRef} — ${d.title}`}
+        message={`Dear ${who?.name.split(" ")[0] ?? "Sir or Madam"}, please find our ${r.number > 1 ? "revised " : ""}quotation for ${d.title}.`}
+        fileName={`${quoteRef}.pdf`}
+        printHref={printHref(r)}
+        pdfHref={pdfHref(r)}
+        today={today}
+      />
     );
-  }
+  };
   // The customer said no (or let it lapse) and nothing new is being drafted: the next step is a new revision.
   const closedLive = !draft && live && (live.status === "rejected" || live.status === "expired") ? live : null;
 
   const editTerms = !!(draft && manage && draftValues && offers);
 
-  // "Edit prices": the page itself becomes the price editor, full width (no side column, nothing else on it).
-  if (sp.edit === "prices" && editTerms)
-    return (
-      <PriceEditor
-        key={draft!.id}
-        action={updateRevisionAction.bind(null, d.id, draft!.id)}
-        number={draft!.number}
-        initial={draftValues!}
-        offers={offers!}
-        showCosts={showCosts}
-        initialOption={Number(sp.option) || 0}
-        startAdding={sp.add === "1"}
-        backHref={`${base}/quotation`}
-      />
-    );
+  // "Edit lines": the lines editor in its window, the same frame as an offer's lines editor.
+  const linesEditor = editTerms ? (
+    <PriceEditor key={draft!.id} action={updateRevisionAction.bind(null, d.id, draft!.id)} initial={draftValues!} offers={offers!} showCosts={showCosts} />
+  ) : null;
   // The terms of a revision as a card: the draft's with Edit (the form in the panel), a sent one's read only.
   const termsOf = (r: RevisionView) => {
     const editable = editTerms && r.id === draft!.id;
     return (
       <DetailsCard
-        title={`R${r.number} · terms`}
-        description={r.status === "draft" ? "Draft: only you see it, and it can still change." : undefined}
+        title={`R${r.number} · the quotation`}
+        description={r.status === "draft" ? "A draft: seen only inside the company, and it can still change." : undefined}
         fields={termsFields(r)}
         action={editable ? revisionFieldsAction.bind(null, d.id, r.id) : undefined}
         canEdit={editable}
-        panelTitle={`R${r.number} · terms`}
-        panelDescription="Printed on the quotation. Changing the currency converts the prices."
+        panelTitle={`Edit quotation R${r.number}`}
+        panelDescription={`${quoRef} · ${d.customer.name} · a draft: it can change until it is sent`}
+        panelClassName="md:w-[860px]"
         panelBody={
           editable ? (
             <TermsPanel number={r.number} initial={draftValues!} offers={offers!} loadOffers={loadOffers} showCosts={showCosts} action={updateRevisionAction.bind(null, d.id, r.id)} />
@@ -209,7 +180,7 @@ export default async function QuotationPage({
               number: draft.number,
               meta: `${draft.options.length === 1 ? "1 option" : `${draft.options.length} options`}, ${totalOf(draft)} · valid until ${date(draft.validUntil)}`,
               previewHref: printHref(draft),
-              sendHref: manage ? `${base}/quotation?send=${draft.id}` : null,
+              send: manage ? sendWindow(draft) : null,
             }
           : null
       }
@@ -228,7 +199,13 @@ export default async function QuotationPage({
       today={today}
       answerAction={live?.canAnswer && manage ? move(live) : null}
       lostAction={live?.canAnswer && manage && d.canWork ? lostAction.bind(null, d.id, live.id) : null}
-      startNext={!draft && manage && q.canStartRevision ? start({ open: true, label: `Start R${(live?.number ?? 0) + 1} from R${live?.number ?? 1}` }) : null}
+      startNext={
+        !draft && manage && q.canStartRevision
+          ? closedLive
+            ? start({ label: `Start R${closedLive.number + 1} from R${closedLive.number}`, variant: "primary" })
+            : start({ label: `Revise (R${(live?.number ?? 0) + 1})`, variant: "secondary" })
+          : null
+      }
       followUp={
         waiting && quoter ? (
           <PanelButton
@@ -373,7 +350,7 @@ export default async function QuotationPage({
                     <OptionsCard
                       key={r.id}
                       r={r}
-                      edit={isDraft && editTerms ? { showCosts, canAdd: offers!.offers.length + 1 > r.options.length, pricesHref: `${base}/quotation?edit=prices` } : null}
+                      edit={isDraft && linesEditor ? { lines: linesEditor } : null}
                     />
                     <div className="flex flex-wrap gap-2">
                       <ButtonLink href={printHref(r)} target="_blank" size="sm">
@@ -383,9 +360,21 @@ export default async function QuotationPage({
                         <Download aria-hidden /> Download PDF
                       </a>
                       {r.status === "sent" && manage && (
-                        <ButtonLink href={`${base}/quotation?send=${r.id}`} size="sm" variant="ghost">
-                          <Send aria-hidden /> Send again
-                        </ButtonLink>
+                        <PanelButton
+                          variant="ghost"
+                          size="sm"
+                          icon={<Send aria-hidden />}
+                          label="Send again"
+                          title={`Send R${r.number} again`}
+                          description={`${quoRef} · the same PDF, by email`}
+                          panelClassName="md:w-[620px]"
+                          body={sendWindow(r)}
+                        />
+                      )}
+                      {isDraft && manage && (
+                        <span className="ml-auto">
+                          <DeleteDraftButton number={r.number} action={deleteRevisionAction.bind(null, d.id, r.id)} backHref={`${base}/quotation`} />
+                        </span>
                       )}
                     </div>
                   </div>
@@ -443,7 +432,7 @@ function draftChecks(r: RevisionView): string[] {
     const unpriced = o.lines.filter((l) => !(Number(l.unitPrice) > 0)).length;
     if (unpriced) out.push(`${who}: ${unpriced} line${unpriced === 1 ? "" : "s"} without a price.`);
     if (o.factory && o.coverage.missing.length)
-      out.push(`${who} does not include ${o.coverage.missing.join(", ")}; the customer will see ${o.coverage.missing.length === 1 ? "it" : "them"} missing.`);
+      out.push(`${who} does not include item${o.coverage.missing.length === 1 ? "" : "s"} ${o.coverage.missing.join(", ")}; the customer will see ${o.coverage.missing.length === 1 ? "it" : "them"} missing.`);
     // People who see costs: the costs to reach our basis (freight…) are part of the price, so a missing one makes the margin look better than it is.
     if (o.costing && o.factory) {
       if (o.factoryBasis === null) out.push(`${who}: the factory's price basis is not said, so the costs to reach ${r.incoterm} are not in its cost.`);

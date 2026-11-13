@@ -1,17 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useRef, useState, type ReactNode } from "react";
-import { CheckCircle2, Clock, FilePlus2, Pencil, Send, Trash2, XCircle } from "lucide-react";
-import { Button, ButtonLink, Card, cn, EmptyState, Field, Input } from "@kebo/ui";
-import { money } from "@/lib/format";
-import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
-import { FileActions } from "@/components/common/file-actions";
-import { ActionForm } from "@/components/common/action-form";
+import { useState, type ReactNode } from "react";
+import { FilePlus2 } from "lucide-react";
+import { Button, ButtonLink, Card, cn, EmptyState } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
-import type { OptionView, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
-import { RevisionEditor } from "./revision-editor";
+import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
+import { SidePanel } from "@/components/common/panel";
+import { TermsPanel } from "./quotation-step";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -34,7 +30,10 @@ export function StartRevision({
   note,
   empty,
   openHref,
+  variant: variantAs,
 }: {
+  /** The button's look, when not the usual (primary for R1, secondary after). */
+  variant?: "primary" | "secondary";
   action: Action;
   draft: RevisionDraft | null;
   offers: QuoteOffers | null;
@@ -58,11 +57,6 @@ export function StartRevision({
   const pathname = usePathname();
   const [open, setOpen] = useState(defaultOpen && allowed);
   const label = labelAs ?? (first ? "Make the quotation (R1)" : `Start a new revision${draft ? ` (R${draft.number})` : ""}`);
-  const startNote =
-    note ??
-    (first
-      ? "Starts with the factory offer that covers the most at the lowest cost, priced at the default margin. Add more offers as Options B, C… for the customer to choose from."
-      : "Starts as a copy of the latest revision. Change what is different, then save the draft.");
   // Nothing made yet: an empty state with the one way to start (design system); the page header has the primary.
   const frame = (body: ReactNode, description?: ReactNode) =>
     empty ? (
@@ -85,7 +79,7 @@ export function StartRevision({
   if (!open || !draft || !offers) {
     const can = allowed && !!draft && !!offers;
     // In an empty card the header already has the primary: this is its secondary twin.
-    const variant = first && !empty ? "primary" : "secondary";
+    const variant = variantAs ?? (first && !empty ? "primary" : "secondary");
     return frame(
       <div className={cn("flex flex-col gap-1.5", empty ? "items-center" : "items-start")}>
         {openHref && can ? (
@@ -112,208 +106,18 @@ export function StartRevision({
   }
   const close = () => {
     setOpen(false);
-    if (openHref) router.replace(pathname, { scroll: false });
+    // Opened by the address (?start=1): take it out, so a reload does not open the window again.
+    if (openHref || defaultOpen) router.replace(pathname, { scroll: false });
   };
+  // The window: which offers to quote and the terms. The same window, filled, is "Edit quotation".
   return (
-    <RevisionEditor
-      action={action}
-      number={draft.number}
-      initial={draft}
-      offers={offers}
-      loadOffers={loadOffers}
-      showCosts={showCosts}
-      title={`New revision R${draft.number}`}
-      note={startNote}
-      submitLabel={`Save R${draft.number} as a draft`}
-      submitShort="Save draft"
-      onDone={close}
-      onCancel={close}
-    />
-  );
-}
-
-/**
- * The open draft. It opens read only, as the customer will see it, with what
- * can be done next: Edit, Preview, Download, Mark as sent, Delete. Edit opens
- * the editor; saving or cancelling comes back to the read-only view.
- */
-export function DraftPanel({
-  number,
-  initial,
-  offers,
-  loadOffers,
-  showCosts,
-  summary,
-  saveAction,
-  deleteAction,
-  moveAction,
-  printHref,
-  pdfHref,
-  today,
-}: {
-  number: number;
-  initial: RevisionDraft;
-  offers: QuoteOffers;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
-  showCosts: boolean;
-  /** The draft read only (the same view as a sent revision). */
-  summary: ReactNode;
-  saveAction: Action;
-  deleteAction: Action;
-  moveAction: Action;
-  printHref: string;
-  pdfHref: string;
-  today: string;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [sending, setSending] = useState(false);
-  const top = useRef<HTMLDivElement>(null);
-  const back = () => {
-    setEditing(false);
-    // The read-only view starts where the editor did.
-    requestAnimationFrame(() => top.current?.scrollIntoView({ block: "nearest" }));
-  };
-
-  if (editing)
-    return (
-      <div ref={top} className="flex flex-col gap-3">
-        <p className="flex items-center gap-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-sm">
-          <Pencil className="size-4 shrink-0 text-primary" aria-hidden />
-          Editing R{number}. Save the draft to keep the changes, or cancel to leave it as it was.
-        </p>
-        <RevisionEditor
-          action={saveAction}
-          number={number}
-          initial={initial}
-          offers={offers}
-          loadOffers={loadOffers}
-          showCosts={showCosts}
-          submitLabel="Save draft"
-          requireChanges
-          onDone={back}
-          onCancel={back}
-        />
-      </div>
-    );
-
-  return (
-    <div ref={top} className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="secondary" onClick={() => setEditing(true)}>
-          <Pencil aria-hidden /> Edit
-        </Button>
-        <Button variant="secondary" className="aria-expanded:bg-surface-2" onClick={() => setSending((v) => !v)} aria-expanded={sending}>
-          <Send aria-hidden /> Mark as sent…
-        </Button>
-        <FileActions className="ml-auto" viewHref={printHref} pdfHref={pdfHref} />
-        <ActionForm action={deleteAction} showSuccess={false}>
-          <ConfirmSubmit variant="danger-ghost" pendingText="Deleting…" message={`Delete the R${number} draft? This cannot be undone.`}>
-            <Trash2 aria-hidden /> Delete draft
-          </ConfirmSubmit>
-        </ActionForm>
-      </div>
-      {sending && (
-        <ActionForm action={moveAction} className="flex flex-wrap items-end gap-3 rounded-lg border border-primary/25 bg-primary-soft/30 p-3">
-          {(s) => (
-            <>
-              <input type="hidden" name="to" value="sent" />
-              <p className="w-full text-sm">
-                Did you send R{number} to the customer? Once marked as sent it is frozen: a change of price needs a new revision. Check it with Preview first.
-              </p>
-              <Field label="Sent on" htmlFor={`sent-on-${number}`} optional hint="Today when empty" error={s.errors?.on}>
-                <Input id={`sent-on-${number}`} name="on" type="date" max={today} className="w-40" defaultValue={s.values?.on} />
-              </Field>
-              <SubmitButton variant="primary" pendingText="Saving…">
-                <Send aria-hidden /> Mark R{number} as sent
-              </SubmitButton>
-              <Button variant="ghost" onClick={() => setSending(false)}>
-                Cancel
-              </Button>
-            </>
-          )}
-        </ActionForm>
-      )}
-      {summary}
-    </div>
-  );
-}
-
-const ANSWERS = [
-  { to: "accepted", label: "Customer accepted", icon: CheckCircle2, variant: "primary" as const },
-  { to: "rejected", label: "Customer rejected", icon: XCircle, variant: "secondary" as const },
-  { to: "expired", label: "Mark expired", icon: Clock, variant: "ghost" as const },
-];
-
-/** The customer's answer on the live sent revision. Accepting means choosing exactly one option; it creates the order. */
-export function AnswerPanel({ number, action, today, options, currency }: { number: number; action: Action; today: string; options: OptionView[]; currency: string }) {
-  const [to, setTo] = useState<string | null>(null);
-  const [optionId, setOptionId] = useState<string>(options.length === 1 ? options[0]!.id : "");
-  const [order, setOrder] = useState<{ orderId: string; orderRefNo: string } | null>(null);
-  const chosen = ANSWERS.find((a) => a.to === to);
-  if (order)
-    return (
-      <p className="text-sm">
-        Order {order.orderRefNo} was created.{" "}
-        <Link href={`/orders/${order.orderId}`} className="font-medium text-primary underline">
-          Go to the order
-        </Link>
-      </p>
-    );
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        {ANSWERS.map((a) => (
-          <Button key={a.to} size="sm" variant={a.variant} onClick={() => setTo(to === a.to ? null : a.to)} aria-pressed={to === a.to}>
-            <a.icon aria-hidden /> {a.label}
-          </Button>
-        ))}
-      </div>
-      {chosen && (
-        <ActionForm
-          action={action}
-          onDone={(s) => {
-            const data = s.data as { orderId?: string; orderRefNo?: string } | undefined;
-            if (data?.orderId && data.orderRefNo) setOrder({ orderId: data.orderId, orderRefNo: data.orderRefNo });
-            setTo(null);
-          }}
-          className="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface-2/60 p-3"
-        >
-          {(s) => (
-            <>
-              <input type="hidden" name="to" value={chosen.to} />
-              {chosen.to === "accepted" && options.length > 1 && (
-                <fieldset className="w-full">
-                  <legend className="mb-1.5 text-sm font-medium">Which option did the customer accept?</legend>
-                  <div className="flex flex-wrap gap-2">
-                    {options.map((o) => (
-                      <label key={o.id} className={cn("flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm", optionId === o.id ? "border-primary bg-primary-soft" : "border-line bg-surface")}>
-                        <input type="radio" name="optionId" value={o.id} checked={optionId === o.id} onChange={() => setOptionId(o.id)} className="accent-[var(--color-primary)]" />
-                        <span>
-                          <span className="font-semibold">Option {o.letter}</span> <span className="tabular">{money(o.total, currency)}</span>
-                          {o.factory && <span className="block text-xs text-muted">{o.factory.name}</span>}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  <p className="mt-1 text-xs text-muted">The other options are marked not chosen. The order is made from this option only.</p>
-                </fieldset>
-              )}
-              {chosen.to === "accepted" && options.length === 1 && <input type="hidden" name="optionId" value={options[0]!.id} />}
-              <Field label={chosen.to === "expired" ? "Expired on" : "Answered on"} htmlFor={`answer-on-${number}`} optional hint="Today when empty" error={s.errors?.on}>
-                <Input id={`answer-on-${number}`} name="on" type="date" max={today} className="w-40" defaultValue={s.values?.on} />
-              </Field>
-              <div className="flex gap-2">
-                <SubmitButton size="md" variant={chosen.to === "accepted" ? "primary" : "secondary"} pendingText="Saving…" disabled={chosen.to === "accepted" && !optionId}>
-                  {chosen.to === "accepted" ? `Confirm: ${options.length > 1 ? (optionId ? `Option ${options.find((o) => o.id === optionId)!.letter}` : "choose an option") : `R${number}`} accepted, create the order` : chosen.to === "rejected" ? "Confirm the rejection" : "Confirm expired"}
-                </SubmitButton>
-                <Button variant="ghost" onClick={() => setTo(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </>
-          )}
-        </ActionForm>
-      )}
-    </div>
+    <SidePanel
+      title={`New quotation R${draft.number}`}
+      description={first ? "Which offers to quote, and the terms. The number is given on save." : `Starts as a copy of R${draft.number - 1}. Change what is different, then save the draft.`}
+      className="md:w-[860px]"
+      onClose={close}
+    >
+      <TermsPanel number={draft.number} initial={draft} offers={offers} loadOffers={loadOffers} showCosts={showCosts} action={action} create tickAll={first} onSaved={close} />
+    </SidePanel>
   );
 }

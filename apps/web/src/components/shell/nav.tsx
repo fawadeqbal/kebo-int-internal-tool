@@ -763,7 +763,7 @@ export function AppShell({
         {tab("/inquiries", "Inquiries", ClipboardList)}
         {canCreate ? (
           <div className="flex flex-1 items-start justify-center">
-            <Link href="/inquiries/new" aria-label="New inquiry" className="-mt-5 grid size-14 place-items-center rounded-full bg-action-solid text-white shadow-pop ring-4 ring-bg active:scale-95">
+            <Link href="/inquiries?panel=new-inquiry" aria-label="New inquiry" className="-mt-5 grid size-14 place-items-center rounded-full bg-action-solid text-white shadow-pop ring-4 ring-bg active:scale-95">
               <Plus className="size-7" strokeWidth={2.25} aria-hidden />
             </Link>
           </div>

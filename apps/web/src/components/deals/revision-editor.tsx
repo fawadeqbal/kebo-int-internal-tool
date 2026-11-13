@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Lock } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Lock } from "lucide-react";
 import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import {
   BALANCE_TERMS,
@@ -26,7 +26,7 @@ import { localLineHandlers } from "@/components/lines/local-lines";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
-import { PANEL_FORM, PanelActions, PanelSection } from "@/components/common/panel";
+import { PANEL_FORM, PanelFooter, PanelSection } from "@/components/common/panel";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -227,7 +227,13 @@ export function RevisionEditor({
   title,
   note,
   submitShort,
+  tickAll = false,
+  footNote,
 }: {
+  /** The window of a first revision: every factory offer that has lines starts ticked. */
+  tickAll?: boolean;
+  /** The window's footer, on the left ("Once sent, a change needs a new revision."). */
+  footNote?: ReactNode;
   action: Action;
   number: number;
   initial: RevisionDraft;
@@ -236,7 +242,8 @@ export function RevisionEditor({
   loadOffers?: (currency: string) => Promise<QuoteOffers | null>;
   showCosts: boolean;
   submitLabel: string;
-  onDone?: () => void;
+  /** Saved: given the answer, so a window can close without asking "Discard changes?". */
+  onDone?: (state: ActionState) => void;
   /** Saving needs a change (editing an existing draft). */
   requireChanges?: boolean;
   /** Shown under the form, e.g. the draft's own actions; told whether there are unsaved changes. */
@@ -258,8 +265,18 @@ export function RevisionEditor({
   /** The save button's words on a phone, when submitLabel is long ("Save draft"). */
   submitShort?: string;
 }) {
-  const [s, setS] = useState<EditorState>(() => fromDraft(initial));
-  const [saved, setSaved] = useState(() => JSON.stringify(fromDraft(initial)));
+  // The window of a first revision quotes every offer that has lines; the person unticks what they do not want.
+  const startState = (): EditorState => {
+    const st = fromDraft(initial);
+    if (!tickAll) return st;
+    const has = new Set(st.options.map((o) => o.factoryQuoteId));
+    const more = initialOffers.offers
+      .filter((o) => !has.has(o.factoryQuoteId) && o.lines.length > 0)
+      .map((o) => ({ key: rowKey(), factoryQuoteId: o.factoryQuoteId, leadTime: o.leadTime ?? "", discount: "", prices: priced(o.lines, {}, initialOffers.defaultMargin), charges: [], costs: {} }));
+    return { ...st, options: [...st.options, ...more] };
+  };
+  const [s, setS] = useState<EditorState>(startState);
+  const [saved, setSaved] = useState(() => JSON.stringify(startState()));
   const [offers, setOffers] = useState(initialOffers);
   const [active, setActive] = useState(initialOption);
   const [adding, setAdding] = useState(startAdding);
@@ -323,6 +340,11 @@ export function RevisionEditor({
     );
     return { lines, totals, costing, extra };
   };
+
+  // The list keeps the order it opened with (options A, B… first, then the other offers), so a tick never moves a row.
+  const [firstOrder] = useState(() => s.options.map((o) => o.factoryQuoteId));
+  const place = (id: string) => { const i = firstOrder.indexOf(id); return i < 0 ? firstOrder.length : i; };
+  const listed = [...offers.offers].sort((a, b) => place(a.factoryQuoteId) - place(b.factoryQuoteId));
 
   // What can still be added: offers not used yet, and the customer's items when no option uses them.
   const used = new Set(s.options.map((o) => o.factoryQuoteId ?? "items"));
@@ -469,9 +491,9 @@ export function RevisionEditor({
     <>
       <ActionForm
         action={action}
-        onDone={() => {
+        onDone={(state) => {
           setSaved(JSON.stringify(s));
-          onDone?.();
+          onDone?.(state);
         }}
         className={inPanel ? PANEL_FORM : "flex flex-col gap-4"}
       >
@@ -481,7 +503,79 @@ export function RevisionEditor({
 
             {terms && inPanel && (
               <>
-                <PanelSection title="The deal" first>
+                <PanelSection title="Options: which offers to quote" first className="sm:grid-cols-1">
+                  <ul className="flex flex-col divide-y divide-line rounded-xl border border-line" aria-label="Factory offers">
+                    {listed.map((off) => {
+                      const i = s.options.findIndex((o) => o.factoryQuoteId === off.factoryQuoteId);
+                      const on = i >= 0;
+                      const t = on ? totalsOf(s.options[i]!) : null;
+                      const none = off.lines.length === 0;
+                      const last = on && s.options.length === 1;
+                      const facts = [
+                        none ? "No lines yet: add its lines on Factory offers to quote it" : off.coverage.missing.length ? `Does not include item ${off.coverage.missing.join(", ")}` : "Covers every item",
+                        off.leadTime,
+                        showCosts && off.totalCost ? `cost ${formatMinor(toMinor(off.totalCost), currency)}` : null,
+                        showCosts && t && t.costing.marginPercent !== null ? `margin ${t.costing.marginPercent.toFixed(1)}%` : null,
+                      ].filter(Boolean);
+                      return (
+                        <li key={off.factoryQuoteId}>
+                          <label className={cn("flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm", none && "cursor-default opacity-60")} title={last ? "A quotation keeps at least one option" : undefined}>
+                            <input
+                              type="checkbox"
+                              className="size-[18px] shrink-0 accent-primary"
+                              checked={on}
+                              disabled={none || last}
+                              onChange={() => (on ? setS((x) => ({ ...x, options: x.options.filter((o) => o.factoryQuoteId !== off.factoryQuoteId) })) : addOption(off.factoryQuoteId))}
+                            />
+                            <span className="w-4 shrink-0 font-bold">{on ? optionLetter(i) : ""}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-semibold">{off.factory.name}</span>
+                              <span className="block text-xs text-text-2">{facts.join(" · ")}</span>
+                            </span>
+                            <span className="shrink-0 font-semibold tabular">{t ? fmt(t.totals.total) : "—"}</span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                    {(s.options.some((o) => o.factoryQuoteId === null) || offers.offers.length === 0) && (
+                      <li>
+                        <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm">
+                          <input
+                            type="checkbox"
+                            className="size-[18px] shrink-0 accent-primary"
+                            checked={s.options.some((o) => o.factoryQuoteId === null)}
+                            disabled={s.options.length === 1 && s.options[0]!.factoryQuoteId === null}
+                            onChange={() => (s.options.some((o) => o.factoryQuoteId === null) ? setS((x) => ({ ...x, options: x.options.filter((o) => o.factoryQuoteId !== null) })) : addOption(null))}
+                          />
+                          <span className="w-4 shrink-0 font-bold">{s.options.some((o) => o.factoryQuoteId === null) ? optionLetter(s.options.findIndex((o) => o.factoryQuoteId === null)) : ""}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-semibold">The customer&rsquo;s items, priced by hand</span>
+                            <span className="block text-xs text-text-2">No factory prices: the items as the customer asked for them</span>
+                          </span>
+                        </label>
+                      </li>
+                    )}
+                  </ul>
+                  {showCosts && (
+                    <p className="flex flex-wrap items-center gap-2 text-[13px] text-text-2">
+                      <label htmlFor={`margin-${number}`}>A newly ticked offer is priced at</label>
+                      <Input id={`margin-${number}`} inputMode="decimal" className="h-9 w-16 text-right tabular" value={margin} onChange={(e) => setMargin(e.target.value)} />
+                      <span>% on our cost. Each price can be changed after, in Edit lines.</span>
+                    </p>
+                  )}
+                  {initial.options
+                    .map((o, i) => ({ o, i }))
+                    .filter(({ o }) => requireChanges && !s.options.some((x) => x.factoryQuoteId === o.factoryQuoteId))
+                    .map(({ o, i }) => (
+                      <p key={o.factoryQuoteId ?? "items"} className="rounded-lg bg-warn-soft/60 px-3 py-2 text-[13px]">
+                        Option {optionLetter(i)}
+                        {o.factoryQuoteId ? ` (${offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.factory.name ?? "its offer"})` : ""} and the prices you set for it will be removed when
+                        you save.
+                      </p>
+                    ))}
+                  <ErrorText error={st.errors?.options} />
+                </PanelSection>
+                <PanelSection title="The deal">
                   <Field
                     label="Currency"
                     htmlFor={`cur-${number}`}
@@ -523,7 +617,7 @@ export function RevisionEditor({
                     </Select>
                   </Field>
                 </PanelSection>
-                <PanelSection title="Printed on the quotation" className="sm:grid-cols-1">
+                <PanelSection title="Printed on the quotation">
                   <Field label="Payment terms" htmlFor={`pay-terms-${number}`} optional error={st.errors?.paymentTerms} hint="Printed after the deposit and balance">
                     <Textarea id={`pay-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. By T/T; L/C at sight accepted" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} />
                   </Field>
@@ -1008,17 +1102,16 @@ export function RevisionEditor({
             {part === "options" && <ErrorText error={st.errors?.currency ?? st.errors?.validUntil} />}
 
             {inPanel ? (
-              <PanelActions>
-                <SubmitButton size="sm" pendingText="Saving…" disabled={requireChanges && !dirty}>
-                  {submitLabel}
-                </SubmitButton>
+              <PanelFooter start={footNote}>
                 {onCancel && (
-                  <Button size="sm" variant="ghost" onClick={() => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && onCancel()}>
+                  <Button type="button" variant="ghost" onClick={onCancel}>
                     Cancel
                   </Button>
                 )}
-                {dirty && requireChanges && <span className="text-xs text-warn">Unsaved changes</span>}
-              </PanelActions>
+                <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
+                  <Check aria-hidden /> {submitLabel}
+                </SubmitButton>
+              </PanelFooter>
             ) : (
               <StickyBar className="gap-x-6 px-4 py-2.5 sm:px-5">
                 {options && (

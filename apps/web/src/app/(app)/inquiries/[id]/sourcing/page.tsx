@@ -70,7 +70,6 @@ export default async function SourcingPage({
       <AddOfferButton
         dealId={d.id}
         refNo={d.refNo}
-        items={s.items}
         today={today}
         mainCurrency={s.currency}
         rates={settings.sales.exchangeRates}
@@ -193,12 +192,22 @@ export default async function SourcingPage({
                     <span className="min-w-0">
                       <span className="line-clamp-2 font-semibold">{x.factory.name}</span>
                       <span className="block text-xs text-text-2 md:hidden">
-                        {[cover ? (cover.all ? `All ${cover.of} items` : `${cover.n} of ${cover.of} items`) : null, x.leadTime, letter ? `Option ${letter}` : null].filter(Boolean).join(" · ")}
+                        {[!x.lines.length ? "No lines yet" : cover ? (cover.all ? `All ${cover.of} items` : `${cover.n} of ${cover.of} items`) : null, x.leadTime, letter ? `Option ${letter}` : null].filter(Boolean).join(" · ")}
                       </span>
                     </span>
                     <span className="text-right font-semibold whitespace-nowrap tabular">{x.lines.length ? money(x.factoryTotal, x.currency) : dash}</span>
                     <span className="max-md:hidden">
-                      {cover ? (cover.all ? `All ${cover.of} items` : `${cover.n} of ${cover.of} items`) : x.lines.length ? plural(x.lines.length, "line") : dash}
+                      {!x.lines.length ? (
+                        <span className="text-warn">No lines yet</span>
+                      ) : cover ? (
+                        cover.all ? (
+                          `All ${cover.of} items`
+                        ) : (
+                          `${cover.n} of ${cover.of} items`
+                        )
+                      ) : (
+                        plural(x.lines.length, "line")
+                      )}
                       {x.unpriced > 0 && <span className="block text-xs text-warn">{x.unpriced} without a price</span>}
                     </span>
                     <span className="max-md:hidden">{x.leadTime ?? dash}</span>

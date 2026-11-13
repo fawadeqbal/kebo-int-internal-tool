@@ -69,7 +69,7 @@ export default async function CustomerInquiries({
                   <X aria-hidden /> Clear filters
                 </ButtonLink>
               ) : can(me, "inquiries.create") ? (
-                <ButtonLink href={`/inquiries/new?customer=${c.id}`}>
+                <ButtonLink href={`/inquiries?panel=new-inquiry&for=${c.id}`}>
                   <Plus aria-hidden /> New inquiry
                 </ButtonLink>
               ) : undefined

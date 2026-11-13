@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL } from "@kebo/shared";
-import { Alert, Badge, Button, cn, Field, Textarea } from "@kebo/ui";
+import { Alert, Badge, Button, cn } from "@kebo/ui";
 import { LineTable, type LineRow } from "@/components/lines/line-table";
 import { localLineHandlers } from "@/components/lines/local-lines";
 import { PanelActions, PanelBody, SidePanel, useClosePanel, useReportDirty } from "@/components/common/panel";
@@ -80,14 +80,12 @@ interface ItemState {
  */
 export function ItemsEditor({
   items,
-  requirements,
   action,
   upload,
   edit,
   card,
 }: {
   items: DealItem[];
-  requirements: string | null;
   action: Action;
   upload: boolean;
   edit?: EditRef;
@@ -108,7 +106,6 @@ export function ItemsEditor({
       priced: it.priced,
     }));
   const [rows, setRows] = useState<ItemState[]>(start);
-  const [text, setText] = useState(requirements ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const saver = useEditSave({ edit, card });
   const handlers = localLineHandlers(
@@ -140,15 +137,14 @@ export function ItemsEditor({
     }));
   const savedRows = useMemo(() => asRows(start()), [items]); // eslint-disable-line react-hooks/exhaustive-deps
   const diff = useMemo(() => linesDiff(savedRows, asRows(rows), ITEM_COLUMNS), [savedRows, rows]);
-  const wasText = (requirements ?? "").trim();
-  const textChanged = text.trim() !== wasText;
-  const changes = [...diff.changes, ...(textChanged ? [`What they wrote: ${wasText ? "changed" : "added"}`] : [])];
+  // Only the items: what the customer wrote is part of the request (Edit the request).
+  const changes = diff.changes;
   const dirty = changes.length > 0;
   useEffect(() => {
     reportDirty(dirty);
     return () => reportDirty(null);
   }, [dirty, reportDirty]);
-  const askWhy = (items.length > 0 && (diff.filledChanged || diff.added)) || (textChanged && !!wasText);
+  const askWhy = items.length > 0 && (diff.filledChanged || diff.added);
 
   const save = () =>
     saver.save({
@@ -158,7 +154,6 @@ export function ItemsEditor({
       run: async (reason) => {
         const form = new FormData();
         form.set("items", JSON.stringify(rows));
-        form.set("requirements", text);
         if (reason) form.set("reason", reason);
         const st = await action({}, form);
         if (st.ok) return { ok: true };
@@ -182,12 +177,10 @@ export function ItemsEditor({
         noun="item"
         sheet={{ name: "Customer items", upload }}
         error={errors.items}
-        empty="No list: the requirement below is enough."
+        empty="No items yet: type the first one below, or paste the customer’s list from Excel."
         {...handlers}
       />
-      <Field label="What they wrote" htmlFor="requirements" optional error={errors.requirements} hint="Standards, destination, anything else the customer said">
-        <Textarea id="requirements" rows={4} value={text} onChange={(e) => setText(e.target.value)} />
-      </Field>
+      {errors.requirements && <p className="text-sm text-bad">{errors.requirements}</p>}
       <PanelActions>
         <Button size="sm" onClick={() => void save()} disabled={!dirty || saver.busy}>
           {saver.busy ? "Saving…" : "Save changes"}

@@ -48,6 +48,9 @@ export async function moveRevisionAction(dealId: string, revisionId: string, _pr
     () => api.post(`/revisions/${revisionId}/status`, { to: v.to, on: v.on || null, reason: reasonOf(form), optionId: v.optionId || null, ...(v.to === "sent" && v.via ? { via: v.via } : {}), ...(v.to === "accepted" ? { customerRef: v.customerRef?.trim() || null, route: v.route || undefined } : {}) }),
     DONE[v.to] ?? "Saved.",
   );
+  // Accepting is one step: when the order cannot be made, nothing at all was changed. Say so.
+  if (!r.ok && v.to === "accepted" && !r.code && !r.errors && /went wrong/i.test(r.message ?? ""))
+    return { ...r, message: "The order could not be made, so nothing was changed: the quotation is still waiting for the answer. Try again; if it happens again, tell whoever looks after the system." };
   if (!r.ok) return r;
   refresh(dealId);
   if (v.to === "accepted") {

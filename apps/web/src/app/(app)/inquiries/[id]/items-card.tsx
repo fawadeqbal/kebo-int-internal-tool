@@ -74,11 +74,11 @@ export async function ItemsCard({ id }: { id: string }) {
         title="Items they asked for"
         description={d.items.length ? (fromOffer ? "made from the first offer" : itemsLine(d)) : "none yet"}
         canEdit={d.allowed.edit}
-        editLabel={d.items.length ? "Edit items" : "Add item"}
+        editLabel={d.items.length ? "Edit items" : "Add items"}
         actions={d.items.length ? <ItemsExcel items={d.items} /> : undefined}
         edits={needs}
         panelTitle={d.items.length ? "Edit items" : "Add items"}
-        panelDescription="What the customer needs: type, paste their list or upload Excel. Nothing is saved until Save changes."
+        panelDescription="The customer’s items: type them, paste their list or upload Excel. A number like 1.1 is a part of item 1. Nothing is saved until Save changes."
         view={
           d.items.length ? (
             table
@@ -92,7 +92,6 @@ export async function ItemsCard({ id }: { id: string }) {
         edit={
           <ItemsEditor
             items={d.items}
-            requirements={d.requirements}
             action={dealFieldsAction.bind(null, d.id)}
             upload={!quoted}
             edit={{ type: "inquiry", id: d.id, card: "needs" }}

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { OpenPanelButton } from "@/components/common/panel";
+import { NewInquiryWindow } from "./inquiry-windows";
 import { Check, Clock, Download, Factory, FileText, LayoutGrid, List, MessageSquareText, Plus, Target, TrendingUp, UserRound, X } from "lucide-react";
 import {
   can,
@@ -110,10 +112,10 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
         }
         primary={
           canCreate && (
-            <ButtonLink href="/inquiries/new" variant="primary">
+            <OpenPanelButton panel="new-inquiry" variant="primary" label="New inquiry">
               <Plus aria-hidden /> <span className="sm:hidden">New</span>
               <span className="max-sm:hidden">New inquiry</span>
-            </ButtonLink>
+            </OpenPanelButton>
           )
         }
       />
@@ -197,9 +199,9 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                   <X aria-hidden /> Clear filters
                 </ButtonLink>
               ) : canCreate ? (
-                <ButtonLink href="/inquiries/new">
+                <OpenPanelButton panel="new-inquiry">
                   <Plus aria-hidden /> Add the first inquiry
-                </ButtonLink>
+                </OpenPanelButton>
               ) : undefined
             }
           />
@@ -265,6 +267,8 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
         )}
       </Card>
       <Pager base="/inquiries" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
+
+      {sp.panel === "new-inquiry" && <NewInquiryWindow customerId={sp.for} />}
     </div>
   );
 }
