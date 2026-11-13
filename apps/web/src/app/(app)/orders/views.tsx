@@ -115,7 +115,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
           value={short(owedTotal, main)}
           tone={owedLate > 0 ? "bad" : undefined}
           sub={owedLate > 0 ? `${short(owedLate, main)} late` : "nothing late"}
-          href="/finance/receivables"
+          href="/money/due"
         />
         <StatTile
           icon={Factory}

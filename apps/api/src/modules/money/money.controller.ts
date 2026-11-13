@@ -78,6 +78,13 @@ export class MoneyController {
     return this.leaks.report(user, q);
   }
 
+  /** Managers only: the bills known and not paid yet, and the people to pay back, across the company. */
+  @RequireFeature("expenses")
+  @Get("money/bills")
+  openBills(@CurrentUser() user: SessionUser) {
+    return this.money.openBills(user);
+  }
+
   /** Managers only: what an expense can be for (customers, deals, orders, factories). */
   @RequireFeature("expenses")
   @Get("expenses/targets")

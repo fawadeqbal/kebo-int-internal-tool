@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, Check, Download, List, Plus, TriangleAlert } from "lucide-react";
+import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, Download, List, Plus, TriangleAlert } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow, type PaymentSum } from "@kebo/shared";
 import {
   Badge,
@@ -16,7 +16,6 @@ import {
   PhoneList,
   PhoneRow,
   RefCode,
-  Segmented,
   StatRow,
   StatTile,
   StatusBadge,
@@ -30,23 +29,17 @@ import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, money, TZ, whole } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
-import { requireUser } from "@/lib/session";
+import { hasFeature, requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
 import { FilterCard } from "@/components/common/filter-card";
 import { periodOf } from "@/components/common/period";
-import { RequestsTab } from "./requests-tab";
-import { ToPayTab } from "./to-pay-tab";
+import { DUE, paymentsTabTarget } from "@/lib/old-addresses";
 import { opensPayments, paymentHref } from "./shared";
 
 export const metadata = { title: "Payments" };
 
 const PAGE_SIZE = 50;
 type Search = { tab?: string; mine?: string; p?: string; dir?: string; status?: string; kind?: string; q?: string; order?: string; party?: string; account?: string; method?: string; page?: string };
-/** A link that filters the list of payments (an order's, a party's, a search) opens the Paid tab. */
-const LIST_FILTERS = ["p", "dir", "kind", "order", "party", "account", "method"] as const;
-
-type Tab = "requests" | "to-pay" | "paid";
-
 const STATUS_MEANING = { to_verify: "warn", sent_back: "bad", recorded: "ok", void: "neutral" } as const;
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -56,57 +49,28 @@ function top(sums: PaymentSum[]) {
   return first ? `${whole(first.amount, first.currency)}${sums.length > 1 ? ` +${sums.length - 1}` : ""}` : "—";
 }
 
-/** The row's status as the board shows it: a recorded receipt reads "Verified", a supplier payment "Paid", an expense "Expense", a transfer "Transfer". */
+/** The row's status: money in reads "Received", a supplier payment "Paid", an expense "Expense", a transfer "Transfer". */
 function statusOf(r: PaymentRow) {
   if (r.status !== "recorded") return <StatusBadge meaning={STATUS_MEANING[r.status]}>{PAYMENT_STATUS_LABEL[r.status]}</StatusBadge>;
   if (r.fromCredit) return <Badge>From credit</Badge>;
   if (r.kind === "expense") return <StatusBadge meaning="neutral">Expense</StatusBadge>;
   if (r.kind === "transfer") return <Badge dot className="bg-chart-4/12 text-chart-4">Transfer</Badge>;
-  if (r.direction === "in") return <StatusBadge meaning="ok">Verified</StatusBadge>;
+  if (r.direction === "in") return <StatusBadge meaning="ok">Received</StatusBadge>;
   return <StatusBadge meaning="ok">Paid</StatusBadge>;
 }
 
 /**
- * Treasury › Payments: what is asked for, what is to pay and what was paid, in one place. Payment requests (every
- * part of an order's plan still being asked for; open to everyone who sees orders), To pay (every open part of a
- * supplier's plan; for people who see factory costs) and Paid (every payment
- * recorded, with its receipt; for the people who see money).
+ * Money › Payments (design "money, simple", board MPayments): every amount that came in or went out, with
+ * who recorded it. What is still owed either way is on "To receive and to pay"; this page is what happened.
  */
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const me = await requireUser();
   const sp = await searchParams;
-  const seesMoney = opensPayments(me);
-  const seesCosts = can(me, "sourcing.manage");
-  const tab: Tab =
-    !seesMoney || sp.tab === "requests"
-      ? "requests"
-      : sp.tab === "to-pay" && seesCosts
-        ? "to-pay"
-        : sp.tab === "paid" || sp.status === "to_verify" || sp.status === "void" || LIST_FILTERS.some((k) => sp[k])
-          ? "paid"
-          : "requests";
-  if (tab !== "paid") {
-    const out = tab === "to-pay";
-    return (
-      <div>
-        <PageHeader
-          crumbs={crumbsFor("/payments")}
-          title="Payments"
-          summary="What is asked for, what is to pay and what was paid, in one place"
-          primary={
-            can(me, "payments.record") ? (
-              <ButtonLink href={out ? "/payments/new?kind=out" : "/payments/new?kind=in"} variant="primary">
-                <Plus aria-hidden /> {out ? "Pay supplier" : "Record payment"}
-              </ButtonLink>
-            ) : undefined
-          }
-        />
-        {seesMoney && <Tabs tab={tab} toPay={seesCosts} />}
-        {out ? <ToPayTab sp={sp} /> : <RequestsTab sp={sp} />}
-      </div>
-    );
-  }
-  if (!seesMoney) redirect("/forbidden");
+  // Its old tabs (Payment requests, To pay) are the two sides of "To receive and to pay".
+  const old = paymentsTabTarget(sp);
+  if (old) redirect(old);
+  // People who see no payments used to land on the requests of their orders: that list is there too.
+  if (!opensPayments(me)) redirect(DUE);
   const today = todayIn(TZ);
   const order = UUID.test(sp.order ?? "") ? sp.order : undefined;
   const party = UUID.test(sp.party ?? "") ? sp.party : undefined;
@@ -134,11 +98,20 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     page,
     pageSize: PAGE_SIZE,
   });
-  const keep = { tab: "paid", p: sp.p, dir, status, kind, q, order, party, account, method };
+  const keep = { p: sp.p, dir, status, kind, q, order, party, account, method };
   const href = (change: Record<string, string | undefined>) => buildHref("/payments", keep, { page: undefined, ...change });
   const chip = (c: Record<string, string | undefined>) => href({ dir: undefined, status: undefined, kind: undefined, ...c });
   const recordHref = order ? `/payments/new?kind=in&order=${order}` : "/payments/new";
   const canRecord = Object.values(list.canRecord).some(Boolean);
+  // Money added by the team for a manager to verify (or sent back to the person who added it): it opens from here.
+  const approver = can(me, "payments.record") || (can(me, "expenses.manage") && (await hasFeature("expenses")));
+  const waiting =
+    approver || can(me, "money.submit")
+      ? await api
+          .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approver ? undefined : "true", pageSize: 1 })
+          .then((r) => (approver ? r.counts.pending : r.counts.sent_back))
+          .catch(() => 0)
+      : 0;
   const t = list.totals;
   const when = allDates ? "" : pr.period === pr.thisMonth ? " this month" : ` · ${pr.name}`;
   // The month filter: this month, the eleven before it, this year and last year.
@@ -158,16 +131,16 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           order || party ? (
             <>
               For {list.scope ?? "this record"} ·{" "}
-              <Link href={buildHref("/payments", {}, { tab: "paid" })} className="font-medium text-primary hover:underline">
+              <Link href="/payments" className="font-medium text-primary hover:underline">
                 All payments
               </Link>
             </>
           ) : (
-            "What is asked for and what was paid, in one place"
+            "Every amount that came in or went out"
           )
         }
         actions={
-          <ButtonLink href={buildHref("/sheets/export/cash-book", {}, { format: "csv", from: allDates ? undefined : pr.from, to: allDates ? undefined : pr.to, account })} variant="secondary">
+          <ButtonLink prefetch={false} href={buildHref("/sheets/export/cash-book", {}, { format: "csv", from: allDates ? undefined : pr.from, to: allDates ? undefined : pr.to, account })} variant="secondary">
             <Download aria-hidden /> Export CSV
           </ButtonLink>
         }
@@ -179,19 +152,20 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           ) : undefined
         }
       />
-      {!order && !party && <Tabs tab="paid" toPay={can(me, "sourcing.manage")} />}
+      {waiting > 0 && (
+        <p className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm">
+          <span>
+            <strong className="font-semibold">{approver ? `${waiting} waiting to be verified` : `${waiting} sent back to you`}</strong>
+            <span className="text-text-2"> · {approver ? "added by the team, not counted yet" : "to correct and send again"}</span>
+          </span>
+          <ButtonLink href={approver ? "/approvals" : "/approvals?status=sent_back"} variant="secondary" size="sm">
+            {approver ? "Verify" : "Open"}
+          </ButtonLink>
+        </p>
+      )}
       <StatRow className="mb-4">
         <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} value={top(t.in)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />
         <StatTile icon={ArrowUpFromLine} iconColor={2} label={`Out${when}`} value={top(t.out)} sub={`${t.outCount} payment${t.outCount === 1 ? "" : "s"} out`} />
-        <StatTile
-          icon={Check}
-          iconColor={2}
-          label="To verify"
-          value={list.counts.to_verify}
-          sub={t.toVerify.length ? top(t.toVerify) : "nothing waiting"}
-          tone={list.counts.to_verify ? "warn" : undefined}
-          href={list.counts.to_verify ? chip({ status: "to_verify" }) : undefined}
-        />
         <StatTile icon={Banknote} iconColor={4} label="Expenses" value={top(t.expenses)} sub={`${list.counts.expense} entr${list.counts.expense === 1 ? "y" : "ies"}`} />
       </StatRow>
       <LinkTabs
@@ -203,14 +177,14 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           { href: chip({ dir: "out" }), label: <><ArrowUpFromLine aria-hidden /> Money out</>, active: dir === "out" && !status && !kind },
           { href: chip({ kind: "expense" }), label: <><Banknote aria-hidden /> Expenses</>, active: kind === "expense" },
           { href: chip({ dir: "move" }), label: <><ArrowLeftRight aria-hidden /> Transfers</>, active: dir === "move" },
-          { href: chip({ status: "to_verify" }), label: <><TriangleAlert aria-hidden /> To verify</>, count: list.counts.to_verify, active: status === "to_verify" },
+          ...(list.counts.to_verify ? [{ href: chip({ status: "to_verify" }), label: <><TriangleAlert aria-hidden /> To verify</>, count: list.counts.to_verify, active: status === "to_verify" }] : []),
           { href: chip({ status: "void" }), label: "Removed", active: status === "void" },
         ]}
       />
       <FilterCard
         search="Search number, customer, reference…"
         value={q}
-        keep={{ tab: "paid", dir, status, kind, order, party }}
+        keep={{ dir, status, kind, order, party }}
         clearHref={href({ q: undefined })}
         selects={[
           { name: "account", label: "Account", value: account, options: list.accounts.map((a) => ({ value: a.id, label: a.name })) },
@@ -250,7 +224,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                     <Th>Method</Th>
                     <Th>Account</Th>
                     <Th className="text-right">Amount</Th>
-                    <Th>By</Th>
+                    <Th>Recorded by</Th>
                     <Th>Status</Th>
                   </tr>
                 </THead>
@@ -284,21 +258,6 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <Pager base="/payments" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} />
       </Card>
     </div>
-  );
-}
-
-/** The page's tabs: what customers are asked for, what suppliers are owed (people who see costs), what was paid. */
-function Tabs({ tab, toPay }: { tab: Tab; toPay: boolean }) {
-  return (
-    <Segmented
-      label="Show"
-      className="mb-4"
-      options={[
-        { href: "/payments?tab=requests", label: "Payment requests", active: tab === "requests" },
-        ...(toPay ? [{ href: "/payments?tab=to-pay", label: "To pay", active: tab === "to-pay" }] : []),
-        { href: "/payments?tab=paid", label: "Paid", active: tab === "paid" },
-      ]}
-    />
   );
 }
 

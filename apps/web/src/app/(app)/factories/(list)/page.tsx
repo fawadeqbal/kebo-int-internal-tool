@@ -155,7 +155,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                 ? `${short(overdueTotal, owed.currency)} past its date`
                 : `to ${plural(owed.rows.length, "factory", "factories")}`
             }
-            href="/purchasing/to-pay"
+            href="/money/due?side=suppliers"
           />
         )}
         {thisYear && (

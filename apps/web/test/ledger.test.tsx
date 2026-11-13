@@ -63,15 +63,9 @@ function Line({ r }: { r: LedgerListRow }) {
 }
 
 describe("the menu", () => {
-  it("has Ledger last in Money, for those with ledger.view only", () => {
-    const pages = (can: (p: string) => boolean) =>
-      buildModules({ can, feature: () => true, approvals: null, approves: false, companyAddresses: false })
-        .find((m) => m.key === "money")
-        ?.pages.map((p) => p.label);
-    expect(pages(() => true)).toEqual(["Payments", "Cash & bank", "Expenses", "Invoices", "To receive", "To pay", "Ledger"]);
-    // Payments and Invoices are open to everyone who sees orders.
-    expect(pages((p) => p === "ledger.view")).toEqual(["Payments", "Invoices", "Ledger"]);
-    expect(pages((p) => p !== "ledger.view")).not.toContain("Ledger");
+  it("no longer lists the Ledger: the page keeps its address for those who open it", () => {
+    const hrefs = buildModules({ can: () => true, feature: () => true, approvals: null, approves: false, companyAddresses: false }).flatMap((m) => m.pages.map((p) => p.href));
+    expect(hrefs).not.toContain("/finance/ledger");
   });
 });
 

@@ -18,7 +18,8 @@ export function PayCostWindow({
   from,
   canFiles,
 }: {
-  orderId: string;
+  /** Null: a bill of the company, on no order. */
+  orderId: string | null;
   id: string;
   currency: string;
   /** "Sino-Africa Logistics · Sea freight · USD 6,400.00". */
@@ -37,7 +38,7 @@ export function PayCostWindow({
       action={repayAction.bind(null, orderId, [id])}
       submit="Pay"
       whats={["The cost shows the day it was paid.", "It leaves “to pay” and shows under Payments."]}
-      files={canFiles ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
+      files={canFiles && orderId ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
     >
       {(s) => (
         <FieldRow>
@@ -73,7 +74,8 @@ export function RepayWindow({
   today,
   canFiles,
 }: {
-  orderId: string;
+  /** Null: an expense of the company, on no order. */
+  orderId: string | null;
   /** The expenses repaid together. */
   ids: string[];
   currency: string;
@@ -92,7 +94,7 @@ export function RepayWindow({
       action={repayAction.bind(null, orderId, ids)}
       submit="Repay"
       whats={[ids.length === 1 ? "The expense shows the day it was repaid." : `The ${ids.length} expenses show the day they were repaid.`]}
-      files={canFiles ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
+      files={canFiles && orderId ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
     >
       {(s) => (
         <FieldRow>

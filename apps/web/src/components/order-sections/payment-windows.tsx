@@ -66,12 +66,23 @@ export function RecordPaymentWindow({
   today: string;
   /** Opened from a part of the plan: what is still to come on it, filled in. */
   amount?: string;
+  /** Open at once (a list's row asked for it), and what to do once it closes. */
+  startOpen?: boolean;
+  onClosed?: () => void;
 }) {
   const [fileError, setFileError] = useState<string | null>(null);
+  const { startOpen, onClosed, ...fields } = p;
   return (
     <>
-      <FormWindow button={{ label: "Record payment", kind: main ? "main" : "plain" }} title="Record a payment" sub={`${p.refNo} · from ${p.customer}${p.forWhat ? ` · ${p.forWhat}` : ""}`} size="lg">
-        {(close) => <ReceivedFields {...p} bare onClose={close} onFileError={setFileError} />}
+      <FormWindow
+        button={{ label: "Record payment", kind: main ? "main" : "plain" }}
+        title="Record a payment"
+        sub={`${p.refNo} · from ${p.customer}${p.forWhat ? ` · ${p.forWhat}` : ""}`}
+        size="lg"
+        startOpen={startOpen}
+        onClosed={onClosed}
+      >
+        {(close) => <ReceivedFields {...fields} bare onClose={close} onFileError={setFileError} />}
       </FormWindow>
       {fileError && <Alert tone="error">{fileError}</Alert>}
     </>

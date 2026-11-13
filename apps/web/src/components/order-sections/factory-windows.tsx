@@ -64,12 +64,16 @@ export function PayFactoryWindow({
   fx: Fx;
   today: string;
   prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" };
+  /** Open at once (a list's row asked for it), and what to do once it closes. */
+  startOpen?: boolean;
+  onClosed?: () => void;
 }) {
   const [fileError, setFileError] = useState<string | null>(null);
+  const { startOpen, onClosed, ...fields } = p;
   return (
     <>
-      <FormWindow button={{ label, kind: main ? "main" : "plain" }} title="Pay the factory" sub={sub} size="lg" disabled={!p.factories.length}>
-        {(close) => <FactoryPaymentForm {...p} bare onClose={close} onFileError={setFileError} />}
+      <FormWindow button={{ label, kind: main ? "main" : "plain" }} title="Pay the factory" sub={sub} size="lg" disabled={!p.factories.length} startOpen={startOpen} onClosed={onClosed}>
+        {(close) => <FactoryPaymentForm {...fields} bare onClose={close} onFileError={setFileError} />}
       </FormWindow>
       {fileError && <Alert tone="error">{fileError}</Alert>}
     </>

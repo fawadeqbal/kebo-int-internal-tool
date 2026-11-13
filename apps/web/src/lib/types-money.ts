@@ -847,7 +847,27 @@ export interface RequestList {
   canSend: boolean;
 }
 
-/** GET /billing/to-pay: the open parts of every supplier's plan (Payments › To pay). */
+/** GET /money/bills: the bills known and not paid yet, and the people to pay back, across the company. */
+export interface OpenBills {
+  rows: {
+    id: string;
+    kind: "bill" | "repay";
+    owedTo: string | null;
+    category: ExpenseCategory;
+    description: string;
+    reference: string | null;
+    order: { id: string; refNo: string } | null;
+    amount: string;
+    currency: string;
+    /** The day it is dated, and how many days it has waited. */
+    on: string;
+    days: number;
+    fromShipment: boolean;
+  }[];
+  totals: { currency: string; open: string; count: number }[];
+}
+
+/** GET /billing/to-pay: the open parts of every supplier's plan (Money › To receive and to pay). */
 export interface ToPayList {
   rows: {
     key: string;

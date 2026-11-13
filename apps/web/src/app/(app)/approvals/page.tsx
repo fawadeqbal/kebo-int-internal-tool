@@ -28,7 +28,6 @@ import { date, dateTime, money, timeAgo, whole } from "@/lib/format";
 import type { Submission, SubmissionList, SubmissionStatus } from "@/lib/types-approvals";
 import { ApproveButtons, VerifyChosen, WithdrawButton } from "@/components/money/approval-actions";
 import { approveAction, approveManyAction, sendBackAction, withdrawAction } from "./actions";
-import { crumbsFor, labelFor } from "@/lib/nav";
 import { today } from "@/components/orders/today";
 
 export const metadata = { title: "To verify" };
@@ -90,9 +89,9 @@ export default async function ApprovalsPage({
   return (
     <div>
       <PageHeader
-        crumbs={crumbsFor("/approvals")}
+        crumbs={[{ label: "Money" }, { label: "Payments", href: "/payments" }, { label: "To verify" }]}
         icon={Check}
-        title={labelFor("/approvals")}
+        title="To verify"
         summary={
           mine
             ? "Sent for approval: money received and expenses you added. Each counts once a manager approves it."

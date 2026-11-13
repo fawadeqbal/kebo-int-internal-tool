@@ -11,6 +11,7 @@ const refresh = (orderId?: string | null, customerId?: string | null) => {
   revalidatePath("/finance", "layout");
   revalidatePath("/purchasing", "layout");
   revalidatePath("/payments", "layout");
+  revalidatePath("/money", "layout");
 };
 
 /** The customer's instalments: payload { items: [{ id?, label, amount, dueOn }] }. */
@@ -167,7 +168,7 @@ export async function removePaymentFileAction(side: "in" | "out", paymentId: str
 }
 
 /** Pays back what someone paid from their own money: each of `expenseIds`, on one day, from one account. */
-export async function repayAction(orderId: string, expenseIds: string[], _prev: ActionState, form: FormData): Promise<ActionState> {
+export async function repayAction(orderId: string | null, expenseIds: string[], _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const body = { repaidOn: v.repaidOn, accountId: v.accountId || null };
   let r: ActionState = { ok: true };
