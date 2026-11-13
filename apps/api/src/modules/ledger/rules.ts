@@ -473,6 +473,9 @@ export interface ExpenseDoc {
   accountId: string | null;
   borneBy: string;
   ownMoney: boolean;
+  /** A bill known before it is paid: we owe it (to `payee`) until `repaidOn`. */
+  payLater: boolean;
+  payee: string | null;
   repaidOn: ISODate | null;
   repaidAccountId: string | null;
   order: {
@@ -493,7 +496,8 @@ export interface ExpenseDoc {
 
 /**
  * An expense: the cost (by kind), paid from an account (or "not on an account"), or from a person's own money
- * (we owe it back until it is repaid: a second posting on that day). Charged to the customer: they owe it too
+ * (we owe it back until it is repaid: a second posting on that day), or a bill known before it is paid (it
+ * sits in "Bills to pay" until it is paid: a second posting on that day). Charged to the customer: they owe it too
  * (in the order's currency, as positionOf counts it). Borne by a factory: taken off what we owe it (in its
  * currency, as factoryPosition counts it). On a cancelled order neither: the order owes nothing any more. The
  * money paid to a factory and lost when the order was cancelled comes off what the factory owed us back.
@@ -510,12 +514,16 @@ export function expensePlan(e: ExpenseDoc, ctx: RuleCtx): DocPlan {
     e.factoryId &&
     !e.accountId &&
     !e.ownMoney &&
+    !e.payLater &&
     e.borneBy === "us" &&
     e.step === "factory"
   );
+  const bill = e.payLater && !staff;
   const from: Line = staff
     ? { account: acc.staff(staff.id), side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate }
-    : lossOnCancel
+    : bill
+      ? { account: "bills", side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate }
+      : lossOnCancel
       ? { account: acc.factory(e.factoryId!), side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate }
       : { ...moneyLine(e.accountId, e.currency), side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate };
   const lines: Line[] = [
@@ -558,6 +566,19 @@ export function expensePlan(e: ExpenseDoc, ctx: RuleCtx): DocPlan {
       dims: d,
       lines: [
         { account: acc.staff(staff.id), side: "debit", minor: e.amountMinor, currency: e.currency, rate: ownRate },
+        { ...moneyLine(e.repaidAccountId, e.currency), side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate },
+      ],
+    });
+  if (bill && e.repaidOn)
+    parts.push({
+      part: "paid",
+      date: e.repaidOn,
+      type: "money_out",
+      ref: "",
+      memo: `Paid${e.payee ? ` ${e.payee}` : ""}: ${e.description}`,
+      dims: d,
+      lines: [
+        { account: "bills", side: "debit", minor: e.amountMinor, currency: e.currency, rate: ownRate },
         { ...moneyLine(e.repaidAccountId, e.currency), side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate },
       ],
     });

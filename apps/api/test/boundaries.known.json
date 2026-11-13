@@ -24,6 +24,7 @@
   "flow -> billing",
   "flow -> documents",
   "flow -> inquiries",
+  "flow -> money",
   "flow -> orders",
   "flow -> settings",
   "history -> inquiries",

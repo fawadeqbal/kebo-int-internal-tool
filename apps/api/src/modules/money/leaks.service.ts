@@ -335,7 +335,7 @@ export class LeaksService {
     /* ----- amounts not on an account (the cash book cannot match the bank) */
     const unassigned =
       (await this.prisma.db.moneyMovement.count({ where: { accountId: null, voidedAt: null, valueDate: range } })) +
-      (await this.prisma.db.expense.count({ where: { accountId: null, voidedAt: null, spentOn: range } }));
+      (await this.prisma.db.expense.count({ where: { accountId: null, payLater: false, voidedAt: null, spentOn: range } }));
     const hasAccounts = (await this.prisma.db.moneyAccount.count()) > 0;
     if (cashBook && hasAccounts && unassigned > 0)
       warnings.push({

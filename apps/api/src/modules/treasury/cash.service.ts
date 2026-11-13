@@ -262,8 +262,8 @@ export class CashService {
       }),
       expensesOn
         ? this.prisma.db.expense.findMany({
-            // Paid from someone's own money: on no account of ours (its repayment is).
-            where: { spentOn: range, ...onAccount, ...cur, ...live, ...(none ? { ownMoney: false } : {}) },
+            // Paid from someone's own money, or a bill not paid when it was recorded: on no account of ours (paying it is).
+            where: { spentOn: range, ...onAccount, ...cur, ...live, ...(none ? { ownMoney: false, payLater: false } : {}) },
             include: { account: acc, customer: { select: { id: true, name: true } }, order: { select: { id: true, refNo: true } }, inquiry: { select: { id: true, refNo: true } } },
           })
         : Promise.resolve([]),
@@ -362,8 +362,8 @@ export class CashService {
         minor: -decimalToMinor(e.amount),
         currency: e.currency,
         account: e.repaidAccount,
-        what: `Repaid${e.paidBy ? ` to ${e.paidBy.name}` : ""}: ${e.description}`,
-        party: e.paidBy ? { name: e.paidBy.name, href: null } : null,
+        what: e.payLater ? `Paid${e.payee ? ` ${e.payee}` : ""}: ${e.description}` : `Repaid${e.paidBy ? ` to ${e.paidBy.name}` : ""}: ${e.description}`,
+        party: e.payLater ? (e.payee ? { name: e.payee, href: null } : null) : e.paidBy ? { name: e.paidBy.name, href: null } : null,
         reference: e.reference,
         href: e.order ? `/orders/${e.order.id}/costs` : null,
         voided: Boolean(e.voidedAt),
@@ -450,7 +450,7 @@ export class CashService {
     const unassigned = none
       ? out.filter((r) => !r.voided).length
       : (await this.prisma.db.moneyMovement.count({ where: { valueDate: range, accountId: null, voidedAt: null, ...curOfUnassigned } })) +
-        (expensesOn ? await this.prisma.db.expense.count({ where: { spentOn: range, accountId: null, ownMoney: false, voidedAt: null, ...curOfUnassigned } }) : 0);
+        (expensesOn ? await this.prisma.db.expense.count({ where: { spentOn: range, accountId: null, ownMoney: false, payLater: false, voidedAt: null, ...curOfUnassigned } }) : 0);
 
     return {
       from: q.from,
@@ -491,6 +491,8 @@ export class CashService {
     if (!row) throw new NotFoundError("Entry");
     if (kind === "expense" && (await this.prisma.db.expense.count({ where: { id, ownMoney: true } })))
       throw new DomainError("It was paid from someone's own money: record the repayment on the order's Costs page instead.");
+    if (kind === "expense" && (await this.prisma.db.expense.count({ where: { id, payLater: true } })))
+      throw new DomainError("It is a bill to pay: record its payment where the cost is, and say the account there.");
     const next = await checkAccount(this.prisma.db, accountId, row.currency, row.accountId);
     await this.prisma.tx(async (tx) => {
       await tx.expense.update({ where: { id }, data: { accountId: next } });

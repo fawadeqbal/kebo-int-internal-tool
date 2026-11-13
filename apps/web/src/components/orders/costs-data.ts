@@ -37,8 +37,6 @@ export const orderCostsSetup = cache(async (id: string) => {
     // The stages the company uses, named as the order's tabs.
     steps: (sections?.stages ?? [...FLOW_STEPS]).map((key, i) => ({ key, number: i + 1, label: ORDER_TAB_LABEL[key] })),
     factories: [...factories].map(([fid, name]) => ({ id: fid, name })),
-    plan: costs.planned.map((r) => ({ label: r.label, categories: r.categories, planned: r.planned, difference: r.difference })),
-    expected: costs.profit?.expected ?? null,
     canEdit: costs.canEdit,
   };
   return { costs, setup, money: m };

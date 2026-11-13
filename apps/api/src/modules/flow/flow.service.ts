@@ -63,6 +63,7 @@ import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } 
 import { seedFactoryPlans } from "../billing/api";
 import { onPrimaryShipment, SHIPMENT_ORDER } from "../orders/shipment-facts";
 import { addDocument, changeDocument, removeDocument } from "../documents/api";
+import { ShipmentCosts } from "../money/shipment-costs.service";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 
@@ -190,6 +191,7 @@ export class FlowService {
     private readonly limits: LimitsService,
     private readonly orders: OrdersService,
     private readonly settings: SettingsService,
+    private readonly shipmentCosts: ShipmentCosts,
   ) {}
 
   /* ---------------------------------------------------------------- guards */
@@ -324,6 +326,8 @@ export class FlowService {
       insurancePolicyNo: s.insurancePolicyNo,
       freightTerms: s.freightTerms,
       insuredValue: s.insuredValue === null ? null : s.insuredValue.toString(),
+      insurancePremium: s.insurancePremium === null ? null : s.insurancePremium.toString(),
+      insuranceCurrency: s.insuranceCurrency,
       customsDeclarationNo: s.customsDeclarationNo,
       clearedOn: fromDbDateOrNull(s.clearedOn),
     }));
@@ -838,6 +842,7 @@ export class FlowService {
         undefined,
         { shipmentId: s.id, ...input },
       );
+      await this.shipmentCosts.sync(tx, user, o);
       return this.shipped(tx, user, id, s.id, input.status, input.departedOn);
     });
     await this.orders.announce(event);
@@ -872,6 +877,7 @@ export class FlowService {
         { status: before.status, blNo: before.blNo },
         input,
       );
+      await this.shipmentCosts.sync(tx, user, o);
       return this.shipped(
         tx,
         user,
@@ -901,6 +907,7 @@ export class FlowService {
         before,
         undefined,
       );
+      await this.shipmentCosts.sync(tx, user, o);
     });
     return this.get(user, orderId);
   }
@@ -949,6 +956,8 @@ export class FlowService {
       "insurancePolicyNo",
       "freightTerms",
       "insuredValue",
+      "insurancePremium",
+      "insuranceCurrency",
       "customsDeclarationNo",
     ] as const) {
       if (input[k] !== undefined) (d as Record<string, unknown>)[k] = input[k];

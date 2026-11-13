@@ -261,6 +261,7 @@ export class MoneyService {
             receivedMinor: position.receivedMinor,
             factoryPaidMinor,
             expensesMinor,
+            expensesUnpaidMinor: liveExpenses.filter((e) => e.payLater && !e.repaidOn).reduce((t, e) => t + inOrder(e), 0),
             basisPaidMinor,
             bankChargesMinor: position.bankChargesMinor,
             beforeSaleMinor: beforeSaleMinor ?? 0,
@@ -434,6 +435,11 @@ export class MoneyService {
       borneBy: e.borneBy as ExpenseBearer,
       /** Paid by `paidBy` from their own money, and when we paid it back (from which account). */
       ownMoney: e.ownMoney,
+      /** A bill known before it was paid, who it is owed to, and what made it (a shipment's freight or insurance). */
+      payLater: e.payLater,
+      payee: e.payee,
+      source: e.source,
+      /** When what was owed (own money, or a bill) was paid, and from which account. */
       repaid: e.repaidOn ? { on: fromDbDate(e.repaidOn), account: e.repaidAccount ?? null } : null,
       recordedAt: e.createdAt,
       voided: e.voidedAt ? { at: e.voidedAt, reason: e.voidReason } : null,
@@ -549,7 +555,7 @@ export class MoneyService {
     user: SessionUser,
     input: ExpenseInput,
     keepAccount?: string | null,
-    before?: { step: string | null; borneBy: string; ownMoney: boolean; repaidOn: Date | null; repaidAccountId: string | null },
+    before?: { step: string | null; borneBy: string; ownMoney: boolean; payLater: boolean; payee: string | null; repaidOn: Date | null; repaidAccountId: string | null },
   ) {
     if (input.spentOn > this.clock.today()) throw new DomainError("The date cannot be in the future.");
     let order: { id: string; refNo: string } | null = null;
@@ -590,6 +596,9 @@ export class MoneyService {
     }
     const ownMoney = input.ownMoney ?? before?.ownMoney ?? false;
     if (ownMoney && !input.paidById) throw new DomainError("Say who paid it from their own money.");
+    // Known and not paid yet (a bill): it counts from its day and is owed until it is paid. Saying "own money" ends that.
+    const payLater = !ownMoney && (input.payLater ?? before?.payLater ?? false);
+    const owed = ownMoney || payLater;
     const { sales } = await this.settings.get();
     return {
       order,
@@ -597,8 +606,10 @@ export class MoneyService {
         step,
         borneBy,
         ownMoney,
-        // Paid from someone's own money: no account of ours yet (the repayment says which one).
-        ...(ownMoney ? {} : { repaidOn: null, repaidAccountId: null }),
+        payLater,
+        payee: input.payee === undefined ? (before?.payee ?? null) : input.payee,
+        // Owed (someone's own money, or a bill to pay later): no account of ours yet (paying it says which one).
+        ...(owed ? {} : { repaidOn: null, repaidAccountId: null }),
         orderId: order?.id ?? null,
         customerId,
         inquiryId,
@@ -612,7 +623,7 @@ export class MoneyService {
         paidById: await this.activePerson(input.paidById),
         reference: input.reference,
         note: input.note,
-        accountId: ownMoney
+        accountId: owed
           ? null
           : await checkAccount(this.prisma.db, input.accountId, input.currency, keepAccount, await this.limits.allows("cash_book")),
       },
@@ -637,7 +648,7 @@ export class MoneyService {
         include: expenseInclude,
       });
       await this.expenseAudit(tx, user, row.id, order, `added ${input.description} ${formatMinor(toMinor(data.amount), input.currency)}`, "expense", {
-        newValues: { step: data.step, borneBy: data.borneBy, ...(data.ownMoney ? { ownMoney: true } : {}) },
+        newValues: { step: data.step, borneBy: data.borneBy, ...(data.ownMoney ? { ownMoney: true } : {}), ...(data.payLater ? { payLater: true } : {}) },
       });
       await this.ledger.post(tx, [{ type: "expense", id: row.id }], { userId: user.id });
       return row;
@@ -676,6 +687,7 @@ export class MoneyService {
   /** Changing a recorded expense always says why. */
   async editExpense(user: SessionUser, id: string, input: ExpenseInput) {
     const e = await this.findExpense(user, id);
+    this.notFollowing(e, "change");
     const reason = requireReason(input.reason, "payment", "a recorded expense changes");
     const { order, data } = await this.expenseData(user, { ...input, rate: this.keptRate(input, e) }, e.accountId, e);
     const row = await this.prisma.tx(async (tx) => {
@@ -716,8 +728,19 @@ export class MoneyService {
     return this.expenseView(row);
   }
 
+  /** A cost the system keeps in step with a shipment follows it until it is paid: it is changed there, not here. */
+  private notFollowing(e: { source: string | null; repaidOn: Date | null }, what: "change" | "remove") {
+    if (e.source?.startsWith("shipment:") && !e.repaidOn)
+      throw new DomainError(
+        what === "change"
+          ? "This cost comes from the shipment: change the freight or the insurance there, and it follows."
+          : "This cost comes from the shipment: clear the freight or the insurance there, and it goes.",
+      );
+  }
+
   async voidExpense(user: SessionUser, id: string, reason: string) {
     const e = await this.findExpense(user, id);
+    this.notFollowing(e, "remove");
     await this.prisma.tx(async (tx) => {
       await tx.expense.update({ where: { id }, data: { voidedAt: new Date(), voidReason: reason } });
       await this.expenseAudit(
@@ -735,15 +758,15 @@ export class MoneyService {
   }
 
   /**
-   * Paying back someone who paid an expense from their own money: the day and
-   * the account it left from (same currency). It leaves "To repay".
+   * Paying what is owed on an expense: back to someone who paid it from their own money, or a bill that was
+   * known and not paid yet. The day and the account it left from (same currency). It leaves "to pay".
    */
   async repayExpense(user: SessionUser, id: string, input: RepayInput) {
     const e = await this.findExpense(user, id);
-    if (!e.ownMoney) throw new DomainError("This expense was not paid from someone's own money.");
-    if (e.repaidOn) throw new DomainError(`It was already repaid on ${fromDbDate(e.repaidOn)}.`);
+    if (!e.ownMoney && !e.payLater) throw new DomainError("This expense was paid when it was recorded.");
+    if (e.repaidOn) throw new DomainError(`It was already ${e.payLater ? "paid" : "repaid"} on ${fromDbDate(e.repaidOn)}.`);
     if (input.repaidOn > this.clock.today()) throw new DomainError("The date cannot be in the future.");
-    if (input.repaidOn < fromDbDate(e.spentOn)) throw new DomainError("It cannot be repaid before it was spent.");
+    if (input.repaidOn < fromDbDate(e.spentOn)) throw new DomainError(e.payLater ? "It cannot be paid before the day the cost is dated." : "It cannot be repaid before it was spent.");
     const accountId = await checkAccount(this.prisma.db, input.accountId, e.currency, null, await this.limits.allows("cash_book"));
     const row = await this.prisma.tx(async (tx) => {
       const updated = await tx.expense.update({
@@ -756,9 +779,11 @@ export class MoneyService {
         user,
         id,
         e.order,
-        `repaid ${e.paidBy?.name ?? "the person"} ${e.currency} ${e.amount.toFixed(2)} for "${e.description}"`,
+        e.payLater
+          ? `paid ${e.payee ?? e.factory?.name ?? "the bill"} ${e.currency} ${e.amount.toFixed(2)} for "${e.description}"`
+          : `repaid ${e.paidBy?.name ?? "the person"} ${e.currency} ${e.amount.toFixed(2)} for "${e.description}"`,
         "expense_repay",
-        { newValues: { step: e.step, repaidOn: input.repaidOn, account: updated.repaidAccount?.name ?? null } },
+        { newValues: { step: e.step, [e.payLater ? "paidOn" : "repaidOn"]: input.repaidOn, account: updated.repaidAccount?.name ?? null } },
       );
       await this.ledger.post(tx, [{ type: "expense", id }], { userId: user.id });
       return updated;
@@ -870,9 +895,14 @@ export class MoneyService {
         .then((rows) => rows.map((a) => ({ amount: a.share, rate: a.movement.rate, paidOn: a.on, order: a.purchaseOrder! }))),
       this.prisma.db.expense.findMany({
         where: { voidedAt: null, spentOn: { gte: from, lte: to } },
-        select: { amount: true, rate: true, spentOn: true, orderId: true, order: { select: { status: true } } },
+        select: { amount: true, rate: true, spentOn: true, payLater: true, orderId: true, order: { select: { status: true } } },
       }),
     ]);
+    // Bills known before they were paid: a cost in the month they are dated, cash in the month they were paid.
+    const billsPaid = await this.prisma.db.expense.findMany({
+      where: { voidedAt: null, payLater: true, repaidOn: { gte: from, lte: to } },
+      select: { amount: true, rate: true, repaidOn: true },
+    });
     const costings = await costingsOf(
       this.prisma.db,
       shipped.map((o) => ({ id: o.id, totalMinor: decimalToMinor(o.total) })),
@@ -960,8 +990,9 @@ export class MoneyService {
       const inMain = convert(decimalToMinor(e.amount), Number(e.rate));
       // The company's own, or spent on an order that was then cancelled: a general expense of the month.
       if (!e.orderId || e.order?.status === "cancelled") monthOf(e.spentOn).earned.generalExpenses += inMain;
-      monthOf(e.spentOn).cash.expenses += inMain;
+      if (!e.payLater) monthOf(e.spentOn).cash.expenses += inMain;
     }
+    for (const e of billsPaid) monthOf(e.repaidOn!).cash.expenses += convert(decimalToMinor(e.amount), Number(e.rate));
     for (const p of payments) {
       // Cash in is what arrived; bank charges never reached us.
       monthOf(p.paidOn).cash.in += fx.order(decimalToMinor(p.amount), p.order);

@@ -455,7 +455,11 @@ export class LedgerService {
               ? e.repaidOn
                 ? `Repaid to ${e.paidBy.name} on ${fromDbDate(e.repaidOn)}`
                 : `We owe ${e.paidBy.name} until it is repaid`
-              : null;
+              : e.payLater
+                ? e.repaidOn
+                  ? `Paid on ${fromDbDate(e.repaidOn)}`
+                  : `We owe ${e.payee ?? "it"} until it is paid`
+                : null;
       return {
         ...out,
         orderId: e.orderId,

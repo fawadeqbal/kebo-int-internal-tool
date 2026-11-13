@@ -10,6 +10,7 @@ import { CostsService } from "./costs.service";
 import { AccountsService } from "./accounts.service";
 import { LeaksService } from "./leaks.service";
 import { MoneyController } from "./money.controller";
+import { ShipmentCosts } from "./shipment-costs.service";
 
-@Module({ imports: [OrdersModule, FactsModule, BillingModule, TreasuryModule], controllers: [MoneyController], providers: [MoneyService, CostsService, AccountsService, LeaksService], exports: [MoneyService, AccountsService, LeaksService] })
+@Module({ imports: [OrdersModule, FactsModule, BillingModule, TreasuryModule], controllers: [MoneyController], providers: [MoneyService, CostsService, AccountsService, LeaksService, ShipmentCosts], exports: [MoneyService, AccountsService, LeaksService, ShipmentCosts] })
 export class MoneyModule {}

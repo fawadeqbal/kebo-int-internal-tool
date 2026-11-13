@@ -103,6 +103,9 @@ export interface ShipmentView {
   /** prepaid | collect */
   freightTerms?: string | null;
   insuredValue?: string | null;
+  /** What the insurance costs us, in its currency: a cost of the order by itself. */
+  insurancePremium?: string | null;
+  insuranceCurrency?: string | null;
   customsDeclarationNo?: string | null;
   clearedOn?: string | null;
 }

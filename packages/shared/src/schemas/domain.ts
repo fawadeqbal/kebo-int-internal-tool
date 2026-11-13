@@ -747,11 +747,15 @@ export const expenseInput = z.object({
   borneBy: z.enum(EXPENSE_BEARERS).optional(),
   /** Paid by `paidById` from their own money: shows under "To repay" until it is repaid. */
   ownMoney: optionalBool,
+  /** A cost known and not paid yet (a forwarder's bill): it counts at once and shows as "to pay" until it is paid. */
+  payLater: optionalBool,
+  /** Who we owe it to, in words (the forwarder, the insurer). Left out on a change: kept. */
+  payee: optionalText(120).optional(),
   reason: optionalText(500).optional(),
 });
 export type ExpenseInput = z.infer<typeof expenseInput>;
 
-/** Paying back someone who paid an expense from their own money. */
+/** Paying a bill, or paying back someone who paid an expense from their own money: the day and the account it left from. */
 export const repayInput = z.object({
   repaidOn: isoDate(),
   /** Which of our accounts the money left from (same currency as the expense). */

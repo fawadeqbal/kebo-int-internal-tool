@@ -6,6 +6,61 @@ import { repayAction } from "@/app/(app)/money/actions";
 import { FieldRow, SectionWindow } from "./section-window";
 
 /**
+ * "Pay" on a cost that waits: the bill is paid on a day, from one of our accounts. The transfer slip is kept
+ * with the order's costs.
+ */
+export function PayCostWindow({
+  orderId,
+  id,
+  currency,
+  sub,
+  today,
+  from,
+  canFiles,
+}: {
+  orderId: string;
+  id: string;
+  currency: string;
+  /** "Sino-Africa Logistics · Sea freight · USD 6,400.00". */
+  sub: string;
+  today: string;
+  /** The earliest day it can be paid (the day the cost is dated). */
+  from: string;
+  canFiles: boolean;
+}) {
+  const accounts = useAccounts().filter((a) => a.currency === currency && !a.archived);
+  return (
+    <SectionWindow
+      button={{ label: "Pay", kind: "plain" }}
+      title="Pay"
+      sub={sub}
+      action={repayAction.bind(null, orderId, [id])}
+      submit="Pay"
+      whats={["The cost shows the day it was paid.", "It leaves “to pay” and shows under Payments."]}
+      files={canFiles ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
+    >
+      {(s) => (
+        <FieldRow>
+          <Field label="Paid on" htmlFor={`pay-${id}`} error={s.errors?.repaidOn}>
+            <Input id={`pay-${id}`} name="repaidOn" type="date" min={from} max={today} defaultValue={s.values?.repaidOn ?? today} />
+          </Field>
+          <Field label="From" htmlFor={`pay-acc-${id}`} optional error={s.errors?.accountId}>
+            <Select id={`pay-acc-${id}`} name="accountId" defaultValue={s.values?.accountId ?? ""}>
+              <option value="">Not said</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </FieldRow>
+      )}
+    </SectionWindow>
+  );
+}
+
+/**
  * "Repay": pays back what one person paid from their own money on this order, on a day, from one of
  * our accounts. The transfer slip is kept with the order's expenses.
  */

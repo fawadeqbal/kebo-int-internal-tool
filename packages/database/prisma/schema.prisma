@@ -1473,6 +1473,9 @@ model Shipment {
   /// prepaid | collect
   freightTerms         String?   @map("freight_terms") @db.VarChar(10)
   insuredValue         Decimal?  @map("insured_value") @db.Decimal(14, 2)
+  /// What the insurance costs us (the premium), in `insuranceCurrency`: it is a cost of the order by itself.
+  insurancePremium     Decimal?  @map("insurance_premium") @db.Decimal(14, 2)
+  insuranceCurrency    String?   @map("insurance_currency") @db.Char(3)
   /// Customs at the destination.
   customsDeclarationNo String?   @map("customs_declaration_no") @db.VarChar(60)
   clearedOn            DateTime? @map("cleared_on") @db.Date
@@ -1719,8 +1722,15 @@ model Expense {
   borneBy         String        @default("us") @map("borne_by") @db.VarChar(10)
   /// Paid by `paidBy` from their own money: we owe it back until `repaidOn`.
   ownMoney        Boolean       @default(false) @map("own_money")
+  /// A cost known before it is paid (a forwarder's bill): it counts from `spentOn` and we owe it to `payee` until `repaidOn`.
+  payLater        Boolean       @default(false) @map("pay_later")
+  /// Who we owe it to, in words (the forwarder, the insurer, a courier). A factory's cost names `factory` instead.
+  payee           String?       @db.VarChar(120)
+  /// Made by the system from another record and kept in step with it: "shipment:<id>:freight", "shipment:<id>:insurance".
+  source          String?       @db.VarChar(80)
+  /// The day the person was paid back (own money), or the bill was paid (pay later).
   repaidOn        DateTime?     @map("repaid_on") @db.Date
-  /// The account the money was paid back from.
+  /// The account that money left from.
   repaidAccountId String?       @map("repaid_account_id") @db.Uuid
   repaidAccount   MoneyAccount? @relation("ExpenseRepaidFrom", fields: [repaidAccountId], references: [id])
   recordedById    String        @map("recorded_by") @db.Uuid
@@ -1739,6 +1749,7 @@ model Expense {
   @@index([spentOn])
   @@index([accountId])
   @@index([repaidAccountId])
+  @@index([source])
   @@index([companyId])
   @@map("expenses")
 }
@@ -2684,7 +2695,7 @@ model LedgerEntry {
   moneyAccountId String?       @map("money_account_id") @db.Uuid
   moneyAccount   MoneyAccount? @relation(fields: [moneyAccountId], references: [id], onDelete: Restrict)
   /// The fixed account: money:<id> | money:none:<CUR> | customer:<id> | credit:<customerId> | factory:<id> | staff:<userId> |
-  /// expense:<category> | sales | goods_cost | bank_charges | fx_diff | expenses_recovered | opening
+  /// expense:<category> | sales | goods_cost | bank_charges | fx_diff | expenses_recovered | bills | opening
   account        String        @db.VarChar(80)
   /// In the entry's currency.
   debit          Decimal       @default(0) @db.Decimal(16, 2)

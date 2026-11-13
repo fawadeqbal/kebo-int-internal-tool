@@ -268,9 +268,14 @@ export class TreasuryService {
         ? this.prisma.db.expense.findMany({
             where: {
               ...pick("expense"),
-              ...(range ? { spentOn: range } : {}),
               ...(q.order ? { orderId: q.order } : {}),
-              ...(party ? { OR: [{ customerId: party }, { factoryId: party }] } : {}),
+              AND: [
+                // A bill known before it is paid is a payment on the day it is paid, and not one until then.
+                range
+                  ? { OR: [{ payLater: false, spentOn: range }, { payLater: true, repaidOn: range }] }
+                  : { OR: [{ payLater: false }, { payLater: true, repaidOn: { not: null } }] },
+                ...(party ? [{ OR: [{ customerId: party }, { factoryId: party }] }] : []),
+              ],
             },
             include: {
               order: orderRef,
@@ -278,6 +283,7 @@ export class TreasuryService {
               customer: name,
               factory: name,
               account: { select: { id: true, name: true, kind: true } },
+              repaidAccount: { select: { id: true, name: true, kind: true } },
               paidBy: name,
               recordedBy: name,
             },
@@ -394,26 +400,29 @@ export class TreasuryService {
         by: first(p.movement.recordedBy),
         accountId: p.movement.accountId,
       });
-    for (const e of expenses)
+    for (const e of expenses) {
+      // A bill paid later: the day and the account are those of its payment.
+      const from = e.payLater ? e.repaidAccount : e.account;
       out.push({
         kind: "expense",
         id: e.id,
         number: null,
-        on: fromDbDate(e.spentOn),
+        on: fromDbDate(e.payLater && e.repaidOn ? e.repaidOn : e.spentOn),
         direction: "out",
         what: `${EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory] ?? e.category}: ${e.description}`,
         amount: money(e.amount),
         currency: e.currency,
         party: e.factory ? supplierLink(e.factory) : customerLink(e.customer),
         for: e.order ? [orderLink(e.order)] : e.inquiry ? [{ label: e.inquiry.refNo, href: `/inquiries/${e.inquiry.id}` }] : [],
-        account: e.ownMoney ? `${e.paidBy?.name ?? "Someone"}'s own money` : (e.account?.name ?? null),
+        account: e.ownMoney ? `${e.paidBy?.name ?? "Someone"}'s own money` : (from?.name ?? null),
         reference: e.reference,
         status: statusOf(e.voidedAt),
         fromCredit: false,
-        method: e.ownMoney ? "Own money" : e.account?.kind === "cash" ? "Cash" : e.account ? "Bank transfer" : null,
+        method: e.ownMoney ? "Own money" : from?.kind === "cash" ? "Cash" : from ? "Bank transfer" : null,
         by: first(e.recordedBy),
-        accountId: e.accountId,
+        accountId: e.payLater ? e.repaidAccountId : e.accountId,
       });
+    }
     for (const t of transfers)
       out.push({
         kind: "transfer",
@@ -629,14 +638,15 @@ export class TreasuryService {
             { label: "Category", value: EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory] ?? e.category },
             { label: "Borne by", value: borne },
             ...(e.paidBy ? [{ label: "Paid by", value: e.paidBy.name }] : []),
-            ...(e.ownMoney
+            ...(e.ownMoney || e.payLater
               ? [
                   {
-                    label: "Paid back",
+                    label: e.payLater ? "Paid" : "Paid back",
                     value: e.repaidOn ? `${fromDbDate(e.repaidOn)}${e.repaidAccount ? ` from ${e.repaidAccount.name}` : ""}` : "Not yet",
                   },
                 ]
               : []),
+            ...(e.payee ? [{ label: "Owed to", value: e.payee }] : []),
             ...(e.note ? [{ label: "Note", value: e.note }] : []),
           ],
           file: e.files[0] ? { name: e.files[0].fileName, href: `/files/${e.files[0].id}` } : null,
