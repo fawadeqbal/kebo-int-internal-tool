@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EditRequestWindow } from "../inquiry-windows";
-import { can, CHANNEL_LABEL, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, PRIORITY_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
+import { ATTACHMENT_KIND_LABEL, can, CHANNEL_LABEL, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, PRIORITY_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
+import { Paperclip } from "lucide-react";
 import { Badge, Card, CardBody, CardHeader, cn, RefCode } from "@kebo/ui";
 import { DetailsCard } from "@/components/common/record";
 import { requireUser } from "@/lib/session";
@@ -206,6 +207,26 @@ export default async function DealOverview({ params, searchParams }: { params: P
           { label: "Priority", value: PRIORITY_LABEL[d.priority] },
           { label: "Needed by", value: d.requiredBy ? date(d.requiredBy) : null },
           { label: "What they need", value: d.requirements && <span className="whitespace-pre-line">{d.requirements}</span>, wide: true },
+          {
+            // The same files as "Files from the customer" in the request's window: what came with the request is read with it.
+            label: "Files from the customer",
+            wide: true,
+            value: d.attachments.length > 0 && (
+              <ul className="flex flex-col gap-1.5">
+                {d.attachments.map((f) => (
+                  <li key={f.id} className="flex flex-wrap items-baseline gap-x-2">
+                    <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-primary [overflow-wrap:anywhere] hover:underline">
+                      <Paperclip className="size-3.5 shrink-0 self-center" aria-hidden />
+                      {f.fileName}
+                    </a>
+                    <span className="text-xs font-normal text-text-2">
+                      {ATTACHMENT_KIND_LABEL[f.kind]} · {date(f.createdAt)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ),
+          },
         ]}
         edit={d.allowed.edit ? { panel: "edit-request", label: "Edit the request" } : null}
       />
