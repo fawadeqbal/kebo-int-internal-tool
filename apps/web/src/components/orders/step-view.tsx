@@ -317,10 +317,13 @@ export function DetailsCard({
   panelTitle,
   panelDescription,
   panelBody,
+  panelClassName,
   actions,
   footer,
   edits,
 }: {
+  /** The panel's width, when its body needs more than the usual (a window with three columns). */
+  panelClassName?: string;
   id?: string;
   /** Where checklist links land: the card is `target`, each value `target.name` (see goTo). */
   target?: string;
@@ -364,6 +367,7 @@ export function DetailsCard({
           ? {
               title: panelTitle ?? `Edit ${typeof title === "string" ? title.toLowerCase() : "the details"}`,
               description: panelDescription ?? "Everything about it in one place. Saving updates the checklist.",
+              className: panelClassName,
               body: panelBody ?? <FieldsForm action={action!} fields={fields} edit={edits?.ref} card={edits?.card} plain={edits?.plain} />,
             }
           : undefined

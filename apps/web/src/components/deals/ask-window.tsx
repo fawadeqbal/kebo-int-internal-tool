@@ -1,15 +1,16 @@
 "use client";
 
+import { ConfirmDialog } from "@/components/common/dialog";
 import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Copy, FileSpreadsheet, Filter, Plus, Search } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL, REQUEST_CHANNELS } from "@kebo/shared";
 import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
+import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { FloatingMenu } from "@/components/common/floating";
-import { useClosePanel } from "@/components/common/panel";
+import { useClosePanel, WhatHappens } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryRequests } from "@/lib/types-flow";
 
@@ -192,6 +193,7 @@ export function RequestMore({
   remove: Action;
 }) {
   const [open, setOpen] = useState(false);
+  const [asking, setAsking] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -201,7 +203,7 @@ export function RequestMore({
       const form = new FormData();
       for (const [k, v] of Object.entries(values)) form.set(k, v);
       const r = await fn({}, form);
-      if (!r.ok && r.message) alert(r.message);
+      if (!r.ok && r.message) toast(r.message);
       router.refresh();
     });
   };
@@ -242,11 +244,30 @@ export function RequestMore({
             type="button"
             role="menuitem"
             className={cn(item, "text-bad")}
-            onClick={() => (confirm(`Remove the request to ${name}?`) ? run(remove, {})() : setOpen(false))}
+            onClick={() => {
+              setOpen(false);
+              setAsking(true);
+            }}
           >
             Remove the request
           </button>
         </FloatingMenu>
+      )}
+      {asking && (
+        <ConfirmDialog
+          title={`Remove the request to ${name}?`}
+          confirmLabel="Remove the request"
+          cancelLabel="Keep it"
+          danger
+          busy={pending}
+          onCancel={() => setAsking(false)}
+          onConfirm={() => {
+            setAsking(false);
+            run(remove, {})();
+          }}
+        >
+          <WhatHappens lines={["The line leaves this inquiry. Nothing else changes.", `${name} stays in Partners.`]} />
+        </ConfirmDialog>
       )}
     </>
   );
