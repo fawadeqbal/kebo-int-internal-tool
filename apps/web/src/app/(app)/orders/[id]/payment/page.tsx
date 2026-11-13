@@ -13,7 +13,8 @@ import { LcChecks, UseCredit } from "@/components/money/money-v2";
 import { editPaymentAction, removePaymentFileAction, savePlanAction, sendRequestAction } from "../../../money/actions";
 import { voidPaymentAction } from "../../../payments/actions";
 import { bankContractAction, routeAction } from "../../flow-actions";
-import { paymentAction, useCreditAction } from "../../actions";
+import { paymentAction, submitPaymentAction, useCreditAction } from "../../actions";
+import { WaitingToVerify } from "@/components/money/waiting-money";
 import { stageData } from "../stage-data";
 
 export const metadata = { title: "Order · payment" };
@@ -39,6 +40,8 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const [p, m, settings] = await Promise.all([orderPaymentsOf(id), orderMoneyOf(id), getSettings()]);
   const c = o.currency;
   const canPay = can(me, "payments.record") && o.status !== "cancelled";
+  // Staff add money that a manager verifies: the same window, kept waiting until then.
+  const canSend = !can(me, "payments.record") && can(me, "money.submit") && o.status !== "cancelled";
   const canRoute = can(me, "orders.update") && d.open && !!flow;
   const route = flow?.payment.route ?? null;
   const lc = route === "letter_of_credit";
@@ -51,7 +54,10 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const balance = (Number(o.money.total) - Number(o.money.deposit)).toFixed(2);
   // Money pays the plan's parts in order: the first open one offers "Record payment". Without one (no plan, or only charges left) the list below does.
   const openPart = m.plan.items.some((i) => i.request.state !== "paid");
-  const pay = canPay && !paid ? { action: paymentAction.bind(null, o.id, c), customer: o.customer.name, refNo: o.refNo, due: p.due, depositDue: p.depositDue, fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates }, today: now } : null;
+  const pay =
+    (canPay || canSend) && !paid
+      ? { action: (canPay ? paymentAction : submitPaymentAction).bind(null, o.id, c), customer: o.customer.name, refNo: o.refNo, due: p.due, depositDue: p.depositDue, fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates }, today: now, verify: !canPay }
+      : null;
   const record = pay && !openPart && <RecordPaymentWindow main {...pay} currency={c} forWhat={m.plan.next?.label ?? null} />;
   /** The parts of the plan a payment paid ("Deposit 30%"), and its receipt. */
   const paidFor = new Map<string, string[]>();
@@ -138,6 +144,11 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
             </p>
           )}
           <PaymentPlanTable orderId={o.id} plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} send={sendRequestAction.bind(null, o.id)} pay={pay} />
+          {(canPay || canSend) && (
+            <div className="mx-[18px] empty:hidden">
+              <WaitingToVerify orderId={o.id} verifies={canPay} />
+            </div>
+          )}
           {m.charged.length > 0 && (
             <ul aria-label="Charged to the customer" className="mx-[18px] flex flex-col divide-y divide-line rounded-lg border border-line text-sm">
               {m.charged.map((x) => (

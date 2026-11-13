@@ -1,7 +1,7 @@
 "use client";
 
-import { Field, Input, Select } from "@kebo/ui";
-import { useAccounts } from "@/components/money/accounts";
+import { Field, Input } from "@kebo/ui";
+import { AccountSelect, RecordedBy } from "@/components/money/accounts";
 import { repayAction } from "@/app/(app)/money/actions";
 import { FieldRow, SectionWindow } from "./section-window";
 
@@ -29,7 +29,6 @@ export function PayCostWindow({
   from: string;
   canFiles: boolean;
 }) {
-  const accounts = useAccounts().filter((a) => a.currency === currency && !a.archived);
   return (
     <SectionWindow
       button={{ label: "Pay", kind: "plain" }}
@@ -41,21 +40,15 @@ export function PayCostWindow({
       files={canFiles && orderId ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
     >
       {(s) => (
-        <FieldRow>
-          <Field label="Paid on" htmlFor={`pay-${id}`} error={s.errors?.repaidOn}>
-            <Input id={`pay-${id}`} name="repaidOn" type="date" min={from} max={today} defaultValue={s.values?.repaidOn ?? today} />
-          </Field>
-          <Field label="From" htmlFor={`pay-acc-${id}`} optional error={s.errors?.accountId}>
-            <Select id={`pay-acc-${id}`} name="accountId" defaultValue={s.values?.accountId ?? ""}>
-              <option value="">Not said</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </FieldRow>
+        <>
+          <FieldRow>
+            <Field label="Paid on" htmlFor={`pay-${id}`} error={s.errors?.repaidOn}>
+              <Input id={`pay-${id}`} name="repaidOn" type="date" min={from} max={today} defaultValue={s.values?.repaidOn ?? today} />
+            </Field>
+            <AccountSelect id={`pay-acc-${id}`} label="From account" currency={currency} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+          </FieldRow>
+          <RecordedBy />
+        </>
       )}
     </SectionWindow>
   );
@@ -85,7 +78,6 @@ export function RepayWindow({
   today: string;
   canFiles: boolean;
 }) {
-  const accounts = useAccounts().filter((a) => a.currency === currency && !a.archived);
   return (
     <SectionWindow
       button={{ label: "Repay", kind: "plain" }}
@@ -97,21 +89,15 @@ export function RepayWindow({
       files={canFiles && orderId ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
     >
       {(s) => (
-        <FieldRow>
-          <Field label="Repaid on" htmlFor={`repay-${ids[0]}`} error={s.errors?.repaidOn}>
-            <Input id={`repay-${ids[0]}`} name="repaidOn" type="date" max={today} defaultValue={s.values?.repaidOn ?? today} />
-          </Field>
-          <Field label="From account" htmlFor={`repay-acc-${ids[0]}`} optional error={s.errors?.accountId}>
-            <Select id={`repay-acc-${ids[0]}`} name="accountId" defaultValue={s.values?.accountId ?? ""}>
-              <option value="">Not said</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </FieldRow>
+        <>
+          <FieldRow>
+            <Field label="Repaid on" htmlFor={`repay-${ids[0]}`} error={s.errors?.repaidOn}>
+              <Input id={`repay-${ids[0]}`} name="repaidOn" type="date" max={today} defaultValue={s.values?.repaidOn ?? today} />
+            </Field>
+            <AccountSelect id={`repay-acc-${ids[0]}`} label="From account" currency={currency} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+          </FieldRow>
+          <RecordedBy />
+        </>
       )}
     </SectionWindow>
   );

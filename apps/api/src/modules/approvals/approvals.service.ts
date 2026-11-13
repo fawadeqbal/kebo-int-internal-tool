@@ -275,13 +275,13 @@ export class ApprovalsService {
    * ?status=pending|approved|sent_back|withdrawn|all (default pending), ?mine=true (what I added; else what
    * I approve: the kinds I record, on orders I see). Pending oldest first; the rest newest first.
    */
-  async list(user: SessionUser, q: { status: SubmissionStatus | "all"; mine: boolean; page: number; pageSize: number }) {
+  async list(user: SessionUser, q: { status: SubmissionStatus | "all"; mine: boolean; orderId?: string; page: number; pageSize: number }) {
     const kinds = await this.kindsFor(user);
     if (!q.mine && !kinds.length) throw new ForbiddenError("Only someone who records payments or expenses approves them.");
     const scope: Prisma.MoneySubmissionWhereInput = q.mine
       ? { submittedById: user.id }
       : { kind: { in: kinds }, OR: [{ orderId: null }, { order: { is: orderAccess(user) } }] };
-    const where: Prisma.MoneySubmissionWhereInput = { ...scope, ...(q.status === "all" ? {} : { status: q.status }) };
+    const where: Prisma.MoneySubmissionWhereInput = { ...scope, ...(q.orderId ? { orderId: q.orderId } : {}), ...(q.status === "all" ? {} : { status: q.status }) };
     const [rows, total, grouped] = await Promise.all([
       this.prisma.db.moneySubmission.findMany({
         where,

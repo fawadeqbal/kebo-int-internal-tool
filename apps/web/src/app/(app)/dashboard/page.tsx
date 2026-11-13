@@ -10,6 +10,9 @@ import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
 import { money, TZ } from "@/lib/format";
 import type { HomeFigures, Receivables, Reminders } from "@/lib/types-insights";
+import { getSettings } from "@/lib/loaders";
+import { SendCostWindow } from "@/components/money/send-cost";
+import { WaitingToVerify } from "@/components/money/waiting-money";
 import { CustomersOwe, InquiriesNow, MonthFigures, NeedsYou, NextWeeks, OrdersNow, SoldByMonth, StandsOut, ThinProfit } from "@/components/home/board";
 
 export const metadata = { title: "Home" };
@@ -39,6 +42,9 @@ export default async function DashboardPage() {
   const today = todayIn(TZ);
   const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: TZ }).format(new Date()));
   const hello = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  // Staff add money and costs that a manager verifies; people who record them verify.
+  const verifies = can(me, "payments.record") || can(me, "expenses.manage");
+  const sendsCosts = !can(me, "expenses.manage") && can(me, "money.submit") && (await hasFeature("expenses"));
   const day = new Date(`${today}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
   return (
@@ -67,6 +73,11 @@ export default async function DashboardPage() {
               Add a cost
             </ButtonLink>
           )}
+          {sendsCosts && (
+            <Suspense>
+              <SendCost meId={me.id} today={today} />
+            </Suspense>
+          )}
           {can(me, "inquiries.create") && (
             <ButtonLink href="/inquiries?panel=new-inquiry" variant="primary">
               <Plus aria-hidden /> New inquiry
@@ -75,9 +86,20 @@ export default async function DashboardPage() {
         </div>
       </header>
 
+      {(verifies || can(me, "money.submit")) && (
+        <Suspense>
+          <WaitingToVerify verifies={verifies} title={verifies ? "Waiting for you to verify" : "What you sent, waiting to be verified"} limit={5} />
+        </Suspense>
+      )}
       {insights ? <Board /> : <Simple />}
     </div>
   );
+}
+
+/** Staff's "Add a cost": their open orders to choose from, and the company's currency. */
+async function SendCost({ meId, today }: { meId: string; today: string }) {
+  const [orders, settings] = await Promise.all([api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1, pageSize: 100 }).catch(() => null), getSettings()]);
+  return <SendCostWindow meId={meId} today={today} mainCurrency={settings.sales.currency} orders={(orders?.rows ?? []).map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name }))} />;
 }
 
 const block = (h: string) => <div className={cn("animate-pulse rounded-2xl bg-surface-2", h)} aria-hidden />;

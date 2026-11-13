@@ -34,6 +34,8 @@ const listQuery = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => v === "true"),
+  /** Only what was sent on this order (the order's Payment tab). */
+  orderId: z.uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });
@@ -47,7 +49,7 @@ const listQuery = z.object({
 export class SubmissionsController {
   constructor(private readonly approvals: ApprovalsService) {}
 
-  /** ?status=pending|approved|sent_back|withdrawn|all&mine=true&page&pageSize → { rows, total, page, pageSize, counts, approves, canSubmit } */
+  /** ?status=pending|approved|sent_back|withdrawn|all&mine=true&orderId&page&pageSize → { rows, total, page, pageSize, counts, approves, canSubmit } */
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(listQuery)) q: z.infer<typeof listQuery>) {
     return this.approvals.list(user, q);

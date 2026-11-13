@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
+import { todayIn } from "@kebo/utils";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
+import { TZ } from "@/lib/format";
 
 /** Money changes show on the order, the customer and the Money page. */
 const refresh = (orderId?: string | null, customerId?: string | null) => {
@@ -228,6 +230,41 @@ export async function saveAccountAction(id: string | null, _prev: ActionState, f
   const r = await attempt(form, () => (id ? api.patch(`/money/accounts/${id}`, body) : api.post("/money/accounts", body)), id ? "Account saved." : "Account added.");
   if (r.ok) revalidatePath("/", "layout");
   return r;
+}
+
+/**
+ * A cost added by someone who does not record costs themselves (Staff): it waits for a manager to verify,
+ * and counts only then. On an order, or the company's own; from their own money, or from one of our accounts.
+ */
+export async function submitCostAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const own = v.ownMoney === "on";
+  const orderId = v.orderId || null;
+  const body = {
+    orderId,
+    category: v.category,
+    description: v.description?.trim() ?? "",
+    amount: v.amount,
+    currency: v.currency,
+    spentOn: v.spentOn,
+    ownMoney: own,
+    paidById: own ? v.paidById || null : null,
+    accountId: own ? null : v.accountId || null,
+  };
+  const r = await attempt(form, () => api.post("/submissions", { kind: "expense", orderId, body }), "Sent to a manager to verify.");
+  if (r.ok) revalidatePath("/", "layout");
+  return r;
+}
+
+/**
+ * An account added from inside a money window (name and kind; it starts empty, today): the window chooses it
+ * at once, so the answer carries its id. Its opening balance and note are changed on Cash & bank.
+ */
+export async function quickAccountAction(name: string, kind: string, currency: string): Promise<{ ok: boolean; message?: string; id?: string }> {
+  const body = { name: name.trim(), kind, currency, openingBalance: "0", openingOn: todayIn(TZ), note: null };
+  const r = await attempt(null, () => api.post<{ id: string }>("/money/accounts", body), "Account added.");
+  if (r.ok) revalidatePath("/", "layout");
+  return { ok: !!r.ok, message: r.ok ? r.message : (r.errors?.name?.[0] ?? r.message), id: (r.data as { id?: string } | undefined)?.id };
 }
 
 /** Money moved between two of our accounts. */

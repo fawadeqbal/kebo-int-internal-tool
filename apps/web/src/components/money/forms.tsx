@@ -24,7 +24,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
-import { AccountSelect } from "./accounts";
+import { AccountSelect, RecordedBy } from "./accounts";
 import { FilePicker, uploadFile, useSaveThenSend } from "./attachment";
 import { MoneyInput } from "@/components/common/money-input";
 import { convertText, rateOf, type Fx } from "@/lib/fx";
@@ -739,6 +739,7 @@ export function FactoryPaymentForm({
             <Textarea id="fp-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? payment?.note ?? ""} />
           </Field>
           {payment && bare && <WhyField id="fp-reason" error={s.errors?.reason} value={s.values?.reason} />}
+          {!payment && <RecordedBy />}
           <div className="flex gap-2">
             <SubmitButton size="sm" pendingText={file ? "Saving, sending the file…" : "Saving…"} disabled={mismatch}>
               {payment ? "Save the change" : "Record the payment"}

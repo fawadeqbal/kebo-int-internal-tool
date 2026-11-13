@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const feature = (f: string) => !company || company.features.includes(f);
   const has = (p: Parameters<typeof can>[1]) => can(me, p);
   // Our money accounts, for every form that records money (payments, factory payments, expenses).
-  const accounts = has("payments.record") || has("expenses.manage") ? await api.get<AccountOption[]>("/money/accounts").catch(() => []) : [];
+  const accounts = has("payments.record") || has("expenses.manage") || has("money.submit") ? await api.get<AccountOption[]>("/money/accounts").catch(() => []) : [];
   // Money received and expenses sent for approval: approvers see how many wait for them; those who add them, how many were sent back.
   const approves = has("payments.record") || (has("expenses.manage") && feature("expenses"));
   const approvals =
@@ -89,7 +89,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </p>
         )}
         <FeaturesProvider features={company?.features ?? null}>
-          <AccountsProvider accounts={accounts}>{children}</AccountsProvider>
+          <AccountsProvider accounts={accounts} me={me.name} canAdd={has("expenses.manage") && feature("cash_book")}>
+            {children}
+          </AccountsProvider>
         </FeaturesProvider>
       </AppShell>
       <Suspense>

@@ -17,7 +17,7 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
  * "Approve" (records it now as the usual payment or expense). `what` names the row for screen readers
  * ("money received · SO-2026-0447 · USD 1,000.00").
  */
-export function ApproveButtons({ approve, sendBack, what }: { approve: Action; sendBack: Action; what: string }) {
+export function ApproveButtons({ approve, sendBack, what, verb = "Approve" }: { approve: Action; sendBack: Action; what: string; /** The word on the button ("Verify" where the page says verify). */ verb?: "Approve" | "Verify" }) {
   const [asking, setAsking] = useState(false);
   return (
     <div className="flex flex-wrap items-start justify-end gap-2">
@@ -25,8 +25,8 @@ export function ApproveButtons({ approve, sendBack, what }: { approve: Action; s
         <Undo2 aria-hidden /> Send back…
       </Button>
       <ActionForm action={approve} showSuccess={false}>
-        <SubmitButton size="sm" pendingText="Approving…" aria-label={`Approve ${what}`}>
-          <Check aria-hidden /> Approve
+        <SubmitButton size="sm" pendingText={verb === "Verify" ? "Verifying…" : "Approving…"} aria-label={`${verb} ${what}`}>
+          <Check aria-hidden /> {verb}
         </SubmitButton>
       </ActionForm>
       {asking && <SendBackDialog action={sendBack} what={what} onClose={() => setAsking(false)} />}

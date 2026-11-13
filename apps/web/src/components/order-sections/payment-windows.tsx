@@ -69,6 +69,8 @@ export function RecordPaymentWindow({
   /** Open at once (a list's row asked for it), and what to do once it closes. */
   startOpen?: boolean;
   onClosed?: () => void;
+  /** The person sends money for a manager to verify (it does not count until then). */
+  verify?: boolean;
 }) {
   const [fileError, setFileError] = useState<string | null>(null);
   const { startOpen, onClosed, ...fields } = p;

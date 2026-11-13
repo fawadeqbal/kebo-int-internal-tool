@@ -102,11 +102,12 @@ export async function orderLineAction(orderId: string, lineId: string, body: Rec
  * this order's part, other orders it also pays, the rest as the customer's
  * credit; "Money reached us" ticks the bank step with it.
  */
-export async function paymentAction(orderId: string, currency: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+/** What the Record payment form says, as the API takes it (the same for recording it and for sending it to verify). */
+function paymentBody(form: FormData, currency: string) {
   const v = formValues(form);
   const parts = partsOf(v.parts);
   const received = v.receivedAmount ?? v.amount;
-  const body = {
+  return {
     kind: v.kind,
     // Money v2: `amount` is this order's part (blank: what it counts as, up to what is due).
     amount: v.receivedAmount !== undefined ? v.amount || null : v.amount,
@@ -124,8 +125,21 @@ export async function paymentAction(orderId: string, currency: string, _prev: Ac
     parts,
     ...(v.bankStep ? { bankStep: v.bankStep } : {}),
   };
-  const r = await attempt(form, () => api.post(`/orders/${orderId}/payments`, body), "Payment recorded.");
+}
+
+export async function paymentAction(orderId: string, currency: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.post(`/orders/${orderId}/payments`, paymentBody(form, currency)), "Payment recorded.");
   if (r.ok) refresh(orderId);
+  return r;
+}
+
+/**
+ * Someone who does not record money themselves (Staff) adds a payment received: it waits for a manager to
+ * verify, and counts on the order only then. The same form and the same checks as recording it.
+ */
+export async function submitPaymentAction(orderId: string, currency: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.post("/submissions", { kind: "payment", orderId, body: paymentBody(form, currency) }), "Sent to a manager to verify.");
+  if (r.ok) revalidatePath("/", "layout");
   return r;
 }
 
