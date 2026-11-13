@@ -260,8 +260,7 @@ export default async function FollowUpsPage({
               }
             />
           ) : (
-            <DataTable label="Follow-ups">
-              <table className="w-full min-w-[720px] text-[13px]">
+            <DataTable label="Follow-ups" tableClassName="min-w-[720px] text-[13px]">
                 <THead>
                   <tr>
                     <Th className="w-12">
@@ -339,7 +338,6 @@ export default async function FollowUpsPage({
                     );
                   })}
                 </tbody>
-              </table>
             </DataTable>
           )}
           <Pager base="/follow-ups" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} />

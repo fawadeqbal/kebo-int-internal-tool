@@ -151,8 +151,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
             description="Their orders and payments show here as a statement, with the balance after each."
           />
         ) : (
-          <DataTable label="Statement">
-            <table className="w-full min-w-[1000px] text-[13px]">
+          <DataTable label="Statement" tableClassName="min-w-[1000px] text-[13px]">
               <THead>
                 <tr>
                   <Th>Date</Th>
@@ -193,7 +192,6 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
                   </Td>
                 </tr>
               </tfoot>
-            </table>
           </DataTable>
         )}
       </Card>

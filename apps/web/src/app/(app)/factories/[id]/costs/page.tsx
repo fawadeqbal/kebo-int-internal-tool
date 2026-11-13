@@ -137,8 +137,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
             description="What we buy from this factory and what we pay it show here, with what we owe after each."
           />
         ) : (
-          <DataTable label="Statement">
-            <table className="w-full min-w-[1000px] text-[13px]">
+          <DataTable label="Statement" tableClassName="min-w-[1000px] text-[13px]">
               <THead>
                 <tr>
                   <Th>Date</Th>
@@ -175,7 +174,6 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
                   <Td className="text-right tabular">{two(closing)}</Td>
                 </tr>
               </tfoot>
-            </table>
           </DataTable>
         )}
       </Card>

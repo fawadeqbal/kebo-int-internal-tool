@@ -108,8 +108,7 @@ export default async function FactoryOffers({
                 );
               })}
             </PhoneList>
-            <DataTable label="Offers" className="max-sm:hidden">
-              <table className="w-full min-w-[1100px] text-[13px]">
+            <DataTable label="Offers" className="max-sm:hidden" tableClassName="min-w-[1100px] text-[13px]">
                 <THead>
                   <tr>
                     <Th>Inquiry</Th>
@@ -145,7 +144,6 @@ export default async function FactoryOffers({
                     );
                   })}
                 </tbody>
-              </table>
             </DataTable>
           </>
         )}

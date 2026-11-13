@@ -120,8 +120,7 @@ export default async function FactoryOverview({
             />
             {pos ? (
               pos.rows.length ? (
-                <DataTable label="Purchase orders">
-                  <table className="w-full min-w-[640px] text-[13px]">
+                <DataTable label="Purchase orders" tableClassName="min-w-[640px] text-[13px]">
                     <THead>
                       <tr>
                         <Th>Sales order</Th>
@@ -149,7 +148,6 @@ export default async function FactoryOverview({
                         );
                       })}
                     </tbody>
-                  </table>
                 </DataTable>
               ) : (
                 <EmptyState
