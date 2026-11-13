@@ -331,6 +331,8 @@ export class FlowService {
       freightCurrency: s.freightCurrency,
       insurer: s.insurer,
       insurancePolicyNo: s.insurancePolicyNo,
+      freightTerms: s.freightTerms,
+      insuredValue: s.insuredValue === null ? null : s.insuredValue.toString(),
       customsDeclarationNo: s.customsDeclarationNo,
       clearedOn: fromDbDateOrNull(s.clearedOn),
     }));
@@ -1019,6 +1021,8 @@ export class FlowService {
       "freightCurrency",
       "insurer",
       "insurancePolicyNo",
+      "freightTerms",
+      "insuredValue",
       "customsDeclarationNo",
     ] as const) {
       if (input[k] !== undefined) (d as Record<string, unknown>)[k] = input[k];

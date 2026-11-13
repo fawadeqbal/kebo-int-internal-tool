@@ -12,6 +12,7 @@ import {
   SHIPMENT_STATUSES,
 } from "../enums";
 import { REQUEST_CHANNELS } from "../workflows/flow";
+import { FREIGHT_TERMS } from "../workflows/order-sections";
 import { BALANCE_WHENS, LC_TERMS } from "../workflows/money-route";
 import { id, isoDate, optionalAmount, optionalDate, optionalId, optionalText, text } from "./common";
 
@@ -148,6 +149,12 @@ const shipmentFields = {
   freightCurrency: z.preprocess((v) => (v === "" || v === null ? null : typeof v === "string" ? v.trim().toUpperCase() : v), z.string().length(3, "A currency like USD").nullable()),
   insurer: optionalText(120),
   insurancePolicyNo: optionalText(60),
+  /** How the freight is paid (prepaid | collect) and what the goods are insured for (in the order's currency). */
+  freightTerms: optionalEnum(FREIGHT_TERMS),
+  insuredValue: z.preprocess(
+    (v) => (v === "" || v === null ? null : typeof v === "string" ? v.replace(/,/g, "").trim() : v),
+    z.coerce.number().min(0, "Cannot be negative").max(999_999_999_999).nullable(),
+  ),
   /** Customs at the destination. */
   customsDeclarationNo: optionalText(60),
   clearedOn: optionalDate,
@@ -168,7 +175,7 @@ export const shipmentInput = z
     status: shipmentFields.status.default("planned"),
     vgmKg: shipmentFields.vgmKg.optional().transform((v) => v ?? null),
     ...Object.fromEntries(
-      (["forwarderContact", "forwarderPhone", "customsBroker", "trackingNo", "freightAmount", "freightCurrency", "insurer", "insurancePolicyNo", "customsDeclarationNo", "clearedOn"] as const).map((k) => [
+      (["forwarderContact", "forwarderPhone", "customsBroker", "trackingNo", "freightAmount", "freightCurrency", "insurer", "insurancePolicyNo", "freightTerms", "insuredValue", "customsDeclarationNo", "clearedOn"] as const).map((k) => [
         k,
         shipmentFields[k].optional(),
       ]),

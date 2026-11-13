@@ -94,6 +94,18 @@ export const paperOrderInclude = {
   // Each factory's ready date (its purchase order prints its own), and the papers' day at the customer's bank
   // (an LC's instalment is due from it): what the plan's dates are worked out from.
   ...readySelect,
+  // Each factory's ready date, and its factory test (the FAT report prints from it).
+  factories: {
+    select: {
+      ...readySelect.factories.select,
+      fatPlannedOn: true,
+      fatDoneOn: true,
+      fatResult: true,
+      fatRemarks: true,
+      fatAttendedBy: { select: { name: true } },
+      factory: { select: { name: true } },
+    },
+  },
   bankSteps: { where: { step: "customer_bank_received" }, select: { doneOn: true }, orderBy: { doneOn: "asc" } },
 } satisfies Prisma.OrderInclude;
 
@@ -821,7 +833,47 @@ export function reportItem(c: { o: PaperOrder }, kind: "fat-report" | "inspectio
   return c.o.checklist.find((i) => i.paper === kind && (!i.route || i.route === routeOf(c.o))) ?? null;
 }
 
+/** The factory test kept on Production (the order without checklists): the one done, else the one planned. */
+export function fatOf(c: { o: PaperOrder }) {
+  return c.o.factories.find((f) => f.fatDoneOn || f.fatResult) ?? c.o.factories.find((f) => f.fatPlannedOn) ?? null;
+}
+
+const FAT_WORD: Record<string, string> = { passed: "Passed", passed_with_remarks: "Passed with remarks", failed: "Failed" };
+
+/** The FAT report from Production's Factory test section. */
+function fatReport(c: PaperCtx, t: NonNullable<ReturnType<typeof fatOf>>): Built {
+  const day = fromDbDateOrNull(t.fatDoneOn);
+  const result = t.fatResult ? (FAT_WORD[t.fatResult] ?? t.fatResult) : null;
+  return {
+    checks: [
+      check("item", "The factory test", t.factory?.name ? `at ${t.factory.name}` : "on Production", true, { required: true, href: "production" }),
+      check("done", "Recorded", day ? [`Done ${day}`, result].filter(Boolean).join(" · ") : "no result yet", !!day, { required: true, href: "production" }),
+    ],
+    doc: {
+      date: day ?? c.today,
+      meta: [{ label: "Order No.", value: c.o.refNo }, ...(result ? [{ label: "Result", value: result }] : [])],
+      heading: c.o.documentTitle,
+      columns: [COL.no, COL.item, COL.qty, { key: "result", label: "Result", width: 90, wrap: true }],
+      rows: itemRows(c, true).map((r) => ({ no: r.cells.no!, item: r.cells.item!, qty: r.cells.qty!, result: result ?? "" })),
+      sums: [],
+      total: null,
+      foot: null,
+      boxTitle: "Factory acceptance test",
+      bullets: [
+        ...(day ? [{ label: "Date:", value: date(day) }] : []),
+        ...(t.factory?.name ? [{ label: "Factory:", value: t.factory.name }] : []),
+        ...(t.fatAttendedBy ? [{ label: "Attended by:", value: t.fatAttendedBy.name }] : []),
+        ...(t.fatRemarks ? [t.fatRemarks] : []),
+      ],
+      bank: null,
+      signatures: { left: "Tested by", right: "Witnessed by" },
+    },
+  };
+}
+
 function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {
+  const test = kind === "fat-report" ? fatOf(c) : null;
+  if (test) return fatReport(c, test);
   const item = reportItem(c, kind);
   const fields = (Array.isArray(item?.fields) ? item.fields : []) as unknown as { key: string; label: string; type: string }[];
   const values = (item?.data && typeof item.data === "object" && !Array.isArray(item.data) ? item.data : {}) as Record<string, string>;

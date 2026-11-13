@@ -77,6 +77,7 @@ import {
   paperOrderInclude,
   positionOf,
   receiptMark,
+  fatOf,
   reportItem,
   type PaperCtx,
   type PaperOrder,
@@ -651,6 +652,7 @@ export class PapersService implements OnModuleInit {
       if (
         (kind === "fat-report" || kind === "inspection-report") &&
         !reportItem(c, kind) &&
+        !(kind === "fat-report" && fatOf(c)) &&
         !(kind === "inspection-report" && set.includes("inspection"))
       )
         continue;

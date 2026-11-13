@@ -125,6 +125,8 @@ export function FieldsForm({
   edit,
   card,
   plain,
+  note,
+  extra,
 }: {
   action: Action;
   fields: DetailField[];
@@ -133,6 +135,10 @@ export function FieldsForm({
   card?: EditCard | null;
   /** Never asks why (a draft). */
   plain?: boolean;
+  /** The quiet line beside the buttons ("" for none). */
+  note?: ReactNode;
+  /** Under the fields, above the buttons (a section's files, what saving does). */
+  extra?: ReactNode;
 }) {
   const close = useClosePanel();
   const id = useId();
@@ -213,7 +219,8 @@ export function FieldsForm({
               ))}
           </PanelSection>
         ))}
-        <PanelFooter save={save} busy={saver.busy} note={card?.first ? "Changing a saved value asks why." : undefined} />
+        {extra}
+        <PanelFooter save={save} busy={saver.busy} note={note ?? (card?.first ? "Changing a saved value asks why." : undefined)} />
       </PanelBody>
       {saver.dialog}
     </form>

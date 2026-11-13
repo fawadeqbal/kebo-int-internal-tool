@@ -154,6 +154,8 @@ export default async function OrderLayout({ children, params }: { children: Reac
         tabs={ORDER_TABS.filter((t) => {
           if (t === "overview" || t === "history") return true;
           if (t === "costs") return !!costs;
+          // Without the shipping module the tab still holds the few shipping values of the order itself.
+          if (t === "shipping") return true;
           // A stage whose module the company switched off has no tab.
           return !sections || sections.stages.includes(t as FlowStep);
         }).map((t): { key: OrderTab; word?: string } => ({ key: t, word: sections?.tabs[t] || undefined }))}

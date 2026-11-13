@@ -1,6 +1,8 @@
-import { Controller, Get, Param, ParseUUIDPipe } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Put } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { CurrentUser } from "../../common/auth/decorators";
+import { factoryFactsInput, type FactoryFactsInput } from "@kebo/shared";
+import { Validate } from "../../common/http/zod.pipe";
+import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SectionsService } from "./sections.service";
 
@@ -14,5 +16,12 @@ export class SectionsController {
   @Get("orders/:id/sections")
   view(@CurrentUser() user: SessionUser, @Param("id", new ParseUUIDPipe()) id: string) {
     return this.sections.view(user, id);
+  }
+
+  /** { factoryId?, readyToldOn?, readyToldVia?, readyNote?, fatPlannedOn?, fatAttendedById?, fatDoneOn?, fatResult?, fatRemarks?, goodsReceivedAt? } — Production's windows, for one factory. */
+  @Put("orders/:id/factory-facts")
+  @RequirePermissions("orders.update")
+  factoryFacts(@CurrentUser() user: SessionUser, @Param("id", new ParseUUIDPipe()) id: string, @Body(Validate(factoryFactsInput)) input: FactoryFactsInput) {
+    return this.sections.saveFactoryFacts(user, id, input);
   }
 }

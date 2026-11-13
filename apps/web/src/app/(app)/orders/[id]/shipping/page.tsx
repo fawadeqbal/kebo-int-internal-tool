@@ -1,395 +1,360 @@
+import { Globe } from "lucide-react";
+import { can, dayMonth, FREIGHT_TERMS, FREIGHT_TERMS_LABEL, portsOf, SHIP_MODE_LABEL, SHIP_MODES, shipByVsLc, trackingLink, type FreightTerms, type OrderSection } from "@kebo/shared";
+import { Badge, buttonClass, ButtonLink, cn } from "@kebo/ui";
+import { date, money } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
-import { Globe, Plus } from "lucide-react";
-import { can, trackingLink, portsOf, SHIP_MODE_LABEL, SHIP_MODES, SHIPMENT_STATUS_LABEL, SHIPMENT_STATUSES, shipByVsLc } from "@kebo/shared";
-import { Badge, buttonClass } from "@kebo/ui";
-import { date } from "@/lib/format";
+import { orderPapersOf } from "@/lib/order-data";
+import { optional } from "@/components/print/data";
 import type { ShipmentView } from "@/lib/types-flow";
-import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepPage, StepViewDivider } from "@/components/orders/step-page";
-import { StepSidePanel } from "@/components/orders/side-panel";
-import { DetailsCard, FieldsForm, PanelButton, type DetailField } from "@/components/orders/step-view";
-import { HeaderTap } from "@/components/orders/header-slot";
-import { expensePayTools } from "@/components/orders/costs-card";
-import { fieldsAction, lightAction } from "../../light-actions";
-import { RecordPaymentLink } from "@/components/money/pay-links";
+import type { DetailField } from "@/components/orders/step-view";
+import { OrderPage } from "@/components/order-sections/order-side";
+import { EmptySection, Section } from "@/components/order-sections/section";
+import { SectionFiles } from "@/components/order-sections/section-files";
+import { FieldsWindow } from "@/components/order-sections/fields-window";
+import { fieldsAction } from "../../light-actions";
+import { packingAction, packingMarksAction } from "../../actions";
 import { docHref, goodsOf } from "../shared";
 import { PackingCard } from "../goods";
-import { packingAction, packingMarksAction } from "../../actions";
-import { stageTool } from "../close-tool";
-import { stepData } from "../step-data";
+import { stageData } from "../stage-data";
 
 export const metadata = { title: "Order · shipping" };
 
-const LOADED = ["loaded", "departed", "arrived", "cleared"];
-const SAILED = ["departed", "arrived", "cleared"];
+const SMALL = "h-8 px-2.5 text-[13px]";
+const has = (...v: (string | null | undefined)[]) => v.some((x) => x !== null && x !== undefined && x !== "");
 
-/** Our ship-by and, on an LC order, the LC's latest shipment date: both shown, ours warned about when it is later. */
-interface ShipBy {
-  ours: string | null;
-  lc: string | null;
-  late: boolean;
-}
-
-/** The ship-by rows of a card: ours, and the LC's latest shipment date beside it (read-only here). */
-function shipByFields(b: ShipBy): DetailField[] {
-  return [
-    {
-      label: b.lc ? "Ship by (ours)" : "Ship by",
-      value: b.ours,
-      show: b.ours ? (
-        b.late ? (
-          <span className="flex flex-col">
-            {date(b.ours)}
-            <span className="text-xs font-medium text-bad">Later than the LC allows</span>
-          </span>
-        ) : (
-          date(b.ours)
-        )
-      ) : null,
-      uncounted: true,
-    },
-    ...(b.lc ? [{ label: "LC latest shipment", value: b.lc, show: date(b.lc), uncounted: true } satisfies DetailField] : []),
-  ];
-}
-
-/** A value asked for later: in the Edit panel always; on the card (and counted) only once it is filled. */
-const later = (v: string | null | undefined) => ({ panelOnly: !v, uncounted: true });
-
-/** A shipment's values for its card and its Edit panel (board OrderV4ShippingEdit), grouped as the panel shows them. */
-function shipmentFields(s: Partial<ShipmentView>, shipBy: ShipBy): DetailField[] {
-  const air = s.mode === "air";
-  const ports = s.portOfLoading || s.portOfDischarge ? `${s.portOfLoading ?? "?"} → ${s.portOfDischarge ?? "?"}` : null;
-  const container = [s.containerType, s.containerNo].filter(Boolean).join(" · ") || null;
-  const out: DetailField[] = [
-    {
-      name: "mode",
-      label: "Way",
-      value: s.mode ?? "sea",
-      show: SHIP_MODE_LABEL[s.mode ?? "sea"],
-      type: "select",
-      options: SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] })),
-      group: "Way and ports",
-    },
-    {
-      name: "status",
-      label: "Status",
-      value: s.status ?? "planned",
-      type: "select",
-      options: SHIPMENT_STATUSES.map((m) => ({ value: m, label: SHIPMENT_STATUS_LABEL[m] })),
-      group: "Way and ports",
-      panelOnly: true,
-      hint: "Moves on by itself as the dates come in",
-    },
-    { label: "From → to", value: ports, cardOnly: true },
-    { name: "portOfLoading", label: "From", value: s.portOfLoading, group: "Way and ports", panelOnly: true, placeholder: air ? "e.g. Shanghai PVG" : "e.g. Ningbo" },
-    { name: "portOfDischarge", label: "To", value: s.portOfDischarge, group: "Way and ports", panelOnly: true, placeholder: air ? "e.g. Lahore LHE" : "e.g. Karachi" },
-    { name: "forwarder", label: "Forwarder", value: s.forwarder, group: "Forwarder and booking" },
-    { name: "bookingNo", label: "Booking no.", value: s.bookingNo, group: "Forwarder and booking" },
-    // The rest of the forwarder's side: shown on the card once filled, always in the Edit panel.
-    { name: "forwarderContact", label: "Forwarder's contact", panelLabel: "Contact person", value: s.forwarderContact, group: "Forwarder and booking", ...later(s.forwarderContact) },
-    { name: "forwarderPhone", label: "Forwarder's phone", panelLabel: "Phone or WhatsApp", value: s.forwarderPhone, group: "Forwarder and booking", ...later(s.forwarderPhone) },
-    { name: "trackingNo", label: "Tracking no.", value: s.trackingNo, group: "Forwarder and booking", ...later(s.trackingNo), hint: "The carrier's own number, for the Track link" },
-  ];
-  if (!air)
-    out.push(
-      { name: "containerType", label: "Container type", value: s.containerType, group: "Container", panelOnly: true, placeholder: "e.g. 1 × 40 HQ" },
-      { name: "containerNo", label: "Container", panelLabel: "Container no.", value: s.containerNo, show: container, group: "Container" },
-      { name: "sealNo", label: "Seal no.", value: s.sealNo, group: "Container", placeholder: "e.g. 0048812" },
-      { name: "loadedOn", label: "Loaded on", value: s.loadedOn, type: "date", group: "Container", panelOnly: true },
-      { name: "vgmKg", label: "Gross weight (VGM), kg", value: s.vgmKg, type: "number", group: "Container", panelOnly: true, uncounted: true },
-      { name: "vessel", label: "Vessel", value: s.vessel, group: "Vessel and B/L", placeholder: "e.g. MSC Aurora" },
-    );
-  out.push(
-    { name: "blNo", label: air ? "AWB no." : "B/L no.", value: s.blNo, group: air ? "Air waybill" : "Vessel and B/L", placeholder: air ? "e.g. 999-12345675" : "e.g. MEDU1234567" },
-    { name: "etd", label: "ETD", value: s.etd, type: "date", group: "Dates" },
-    { name: "eta", label: "ETA", value: s.eta, type: "date", group: "Dates" },
-    ...shipByFields(shipBy).map((f) => ({ ...f, cardOnly: true })),
-  );
-  if (!air) out.push({ label: "Loaded on", value: s.loadedOn, show: s.loadedOn ? date(s.loadedOn) : null, name: "loadedOn", type: "date", cardOnly: true });
-  out.push(
-    { name: "departedOn", label: air ? "Flown on" : "Sailed on", value: s.departedOn, type: "date", group: "Dates" },
-    { name: "arrivedOn", label: "Arrived on", value: s.arrivedOn, type: "date", group: "Dates", uncounted: !SAILED.includes(s.status ?? "") , panelOnly: !SAILED.includes(s.status ?? "") },
-    { name: "freightAmount", label: "Freight", panelLabel: "Freight agreed", value: s.freightAmount, type: "number", group: "Freight and insurance", ...later(s.freightAmount), show: s.freightAmount ? `${s.freightCurrency ?? ""} ${Number(s.freightAmount).toLocaleString("en-US", { maximumFractionDigits: 2 })}`.trim() : null },
-    { name: "freightCurrency", label: "Freight currency", value: s.freightCurrency, group: "Freight and insurance", panelOnly: true, uncounted: true, placeholder: "e.g. USD" },
-    { name: "insurer", label: "Insured with", value: s.insurer, group: "Freight and insurance", ...later(s.insurer) },
-    { name: "insurancePolicyNo", label: "Policy no.", value: s.insurancePolicyNo, group: "Freight and insurance", ...later(s.insurancePolicyNo) },
-    { name: "customsBroker", label: "Customs broker", value: s.customsBroker, group: "Arrival and customs", ...later(s.customsBroker) },
-    { name: "customsDeclarationNo", label: "Customs declaration no.", value: s.customsDeclarationNo, group: "Arrival and customs", ...later(s.customsDeclarationNo) },
-    { name: "clearedOn", label: "Cleared customs on", value: s.clearedOn, type: "date", group: "Arrival and customs", ...later(s.clearedOn) },
-    { name: "note", label: "Note", value: s.note, type: "textarea", group: "Note", panelOnly: true, uncounted: true, wide: true },
-  );
-  // Dates show as people read them.
-  return out.map((f) => (f.type === "date" && f.value && !f.show ? { ...f, show: date(f.value) } : f));
-}
-
-
-const DAY = 86_400_000;
-/** "At sea · day 4 of 17", "Booked", "Arrived 8 Jan": where the shipment is, for its card. */
-function whereBadge(s: ShipmentView, now: string) {
-  if (s.status === "departed" && s.departedOn) {
-    const day = Math.max(1, Math.round((Date.parse(now) - Date.parse(s.departedOn)) / DAY) + 1);
-    const of = s.eta ? Math.max(day, Math.round((Date.parse(s.eta) - Date.parse(s.departedOn)) / DAY)) : null;
-    return <Badge tone="info" dot>{`${s.mode === "air" ? "In the air" : "At sea"} · day ${day}${of ? ` of ${of}` : ""}`}</Badge>;
-  }
-  if (s.status === "arrived" || s.status === "cleared")
-    return <Badge tone="ok" dot>{`${SHIPMENT_STATUS_LABEL[s.status]}${s.arrivedOn ? ` ${date(s.arrivedOn)}` : ""}`}</Badge>;
-  return <Badge tone="neutral" dot>{SHIPMENT_STATUS_LABEL[s.status]}</Badge>;
-}
-
-/** Step 4, Shipping: booking, loading, sailing and arrival of each shipment, the packing list, and the balance when it is paid before or against the B/L. */
+/**
+ * Shipping (design "the order, final"): each shipment as small sections — booking, container and loading,
+ * vessel and bill of lading, freight and insurance, arrival and customs — each with its own window and
+ * files; then the packing of the order and the shipping advice to the customer. Every section is open
+ * from the first day; a date out of order asks before it is saved.
+ */
 export default async function OrderShipping({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const d = await stepData(id, "shipping");
+  const d = await stageData(id, "shipping");
   const { me, o, flow, now, defaults } = d;
+  const [papers, edits] = await Promise.all([optional(() => orderPapersOf(id)), editsOf("order", id)]);
   const shipping = flow?.shipping ?? null;
-  const shipments = shipping?.shipments ?? [];
   const canShip = can(me, "shipping.manage") && d.open;
   const canEdit = can(me, "orders.update") && d.open;
-  const canPay = can(me, "payments.record") && d.open;
-  const goods = goodsOf(o);
-  // Our ship-by stays ours; with an LC its latest shipment date is shown beside it (warned about when ours is later).
   const lcLatest = flow?.payment.route === "letter_of_credit" ? (flow.payment.bankContract?.latestShipOn ?? null) : null;
-  const shipBy: ShipBy = { ours: o.shipBy, lc: lcLatest, late: !!shipByVsLc(o.shipBy, lcLatest)?.late };
-  const totals = o.goods.totals;
-
-  // Each light row works on the first shipment not past it (a new one when there is none).
-  const tools: Record<string, AutoTool> = {};
-  if (shipping && canShip) {
-    const first = shipments[0];
-    const at = (pred: (s: ShipmentView) => boolean) => shipments.find(pred) ?? first;
-    const toBook = at((s) => s.status === "planned");
-    const toLoad = at((s) => !LOADED.includes(s.status));
-    const toSail = at((s) => !SAILED.includes(s.status));
-    const fwd = toBook?.forwarder ?? defaults.forwarder?.name ?? "";
-    tools.booked = {
-      kind: "light",
-      label: "Add the booking",
-      action: lightAction.bind(null, o.id, `booked:${toBook?.id ?? "new"}`),
-      fields: [
-        {
-          name: "forwarder",
-          label: "Forwarder",
-          value: fwd,
-          required: true,
-          hint: !toBook?.forwarder && defaults.forwarder ? `As on ${defaults.forwarder.refNo} (same ${defaults.forwarder.why})` : undefined,
-        },
-        { name: "bookingNo", label: "Booking no.", value: toBook?.bookingNo, required: true, placeholder: "e.g. NGB-77812" },
-        { name: "etd", label: "ETD", type: "date", value: toBook?.etd, required: true },
-      ],
-      chips: [
-        { label: "Container type", field: { name: "containerType", label: "Container type", value: toBook?.containerType, placeholder: "e.g. 1 × 40 HQ" } },
-        { label: "ETA", field: { name: "eta", label: "ETA", type: "date", value: toBook?.eta } },
-        { label: "Booking copy", field: { name: "attachmentId", label: "Booking copy (PDF or photo)", type: "file" } },
-        { label: "Note", field: { name: "itemNote", label: "Note", type: "textarea" } },
-      ],
-    };
-    const air = toLoad?.mode === "air";
-    tools.loaded = {
-      kind: "light",
-      label: air ? "Handed over today" : "Add the container",
-      action: lightAction.bind(null, o.id, `loaded:${toLoad?.id ?? "new"}`),
-      fields: air
-        ? [{ name: "loadedOn", label: "Handed over on", type: "date", value: toLoad?.loadedOn ?? now, max: now, required: true }]
-        : [
-            { name: "containerNo", label: "Container no.", value: toLoad?.containerNo, required: true, placeholder: "e.g. MSKU 7741203" },
-            { name: "loadedOn", label: "Loaded on", type: "date", value: toLoad?.loadedOn ?? now, max: now, required: true },
-            { name: "sealNo", label: "Seal no.", value: toLoad?.sealNo, placeholder: "e.g. 0048812" },
-          ],
-      chips: [
-        { label: "Loading photos", field: { name: "attachmentId", label: "Loading photos", type: "file" } },
-        ...(air
-          ? []
-          : [
-              {
-                label: "Gross weight (VGM)",
-                field: { name: "vgmKg", label: "VGM, kg", type: "number" as const, value: toLoad?.vgmKg ?? (Number(totals.grossWeightKg) > 0 ? totals.grossWeightKg : "") },
-              },
-            ]),
-        { label: "Note", field: { name: "itemNote", label: "Note", type: "textarea" } },
-      ],
-      hint: air ? undefined : "Only the first two are needed to tick it.",
-    };
-    const sailAir = toSail?.mode === "air";
-    tools.sailed = {
-      kind: "light",
-      label: sailAir ? "Add the AWB" : "Add B/L",
-      action: lightAction.bind(null, o.id, `sailed:${toSail?.id ?? "new"}${sailAir ? ":air" : ""}`),
-      fields: [
-        { name: "blNo", label: sailAir ? "AWB no." : "B/L no.", value: toSail?.blNo, required: true, placeholder: sailAir ? "e.g. 999-12345675" : "e.g. MEDU1234567" },
-        ...(sailAir ? [] : [{ name: "vessel", label: "Vessel", value: toSail?.vessel, required: true, placeholder: "e.g. MSC Aurora" }]),
-        { name: "departedOn", label: sailAir ? "Flown on" : "Sailed on", type: "date" as const, value: toSail?.departedOn ?? now, max: now, required: true },
-      ],
-      chips: [
-        { label: sailAir ? "AWB copy (PDF or photo)" : "B/L copy (PDF or photo)", field: { name: "attachmentId", label: sailAir ? "AWB copy" : "B/L copy", type: "file" } },
-        { label: "Note", field: { name: "itemNote", label: "Note", type: "textarea" } },
-      ],
-      hint: "The copy is kept with the item and the paper set.",
-    };
-    const going = shipments.filter((s) => s.status !== "arrived" && s.status !== "cleared");
-    if (going.length)
-      tools.arrived = { kind: "tap", tap: { label: "Arrived today", action: lightAction.bind(null, o.id, `arrived:${going.map((s) => s.id).join(",")}`), on: now } };
-  }
-  if (goods.length)
-    tools.packing_list = { kind: "link", label: o.goods.packed ? "See it" : canEdit ? "Make it" : "See it", href: "#edit-lines" };
-  if (canPay && Number(o.money.due) > 0)
-    tools.balance_in = {
-      kind: "node",
-      node: (
-        <RecordPaymentLink kind="in" order={o.id} back={`/orders/${o.id}/shipping`} />
-      ),
-    };
-  const shipped = stageTool(me, o, "shipped", now);
-  if (shipped) tools.shipped = { kind: "node", node: shipped };
-  const close = stageTool(me, o, "done", now);
-  if (close) tools.closed = { kind: "node", node: close };
-
-  // A new shipment starts from the ports the terms give: E/F terms load at the Incoterm place, C/D terms discharge there.
-  const fresh: Partial<ShipmentView> = { mode: "sea", status: "planned", ...portsOf(o) };
-  const addShipment =
-    shipping && canShip ? (
-      <PanelButton
-        label={shipments.length === 1 ? "Split into two shipments" : "Add a shipment"}
-        icon={shipments.length === 1 ? undefined : <Plus aria-hidden />}
-        variant="ghost"
-        title={shipments.length ? `Shipment ${shipments.length + 1}` : "The shipment"}
-        description="A shipment of its own: its way, booking, container and dates. Saving adds it to the checklist."
-        body={<FieldsForm action={fieldsAction.bind(null, o.id, "shipment:new")} fields={shipmentFields(fresh, shipBy)} save="Add the shipment" />}
-      />
-    ) : undefined;
-
-  const going = shipments.filter((s) => s.status !== "arrived" && s.status !== "cleared");
-  const lead = shipments.find((s) => s.status !== "cleared") ?? shipments[0];
-  const track = lead ? trackingLink(lead) : null;
-  const header = (
-    <>
-      {shipments.length > 0 && addShipment}
-      {track && (
-        <a href={track.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary")} title={`${track.carrier} · ${track.number}`}>
-          <Globe aria-hidden /> Track
-        </a>
-      )}
-      {canShip && going.some((s) => s.status === "departed") && (
-        <HeaderTap label="Mark arrived" action={lightAction.bind(null, o.id, `arrived:${going.map((s) => s.id).join(",")}`)} on={now} />
-      )}
-    </>
-  );
-
-  const edits = await editsOf("order", o.id);
-  const ref = (card: string) => ({ type: "order" as const, id: o.id, card });
-
+  const lateForLc = !!shipByVsLc(o.shipBy, lcLatest)?.late;
+  // A new shipment starts from the ports the terms give, and the forwarder of the last order like it.
+  const fresh: Partial<ShipmentView> = { mode: "sea", status: "planned", ...portsOf(o), forwarder: defaults.forwarder?.name ?? null };
+  const shipments: Partial<ShipmentView>[] = shipping?.shipments.length ? shipping.shipments : [fresh];
+  const many = shipments.length > 1;
   const packGoods = goodsOf(o);
+  const advice = papers?.papers.find((p) => p.kind === "shipping-advice") ?? null;
+
+  // A company without the shipping module keeps the few values the order itself holds.
+  if (!shipping)
+    return (
+      <OrderPage id={id}>
+        <Section
+          title="Shipping"
+          state={o.shippedOn ? `Shipped ${dayMonth(o.shippedOn)}` : "Not shipped yet"}
+          tone={o.shippedOn ? "ok" : "neutral"}
+          cols={4}
+          rows={[
+            { label: "To", value: o.portOfDischarge },
+            { label: "Shipped on", value: o.shippedOn ? date(o.shippedOn) : null },
+            { label: "B/L no.", value: o.blNo },
+            { label: "Container no.", value: o.goods.containerNo },
+          ]}
+          actions={
+            canEdit && (
+              <FieldsWindow
+                button={{ label: "Edit" }}
+                title="Shipping"
+                sub={o.refNo}
+                action={fieldsAction.bind(null, o.id, "order")}
+                fields={[
+                  { name: "portOfDischarge", label: "To", value: o.portOfDischarge },
+                  { name: "shippedOn", label: "Shipped on", value: o.shippedOn, type: "date", max: now },
+                  { name: "blNo", label: "B/L no.", value: o.blNo },
+                  { name: "containerNo", label: "Container no.", value: o.goods.containerNo },
+                ]}
+              />
+            )
+          }
+          files={<SectionFiles orderId={o.id} section="vessel" canAdd={d.canFiles} />}
+        />
+      </OrderPage>
+    );
 
   return (
-    <StepPage
-      steps={d.steps}
-      step="shipping"
-      base={d.base}
-      action={header}
-      side={<StepSidePanel id={o.id} step="shipping" changes={d.changes} historyHref={d.historyHref} />}
-    >
-      <Checklist
-        payFor={await expensePayTools(o.id, d.items)}
-        step="shipping"
-        label="Shipping"
-        items={d.items}
-        current={d.current}
-        nowKey={d.nowKey}
-        waits={d.waits}
-        canEdit={d.steps.canEdit}
-        run={d.run}
-        dealId={o.inquiry.id}
-        people={d.people}
-        tools={tools}
-        listHref={d.listHref}
-        me={me.name}
-        today={now}
-      />
-      <StepViewDivider />
-      {shipping ? (
-        shipments.length ? (
-          <>
-            {shipments.map((s, i) => (
-              <DetailsCard
-                key={s.id}
-                target="shipment"
-                id={i === 0 ? "shipments" : undefined}
-                title={shipments.length > 1 ? `Shipment ${i + 1}` : "Shipment"}
-                actions={whereBadge(s, now)}
-                fields={shipmentFields(s, shipBy)}
-                action={fieldsAction.bind(null, o.id, `shipment:${s.id}`)}
-                canEdit={canShip}
-                panelTitle={shipments.length > 1 ? `Edit shipment ${i + 1}` : "Edit the shipment"}
-                panelDescription="The way, the ports, the carrier and the papers. Saving updates the checklist."
-                edits={{ ref: ref(`shipment:${s.id}`), card: edits.cards[`shipment:${s.id}`] }}
+    <OrderPage id={id}>
+      {shipments.map((s, i) => {
+        const air = s.mode === "air";
+        // Several shipments: each has its heading; the sections keep their short names.
+        const of = "";
+        const sub = `${o.refNo}${many ? ` · Shipment ${i + 1}` : ""}`;
+        const action = fieldsAction.bind(null, o.id, s.id ? `shipment:${s.id}` : "shipment:new");
+        const filesOf = (section: OrderSection, hint: string) => (d.canFiles && i === 0 ? { orderId: o.id, section, hint } : undefined);
+        const row = (section: OrderSection) => (i === 0 ? <SectionFiles orderId={o.id} section={section} canAdd={d.canFiles} /> : undefined);
+        const win = (title: string, fields: DetailField[], filled: boolean, files?: ReturnType<typeof filesOf>, whats?: string[], main = false) =>
+          canShip && (
+            <FieldsWindow
+              button={filled ? { label: "Edit" } : { label: "Add", kind: main ? "main" : "plain" }}
+              title={title}
+              sub={sub}
+              action={action}
+              fields={fields}
+              files={files}
+              whats={whats}
+              size={fields.length > 6 ? "md" : "sm"}
+            />
+          );
+        const track = s.id ? trackingLink(s as ShipmentView) : null;
+        const left = !!s.departedOn;
+
+        const booking: DetailField[] = [
+          { name: "mode", label: "Way", type: "select", value: s.mode ?? "sea", options: SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] })) },
+          { name: "forwarder", label: "Forwarder", value: s.forwarder },
+          { name: "forwarderContact", label: "Contact", value: s.forwarderContact },
+          { name: "forwarderPhone", label: "Phone", value: s.forwarderPhone },
+          { name: "bookingNo", label: "Booking no.", value: s.bookingNo },
+          ...(air ? [] : [{ name: "containerType", label: "Container type", value: s.containerType, placeholder: "e.g. 1 × 40 HQ" }]),
+          { name: "portOfLoading", label: "From", value: s.portOfLoading, placeholder: air ? "e.g. Shanghai PVG" : "e.g. Ningbo" },
+          { name: "portOfDischarge", label: "To", value: s.portOfDischarge, placeholder: air ? "e.g. Lahore LHE" : "e.g. Karachi" },
+          { name: "etd", label: "ETD", type: "date", value: s.etd },
+          { name: "eta", label: "ETA", type: "date", value: s.eta },
+        ];
+        const container: DetailField[] = air
+          ? [{ name: "loadedOn", label: "Handed over on", type: "date", value: s.loadedOn, max: now }]
+          : [
+              { name: "containerNo", label: "Container no.", value: s.containerNo, wide: true, placeholder: "e.g. MSKU 7741203" },
+              { name: "sealNo", label: "Seal no.", value: s.sealNo, wide: true },
+              { name: "loadedOn", label: "Loaded on", type: "date", value: s.loadedOn, max: now },
+              { name: "vgmKg", label: "Gross weight (VGM), kg", type: "number", value: s.vgmKg },
+            ];
+        const vessel: DetailField[] = [
+          ...(air ? [] : [{ name: "vessel", label: "Vessel", value: s.vessel, placeholder: "e.g. MSC Aurora" }]),
+          { name: "blNo", label: air ? "AWB no." : "B/L no.", value: s.blNo },
+          { name: "departedOn", label: air ? "Flown on" : "Sailed on", type: "date", value: s.departedOn, max: now },
+          { name: "trackingNo", label: "Tracking no.", value: s.trackingNo },
+          { name: "note", label: "Note", type: "textarea", value: s.note, wide: true },
+        ];
+        const freight: DetailField[] = [
+          { name: "freightAmount", label: "Freight", type: "number", value: s.freightAmount },
+          { name: "freightCurrency", label: "Currency", value: s.freightCurrency ?? (s.freightAmount ? null : o.currency), placeholder: "e.g. USD" },
+          { name: "freightTerms", label: "Paid", type: "select", value: s.freightTerms ?? "", options: [{ value: "", label: "Not said" }, ...FREIGHT_TERMS.map((t) => ({ value: t, label: FREIGHT_TERMS_LABEL[t] }))] },
+          { name: "insurer", label: "Insured with", value: s.insurer },
+          { name: "insurancePolicyNo", label: "Policy no.", value: s.insurancePolicyNo },
+          { name: "insuredValue", label: `Insured value, ${o.currency}`, type: "number", value: s.insuredValue },
+        ];
+        const arrival: DetailField[] = [
+          { name: "arrivedOn", label: "Arrived on", type: "date", value: s.arrivedOn, max: now },
+          { name: "customsBroker", label: "Customs broker", value: s.customsBroker },
+          { name: "customsDeclarationNo", label: "Declaration no.", value: s.customsDeclarationNo },
+          { name: "clearedOn", label: "Cleared on", type: "date", value: s.clearedOn, max: now },
+        ];
+        const booked = has(s.forwarder, s.bookingNo);
+        const loaded = has(s.containerNo, s.sealNo, s.loadedOn, s.vgmKg);
+        const sailed = has(s.vessel, s.blNo, s.departedOn, s.trackingNo);
+        const paidFreight = has(s.freightAmount, s.insurer, s.insurancePolicyNo, s.insuredValue);
+        const arrived = has(s.arrivedOn, s.customsBroker, s.customsDeclarationNo, s.clearedOn);
+        const leaves = air ? "Flown" : "Sailed";
+
+        return (
+          <div key={i} className="contents">
+            {many && <h2 className={cn("text-[13px] font-bold text-text-2", i > 0 && "mt-2")}>Shipment {i + 1}</h2>}
+            {booked ? (
+              <Section
+                title={`Booking${of}`}
+                state={s.bookingNo ? "Booked" : "Forwarder chosen"}
+                tone={s.bookingNo ? "ok" : "info"}
+                cols={3}
+                rows={[
+                  { label: "Way", value: SHIP_MODE_LABEL[s.mode ?? "sea"] },
+                  { label: "Forwarder", value: s.forwarder },
+                  { label: "Contact", value: [s.forwarderContact, s.forwarderPhone].filter(Boolean).join(" · ") || null },
+                  { label: "Booking no.", value: s.bookingNo },
+                  { label: "From", value: s.portOfLoading },
+                  { label: "To", value: s.portOfDischarge },
+                  { label: "ETD", value: s.etd ? date(s.etd) : null },
+                  { label: "ETA", value: s.eta ? date(s.eta) : null },
+                  ...(air ? [] : [{ label: "Container type", value: s.containerType }]),
+                  ...(o.shipBy
+                    ? [
+                        {
+                          label: lcLatest ? "Ship by · LC latest" : "Ship by",
+                          value: (
+                            <span className={cn(lateForLc && "text-bad")}>
+                              {date(o.shipBy)}
+                              {lcLatest ? ` · ${date(lcLatest)}` : ""}
+                            </span>
+                          ),
+                        },
+                      ]
+                    : []),
+                ]}
+                actions={win("Booking", booking, true, filesOf("booking", "the booking copy"))}
+                files={row("booking")}
               />
-            ))}
-            {shipBy.ours && (shipBy.lc || shipBy.late) && (
-              <p className={shipBy.late ? "text-sm text-bad" : "text-sm text-text-2"}>
-                Ship by {date(shipBy.ours)}
-                {shipBy.lc && ` · LC latest shipment ${date(shipBy.lc)}`}
-                {shipBy.late && " · ours is later than the LC allows"}
-              </p>
+            ) : (
+              <EmptySection title={`Booking${of}`} text={o.shipBy ? `Not booked yet. Ship by ${date(o.shipBy)}.` : "Not booked yet."} action={win("Booking", booking, false, filesOf("booking", "the booking copy"), undefined, true)} />
             )}
-          </>
-        ) : (
-          <DetailsCard
-            id="shipments"
-            target="shipment"
-            title="Shipment"
-            description={canShip ? "Not booked yet: Edit starts the shipment, its ports from the terms." : "Not booked yet."}
-            fields={shipmentFields(fresh, shipBy)}
-            action={fieldsAction.bind(null, o.id, "shipment:new")}
-            canEdit={canShip}
-            panelTitle="The shipment"
-          />
-        )
-      ) : (
-        <DetailsCard
-          id="shipments"
-          target="shipment"
-          title="Shipping"
-          fields={[
-            { name: "portOfDischarge", label: "To", value: o.portOfDischarge },
-            { name: "shippedOn", label: "Shipped on", value: o.shippedOn, type: "date", max: now, show: o.shippedOn ? date(o.shippedOn) : null },
-            { name: "blNo", label: "B/L no.", value: o.blNo },
-            { name: "containerNo", label: "Container no.", value: o.goods.containerNo },
-            { name: "shipBy", label: "Ship by", value: o.shipBy, type: "date", show: shipByFields(shipBy)[0]!.show },
-            ...shipByFields(shipBy).slice(1),
-          ]}
-          action={fieldsAction.bind(null, o.id, "order")}
+
+            <div className="grid min-w-0 items-stretch gap-4 lg:grid-cols-2">
+              {loaded ? (
+                <Section
+                  title={`${air ? "Handing over" : "Container and loading"}${of}`}
+                  state={s.loadedOn ? `${air ? "Handed over" : "Loaded"} ${dayMonth(s.loadedOn)}` : "Not loaded yet"}
+                  tone={s.loadedOn ? "ok" : "neutral"}
+                  rows={air ? [{ label: "Handed over on", value: s.loadedOn ? date(s.loadedOn) : null }] : [
+                    { label: "Container no.", value: s.containerNo },
+                    { label: "Seal no.", value: s.sealNo },
+                    { label: "Loaded on", value: s.loadedOn ? date(s.loadedOn) : null },
+                    { label: "Gross weight (VGM)", value: s.vgmKg ? `${Number(s.vgmKg).toLocaleString("en-US")} kg` : null },
+                  ]}
+                  actions={win(air ? "Handing over" : "Container and loading", container, true, filesOf("container", "loading photos, the VGM slip"))}
+                  files={row("container")}
+                />
+              ) : (
+                <EmptySection title={`${air ? "Handing over" : "Container and loading"}${of}`} text="Not loaded yet." action={win(air ? "Handing over" : "Container and loading", container, false, filesOf("container", "loading photos, the VGM slip"))} />
+              )}
+              {sailed ? (
+                <Section
+                  title={`${air ? "Flight and air waybill" : "Vessel and bill of lading"}${of}`}
+                  state={s.departedOn ? `${leaves} ${dayMonth(s.departedOn)}` : `Not ${air ? "flown" : "sailed"} yet`}
+                  tone={s.departedOn ? "ok" : "neutral"}
+                  rows={[
+                    ...(air ? [] : [{ label: "Vessel", value: s.vessel }]),
+                    { label: air ? "AWB no." : "B/L no.", value: s.blNo },
+                    { label: `${leaves} on`, value: s.departedOn ? date(s.departedOn) : null },
+                    { label: "Tracking no.", value: s.trackingNo },
+                    ...(s.note ? [{ label: "Note", value: s.note }] : []),
+                  ]}
+                  actions={
+                    <>
+                      {track && (
+                        <a href={track.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm", SMALL)} title={`${track.carrier} · ${track.number}`}>
+                          <Globe aria-hidden /> Track
+                        </a>
+                      )}
+                      {win(air ? "Flight and air waybill" : "Vessel and bill of lading", vessel, true, filesOf("vessel", air ? "the AWB copy" : "the B/L copy"), left ? undefined : [`With a date the section says “${leaves} …”.`, "The order becomes “Shipped”."])}
+                    </>
+                  }
+                  files={row("vessel")}
+                />
+              ) : (
+                <EmptySection
+                  title={`${air ? "Flight and air waybill" : "Vessel and bill of lading"}${of}`}
+                  text={`Not ${air ? "flown" : "sailed"} yet.`}
+                  action={win(air ? "Flight and air waybill" : "Vessel and bill of lading", vessel, false, filesOf("vessel", air ? "the AWB copy" : "the B/L copy"), [`With a date the section says “${leaves} …”.`, "The order becomes “Shipped”."])}
+                />
+              )}
+              {paidFreight ? (
+                <Section
+                  title={`Freight and insurance${of}`}
+                  state={s.insurer || s.insurancePolicyNo ? "Insured" : "Not insured yet"}
+                  tone={s.insurer || s.insurancePolicyNo ? "ok" : "warn"}
+                  rows={[
+                    {
+                      label: "Freight",
+                      value: s.freightAmount ? `${money(s.freightAmount, s.freightCurrency ?? o.currency)}${s.freightTerms ? ` · ${FREIGHT_TERMS_LABEL[s.freightTerms as FreightTerms].toLowerCase()}` : ""}` : null,
+                    },
+                    { label: "Insured with", value: s.insurer },
+                    { label: "Policy no.", value: s.insurancePolicyNo },
+                    { label: "Insured value", value: s.insuredValue ? money(s.insuredValue, o.currency) : null },
+                  ]}
+                  actions={win("Freight and insurance", freight, true, filesOf("freight", "the policy, the freight invoice"))}
+                  files={row("freight")}
+                />
+              ) : (
+                <EmptySection title={`Freight and insurance${of}`} text="No freight or insurance yet." action={win("Freight and insurance", freight, false, filesOf("freight", "the policy, the freight invoice"))} />
+              )}
+              {arrived ? (
+                <Section
+                  title={`Arrival and customs${of}`}
+                  state={s.clearedOn ? `Cleared ${dayMonth(s.clearedOn)}` : s.arrivedOn ? `Arrived ${dayMonth(s.arrivedOn)}` : "Not arrived yet"}
+                  tone={s.arrivedOn || s.clearedOn ? "ok" : "neutral"}
+                  rows={[
+                    { label: "Arrived on", value: s.arrivedOn ? date(s.arrivedOn) : null },
+                    { label: "Customs broker", value: s.customsBroker },
+                    { label: "Declaration no.", value: s.customsDeclarationNo },
+                    { label: "Cleared on", value: s.clearedOn ? date(s.clearedOn) : null },
+                  ]}
+                  actions={win("Arrival and customs", arrival, true, filesOf("arrival", "the arrival notice, the customs release"))}
+                  files={row("arrival")}
+                />
+              ) : (
+                <EmptySection title={`Arrival and customs${of}`} text="Not arrived yet." action={win("Arrival and customs", arrival, false, filesOf("arrival", "the arrival notice, the customs release"))} />
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* The order's packing: the lines' packages, weights and volume, and the marks (the packing list paper is on Documents). */}
+      {packGoods.length > 0 && (
+        <PackingCard
+          title="Packing"
+          badge={o.goods.totals.packages > 0 ? <Badge tone="ok">{`${o.goods.totals.packages.toLocaleString("en-US")} package${o.goods.totals.packages === 1 ? "" : "s"}`}</Badge> : <Badge tone="neutral">No packing lines yet</Badge>}
+          orderId={o.id}
+          lines={o.lines.filter((l) => l.type === "goods")}
+          goods={packGoods}
+          containerNo={o.goods.containerNo}
+          containerHref={`/orders/${o.id}/shipping`}
+          shippingMarks={o.goods.shippingMarks}
           canEdit={canEdit}
-          panelTitle="Edit shipping"
-          edits={{ ref: ref("shipping"), card: edits.cards.shipping }}
+          canUpload={canEdit && (o.stage === "confirmed" || o.stage === "in_production")}
+          action={packingAction.bind(null, o.id)}
+          marksAction={packingMarksAction.bind(null, o.id)}
+          links={o.goods.packed || o.goods.totals.packages > 0 ? docHref(o, { kind: "packing-list", label: "Packing list" }) : undefined}
+          today={now}
+          toggle
+          edits={edits}
         />
       )}
-      {/* Packing belongs to Shipping (it was its own tab): the lines' packages, weights and volume, and the marks. */}
-      {packGoods.length > 0 &&
-        (o.goods.allReceived || o.stage !== "confirmed" ? (
-          <div id="lines" data-target="lines.packing" data-target-card="" className="scroll-mt-24 rounded-xl">
-            <PackingCard
-              title="Packing lines"
-              badge={o.goods.packed ? <Badge tone="ok">Done</Badge> : <Badge tone="warn">Not made yet</Badge>}
-              orderId={o.id}
-              lines={o.lines.filter((l) => l.type === "goods")}
-              goods={packGoods}
-              containerNo={o.goods.containerNo}
-              containerHref={`/orders/${o.id}/shipping#goto=shipment.containerNo`}
-              shippingMarks={o.goods.shippingMarks}
-              canEdit={canEdit}
-              canUpload={canEdit && (o.stage === "confirmed" || o.stage === "in_production")}
-              action={packingAction.bind(null, o.id)}
-              marksAction={packingMarksAction.bind(null, o.id)}
-              links={o.goods.packed || o.goods.totals.packages > 0 ? docHref(o, { kind: "packing-list", label: "Packing list" }) : undefined}
-              today={now}
-              toggle
-              edits={edits}
-            />
-          </div>
+
+      {advice &&
+        (advice.state === "ready" || advice.state === "draft" ? (
+          <Section
+            title="Shipping advice to the customer"
+            state={advice.stateLabel}
+            tone={advice.state === "ready" ? "ok" : "info"}
+            rows={[{ label: "Number", value: advice.number }, { label: "Version", value: advice.version ? String(advice.version) : null }]}
+            actions={
+              <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary" className={SMALL}>
+                Open
+              </ButtonLink>
+            }
+            files={<SectionFiles orderId={o.id} section="advice" canAdd={d.canFiles} />}
+          />
         ) : (
-          <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-text-2">
-            <b className="font-semibold text-text">Packing</b> · opens once production has started, for the packages, weights and volume of each line.
-          </p>
+          <EmptySection
+            title="Shipping advice to the customer"
+            text="Not sent yet."
+            action={
+              advice.makeable && papers?.canMake ? (
+                <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary" className={SMALL}>
+                  Make and send
+                </ButtonLink>
+              ) : undefined
+            }
+          />
         ))}
-    </StepPage>
+
+      {canShip && shipping.shipments.length > 0 && (
+        <div>
+          <FieldsWindow
+            button={{ label: "+ Add a shipment", kind: "plain" }}
+            title={`Shipment ${shipping.shipments.length + 1}`}
+            sub={`${o.refNo} · when the goods leave in more than one lot`}
+            plain
+            action={fieldsAction.bind(null, o.id, "shipment:new")}
+            save="Add the shipment"
+            whats={["Shipping shows its sections once per shipment."]}
+            fields={[
+              { name: "mode", label: "Way", type: "select", value: "", options: [{ value: "", label: "Choose" }, ...SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] }))] },
+              { name: "forwarder", label: "Forwarder", value: "" },
+              { name: "etd", label: "Planned ETD", type: "date", value: "" },
+              { name: "note", label: "What goes in it", type: "textarea", value: "", wide: true },
+            ]}
+          />
+        </div>
+      )}
+    </OrderPage>
   );
 }
