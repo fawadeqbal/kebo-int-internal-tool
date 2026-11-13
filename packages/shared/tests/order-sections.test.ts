@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ORDER_SECTIONS, ORDER_SECTION_LABEL, ORDER_SECTION_TAB, ORDER_FLOW_STAGES, ORDER_TABS, sectionReminders, sectionStep, stageStands, stageWords, type SectionFacts } from "../src/workflows/order-sections";
+import { editCardLabel, ORDER_SECTIONS, ORDER_SECTION_LABEL, ORDER_SECTION_TAB, ORDER_FLOW_STAGES, ORDER_TABS, orderSteps, sectionReminders, sectionStep, stageStands, stageWords, STEP_OF_ACTION, type SectionFacts } from "../src/workflows/order-sections";
 
 /** An order just made: bank transfer, 30% deposit, nothing done. */
 const fresh = (more: Partial<SectionFacts> = {}): SectionFacts => ({
@@ -256,5 +256,36 @@ describe("what the sections say is late", () => {
 
   it("a closed order reminds of nothing", () => {
     expect(sectionReminders(fresh({ readyOn: "2026-11-20", shipBy: "2026-11-24", closedOn: "2026-11-24" }), TODAY)).toEqual([]);
+  });
+});
+
+describe("the stages an order has, and the stage of a change", () => {
+  it("has the five core stages, and Delivery & SAT with its module", () => {
+    expect(orderSteps(null)).toEqual(["payment", "factory", "production", "shipping", "documents", "delivery"]);
+    expect(orderSteps(["shipping"])).toEqual(["payment", "factory", "production", "shipping", "documents"]);
+    expect(orderSteps(["delivery_sat"])).toContain("delivery");
+  });
+
+  it("files a change in the history under its stage; the order as a whole otherwise", () => {
+    expect(STEP_OF_ACTION("flow.route")).toBe("payment");
+    expect(STEP_OF_ACTION("payment_out")).toBe("factory");
+    expect(STEP_OF_ACTION("payment_in")).toBe("payment");
+    expect(STEP_OF_ACTION("flow.production")).toBe("production");
+    expect(STEP_OF_ACTION("goods_received")).toBe("production");
+    expect(STEP_OF_ACTION("flow.shipment")).toBe("shipping");
+    expect(STEP_OF_ACTION("flow.bank_step")).toBe("documents");
+    expect(STEP_OF_ACTION("flow.claim")).toBe("delivery");
+    // A paper, a file or an expense says its stage itself.
+    expect(STEP_OF_ACTION("paper.final", { step: "shipping" })).toBe("shipping");
+    expect(STEP_OF_ACTION("file.upload", { step: "nowhere" })).toBeNull();
+    expect(STEP_OF_ACTION("expense", { step: "delivery" })).toBe("delivery");
+    // A card's edit: by the card.
+    expect(STEP_OF_ACTION("card.edit", { card: "shipment:1b3d" })).toBe("shipping");
+    expect(STEP_OF_ACTION("card.edit", { card: "lines.received" })).toBe("production");
+    expect(editCardLabel("lines.received")).toBe("Lines from the factory");
+    expect(STEP_OF_ACTION("update", { readyOn: "2026-12-03" })).toBe("production");
+    expect(STEP_OF_ACTION("stage")).toBeNull();
+    // What was ticked on the old checklist keeps its stage in the history.
+    expect(STEP_OF_ACTION("checklist.tick", { step: "shipping" })).toBe("shipping");
   });
 });

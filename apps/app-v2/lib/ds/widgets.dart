@@ -126,7 +126,7 @@ class RowData {
       this.leading,
       this.strong = false});
 
-  /// An icon before the text (a checklist state, a file kind).
+  /// An icon before the text (a state, a file kind).
   final Widget? leading;
   final String? title;
 

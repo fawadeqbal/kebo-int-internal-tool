@@ -181,14 +181,14 @@ describe("one money truth", () => {
       await pay(o.orderId, 3000, "deposit");
     });
 
-    it("asks for 50% on the order, the gate, the checklist, the proforma and the contract", async () => {
+    it("asks for 50% on the order, the gate, the Payment stage, the proforma and the contract", async () => {
       const v = await order(o.orderId);
       expect(v.money).toMatchObject({ deposit: "5000.00", depositPercent: 50, depositDue: "2000.00", status: "partly_paid" });
       expect(v.depositPercent).toBe(30); // as accepted
       expect(v.needs.title).toBe("Get the deposit (USD 2,000.00)");
       expect((await api(app, sana).get(`/orders/${o.orderId}/flow`).expect(200)).body.payment.depositIn).toBe(false);
-      const steps = (await api(app, sana).get(`/orders/${o.orderId}/steps`).expect(200)).body.items as { key: string | null; done: boolean; needs: string | null }[];
-      expect(steps.find((s) => s.key === "deposit_in")).toMatchObject({ done: false, needs: "USD 5,000.00 (50%)" });
+      const stands = (await api(app, sana).get(`/orders/${o.orderId}/sections`).expect(200)).body.stands as { stage: string; word: string; fact: string; missing: string }[];
+      expect(stands.find((x) => x.stage === "payment")).toMatchObject({ word: "Nothing in", fact: expect.stringContaining("deposit 50% USD 5,000 to come") });
       const pi = (await api(app, manager).get(`/orders/${o.orderId}/documents/proforma`).expect(200)).body;
       expect(pi.paymentSentence).toContain("50%");
       expect(pi.totals).toMatchObject({ deposit: "5000.00", depositPercent: 50 });
@@ -198,12 +198,12 @@ describe("one money truth", () => {
       expect(res.body.error).toContain("The deposit (USD 5,000.00) has not been received yet.");
     });
 
-    it("ticks the deposit once 50% is in", async () => {
+    it("says the deposit is in once 50% is in", async () => {
       await pay(o.orderId, 2000, "deposit");
       expect((await order(o.orderId)).money).toMatchObject({ depositDue: "0.00", status: "deposit_paid" });
       expect((await api(app, sana).get(`/orders/${o.orderId}/flow`).expect(200)).body.payment.depositIn).toBe(true);
-      const steps = (await api(app, sana).get(`/orders/${o.orderId}/steps`).expect(200)).body.items as { key: string | null; done: boolean }[];
-      expect(steps.find((s) => s.key === "deposit_in")?.done).toBe(true);
+      const stands = (await api(app, sana).get(`/orders/${o.orderId}/sections`).expect(200)).body.stands as { stage: string; word: string; fact: string; missing: string }[];
+      expect(stands.find((x) => x.stage === "payment")!.word).toBe("Deposit in");
     });
   });
 

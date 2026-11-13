@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { CheckCircle2 } from "lucide-react";
-import { LINE_CONDITION_LABEL } from "@kebo/shared";
 import { Button, Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -35,82 +33,6 @@ export interface GoodsLine {
   receivedOn: string | null;
   packing: LinePacking;
 }
-
-/* ---------------------------------------------------------------- goods from the factory */
-
-/** Excel for the goods (export only), in the card's header. */
-export function GoodsExcel({ lines }: { lines: GoodsLine[] }) {
-  return <ExcelMenu noun="lines" exportSheet={() => goodsExport(lines)} />;
-}
-
-/** The goods lines with what came in, as a file. */
-const goodsExport = (lines: GoodsLine[]): SheetSpec => ({
-  name: "Goods from the factory",
-  title: "Goods",
-  columns: [
-    { header: "No.", width: 7 },
-    { header: "Goods", width: 48 },
-    { header: "Model", width: 16 },
-    { header: "Factory", width: 24 },
-    { header: "Ordered", kind: "number", width: 11 },
-    { header: "Unit", width: 9 },
-    { header: "Came in", kind: "number", width: 11 },
-    { header: "Status", width: 11 },
-    { header: "Last came in", width: 14 },
-  ],
-  rows: lines.map((l) => [
-    l.no,
-    l.description,
-    l.model,
-    l.factory,
-    Number(l.quantity),
-    l.unit,
-    Number(l.receivedQty),
-    STATE[stateOf(Number(l.receivedQty), Number(l.quantity))].label,
-    Number(l.receivedQty) > 0 ? l.receivedOn : null,
-  ]),
-});
-
-/** What reached the customer, line by line, as a file (export only). */
-export function DeliveredExcel({ lines }: { lines: OrderLineView[] }) {
-  return (
-    <ExcelMenu
-      noun="lines"
-      exportSheet={() => ({
-        name: "Delivered to the customer",
-        title: "Delivered",
-        columns: [
-          { header: "No.", width: 7 },
-          { header: "Goods", width: 48 },
-          { header: "Model", width: 16 },
-          { header: "Ordered", kind: "number", width: 11 },
-          { header: "Unit", width: 9 },
-          { header: "Delivered", kind: "number", width: 11 },
-          { header: "Condition", width: 14 },
-          { header: "Note", width: 40 },
-        ],
-        rows: lines.map((l) => [
-          l.no,
-          l.description,
-          l.model,
-          Number(l.quantity),
-          l.unit,
-          Number(l.delivered?.qty ?? 0),
-          l.delivered?.condition ? LINE_CONDITION_LABEL[l.delivered.condition] : null,
-          l.delivered?.note ?? null,
-        ]),
-      })}
-    />
-  );
-}
-
-type GoodsState = "waiting" | "partly" | "in";
-const stateOf = (got: number, of: number): GoodsState => (got >= of ? "in" : got > 0 ? "partly" : "waiting");
-const STATE: Record<GoodsState, { label: string; tone: "neutral" | "warn" | "ok" }> = {
-  waiting: { label: "Waiting", tone: "neutral" },
-  partly: { label: "Partly in", tone: "warn" },
-  in: { label: "All in", tone: "ok" },
-};
 
 /* ---------------------------------------------------------------- packing list */
 
@@ -237,19 +159,6 @@ function packingFromSheet(read: ReadSheet, lines: GoodsLine[]): { fill: Map<stri
 
 
 /* ---------------------------------------------------------------- the cards */
-
-/** "Mark all received": every goods line in full, dated today (the bulk save). */
-export function MarkAllReceived({ lines, action }: { lines: GoodsLine[]; action: Action }) {
-  const payload = JSON.stringify({ lines: lines.map((l) => ({ lineId: l.id, receivedQty: Number(l.quantity) })) });
-  return (
-    <ActionForm action={action} className="contents">
-      <input type="hidden" name="payload" value={payload} />
-      <SubmitButton size="sm" variant="secondary" pendingText="Saving…">
-        <CheckCircle2 aria-hidden /> Mark all received
-      </SubmitButton>
-    </ActionForm>
-  );
-}
 
 /**
  * The packing list card on Shipping: the order's lines with the packing

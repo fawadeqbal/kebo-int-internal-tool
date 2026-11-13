@@ -11,19 +11,20 @@ import 'waiting.dart';
 
 String _today() => isoDay(DateTime.now())!;
 
-const _fatResults = {'Passed': 'Passed', 'Passed with notes': 'Passed with notes', 'Failed': 'Failed'};
+const _fatResults = {'passed': 'Passed', 'passed_with_remarks': 'Passed with remarks', 'failed': 'Failed'};
 
-/// At the factory: the ready date they give now, the FAT result and notes, photos, and the
-/// visit's costs. One Save; each answer goes where it lives. True when saved.
+/// At the factory: the ready date they give now, the factory test's result and remarks (kept on
+/// Production, where the FAT report is made from), photos, and the visit's costs. One Save; each
+/// answer goes where it lives. True when saved.
 Future<bool> openFactoryVisit(BuildContext context, Order order) async {
   final api = context.api;
   final Json flow;
-  final Json? fat;
+  final List<Json> production;
   try {
-    final r = await Future.wait([api.get('/api/orders/${order.id}/flow'), api.get('/api/orders/${order.id}/steps')]);
+    final r = await Future.wait([api.get('/api/orders/${order.id}/flow'), api.get('/api/orders/${order.id}/sections')]);
     flow = r[0];
-    // The company's own FAT item: the one that makes the FAT report.
-    fat = r[1].list('items', (m) => m).where((i) => i.strOrNull('paper') == 'fat-report' && i.strOrNull('id') != null).firstOrNull;
+    // Production, one row per factory of the order: its ready date and its factory test.
+    production = r[1].list('production', (m) => m);
   } on ApiException catch (e) {
     if (context.mounted) toast(context, e.message);
     return false;
@@ -38,7 +39,10 @@ Future<bool> openFactoryVisit(BuildContext context, Order order) async {
   }
   String? readyOf(Object? id) => readyBy.where((f) => f.str('factoryId') == id).firstOrNull?.strOrNull('readyOn');
   final first = factories.keys.firstOrNull;
-  final fatDone = fat?.boolean('done') ?? false;
+  // The factory's test: its row of Production (the only row when the lines name no factory).
+  Json? testOf(Object? id) => production.where((p) => p.at('factory.id') == id).firstOrNull ?? (production.length == 1 ? production.first : null);
+  final hasTest = production.isNotEmpty;
+  final fatDone = testOf(first)?.at('fat.doneOn') != null;
   PickedFile? photo;
   Sent? sent;
   final box = context.outbox;
@@ -49,16 +53,16 @@ Future<bool> openFactoryVisit(BuildContext context, Order order) async {
     save: 'Save the visit',
     keeps: true,
     intro: joinParts([order.refNo, order.customer?.name, if (fatDone) 'FAT already recorded']),
-    initial: {'factoryId': first, 'readyOn': readyOf(first), 'result': null, 'note': fat?.strOrNull('note') ?? ''},
+    initial: {'factoryId': first, 'readyOn': readyOf(first), 'result': null, 'note': testOf(first)?.at('fat.remarks') ?? ''},
     groups: [
       FormGroup(fields: [
         if (factories.length > 1) FieldDef('factoryId', 'Factory', FieldKind.choice, required: true, options: factories),
         FieldDef('readyOn', 'Factory says ready on', FieldKind.date, hint: 'The payment plans that follow the ready date move with it'),
       ]),
-      if (fat != null && !fatDone)
-        FormGroup(title: 'FAT', fields: [
+      if (hasTest && !fatDone)
+        FormGroup(title: 'Factory test (FAT)', fields: [
           FieldDef('result', 'Result', FieldKind.choice, options: _fatResults),
-          const FieldDef('note', 'Notes', FieldKind.multiline, max: 1000, hint: 'e.g. speed 98 bpm at test, label alignment ok'),
+          const FieldDef('note', 'Remarks', FieldKind.multiline, max: 1000, hint: 'e.g. speed 98 bpm at test, label alignment ok'),
         ]),
     ],
     onChange: (v, key) {
@@ -102,19 +106,20 @@ Future<bool> openFactoryVisit(BuildContext context, Order order) async {
           guard: {'get': '/api/orders/${order.id}/flow', 'list': 'factory.readyBy', 'where': {'factoryId': factoryId}, 'field': 'readyOn', 'was': was, 'yours': body['readyOn']},
         );
       }
-      OutStep? up;
       if (photo != null) {
-        up = ch.upload('/api/orders/${order.id}/files', photo!.bytes, photo!.name,
-            fields: {'step': 'production', 'kind': 'photo', 'note': 'Factory visit ${factories[factoryId] ?? ''}'.trim()}, idAt: 'sourceId');
+        ch.upload('/api/orders/${order.id}/files', photo!.bytes, photo!.name,
+            fields: {'step': 'production', 'section': 'fat', 'kind': 'photo', 'note': 'Factory visit ${factories[factoryId] ?? ''}'.trim()}, idAt: 'sourceId');
       }
-      if (fat != null && !fatDone && body['result'] != null) {
-        ch.post('/api/checklist/${fat.str('id')}/tick', {
-          'data': {'date': _today(), 'result': body['result']},
-          if (up != null) 'attachmentId': Chain.ref(up),
+      // The test's result and remarks go on Production (the FAT report prints from there).
+      final remarks = '${body['note'] ?? ''}'.trim();
+      final test = testOf(factoryId);
+      final result = hasTest && !fatDone ? body['result'] : null;
+      if (result != null || (hasTest && !fatDone && remarks != (test?.at('fat.remarks') ?? ''))) {
+        ch.put('/api/orders/${order.id}/factory-facts', {
+          'factoryId': ?factoryId,
+          if (result != null) ...{'fatDoneOn': _today(), 'fatResult': result},
+          'fatRemarks': remarks,
         });
-      }
-      if (fat != null && '${body['note'] ?? ''}'.trim() != (fat.strOrNull('note') ?? '')) {
-        ch.patch('/api/checklist/${fat.str('id')}', {'note': '${body['note']}'.trim()});
       }
       sent = await ch.send();
       photo = null; // sent or kept: not again if the form sends a second time

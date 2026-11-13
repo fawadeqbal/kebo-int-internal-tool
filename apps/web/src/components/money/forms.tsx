@@ -574,7 +574,7 @@ export function FactoryPaymentForm({
   const mismatch = !!owedIn && m.currency !== owedIn && !kept;
   const left = chosen && Number(chosen.toPay) > 0 && m.currency === chosen.currency ? chosen.toPay : null;
   const [file, setFile] = useState<File | null>(null);
-  // The slip goes with the save itself: paying the advance ticks the checklist row this form was opened from.
+  // The slip goes with the save itself: the page re-draws once the payment is saved.
   const save = useSaveThenSend(
     action,
     file,

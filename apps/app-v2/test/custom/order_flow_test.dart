@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kebo_app/generated/screens/order.g.dart';
 
@@ -16,67 +15,38 @@ Map<String, Object?> _server() => {
         'inquiry': {'refNo': 'RFQ-2026-0161', 'title': 'Blister packing machine', 'assignee': {'name': 'Sana'}},
         'documents': [],
       },
-      '/api/orders/o1/steps': {
-        'canEdit': true,
-        'steps': [
-          {'key': 'payment', 'number': 1, 'label': 'Payment', 'state': 'done', 'stateLabel': 'Done', 'done': 3, 'total': 3},
-          {'key': 'shipping', 'number': 4, 'label': 'Shipping', 'state': 'now', 'stateLabel': 'Now', 'done': 3, 'total': 5, 'line': 'Sea to Karachi · Sino Trans'},
+      '/api/orders/o1/sections': {
+        'stages': ['payment', 'shipping', 'delivery'],
+        'stands': [
+          {'stage': 'payment', 'label': 'Payment', 'word': 'Deposit in', 'tone': 'ok', 'fact': 'Bank transfer (T/T) · 30% USD 9,196.36 in on 2 Nov', 'missing': ''},
+          {'stage': 'shipping', 'label': 'Shipping', 'word': 'Booked', 'tone': 'info', 'fact': 'Sino Trans · NGB-77812', 'missing': 'container, B/L empty'},
+          {'stage': 'delivery', 'label': 'Delivery & SAT', 'word': 'Not yet', 'tone': 'neutral', 'fact': 'Not delivered yet', 'missing': ''},
         ],
-        'doNow': {'step': 'shipping', 'label': 'Shipping', 'key': 'sailed', 'title': 'Sailed · bill of lading', 'needs': 'vessel, B/L number, sailed on', 'dueOn': '2026-11-20', 'late': false},
-        'items': [
-          {'key': 'booked', 'step': 'shipping', 'title': 'Space booked', 'done': true, 'data': [['Forwarder', 'Sino Trans']]},
-          {'key': 'sailed', 'step': 'shipping', 'title': 'Sailed · bill of lading', 'done': false, 'needs': 'vessel, B/L number, sailed on'},
-          {'key': 'claims_closed', 'step': 'shipping', 'title': 'Claims closed', 'done': false},
-        ],
+        'production': [],
       },
-      '/api/orders/o1/flow': {
-        'shipping': {
-          'shipments': [
-            {'id': 's1', 'vessel': 'MSC Aurora', 'blNo': null},
-          ],
-        },
-      },
-      '/api/orders/o1/defaults': {},
+      '/api/orders/o1/flow': <String, Object?>{},
+      '/api/orders/o1/defaults': <String, Object?>{},
       '/api/orders/o1/papers': {'papers': []},
       '/api/orders/o1/files': {'files': [], 'groups': []},
-      '/api/shipments/s1': {'ok': true},
     };
 
 void main() {
-  testWidgets('the order shows what to do now, the step chips and the step\'s checklist', (tester) async {
+  testWidgets('the order shows where each stage stands: its word and a line of facts, nothing to tick', (tester) async {
     await pumpScreen(tester, const OrderScreen(id: 'o1'), _server());
-    expect(find.text('DO NOW · SHIPPING'), findsOneWidget);
-    expect(find.text('Fill it'), findsOneWidget);
-    expect(find.text('✓ Payment 3/3'), findsOneWidget);
-    expect(find.text('Shipping · 3 of 5'), findsOneWidget);
-    expect(find.text('Space booked'), findsOneWidget);
+    expect(find.text('Where it stands'), findsWidgets);
+    expect(find.text('Payment'), findsOneWidget);
+    expect(find.text('Deposit in'), findsOneWidget);
+    expect(find.text('Booked'), findsOneWidget);
+    expect(find.textContaining('Sino Trans · NGB-77812'), findsOneWidget);
+    expect(find.textContaining('container, B/L empty'), findsOneWidget);
+    expect(find.text('Fill it'), findsNothing);
     await expectAccessible(tester);
   });
 
-  testWidgets('Fill it asks only what the item needs and saves it on the shipment', (tester) async {
+  testWidgets('Delivery & SAT opens its screen, which says when the company does not use it', (tester) async {
     await pumpScreen(tester, const OrderScreen(id: 'o1'), _server());
-    await tester.tap(find.text('Fill it'));
+    await tester.tap(find.text('Delivery & SAT'));
     await tester.pumpAndSettle();
-    expect(find.text('MSC Aurora'), findsOneWidget, reason: 'the vessel starts from the shipment');
-    await tester.tap(find.text('Tick it'));
-    await tester.pumpAndSettle();
-    expect(find.text('B/L number is needed'), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextField, '').first, 'MSC Aurora');
-    final bl = find.byType(TextField).at(1);
-    await tester.enterText(bl, 'cosu6281734510');
-    await tester.tap(find.text('Tick it'));
-    await tester.pumpAndSettle();
-    final sent = lastServer.sent('PATCH', '/api/shipments/s1')!;
-    expect(sent['status'], 'departed');
-    expect(sent['blNo'], 'COSU6281734510');
-    expect(sent['departedOn'], isA<String>());
-  });
-
-  testWidgets('claims open Delivery & SAT, which says when the company does not use it', (tester) async {
-    await pumpScreen(tester, const OrderScreen(id: 'o1'), _server());
-    await tester.tap(find.text('Claims closed'));
-    await tester.pumpAndSettle();
-    expect(find.text('Delivery & SAT'), findsOneWidget);
     expect(find.text('Delivery & SAT is switched off'), findsOneWidget);
   });
 }

@@ -11,7 +11,7 @@ import { orderAccess } from "../../common/auth/order-access";
 import { MoneyService } from "../money/money.service";
 import { SettingsService } from "../settings/settings.service";
 import { fxOf } from "../billing/api";
-import { checklistFactsOf, checklistOrderInclude } from "../checklist/checklist-facts";
+import { factsInclude, orderFactsOf } from "./order-facts";
 
 /**
  * The order without checklists: where each stage of an order stands, read from
@@ -38,10 +38,10 @@ export class SectionsService {
 
   /** The order's facts: what every section's word is read from. */
   async facts(user: SessionUser, id: string): Promise<{ status: string; facts: SectionFacts }> {
-    const o = await this.prisma.db.order.findFirst({ where: { id, ...orderAccess(user) }, include: checklistOrderInclude });
+    const o = await this.prisma.db.order.findFirst({ where: { id, ...orderAccess(user) }, include: factsInclude });
     if (!o) throw new NotFoundError("Order");
     const [factories, settings, expenses] = await Promise.all([this.factoriesOf(user, o.id), this.settings.get(), this.limits.allows("expenses")]);
-    const facts = { ...checklistFactsOf(o, factories, this.clock.timeZone, fxOf(settings, expenses), settings.reminders.lcCourierDays), papersOff: settings.papers.off };
+    const facts = { ...orderFactsOf(o, factories, this.clock.timeZone, fxOf(settings, expenses), settings.reminders.lcCourierDays), papersOff: settings.papers.off };
     return { status: o.status, facts };
   }
 

@@ -10,7 +10,7 @@ import { requiredDocuments, type FlowStep } from "./flow";
  *
  * - Made papers (sales contract, commercial invoice, …) are a draft until made
  *   final: final keeps a snapshot of exactly what was printed, locks the number
- *   and ticks the checklist; "Make again" starts version 2 and keeps version 1.
+ *  ; "Make again" starts version 2 and keeps version 1.
  * - The customer statement is live: printed from the data whenever opened.
  * - Payment requests and receipts are kept as sent: a request is kept exactly
  *   as printed when it is sent (sent again: R2, the first one stays), a receipt
@@ -29,7 +29,6 @@ export const PAPER_KINDS = [
   "customer-statement",
   "purchase-order",
   "fat-report",
-  "inspection-report",
   "commercial-invoice",
   "shipping-advice",
   "bill-of-exchange",
@@ -49,7 +48,6 @@ export const PAPER_LABEL: Record<PaperKind, string> = {
   "customer-statement": "Customer statement",
   "purchase-order": "Purchase order to the factory",
   "fat-report": "FAT report",
-  "inspection-report": "Inspection report",
   "commercial-invoice": "Commercial invoice",
   "shipping-advice": "Shipping advice",
   "bill-of-exchange": "Bill of exchange (draft)",
@@ -67,7 +65,6 @@ export const PAPER_TITLE: Record<PaperKind, string> = {
   "customer-statement": "STATEMENT OF ACCOUNT",
   "purchase-order": "PURCHASE ORDER",
   "fat-report": "FAT REPORT",
-  "inspection-report": "INSPECTION REPORT",
   "commercial-invoice": "COMMERCIAL INVOICE",
   "shipping-advice": "SHIPPING ADVICE",
   "bill-of-exchange": "BILL OF EXCHANGE",
@@ -85,7 +82,6 @@ export const PAPER_NUMBER_LABEL: Record<PaperKind, string> = {
   "customer-statement": "Statement No.",
   "purchase-order": "PO No.",
   "fat-report": "Report No.",
-  "inspection-report": "Report No.",
   "commercial-invoice": "Invoice No.",
   "shipping-advice": "Advice No.",
   "bill-of-exchange": "Bill No.",
@@ -103,7 +99,6 @@ export const PAPER_PREFIX: Record<PaperKind, string> = {
   "customer-statement": "ST",
   "purchase-order": "PO",
   "fat-report": "FAT",
-  "inspection-report": "IR",
   "commercial-invoice": "CI",
   "shipping-advice": "SA",
   "bill-of-exchange": "BE",
@@ -121,7 +116,6 @@ export const PAPER_STEP: Record<PaperKind, FlowStep> = {
   "customer-statement": "payment",
   "purchase-order": "factory",
   "fat-report": "production",
-  "inspection-report": "production",
   "commercial-invoice": "shipping",
   "shipping-advice": "shipping",
   "bill-of-exchange": "documents",
@@ -138,8 +132,7 @@ export const PAPER_MADE_FROM: Record<PaperKind, string> = {
   "payment-receipt": "the recorded payment",
   "customer-statement": "the customer's orders and payments",
   "purchase-order": "the factory's prices, items, ready date",
-  "fat-report": "the FAT item: result, date, who watched",
-  "inspection-report": "the inspection item: inspector, result",
+  "fat-report": "the factory test on Production: result, date, who attended",
   "commercial-invoice": "order lines + B/L no., vessel, ports, LC no.",
   "shipping-advice": "the shipment: vessel, B/L, ETD/ETA, container",
   "bill-of-exchange": "LC no., amount, banks",
@@ -153,14 +146,12 @@ export const PAPER_MADE_FROM: Record<PaperKind, string> = {
 export const PAPER_DOCUMENT: Partial<Record<PaperKind, OrderDocumentKind>> = {
   "sales-contract": "sales_contract",
   "commercial-invoice": "commercial_invoice",
-  "inspection-report": "inspection",
 };
 
 /** The paper of the app for a document-set kind (the reverse of PAPER_DOCUMENT). */
 export const DOCUMENT_PAPER: Partial<Record<OrderDocumentKind, PaperKind>> = {
   sales_contract: "sales-contract",
   commercial_invoice: "commercial-invoice",
-  inspection: "inspection-report",
 };
 
 /**
@@ -215,8 +206,7 @@ export const FACTORY_PRICE_PAPERS: readonly PaperKind[] = ["purchase-order"];
  * Settings › Papers we use: every paper the app makes or tracks, each with an
  * on/off switch for the company. Every paper starts switched on; a company
  * turns off the ones it never uses. A switched-off paper leaves the Papers
- * lists, their counts, the step's numbers, the checklist's paper items and
- * the "missing" warnings; a paper already made (or recorded) stays visible.
+ * lists, their counts, the stage's numbers and the "missing" warnings; a paper already made (or recorded) stays visible.
  * The keys are the Papers list's kinds: the app's papers, the order's own
  * proforma and packing list, and the document-set kinds others issue.
  */
@@ -228,7 +218,6 @@ export const PAPER_SWITCHES = [
   "customer-statement",
   "purchase-order",
   "fat-report",
-  "inspection-report",
   "packing-list",
   "commercial-invoice",
   "shipping-advice",
@@ -277,7 +266,6 @@ export const PAPER_SWITCH_NOTE: Partial<Record<PaperSwitch, string>> = {
   "bank-cover-letter": "LC and bank-contract orders only",
   "purchase-order": "seen by people who see factory prices",
   "fat-report": "when the order has a FAT",
-  "inspection-report": "when the order has an inspection",
   airway_bill: "orders going by air",
   insurance: "LC orders",
 };
@@ -293,8 +281,8 @@ export function documentSwitch(kind: OrderDocumentKind): PaperSwitch | null {
       return "commercial-invoice";
     case "sales_contract":
       return "sales-contract";
+    // An inspection certificate comes from outside, when a bank asks for one: recorded like any other paper.
     case "inspection":
-      return "inspection-report";
     case "other":
       return null;
     default:

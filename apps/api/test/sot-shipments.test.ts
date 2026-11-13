@@ -11,7 +11,7 @@ import { Clock } from "../src/common/time/clock.service";
  * Single source of truth, PR 3: the shipment is the shipment.
  *  - the B/L, the day it left, the container and the ports live on the shipments only; the order's copies
  *    are gone (the migration moved them, keeping the shipment's where both differed, with a history row);
- *  - every paper, the order page, the checklist and the LC checks read Shipment 1 (the first made);
+ *  - every paper, the order page, the stages' lines and the LC checks read Shipment 1 (the first made);
  *    "shipped on" is the earliest day a shipment left;
  *  - a new shipment's ports come from the terms: E/F terms load at the Incoterm place, C/D terms discharge there;
  *  - our ship-by is kept beside the LC's latest shipment date, and warned about when it is later.
@@ -67,8 +67,8 @@ describe("the shipment is the shipment", () => {
     (await api(app, sana).get(`/orders/${id}/papers/${kind}/checks`).expect(200)).body as {
       checks: { key: string; ok: boolean; value: string; fix: string | null; warn?: string | null }[];
     };
-  const items = async (id: string) =>
-    (await api(app, sana).get(`/orders/${id}/steps`).expect(200)).body.items as { key: string; done: boolean; late: boolean; needs: string | null; data: [string, string][] }[];
+  /** Where each stage stands (its word and its line of facts), read from what is stored. */
+  const stands = async (id: string) => (await api(app, sana).get(`/orders/${id}/sections`).expect(200)).body.stands as { stage: string; word: string; fact: string; missing: string }[];
   const history = async (id: string) =>
     (await api(app, sana).get(`/history?type=order&id=${id}&step=shipping`).expect(200)).body as {
       action: string;
@@ -155,7 +155,7 @@ describe("the shipment is the shipment", () => {
     expect(await shipments(o.id)).toHaveLength(1);
   });
 
-  it("papers, the order page and the checklist agree after a B/L correction; the final packing list keeps what it printed", async () => {
+  it("papers and the order page agree after a B/L correction; the final packing list keeps what it printed", async () => {
     const o = await newOrder("FOB", "Ningbo");
     await packed(o.id);
     await api(app, sana).post(`/orders/${o.id}/stage`, { to: "shipped", confirm: true, shippedOn: day(-40), blNo: "MEDU123" }).expect(200);
@@ -189,7 +189,7 @@ describe("the shipment is the shipment", () => {
     expect(stored?.number).toBeNull();
     const refused = await api(app, sana).post(`/orders/${o.id}/document-set`, { kind: "bill_of_lading", status: "ready", number: "OTHER-9" }).expect(400);
     expect(refused.body.error).toMatch(/shipment's \(MEDU124\)/);
-    expect((await items(o.id)).find((i) => i.key === "doc:bill_of_lading")?.data).toContainEqual(["No.", "MEDU124"]);
+    expect((await stands(o.id)).find((x) => x.stage === "shipping")!.fact).toContain("MEDU124");
   });
 
   it("one rule for the primary shipment: Shipment 1 prints; shipped on is the earliest departure", async () => {
@@ -226,9 +226,6 @@ describe("the shipment is the shipment", () => {
     ).body;
     const ours = f.payment.lcChecks.find((c: { key: string }) => c.key === "our_ship_by");
     expect(ours).toMatchObject({ ok: false, detail: `our ship-by ${day(40)} is after the LC's latest shipment ${day(30)} · ship by ${day(30)}, or ask for an amendment` });
-    const lcItem = (await items(o.id)).find((i) => i.key === "contract")!;
-    expect(lcItem).toMatchObject({ done: false, late: true });
-    expect(lcItem.needs).toMatch(/our ship-by is not after the lc's latest shipment/i);
     // The sales contract's Make page shows both and warns (ours is printed; the check fails).
     let shipBy = (await paperChecks(o.id, "sales-contract")).checks.find((c) => c.key === "shipBy")!;
     expect(shipBy).toMatchObject({ ok: false, fix: "shipBy" });

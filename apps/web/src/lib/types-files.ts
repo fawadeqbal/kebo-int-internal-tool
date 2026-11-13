@@ -29,7 +29,7 @@ export interface OrderFile {
 }
 
 export interface AttachTarget {
-  to: "paper" | "checklist" | "step" | "section";
+  to: "paper" | "step" | "section";
   target: string;
   label: string;
   step: FlowStep;

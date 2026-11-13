@@ -53,7 +53,6 @@ describe("money v2", () => {
   const money = async (id: string, who = manager) => (await api(app, who).get(`/orders/${id}/money`).expect(200)).body;
   const payments = async (id: string, who = manager) => (await api(app, who).get(`/orders/${id}/payments`).expect(200)).body;
   const flow = async (id: string, who = sana) => (await api(app, who).get(`/orders/${id}/flow`).expect(200)).body;
-  const steps = async (id: string, who = manager) => (await api(app, who).get(`/orders/${id}/steps`).expect(200)).body;
   const credit = async (who = manager) => (await api(app, who).get(`/customers/${customerId}/credit`).expect(200)).body;
   const creditIn = async (currency = "USD") => (await credit()).balances.find((b: { currency: string }) => b.currency === currency)?.amount ?? "0.00";
   const account = async (name: string, currency: string) =>
@@ -265,7 +264,6 @@ describe("money v2", () => {
     expect(paid).toMatchObject({ due: "0.00", status: "paid" });
     const step = (await flow(id)).documents.bankSteps.find((s: { step: string }) => s.step === "bank_paid_us");
     expect(step).toMatchObject({ doneOn: today, reference: "MT103-1", paymentId: paid.createdId });
-    expect((await steps(id)).items.find((i: { key: string }) => i.key === "bank:bank_paid_us")).toMatchObject({ done: true });
     // Undone only by removing the payment.
     await api(app, sana).delete(`/orders/${id}/bank-steps/bank_paid_us`).expect(400);
     await api(app, manager).post(`/payments/${paid.createdId}/void`, { reason: "Wrong order" }).expect(200);
@@ -291,19 +289,13 @@ describe("money v2", () => {
     const byKey = (checks: { key: string; ok: boolean | null }[]) => Object.fromEntries(checks.map((c) => [c.key, c.ok]));
     expect(byKey(f.payment.lcChecks)).toEqual({ amount: false, currency: true, ship_by: false, expiry: true });
     expect(f.payment.lcChecksLine).toBe("2 of 4 match");
-    let item = (await steps(id)).items.find((i: { key: string }) => i.key === "contract");
-    expect(item).toMatchObject({ title: "LC opened and checked against the order", done: false, late: true });
-    expect(item.needs).toMatch(/ask for an amendment/);
-    expect(item.data).toContainEqual(["Checks", "2 of 4 match"]);
-    // Amended: every check matches and the item ticks.
+    // Amended: every check matches.
     f = (
       await api(app, sana)
         .put(`/orders/${id}/bank-contract`, { number: `LC/${tag}`, status: "amended", amount: balance, currency: "USD", openedOn: today, latestShipOn: day(70), expiresOn: day(120) })
         .expect(200)
     ).body;
     expect(f.payment.lcChecksLine).toBe("4 of 4 match");
-    item = (await steps(id)).items.find((i: { key: string }) => i.key === "contract");
-    expect(item).toMatchObject({ done: true, late: false });
     // Expiry too close to the latest ship date plus the courier days.
     f = (
       await api(app, sana)
@@ -333,15 +325,10 @@ describe("money v2", () => {
     expect((await money(id)).factories.plans[0].rows[1]).toMatchObject({ due: day(66), inDays: 66 });
     await api(app, sana).patch(`/orders/${id}/details`, { readyOn: day(-1) }).expect(200);
     expect((await money(id)).factories.plans[0].rows[1]).toMatchObject({ due: day(-1), status: "late" });
-    let s = await steps(id);
-    expect(s.items.find((i: { key: string }) => i.key === "factory_paid")).toMatchObject({ title: "Balance paid to the factory", done: false, dueOn: day(-1), late: true });
-    expect(s.items.find((i: { key: string }) => i.key === "factory_advance")).toMatchObject({ done: false });
-    // Paying the advance ticks it.
+    // Paying the advance marks its part of the plan paid.
     await api(app, manager).post(`/orders/${id}/factory-payments`, { factoryId, kind: "deposit", amount: 30000, currency: "CNY", rate: 7.12, paidOn: today }).expect(201);
     m = await money(id);
     expect(m.factories.plans[0].rows[0]).toMatchObject({ status: "paid", paid: "30000.00" });
-    s = await steps(id);
-    expect(s.items.find((i: { key: string }) => i.key === "factory_advance")).toMatchObject({ done: true });
     // Money › We owe factories shows the next part and its date.
     const payables = (await api(app, manager).get("/money/payables").expect(200)).body;
     const row = payables.find((r: { factory: { id: string } }) => r.factory.id === factoryId);

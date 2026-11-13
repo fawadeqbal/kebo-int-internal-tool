@@ -34,7 +34,7 @@ fields:
   declined: int
   noReply: { type: int, label: No reply }
   avgDaysToAnswer: { type: number, label: Days to answer }
-  lateSteps: { type: int, label: Late steps }
+  lateSteps: { type: int, label: Late orders }
   openOrders: { list: FactoryOrderRow, readonly: true }
 
 ---

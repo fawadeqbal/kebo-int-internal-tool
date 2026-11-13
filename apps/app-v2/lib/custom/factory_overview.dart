@@ -79,7 +79,7 @@ class _FactoryOverviewState extends State<FactoryOverview> {
             StatTile('Asked for prices', '${r.asked}', sub: '${r.answered} answered · ${r.declined} declined'),
             StatTile('Days to answer', r.avgDaysToAnswer == null ? '–' : '${r.avgDaysToAnswer}',
                 sub: r.noReply > 0 ? '${r.noReply} never answered' : 'on average', tone: r.noReply > 0 ? Tone.warn : null),
-            if (r.lateSteps > 0) StatTile('Late steps', '${r.lateSteps}', sub: 'on open orders', tone: Tone.bad),
+            if (r.lateSteps > 0) StatTile('Late orders', '${r.lateSteps}', sub: 'ready date passed', tone: Tone.bad),
           ]),
         ],
         if (o != null) ...[

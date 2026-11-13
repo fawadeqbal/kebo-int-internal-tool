@@ -12,7 +12,7 @@ import { OpenPanelButton } from "@/components/common/panel";
 import { AllLink, DetailsCard, RecordEmpty, RecordFrame, RecordListCard, RecordRow, RecordSection } from "@/components/common/record";
 import { RecordLanding, RecordNav } from "@/components/common/record-nav";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
-import { changeRows, compactChanges } from "@/components/orders/side-panel";
+import { changeRows, compactChanges } from "@/components/common/change-lines";
 import { RoleBadge } from "@/components/people/role-badge";
 import { PerformanceCard } from "@/components/insights/performance";
 import { resetTwoStepAction, setActiveAction, setPasswordAction, updateUserAction } from "../actions";

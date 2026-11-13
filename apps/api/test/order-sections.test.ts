@@ -2,6 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
+import { today } from "./dates";
 import { FIRST_COMPANY_ID } from "@kebo/database";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
@@ -20,7 +21,8 @@ describe("order sections: files and reminders", () => {
   let orderId: string;
   let refNo: string;
   const tag = Date.now().toString(36);
-  const ago = (n: number) => new Date(Date.now() - n * 86_400_000);
+  /** n days before today where the company is (the API counts days late from there, not from UTC). */
+  const ago = (n: number) => new Date(Date.parse(`${today}T00:00:00Z`) - n * 86_400_000);
   const pdf = (s: string) => Buffer.from(`%PDF-1.4 ${s}`);
   const upload = (token: string, path: string) => request(app.getHttpServer()).post(`/api${path}`).set("authorization", `Bearer ${token}`);
   const files = async () => (await api(app, sana).get(`/orders/${orderId}/files`).expect(200)).body.files as File[];

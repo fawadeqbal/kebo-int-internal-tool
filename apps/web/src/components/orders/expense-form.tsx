@@ -457,7 +457,7 @@ function ExpenseDialog({ title, sub, open, onClose, children }: { title: string;
   );
 }
 
-/** "Add expense": opens the order's expense form, filled in from the step (or a checklist item). */
+/** "Add expense": opens the order's expense form, filled in from the stage it was opened on. */
 export function AddOrderExpense({
   setup,
   step,

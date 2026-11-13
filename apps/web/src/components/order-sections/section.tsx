@@ -80,7 +80,3 @@ export function EmptySection({ title, text, action, wide, id }: { title: string;
   );
 }
 
-/** A stage's sections in a grid: one or two columns beside the order's side panel. */
-export function SectionGrid({ cols = 2, children }: { cols?: 1 | 2; children: ReactNode }) {
-  return <div className={cn("grid min-w-0 items-stretch gap-4", cols === 2 && "lg:grid-cols-2")}>{children}</div>;
-}

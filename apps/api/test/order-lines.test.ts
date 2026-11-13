@@ -115,9 +115,9 @@ describe("order lines, one at a time", () => {
     await patch(machine.id, { set: "received", receivedQty: 2 }).expect(200);
     const all = (await patch(moulds.id, { set: "received", receivedQty: 4 }).expect(200)).body;
     expect(all.goods).toMatchObject({ received: 2, allReceived: true });
-    // The checklist ticks itself from the lines.
-    const steps = (await api(app, sana).get(`/orders/${orderId}/steps`).expect(200)).body as { items: { key: string | null; done: boolean }[] };
-    expect(steps.items.find((i) => i.key === "goods_received")).toMatchObject({ done: true });
+    // The Production stage reads the lines.
+    const stands = (await api(app, sana).get(`/orders/${orderId}/sections`).expect(200)).body.stands as { stage: string; word: string; fact: string; missing: string }[];
+    expect(stands.find((x) => x.stage === "production")!.word).toBe("Received");
 
     const changes = await history("production");
     expect(changes.filter((c) => c.action === "goods_received").map((c) => c.summary)).toEqual(
@@ -143,8 +143,6 @@ describe("order lines, one at a time", () => {
 
     const done = (await patch(moulds.id, { set: "packing", packages: 1, grossWeightKg: 230, netWeightKg: 190, cbm: 0.6 }).expect(200)).body;
     expect(done.goods).toMatchObject({ packed: true, totals: { packages: 3, grossWeightKg: "4550.00", netWeightKg: "4090.00", cbm: "19.000" } });
-    const steps = (await api(app, sana).get(`/orders/${orderId}/steps`).expect(200)).body as { items: { key: string | null; done: boolean }[] };
-    expect(steps.items.find((i) => i.key === "packing_list")).toMatchObject({ done: true });
     // The packing list paper reads the same lines.
     const pl = (await api(app, sana).get(`/orders/${orderId}/documents/packing-list`).expect(200)).body;
     expect(pl.packing).toMatchObject({ done: true, totals: { packages: 3 } });

@@ -569,7 +569,6 @@ async function run(page, list, title) {
     "/settings/sales",
     "/settings/reminders",
     "/settings/emails",
-    "/settings/order-checklist",
     "/settings/papers",
     "/settings/website-form",
     "/access/roles",

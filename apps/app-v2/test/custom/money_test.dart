@@ -80,7 +80,7 @@ Map<String, Object?> moneyServer({List<Object?> waiting = const []}) => {
         'customer': {'id': 'c1', 'name': 'Lahore Pharma'},
         'documents': [],
       },
-      '/api/orders/o1/steps': {'canEdit': true, 'steps': [], 'items': []},
+      '/api/orders/o1/sections': {'stands': [], 'production': []},
       '/api/orders/o1/flow': {},
       '/api/orders/o1/defaults': {},
       '/api/orders/o1/papers': {

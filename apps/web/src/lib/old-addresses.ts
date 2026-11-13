@@ -88,7 +88,8 @@ export const SETTINGS_PATH: Record<string, string> = {
   reminders: "/settings/reminders",
   notifications: "/settings/emails",
   emails: "/settings/emails",
-  "order-checklist": "/settings/order-checklist",
+  // The order checklist is gone: its old tab opens Settings.
+  "order-checklist": "/settings/company",
   papers: "/settings/papers",
   "website-form": "/settings/website-form",
   address: "/settings/address",

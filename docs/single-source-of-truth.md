@@ -48,8 +48,8 @@ This is the outcome of the single-source-of-truth refactor (audit:
 | Paper, receipt and request numbers | stored: `OrderPaper.number`, `Payment.receiptNo`, `PaymentPlanItem.requestNo` (counters `Order.lastReceiptNo / lastRequestNo`), `Order.proformaNo` | `paperNumber` when a paper is first made; `packingListNo` for the packing list (`packages/shared/src/workflows/papers.ts`); `nextReference` for references (`packages/database/src/counters.ts`) | Given once, never worked out again, never reused (voiding moves no other number). `Order.proformaNo` is an index of the final proforma paper. |
 | What a paper printed | `OrderPaper.snapshot` (final) | the papers service | Final papers never move; "Make again" is a new version with the same number. |
 | The condition the goods arrived in | the goods `OrderLine.deliveredQty / deliveredCondition` | `deliveryConditionOf` (`packages/shared/src/workflows/flow.ts`) | The worst line: damaged, then partly delivered, then minor damage, then good. "All delivered OK" marks the lines. The order keeps only a delivery note. |
-| FAT and inspection results | the checklist item bound by `paper` = `fat-report` / `inspection-report` | `reportItem` (`apps/api/src/modules/papers/papers-data.ts`), `checklistPaperOf` / `REPORT_PAPERS` (`packages/shared/src/workflows/checklist.ts`) | Renaming the item keeps its report. Settings › Order checklist: "The report it fills". |
-| Production timeline | the checklist's Production items | the checklist service | The old `production_steps` table is gone. |
+| The factory test (FAT) | `OrderFactory.fatPlannedOn / fatDoneOn / fatResult / fatRemarks / fatAttendedBy` (one row per factory of the order) | `fatOf` (`apps/api/src/modules/papers/papers-data.ts`), the sections service (`PUT /orders/:id/factory-facts`) | The FAT report prints from it. There is no inspection report: an inspection certificate from outside is uploaded on Documents. |
+| Where each stage of an order stands | the order's own data (payments, the factory order, ready dates, goods received, shipments, papers, delivery) | `stageWords` / `stageStands` (`packages/shared/src/workflows/order-sections.ts`), read by `GET /orders/:id/sections` | Never ticked and never stored: there is no checklist and no production timeline. |
 | Packing (packages, weights, CBM) | `OrderLine` packing fields; `Order.packedAt` | the packing list paper | |
 | Shipped on time | `Order.shipBy` and the shipments | `shippedOnTime` (`packages/shared/src/workflows/shipment.ts`) | Shipped by the ship-by date; unknown before shipping or without one. |
 | A factory's goods actually ready, and late or not | the factory's goods lines (`receivedQty`, `receivedOn`) and the shipments | `factoryReadyActual` / `readyDelay` (`packages/shared/src/workflows/ready.ts`) | The day its last line came in full, or the day the order first shipped, whichever is earlier; against that factory's ready date. |
@@ -73,7 +73,7 @@ This is the outcome of the single-source-of-truth refactor (audit:
 - `QuotationRevision.subtotal / discount / total / lead_time` — read the options.
 - `Order.delivery_condition` and its `DeliveryCondition` database type — read the lines.
 - `Order.blNo / shippedOn / containerNo` — read the shipment.
-- `production_steps` — the checklist's Production items.
+- `production_steps`, `order_checklist_items`, `checklist_templates`, `orders.checklist_seeded_at` — an order's stages read its own data.
 - `datePlan` (plan dates copied once) — due rules, worked out live.
 - Payment filters on `currency = order.currency` — the database holds it.
 - Finding the FAT / inspection item by a regex on its title — bound by `paper`.

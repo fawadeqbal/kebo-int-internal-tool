@@ -8,10 +8,10 @@ import type { OrderFlow, ShipmentView } from "@/lib/types-flow";
 import type { OrderView } from "@/lib/types-orders";
 
 /**
- * Order v4, light steps: what a checklist row's small form, a one-tap button
- * and a view card's "+ Add" / Edit send. Each goes to the endpoint the full
- * forms use (same permissions, history and rules); nothing new is stored here.
- * Forms send plain fields; a field left out is not changed.
+ * What a section's window sends when it saves a few fields or one thing in one
+ * go. Each goes to the endpoint the full forms use (same permissions, history
+ * and rules); nothing new is stored here. Forms send plain fields; a field
+ * left out is not changed.
  */
 
 const refresh = (orderId: string) => {
@@ -95,18 +95,6 @@ async function saveShipment(orderId: string, shipmentId: string | null, v: Recor
   return api.post(`/orders/${orderId}/shipments`, { mode: "sea", ...body });
 }
 
-/** Files and a note kept with an automatic item; a person who may not change the checklist keeps the file in the deal's files only. */
-async function keepWithItem(orderId: string, key: string, v: Record<string, string>) {
-  const body = { ...(v.attachmentId ? { attachmentId: v.attachmentId } : {}), ...(v.itemNote ? { note: v.itemNote } : {}) };
-  if (!Object.keys(body).length) return null;
-  try {
-    await api.put(`/orders/${orderId}/checklist/auto/${key}`, body);
-    return null;
-  } catch {
-    return "Saved. The file stays in the deal's files (you cannot keep it with the item).";
-  }
-}
-
 /* ---------------------------------------------------------------- the view's "+ Add" and Edit */
 
 /**
@@ -154,78 +142,25 @@ export async function fieldsAction(orderId: string, target: string, _prev: Actio
   return { ...r, data: undefined };
 }
 
-/* ---------------------------------------------------------------- the checklist's light rows and one-tap items */
+/* ---------------------------------------------------------------- one window, one save */
 
 /**
- * A light row's "Save and tick", or a one-tap button. `what`:
- * - booked:<shipment id | new>, loaded:<…>, sailed:<…>[:air] — the shipment's fields (status moves on);
- * - arrived:<id,id…> — every listed shipment arrived on the day sent (today);
- * - ordered — the day we ordered from the factory (today) and their order no.;
- * - ready — the ready date;
- * - received_all — every goods line in full;
- * - contract — the LC / bank contract's number, amount, expiry, banks (opened);
- * - bank:<step> — a bank step done on the day sent (today), with the courier no.;
- * - delivered_all — every line delivered in good condition;
+ * A window that saves one thing in one go. `what`:
+ * - bank:<step> — a step at the bank (or the originals to the customer) done on the day sent, with the courier and its no.
+ *   (the date emptied: the step is not done after all);
+ * - delivered_all — every line delivered in good condition on the day sent;
  * - sat_all — every SAT point passed, signed off by the person named.
  */
 export async function lightAction(orderId: string, what: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const [kind, ref = "", extra] = what.split(":");
-  let note: string | null = null;
+  const [kind, ref = ""] = what.split(":");
   const r = await attempt(
     form,
     async () => {
       switch (kind) {
-        case "booked":
-        case "loaded":
-        case "sailed": {
-          const status: ShipmentStatus = kind === "booked" ? "booked" : kind === "loaded" ? "loaded" : "departed";
-          await saveShipment(orderId, ref && ref !== "new" ? ref : null, v, status);
-          // The B/L copy also goes into the paper set (when the papers module is on and the person keeps papers).
-          if (kind === "sailed" && v.attachmentId)
-            await api
-              .post(`/orders/${orderId}/document-set`, {
-                kind: extra === "air" ? "airway_bill" : "bill_of_lading",
-                status: "ready",
-                number: v.blNo ?? null,
-                issuedOn: v.departedOn ?? null,
-                attachmentId: v.attachmentId,
-                note: "Copy",
-              })
-              .catch(() => null);
-          note = await keepWithItem(orderId, kind, v);
-          return null;
-        }
-        case "arrived": {
-          const on = v.arrivedOn || v.on;
-          for (const id of ref.split(",").filter(Boolean)) await api.patch(`/shipments/${id}`, { status: "arrived", arrivedOn: on });
-          return null;
-        }
-        case "ordered":
-          await api.patch(`/orders/${orderId}/factory-order`, {
-            factoryOrderedOn: v.factoryOrderedOn || v.on,
-            ...(v.factoryOrderNo ? { factoryOrderNo: v.factoryOrderNo } : {}),
-          });
-          note = await keepWithItem(orderId, "factory_ordered", v);
-          return null;
-        case "ready":
-          return api.patch(`/orders/${orderId}/details`, { readyOn: v.readyOn || null, reason: reasonOf(form) });
-        case "received_all": {
-          const o = await api.get<OrderView>(`/orders/${orderId}`);
-          const lines = o.lines.filter((l) => l.type === "goods").map((l) => ({ lineId: l.id, receivedQty: Number(l.quantity) }));
-          return api.put(`/orders/${orderId}/receipt`, { on: v.on || null, lines });
-        }
-        case "contract": {
-          const c = (await flowOf(orderId)).payment.bankContract;
-          const was = Object.fromEntries(CONTRACT.map((k) => [k, c?.[k as keyof typeof c] ?? null]));
-          const body: Record<string, unknown> = { ...was, ...pick(v, CONTRACT) };
-          if (!body.status || body.status === "draft") body.status = "opened";
-          if (body.amount !== null && body.amount !== "" && !body.currency) body.currency = (await api.get<OrderView>(`/orders/${orderId}`)).currency;
-          await api.put(`/orders/${orderId}/bank-contract`, body);
-          note = await keepWithItem(orderId, "contract", v);
-          return null;
-        }
         case "bank":
+          // The date emptied: the step is not done after all.
+          if ("doneOn" in v && !v.doneOn) return api.delete(`/orders/${orderId}/bank-steps/${ref as BankStepKind}`);
           return api.put(`/orders/${orderId}/bank-steps/${ref as BankStepKind}`, {
             doneOn: v.doneOn || v.on,
             ...pick(v, ["courier", "reference", "note"]),
@@ -244,5 +179,5 @@ export async function lightAction(orderId: string, what: string, _prev: ActionSt
     "Saved.",
   );
   if (r.ok) refresh(orderId);
-  return { ...r, message: r.ok ? (note ?? r.message) : r.message, data: undefined };
+  return { ...r, data: undefined };
 }

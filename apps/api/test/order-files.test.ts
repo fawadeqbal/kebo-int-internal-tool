@@ -31,8 +31,8 @@ type Files = {
 };
 
 /**
- * Documents v3: every file of an order in one list (the deal's files, a paper's file, a checklist
- * item's file, a step's file, a payment's proof), with the same tools on each: rename, say what it
+ * Documents v3: every file of an order in one list (the deal's files, a paper's file, a section's
+ * file, a step's file, a payment's proof), with the same tools on each: rename, say what it
  * is, attach to, replace (keeping the old as a version), delete, many at once in a zip, and noting
  * a share. Changing follows what the file is attached to; every change is in the order's history.
  */
@@ -169,7 +169,7 @@ describe("order files", () => {
     expect(dealFiles.filter((f) => f.fileName === "BL copy.pdf")).toHaveLength(1);
   });
 
-  it("renames (keeping the type), says what it is, and attaches to a checklist item or a step", async () => {
+  it("renames (keeping the type), says what it is, and attaches to a section or a step", async () => {
     const urs = (await byName(`URS ${tag}.pdf`))!;
     await api(app, sana).patch(`/orders/${orderId}/files/attachment/${urs.sourceId}`, {}).expect(422);
     const after = (
@@ -183,29 +183,20 @@ describe("order files", () => {
       .expect(200);
     expect(await byName(`URS rev B ${tag}.pdf`)).toMatchObject({ kind: "specification", note: "Customer's URS, rev B" });
 
-    const l = await list();
-    const item = l.targets.find((t) => t.to === "checklist" && t.step === "shipping")!;
-    expect(item).toBeDefined();
+    // A section of the order's page takes a file as its own.
     const photos = (await byName("Loading photos.pdf"))!;
     await api(app, sana)
-      .post(`/orders/${orderId}/files/attachment/${photos.sourceId}/attach`, { to: "checklist", target: item.target })
+      .post(`/orders/${orderId}/files/attachment/${photos.sourceId}/attach`, { to: "section", target: "container" })
       .expect(200);
-    expect((await byName("Loading photos.pdf"))!.attachedTo).toMatchObject({ link: "checklist", label: `Checklist · ${item.label}` });
-    const steps = (await api(app, sana).get(`/orders/${orderId}/steps`)).body.items as {
-      key: string | null;
-      id: string | null;
-      file: { id: string } | null;
-    }[];
-    expect(steps.find((i) => (i.key ?? i.id) === item.target)!.file!.id).toBe(photos.sourceId);
+    expect((await byName("Loading photos.pdf"))!.attachedTo).toMatchObject({ link: "section", label: "Container and loading" });
+    // The checklist is gone: nothing is attached to one of its lines.
+    await api(app, sana).post(`/orders/${orderId}/files/attachment/${photos.sourceId}/attach`, { to: "checklist", target: "loaded" }).expect(422);
 
     await api(app, sana)
       .post(`/orders/${orderId}/files/attachment/${urs.sourceId}/attach`, { to: "step", target: "production" })
       .expect(200);
     expect(await byName(`URS rev B ${tag}.pdf`)).toMatchObject({ step: "production", group: "factory", attachedTo: { link: "step" } });
     await api(app, sana).post(`/orders/${orderId}/files/attachment/${urs.sourceId}/attach`, { to: "step", target: "nowhere" }).expect(422);
-    await api(app, sana)
-      .post(`/orders/${orderId}/files/attachment/${urs.sourceId}/attach`, { to: "checklist", target: "doc:bill_of_lading" })
-      .expect(400);
 
     const h = await history("shipping");
     expect(h.some((e) => e.action === "file.upload" && /Loading photos\.pdf/.test(e.summary))).toBe(true);

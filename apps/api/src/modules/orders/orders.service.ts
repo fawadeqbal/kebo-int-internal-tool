@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, nextCount, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer, routeOf, termsSelect } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, nextCount, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
 import { fromMinor, fxRate } from "@kebo/money";
 import {
   can,
@@ -36,7 +36,7 @@ import {
   orderWord,
   orderWordColumn,
 } from "@kebo/shared";
-import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
+import { dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -788,26 +788,8 @@ export class OrdersService {
     // of finished orders are not read on every Home.
     const due = await ordersWithMoneyDue(this.prisma, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
     const all = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed", ids: due }))];
-    // A checklist item of the order that is late or due soon comes first when it is due before what the order needs.
     const today = this.clock.today();
     const soon = (await this.settings.get()).reminders.dueSoonDays;
-    const dated = await this.prisma.db.orderChecklistItem.findMany({
-      where: {
-        key: null,
-        doneAt: null,
-        skippedAt: null,
-        dueOn: { lte: toDbDate(addDays(today, soon)) },
-        orderId: { in: all.filter((i) => i.status === "open").map((i) => i.id) },
-      },
-      select: { orderId: true, title: true, dueOn: true, route: true, order: { select: termsSelect } },
-      orderBy: { dueOn: "asc" },
-    });
-    for (const i of all) {
-      const c = dated.find((d) => d.orderId === i.id && (!d.route || d.route === routeOf(d.order)));
-      if (!c) continue;
-      const on = fromDbDate(c.dueOn!);
-      if (!i.needs || on < i.needs.due) i.needs = { title: c.title ?? "Checklist item", due: on, late: on < today };
-    }
     // A factory's part (the advance, the balance on the ready date) due soon or late, for people who see factory money.
     if (can(user, "sourcing.manage")) {
       const { sales } = await this.settings.get();
@@ -1258,7 +1240,7 @@ export class OrdersService {
   /**
    * Dates and details, editable at any stage. Only the fields sent change; an empty one is cleared.
    * Shipped on, the B/L and the container are Shipment 1's (made when there is none): saved there, the one
-   * place the papers, the checklist and the reports read them from.
+   * place the papers, the sections and the reports read them from.
    */
   async setDetails(user: SessionUser, id: string, input: OrderDetailsInput) {
     if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");

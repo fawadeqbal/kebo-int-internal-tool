@@ -49,7 +49,6 @@ export interface OrderFlow {
     readyBy?: { factoryId: string | null; name: string | null; readyOn: string | null }[];
     factories: { id: string; name: string }[];
   };
-  production: { steps: ProductionStepView[]; suggested: string[] } | null;
   shipping: { shipments: ShipmentView[] } | null;
   documents: { set: FlowDocument[]; bankSteps: BankStepView[] } | null;
   delivery: DeliveryView | null;
@@ -66,16 +65,6 @@ export interface BankContract {
   latestShipOn: string | null;
   expiresOn: string | null;
   note: string | null;
-}
-
-export interface ProductionStepView {
-  id: string;
-  title: string;
-  factory: { id: string; name: string } | null;
-  plannedOn: string | null;
-  doneOn: string | null;
-  note: string | null;
-  late: boolean;
 }
 
 export interface ShipmentView {

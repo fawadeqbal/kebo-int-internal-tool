@@ -8,9 +8,24 @@ import { PAPER_STATE_TONE, paperDone, type PaperState } from "@kebo/shared";
 import { Alert, Badge, Button, buttonClass, Card, CardHeader, cn, Field, Input } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { PaperRow } from "@/lib/types-papers";
-import { uploadToDeal } from "./checklist";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
+
+/** Sends a file to the deal's files and answers its id (server actions cap bodies at 1 MB, so files go through a route). */
+async function uploadToDeal(dealId: string, file: File, note: string): Promise<{ id?: string; error?: string }> {
+  const body = new FormData();
+  body.set("file", file, file.name);
+  body.set("kind", "other");
+  body.set("note", note.slice(0, 300));
+  try {
+    const res = await fetch(`/files/inquiries/${dealId}`, { method: "POST", body });
+    const json = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+    if (!res.ok) return { error: json.error ?? (res.status === 413 ? "This file is too large." : `Upload failed (${res.status})`) };
+    return { id: json.id };
+  } catch {
+    return { error: "The connection dropped. Try again." };
+  }
+}
 
 const SOURCE: Record<string, { label: string; tone: "primary" | "info" | "neutral" | "warn" }> = {
   app: { label: "Made by the app", tone: "primary" },

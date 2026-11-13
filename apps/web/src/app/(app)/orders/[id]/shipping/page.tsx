@@ -17,6 +17,8 @@ import { docHref, goodsOf } from "../shared";
 import { PackingCard } from "../goods";
 import { orderCostsSetup } from "@/components/orders/costs-data";
 import { AddOrderExpense } from "@/components/orders/expense-form";
+import { RemoveButton } from "@/components/orders/flow-forms";
+import { removeShipmentAction } from "../../flow-actions";
 import { stageData } from "../stage-data";
 
 export const metadata = { title: "Order · shipping" };
@@ -161,7 +163,13 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
 
         return (
           <div key={i} className="contents">
-            {many && <h2 className={cn("text-[13px] font-bold text-text-2", i > 0 && "mt-2")}>Shipment {i + 1}</h2>}
+            {many && (
+              <div className={cn("flex items-center justify-between gap-3", i > 0 && "mt-2")}>
+                <h2 className="text-[13px] font-bold text-text-2">Shipment {i + 1}</h2>
+                {/* A shipment added by mistake: only one that has not left. */}
+                {canShip && s.id && !left && <RemoveButton action={removeShipmentAction.bind(null, o.id, s.id)} what={`shipment ${i + 1}`} />}
+              </div>
+            )}
             {booked ? (
               <Section
                 title={`Booking${of}`}
@@ -365,7 +373,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             save="Add the shipment"
             whats={["Shipping shows its sections once per shipment."]}
             fields={[
-              { name: "mode", label: "Way", type: "select", value: "", options: [{ value: "", label: "Choose" }, ...SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] }))] },
+              { name: "mode", label: "Way", type: "select", value: "sea", options: SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] })) },
               { name: "forwarder", label: "Forwarder", value: "" },
               { name: "etd", label: "Planned ETD", type: "date", value: "" },
               { name: "note", label: "What goes in it", type: "textarea", value: "", wide: true },

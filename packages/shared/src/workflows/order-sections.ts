@@ -1,9 +1,9 @@
 import type { ISODate } from "@kebo/utils";
-import type { OrderDocumentKind, PaymentRoute } from "../enums";
+import type { BankContractStatus, BankStepKind, OrderDocumentKind, PaymentRoute, ShipMode, ShipmentStatus } from "../enums";
 import type { Tone } from "../labels";
-import type { ChecklistFacts } from "./checklist";
+import type { LcCheck } from "./money-route";
 import { daysBetween } from "@kebo/utils";
-import { documentDone, FLOW_STEPS, type FlowStep } from "./flow";
+import { documentDone, FLOW_STEP_LABEL, FLOW_STEPS, type FlowStep } from "./flow";
 import { documentsInUse } from "./papers";
 
 /**
@@ -143,13 +143,100 @@ export const CLAIM_BEARERS = ["factory", "us", "customer"] as const;
 export type ClaimBearer = (typeof CLAIM_BEARERS)[number];
 export const CLAIM_BEARER_LABEL: Record<ClaimBearer, string> = { factory: "The factory", us: "We do", customer: "The customer" };
 
+/** What is stored about one order, gathered once: every section's word is read from it. Dates are YYYY-MM-DD. */
+export interface StoredFacts {
+  currency: string;
+  route: PaymentRoute | null;
+  /** The ship mode of the first shipment (sea when none). */
+  shipMode: ShipMode | null;
+  bankContract: {
+    status: BankContractStatus;
+    number: string | null;
+    amount: string | null;
+    currency: string | null;
+    openedOn: ISODate | null;
+  } | null;
+  /** Deposit percent of the order (0: none). */
+  depositPercent: number;
+  depositIn: boolean;
+  /** When the payments reached the deposit, and the deposit amount ("18900.00"). */
+  depositOn: ISODate | null;
+  deposit: string;
+  /** Still due from the customer ("0.00": paid in full). */
+  due: string;
+  paidInFullOn: ISODate | null;
+  factoryOrderedOn: ISODate | null;
+  /** The factory's own number for our order. */
+  factoryOrderNo?: string | null;
+  /**
+   * Money owed to the factories, or null when the person may not see factory money; `plan`: its payment
+   * plan's parts (advance when ordered, balance on the ready date) with where each stands.
+   */
+  factories:
+    | {
+        name: string;
+        currency: string;
+        owed: string;
+        paid: string;
+        toPay: string;
+        plan?: { label: string; dueRule: string; due: ISODate | null; open: string; status: string }[];
+      }[]
+    | null;
+  /** An LC order: the LC checked against the order (amount, currency, ship-by, expiry); null otherwise. */
+  lcChecks?: LcCheck[] | null;
+  /** The route is still the one the quotation's terms implied (the order started on it). */
+  routeFromQuotation?: boolean;
+  /** The order's ready date: the latest of its factories', once each has given one. */
+  readyOn: ISODate | null;
+  /** Each factory's own ready date (one per factory; one row, factory null, when the lines name none). */
+  readyBy?: { factory: string | null; readyOn: ISODate | null }[];
+  goods: { lines: number; received: number };
+  packedAt: ISODate | null;
+  packing: { packages: number; grossKg: string | null; cbm: string | null } | null;
+  /** The order's shipments in their order (shipmentsInOrder): Shipment 1, the primary, first. */
+  shipments: {
+    status: ShipmentStatus;
+    mode: ShipMode;
+    forwarder: string | null;
+    bookingNo: string | null;
+    containerNo: string | null;
+    sealNo?: string | null;
+    loadedOn?: ISODate | null;
+    vessel: string | null;
+    blNo: string | null;
+    etd: ISODate | null;
+    eta: ISODate | null;
+    departedOn: ISODate | null;
+    arrivedOn: ISODate | null;
+    portOfDischarge: string | null;
+  }[];
+  /** Shipped on (the earliest day a shipment left) and Shipment 1's B/L — the one "Shipped" item when the shipping module is off. */
+  shippedOn: ISODate | null;
+  blNo: string | null;
+  proforma: { number: string; issuedOn: ISODate | null } | null;
+  documents: { kind: OrderDocumentKind; status: "missing" | "draft" | "ready" | "elsewhere"; number: string | null; issuedOn: ISODate | null }[];
+  bankSteps: { step: BankStepKind; doneOn: ISODate; reference: string | null }[];
+  deliveredOn: ISODate | null;
+  satDoneOn: ISODate | null;
+  satSignedBy: string | null;
+  claims: { open: number; total: number };
+  closedOn: ISODate | null;
+  /** Settings › Papers we use: the papers the company switched off (left out unless done). */
+  papersOff?: readonly string[];
+}
+
+/** The steps the order has: the five core ones, and Delivery & SAT with its module. */
+export function orderSteps(features: readonly string[] | null): FlowStep[] {
+  const on = (f: string) => !features || features.includes(f);
+  return FLOW_STEPS.filter((s) => s !== "delivery" || on("delivery_sat"));
+}
+
 /** The order's facts the words are read from: the stored facts, plus what the sections added. */
-export interface SectionFacts extends ChecklistFacts {
+export interface SectionFacts extends StoredFacts {
   /** Our promise to the customer. */
   shipBy?: ISODate | null;
   /** Each factory's test: planned, done, how it went. */
   fat?: { factory: string | null; plannedOn: ISODate | null; doneOn: ISODate | null; result: FatResult | null }[];
-  originalsSentOn?: ISODate | null;
 }
 
 /** "5 Dec": a day without its year, for a word on a tab. */
@@ -409,3 +496,80 @@ export function sectionReminders(f: SectionReminderFacts, today: ISODate): Secti
   if (f.shipBy && f.shipBy < today && !left) out.push({ key: "ship_late", tab: "shipping", due: f.shipBy, text: `Ship by ${dayMonth(f.shipBy)} has passed: nothing has left yet` });
   return out;
 }
+
+/* ---------------------------------------------------------------- history per stage */
+
+/** A card key without its record ("shipment:<id>" → "shipment"). */
+const cardKey = (card: string) => card.split(":")[0]!;
+
+/** The cards that count their edits: how each reads in the history, and the order step it belongs to. */
+export const EDIT_CARDS: Record<string, { label: string; step?: FlowStep }> = {
+  needs: { label: "Items" },
+  lines: { label: "Offer lines" },
+  factory: { label: "Factory order", step: "factory" },
+  production: { label: "Production", step: "production" },
+  "lines.received": { label: "Lines from the factory", step: "production" },
+  "lines.packing": { label: "Packing lines", step: "shipping" },
+  "packing.marks": { label: "Shipping marks", step: "shipping" },
+  shipment: { label: "Shipment", step: "shipping" },
+  shipping: { label: "Shipping", step: "shipping" },
+  delivery: { label: "Delivery", step: "delivery" },
+  "lines.delivered": { label: "Lines delivered", step: "delivery" },
+};
+/** "Lines from the factory" for "lines.received"; the key itself when it is not a known card. */
+export const editCardLabel = (card: string) => EDIT_CARDS[cardKey(card)]?.label ?? card;
+
+/**
+ * The stage a change in the order's history belongs to, for the history's
+ * Stage column and filter. Null: the order as a whole.
+ */
+export function STEP_OF_ACTION(action: string, newValues?: unknown): FlowStep | null {
+  const nv = (newValues && typeof newValues === "object" ? newValues : {}) as Record<string, unknown>;
+  const step = typeof nv.step === "string" && (FLOW_STEPS as readonly string[]).includes(nv.step) ? (nv.step as FlowStep) : null;
+  // "checklist.": what was ticked before the order's sections; those entries keep their stage in the history.
+  if (action.startsWith("checklist.") || action.startsWith("paper.") || action.startsWith("file.")) return step;
+  if (action === "card.edit" || action === "card.first") return typeof nv.card === "string" ? (EDIT_CARDS[cardKey(nv.card)]?.step ?? null) : null;
+  if (action.startsWith("expense")) return step;
+  if (action.startsWith("payment_out")) return "factory";
+  if (action.startsWith("payment_") || action === "payment_plan") return "payment";
+  switch (action) {
+    case "flow.route":
+    case "flow.bank_contract":
+      return "payment";
+    case "flow.factory_order":
+      return "factory";
+    case "goods_received":
+    case "flow.production":
+      return "production";
+    case "packing_list":
+    case "flow.shipment":
+      return "shipping";
+    case "flow.document":
+    case "flow.bank_step":
+      return "documents";
+    case "flow.delivery":
+    case "delivered":
+    case "flow.sat":
+    case "flow.claim":
+      return "delivery";
+    case "update":
+      if ("readyOn" in nv) return "production";
+      if ("shippedOn" in nv || "blNo" in nv || "containerNo" in nv || "shippingMarks" in nv) return "shipping";
+      if ("proformaNo" in nv) return "documents";
+      return null;
+    default:
+      return null;
+  }
+}
+
+/** Each step's page under /orders/:id. */
+export const STEP_PATH: Record<FlowStep, string> = {
+  payment: "payment",
+  factory: "factory",
+  production: "production",
+  shipping: "shipping",
+  documents: "documents",
+  delivery: "delivery",
+};
+
+export const stepLabel = (step: FlowStep) => FLOW_STEP_LABEL[step];

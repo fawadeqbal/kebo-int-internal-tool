@@ -83,7 +83,7 @@ describe("/settings?tab=… (and ?section=…)", () => {
     [{ tab: "sales" }, "/settings/sales"],
     [{ tab: "reminders" }, "/settings/reminders"],
     [{ tab: "notifications" }, "/settings/emails"],
-    [{ tab: "order-checklist" }, "/settings/order-checklist"],
+    [{ tab: "order-checklist" }, "/settings/company"],
     [{ tab: "papers" }, "/settings/papers"],
     [{ tab: "website-form" }, "/settings/website-form"],
     [{ tab: "address" }, "/settings/address"],

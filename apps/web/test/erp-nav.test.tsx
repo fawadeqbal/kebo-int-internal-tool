@@ -68,7 +68,7 @@ describe("the groups", () => {
     expect(pages(m, "purchasing")).toEqual(["Purchase orders", "Suppliers"]);
     expect(pages(m, "money")).toEqual(["Payments", "To verify", "Cash & bank", "Expenses", "Invoices", "To receive", "To pay", "Ledger"]);
     expect(pages(m, "reports")).toEqual(["Profit & loss", "Planned vs spent", "All reports", "Activity log"]);
-    expect(pages(m, "settings")).toEqual(["Company", "Sales & quotations", "Order checklist", "Document templates", "Reminders", "Emails", "Website form", "People", "Roles", "Sign-ins", "Sessions"]);
+    expect(pages(m, "settings")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form", "People", "Roles", "Sign-ins", "Sessions"]);
   });
 
   it("have one name each, and two levels: a group and its pages", () => {
@@ -106,7 +106,6 @@ describe("the groups", () => {
         "/settings/company",
         "/settings/address",
         "/settings/sales",
-        "/settings/order-checklist",
         "/settings/papers",
         "/settings/reminders",
         "/settings/emails",

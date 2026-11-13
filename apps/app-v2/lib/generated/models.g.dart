@@ -428,7 +428,7 @@ abstract final class FactoryRecordFields {
   static const declined = FieldDef('declined', 'Declined', FieldKind.integer);
   static const noReply = FieldDef('noReply', 'No reply', FieldKind.integer);
   static const avgDaysToAnswer = FieldDef('avgDaysToAnswer', 'Days to answer', FieldKind.decimal);
-  static const lateSteps = FieldDef('lateSteps', 'Late steps', FieldKind.integer);
+  static const lateSteps = FieldDef('lateSteps', 'Late orders', FieldKind.integer);
   static const rules = <AnyOf>[];
 
   /// A new, empty FactoryRecord as a form starts it.

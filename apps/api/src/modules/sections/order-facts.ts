@@ -1,14 +1,14 @@
 import { fromDbDate, fromDbDateOrNull, livePart, type Prisma, routeOf } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
-import { routeFromQuotation, type ChecklistFacts, type FatResult, type SectionFacts } from "@kebo/shared";
+import { routeFromQuotation, type FatResult, type SectionFacts } from "@kebo/shared";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
 import { lcChecksOf, termsOf } from "../billing/api";
 import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
 import { chargedExpenses, positionOf, reachedOn, type MoneyCtx } from "../billing/api";
 import { dateIn } from "@kebo/utils";
 
-/** What one order's checklist is worked out from, read in one query. */
-export const checklistOrderInclude = {
+/** What one order's sections are worked out from, read in one query. */
+export const factsInclude = {
   paymentTerms: true,
   allocations: {
     where: livePart,
@@ -33,13 +33,13 @@ export const checklistOrderInclude = {
   factories: { select: { ...readySelect.factories.select, fatPlannedOn: true, fatDoneOn: true, fatResult: true, factory: { select: { name: true } } } },
 } satisfies Prisma.OrderInclude;
 
-export type ChecklistOrderRow = Prisma.OrderGetPayload<{ include: typeof checklistOrderInclude }>;
+export type FactsOrderRow = Prisma.OrderGetPayload<{ include: typeof factsInclude }>;
 
 /**
- * The checklist's facts for one order. `factories` comes from the order's money
+ * The facts of one order (what every section's word is read from). `factories` comes from the order's money
  * (null when the person may not see factory money).
  */
-export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts["factories"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): SectionFacts {
+export function orderFactsOf(o: FactsOrderRow, factories: SectionFacts["factories"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): SectionFacts {
   // Where the order stands with the customer, as everywhere: the plan's deposit, what was charged to them.
   const position = positionOf(o, fx);
   const percent = position.depositPercent;
@@ -129,6 +129,5 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
         doneOn: fromDbDateOrNull(f.fatDoneOn),
         result: (f.fatResult as FatResult | null) ?? null,
       })),
-    originalsSentOn: fromDbDateOrNull(o.originalsSentOn),
   };
 }

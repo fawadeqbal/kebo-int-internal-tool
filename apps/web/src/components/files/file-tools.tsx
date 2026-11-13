@@ -127,7 +127,7 @@ export function useFileTools() {
 }
 
 /**
- * Documents v3: the same tools on every file of an order — a chip on a checklist
+ * Documents v3: the same tools on every file of an order — a chip on a section
  * row or a paper, a row in the Files list, a payment's proof — and one viewer
  * and one set of dialogs for all of them. Put it around an order page with the
  * order's files (GET /orders/:id/files).
@@ -235,7 +235,7 @@ export function FileMenu({
         />
       )}
       {file.can.attach && (
-        <MenuItem label="Attach to…" hint="a paper, a checklist item" onClick={run(() => tools.open({ kind: "attach", file }))} />
+        <MenuItem label="Attach to…" hint="a paper, a stage" onClick={run(() => tools.open({ kind: "attach", file }))} />
       )}
       {file.can.replace && (
         <MenuItem
@@ -282,7 +282,7 @@ export function FileMenuButton({ file, set, className }: { file: OrderFile; set?
 /* ---------------------------------------------------------------- chip and row */
 
 /**
- * A file as a chip (on a checklist row, a paper, a payment): its name opens it,
+ * A file as a chip (on a section, a paper, a payment): its name opens it,
  * then View · Download · ⋯. On a phone the chip opens the file's sheet.
  * Without the tools around it (another page), it is a plain link.
  */
@@ -794,8 +794,7 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
     const files = dialog.kind === "attach" ? [dialog.file] : dialog.files.filter((f) => f.can.attach);
     const groups: [string, AttachTarget[]][] = [
       ["Papers", tools.targets.filter((t) => t.to === "paper")],
-      ["Checklist", tools.targets.filter((t) => t.to === "checklist")],
-      ["A step's files", tools.targets.filter((t) => t.to === "step")],
+      ["A stage's files", tools.targets.filter((t) => t.to === "step")],
     ];
     return (
       <Modal

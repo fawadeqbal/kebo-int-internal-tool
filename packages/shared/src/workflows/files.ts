@@ -6,7 +6,7 @@ import { ORDER_SECTIONS } from "./order-sections";
 /**
  * Documents v3: every file of an order in one list (GET /orders/:id/files),
  * wherever it is kept — the deal's files (URS, drawings), a paper's file, a
- * checklist item's file, a file added on a step, a payment's proof, a factory
+ * section's file, a file added on a step, a payment's proof, a factory
  * payment's proof, an expense's receipt — with the same tools everywhere.
  */
 
@@ -36,8 +36,8 @@ export const STEP_FILE_GROUP: Record<FlowStep, OrderFileGroup> = {
   delivery: "customer",
 };
 
-/** What a file is attached to: a paper, a checklist item, a step, the deal (inquiry), a payment, a factory payment, an expense or a factory offer. */
-export const ORDER_FILE_LINKS = ["paper", "checklist", "section", "step", "inquiry", "payment", "factory_payment", "expense", "offer"] as const;
+/** What a file is attached to: a paper, a section of the order, a step, the deal (inquiry), a payment, a factory payment, an expense or a factory offer. */
+export const ORDER_FILE_LINKS = ["paper", "section", "step", "inquiry", "payment", "factory_payment", "expense", "offer"] as const;
 export type OrderFileLink = (typeof ORDER_FILE_LINKS)[number];
 
 /** "attachment:<uuid>" — one file of the list, as the list and the zip name it. */
@@ -68,11 +68,10 @@ export type OrderFileUpdateInput = z.infer<typeof orderFileUpdateInput>;
 
 /**
  * Attach to… a paper ("paper", target: the document-set kind, e.g. bill_of_lading, or "doc:<row id>"),
- * a checklist item ("checklist", target: the item's id, or an automatic item's key), or a step ("step", target: the step).
+ * a step ("step", target: the step), or a section of the order's page.
  */
 export const orderFileAttachInput = z.discriminatedUnion("to", [
   z.object({ to: z.literal("paper"), target: z.string().trim().min(1).max(80) }),
-  z.object({ to: z.literal("checklist"), target: z.string().trim().min(1).max(80) }),
   z.object({ to: z.literal("step"), target: z.enum(FLOW_STEPS) }),
   // A section of the order's page (booking, vessel, fat…): the file is kept as one of that section's files.
   z.object({ to: z.literal("section"), target: z.enum(ORDER_SECTIONS) }),
@@ -91,13 +90,13 @@ export const orderFileUploadInput = z.object({
     .max(300)
     .nullish()
     .transform((v) => (v ? v : null)),
-  /** "paper:<target>" or "checklist:<target>" (see orderFileAttachInput). */
+  /** "paper:<target>" (see orderFileAttachInput). */
   attachTo: z.preprocess(
     blankToUndefined,
     z
       .string()
       .trim()
-      .regex(/^(paper|checklist):[\w:.-]{1,80}$/, "Choose where to attach it")
+      .regex(/^paper:[\w:.-]{1,80}$/, "Choose where to attach it")
       .optional(),
   ),
 });
