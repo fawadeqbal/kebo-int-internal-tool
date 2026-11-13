@@ -346,6 +346,9 @@ export class FlowService {
       openedOn: fromDbDate(c.openedOn),
       resolvedOn: fromDbDateOrNull(c.resolvedOn),
       resolution: c.resolution,
+      amount: c.amount === null ? null : c.amount.toFixed(2),
+      currency: c.currency,
+      bearer: c.bearer,
     }));
     const steps = flowSteps(factsOf(o, depositIn, settings.papers.off), features);
 
@@ -1314,7 +1317,15 @@ export class FlowService {
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       await tx.orderClaim.create({
-        data: { orderId: id, title: input.title, detail: input.detail, openedOn: toDbDate(input.openedOn ?? this.clock.today()) },
+        data: {
+          orderId: id,
+          title: input.title,
+          detail: input.detail,
+          openedOn: toDbDate(input.openedOn ?? this.clock.today()),
+          amount: input.amount ?? null,
+          currency: input.amount !== null && input.amount !== undefined ? o.currency : null,
+          bearer: input.bearer ?? null,
+        },
       });
       await this.log(tx, user, id, "claim", `${o.refNo}: claim opened: ${input.title}`, undefined, input);
     });
@@ -1345,6 +1356,8 @@ export class FlowService {
         data: {
           ...(input.title !== undefined && { title: input.title }),
           ...(input.detail !== undefined && { detail: input.detail }),
+          ...(input.amount !== undefined && { amount: input.amount, currency: input.amount === null ? null : (before.currency ?? o.currency) }),
+          ...(input.bearer !== undefined && { bearer: input.bearer }),
           status,
           resolution,
           resolvedOn: toDbDateOrNull(resolvedOn),

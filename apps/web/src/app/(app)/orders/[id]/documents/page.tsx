@@ -1,54 +1,42 @@
-import Link from "next/link";
-import { BANK_STEP_LABEL, can, paperDone, type BankStepKind } from "@kebo/shared";
-import { buttonClass, StatRow, StatTile } from "@kebo/ui";
-import { orderFilesOf, orderPapersOf, orderPaymentsOf } from "@/lib/order-data";
+import { BANK_STEP_LABEL, can, dayMonth, type BankStepKind } from "@kebo/shared";
+import { Badge } from "@kebo/ui";
+import { getSettings } from "@/lib/loaders";
+import { orderMoneyOf, orderPapersOf, orderPaymentsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
-import { Checklist } from "@/components/orders/checklist";
-import { StepPage } from "@/components/orders/step-page";
-import { StepChangesCompact } from "@/components/orders/side-panel";
-import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
-import { PapersTable, type PaperLineRow, type PapersTab } from "@/components/orders/papers-table";
-import { BankTracker, type BankStepLine, type BankStepTool } from "@/components/orders/bank-tracker";
-import { FilesOfOrder, UploadButton } from "@/components/files/files-list";
-import { ReachedForm } from "@/components/money/money-v2";
 import { date } from "@/lib/format";
+import { OrderPage } from "@/components/order-sections/order-side";
+import { EmptySection, Section } from "@/components/order-sections/section";
+import { SectionFiles } from "@/components/order-sections/section-files";
+import { FieldsWindow } from "@/components/order-sections/fields-window";
+import { RecordPaymentWindow } from "@/components/order-sections/payment-windows";
+import { PapersTable, type PaperLineRow, type PapersTab } from "@/components/orders/papers-table";
+import type { BankStepView } from "@/lib/types-flow";
 import { lightAction } from "../../light-actions";
 import { addDocumentAction, updateDocumentAction } from "../../flow-actions";
-import { issueProformaAction, paymentAction } from "../../actions";
+import { issueProformaAction } from "../../actions";
+import { bankPaidAction } from "../../section-actions";
 import { docHref } from "../shared";
-import { stepData } from "../step-data";
-import { getSettings } from "@/lib/loaders";
+import { stageData } from "../stage-data";
 
-export const metadata = { title: "Order · documents and bank" };
+export const metadata = { title: "Order · documents" };
 
 const TABS: PapersTab[] = ["bank", "all", "missing"];
 
 /**
- * Step 5, Documents & bank (Documents v3): one place for the papers, the bank
- * and the files, each once.
- * - Papers: every paper of the order (For the bank · All papers · Missing), made
- *   by the app, uploaded or kept elsewhere, with its one button and ⋯ menu.
- * - Through the banks: the route's bank steps as a tracker; only today's has its button.
- * - Files of this order: every file of the order, wherever it was added.
- * The papers and bank steps stay the step's count (the doc:* and bank:* items of
- * the checklist) without being listed again as checklist rows; the checklist
- * shows only the company's own items for this step, if any.
+ * Documents (design "the order, final"): every paper of the order in one list, each with its one button
+ * (Make it from the order's data, Upload it when it comes from outside, or View it); then, by the
+ * payment route, the originals couriered to the customer, or the bank's steps. Papers are made and
+ * uploaded here and nowhere else on the order.
  */
-export default async function OrderDocuments({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
-}) {
+export default async function OrderDocuments({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
-  const d = await stepData(id, "documents");
+  const d = await stageData(id, "documents");
   const { me, o, flow, now } = d;
-  const [papers, files] = await Promise.all([optional(() => orderPapersOf(id)), optional(() => orderFilesOf(id))]);
+  const papers = await optional(() => orderPapersOf(id));
   const route = flow?.payment.route ?? null;
-  const open = o.status !== "cancelled";
-  const tab: PapersTab = TABS.includes(sp.tab as PapersTab) ? (sp.tab as PapersTab) : papers?.papers.some((p) => p.inSet) ? "bank" : "all";
+  const open = d.open;
+  const tab: PapersTab = TABS.includes(sp.tab as PapersTab) ? (sp.tab as PapersTab) : "all";
 
   // Papers: the API's list, with the quotation the order was made from (its own print page) and the proforma's internal copy.
   const quotation = o.documents.find((x) => x.kind === "quotation");
@@ -84,157 +72,40 @@ export default async function OrderDocuments({
         : p,
     ),
   ];
-  const bank = rows.filter((r) => r.inSet);
-  const ready = bank.filter((r) => paperDone(r.state));
-  const missing = bank.filter((r) => r.state === "miss").map((r) => r.label);
 
-  // Through the banks: the route's steps, each once; only the first not done has its button.
   const bankSteps = flow?.documents?.bankSteps ?? [];
-  const at = bankSteps.findIndex((b) => !b.doneOn);
-  const current = at >= 0 ? bankSteps[at]! : null;
   const contract = flow?.payment.bankContract ?? null;
-  const subOf = (step: BankStepKind): string | null =>
-    step === "sent_to_our_bank"
-      ? (contract?.ourBank ?? null)
-      : step === "couriered_to_customer_bank"
-        ? "asks the tracking no."
-        : step === "customer_bank_received" && route === "letter_of_credit"
-          ? "starts the LC's days"
-          : step === "bank_paid_us"
-            ? "records the payment"
-            : null;
-  const lines: BankStepLine[] = bankSteps.map((b) => ({
-    step: b.step,
-    label: b.label,
-    done: b.doneOn ? date(b.doneOn) : null,
-    sub: b.doneOn ? [b.courier, b.reference].filter(Boolean).join(" ") || null : subOf(b.step),
-  }));
   const canBank = can(me, "documents.manage") && open;
-  let tool: BankStepTool | null = null;
-  if (current && canBank && current.step !== "bank_paid_us") {
-    const action = lightAction.bind(null, o.id, `bank:${current.step}`);
-    tool =
-      current.step === "couriered_to_customer_bank"
-        ? {
-            kind: "light",
-            label: "Add the tracking no.",
-            note: "The courier's tracking no. and the day it went: ticks the step.",
-            action,
-            fields: [
-              { name: "reference", label: "Tracking no.", value: current.reference, required: true },
-              { name: "courier", label: "Courier", value: current.courier ?? "DHL" },
-              { name: "doneOn", label: "Sent on", type: "date", value: now, max: now, required: true },
-            ],
-            chips: [{ label: "Note", field: { name: "note", label: "Note" } }],
-          }
-        : { kind: "tap", tap: { label: "Done today", action, on: now } };
-  }
-  // "Money reached us" is the payment itself: recording it (credited amount, bank charges, account, MT103) ticks the step.
-  if (current?.step === "bank_paid_us" && can(me, "payments.record") && open) {
-    const [pays, settings] = await Promise.all([
-      orderPaymentsOf(o.id),
-      getSettings(),
-    ]);
-    tool = {
-      kind: "form",
-      label: "Record it",
-      note: "Ticks the bank step and records the payment together.",
-      form: (
-        <ReachedForm
-          action={paymentAction.bind(null, o.id, o.currency)}
-          currency={o.currency}
-          customer={o.customer.name}
-          due={pays.due}
-          depositDue={pays.depositDue}
-          fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
-          today={now}
-        />
-      ),
-    };
-  }
+  const viaBank = route === "bank_contract" || route === "letter_of_credit";
+  const done = bankSteps.filter((b) => b.doneOn).length;
+  const sub = `${o.refNo} · ${o.customer.name}`;
+  // "Money reached us" is the payment itself: recording it here records the payment and marks the step.
+  const reached = bankSteps.find((b) => b.step === "bank_paid_us" && !b.doneOn) && can(me, "payments.record") && open;
+  const [pays, money, settings] = reached ? await Promise.all([orderPaymentsOf(o.id), orderMoneyOf(o.id), getSettings()]) : [null, null, null];
 
-  // The header's one line: papers for the bank, what is missing, where the bank stands.
-  const line = [
-    bank.length ? `${ready.length} of ${bank.length} papers for the bank ready` : null,
-    missing.length ? `${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` and ${missing.length - 2} more` : ""} still missing` : null,
-    current ? `bank: ${BANK_STEP_LABEL[current.step].toLowerCase()}` : bankSteps.length ? "bank: every step done" : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  // The board's four tiles: papers ready (of every paper the order needs), drafts, missing ones, the B/L copy to the customer.
-  const needed = rows.filter((r) => r.state !== "else" || r.inSet);
-  const tiles = {
-    ready: needed.filter((r) => paperDone(r.state)).length,
-    of: needed.length,
-    draft: rows.filter((r) => r.state === "draft").length,
-    missing: rows.filter((r) => r.state === "miss").map((r) => r.label),
-  };
-  const copies = bankSteps.find((b) => b.step === "copies_to_customer") ?? null;
-
-  // The checklist: only the company's own items for this step (papers and bank steps are the cards below).
-  const own = d.items.filter((i) => !i.key?.startsWith("doc:") && !i.key?.startsWith("bank:"));
-  // The B/L is the shipment's (Shipment 1's).
-  const shipNumber = o.blNo;
-  const routeLine = route
-    ? `${route === "letter_of_credit" ? "The LC" : route === "bank_contract" ? "The bank contract" : "The route"}${contract?.number ? ` ${contract.number}` : ""} asks for these. Made by the app, uploaded or kept elsewhere all count as ready.`
-    : "Choose how the customer pays on Payment: it decides the papers for the bank. Made by the app, uploaded or kept elsewhere all count as ready.";
+  const stepWindow = (b: BankStepView, originals = false) =>
+    canBank && (
+      <FieldsWindow
+        button={b.doneOn ? { label: "Edit" } : { label: "Add", kind: "plain" }}
+        title={originals ? "Originals to the customer" : BANK_STEP_LABEL[b.step]}
+        sub={originals ? sub : `${sub}${contract?.number ? ` · ${contract.number}` : ""}`}
+        plain={!b.doneOn}
+        action={lightAction.bind(null, o.id, `bank:${b.step}`)}
+        files={d.canFiles ? { orderId: o.id, section: originals ? "originals" : "bank_steps", hint: originals ? "the courier slip" : "the slip or the bank’s message" } : undefined}
+        fields={[
+          { name: "doneOn", label: originals ? "Sent on" : "Done on", type: "date", value: b.doneOn, max: now },
+          ...(originals || b.step === "couriered_to_customer_bank" ? [{ name: "courier", label: "Courier", value: b.courier, placeholder: "e.g. DHL" }] : []),
+          { name: "reference", label: originals || b.step === "couriered_to_customer_bank" ? "Tracking no." : "Reference", value: b.reference },
+          { name: "note", label: "Note", type: "textarea" as const, value: b.note, wide: true },
+        ]}
+      />
+    );
+  const hintOf = (step: BankStepKind): string =>
+    step === "sent_to_our_bank" ? (contract?.ourBank ?? "") : step === "customer_bank_received" ? (contract?.customerBank ?? "") : step === "bank_paid_us" ? "recorded with the payment" : "";
+  const originals = !viaBank ? (bankSteps.find((b) => b.step === "copies_to_customer") ?? null) : null;
 
   return (
-    <StepPage
-      steps={d.steps}
-      step="documents"
-      base={d.base}
-      line={line || undefined}
-      action={
-        files?.canUpload || papers?.canMake ? (
-          <>
-            {files?.canUpload && <UploadButton orderId={o.id} step="documents" label="Upload files" variant="ghost" />}
-            {papers?.canMake && (
-              <Link href={`${d.base}/documents?tab=all#papers`} className={buttonClass("secondary", "sm")}>
-                Make a paper
-              </Link>
-            )}
-          </>
-        ) : undefined
-      }
-      side={<StepChangesCompact entries={d.changes} historyHref={d.historyHref} />}
-    >
-      <StatRow>
-        <StatTile label="Papers ready" value={`${tiles.ready} of ${tiles.of}`} />
-        <StatTile label="Draft" value={tiles.draft} />
-        <StatTile
-          label="Missing"
-          value={tiles.missing.length}
-          sub={tiles.missing.length ? tiles.missing.slice(0, 2).join(", ").toLowerCase() : undefined}
-          tone={tiles.missing.length ? "bad" : undefined}
-        />
-        <StatTile
-          label="B/L copy to customer"
-          value={copies?.doneOn ? "Sent" : "Not sent"}
-          sub={copies?.doneOn ? date(copies.doneOn) : copies ? "unlocks the balance" : "not on this route"}
-          tone={copies && !copies.doneOn ? "warn" : undefined}
-        />
-      </StatRow>
-      {own.length > 0 && (
-        <Checklist
-          payFor={await expensePayTools(o.id, own)}
-          step="documents"
-          label="Documents & bank"
-          items={own}
-          current={d.current}
-        nowKey={d.nowKey}
-        waits={d.waits}
-          canEdit={d.steps.canEdit}
-          run={d.run}
-          dealId={o.inquiry.id}
-          people={d.people}
-          tools={{}}
-          listHref={d.listHref}
-          me={me.name}
-          today={now}
-        />
-      )}
+    <OrderPage id={id}>
       {papers && (
         <PapersTable
           orderId={o.id}
@@ -244,27 +115,70 @@ export default async function OrderDocuments({
           canMake={papers.canMake}
           canRecord={papers.canRecord}
           addAction={addDocumentAction.bind(null, o.id)}
-          updateActions={Object.fromEntries(
-            rows.filter((r) => r.doc).map((r) => [r.doc!.id, updateDocumentAction.bind(null, o.id, r.doc!.id)]),
-          )}
-          description={routeLine}
-          shipNumber={shipNumber}
+          updateActions={Object.fromEntries(rows.filter((r) => r.doc).map((r) => [r.doc!.id, updateDocumentAction.bind(null, o.id, r.doc!.id)]))}
+          shipNumber={o.blNo}
           today={now}
           issueProforma={!o.proforma && can(me, "orders.update") && open ? issueProformaAction.bind(null, o.id) : undefined}
         />
       )}
-      {bankSteps.length > 0 && (
-        <BankTracker
-          title={route === "informal" || !route ? "To the customer" : "Through the banks"}
-          description="Each bank step once. Today's step has the button; the rest wait their turn."
-          steps={lines}
-          tool={tool}
-          dealId={o.inquiry.id}
-          reference={contract?.number ?? null}
-        />
+
+      {originals &&
+        (originals.doneOn ? (
+          <Section
+            title="Originals to the customer"
+            state={`Sent ${dayMonth(originals.doneOn)}`}
+            tone="ok"
+            cols={3}
+            rows={[
+              { label: "Courier", value: originals.courier },
+              { label: "Tracking no.", value: originals.reference },
+              { label: "Sent on", value: date(originals.doneOn) },
+              ...(originals.note ? [{ label: "Note", value: originals.note }] : []),
+            ]}
+            actions={stepWindow(originals, true)}
+            files={<SectionFiles orderId={o.id} section="originals" canAdd={d.canFiles} />}
+          />
+        ) : (
+          <EmptySection title="Originals to the customer" text="Not sent yet." action={stepWindow(originals, true)} />
+        ))}
+
+      {viaBank && bankSteps.length > 0 && (
+        <Section title="The bank’s steps" state={`${done} of ${bankSteps.length}`} tone={done === bankSteps.length ? "ok" : "neutral"} files={<SectionFiles orderId={o.id} section="bank_steps" canAdd={d.canFiles} />}>
+          <ul>
+            {bankSteps.map((b) => (
+              <li key={b.step} className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-[18px] py-2 text-[13px] sm:grid-cols-[220px_120px_minmax(0,1fr)_auto]">
+                <b className="font-semibold">{b.label}</b>
+                <span className="justify-self-end sm:justify-self-start">
+                  <Badge tone={b.doneOn ? "ok" : "neutral"}>{b.doneOn ? dayMonth(b.doneOn) : "Waiting"}</Badge>
+                </span>
+                <span className="col-span-2 text-text-2 sm:col-span-1">{b.doneOn ? [b.courier, b.reference, b.note].filter(Boolean).join(" · ") || hintOf(b.step) : hintOf(b.step)}</span>
+                <span className="col-span-2 justify-self-end sm:col-span-1">
+                  {b.step === "bank_paid_us"
+                    ? !b.doneOn &&
+                      reached &&
+                      pays &&
+                      money &&
+                      settings && (
+                        <RecordPaymentWindow
+                          main={false}
+                          action={bankPaidAction.bind(null, o.id, o.currency)}
+                          currency={o.currency}
+                          customer={o.customer.name}
+                          refNo={o.refNo}
+                          due={pays.due}
+                          depositDue={pays.depositDue}
+                          forWhat={money.plan.next?.label ?? null}
+                          fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
+                          today={now}
+                        />
+                      )
+                    : stepWindow(b)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
       )}
-      {files && <FilesOfOrder data={files} step="documents" />}
-      <StepCosts id={o.id} step="documents" />
-    </StepPage>
+    </OrderPage>
   );
 }

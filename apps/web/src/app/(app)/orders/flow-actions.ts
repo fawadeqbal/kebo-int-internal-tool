@@ -119,11 +119,11 @@ export async function satAction(orderId: string, _prev: ActionState, form: FormD
 }
 
 export async function addClaimAction(orderId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.post(`/orders/${orderId}/claims`, pick(form, ["title", "detail", "openedOn"])), "Claim opened.");
+  return run(orderId, form, () => api.post(`/orders/${orderId}/claims`, pick(form, ["title", "detail", "openedOn", "amount", "bearer"])), "Claim opened.");
 }
 
 export async function updateClaimAction(orderId: string, claimId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.patch(`/claims/${claimId}`, pick(form, ["status", "resolution"])), "Claim saved.");
+  return run(orderId, form, () => api.patch(`/claims/${claimId}`, pick(form, ["status", "resolution", "amount", "bearer"])), "Claim saved.");
 }
 
 /** Send one purchase order to its supplier (before the deposit is verified: with the reason). */

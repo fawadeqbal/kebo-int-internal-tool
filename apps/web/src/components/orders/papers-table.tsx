@@ -108,7 +108,7 @@ export function PapersTable({
   canRecord: boolean;
   addAction: Action;
   updateActions: Record<string, Action>;
-  description: string;
+  description?: string;
   /** The B/L or AWB number from the shipment, to prefill. */
   shipNumber: string | null;
   today: string;

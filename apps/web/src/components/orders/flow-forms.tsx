@@ -6,6 +6,8 @@ import {
   BANK_CONTRACT_STATUS_LABEL,
   BANK_CONTRACT_STATUSES,
   CLAIM_STATUS_LABEL,
+  CLAIM_BEARER_LABEL,
+  CLAIM_BEARERS,
   CLAIM_STATUSES,
   CURRENCIES,
   DELIVERY_CONDITION_LABEL,
@@ -681,6 +683,21 @@ export function ClaimForm({ action, today, onDone }: { action: Action; today: st
           <Field label="Details" htmlFor="cl-detail" optional error={s.errors?.detail}>
             <Textarea id="cl-detail" name="detail" rows={2} className="min-h-0" defaultValue={s.values?.detail ?? ""} />
           </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Amount" htmlFor="cl-amount" optional error={s.errors?.amount}>
+              <Input id="cl-amount" name="amount" inputMode="decimal" defaultValue={s.values?.amount ?? ""} placeholder="in the order’s currency" />
+            </Field>
+            <Field label="Who pays" htmlFor="cl-bearer" optional error={s.errors?.bearer}>
+              <Select id="cl-bearer" name="bearer" defaultValue={s.values?.bearer ?? ""}>
+                <option value="">Not decided</option>
+                {CLAIM_BEARERS.map((b) => (
+                  <option key={b} value={b}>
+                    {CLAIM_BEARER_LABEL[b]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
           <Actions save="Open the claim" pending="Saving…" onCancel={onDone} />
         </>
       )}
@@ -704,6 +721,21 @@ export function ClaimUpdateForm({ action, claim, onDone }: { action: Action; cla
               ))}
             </Select>
           </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Amount" htmlFor={`ca-${claim.id}`} optional error={s.errors?.amount}>
+              <Input id={`ca-${claim.id}`} name="amount" inputMode="decimal" defaultValue={s.values?.amount ?? claim.amount ?? ""} placeholder="in the order’s currency" />
+            </Field>
+            <Field label="Who pays" htmlFor={`cb-${claim.id}`} optional error={s.errors?.bearer}>
+              <Select id={`cb-${claim.id}`} name="bearer" defaultValue={s.values?.bearer ?? claim.bearer ?? ""}>
+                <option value="">Not decided</option>
+                {CLAIM_BEARERS.map((b) => (
+                  <option key={b} value={b}>
+                    {CLAIM_BEARER_LABEL[b]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
           {closing && (
             <Field label="How it was settled" htmlFor={`cr-${claim.id}`} error={s.errors?.resolution}>
               <Textarea id={`cr-${claim.id}`} name="resolution" rows={2} className="min-h-0" defaultValue={s.values?.resolution ?? claim.resolution ?? ""} placeholder="e.g. Factory sent a new door by air; fitted on site." />
