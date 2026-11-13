@@ -48,6 +48,8 @@ pnpm dev                                          # API http://localhost:4000/ap
 
 Sign in at http://localhost:3000 with admin@example.com / Admin@12345, manager@example.com / Manager@12345, staff@example.com / Staff@12345, or the demo staff bilal@example.com / sana@example.com (Demo@12345).
 The platform area (`http://localhost:3000/platform`): make yourself a platform admin with `cd apps/api && pnpm build && node dist/cli/platform-admin.js add you@example.com "Your Name"` and open the link it prints. Request a demo as a visitor at `/request-a-demo`.
+
+Start again from nothing on your own computer (every inquiry, order, customer and person is deleted): `pnpm db:fresh` empties the database, applies the migrations and sets up the company Kebo with its settings and nobody in it; then `pnpm platform-admin add you@example.com "Your Name"` makes the platform admin and prints the link to set the password. Sign in at `/platform/login`, open Kebo with **Open company** and add its people under Admin › Users. (`pnpm db:reset` does the same but with the starting accounts and the sample data.)
 Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up -d`) and run `pnpm dev`. After changing code in `packages/`, run `pnpm build` (the API and web pick it up).
 
 | Command | |
@@ -59,6 +61,8 @@ Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up
 | `pnpm db:check-migrations [base]` | The migration rules below, against `origin/main` (or `base`); CI runs it |
 | `pnpm db:seed [--demo]` | Starting accounts and settings (`--demo` adds sample inquiries; refused on a non-local database) |
 | `pnpm db:reset` | Empty the local database, apply all migrations and seed it again with the demo data |
+| `pnpm db:fresh` | Empty the local database, apply all migrations and set up Kebo with its settings and nobody in it (no accounts, no sample data) |
+| `pnpm platform-admin add <email> "<name>"` | Make a platform admin; prints the link to set the password (`list`, `link <email>`, `off <email>` too) |
 | `pnpm db:load-data [-- --years N --deals N --people N]` | A year (or N years) of realistic history on top of the seed, to see Insights, Home and the money pages with a working company's data: about 1,200 inquiries a year, growing month by month, targets, accounts. Adds, never deletes; local databases only. Sales people sign in as sales1@example.com… with Demo@12345 |
 
 The API tests run against a real database: migrate and seed with `--demo` first (CI does this).
