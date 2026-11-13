@@ -1,23 +1,19 @@
-import { BALANCE_TERMS_LABEL, can, PAYMENT_ROUTE_LABEL, type PaymentRoute } from "@kebo/shared";
-import { CardBody } from "@kebo/ui";
+import Link from "next/link";
+import { BALANCE_TERMS_LABEL, can, PAYMENT_METHOD_LABEL, ROUTE_NAME, type PaymentRoute } from "@kebo/shared";
+import { Badge, RefCode, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderPaymentsOf } from "@/lib/order-data";
 import { date, money } from "@/lib/format";
-import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { TodoFold } from "@/components/orders/todo-fold";
-import { StepPage } from "@/components/orders/step-page";
-import { StepSidePanel } from "@/components/orders/side-panel";
-import { ViewCard, type DetailField } from "@/components/orders/step-view";
-import { PaymentEdit } from "@/components/orders/view-panels";
-import { expensePayTools } from "@/components/orders/costs-card";
-import { PaymentPlan } from "@/components/money/forms";
+import { OrderPage } from "@/components/order-sections/order-side";
+import { EmptySection, Section } from "@/components/order-sections/section";
+import { SectionFiles } from "@/components/order-sections/section-files";
+import { ContractWindow, PlanWindow, RecordPaymentWindow, RouteWindow } from "@/components/order-sections/payment-windows";
 import { LcChecks, UseCredit } from "@/components/money/money-v2";
 import { PlanRequests } from "@/components/money/requests";
-import { RecordPaymentLink, ViewPaymentsLink } from "@/components/money/pay-links";
 import { savePlanAction, sendRequestAction } from "../../../money/actions";
 import { bankContractAction, routeAction } from "../../flow-actions";
-import { lightAction } from "../../light-actions";
-import { useCreditAction } from "../../actions";
-import { stepData } from "../step-data";
+import { paymentAction, useCreditAction } from "../../actions";
+import { stageData } from "../stage-data";
 
 export const metadata = { title: "Order · payment" };
 
@@ -28,238 +24,110 @@ const SUGGEST: Record<string, PaymentRoute> = {
   against_bl_copy: "informal",
   after_arrival: "informal",
 };
+const CONTRACT_WORD: Record<string, string> = { draft: "Draft", opened: "Open", amended: "Amended", documents_presented: "Documents presented", paid: "Paid", closed: "Closed" };
 
 /**
- * Step 1, Payment: the checklist (route, LC, deposit), then the view: how they
- * pay, the plan, the payments received, the papers and the costs.
+ * Payment (design "the order, final"): how the customer pays, the bank's paper for the routes that have
+ * one, the plan and the payments received. The route decides which sections show. Money from the
+ * customer is recorded here and nowhere else on the order.
  */
 export default async function OrderPayment({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const d = await stepData(id, "payment");
-  const { me, o, flow, now, defaults } = d;
-  const [p, m] = await Promise.all([orderPaymentsOf(id), orderMoneyOf(id)]);
+  const d = await stageData(id, "payment");
+  const { me, o, flow, now } = d;
+  const [p, m, settings] = await Promise.all([orderPaymentsOf(id), orderMoneyOf(id), getSettings()]);
   const c = o.currency;
-  const canPay = can(me, "payments.record") && d.open;
+  const canPay = can(me, "payments.record") && o.status !== "cancelled";
   const canRoute = can(me, "orders.update") && d.open && !!flow;
   const route = flow?.payment.route ?? null;
   const lc = route === "letter_of_credit";
   const bankRoute = (route === "bank_contract" || lc) && !!flow?.modules.bankContracts;
   const contract = flow?.payment.bankContract ?? null;
-  const terms = flow ? { balanceWhen: flow.payment.balanceWhen, lcTerms: flow.payment.lcTerms, lcDays: flow.payment.lcDays } : undefined;
-  // Money in is recorded on Treasury › Payments (one form); here it is a link with the order filled in.
-  const pay = (label: string, quiet = true) =>
-    canPay ? <RecordPaymentLink kind="in" order={o.id} back={`/orders/${o.id}/payment`} label={label} quiet={quiet} /> : null;
-
-  const tools: Record<string, AutoTool> = {};
-  if (canRoute)
-    tools.route = {
-      kind: "route",
-      label: "Choose",
-      action: routeAction.bind(null, o.id),
-      route,
-      bankRoutes: !!flow?.modules.bankContracts,
-      terms: route
-        ? terms
-        : { balanceWhen: o.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment", lcTerms: null, lcDays: null },
-      suggest: SUGGEST[o.balanceTerms] ?? null,
-    };
-  if (canRoute && bankRoute) {
-    const banks = defaults.banks;
-    const balance = (Number(o.money.total) - Number(o.money.deposit)).toFixed(2);
-    tools.contract = {
-      kind: "light",
-      label: contract ? (lc ? "Open the LC" : "Open the contract") : lc ? "Add the LC" : "Add the contract",
-      action: lightAction.bind(null, o.id, "contract"),
-      fields: [
-        {
-          name: "number",
-          label: lc ? "LC no." : "Contract no.",
-          value: contract?.number,
-          required: true,
-          placeholder: lc ? "e.g. LC/HBL/2026/118" : undefined,
-        },
-        {
-          name: "amount",
-          label: `Amount, ${contract?.currency ?? c}`,
-          type: "number",
-          value: contract?.amount !== null && contract?.amount !== undefined ? String(contract.amount) : balance,
-          required: true,
-        },
-        { name: "expiresOn", label: lc ? "Expires" : "Expires (if it does)", type: "date", value: contract?.expiresOn, required: lc },
-        {
-          name: "customerBank",
-          label: "Their bank",
-          value: contract?.customerBank ?? banks?.customerBank,
-          hint: !contract?.customerBank && banks?.customerBank ? `As on ${banks.refNo}` : undefined,
-        },
-        {
-          name: "ourBank",
-          label: "Our bank",
-          value: contract?.ourBank ?? banks?.ourBank,
-          hint: !contract?.ourBank && banks?.ourBank ? `As on ${banks.refNo}` : undefined,
-        },
-      ],
-      chips: [
-        { label: "Opened on", field: { name: "openedOn", label: "Opened on", type: "date", value: contract?.openedOn ?? now, max: now } },
-        ...(lc
-          ? [
-              {
-                label: "Ship by",
-                field: { name: "latestShipOn", label: "Ship by (latest)", type: "date" as const, value: contract?.latestShipOn },
-              },
-            ]
-          : []),
-        { label: lc ? "LC copy" : "Contract copy", field: { name: "attachmentId", label: lc ? "LC copy" : "Contract copy", type: "file" } },
-        { label: "Note", field: { name: "itemNote", label: "Note", type: "textarea" } },
-      ],
-      save: "Save and tick",
-      hint: `Only the first ${lc ? "three" : "two"} are needed; it is checked against the order.`,
-    };
-  }
-  const depositPay = pay("Record payment");
-  if (depositPay) tools.deposit_in = { kind: "node", node: depositPay };
-
-  // How they pay: the route and its terms, and on a bank route the LC or contract (+ Add each value).
-  const fields: DetailField[] = [
-    {
-      label: "Route",
-      // The order started on the route the quotation's terms implied: said so, and changeable.
-      value: route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : null,
-      show: route ? (
-        <span>
-          {PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "")}
-          {flow?.payment.fromQuotation && <span className="font-normal text-text-2"> · from the quotation</span>}
-        </span>
-      ) : null,
-    },
-    {
-      label: "Deposit",
-      // The deposit the plan asks for; the % accepted on the quotation beside it when the plan was changed.
-      value:
-        o.money.depositPercent > 0
-          ? `${o.money.depositPercent}% · ${money(o.money.deposit, c)}${o.money.depositPercent !== o.depositPercent ? ` (plan; ${o.depositPercent}% as accepted)` : ""}`
-          : "None",
-    },
-    { label: "Balance", value: flow?.payment.summary ?? BALANCE_TERMS_LABEL[o.balanceTerms] },
-  ];
-  if (bankRoute)
-    fields.push(
-      { name: "number", label: lc ? "LC no." : "Contract no.", value: contract?.number },
-      {
-        name: "amount",
-        label: lc ? "LC amount" : "Amount",
-        type: "number",
-        value: contract?.amount !== null && contract?.amount !== undefined ? String(contract.amount) : null,
-        show: contract?.amount !== null && contract?.amount !== undefined ? money(String(contract.amount), contract.currency ?? c) : null,
-      },
-      { name: "customerBank", label: "Their bank", value: contract?.customerBank },
-      { name: "ourBank", label: "Our bank", value: contract?.ourBank },
-      ...(lc ? [{ name: "latestShipOn", label: "Ship by", type: "date" as const, value: contract?.latestShipOn }] : []),
-      { name: "expiresOn", label: "Expires", type: "date", value: contract?.expiresOn, uncounted: !lc },
-    );
-  const shown = fields.map((f) => (f.type === "date" && f.value ? { ...f, show: date(f.value) } : f));
-
-  const routeWords = route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : null;
-  const planEditor = <PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly startOpen />;
+  const terms = flow && route ? { balanceWhen: flow.payment.balanceWhen, lcTerms: flow.payment.lcTerms, lcDays: flow.payment.lcDays } : { balanceWhen: o.balanceTerms === "against_bl_copy" ? ("against_bl_copy" as const) : ("before_shipment" as const), lcTerms: null, lcDays: null };
+  const sub = `${o.refNo} · ${o.customer.name} · ${money(m.total, c)}`;
+  const live = p.payments.filter((x) => !x.voided);
+  const paid = Number(p.due) <= 0;
+  const balance = (Number(o.money.total) - Number(o.money.deposit)).toFixed(2);
 
   return (
-    <StepPage
-      steps={d.steps}
-      step="payment"
-      base={d.base}
-      action={pay("Record a payment", false)}
-      side={<StepSidePanel id={o.id} step="payment" changes={d.changes} historyHref={d.historyHref} hidePapers={["payment-request", "payment-receipt"]} />}
-    >
-      {/* The to-do list as one thin line; it opens when there is something to do in it now. */}
-      <TodoFold label="Payment" items={d.items} waits={d.waits} open={d.current}>
-        <Checklist
-          payFor={await expensePayTools(o.id, d.items)}
-          step="payment"
-          label="Payment"
-          items={d.items}
-          current={d.current}
-          nowKey={d.nowKey}
-          waits={d.waits}
-          canEdit={d.steps.canEdit}
-          run={d.run}
-          dealId={o.inquiry.id}
-          people={d.people}
-          tools={tools}
-          payNode={pay("Record payment")}
-          listHref={d.listHref}
-          me={me.name}
-          today={now}
-        />
-      </TodoFold>
-      {/* One card for the money: how they pay in its heading, the parts as requests, the totals at its foot. */}
-      <ViewCard
-        id="plan"
-        target="plan"
-        title={
-          <>
-            Payment
-            <span className="font-normal text-text-2" data-target="payment.route">
-              {" "}
-              · {routeWords ? `${routeWords} · ${o.money.depositPercent > 0 ? `${o.money.depositPercent}% deposit, ` : ""}${m.terms.toLowerCase()}` : "no route chosen yet"}
-            </span>
-          </>
-        }
-        canEdit={(canRoute || m.plan.canEdit) && !!flow}
-        panel={
-          flow
-            ? {
-                title: "Edit payment",
-                description: `${o.refNo} · ${o.customer.name} · ${money(m.total, c)}`,
-                className: "md:w-[900px]",
-                body: (
-                  <PaymentEdit
-                    routeAction={routeAction.bind(null, o.id)}
-                    contractAction={bankContractAction.bind(null, o.id)}
-                    route={route}
-                    contract={contract}
-                    bankRoutes={flow.modules.bankContracts}
-                    currency={c}
-                    terms={
-                      route
-                        ? terms
-                        : {
-                            balanceWhen: o.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment",
-                            lcTerms: null,
-                            lcDays: null,
-                          }
-                    }
-                    fromQuotation={flow.payment.fromQuotation}
-                    suggest={SUGGEST[o.balanceTerms] ?? null}
-                    parts={m.plan.canEdit ? planEditor : undefined}
-                  />
-                ),
-              }
-            : undefined
-        }
+    <OrderPage id={id}>
+      <Section
+        title="How they pay"
+        cols={4}
+        rows={[
+          { label: "Route", value: route ? ROUTE_NAME[route] : null },
+          { label: "Terms", value: flow?.payment.summary ?? BALANCE_TERMS_LABEL[o.balanceTerms] },
+          { label: "Deposit", value: o.money.depositPercent > 0 ? `${o.money.depositPercent}% · ${money(o.money.deposit, c)}` : "None" },
+          { label: "Balance", value: o.money.depositPercent < 100 ? `${100 - o.money.depositPercent}% · ${money(balance, c)}` : "None" },
+        ]}
         actions={
-          <>
-            {canPay && p.credit.canUse && <UseCredit action={useCreditAction.bind(null, o.id)} credit={p.credit.amount} due={p.due} currency={c} today={now} />}
-            {!flow && <PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly />}
-          </>
+          canRoute && (
+            <RouteWindow
+              sub={sub}
+              action={routeAction.bind(null, o.id)}
+              route={route}
+              bankRoutes={!!flow?.modules.bankContracts}
+              terms={terms}
+              fromQuotation={flow?.payment.fromQuotation}
+              suggest={SUGGEST[o.balanceTerms] ?? null}
+            />
+          )
         }
+      />
+
+      {bankRoute &&
+        (contract ? (
+          <Section
+            title={lc ? "The letter of credit" : "The bank contract"}
+            state={`${CONTRACT_WORD[contract.status] ?? contract.status}${contract.openedOn ? ` since ${date(contract.openedOn)}` : ""}`}
+            tone={contract.status === "paid" || contract.status === "opened" ? "ok" : contract.status === "amended" ? "warn" : "neutral"}
+            cols={4}
+            rows={[
+              { label: lc ? "LC no." : "Contract no.", value: contract.number },
+              { label: "Their bank", value: contract.customerBank },
+              { label: "Our bank", value: contract.ourBank },
+              { label: "Amount", value: contract.amount !== null ? money(String(contract.amount), contract.currency ?? c) : null },
+              { label: "Opened on", value: contract.openedOn ? date(contract.openedOn) : null },
+              { label: lc ? "Latest shipment" : "Ship by (latest)", value: contract.latestShipOn ? date(contract.latestShipOn) : null },
+              { label: "Expires", value: contract.expiresOn ? date(contract.expiresOn) : null },
+              { label: lc ? "Terms" : "Note", value: lc ? (flow?.payment.lcTerms === "deferred" ? `Deferred ${flow.payment.lcDays ?? 0} days` : "At sight") : contract.note },
+            ]}
+            actions={
+              canRoute && (
+                <ContractWindow sub={sub} action={bankContractAction.bind(null, o.id)} contract={contract} lc={lc} currency={c} orderId={o.id} canFiles={d.canFiles} />
+              )
+            }
+            files={<SectionFiles orderId={o.id} section={lc ? "lc" : "bank_contract"} canAdd={d.canFiles} />}
+          >
+            {lc && flow?.payment.lcChecks && (
+              <div className="border-t border-line px-[18px] py-3">
+                <LcChecks checks={flow.payment.lcChecks} />
+              </div>
+            )}
+          </Section>
+        ) : (
+          <EmptySection
+            title={lc ? "The letter of credit" : "The bank contract"}
+            text={lc ? "No LC recorded yet." : "No contract recorded yet."}
+            action={
+              canRoute && <ContractWindow sub={sub} action={bankContractAction.bind(null, o.id)} contract={null} lc={lc} currency={c} orderId={o.id} canFiles={d.canFiles} />
+            }
+          />
+        ))}
+
+      <Section
+        title="Payment plan"
+        state={paid ? "Paid in full" : `${money(p.due, c)} to come`}
+        tone={paid ? "ok" : "warn"}
+        actions={m.plan.canEdit && d.open && <PlanWindow sub={sub} action={savePlanAction.bind(null, o.id)} plan={m.plan} currency={c} total={m.total} terms={m.terms} />}
       >
-        <CardBody className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 px-[18px] pb-3.5">
           {!m.plan.matchesTotal && (
             <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
-              The parts do not add up to the order total ({money(m.plan.difference, c)} {Number(m.plan.difference) > 0 ? "missing" : "too much"}). Edit the
-              parts.
+              The parts do not add up to the order total ({money(m.plan.difference, c)} {Number(m.plan.difference) > 0 ? "missing" : "too much"}).
             </p>
           )}
-          <PlanRequests
-            orderId={o.id}
-            plan={m.plan}
-            currency={c}
-            total={m.total}
-            received={m.received}
-            due={m.due}
-            send={sendRequestAction.bind(null, o.id)}
-            foot={p.payments.length > 0 ? <ViewPaymentsLink order={o.id} label="All payments of this order" /> : undefined}
-          />
+          <PlanRequests orderId={o.id} plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} send={sendRequestAction.bind(null, o.id)} />
           {m.charged.length > 0 && (
             <ul aria-label="Charged to the customer" className="flex flex-col divide-y divide-line rounded-lg border border-line text-sm">
               {m.charged.map((x) => (
@@ -272,26 +140,95 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
               ))}
             </ul>
           )}
-          {bankRoute && (
-            <dl className="grid gap-x-6 gap-y-2 border-t border-line pt-3 text-sm sm:grid-cols-3">
-              {shown
-                .filter((f) => f.name)
-                .map((f) => (
-                  <div key={f.label} data-target={`payment.${f.name}`}>
-                    <dt className="text-xs text-muted">{f.label}</dt>
-                    <dd className="font-medium">{f.show ?? f.value ?? "—"}</dd>
-                  </div>
-                ))}
-            </dl>
-          )}
-          {lc && flow?.payment.lcChecks && (
-            <div className="flex flex-col gap-1 border-t border-line pt-3">
-              <p className="text-xs font-semibold text-text-2">The LC against the order</p>
-              <LcChecks checks={flow.payment.lcChecks} />
-            </div>
-          )}
-        </CardBody>
-      </ViewCard>
-    </StepPage>
+        </div>
+      </Section>
+
+      {live.length === 0 ? (
+        <EmptySection
+          title="Payments received"
+          text={paid ? "Paid in full." : "No payment yet."}
+          action={
+            canPay &&
+            !paid && (
+              <RecordPaymentWindow
+                main
+                action={paymentAction.bind(null, o.id, c)}
+                currency={c}
+                customer={o.customer.name}
+                refNo={o.refNo}
+                due={p.due}
+                depositDue={p.depositDue}
+                forWhat={m.plan.next?.label ?? null}
+                fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
+                today={now}
+              />
+            )
+          }
+        />
+      ) : (
+        <Section
+          title="Payments received"
+          state={`${live.length} payment${live.length === 1 ? "" : "s"}`}
+          actions={
+            <>
+              {canPay && p.credit.canUse && <UseCredit action={useCreditAction.bind(null, o.id)} credit={p.credit.amount} due={p.due} currency={c} today={now} />}
+              {canPay && !paid && (
+                <RecordPaymentWindow
+                  main
+                  action={paymentAction.bind(null, o.id, c)}
+                  currency={c}
+                  customer={o.customer.name}
+                  refNo={o.refNo}
+                  due={p.due}
+                  depositDue={p.depositDue}
+                  forWhat={m.plan.next?.label ?? null}
+                  fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
+                  today={now}
+                />
+              )}
+            </>
+          }
+          files={<SectionFiles orderId={o.id} section="payments" canAdd={false} />}
+        >
+          <Table>
+            <THead>
+              <tr>
+                <Th>Date</Th>
+                <Th>How</Th>
+                <Th>Into</Th>
+                <Th>Reference</Th>
+                <Th className="text-right">Amount</Th>
+                <Th className="text-right">Counts for</Th>
+              </tr>
+            </THead>
+            <tbody>
+              {p.payments.map((x) => (
+                <Tr key={x.id} className={x.voided ? "text-muted line-through" : undefined}>
+                  <Td className="whitespace-nowrap tabular">{date(x.paidOn)}</Td>
+                  <Td>{PAYMENT_METHOD_LABEL[x.method]}</Td>
+                  <Td>{x.account?.name ?? <span className="text-muted">—</span>}</Td>
+                  <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <span className="text-muted">—</span>}</Td>
+                  <Td className="text-right whitespace-nowrap tabular">{money(x.receivedAmount, x.receivedCurrency)}</Td>
+                  <Td className="text-right whitespace-nowrap tabular">
+                    {x.voided ? <Badge tone="neutral">Removed</Badge> : <span className="font-semibold">{money(x.counts, c)}</span>}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-line-strong font-bold">
+                <td className="px-3.5 py-3" colSpan={5}>
+                  Received{" "}
+                  <Link href={`/payments?order=${o.id}`} className="ml-2 text-[12.5px] font-medium text-primary hover:underline">
+                    Change or remove a payment
+                  </Link>
+                </td>
+                <td className="px-3.5 py-3 text-right tabular">{money(p.received, c)}</td>
+              </tr>
+            </tfoot>
+          </Table>
+        </Section>
+      )}
+    </OrderPage>
   );
 }

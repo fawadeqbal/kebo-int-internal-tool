@@ -136,7 +136,7 @@ export function PurchaseOrderCard({
 }
 
 /** "Send PO-2026-0044 to …" (board POSendEarly): the day, their order no., how; before the deposit is verified, why. */
-function SendForm({ action, deposit, today, supplierRef }: { action: Action; deposit: { verified: boolean; text: string }; today: string; supplierRef: string | null }) {
+export function SendForm({ action, deposit, today, supplierRef }: { action: Action; deposit: { verified: boolean; text: string }; today: string; supplierRef: string | null }) {
   const close = useClosePanel();
   return (
     <ActionForm action={action} onDone={close} className="flex min-h-0 flex-1 flex-col">

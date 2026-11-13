@@ -130,7 +130,7 @@ export function ReceivedForm({
   );
 }
 
-function ReceivedFields({
+export function ReceivedFields({
   action,
   currency,
   customer,
@@ -141,7 +141,8 @@ function ReceivedFields({
   today,
   onClose,
   onFileError,
-}: Omit<Parameters<typeof ReceivedForm>[0], "label" | "quiet"> & { onClose: () => void; onFileError: (m: string) => void }) {
+  bare,
+}: Omit<Parameters<typeof ReceivedForm>[0], "label" | "quiet"> & { onClose: () => void; onFileError: (m: string) => void; /** In a window that already has the title: no frame, no heading. */ bare?: boolean }) {
   const dueMinor = toMinor(due);
   const a = useArrival(fx, currency);
   const [charges, setCharges] = useState("");
@@ -157,15 +158,17 @@ function ReceivedFields({
   const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", onFileError);
   const done = () => onClose();
   return (
-    <ActionForm action={save} onDone={done} keepFields className={framed}>
+    <ActionForm action={save} onDone={done} keepFields className={bare ? "flex flex-col gap-3" : framed}>
       {(s) => (
         <>
-          <div className="-mx-3 -mt-3 border-b border-line px-3 py-2.5 sm:-mx-4 sm:-mt-4 sm:px-4">
-            <p className="font-semibold">Money received from {customer}</p>
-            <p className="text-xs text-text-2">
-              Record what really happened: the currency and account it arrived in, who paid, and the rate. The system works out what it covers on the order.
-            </p>
-          </div>
+          {!bare && (
+            <div className="-mx-3 -mt-3 border-b border-line px-3 py-2.5 sm:-mx-4 sm:-mt-4 sm:px-4">
+              <p className="font-semibold">Money received from {customer}</p>
+              <p className="text-xs text-text-2">
+                Record what really happened: the currency and account it arrived in, who paid, and the rate. The system works out what it covers on the order.
+              </p>
+            </div>
+          )}
           <input type="hidden" name="receivedCurrency" value={a.received} />
           <input type="hidden" name="amount" value={fromMinor(Math.max(partMinor, 0))} />
           <input type="hidden" name="method" value={method} />
