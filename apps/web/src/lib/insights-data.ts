@@ -8,12 +8,10 @@ import type { SheetSpec } from "./sheet-spec";
 import type { Receivables } from "./types-insights";
 import type { OpenBills, ToPayList } from "./types-money";
 import type {
-  Aging,
   CashFacts,
   CashReport,
   FactoryGroups,
   FactOrders,
-  FactsNow,
   Funnel,
   InquiryGroups,
   OrderGroupRow,
@@ -199,57 +197,6 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
       : []),
   ];
   return { ...data, sheets };
-}
-
-/* ------------------------------------------------------------------------------------------- Home */
-
-/** GET /insights/target: this month's company target and Insights' sales towards it. */
-export interface MonthTarget {
-  month: string;
-  currency: string;
-  amount: string | null;
-  reached: string;
-  percent: number | null;
-  canSet: boolean;
-}
-
-/**
- * Home's month (managers with Insights): Insights › Overview's own tiles for "this month" — Sales, Gross
- * profit, To receive (and Overdue), Open quotes — from the same endpoints, plus the month's target and sales
- * and gross profit for the last 6 months.
- */
-export async function loadHome(today: string) {
-  const p = periodOf({ period: "month" }, today);
-  const [cur, before, now, recv, monthly, target] = await Promise.all([
-    facts<OrderGroups>("orders/groups", { from: p.from, to: p.to, period: "all" }),
-    facts<OrderGroups>("orders/groups", { from: p.prevFrom, to: p.prevTo, period: "all" }),
-    facts<FactsNow>("now", { from: p.from, to: p.to }),
-    facts<Aging>("aging", { side: "receivable" }),
-    facts<OrderGroups>("orders/groups", { from: monthStart(p.to, -5), to: p.to, period: "month" }),
-    api.get<MonthTarget>("/insights/target"),
-  ]);
-  const t = totalOf(cur);
-  const b = totalOf(before);
-  return {
-    p,
-    currency: cur.currency,
-    sales: { now: n(t?.sales), before: n(b?.sales), orders: t?.orders ?? 0 },
-    profit: { now: n(t?.profitQuote), before: n(b?.profitQuote), margin: t?.marginQuote ?? null, marginBefore: b?.marginQuote ?? null },
-    receivable: recv,
-    now,
-    months: lastMonths(p.to, 6).map((m) => {
-      const r = monthly.rows.find((x) => x.period === m);
-      return { month: m, sales: n(r?.sales), profit: n(r?.profitQuote), orders: r?.orders ?? 0, margin: r?.marginQuote ?? null };
-    }),
-    target,
-    missingRates: [...new Set([...cur.missingRates, ...monthly.missingRates])].sort(),
-  };
-}
-
-export interface AccountRow {
-  currency: string;
-  archived: boolean;
-  balance?: string;
 }
 
 /* ------------------------------------------------------------------------------------------- Profit */
