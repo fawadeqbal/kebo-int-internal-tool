@@ -32,6 +32,9 @@ jobs:
       - run: pnpm turbo run build
       - name: Migrations apply cleanly and the demo seed runs
         run: pnpm db:deploy && pnpm db:seed --demo
+      # A difference here is what `prisma migrate dev` would write as a migration on a developer's machine.
+      - name: The schema file says what the migrations made (no drift)
+        run: pnpm db:check-drift
       - name: The ledger posts the demo and agrees with its figures
         run: |
           node apps/api/dist/cli/ledger.js rebuild --all --dry-run
