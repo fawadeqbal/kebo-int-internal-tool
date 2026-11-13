@@ -19,6 +19,6 @@ import { CashController } from "./cash.controller";
   imports: [OrdersModule],
   controllers: [TreasuryController, OrderPaymentsController, CustomerPaymentsController, CreditController, CashController],
   providers: [TreasuryService, CustomerPaymentsService, SupplierPaymentsService, CashService, CashReportService, PaymentFilesService],
-  exports: [TreasuryService, CustomerPaymentsService, SupplierPaymentsService, CashService, PaymentFilesService],
+  exports: [TreasuryService, CustomerPaymentsService, SupplierPaymentsService, CashService, CashReportService, PaymentFilesService],
 })
 export class TreasuryModule {}

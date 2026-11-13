@@ -6,6 +6,7 @@ import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { InsightsService } from "./insights.service";
 import { RemindersListService } from "./reminders-list.service";
+import { HomeService } from "./home.service";
 
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month like 2026-10");
 const key = z.object({ key: z.string().min(1).max(120) });
@@ -16,7 +17,15 @@ export class InsightsController {
   constructor(
     private readonly insights: InsightsService,
     private readonly reminders: RemindersListService,
+    private readonly homeFigures: HomeService,
   ) {}
+
+  /** People who see the reports: Home's figures, what stands out, the next four weeks, orders and inquiries now. */
+  @RequireFeature("insights")
+  @Get("insights/home")
+  home(@CurrentUser() user: SessionUser) {
+    return this.homeFigures.home(user);
+  }
 
   /** Managers: this month's company target and how far along it is (Home), from Insights' sales. */
   @RequireFeature("insights")

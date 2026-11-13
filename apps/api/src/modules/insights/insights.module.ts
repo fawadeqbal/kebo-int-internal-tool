@@ -6,6 +6,7 @@ import { InsightsService } from "./insights.service";
 import { RemindersListService } from "./reminders-list.service";
 import { FactsModule } from "./facts/facts.module";
 import { InsightsController } from "./insights.controller";
+import { HomeService } from "./home.service";
 
-@Module({ imports: [OrdersModule, MoneyModule, TreasuryModule, FactsModule], controllers: [InsightsController], providers: [InsightsService, RemindersListService], exports: [InsightsService, FactsModule] })
+@Module({ imports: [OrdersModule, MoneyModule, TreasuryModule, FactsModule], controllers: [InsightsController], providers: [InsightsService, RemindersListService, HomeService], exports: [InsightsService, FactsModule] })
 export class InsightsModule {}
