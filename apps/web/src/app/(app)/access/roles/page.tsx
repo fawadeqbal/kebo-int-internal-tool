@@ -1,4 +1,3 @@
-import { AdminTabs } from "@/components/common/admin-tabs";
 import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
@@ -28,9 +27,7 @@ export default async function RolesPage() {
   const frozen = roles.filter((r) => r.frozen);
   return (
     <div>
-      <PageHeader crumbs={crumbsFor("/access/roles")} title="Roles" description="Who may do what, who must use two-step sign-in, and how people stand.">
-        <AdminTabs set="people" current="/access/roles" />
-      </PageHeader>
+      <PageHeader crumbs={crumbsFor("/access/roles")} title="Roles" description="Who may do what, who must use two-step sign-in, and how people stand." />
       <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Signed in now" value={o.liveSessions} sub="Browsers and phones" href="/access/sessions" />

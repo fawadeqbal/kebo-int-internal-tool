@@ -1,5 +1,3 @@
-import { can } from "@kebo/shared";
-import { AdminTabs } from "@/components/common/admin-tabs";
 import Link from "next/link";
 import { Plus, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
@@ -16,7 +14,7 @@ import { createUserAction, remindTwoStepAction, setActiveAction } from "./action
 import { NewUserPanel } from "./forms";
 import { crumbsFor } from "@/lib/nav";
 
-export const metadata = { title: "Users" };
+export const metadata = { title: "People" };
 
 type Params = Record<string, string | undefined>;
 
@@ -86,7 +84,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     <div>
       <PageHeader
         crumbs={crumbsFor("/users")}
-        title="Users"
+        title="People"
         summary={
           <>
             {active} {active === 1 ? "person" : "people"} can sign in{users.length > active ? ` · ${users.length - active} switched off` : ""}
@@ -98,10 +96,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             <Plus aria-hidden /> <span className="sm:hidden">Add</span>
             <span className="max-sm:hidden">Add a person</span>
           </OpenPanelButton>
-        }
-     >
-        {can(me, "security.manage") && <AdminTabs set="people" current="/users" />}
-      </PageHeader>
+        } />
       {without.length > 0 && (
         <Card className="mb-4 border-warn/30 bg-warn-soft/40 px-4 py-3">
           <p className="flex items-center gap-2 text-sm font-semibold text-warn">
@@ -147,7 +142,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           />
         ) : (
           <>
-            <PhoneList label="Users">
+            <PhoneList label="People">
               {rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((u) => (
                 <PhoneRow
                   key={u.id}
@@ -161,7 +156,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 />
               ))}
             </PhoneList>
-            <DataTable label="Users" clearParam="saved" className="max-sm:hidden">
+            <DataTable label="People" clearParam="saved" className="max-sm:hidden">
               <THead>
                 <tr>
                   <Th>Person</Th>

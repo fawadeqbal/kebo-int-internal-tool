@@ -32,7 +32,7 @@ export default async function CustomerLayout({ children, params }: { children: R
   return (
     <div>
       <PageHeader
-        crumbs={[{ label: "Partners & CRM" }, { label: "Customers", href: "/customers" }, { label: c.name }]}
+        crumbs={[{ label: "Sales" }, { label: "Customers", href: "/customers" }, { label: c.name }]}
         phoneStack
         title={c.name}
         summary={

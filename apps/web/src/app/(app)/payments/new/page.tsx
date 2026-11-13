@@ -333,7 +333,7 @@ async function Expense({ today }: { today: string }) {
 async function Transfer({ today }: { today: string }) {
   const accounts = await api.get<AccountRow[]>("/money/accounts");
   return accounts.filter((a) => !a.archived).length < 2 ? (
-    <Alert tone="info">A transfer needs two accounts. Add them in Treasury › Multi-currency vault.</Alert>
+    <Alert tone="info">A transfer needs two accounts. Add them in Money › Cash & bank.</Alert>
   ) : (
     <MoveMoney startOpen accounts={accounts} today={today} />
   );

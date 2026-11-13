@@ -213,7 +213,8 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                 <tr>
                   <Th>Order</Th>
                   <Th>What · customer</Th>
-                  <Th>Purchase order</Th>
+                  {/* Shown only where the page has room (roomy): the list fits beside the open menu without it. */}
+                  <Th className="hidden roomy:table-cell">Purchase order</Th>
                   <Th>Date</Th>
                   <Th className="text-right">Total</Th>
                   <Th className="text-right">They owe</Th>
@@ -235,7 +236,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                       <span className="block max-w-56 truncate text-xs text-muted">{o.customer.name}</span>
                       {o.customer.country === UNKNOWN_COUNTRY && <span className="block text-xs text-warn">Country not set</span>}
                     </Td>
-                    <Td>
+                    <Td className="hidden roomy:table-cell">
                       {(o as OrderRow & { purchaseOrders?: string[] }).purchaseOrders?.length ? (
                         <span className="flex flex-col items-start gap-1">
                           {(o as OrderRow & { purchaseOrders?: string[] }).purchaseOrders!.map((n) => (
@@ -317,9 +318,9 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
   return (
     <div>
       <PageHeader
-        crumbs={[{ label: "Overview" }, { label: "Pipelines" }]}
+        crumbs={[{ label: "Sales" }, { label: "Order board" }]}
         icon={LayoutGrid}
-        title="Order pipeline"
+        title="Order board"
         description="Orders by stage. A card moves when its step is done."
         actions={
           <ButtonLink href={mine ? "/orders?mine=1" : "/orders"}>
@@ -328,7 +329,7 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
         }
       />
       <LinkTabs
-        label="Pipelines"
+        label="Boards"
         className="mb-4"
         tabs={[
           {

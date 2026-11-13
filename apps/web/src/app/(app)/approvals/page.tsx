@@ -31,7 +31,7 @@ import { approveAction, approveManyAction, sendBackAction, withdrawAction } from
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { today } from "@/components/orders/today";
 
-export const metadata = { title: "Verification queue" };
+export const metadata = { title: "To verify" };
 
 const PAGE_SIZE = 25;
 const STATUS_LABEL: Record<SubmissionStatus, string> = {

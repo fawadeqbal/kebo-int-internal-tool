@@ -11,8 +11,8 @@ const OWN = "a,button,input,select,textarea,label,summary,[role=menu],[role=menu
  * A list's table (design system: List frame). Rows are DataRow: a click on a
  * row opens it, hover lights it, its first cell's link opens it from the
  * keyboard (Enter), and its ⋯ (RowMenu) sits in the last cell. The header
- * stays in view while the page scrolls (from 1280px up; on smaller screens
- * a wide table scrolls sideways instead). Not for tables of lines you edit
+ * stays in view while the page scrolls (where the list fits; on a narrower
+ * page a wide table scrolls sideways instead). Not for tables of lines you edit
  * (LineTable). This is the <table>: give it <thead>/<tbody>, never another table.
  *
  * `clearParam`: a parameter that only lights a row once (?saved=…), taken out
@@ -53,10 +53,10 @@ export function DataTable({
     <div
       ref={box}
       className={cn(
-        "w-full overflow-x-auto xl:overflow-x-visible",
-        // The header row sticks under the app's top bar while the list scrolls (from 1280px, where every list fits;
-        // narrower, a wide table scrolls sideways instead of losing its last columns).
-        "xl:[&_thead_th]:sticky xl:[&_thead_th]:top-14 xl:[&_thead_th]:z-[1] [&_thead_th]:bg-surface-2",
+        // Where every list fits its card (`fits`, see globals.css) the header row sticks under the app's top row
+        // while the list scrolls; narrower, a wide table scrolls sideways instead of losing its last columns.
+        "w-full overflow-x-auto fits:overflow-x-visible [&_thead_th]:bg-surface-2",
+        "fits:[&_thead_th]:sticky fits:[&_thead_th]:top-14 fits:[&_thead_th]:z-[1]",
         className,
       )}
       onClick={(e) => {

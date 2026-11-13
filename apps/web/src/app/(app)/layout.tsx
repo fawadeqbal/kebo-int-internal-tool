@@ -8,8 +8,8 @@ import { Alert } from "@kebo/ui";
 import { FeaturesProvider } from "@/components/common/features";
 import { leaveCompanyAction } from "@/app/platform/actions";
 import { demoMode } from "@/lib/demo";
-import { AppShell } from "@/components/shell/nav";
-import { buildModules, MODULE_PAGES, OPEN_COOKIE, type ModuleKey } from "@/lib/nav";
+import { AppShell, type NewItem } from "@/components/shell/nav";
+import { buildModules, FOLD_COOKIE, MODULE_PAGES, OPEN_COOKIE, type ModuleKey } from "@/lib/nav";
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
 import { AccountsProvider, type AccountOption } from "@/components/money/accounts";
 import { getSettings } from "@/lib/loaders";
@@ -43,7 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           .catch(() => 0)
       : null;
 
-  // The menu's modules (nine, ERP redesign): each page only for those who may open it, with the same checks as the page itself.
+  // The menu's groups: each page only for those who may open it, with the same checks as the page itself.
   const modules = buildModules({
     can: (p) => has(p as Parameters<typeof can>[1]),
     feature,
@@ -54,10 +54,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const jar = await cookies();
   const keys = new Set<string>(MODULE_PAGES.map((m) => m.key));
   const initialOpen = (jar.get(OPEN_COOKIE)?.value ?? "").split(".").filter((k): k is ModuleKey => keys.has(k));
+  const foldCookie = jar.get(FOLD_COOKIE)?.value;
+  const initialFold = foldCookie === "1" ? true : foldCookie === "0" ? false : null;
+  // "New" in the top row: what this person may make, each opening the same window as its own page's button.
+  const newItems: NewItem[] = [
+    has("inquiries.create") && { href: "/inquiries?panel=new-inquiry", label: "Inquiry" },
+    has("customers.manage") && { href: "/customers?panel=new-customer", label: "Customer" },
+    has("sourcing.manage") && { href: "/factories?panel=new-factory", label: "Supplier" },
+    has("payments.record") && { href: "/payments/new", label: "Payment received" },
+    has("expenses.manage") && feature("expenses") && { href: "/payments/new?kind=expense", label: "Expense" },
+  ].filter((x): x is NewItem => !!x);
 
   return (
     <>
-      <AppShell modules={modules} initialOpen={initialOpen} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
+      <AppShell modules={modules} initialOpen={initialOpen} initialFold={initialFold} newItems={newItems} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
         {me.viaPlatform && (
           <form action={leaveCompanyAction} className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary-soft/60 px-3 py-2 text-sm">
             <span>

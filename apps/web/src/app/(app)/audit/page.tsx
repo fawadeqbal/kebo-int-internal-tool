@@ -1,4 +1,3 @@
-import { AdminTabs } from "@/components/common/admin-tabs";
 import Link from "next/link";
 import { can } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr } from "@kebo/ui";
@@ -15,7 +14,7 @@ import type { AuditRow } from "@/lib/types-people";
 import { crumbsFor } from "@/lib/nav";
 import { getPeople } from "@/lib/loaders";
 
-export const metadata = { title: "Audit log" };
+export const metadata = { title: "Activity log" };
 
 const ENTITY_LABEL: Record<string, string> = {
   inquiry: "Inquiry",
@@ -116,7 +115,7 @@ function Changes({ r }: { r: AuditRow }) {
  */
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const me = await requirePermission("audit.view");
-  if (!(await hasFeature("audit_log"))) return <PlanOff title="Audit log" what="The audit log" crumbs={crumbsFor("/audit")} />;
+  if (!(await hasFeature("audit_log"))) return <PlanOff title="Activity log" what="The activity log" crumbs={crumbsFor("/audit")} />;
   const sp = await searchParams;
   const [data, people] = await Promise.all([
     api.get<Paged<AuditRow> & { counts: Record<string, number> }>("/audit", { entityType: sp.type, userId: sp.person, page: toPage(sp.page), pageSize: PAGE_SIZE }),
@@ -149,17 +148,14 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
     <div>
       <PageHeader
         crumbs={crumbsFor("/audit")}
-        title="Audit log"
+        title="Activity log"
         summary={
           <>
             {data.total.toLocaleString("en-US")} {data.total === 1 ? "entry" : "entries"}
             {who && ` by ${who}`}
             <span className="max-sm:hidden"> · every change anyone made, newest first; entries cannot be edited or removed</span>
           </>
-        }
-     >
-        {can(me, "security.manage") && <AdminTabs set="people" current="/audit" />}
-      </PageHeader>
+        } />
       <ListToolbar
         chips={chips}
         label="Filter the audit log"
@@ -203,7 +199,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           )
         ) : (
           <>
-            <PhoneList label="Audit log">
+            <PhoneList label="Activity log">
               {data.rows.map((r) => (
                 <PhoneRow
                   key={r.id}
@@ -215,7 +211,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 />
               ))}
             </PhoneList>
-            <DataTable label="Audit log" className="max-sm:hidden">
+            <DataTable label="Activity log" className="max-sm:hidden">
               <THead>
                 <tr>
                   <Th>When</Th>

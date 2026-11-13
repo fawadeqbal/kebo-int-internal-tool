@@ -150,7 +150,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
         }
       >
         <PageHeader
-          crumbs={[{ label: "Operations & trading" }, { label: "Orders", href: "/orders" }, { label: o.refNo }]}
+          crumbs={[{ label: "Sales" }, { label: "Orders", href: "/orders" }, { label: o.refNo }]}
           icon={Package}
           title={o.inquiry.title || <span className="tabular">{o.refNo}</span>}
           summary={

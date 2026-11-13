@@ -59,7 +59,7 @@ export default async function DealLayout({ children, params }: { children: React
   return (
     <div>
       <PageHeader
-        crumbs={[{ label: "Operations & trading" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }]}
+        crumbs={[{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }]}
         icon={MessageSquareText}
         title={d.title ? d.title : <span className="tabular">{d.refNo}</span>}
         summary={

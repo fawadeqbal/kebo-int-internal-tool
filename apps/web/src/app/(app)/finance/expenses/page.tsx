@@ -7,7 +7,7 @@ import { crumbsFor, labelFor } from "@/lib/nav";
 import { requirePermission } from "@/lib/session";
 import { ExpensesBody, moneyAccess, TZ, type Search } from "../sections";
 
-export const metadata = { title: "Cost & expense allocation" };
+export const metadata = { title: "Expenses" };
 
 /** Finance › Expenses: every cost in a month or a year, running the company and spent on customers. */
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<Search> }) {

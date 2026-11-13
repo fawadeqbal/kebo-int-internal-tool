@@ -222,7 +222,7 @@ export default async function QuotationPage({
       route={live ? routeFromTerms(live.balanceTerms).route : null}
     />
   );
-  const COLS = "md:grid-cols-[16px_48px_96px_minmax(0,1fr)_170px_104px_104px]";
+  const COLS = "md:grid-cols-[16px_40px_92px_minmax(0,1fr)_150px_96px_96px]";
 
   return (
     <WithSide id={id} top={accepted && order ? null : (draft || live?.canAnswer || closedLive) && next}>
@@ -296,11 +296,13 @@ export default async function QuotationPage({
                     <span className="min-w-0">
                       <span className="font-semibold md:hidden">R{r.number} · </span>
                       {r.options.map((o, i) => (
-                        <span key={o.id} className={o.status === "accepted" ? "font-semibold" : undefined}>
-                          {i > 0 && " · "}
+                        // One option never breaks in two: in a narrow column the next option goes to the next line.
+                        <span key={o.id} className={cn("inline-block whitespace-nowrap", o.status === "accepted" && "font-semibold")}>
+                          {i > 0 && <span aria-hidden>·&nbsp;</span>}
                           {o.letter}
                           {o.factory ? ` ${o.factory.name.split(" ")[0]}` : ""}
                           {o.status === "accepted" ? ", chosen" : ""}
+                          {i < r.options.length - 1 && <>&nbsp;</>}
                         </span>
                       ))}
                       <span className="block text-xs text-text-2 md:hidden">
