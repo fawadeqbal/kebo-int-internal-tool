@@ -17,6 +17,8 @@ export function FormWindow({
   sub,
   size = "md",
   disabled,
+  startOpen = false,
+  onClosed,
   children,
 }: {
   button: WindowButton;
@@ -25,11 +27,18 @@ export function FormWindow({
   /** sm 460px, md 600px, lg 720px, xl 900px. */
   size?: "sm" | "md" | "lg" | "xl";
   disabled?: boolean;
+  /** Open as soon as it is drawn (a list's row that asked for this window). */
+  startOpen?: boolean;
+  /** After it closes, saved or not. */
+  onClosed?: () => void;
   children: (close: () => void) => ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const kind = button.kind ?? "edit";
-  const close = () => setOpen(false);
+  const close = () => {
+    setOpen(false);
+    onClosed?.();
+  };
   return (
     <>
       {kind === "edit" ? (

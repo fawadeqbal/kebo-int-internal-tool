@@ -55,7 +55,15 @@ export function PaymentPlanTable({
   due,
   send,
   pay,
+  back = `/orders/${orderId}/payment`,
+  auto,
+  onAutoClosed,
 }: {
+  /** Where a paper opened from here goes back to (the page the plan is shown on). */
+  back?: string;
+  /** Open the payment window of the first open part at once (a list's row asked for it). */
+  auto?: "pay";
+  onAutoClosed?: () => void;
   orderId: string;
   plan: OrderMoney["plan"];
   currency: string;
@@ -70,7 +78,6 @@ export function PaymentPlanTable({
   const [sending, setSending] = useState<Sending | null>(null);
   const close = useCallback(() => setSending(null), []);
   if (!plan.items.length && !plan.cancelled.length) return <p className="text-sm text-muted">No plan yet.</p>;
-  const back = `/orders/${orderId}/payment`;
   const next = plan.items.find((i) => i.request.state !== "paid");
 
   /** Under a part's name: its request's number (the kept copy, once sent) and how it is paid. */
@@ -209,6 +216,12 @@ export function PaymentPlanTable({
         </Table>
       </div>
       {sending && <SendDialog key={sending.refId} what={sending} onClose={close} />}
+      {/* Asked for from a list's row: one window, open at once (the rows' own buttons are drawn twice, for phone and desk). */}
+      {auto === "pay" && pay && next && (
+        <span className="hidden">
+          <RecordPaymentWindow main {...pay} currency={currency} forWhat={next.label} amount={next.open} startOpen onClosed={onAutoClosed} />
+        </span>
+      )}
       <div data-target="payments.received" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-[18px] text-sm sm:px-3.5">
         <span className="text-muted">
           Order total <span className="font-semibold text-text tabular">{money(total, currency)}</span>

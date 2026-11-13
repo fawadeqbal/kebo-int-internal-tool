@@ -58,8 +58,13 @@ describe("insights", () => {
   });
 
   it("lists what customers still owe, the most overdue first", async () => {
-    await api(app, staff).get("/money/receivables").expect(403);
     const r = (await api(app, manager).get("/money/receivables").expect(200)).body;
+    // Someone who does not record money sees the orders they may see, and nothing held for customers.
+    const own = (await api(app, staff).get("/money/receivables").expect(200)).body;
+    const all = new Set(r.rows.map((x: { id: string }) => x.id));
+    for (const row of own.rows) expect(all.has(row.id)).toBe(true);
+    expect(own.rows.length).toBeLessThanOrEqual(r.rows.length);
+    expect(own.held).toEqual([]);
     expect(r.rows.length).toBeGreaterThan(0);
     for (const row of r.rows) expect(Number(row.due)).toBeGreaterThan(0);
     const late = r.rows.map((x: { daysLate: number }) => x.daysLate);

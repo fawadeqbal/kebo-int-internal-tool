@@ -4,7 +4,6 @@ import { ArrowRight, Factory, Landmark, List, User, Users } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { todayIn } from "@kebo/utils";
 import { PageHeader } from "@kebo/ui";
-import { crumbsFor, labelFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { money } from "@/lib/format";
@@ -73,8 +72,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   return (
     <div>
       <PageHeader
-        crumbs={crumbsFor(PATH)}
-        title={labelFor(PATH)}
+        crumbs={[{ label: "Money" }, { label: "Ledger" }]}
+        title="Ledger"
         description={view === "balances" ? "Every customer, supplier, account and person with a balance" : `Every money record, posted from its document · ${main} at each entry's rate`}
         actions={
           <>

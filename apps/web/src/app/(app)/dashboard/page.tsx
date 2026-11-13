@@ -185,7 +185,7 @@ async function Figures({ today, insights, seeMoney }: { today: string; insights:
             value={bigMoney(owed, c)}
             tone={overdue > 0.005 ? "bad" : undefined}
             sub={overdue > 0.005 ? `${bigMoney(overdue, c)} late` : "nothing late"}
-            href="/finance/to-receive"
+            href="/money/due"
           />
         )}
         {payable && (
@@ -195,7 +195,7 @@ async function Figures({ today, insights, seeMoney }: { today: string; insights:
             label="Payable"
             value={bigMoney(Number(payable.total), payable.currency)}
             sub={Number(payable.d30) + Number(payable.d60) + Number(payable.d90) + Number(payable.older) > 0.005 ? "some past its date" : "to factories"}
-            href="/purchasing/to-pay"
+            href="/money/due?side=suppliers"
           />
         )}
         {accounts && (

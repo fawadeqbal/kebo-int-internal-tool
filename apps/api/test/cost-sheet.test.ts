@@ -204,4 +204,25 @@ describe("the order's cost sheet", () => {
     for (const id of paid) expect(ids).toContain(id);
     expect(await bills()).toBe(75);
   });
+
+  it("the company's open bills list what waits to be paid, and who is to be paid back (money, step 3)", async () => {
+    const own = (await api(app, manager).post("/expenses", { orderId, category: "travel", description: "Train to the port", amount: 40, currency: "USD", spentOn: today, ownMoney: true, paidById: sanaId }).expect(201)).body;
+    const list = (await api(app, manager).get("/money/bills").expect(200)).body as { rows: { id: string; kind: string; owedTo: string | null; order: { id: string } | null; amount: string; currency: string; days: number }[]; totals: { currency: string; open: string; count: number }[] };
+    const mine = list.rows.filter((r) => r.order?.id === orderId);
+    expect(mine.map((r) => [r.kind, r.owedTo, r.amount]).sort()).toEqual(
+      [
+        ["bill", "Broker", "75.00"],
+        ["repay", (await api(app, sana).get("/auth/me")).body.name, "40.00"],
+      ].sort(),
+    );
+    expect(mine.every((r) => r.days === 0)).toBe(true);
+    const usd = list.totals.find((t) => t.currency === "USD")!;
+    expect(Number(usd.open)).toBeCloseTo(list.rows.filter((r) => r.currency === "USD").reduce((t, r) => t + Number(r.amount), 0), 2);
+    // Paid back: it leaves the list.
+    await api(app, manager).post(`/expenses/${own.id}/repay`, { repaidOn: today }).expect(200);
+    const after = (await api(app, manager).get("/money/bills").expect(200)).body as typeof list;
+    expect(after.rows.some((r) => r.id === own.id)).toBe(false);
+    // Only people who see expenses open it.
+    await api(app, sana).get("/money/bills").expect(403);
+  });
 });

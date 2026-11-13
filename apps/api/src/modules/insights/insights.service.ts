@@ -3,6 +3,7 @@ import { livePart, fromDbDate, routeOf, termsOf, termsSelect } from "@kebo/datab
 import { fromMinor, toMinor } from "@kebo/money";
 import { can, PAYMENT_ROUTE_SHORT, planStatus, planWhen } from "@kebo/shared";
 import { daysBetween, DomainError, ForbiddenError, type ISODate } from "@kebo/utils";
+import { orderAccess } from "../../common/auth/order-access";
 import { creditsAll } from "../treasury/api";
 import { CashService } from "../treasury/cash.service";
 import { PrismaService } from "../../database/prisma.service";
@@ -213,11 +214,12 @@ export class InsightsService {
 
   /** What customers still owe, order by order, the most overdue first (Money → To receive). */
   async receivables(user: SessionUser) {
-    if (!can(user, "payments.record") && !can(user, "expenses.manage")) throw new ForbiddenError("You do not record money.");
+    // People who record money see every order; everyone else the orders they may see (as the order itself shows them).
+    const recorder = can(user, "payments.record") || can(user, "expenses.manage");
     const today = this.clock.today();
     const fx = fxOf(await this.settings.get(), await this.limits.allows("expenses"));
     const orders = await this.prisma.db.order.findMany({
-      where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma, fx) } },
+      where: { AND: [recorder ? {} : orderAccess(user)], status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma, fx) } },
       select: {
         id: true,
         refNo: true,
@@ -290,7 +292,7 @@ export class InsightsService {
     }
     // Money we hold for customers (their credit): shown as a minus against what they owe.
     const byCustomer = new Map<string, Record<string, number>>();
-    for (const c of await creditsAll(this.prisma.db)) {
+    for (const c of recorder ? await creditsAll(this.prisma.db) : []) {
       const b = byCustomer.get(c.partyId) ?? {};
       b[c.currency] = (b[c.currency] ?? 0) + c.minor;
       byCustomer.set(c.partyId, b);

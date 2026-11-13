@@ -73,7 +73,7 @@ export default async function RecordPaymentPage({ searchParams }: { searchParams
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        crumbs={[...crumbsFor("/payments").slice(0, 2), { label: "Payments", href: "/payments" }, { label: "Record payment" }]}
+        crumbs={[...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: "Record payment" }]}
         title="Record payment"
         summary={`Number given on save · ${PREFIX[kind]}-${today.slice(0, 4)}-…`}
         primary={

@@ -190,7 +190,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             value={short(owedTotal, owed.currency)}
             tone={overdueTotal > 0.005 ? "bad" : undefined}
             sub={overdueTotal > 0.005 ? `${short(overdueTotal, owed.currency)} late` : "nothing late"}
-            href="/finance/to-receive"
+            href="/money/due"
           />
         )}
         {soldYear && (

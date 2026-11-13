@@ -59,15 +59,13 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     key: "money",
     title: "Money",
     icon: "money",
+    // Money, simple (14 Nov 2026): four pages. Payment requests, Invoices, To receive and the two To pay lists
+    // are one page; To verify and the Ledger keep their addresses and left the menu.
     pages: [
+      { href: "/money/due", label: "To receive and to pay" },
       { href: "/payments", label: "Payments" },
-      { href: "/approvals", label: "To verify" },
       { href: "/finance/cash-book", label: "Cash & bank" },
       { href: "/finance/expenses", label: "Expenses" },
-      { href: "/finance/invoices", label: "Invoices", lineBefore: true },
-      { href: "/finance/to-receive", label: "To receive" },
-      { href: "/purchasing/to-pay", label: "To pay" },
-      { href: "/finance/ledger", label: "Ledger" },
     ],
   },
   {
@@ -78,7 +76,6 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
       { href: "/finance/profit", label: "Profit & loss" },
       { href: "/finance/leaks", label: "Planned vs spent" },
       { href: "/reports", label: "All reports" },
-      { href: "/audit", label: "Activity log" },
     ],
   },
   {
@@ -97,6 +94,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
       { href: "/access/roles", label: "Roles" },
       { href: "/access/sign-ins", label: "Sign-ins" },
       { href: "/access/sessions", label: "Sessions" },
+      { href: "/audit", label: "Activity log", lineBefore: true },
     ],
   },
 ];
@@ -191,12 +189,8 @@ export function buildModules({
     "/finance/profit": reports && managers,
     "/finance/expenses": sourcing && managers && feature("expenses"),
     "/finance/leaks": reports && managers,
-    "/approvals": approvals !== null,
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
-    "/finance/to-receive": sourcing && (managers || can("payments.record")),
-    "/purchasing/to-pay": sourcing,
     "/operations/purchase-orders": sourcing,
-    "/finance/ledger": can("ledger.view"),
     "/settings/company": settings,
     "/settings/sales": settings,
     "/settings/reminders": settings,
@@ -208,8 +202,9 @@ export function buildModules({
     "/access/sessions": security,
     "/access/sign-ins": security,
   };
+  // Payments waiting to be verified show on Payments, where its strip opens them.
   const badges: Record<string, Pick<NavPage, "badge" | "badgeLabel">> = {
-    "/approvals": { badge: approvals ?? 0, badgeLabel: approves ? "waiting" : "sent back" },
+    "/payments": { badge: approvals ?? 0, badgeLabel: approves ? "waiting to be verified" : "sent back" },
   };
   return MODULE_PAGES.map((m) => ({
     key: m.key,

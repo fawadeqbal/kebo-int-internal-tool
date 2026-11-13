@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { requestHref, requestPdfHref, requestPrintHref, requestWords } from "@/lib/requests";
+import { requestPdfHref, requestPrintHref, requestWords } from "@/lib/requests";
 
 describe("payment requests in words", () => {
   const base = { with: null, sentOn: null, revision: null } as const;
@@ -23,8 +23,7 @@ describe("payment requests in words", () => {
     expect(requestWords({ ...base, state: "not_sent", through: "customer" })).toBe("Not sent");
   });
 
-  it("links to the request's page, its print page and its PDF", () => {
-    expect(requestHref("o1", "r1")).toBe("/payments/requests/o1/r1");
+  it("links to the request's print page and its PDF", () => {
     expect(requestPrintHref("o1", "r1")).toBe("/print/orders/o1/payment-request?ref=r1");
     expect(requestPrintHref("o1", "r1", { now: true })).toBe("/print/orders/o1/payment-request?ref=r1&now=1");
     expect(requestPrintHref("o1", "r1", { v: 2 })).toBe("/print/orders/o1/payment-request?ref=r1&v=2");

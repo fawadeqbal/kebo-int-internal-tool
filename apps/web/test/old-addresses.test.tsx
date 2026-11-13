@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { insightsTarget, moneyTarget, ordersBoardTarget, reportsMoneyTarget, reportsOverviewQuery, securityTarget, settingsTarget } from "@/lib/old-addresses";
+import { dueTarget, insightsTarget, moneyTarget, orderPaymentTarget, ordersBoardTarget, paymentsTabTarget, reportsMoneyTarget, reportsOverviewQuery, securityTarget, settingsTarget } from "@/lib/old-addresses";
 
 // Every old address keeps working (design page 33): old → new, with the rest of the query.
 
@@ -7,22 +7,46 @@ describe("/money?tab=…", () => {
   it.each([
     ["cash", "/finance/cash-book"],
     ["expenses", "/finance/expenses"],
-    ["receive", "/finance/to-receive"],
-    ["owe", "/purchasing/to-pay"],
+    ["receive", "/money/due"],
+    ["owe", "/money/due?side=suppliers"],
     ["pnl", "/finance/profit"],
   ])("tab=%s → %s", (tab, to) => expect(moneyTarget({ tab })).toBe(to));
 
   it("keeps the filters", () => {
     expect(moneyTarget({ tab: "expenses", p: "2026", customer: "c1" })).toBe("/finance/expenses?p=2026&customer=c1");
     expect(moneyTarget({ tab: "cash", acct: "none" })).toBe("/finance/cash-book?acct=none");
-    expect(moneyTarget({ tab: "owe", mine: "1" })).toBe("/purchasing/to-pay?mine=1");
+    expect(moneyTarget({ tab: "owe", q: "jiangsu" })).toBe("/money/due?side=suppliers&q=jiangsu");
   });
 
   it("without a tab: the first page this person may open, as the old page did", () => {
     expect(moneyTarget({}, { cashBook: true, expenses: true, recorders: true })).toBe("/finance/cash-book");
     expect(moneyTarget({}, { cashBook: false, expenses: true, recorders: true })).toBe("/finance/expenses");
-    expect(moneyTarget({}, { cashBook: false, expenses: false, recorders: true })).toBe("/finance/to-receive");
-    expect(moneyTarget({}, { cashBook: false, expenses: false, recorders: false })).toBe("/purchasing/to-pay");
+    expect(moneyTarget({}, { cashBook: false, expenses: false, recorders: true })).toBe("/money/due");
+    expect(moneyTarget({}, { cashBook: false, expenses: false, recorders: false })).toBe("/money/due?side=suppliers");
+  });
+});
+
+// Money, simple (14 Nov 2026): eight Money pages became four.
+describe("the Money pages that became “To receive and to pay”", () => {
+  it("Invoices and To receive open the customers' side; the two To pay lists the suppliers' side", () => {
+    expect(dueTarget("customers")).toBe("/money/due");
+    expect(dueTarget("suppliers")).toBe("/money/due?side=suppliers");
+  });
+
+  it("keep a search, and drop the views that are gone", () => {
+    expect(dueTarget("customers", { q: "lagos", view: "invoices", age: "d90_plus" })).toBe("/money/due?q=lagos");
+    expect(dueTarget("suppliers", { q: "jiangsu", mine: "1" })).toBe("/money/due?side=suppliers&q=jiangsu");
+  });
+
+  it("Payments' tabs Payment requests and To pay go there too; its list stays on Payments", () => {
+    expect(paymentsTabTarget({ tab: "requests" })).toBe("/money/due");
+    expect(paymentsTabTarget({ tab: "to-pay", q: "pack" })).toBe("/money/due?side=suppliers&q=pack");
+    expect(paymentsTabTarget({ tab: "paid" })).toBeNull();
+    expect(paymentsTabTarget({ order: "o1" })).toBeNull();
+  });
+
+  it("a payment request and an order's invoice open the order's Payment tab", () => {
+    expect(orderPaymentTarget("o1")).toBe("/orders/o1/payment");
   });
 });
 

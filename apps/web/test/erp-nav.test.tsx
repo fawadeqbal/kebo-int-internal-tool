@@ -66,9 +66,10 @@ describe("the groups", () => {
     expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Settings"]);
     expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Shipments", "Customers", "Follow-ups"]);
     expect(pages(m, "purchasing")).toEqual(["Purchase orders", "Suppliers"]);
-    expect(pages(m, "money")).toEqual(["Payments", "To verify", "Cash & bank", "Expenses", "Invoices", "To receive", "To pay", "Ledger"]);
-    expect(pages(m, "reports")).toEqual(["Profit & loss", "Planned vs spent", "All reports", "Activity log"]);
-    expect(pages(m, "settings")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form", "People", "Roles", "Sign-ins", "Sessions"]);
+    // Money, simple (14 Nov 2026): four pages. To verify and the Ledger keep their addresses and left the menu.
+    expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments", "Cash & bank", "Expenses"]);
+    expect(pages(m, "reports")).toEqual(["Profit & loss", "Planned vs spent", "All reports"]);
+    expect(pages(m, "settings")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form", "People", "Roles", "Sign-ins", "Sessions", "Activity log"]);
   });
 
   it("have one name each, and two levels: a group and its pages", () => {
@@ -91,14 +92,10 @@ describe("the groups", () => {
         "/follow-ups",
         "/operations/purchase-orders",
         "/factories",
+        "/money/due",
         "/payments",
-        "/approvals",
         "/finance/cash-book",
         "/finance/expenses",
-        "/finance/invoices",
-        "/finance/to-receive",
-        "/purchasing/to-pay",
-        "/finance/ledger",
         "/finance/profit",
         "/finance/leaks",
         "/reports",
@@ -116,8 +113,9 @@ describe("the groups", () => {
         "/access/sessions",
       ].sort(),
     );
-    // Tabs on the page, and the bell: not menu items.
-    for (const tab of ["/reports/customers", "/reports/factories", "/reports/people", "/reports/funnel", "/reports/print", "/notifications"]) expect(hrefs).not.toContain(tab);
+    // Tabs on the page, the bell, and the pages that left the menu: not menu items.
+    for (const tab of ["/reports/customers", "/reports/factories", "/reports/people", "/reports/funnel", "/reports/print", "/notifications", "/approvals", "/finance/ledger", "/finance/invoices", "/finance/to-receive", "/purchasing/to-pay"])
+      expect(hrefs).not.toContain(tab);
   });
 
   it("Company address shows only when companies have their own addresses", () => {
@@ -128,21 +126,20 @@ describe("the groups", () => {
 
   it("hide the pages a person may not open, and a group with none left", () => {
     const m = staff();
-    // Payments (its Payment requests tab) and Invoices are open to everyone who sees orders.
+    // What customers owe on the orders a person sees, and Payments, are open to everyone who sees orders.
     expect(titles(m)).toEqual(["Sales", "Money"]);
     expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Shipments", "Customers", "Follow-ups"]);
-    // Staff who send money for approval see their payments and what was sent back.
-    expect(pages(m, "money")).toEqual(["Payments", "To verify", "Invoices"]);
-    // Nothing to verify for someone who neither verifies nor sends money for it.
+    expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments"]);
     const none = buildModules({ can: () => false, feature: () => true, approvals: null, approves: false, companyAddresses: false });
     expect(titles(none)).toEqual(["Sales", "Money"]);
-    expect(pages(none, "money")).toEqual(["Payments", "Invoices"]);
+    expect(pages(none, "money")).toEqual(["To receive and to pay", "Payments"]);
   });
 
   it("follow the plan: no cash and bank, expenses, reports or activity log when the plan leaves them out", () => {
     const m = buildModules({ can: () => true, feature: (f) => !["cash_book", "expenses", "insights", "audit_log"].includes(f), approvals: 0, approves: true, companyAddresses: false });
-    expect(pages(m, "money")).toEqual(["Payments", "To verify", "Invoices", "To receive", "To pay", "Ledger"]);
+    expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments"]);
     expect(titles(m)).not.toContain("Reports");
+    expect(pages(m, "settings")).not.toContain("Activity log");
   });
 
   it("a manager sees money and reports, and of Settings only what their permissions allow", () => {
@@ -153,15 +150,14 @@ describe("the groups", () => {
     expect(pages(m, "settings")).toEqual(["People"]);
     // A recorder without expenses: what is to receive and to pay, no money reports (they need expenses.manage).
     const recorder = buildModules({ can: (p) => ["sourcing.manage", "payments.record", "reports.view"].includes(p), feature: () => true, approvals: 0, approves: true, companyAddresses: false });
-    expect(pages(recorder, "money")).toEqual(["Payments", "To verify", "Invoices", "To receive", "To pay"]);
+    expect(pages(recorder, "money")).toEqual(["To receive and to pay", "Payments"]);
     expect(pages(recorder, "reports")).toEqual(["All reports"]);
   });
 
   it("keep the thin line between a group's two kinds of page, whatever is hidden", () => {
-    expect(lines(everything(), "money")).toEqual(["Invoices"]);
-    expect(lines(everything(), "settings")).toEqual(["People"]);
-    // Invoices is the page that carries it; Payments is above, so the line stays.
-    expect(lines(staff(), "money")).toEqual(["Invoices"]);
+    // Money is four pages of one kind: no line. Settings has three kinds: the company, its people, the record.
+    expect(lines(everything(), "money")).toEqual([]);
+    expect(lines(everything(), "settings")).toEqual(["People", "Activity log"]);
     // Only People is left in Settings: no line above the first page.
     const onlyPeople = buildModules({ can: (p) => p === "users.manage", feature: () => true, approvals: null, approves: false, companyAddresses: false });
     expect(pages(onlyPeople, "settings")).toEqual(["People"]);
@@ -180,7 +176,8 @@ describe("the groups", () => {
     expect(pageOf("/access/roles/manager", flat)?.label).toBe("Roles");
     expect(moduleOf("/finance/leaks", all)).toBe("reports");
     expect(moduleOf("/orders/board", all)).toBe("sales");
-    expect(moduleOf("/purchasing/to-pay", all)).toBe("money");
+    expect(moduleOf("/money/due", all)).toBe("money");
+    expect(moduleOf("/audit", all)).toBe("settings");
     expect(moduleOf("/factories/9a1b", all)).toBe("purchasing");
     expect(moduleOf("/dashboard", all)).toBeUndefined();
     // The path above a page's title: the group, then the page. Two levels.
@@ -236,15 +233,16 @@ describe("the menu down the left", () => {
     at.path = "/payments";
     shell(everything(3));
     expect(menu().getByRole("button", { name: "Money" }).textContent).toBe("Money");
-    expect(menu().getByRole("link", { name: /To verify/ }).textContent).toBe("To verify3");
+    // Money added by the team and waiting to be verified opens from Payments: the count is there.
+    expect(menu().getByRole("link", { name: /^Payments/ }).textContent).toBe("Payments3");
   });
 
   it("draws the thin line above the group's second kind of page", () => {
-    at.path = "/payments";
+    at.path = "/users";
     shell(everything());
     const li = (name: string) => menu().getByRole("link", { name: new RegExp(`^${name}`) }).closest("li")!;
-    expect(li("Invoices").className).toContain("before:bg-line");
-    expect(li("Expenses").className).not.toContain("before:bg-line");
+    expect(li("People").className).toContain("before:bg-line");
+    expect(li("Roles").className).not.toContain("before:bg-line");
   });
 });
 
@@ -308,7 +306,7 @@ describe("the folded strip", () => {
   });
 
   it("works with the keyboard: focus opens it, ↓ goes in, ↑ ↓ move, Esc closes it back on the icon", () => {
-    at.path = "/finance/ledger";
+    at.path = "/finance/expenses";
     shell(everything());
     const money = strip().getByRole("button", { name: /^Money/ });
     act(() => money.focus());
@@ -316,23 +314,23 @@ describe("the folded strip", () => {
     const m = screen.getByRole("menu", { name: "Money" });
     expect(money.getAttribute("aria-controls")).toBe(m.id);
     const items = within(m).getAllByRole("menuitem");
-    expect(items.map((a) => a.textContent?.replace(/\d+/g, ""))).toEqual(["Payments", "To verify", "Cash & bank", "Expenses", "Invoices", "To receive", "To pay", "Ledger"]);
-    expect(items[7]!.getAttribute("aria-current")).toBe("page");
+    expect(items.map((a) => a.textContent?.replace(/\d+/g, ""))).toEqual(["To receive and to pay", "Payments", "Cash & bank", "Expenses"]);
+    expect(items[3]!.getAttribute("aria-current")).toBe("page");
     fireEvent.keyDown(money, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(items[0]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(items[1]!, { key: "ArrowUp" });
     fireEvent.keyDown(items[0]!, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(items[7]);
-    fireEvent.keyDown(items[7]!, { key: "Home" });
+    expect(document.activeElement).toBe(items[3]);
+    fireEvent.keyDown(items[3]!, { key: "Home" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(money);
     expect(money.getAttribute("aria-expanded")).toBe("false");
     fireEvent.keyDown(money, { key: "Enter" });
-    expect(document.activeElement?.textContent).toBe("Payments");
+    expect(document.activeElement?.textContent).toBe("To receive and to pay");
   });
 
   it("Tab in a group's pages closes them and moves on to the next icon", () => {

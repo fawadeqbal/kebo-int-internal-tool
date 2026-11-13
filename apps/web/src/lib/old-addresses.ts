@@ -14,20 +14,42 @@ type Query = Record<string, string | undefined>;
 const MONEY_TAB: Record<string, string> = {
   cash: "/finance/cash-book",
   expenses: "/finance/expenses",
-  receive: "/finance/to-receive",
-  owe: "/purchasing/to-pay",
   pnl: "/finance/profit",
 };
 
 /** Cash & accounts' tabs. Without a tab: the first this person may open, as the old page did. */
 export function moneyTarget(q: Query, first?: { cashBook: boolean; expenses: boolean; recorders: boolean }): string {
   const { tab, ...rest } = q;
+  // What customers owe and what we owe: the two sides of one page now.
+  if (tab === "receive") return dueTarget("customers", rest);
+  if (tab === "owe") return dueTarget("suppliers", rest);
   const known = tab ? MONEY_TAB[tab] : undefined;
-  const path =
-    known ??
-    (first?.cashBook ? MONEY_TAB.cash : first?.expenses ? MONEY_TAB.expenses : first?.recorders ? MONEY_TAB.receive : MONEY_TAB.owe)!;
-  return buildHref(path, {}, rest);
+  if (!known && !first?.cashBook && !first?.expenses) return dueTarget(first?.recorders ? "customers" : "suppliers", rest);
+  return buildHref(known ?? (first?.cashBook ? MONEY_TAB.cash : MONEY_TAB.expenses)!, {}, rest);
 }
+
+/* ------------------------------------------------------------------ money, simple (14 Nov 2026) */
+
+/** Where what customers owe and what we owe is now: one page, two sides. */
+export const DUE = "/money/due";
+
+/**
+ * The pages that became "To receive and to pay": Invoices, To receive (customers), the two To pay lists
+ * (suppliers). A search typed there is kept; their own views (?view=, ?age=, ?cur=) are gone.
+ */
+export function dueTarget(side: "customers" | "suppliers", q: Query = {}): string {
+  return buildHref(DUE, {}, { side: side === "suppliers" ? "suppliers" : undefined, q: q.q });
+}
+
+/** Payments' old tabs: Payment requests and To pay are sides of "To receive and to pay"; the rest is Payments itself. */
+export function paymentsTabTarget(q: Query): string | null {
+  if (q.tab === "requests") return dueTarget("customers", q);
+  if (q.tab === "to-pay") return dueTarget("suppliers", q);
+  return null;
+}
+
+/** A payment request and an order's invoice were pages of their own: the order's Payment tab holds them now. */
+export const orderPaymentTarget = (orderId: string) => `/orders/${orderId}/payment`;
 
 /* ------------------------------------------------------------------ /insights?section=&view= */
 

@@ -791,6 +791,61 @@ export class MoneyService {
     return this.expenseView(row);
   }
 
+  /**
+   * What we owe outside the factories' goods, across the company (money, step 3, "Suppliers and bills"): every
+   * bill known and not paid yet, and every expense someone paid from their own money and was not paid back.
+   * Oldest first. Managers with the expenses feature.
+   */
+  async openBills(user: SessionUser) {
+    this.assertExpenses(user);
+    const rows = await this.prisma.db.expense.findMany({
+      where: { voidedAt: null, repaidOn: null, OR: [{ payLater: true }, { ownMoney: true, paidById: { not: null } }], AND: [{ OR: [{ orderId: null }, { order: { status: { not: "cancelled" } } }] }] },
+      orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        category: true,
+        description: true,
+        amount: true,
+        currency: true,
+        spentOn: true,
+        payLater: true,
+        payee: true,
+        reference: true,
+        source: true,
+        paidBy: person,
+        factory: { select: { id: true, name: true } },
+        order: { select: { id: true, refNo: true } },
+      },
+    });
+    const today = this.clock.today();
+    const totals = new Map<string, { open: Minor; count: number }>();
+    for (const e of rows) {
+      const t = totals.get(e.currency) ?? { open: 0, count: 0 };
+      t.open += decimalToMinor(e.amount);
+      t.count += 1;
+      totals.set(e.currency, t);
+    }
+    return {
+      rows: rows.map((e) => ({
+        id: e.id,
+        /** A bill to pay, or a person to pay back. */
+        kind: e.payLater ? ("bill" as const) : ("repay" as const),
+        owedTo: e.payLater ? (e.payee ?? e.factory?.name ?? null) : (e.paidBy?.name ?? null),
+        category: e.category as ExpenseCategory,
+        description: e.description,
+        reference: e.reference,
+        order: e.order,
+        amount: e.amount.toFixed(2),
+        currency: e.currency,
+        /** The day it is dated, and how many days it has waited. */
+        on: fromDbDate(e.spentOn),
+        days: Math.max(daysBetween(fromDbDate(e.spentOn), today), 0),
+        fromShipment: !!e.source?.startsWith("shipment:"),
+      })),
+      totals: [...totals].map(([currency, t]) => ({ currency, open: fromMinor(t.open), count: t.count })).sort((a, b) => b.count - a.count),
+    };
+  }
+
   /* ---------------------------------------------------------------- receipts */
 
   /** A photo or PDF of the receipt or ticket; a new one replaces the old. */

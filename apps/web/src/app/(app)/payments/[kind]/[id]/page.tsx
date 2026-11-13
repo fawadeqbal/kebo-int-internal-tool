@@ -77,7 +77,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
     <div className="flex flex-col gap-4">
       <PageHeader
         icon={Banknote}
-        crumbs={[...crumbsFor("/payments").slice(0, 2), { label: "Payments", href: "/payments?tab=paid" }, { label: p.number ?? p.title }]}
+        crumbs={[...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }]}
         title={title}
         badge={<StatusBadge meaning={STATUS_MEANING[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</StatusBadge>}
         summary={[p.party?.label, p.for.map((f) => f.label).join(", ") || null, p.number ? null : date(p.on)].filter(Boolean).join(" · ")}
