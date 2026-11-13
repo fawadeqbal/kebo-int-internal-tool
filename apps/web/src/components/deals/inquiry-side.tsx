@@ -6,7 +6,7 @@ import type { HistoryEntry } from "@/lib/types";
 /** Which inquiry step a change belongs to (null: the inquiry as a whole, e.g. its stage or who handles it). */
 export type ChangeStep = "needs" | "sourcing" | "quotation";
 
-export const CHANGE_STEP_LABEL: Record<ChangeStep, string> = { needs: "Needs", sourcing: "Factory prices", quotation: "Quotation" };
+export const CHANGE_STEP_LABEL: Record<ChangeStep, string> = { needs: "Needs", sourcing: "Factory offers", quotation: "Quotation" };
 
 /** A change's step: its record type, and for files whose they are (the customer's, or a factory offer's). */
 export function changeStep(e: HistoryEntry, offerFiles: string[] = []): ChangeStep | null {

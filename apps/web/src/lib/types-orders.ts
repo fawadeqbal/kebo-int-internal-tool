@@ -389,8 +389,10 @@ export interface RevisionDoc {
   total: string;
   /** Printed under the payment (beyond the deposit and balance). */
   paymentTerms: string | null;
-  /** Printed under the delivery (packing, inspection, warranty…). */
+  /** Printed under the delivery (packing, inspection…). */
   deliveryTerms: string | null;
+  /** The warranty line. */
+  warranty: string | null;
   notes: string | null;
   sentOn: string | null;
   customerSnapshot: CustomerSnapshot | null;

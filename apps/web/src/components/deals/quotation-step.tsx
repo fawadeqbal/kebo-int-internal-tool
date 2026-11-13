@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, Check, CheckCircle2, ChevronRight, Lock, Plus, Send } from "lucide-react";
-import { BASIS_STEP_LABEL, LINE_TYPE_LABEL, LOST_REASON_LABEL, LOST_REASONS, PAYMENT_ROUTES, type PaymentRoute } from "@kebo/shared";
+import { AlertTriangle, Check, CheckCircle2, ChevronRight, Eye, Lock, Pencil, Plus, Send } from "lucide-react";
+import { BASIS_STEP_LABEL, LINE_TYPE_LABEL, LOST_REASON_LABEL, LOST_REASONS, PAYMENT_ROUTES, SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type PaymentRoute, type SentVia } from "@kebo/shared";
 import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelButton, ViewCard } from "@/components/orders/step-view";
+import { NextCard } from "./inquiry-nav";
 import { PANEL_FORM, PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { money, qty } from "@/lib/format";
@@ -95,13 +96,8 @@ export function OptionsCard({
       actions={
         edit ? (
           <>
-            {edit.showCosts && (
-              <Link href={`${edit.pricesHref}&option=${at}`} className={buttonClass("ghost", "xs")}>
-                Price at a margin
-              </Link>
-            )}
             <Link href={`${edit.pricesHref}&option=${at}`} className={buttonClass("ghost", "xs")}>
-              Edit prices
+              <Pencil aria-hidden /> Edit lines
             </Link>
           </>
         ) : undefined
@@ -287,28 +283,29 @@ function OptionLines({ o, currency, incoterm, single }: { o: OptionView; currenc
 
 /* ---------------------------------------------------------------- sending and the answer */
 
-const HOW = ["WhatsApp", "Email", "WeChat", "In person", "Other"];
+const HOW = SENT_VIA.map((v) => ({ value: v, label: SENT_VIA_LABEL[v] }));
 
 /** Mark as sent: how and when (today unless said). Once sent the revision is frozen. */
 function SentForm({ number, action, today }: { number: number; action: Action; today: string }) {
   const close = useClosePanel();
-  const [how, setHow] = useState(HOW[0]!);
+  const [how, setHow] = useState<SentVia>("whatsapp");
   return (
     <PanelBody>
       <ActionForm action={action} onDone={close} className={PANEL_FORM}>
         {(s) => (
           <>
             <input type="hidden" name="to" value="sent" />
-            <input type="hidden" name="reason" value={`By ${how}`} />
+            <input type="hidden" name="via" value={how} />
+            <input type="hidden" name="reason" value={`Sent ${SENT_VIA_TEXT[how]}`} />
             <p className="text-sm text-text-2">
               Once marked as sent, R{number} is frozen: a change of price needs a new revision. Check it with View / Print first.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <Field label="How" htmlFor="sent-how">
-                <Select id="sent-how" value={how} onChange={(e) => setHow(e.target.value)}>
+                <Select id="sent-how" value={how} onChange={(e) => setHow(e.target.value as SentVia)}>
                   {HOW.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
+                    <option key={h.value} value={h.value}>
+                      {h.label}
                     </option>
                   ))}
                 </Select>
@@ -557,119 +554,127 @@ function ExpiredForm({ action, today }: { action: Action; today: string }) {
 }
 
 /**
- * "Sending and the answer": while a draft is open, Mark as sent; once the
- * customer has it, their answer — Accepted… (makes the order), Asked for
- * changes… (the next revision, a copy to change), Lost… (why), or expired.
+ * "Do next" on the Quotations tab, with the working buttons: while a draft is open, Preview and Send R1…;
+ * once the customer has it, their answer — Customer accepted… (which option; it makes the order), and
+ * beside it the quiet ones: Lost… (why), Revise (the next revision, a copy to change), Expired… when its
+ * validity has passed, and a follow-up. After a no: start the next revision.
  */
-export function AnswerCard({
+export function QuotationNext({
+  customer,
+  quoRef,
   draft,
   live,
+  closed,
   currency,
   today,
-  sendAction,
   answerAction,
   lostAction,
   startNext,
+  followUp,
   subtitle,
   route,
 }: {
+  customer: string;
+  /** "QUO-2026-0410". */
+  quoRef: string;
+  /** The open draft: what Do next says of it, how it prints and where it is sent from (null: this person may not send it). */
+  draft: { number: number; meta: string; previewHref: string; sendHref: string | null } | null;
+  /** The sent revision waiting for the answer. */
+  live: { number: number; options: OptionView[]; meta: string; overdue: boolean } | null;
+  /** The last revision was rejected or expired and nothing new is drafted. */
+  closed: { number: number; how: "rejected" | "expired" } | null;
+  currency: string;
+  today: string;
+  answerAction: Action | null;
+  lostAction: Action | null;
+  /** Today's "Start a new revision", opened at once (null: a draft is open, or this person may not). */
+  startNext: ReactNode | null;
+  /** "Add follow-up". */
+  followUp?: ReactNode;
   /** Under the accept window's title: "QUO-2026-0051 · Kabul Medical Supplies". */
   subtitle?: string;
   /** The payment route the quotation's terms imply (the accept window starts on it). */
   route?: PaymentRoute | null;
-  /** The open draft (Mark as sent), with its number. */
-  draft: { number: number } | null;
-  /** The sent revision waiting for the answer. */
-  live: { number: number; options: OptionView[]; validUntil: string; overdue: boolean } | null;
-  currency: string;
-  today: string;
-  sendAction: Action | null;
-  answerAction: Action | null;
-  lostAction: Action | null;
-  /** "Asked for changes…": today's Start a new revision, opened at once. Null when a draft is already open. */
-  startNext: ReactNode | null;
 }) {
   const [order, setOrder] = useState<{ orderId: string; orderRefNo: string } | null>(null);
   const [changes, setChanges] = useState(false);
   if (order)
     return (
-      <ViewCard id="answer" title="Sending and the answer" canEdit={false}>
-        <p className="flex items-center gap-2 px-4 py-4 text-sm">
-          <CheckCircle2 className="size-4 text-ok" aria-hidden /> Order {order.orderRefNo} was made.{" "}
-          <Link href={`/orders/${order.orderId}`} className="font-medium text-primary underline">
-            Go to the order
-          </Link>
-        </p>
-      </ViewCard>
+      <p className="flex items-center gap-2 rounded-xl border border-ok/30 bg-ok-soft px-5 py-4 text-sm">
+        <CheckCircle2 className="size-4 shrink-0 text-ok" aria-hidden /> Order {order.orderRefNo} was made.{" "}
+        <Link href={`/orders/${order.orderId}`} className="font-medium text-primary underline">
+          Go to the order
+        </Link>
+      </p>
     );
-  return (
-    <ViewCard id="answer" title="Sending and the answer" canEdit={false}>
-      <div className="flex flex-col gap-3 px-4 py-4">
-        {draft && (
-          <p className="text-sm text-text-2">
-            When R{draft.number} goes out: <b className="text-text">Mark as sent</b> (how and when).{" "}
-            {live ? `The customer's answer to R${live.number} still goes here.` : "After that the customer's answer goes here."}
-          </p>
-        )}
-        {!draft && live && (
-          <p className="text-sm text-text-2">
-            R{live.number} is with the customer
-            {live.overdue ? (
-              <span className="font-medium text-warn"> and its validity has passed: ask them, then start a new revision or mark it expired.</span>
-            ) : (
-              <>: follow up, then record their answer.</>
-            )}
-          </p>
-        )}
-        {!draft && !live && <p className="text-sm text-muted">Nothing is waiting for an answer.</p>}
-        {(draft && sendAction) || (live && answerAction) ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {draft && sendAction && !live && <MarkSentButton number={draft.number} action={sendAction} today={today} size="sm" variant="secondary" />}
-            {live && answerAction && (
-              <>
-                <PanelButton
-                  size="sm"
-                  variant="secondary"
-                  label="Accepted…"
-                  title={`Customer accepted R${live.number}`}
-                  description={subtitle ?? "It makes the order from the option they chose."}
-                  panelClassName="md:w-[760px]"
-                  body={<AcceptForm options={live.options} currency={currency} action={answerAction} today={today} onOrder={setOrder} route={route ?? null} />}
-                />
-                {startNext && (
-                  <Button size="sm" variant="ghost" onClick={() => setChanges((v) => !v)} aria-expanded={changes}>
-                    Asked for changes…
-                  </Button>
-                )}
-                {lostAction && (
-                  <PanelButton
-                    size="sm"
-                    variant="ghost"
-                    label="Lost…"
-                    title="The customer said no"
-                    description={`R${live.number} is recorded as rejected and the inquiry as lost.`}
-                    body={<LostForm action={lostAction} today={today} />}
-                  />
-                )}
-                <PanelButton
-                  size="sm"
-                  variant="ghost"
-                  label="Expired…"
-                  title={`R${live.number} expired`}
-                  description="No answer before its validity passed."
-                  body={<ExpiredForm action={answerAction} today={today} />}
-                />
-              </>
-            )}
-          </div>
-        ) : null}
-        {draft && live && sendAction && (
-          <p className="flex items-center gap-1.5 text-xs text-muted">
-            <AlertTriangle className="size-3.5" aria-hidden /> Accepting R{live.number} discards the R{draft.number} draft.
-          </p>
-        )}
-        {changes && startNext && <div className="rounded-xl border border-line bg-surface-2/40 p-3">{startNext}</div>}
-      </div>
-    </ViewCard>
+  const accept = live && answerAction && (
+    <PanelButton
+      variant={draft ? "secondary" : "primary"}
+      label={draft ? `Customer accepted R${live.number}…` : "Customer accepted…"}
+      icon={draft ? undefined : <Check aria-hidden />}
+      title={`Customer accepted R${live.number}`}
+      description={subtitle ?? "It makes the order from the option they chose."}
+      panelClassName="md:w-[760px]"
+      body={<AcceptForm options={live.options} currency={currency} action={answerAction} today={today} onOrder={setOrder} route={route ?? null} />}
+    />
   );
+  if (draft)
+    return (
+      <div className="flex flex-col gap-2">
+        <NextCard title={`Send R${draft.number} to ${customer}`} meta={`${quoRef} · ${draft.meta}`}>
+          {accept}
+          <a href={draft.previewHref} target="_blank" rel="noreferrer" className={buttonClass("secondary", "md")}>
+            <Eye aria-hidden /> Preview
+          </a>
+          {draft.sendHref && (
+            <Link href={draft.sendHref} className={buttonClass("primary", "md")}>
+              <Send aria-hidden /> Send R{draft.number}…
+            </Link>
+          )}
+        </NextCard>
+        {live && accept && (
+          <p className="flex items-center gap-1.5 px-1 text-xs text-muted">
+            <AlertTriangle className="size-3.5" aria-hidden /> R{live.number} is still with the customer. Accepting it discards the R{draft.number} draft.
+          </p>
+        )}
+      </div>
+    );
+  if (live)
+    return (
+      <div className="flex flex-col gap-3">
+        <NextCard title={`Record ${customer}'s answer to R${live.number}`} meta={`${quoRef} · ${live.meta}`} late={live.overdue}>
+          {followUp}
+          {answerAction && live.overdue && (
+            <PanelButton variant="ghost" label="Expired…" title={`R${live.number} expired`} description="No answer before its validity passed." body={<ExpiredForm action={answerAction} today={today} />} />
+          )}
+          {lostAction && (
+            <PanelButton
+              variant="secondary"
+              label="Lost…"
+              title="The customer said no"
+              description={`R${live.number} is recorded as rejected and the inquiry as lost.`}
+              body={<LostForm action={lostAction} today={today} />}
+            />
+          )}
+          {startNext && (
+            <Button variant="secondary" onClick={() => setChanges((v) => !v)} aria-expanded={changes}>
+              Revise (R{live.number + 1})
+            </Button>
+          )}
+          {accept}
+        </NextCard>
+        {changes && startNext && <div className="rounded-xl border border-line bg-surface p-3">{startNext}</div>}
+      </div>
+    );
+  if (closed)
+    return (
+      <div className="flex flex-col gap-3">
+        <NextCard
+          title={`R${closed.number} ${closed.how === "rejected" ? "was rejected" : "expired"}`}
+          meta={`${quoRef} · try again with R${closed.number + 1} (it starts as a copy of R${closed.number}), or mark the inquiry lost in the panel beside.`}
+        />
+        {startNext && <div className="rounded-xl border border-line bg-surface p-3">{startNext}</div>}
+      </div>
+    );
+  return null;
 }

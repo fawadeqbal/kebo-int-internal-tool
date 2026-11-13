@@ -15,6 +15,15 @@ export const text = (max: number, message?: string) =>
     .min(1, message ?? "Required")
     .max(max);
 
+/** A text an older form may not send at all: left out it stays undefined (the saved value is kept), empty it is cleared. */
+export const keptText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .nullish()
+    .transform((v) => (v === undefined ? undefined : v ? v : null));
+
 export const optionalText = (max: number) =>
   z
     .string()

@@ -1,4 +1,4 @@
-import type { AttachmentKind, BalanceTerms, BasisStep, Incoterm, InquiryChannel, LineType, LostReason, RevisionStatus } from "@kebo/shared";
+import type { AttachmentKind, BalanceTerms, BasisStep, Incoterm, InquiryChannel, LineType, LostReason, RevisionStatus, SentVia } from "@kebo/shared";
 
 /** Response shapes for the deal-work screens: inquiry form, factory prices, quotation, reports. */
 
@@ -133,6 +133,8 @@ export interface FactoryQuoteView {
   leadTime: string | null;
   moq: string | null;
   paymentTerms: string | null;
+  /** The warranty the factory gives. */
+  warranty: string | null;
   /** The advance the factory asks when we order, in % (null: the company's default). */
   advancePercent: number | null;
   notes: string | null;
@@ -279,10 +281,14 @@ export interface RevisionView {
   figuresOf: string;
   /** Printed under the payment (beyond the deposit and balance). */
   paymentTerms: string | null;
-  /** Printed under the delivery (packing, inspection, warranty…). */
+  /** Printed under the delivery (packing, inspection…). */
   deliveryTerms: string | null;
+  /** The warranty printed on the quotation. */
+  warranty: string | null;
   notes: string | null;
   sentOn: string | null;
+  /** How it went to the customer (null: not said). */
+  sentVia: SentVia | null;
   answeredOn: string | null;
   createdAt: string;
   options: OptionView[];
@@ -326,8 +332,9 @@ export interface RevisionDraft {
   validUntil: string;
   /** Printed under the payment (beyond the deposit and balance). */
   paymentTerms: string | null;
-  /** Printed under the delivery (packing, inspection, warranty…). */
+  /** Printed under the delivery (packing, inspection…). */
   deliveryTerms: string | null;
+  warranty: string | null;
   notes: string | null;
   options: OptionValues[];
 }

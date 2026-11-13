@@ -244,6 +244,8 @@ export interface QuoteState {
   paymentTerms: string;
   /** The advance they ask when we order, % ("": the company's default). */
   advancePercent: string;
+  /** The warranty the factory gives. */
+  warranty: string;
   notes: string;
   /** Their prices have the tax in them (null: a new offer, the company's default). */
   taxIncluded: boolean | null;
@@ -265,6 +267,7 @@ function initialState(quote: FactoryQuoteView | null, today: string): QuoteState
     moq: quote?.moq ?? "",
     paymentTerms: quote?.paymentTerms ?? "",
     advancePercent: quote?.advancePercent === null || quote?.advancePercent === undefined ? "" : String(quote.advancePercent),
+    warranty: quote?.warranty ?? "",
     notes: quote?.notes ?? "",
     taxIncluded: quote ? quote.taxIncluded : null,
     taxRate: quote ? String(quote.taxRate) : "",
@@ -288,6 +291,7 @@ function payload(s: QuoteState, convertible?: boolean) {
     paymentTerms: s.paymentTerms,
     // Not set: a new offer takes the company's default; an edited one keeps its own.
     ...(s.advancePercent.trim() === "" ? {} : { advancePercent: s.advancePercent.trim() }),
+    warranty: s.warranty,
     notes: s.notes,
     // Not set (a new offer): the company's default.
     ...(s.taxIncluded === null ? {} : { taxIncluded: s.taxIncluded }),
@@ -587,6 +591,9 @@ export function OfferHeaderForm({
               <Field label="Payment terms (note)" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms}>
                 <Input id="paymentTerms" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} placeholder="e.g. 70% before shipment, by T/T" />
               </Field>
+              <Field label="Warranty" htmlFor="fq-warranty" optional error={st.errors?.warranty}>
+                <Input id="fq-warranty" value={s.warranty} onChange={(e) => set("warranty", e.target.value)} maxLength={300} placeholder="e.g. 12 months from commissioning" />
+              </Field>
             </PanelSection>
             <PanelSection className="sm:grid-cols-1">
               <Field label="Notes" htmlFor="fq-notes" optional error={st.errors?.notes}>
@@ -738,6 +745,9 @@ export function OfferHeaderForm({
                 maxLength={2000}
                 placeholder="e.g. 30% deposit, 70% before delivery"
               />
+            </Field>
+            <Field label="Warranty" htmlFor="fq-warranty" optional error={st.errors?.warranty} className="md:col-span-2">
+              <Input id="fq-warranty" value={s.warranty} onChange={(e) => set("warranty", e.target.value)} maxLength={300} placeholder="e.g. 12 months from commissioning" />
             </Field>
               </>
             )}

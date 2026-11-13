@@ -282,7 +282,7 @@ export function PriceEditor({
           {/* What is being edited, and the margin for everything. */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/60 bg-surface px-4 py-3 shadow-card sm:px-5">
             <div className="min-w-0">
-              <h2 className="text-base font-semibold">Editing R{number} prices</h2>
+              <h2 className="text-base font-semibold">Edit lines · R{number}</h2>
               <p className="text-xs text-text-2 max-sm:hidden">Type a price, Enter goes to the next line. A column copied from Excel fills the lines below.</p>
             </div>
             <Button variant="ghost" size="sm" className="sm:hidden" onClick={cancel}>
@@ -488,7 +488,7 @@ export function PriceEditor({
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm">
                   {!gap ? (
                     <span className="flex items-center gap-1.5 text-warn">
-                      <AlertTriangle className="size-4" aria-hidden /> The offer does not say its price basis: set it on Factory prices, or add freight as a charge.
+                      <AlertTriangle className="size-4" aria-hidden /> The offer does not say its price basis: set it on Factory offers, or add freight as a charge.
                     </span>
                   ) : gap.needed.length === 0 ? (
                     <span className="flex items-center gap-1.5 text-ok">
@@ -675,7 +675,7 @@ export function PriceEditor({
                 Cancel
               </Button>
               <SubmitButton pendingText="Saving…" disabled={!dirty}>
-                Save prices
+                Save changes
               </SubmitButton>
             </div>
           </div>

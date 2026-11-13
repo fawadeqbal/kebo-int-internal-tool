@@ -147,6 +147,11 @@ const bullets = (text: string | null | undefined) =>
     .split(/\r?\n/)
     .map((l) => l.replace(/^\s*(?:\d+[.)]|[-•*])\s*/, "").trim())
     .filter(Boolean);
+/** The warranty the papers print: the one on this order's quotation, else the company's usual one (Settings). */
+const warrantyOf = (c: PaperCtx) => {
+  const own = c.o.revision.warranty?.trim();
+  return own ? (/^warranty/i.test(own) ? own : `Warranty: ${own}`) : c.settings.sales.warrantyTerms;
+};
 
 function check(
   key: string,
@@ -338,7 +343,7 @@ function salesContract(c: PaperCtx): Built {
         { fix: "shipBy", warn: vsLc?.late ? `Ours is later than the LC allows: ship by ${paperDateText(lcLatest!)}, or ask for an amendment.` : null },
       ),
       hs.check,
-      check("warranty", "Warranty", c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!c.settings.sales.warrantyTerms, {
+      check("warranty", "Warranty", c.o.revision.warranty ? "from the quotation" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
         href: "/settings/sales",
       }),
     ],
@@ -361,7 +366,7 @@ function salesContract(c: PaperCtx): Built {
         has(c, "delivery_sat")
           ? "Inspection: FAT at the factory before shipment; SAT at the buyer's site."
           : "Inspection: FAT at the factory before shipment.",
-        ...bullets(c.settings.sales.warrantyTerms),
+        ...bullets(warrantyOf(c)),
         ...bullets(rev.deliveryTerms),
       ],
       bank: c.settings.company.bankDetails || null,
@@ -956,7 +961,7 @@ function satCertificate(c: PaperCtx): Built {
       ),
       check("done", "Signed off on", on ? paperDateText(on) : "not yet", !!on, { required: true, href: "delivery" }),
       check("by", "Signed by", c.o.delivery?.satSignedBy ?? "not recorded", !!c.o.delivery?.satSignedBy, { href: "delivery" }),
-      check("warranty", "Warranty", c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!c.settings.sales.warrantyTerms, {
+      check("warranty", "Warranty", c.o.revision.warranty ? "from the quotation" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
         href: "/settings/sales",
       }),
     ],
@@ -978,7 +983,7 @@ function satCertificate(c: PaperCtx): Built {
       bullets: [
         ...(on ? [`Machine accepted by the customer on ${paperDateText(on)}.`] : []),
         ...(on ? [{ label: "Warranty starts:", value: date(on) }] : []),
-        ...bullets(c.settings.sales.warrantyTerms),
+        ...bullets(warrantyOf(c)),
         ...(c.o.delivery?.satSignedBy ? [{ label: "Signed for the customer:", value: c.o.delivery.satSignedBy }] : []),
         ...(c.o.delivery?.satEngineer ? [{ label: "Our engineer:", value: c.o.delivery.satEngineer.name }] : []),
       ],

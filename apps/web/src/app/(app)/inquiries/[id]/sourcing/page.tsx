@@ -1,34 +1,35 @@
 import Link from "next/link";
-import { ArrowLeft, Factory, FileText, Package, Pencil } from "lucide-react";
-import { basisText, offerTaxTag, REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { api } from "@/lib/api";
-import type { FactoryRequests } from "@/lib/types-flow";
-import { Alert, Badge, buttonClass, ButtonLink, Card, CardHeader, cn, EmptyState, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ArrowLeft, ChevronDown, ChevronRight, Factory, FileText } from "lucide-react";
+import { basisText, REQUEST_CHANNEL_LABEL } from "@kebo/shared";
+import { Alert, Badge, buttonClass, ButtonLink, Card, CardHeader, cn, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { requirePermission } from "@/lib/session";
-import { date, money, qty, TZ } from "@/lib/format";
+import { date, money, plural, qty, TZ } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 import { optional } from "@/components/print/data";
-import { cheapestComplete, shortName } from "@/components/deals/offer-facts";
+import { cheapestComplete, coverOf } from "@/components/deals/offer-facts";
 import { AddOfferButton, OfferDetails, OfferLines } from "@/components/deals/offer-work";
 import { removeFileAction } from "../../actions";
 import { askFactories } from "../ask";
+import { NextCard } from "@/components/deals/inquiry-nav";
+import { offerFactsOf, requestsOf } from "../facts";
+import { WithSide } from "../side";
+import { inquiryNext } from "../steps";
 import { RequestMore } from "@/components/deals/ask-window";
 import { factoryRequestStatusAction, removeFactoryRequestAction } from "../../factory-request-actions";
 import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, moveOfferLineAction, offerFieldsAction, removeFactoryQuoteAction, removeOfferLineAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
 import { getSettings } from "@/lib/loaders";
 import { editsOf } from "@/lib/edit-data";
 
-export const metadata = { title: "Factory prices" };
+export const metadata = { title: "Factory offers" };
 
 
 /**
- * Step 2, Factory prices (board InqV4Prices): the offers as one compare table
- * (click a row to open it below: its details and its lines, read only until
- * Edit), Add an offer in a short side panel, and "Compare side by side" for
- * each of the customer's items across the offers. The quotation offers whole
- * offers as options A, B…
+ * Factory offers: one line per factory asked — its offer once it is in (total, what it covers, lead time,
+ * valid until, which option of the quotation it is), or that it has not answered yet. A click opens a line
+ * in place: the offer's lines (Edit lines, the wide lines editor) and its details (Edit, the form in the
+ * panel), each with its "Edited n×". "Compare side by side" sets each of the customer's items across the offers.
  */
 export default async function SourcingPage({
   params,
@@ -56,7 +57,6 @@ export default async function SourcingPage({
   const revs = [...(q?.revisions ?? [])].sort((a, b) => b.number - a.number);
   const current = revs[0] ?? null;
   const letterOf = new Map((current?.options ?? []).filter((o) => o.factoryQuoteId).map((o) => [o.factoryQuoteId!, o.letter]));
-  const withLines = s.quotes.some((x) => x.lines.length);
   const lines = {
     add: addOfferLinesAction.bind(null, d.id),
     edit: editOfferLineAction.bind(null, d.id),
@@ -84,258 +84,229 @@ export default async function SourcingPage({
         defaultOpen={props.open}
       />
     ) : null;
-  const quotationHref = `/inquiries/${d.id}/quotation`;
 
-  const requests = await optional(() => api.get<FactoryRequests>(`/inquiries/${d.id}/factory-requests`));
+  const requests = await requestsOf(d.id);
   const waiting = (requests?.items ?? []).filter((r) => !r.factoryQuoteId && r.status === "sent");
   const editing = s.quotes.find((x) => x.id === sp.offer) ?? null;
   const offerEdits = editing ? await editsOf("factory_quote", editing.id) : null;
 
-  return (
-    <div className="flex flex-col gap-4">
-      {!canEdit && (
-        <Alert tone="info">
-          {d.stage === "won" || d.stage === "lost"
-            ? "This inquiry is closed, so its factory prices can no longer change."
-            : "Only the person handling this inquiry (or a manager) can change its factory prices."}
-        </Alert>
-      )}
+  const notice = !canEdit && (
+    <Alert tone="info">
+      {d.stage === "won" || d.stage === "lost"
+        ? "This inquiry is closed, so its factory prices can no longer change."
+        : "Only the person handling this inquiry (or a manager) can change its factory prices."}
+    </Alert>
+  );
 
-      {/* Requests (board): who was asked, how, when the answer is due, and where each stands. */}
-      {requests && !compare && (
-        <Card className="overflow-clip">
-          <CardHeader title="Requests" actions={<span className="flex flex-wrap gap-2">{ask?.button}{s.quotes.length > 0 && addOffer({ variant: "primary", label: "Enter an offer", open: sp.add === "1" })}</span>} />
-          {requests.items.length === 0 ? (
-            <EmptyState title="Nobody asked yet" description="Send the customer's list to two or three factories; each one shows here with when its answer is due." />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-[13px]">
-                <THead>
-                  <tr>
-                    <Th>Factory</Th>
-                    <Th>Asked by</Th>
-                    <Th>Sent</Th>
-                    <Th>Reply by</Th>
-                    <Th>Status</Th>
-                    <Th className="text-right">
-                      <span className="sr-only">Actions</span>
-                    </Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {requests.items.map((r) => (
-                    <Tr key={r.id}>
-                      <Td>
-                        <Link href={`/factories/${r.factory.id}`} className="font-semibold hover:text-primary">
-                          {r.factory.name}
-                        </Link>
-                        {r.note && <span className="block text-xs text-text-2">{r.note}</span>}
-                      </Td>
-                      <Td>{r.channel ? REQUEST_CHANNEL_LABEL[r.channel] : "—"}</Td>
-                      <Td className="whitespace-nowrap">{date(r.sentOn)}</Td>
-                      <Td className="whitespace-nowrap">{r.replyBy ? date(r.replyBy) : "—"}</Td>
-                      <Td>
-                        <StatusBadge meaning={r.status === "quoted" ? "ok" : r.status === "declined" ? "bad" : r.status === "no_reply" ? "neutral" : r.late ? "warn" : "info"}>
-                          {r.status === "sent" ? (r.late ? "Sent · reply due" : "Sent") : r.statusLabel}
-                        </StatusBadge>
-                      </Td>
-                      <Td className="text-right whitespace-nowrap">
-                        {r.factoryQuoteId ? (
-                          <ButtonLink href={`${base}?offer=${r.factoryQuoteId}#offer`} size="sm">
-                            Open offer
-                          </ButtonLink>
-                        ) : (
-                          <span className="inline-flex items-center gap-1">
-                            {r.status === "sent" && addOffer({ variant: "primary", size: "sm", label: "Enter offer" })}
-                            {canEdit && (
-                              <RequestMore
-                                name={r.factory.name}
-                                status={r.status}
-                                setStatus={factoryRequestStatusAction.bind(null, d.id, r.id)}
-                                remove={removeFactoryRequestAction.bind(null, d.id, r.id)}
-                              />
-                            )}
-                          </span>
-                        )}
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      )}
+  // Compare side by side: each of the customer's items across the offers, full width.
+  if (compare && s.quotes.length > 0)
+    return (
+      <div className="flex flex-col gap-4">
+        {notice}
+        <Link href={base} className={buttonClass("ghost", "sm", "self-start px-1")}>
+          <ArrowLeft aria-hidden /> Back to the offers
+        </Link>
+        {requests && requests.counts.asked > 0 && (
+          <Alert tone={requests.counts.waiting ? "info" : "success"}>
+            <strong>
+              {requests.counts.quoted} of {requests.counts.asked} replied.
+            </strong>{" "}
+            {requests.counts.waiting ? `${requests.counts.waiting} still to answer.` : "Every factory asked has answered."}
+          </Alert>
+        )}
+        <CompareView view={s} dealId={d.id} />
+      </div>
+    );
 
-      {s.quotes.length === 0 && waiting.length === 0 ? (
-        <NoOffers items={s.items} add={addOffer({ variant: "primary", label: "Add the first offer", open: sp.add === "1" })} />
-      ) : compare ? (
+  // "Do next" with its working button, when the next thing is done on this tab (else the frame points to its tab).
+  const next = inquiryNext(d, await offerFactsOf(id));
+  const ownNext = next?.tab === "sourcing" && canEdit;
+  const top = ownNext ? (
+    <NextCard title={next.title} meta={next.meta}>
+      {waiting.length > 0 || s.quotes.length > 0 ? (
         <>
-          <Link href={base} className={buttonClass("ghost", "sm", "self-start px-1")}>
-            <ArrowLeft aria-hidden /> Back to the offers
-          </Link>
-          {requests && requests.counts.asked > 0 && (
-            <Alert tone={requests.counts.waiting ? "info" : "success"}>
-              <strong>
-                {requests.counts.quoted} of {requests.counts.asked} replied.
-              </strong>{" "}
-              {requests.counts.waiting ? `${requests.counts.waiting} still to answer.` : "Every factory asked has answered."}
-            </Alert>
-          )}
-          <CompareView view={s} dealId={d.id} />
+          {ask?.button}
+          {addOffer({ variant: "primary", size: "md", label: "Enter an offer", open: sp.add === "1" })}
         </>
       ) : (
         <>
-          {/* One card per offer (board), and one per factory still to answer. */}
-          <div className="grid items-start gap-4 lg:grid-cols-2">
-            {s.quotes.map((x) => (
-              <OfferCard key={x.id} q={x} base={base} letter={letterOf.get(x.id)} cheapest={cheapest?.id === x.id} canEdit={canEdit} />
-            ))}
-            {waiting.map((r) => (
-              <Card key={r.id}>
-                <CardHeader title={r.factory.name} />
-                <EmptyState
-                  icon={Package}
-                  title={`Waiting for ${shortName(r.factory.name)}`}
-                  description={`${r.replyBy ? `Reply due ${date(r.replyBy)}. ` : ""}Enter the offer when it comes, or mark “No reply” under Ask factories.`}
-                  action={addOffer({ variant: "secondary", label: "Enter offer" })}
-                />
-              </Card>
-            ))}
-          </div>
-          {s.quotes.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-              <span>Our cost = their price to our basis, plus tax unless it is included, in {s.currency}.</span>
-              <span className="flex flex-wrap gap-2">
-                {s.quotes.length > 1 && (
-                  <ButtonLink href={`${base}?view=compare`} size="sm">
-                    Compare side by side
-                  </ButtonLink>
-                )}
-                {withLines && (
-                  <Link href={current ? quotationHref : `${quotationHref}?start=1`} className={buttonClass("primary", "sm")}>
-                    {current ? "Open the quotation" : "Make the quotation"}
-                  </Link>
-                )}
-              </span>
-            </div>
-          )}
-          {editing && (
-            <div id="offer" className="flex scroll-mt-24 flex-col gap-4">
-              <OfferDetails
-                key={`d-${editing.id}`}
-                dealId={d.id}
-                q={editing}
-                canEdit={canEdit}
-                today={today}
-                mainCurrency={s.currency}
-                rates={settings.sales.exchangeRates}
-                searchFactories={searchFactoriesAction}
-                saveAction={saveFactoryQuoteAction.bind(null, d.id, editing.id)}
-                fieldsAction={offerFieldsAction.bind(null, d.id, editing.id)}
-                removeAction={removeFactoryQuoteAction.bind(null, d.id, editing.id)}
-                removeFile={lines.removeFile}
-              />
-              <OfferLines
-                key={`l-${editing.id}`}
-                q={editing}
-                others={s.quotes.filter((x) => x.id !== editing.id && x.lines.length)}
-                items={s.items}
-                canEdit={canEdit}
-                mainCurrency={s.currency}
-                lines={lines}
-                edits={offerEdits?.cards.lines}
-              />
-            </div>
-          )}
+          {addOffer({ variant: "secondary", size: "md", label: "Enter an offer", open: sp.add === "1" })}
+          {(await askFactories(d, me, "primary", { label: "Ask factories", size: "md" }))?.button}
         </>
       )}
-    </div>
-  );
-}
+    </NextCard>
+  ) : null;
 
-/** One factory's offer as the board draws it: its total and tax, basis, lead time, MOQ, payment, validity, their ref., the lines, the files, Edit. */
-function OfferCard({ q, base, letter, cheapest, canEdit }: { q: FactoryQuoteView; base: string; letter?: string; cheapest: boolean; canEdit: boolean }) {
-  const tax = offerTaxTag(q.taxRate, q.taxIncluded);
-  const facts: [string, string | null][] = [
-    ["Basis", q.basis ? basisText(q.basis, q.basisPlace) : null],
-    ["Lead time", q.leadTime],
-    ["MOQ", q.moq],
-    ["Payment", q.paymentTerms ?? (q.advancePercent !== null ? `${q.advancePercent}% advance` : null)],
-    ["Valid until", q.validUntil ? date(q.validUntil) : null],
-    ["Their ref.", q.reference],
-  ];
+  // One line per factory: its offer once it is in, or that it was asked and has not answered. Others asked and closed (declined, no reply) come last.
+  const askedOf = new Map((requests?.items ?? []).filter((r) => r.factoryQuoteId).map((r) => [r.factoryQuoteId!, r]));
+  const others = (requests?.items ?? []).filter((r) => !r.factoryQuoteId);
+  const answered = s.quotes.length;
+  const asked = answered + others.length;
+  const COLS = "md:grid-cols-[16px_minmax(0,1fr)_128px_112px_92px_92px_76px_72px]";
+  const dash = <span className="text-muted">—</span>;
+
   return (
-    <Card>
-      <CardHeader
-        title={q.factory.name}
-        actions={
-          <span className="flex gap-1.5">
-            {letter && <Badge tone="info">Option {letter}</Badge>}
-            {cheapest && <Badge tone="ok">Cheapest complete</Badge>}
-          </span>
-        }
-      />
-      <div className="flex flex-col gap-3.5 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <strong className="text-2xl font-bold tabular">{money(q.factoryTotal, q.currency)}</strong>
-          {tax && <Badge tone="ok">{q.taxIncluded ? `Tax included ${q.taxRate}%` : `+${q.taxRate}% tax`}</Badge>}
-        </div>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-          {facts.map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-xs text-muted">{k}</dt>
-              <dd className="text-sm">{v ?? "—"}</dd>
+    <WithSide id={id} top={top}>
+      {notice}
+      <Card className="overflow-clip">
+        <CardHeader
+          title="Factory offers"
+          description={asked > 0 ? `${asked} asked · ${answered} answered` : "Nobody was asked yet."}
+          actions={
+            <span className="flex flex-wrap items-center gap-2 sm:justify-end">
+              {s.quotes.length > 1 && (
+                <ButtonLink href={`${base}?view=compare`} size="sm" variant="ghost">
+                  Compare side by side
+                </ButtonLink>
+              )}
+              {!ownNext && ask?.button}
+              {!ownNext && addOffer({ variant: "secondary", size: "sm", label: "Enter an offer", open: sp.add === "1" })}
+            </span>
+          }
+        />
+        {asked === 0 ? (
+          <NoOffers items={s.items} />
+        ) : (
+          <div>
+            <div className={cn("hidden items-center gap-x-4 border-b border-line px-5 py-2 text-xs font-medium text-text-2 md:grid", COLS)}>
+              <span />
+              <span>Factory</span>
+              <span className="text-right">Offer total</span>
+              <span>Covers</span>
+              <span>Lead time</span>
+              <span>Valid until</span>
+              <span>Used in</span>
+              <span>Status</span>
             </div>
-          ))}
-        </dl>
-        {q.lines.length > 0 && (
-          <ul className="flex flex-col gap-1.5 border-t border-surface-2 pt-3 text-[13px]">
-            {q.lines.map((l) => (
-              <li key={l.id} className="flex justify-between gap-3">
+            {s.quotes.map((x) => {
+              const open = editing?.id === x.id;
+              const cover = coverOf(x, s.items);
+              const letter = letterOf.get(x.id);
+              return (
+                <div key={x.id} id={open ? "offer" : undefined} className="scroll-mt-24 border-b border-line last:border-b-0">
+                  <Link
+                    href={open ? base : `${base}?offer=${x.id}#offer`}
+                    scroll={false}
+                    aria-expanded={open}
+                    className={cn("grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 text-sm hover:bg-surface-2/60", COLS, open && "bg-primary-soft/40")}
+                  >
+                    {open ? <ChevronDown className="size-4 text-text-2" aria-hidden /> : <ChevronRight className="size-4 text-text-2" aria-hidden />}
+                    <span className="min-w-0">
+                      <span className="line-clamp-2 font-semibold">{x.factory.name}</span>
+                      <span className="block text-xs text-text-2 md:hidden">
+                        {[cover ? (cover.all ? `All ${cover.of} items` : `${cover.n} of ${cover.of} items`) : null, x.leadTime, letter ? `Option ${letter}` : null].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                    <span className="text-right font-semibold whitespace-nowrap tabular">{x.lines.length ? money(x.factoryTotal, x.currency) : dash}</span>
+                    <span className="max-md:hidden">
+                      {cover ? (cover.all ? `All ${cover.of} items` : `${cover.n} of ${cover.of} items`) : x.lines.length ? plural(x.lines.length, "line") : dash}
+                      {x.unpriced > 0 && <span className="block text-xs text-warn">{x.unpriced} without a price</span>}
+                    </span>
+                    <span className="max-md:hidden">{x.leadTime ?? dash}</span>
+                    <span className="max-md:hidden">{x.validUntil ? date(x.validUntil) : dash}</span>
+                    <span className="max-md:hidden">{letter ? <Badge tone="ok">Option {letter}</Badge> : dash}</span>
+                    <span className="max-md:hidden">
+                      <span className="font-semibold text-ok">Offer in</span>
+                      {cheapest?.id === x.id && s.quotes.length > 1 && <span className="block text-xs text-text-2">cheapest complete</span>}
+                    </span>
+                  </Link>
+                  {open && (
+                    <div className="flex flex-col gap-4 border-t border-line bg-surface-2/40 p-2 sm:p-4 md:pl-12">
+                      {askedOf.get(x.id) && (
+                        <p className="text-xs text-text-2">
+                          Asked {date(askedOf.get(x.id)!.sentOn)}
+                          {askedOf.get(x.id)!.channel ? ` by ${REQUEST_CHANNEL_LABEL[askedOf.get(x.id)!.channel!].toLowerCase()}` : ""} · offer received {date(x.receivedOn)}
+                        </p>
+                      )}
+                      <OfferLines
+                        key={`l-${x.id}`}
+                        q={x}
+                        others={s.quotes.filter((o) => o.id !== x.id && o.lines.length)}
+                        items={s.items}
+                        canEdit={canEdit}
+                        mainCurrency={s.currency}
+                        lines={lines}
+                        edits={offerEdits?.cards.lines}
+                      />
+                      <OfferDetails
+                        key={`d-${x.id}`}
+                        dealId={d.id}
+                        q={x}
+                        canEdit={canEdit}
+                        today={today}
+                        mainCurrency={s.currency}
+                        rates={settings.sales.exchangeRates}
+                        searchFactories={searchFactoriesAction}
+                        saveAction={saveFactoryQuoteAction.bind(null, d.id, x.id)}
+                        fieldsAction={offerFieldsAction.bind(null, d.id, x.id)}
+                        removeAction={removeFactoryQuoteAction.bind(null, d.id, x.id)}
+                        removeFile={lines.removeFile}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {others.map((r) => (
+              <div key={r.id} className={cn("grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-line px-5 py-3 text-sm last:border-b-0", COLS)}>
+                <span />
                 <span className="min-w-0">
-                  {l.answersNo ? `${l.no}` : "Extra"} · {l.description.split("\n")[0]} × {qty(l.quantity)} {l.unit}
+                  <Link href={`/factories/${r.factory.id}`} className="line-clamp-2 font-semibold hover:text-primary">
+                    {r.factory.name}
+                  </Link>
+                  <span className="block text-xs text-text-2">
+                    Asked {date(r.sentOn)}
+                    {r.channel ? ` by ${REQUEST_CHANNEL_LABEL[r.channel].toLowerCase()}` : ""}
+                    {r.note ? ` · ${r.note}` : ""}
+                  </span>
                 </span>
-                <span className="tabular">{(Number(l.quantity) * Number(l.unitPrice)).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {q.files.length > 0 && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {q.files.map((f) => (
-              <a key={f.id} href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                <FileText className="size-3.5" aria-hidden /> {f.fileName}
-              </a>
+                <span className="text-right max-md:hidden">{dash}</span>
+                <span className="max-md:hidden">{dash}</span>
+                <span className="max-md:hidden">{dash}</span>
+                <span className="max-md:hidden">{dash}</span>
+                <span className="max-md:hidden">{dash}</span>
+                <span className="flex items-center justify-between gap-2 max-md:col-start-2 max-md:col-end-4">
+                  <span>
+                    <span className={cn("font-semibold", r.status === "sent" ? "text-action" : r.status === "declined" ? "text-bad" : "text-text-2")}>
+                      {r.status === "sent" ? "Waiting" : r.statusLabel}
+                    </span>
+                    {r.status === "sent" && r.replyBy && <span className={cn("block text-xs", r.late ? "text-bad" : "text-text-2")}>due {date(r.replyBy)}</span>}
+                  </span>
+                  {canEdit && (
+                    <RequestMore
+                      name={r.factory.name}
+                      status={r.status}
+                      setStatus={factoryRequestStatusAction.bind(null, d.id, r.id)}
+                      remove={removeFactoryRequestAction.bind(null, d.id, r.id)}
+                    />
+                  )}
+                </span>
+              </div>
             ))}
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
-          <ButtonLink href={`${base}?offer=${q.id}#offer`} size="sm">
-            <Pencil aria-hidden /> {canEdit ? "Edit" : "Open"}
-          </ButtonLink>
-          {q.unpriced > 0 && <Badge tone="warn">{q.unpriced} line{q.unpriced === 1 ? "" : "s"} without a price</Badge>}
-        </div>
-      </div>
-    </Card>
+      </Card>
+      {s.quotes.length > 0 && (
+        <p className="text-xs text-muted">
+          Our cost = their price to our basis, plus tax unless it is included, in {s.currency}. Click a line to open the offer: its lines and its details, each with its own Edit.
+        </p>
+      )}
+    </WithSide>
   );
 }
 
-function NoOffers({ items, add }: { items: SourcingView["items"]; add: React.ReactNode }) {
+function NoOffers({ items }: { items: SourcingView["items"] }) {
   return (
-    <div className="flex flex-col gap-5">
-      <Card className="flex items-center justify-center">
-        <EmptyState
-          icon={Factory}
-          title="No factory offers yet"
-          description="Send the customer's list to two or three factories (Ask factories, above). When each one replies, add its offer here: the customer's items are listed with a price box each."
-          action={add ?? undefined}
-        />
-      </Card>
+    <div>
+      <EmptyState
+        icon={Factory}
+        title="No factory asked yet"
+        description="Send the customer's list to two or three factories. Each one shows here as a line; when it replies, enter its offer: the customer's items are listed with a price box each."
+      />
       {items.length > 0 && (
-        <Card className="flex flex-col gap-2 p-4">
+        <div className="border-t border-line px-5 py-4">
           <h3 className="text-sm font-semibold">What the factories quote on</h3>
-          <ul className="flex flex-col divide-y divide-line">
+          <ul className="mt-1 flex flex-col divide-y divide-line">
             {items.map((it) => (
               <li key={it.id} className={cn("flex items-baseline justify-between gap-3 py-2 text-sm", it.parentId && "pl-5")}>
                 <span className="min-w-0">
@@ -348,7 +319,7 @@ function NoOffers({ items, add }: { items: SourcingView["items"]; add: React.Rea
               </li>
             ))}
           </ul>
-        </Card>
+        </div>
       )}
     </div>
   );

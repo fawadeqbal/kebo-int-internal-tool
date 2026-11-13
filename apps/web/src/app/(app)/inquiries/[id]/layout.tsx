@@ -1,44 +1,60 @@
-import { ArrowRight, Banknote, Eye, Factory, File, FileText, History, List, MessageSquareText, Package, Pencil } from "lucide-react";
+import { ArrowRight, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Banner, ButtonLink, PageHeader, PriorityBadge, RefCode, StageBadge } from "@kebo/ui";
-import { date } from "@/lib/format";
-import { askFactories } from "./ask";
+import { Banner, ButtonLink, cn, PageHeader, PriorityBadge, RefCode } from "@kebo/ui";
+import { todayIn } from "@kebo/utils";
+import { TZ } from "@/lib/format";
 import { requireUser, hasFeature } from "@/lib/session";
-import { dealOf, sourcingOf } from "@/lib/deal-data";
-import { StepNav } from "@/components/orders/step-nav";
-import { guidance, inquirySteps } from "./steps";
+import { dealOf } from "@/lib/deal-data";
+import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
+import { InquiryNext, InquiryTabs, type InquiryTab } from "@/components/deals/inquiry-nav";
+import { offerFactsOf } from "./facts";
+import { inquiryNext, quotationStatus, statusWords } from "./steps";
+
+const TONE = { action: "text-action", ok: "text-ok", bad: "text-bad", mute: "text-text-2" } as const;
 
 /**
- * Every page of an inquiry shares one top (design system: page header): its
- * number and stage, one summary line (what it is, the customer, how it came,
- * who handles it), ⋯ more (Edit details, the order once won), and the
- * inquiry's navigation: Overview · 1 Needs · 2 Factory prices · 3 Quotation ·
- * Costs (managers) · History, then "Order →" once won. Each step's own header
- * has that page's one primary.
+ * Every page of an inquiry shares one top, the same shape as an order's: its title, then one line that
+ * starts with its status in words ("Sourcing · 2 of 3 offers in") and goes on with its number, the
+ * customer, the category and who handles it; ⋯ more; one row of tabs (Overview · Factory offers ·
+ * Quotations · Costs · History · Order); and "Do next", the one thing it needs now.
  */
 export default async function DealLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
   const d = await dealOf(id);
   const sourcing = can(me, "sourcing.manage");
-  const offers = sourcing ? ((await sourcingOf(id).catch(() => null))?.quotes.length ?? 0) : null;
+  const facts = sourcing ? await offerFactsOf(id) : null;
   const order = d.orders.find((o) => o.status !== "cancelled");
   const base = `/inquiries/${d.id}`;
   const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const g = guidance(d);
-  // The one main action at the top (board): Ask factories while prices are wanted, else what comes next.
-  const ask = d.canWork && (d.stage === "new" || d.stage === "sourcing") ? await askFactories(d, me, "primary") : null;
+  const status = statusWords(d, facts, todayIn(TZ));
+  const next = inquiryNext(d, facts);
   const meta = [
+    <span key="st" className={cn("font-semibold whitespace-nowrap", TONE[status.tone])}>
+      {status.text}
+    </span>,
     <RefCode key="r">{d.refNo}</RefCode>,
-    <Link key="c" href={`/customers/${d.customer.id}`} className="text-primary underline underline-offset-2">
+    <Link key="c" href={`/customers/${d.customer.id}`} className="text-primary underline underline-offset-2 hover:opacity-80">
       {d.customer.name}
     </Link>,
     d.category && <span key="cat">{d.category}</span>,
-    <PriorityBadge key="p" priority={d.priority} />,
+    d.priority !== "normal" && <PriorityBadge key="p" priority={d.priority} />,
     <span key="a">{d.assignee ? `${d.assignee.name} handles it` : "nobody handles it yet"}</span>,
-    d.requiredBy && <span key="n">needed by {date(d.requiredBy)}</span>,
   ].filter(Boolean);
+  const tabs: InquiryTab[] = [
+    { href: base, label: "Overview" },
+    ...(facts ? [{ href: `${base}/sourcing`, label: "Factory offers", tag: facts.offers || facts.asked ? String(Math.max(facts.offers, facts.asked)) : undefined }] : []),
+    { href: `${base}/quotation`, label: "Quotations", tag: d.quotation?.revisions.length ? quotationStatus(d) : undefined },
+    ...(managers ? [{ href: `${base}/costs`, label: "Costs" }] : []),
+    { href: `${base}/history`, label: "History" },
+  ];
+  const more: MenuEntry[] = [
+    ...(d.allowed.edit ? [{ label: "Edit the request", href: `${base}/edit` }] : []),
+    { label: "All files", href: `${base}/files` },
+    { label: `Open the customer ${d.customer.name}`, href: `/customers/${d.customer.id}` },
+    { label: "Copy link to this inquiry", copy: base },
+  ];
 
   return (
     <div>
@@ -46,11 +62,10 @@ export default async function DealLayout({ children, params }: { children: React
         crumbs={[{ label: "Operations & trading" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }]}
         icon={MessageSquareText}
         title={d.title ? d.title : <span className="tabular">{d.refNo}</span>}
-        badge={<StageBadge stage={d.stage} onHold={d.onHold} />}
         summary={
-          <span className="flex min-w-0 flex-wrap items-center gap-y-1">
+          <p className="min-w-0">
             {meta.map((m, i) => (
-              <span key={i} className="inline-flex items-center">
+              <span key={i}>
                 {i > 0 && (
                   <span aria-hidden className="px-1.5 text-muted">
                     ·
@@ -59,26 +74,19 @@ export default async function DealLayout({ children, params }: { children: React
                 {m}
               </span>
             ))}
-          </span>
-        }
-        papers={
-          d.allowed.edit && (
-            <ButtonLink href={`${base}/edit`}>
-              <Pencil aria-hidden /> Edit
-            </ButtonLink>
-          )
+          </p>
         }
         primary={
-          ask?.button ??
-          (g.href && g.label && (
-            <ButtonLink href={g.href} variant="primary">
-              {g.label} <ArrowRight aria-hidden />
+          order && d.stage === "won" ? (
+            <ButtonLink href={`/orders/${order.id}`} variant="primary">
+              Go to the order <ArrowRight aria-hidden />
             </ButtonLink>
-          ))
+          ) : undefined
         }
+        more={<MoreMenu label={`More for ${d.refNo}`} items={more} />}
       />
       {d.customer.country === "ZZ" && (
-        <Banner meaning="warn" className="mb-3">
+        <Banner meaning="warn" className="mt-3">
           This customer&apos;s country is not set.{" "}
           <Link href={`/customers/${d.customer.id}?panel=edit-customer&id=${d.customer.id}`} className="font-medium underline">
             Add it
@@ -86,30 +94,9 @@ export default async function DealLayout({ children, params }: { children: React
           — it decides shipping.
         </Banner>
       )}
-      <StepNav
-        base={base}
-        label="Inquiry steps"
-        glance="The inquiry at a glance"
-        steps={inquirySteps(d, offers).map((s) => ({ key: s.key, number: s.number, label: s.label, state: s.state, status: s.status, href: `${base}/${s.path}` }))}
-        costs={managers ? {} : null}
-        extra={order ? [{ href: `/orders/${order.id}`, label: "Order →" }] : []}
-        files
-        icons={{
-          Overview: <Eye aria-hidden />,
-          Needs: <List aria-hidden />,
-          "Factory prices": <Factory aria-hidden />,
-          Quotation: <FileText aria-hidden />,
-          Costs: <Banknote aria-hidden />,
-          Files: <File aria-hidden />,
-          History: <History aria-hidden />,
-          "Order →": <Package aria-hidden />,
-        }}
-        stages={{
-          list: ["New", "Sourcing", "Quoted", d.stage === "lost" ? "Lost" : "Won"],
-          current: d.stage === "new" ? 0 : d.stage === "sourcing" ? 1 : d.stage === "quoted" ? 2 : 3,
-        }}
-      />
-      <div className="mt-5">{children}</div>
+      <InquiryTabs base={base} tabs={tabs} order={order && d.stage === "won" ? { href: `/orders/${order.id}`, refNo: order.refNo } : null} />
+      {next && <InquiryNext base={base} tab={next.tab} title={next.title} meta={next.meta} href={next.href} label={next.label} />}
+      <div className="mt-4">{children}</div>
     </div>
   );
 }

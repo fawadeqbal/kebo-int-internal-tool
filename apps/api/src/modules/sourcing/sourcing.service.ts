@@ -138,6 +138,8 @@ export class SourcingService {
         leadTime: q.leadTime,
         moq: q.moq,
         paymentTerms: q.paymentTerms,
+        /** The warranty the factory gives. */
+        warranty: q.warranty,
         /** The advance the factory asks when we order, in % (null: the company's default). */
         advancePercent: q.advancePercent === null ? null : Number(q.advancePercent),
         notes: q.notes,
@@ -307,6 +309,7 @@ export class SourcingService {
       paymentTerms: input.paymentTerms,
       // Left out on an edit: kept as it is (a new offer takes the company's default, see create).
       ...(input.advancePercent !== undefined ? { advancePercent: input.advancePercent } : {}),
+      ...(input.warranty !== undefined ? { warranty: input.warranty } : {}),
       notes: input.notes,
     };
   }

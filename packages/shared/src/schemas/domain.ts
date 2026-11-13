@@ -19,8 +19,9 @@ import {
   PAYMENT_ROUTES,
   PRIORITIES,
   REVISION_STATUSES,
+  SENT_VIA,
 } from "../enums";
-import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, optionalPercent, percentOr, phone, quantity, text } from "./common";
+import { amount, bool, currency, email, id, isoDate, keptText, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, optionalPercent, percentOr, phone, quantity, text } from "./common";
 import { DEFAULT_TAX_RATE } from "../workflows/tax";
 import { PLAN_DUE_RULES } from "../workflows/money-route";
 import { CANCEL_CUSTOMER_MONEY, CANCEL_FACTORY_MONEY, FACTORY_DUE_RULES } from "../workflows/money-route";
@@ -237,6 +238,8 @@ export const factoryQuoteInput = z
     leadTime: optionalText(120),
     moq: optionalText(60),
     paymentTerms: optionalText(2000),
+    /** The warranty the factory gives. Left out: kept as it is. */
+    warranty: keptText(300),
     /**
      * The advance the factory asks when we order, in % (seeds its payment plan on the order and is printed on
      * the purchase order; the payment terms text stays as a note). Empty: the company's default (Settings).
@@ -348,6 +351,8 @@ export const revisionInput = z.object({
   paymentTerms: optionalText(5000),
   /** Printed under the delivery, e.g. "Packing: export wooden cases. Inspection before shipment." */
   deliveryTerms: optionalText(5000),
+  /** The warranty printed on the quotation ("12 months from commissioning"). Left out: kept as it is. */
+  warranty: keptText(300),
   notes: optionalText(5000),
   /** Options A, B… in this order; the customer accepts exactly one. */
   options: z.array(optionInput).min(1, "Add at least one option").max(6, "Use at most 6 options"),
@@ -361,6 +366,8 @@ export const revisionMoveInput = z.object({
   optionId: optionalId,
   /** The day it was sent or answered; today when empty. */
   on: optionalDate,
+  /** Sent: how it went to the customer. */
+  via: z.preprocess((v) => (v === "" ? undefined : v), z.enum(SENT_VIA).optional()),
   /** Accepted: the customer's PO number or reference, kept on the order. */
   customerRef: optionalText(80),
   /** Accepted: how the customer pays; empty: what the quotation's terms imply. */

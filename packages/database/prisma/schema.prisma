@@ -856,6 +856,8 @@ model FactoryQuote {
   /// The advance the factory asks when we order, in % (empty: the company's default in Settings). Seeds the
   /// factory's payment plan on the order and is printed on the purchase order; paymentTerms stays as a note.
   advancePercent Decimal?  @map("advance_percent") @db.Decimal(5, 2)
+  /// The warranty the factory gives ("12 months from commissioning").
+  warranty       String?   @db.VarChar(300)
   notes          String?
   createdById    String    @map("created_by") @db.Uuid
   createdBy      User      @relation("FactoryQuoteCreator", fields: [createdById], references: [id])
@@ -958,7 +960,11 @@ model QuotationRevision {
   /// Delivery terms printed on the quotation, e.g. "Packing: export wooden cases. Inspection before shipment."
   deliveryTerms    String?        @map("delivery_terms")
   notes            String?
+  /// The warranty printed on the quotation (it starts from the company's usual warranty in Settings).
+  warranty         String?        @db.VarChar(300)
   sentOn           DateTime?      @map("sent_on") @db.Date
+  /// How it went to the customer: email | whatsapp | wechat | in_person | other.
+  sentVia          String?        @map("sent_via") @db.VarChar(20)
   answeredOn       DateTime?      @map("answered_on") @db.Date
   /// Frozen when sent, so the PDF never changes afterwards.
   customerSnapshot Json?          @map("customer_snapshot")

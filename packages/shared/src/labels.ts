@@ -14,6 +14,7 @@ import type {
   PaymentMethod,
   Priority,
   RevisionStatus,
+  SentVia,
   SignInResult,
 } from "./enums";
 
@@ -67,6 +68,10 @@ export const LOST_REASON_LABEL: Record<LostReason, string> = {
 export const UNKNOWN_COUNTRY = "ZZ";
 
 export const PARTY_TYPE_LABEL: Record<PartyType, string> = { company: "Company", individual: "Individual" };
+
+export const SENT_VIA_LABEL: Record<SentVia, string> = { email: "Email", whatsapp: "WhatsApp", wechat: "WeChat", in_person: "In person", other: "Another way" };
+/** In a sentence: "sent 13 Nov by WeChat", "sent 13 Nov in person". */
+export const SENT_VIA_TEXT: Record<SentVia, string> = { email: "by email", whatsapp: "by WhatsApp", wechat: "by WeChat", in_person: "in person", other: "another way" };
 
 export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   draft: "Draft",

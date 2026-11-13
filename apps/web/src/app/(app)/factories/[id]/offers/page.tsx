@@ -77,7 +77,7 @@ export default async function FactoryOffers({
             description={
               filtered
                 ? "Try another word, inquiry or result."
-                : "Prices are recorded on an inquiry, under Factory prices. Open an inquiry that needs prices and ask this supplier."
+                : "Prices are recorded on an inquiry, under Factory offers. Open an inquiry that needs prices and ask this supplier."
             }
             action={
               filtered ? (

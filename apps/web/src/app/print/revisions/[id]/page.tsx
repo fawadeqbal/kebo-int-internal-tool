@@ -147,6 +147,7 @@ export default async function QuotationPrint({
           ...textBullets(r.paymentTerms),
           single ? (options[0]!.leadTime ? `Delivery: ${options[0]!.leadTime}` : null) : null,
           ...textBullets(r.deliveryTerms),
+          r.warranty ? (/^warranty/i.test(r.warranty) ? r.warranty : `Warranty: ${r.warranty}`) : null,
           single ? null : `Please choose one of the ${options.length} options above (${options.map((o) => o.letter).join(", ")}); each is priced on its own.`,
           ...textBullets(r.notes),
           ...portBullets(r.incoterm, r.incotermPlace),
