@@ -25,6 +25,7 @@ import {
   type RevisionStatus,
   type Settings,
   type PaymentRoute,
+  type SentVia,
 } from "@kebo/shared";
 import { addDays, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -282,8 +283,11 @@ export class QuotationsService {
       ...figuresOf(r),
       paymentTerms: r.paymentTerms,
       deliveryTerms: r.deliveryTerms,
+      warranty: r.warranty,
       notes: r.notes,
       sentOn: fromDbDateOrNull(r.sentOn),
+      /** How it went to the customer (null: not said, or sent before this was kept). */
+      sentVia: r.sentVia as SentVia | null,
       answeredOn: fromDbDateOrNull(r.answeredOn),
       customerSnapshot: r.customerSnapshot,
       companySnapshot: r.companySnapshot,
@@ -327,6 +331,7 @@ export class QuotationsService {
       validUntil: fromDbDate(r.validUntil),
       paymentTerms: r.paymentTerms,
       deliveryTerms: r.deliveryTerms,
+      warranty: r.warranty,
       notes: r.notes,
       options: r.options.map((o) => ({
         factoryQuoteId: o.factoryQuoteId,
@@ -413,6 +418,8 @@ export class QuotationsService {
       validUntil,
       paymentTerms: settings.sales.defaultPaymentTerms || null,
       deliveryTerms: settings.sales.defaultDeliveryTerms || null,
+      // The company's usual warranty, to change for this quotation.
+      warranty: settings.sales.warrantyTerms?.replace(/^warranty\s*:\s*/i, "").slice(0, 300) || null,
       notes: null,
       options: [option],
     };
@@ -537,6 +544,8 @@ export class QuotationsService {
         validUntil: toDbDate(input.validUntil),
         paymentTerms: input.paymentTerms,
         deliveryTerms: input.deliveryTerms,
+        // Left out by an older form: kept as it is.
+        ...(input.warranty !== undefined ? { warranty: input.warranty } : {}),
         notes: input.notes,
       },
     };
@@ -682,7 +691,7 @@ export class QuotationsService {
       attachments: input.pdf ? [{ filename: input.fileName || `${head.quotation.refNo} R${r.number}.pdf`, content: Buffer.from(input.pdf, "base64"), contentType: "application/pdf" }] : undefined,
     });
     const how = `By email to ${input.to.join(", ")}`;
-    if (r.status === "draft") return this.move(user, revisionId, "sent", null, how);
+    if (r.status === "draft") return this.move(user, revisionId, "sent", null, how, null, { via: "email" });
     await this.audit.record(this.prisma.db, {
       userId: user.id,
       action: "update",
@@ -706,8 +715,8 @@ export class QuotationsService {
     on: ISODate | null,
     reasonInput?: string | null,
     optionId?: string | null,
-    /** Accepted: the customer's PO or reference, and the payment route when it is not the one the terms imply. */
-    accept: { customerRef?: string | null; route?: PaymentRoute } = {},
+    /** Accepted: the customer's PO or reference, and the payment route when it is not the one the terms imply. Sent: how it went. */
+    accept: { customerRef?: string | null; route?: PaymentRoute; via?: SentVia } = {},
   ) {
     this.assertCan(user);
     const today = this.clock.today();
@@ -740,6 +749,7 @@ export class QuotationsService {
           data: {
             status: "sent",
             sentOn: toDbDate(day),
+            sentVia: accept.via ?? null,
             customerSnapshot: await customerSnapshot(tx, inquiry.customerId, inquiry.contactId),
             companySnapshot: companySnapshot(settings),
           },

@@ -109,7 +109,7 @@ export async function copyOfferLinesAction(dealId: string, quoteId: string, from
   return lineCall(dealId, () => api.post<FactoryQuoteView>(`/factory-quotes/${quoteId}/copy-lines`, { fromQuoteId }));
 }
 
-const OFFER_FIELDS = ["reference", "validUntil", "basis", "basisPlace", "leadTime", "moq", "paymentTerms", "advancePercent", "notes"] as const;
+const OFFER_FIELDS = ["reference", "validUntil", "basis", "basisPlace", "leadTime", "moq", "paymentTerms", "advancePercent", "warranty", "notes"] as const;
 
 /**
  * One or a few of an offer's details ("+ Add" in place on its card): the offer
@@ -134,6 +134,7 @@ export async function offerFieldsAction(dealId: string, quoteId: string, _prev: 
         moq: q.moq,
         paymentTerms: q.paymentTerms,
         advancePercent: q.advancePercent,
+        warranty: q.warranty,
         notes: q.notes,
       };
       for (const k of OFFER_FIELDS) if (k in v) body[k] = v[k]!.trim() === "" ? null : v[k]!.trim();

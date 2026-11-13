@@ -76,10 +76,10 @@ export function StartRevision({
   const nothing = !!offers && offers.offers.length === 0 && offers.items.length === 0;
   if (nothing)
     return empty ? (
-      frame(null, "Add a factory offer with its lines on the Factory prices tab first; each offer becomes an option the customer can choose.")
+      frame(null, "Add a factory offer with its lines on the Factory offers tab first; each offer becomes an option the customer can choose.")
     ) : (
       <p className="text-sm text-muted">
-        Add a factory offer with its lines on the Factory prices tab first; each offer becomes an option the customer can choose.
+        Add a factory offer with its lines on the Factory offers tab first; each offer becomes an option the customer can choose.
       </p>
     );
   if (!open || !draft || !offers) {

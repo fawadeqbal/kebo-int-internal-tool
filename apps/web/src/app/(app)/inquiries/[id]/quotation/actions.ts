@@ -45,7 +45,7 @@ export async function moveRevisionAction(dealId: string, revisionId: string, _pr
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.post(`/revisions/${revisionId}/status`, { to: v.to, on: v.on || null, reason: reasonOf(form), optionId: v.optionId || null, ...(v.to === "accepted" ? { customerRef: v.customerRef?.trim() || null, route: v.route || undefined } : {}) }),
+    () => api.post(`/revisions/${revisionId}/status`, { to: v.to, on: v.on || null, reason: reasonOf(form), optionId: v.optionId || null, ...(v.to === "sent" && v.via ? { via: v.via } : {}), ...(v.to === "accepted" ? { customerRef: v.customerRef?.trim() || null, route: v.route || undefined } : {}) }),
     DONE[v.to] ?? "Saved.",
   );
   if (!r.ok) return r;
@@ -91,7 +91,7 @@ export async function lostAction(dealId: string, revisionId: string | null, _pre
   return r;
 }
 
-const TERM_FIELDS = ["validUntil", "incotermPlace", "paymentTerms", "deliveryTerms", "notes"] as const;
+const TERM_FIELDS = ["validUntil", "incotermPlace", "paymentTerms", "deliveryTerms", "warranty", "notes"] as const;
 
 /** One of a draft's terms ("+ Add" on the terms card): the draft's values with it put in, saved with the same PUT as the editor. */
 export async function revisionFieldsAction(dealId: string, revisionId: string, _prev: ActionState, form: FormData): Promise<ActionState> {

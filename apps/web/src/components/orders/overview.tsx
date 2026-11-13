@@ -95,7 +95,7 @@ export function overviewFacts({ o, steps, flow, m, costs, deal, now }: OverviewI
       sub: [CHANNEL_LABEL[deal.channel], deal.attachments.length ? `${deal.attachments.length} file${deal.attachments.length === 1 ? "" : "s"}` : null]
         .filter(Boolean)
         .join(" · "),
-      href: `/inquiries/${deal.id}/needs`,
+      href: `/inquiries/${deal.id}#items`,
     });
     stops.push({
       key: "quotation",

@@ -73,6 +73,10 @@ export type PartyRole = (typeof PARTY_ROLES)[number];
 export const REVISION_STATUSES = values("draft", "sent", "accepted", "rejected", "expired", "superseded", "void");
 export type RevisionStatus = (typeof REVISION_STATUSES)[number];
 
+/** How a quotation went to the customer (kept beside the day it was sent). */
+export const SENT_VIA = values("email", "whatsapp", "wechat", "in_person", "other");
+export type SentVia = (typeof SENT_VIA)[number];
+
 /** Goods are shipped (packing list, inspection); services and charges are not. */
 export const LINE_TYPES = values("goods", "service", "charge");
 export type LineType = (typeof LINE_TYPES)[number];

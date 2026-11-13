@@ -70,6 +70,7 @@ export interface EditorState {
   validUntil: string;
   paymentTerms: string;
   deliveryTerms: string;
+  warranty: string;
   notes: string;
   options: OptionState[];
 }
@@ -88,6 +89,7 @@ export function fromDraft(d: RevisionDraft): EditorState {
     validUntil: d.validUntil,
     paymentTerms: str(d.paymentTerms),
     deliveryTerms: str(d.deliveryTerms),
+    warranty: str(d.warranty),
     notes: str(d.notes),
     options: d.options.map((o, i) => ({
       key: `option-${i}`,
@@ -164,6 +166,7 @@ export function payload(s: EditorState, offers: QuoteOffers) {
     validUntil: s.validUntil,
     paymentTerms: s.paymentTerms,
     deliveryTerms: s.deliveryTerms,
+    warranty: s.warranty,
     notes: s.notes,
     options: s.options.map((o) => ({
       factoryQuoteId: o.factoryQuoteId,
@@ -525,10 +528,13 @@ export function RevisionEditor({
                     <Textarea id={`pay-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. By T/T; L/C at sight accepted" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} />
                   </Field>
                   <Field label="Delivery terms" htmlFor={`del-terms-${number}`} optional error={st.errors?.deliveryTerms} hint="Printed under the delivery time">
-                    <Textarea id={`del-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. packing, inspection, warranty" value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
+                    <Textarea id={`del-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. packing, inspection" value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
+                  </Field>
+                  <Field label="Warranty" htmlFor={`warranty-${number}`} optional error={st.errors?.warranty} hint="Starts from the company's usual warranty; change it for this quotation">
+                    <Input id={`warranty-${number}`} maxLength={300} placeholder="e.g. 12 months from commissioning" value={s.warranty} onChange={(e) => set("warranty", e.target.value)} />
                   </Field>
                   <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last">
-                    <Textarea id={`notes-${number}`} rows={3} className="min-h-0" placeholder="Warranty 12 months from SAT; prices include export wooden cases…" value={s.notes} onChange={(e) => set("notes", e.target.value)} />
+                    <Textarea id={`notes-${number}`} rows={3} className="min-h-0" placeholder="Prices include export wooden cases…" value={s.notes} onChange={(e) => set("notes", e.target.value)} />
                   </Field>
                 </PanelSection>
               </>
@@ -608,7 +614,10 @@ export function RevisionEditor({
                             </Field>
                           </div>
                           <Field label="Printed delivery terms" htmlFor={`del-terms-${number}`} optional error={st.errors?.deliveryTerms} hint="Printed under the delivery time">
-                            <Textarea id={`del-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. packing, inspection, warranty" value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
+                            <Textarea id={`del-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. packing, inspection" value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
+                          </Field>
+                          <Field label="Warranty" htmlFor={`warranty-${number}`} optional error={st.errors?.warranty} hint="Printed on the quotation">
+                            <Input id={`warranty-${number}`} maxLength={300} placeholder="e.g. 12 months from commissioning" value={s.warranty} onChange={(e) => set("warranty", e.target.value)} />
                           </Field>
                         </TermsGroup>
                       </div>
@@ -874,7 +883,7 @@ export function RevisionEditor({
                           </ul>
                           <p className="text-xs text-muted">
                             Type a price and press Enter for the next line; a column of prices copied from Excel fills the lines below. The factory&apos;s lines
-                            themselves change on Factory prices.
+                            themselves change on Factory offers.
                           </p>
                           {showCosts && opt.factoryQuoteId && (
                             <BasisCosts
@@ -1243,7 +1252,7 @@ export function BasisCosts({
       {!gap ? (
         <p className="flex items-start gap-1.5 rounded-md bg-warn-soft px-3 py-2 text-xs text-text">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
-          The offer does not say its price basis (EXW, FOB…), so the costs to reach {selling} cannot be worked out. Set it on Factory prices → Details, or add
+          The offer does not say its price basis (EXW, FOB…), so the costs to reach {selling} cannot be worked out. Set it on Factory offers (the offer's Edit), or add
           freight and the like as charges.
         </p>
       ) : (

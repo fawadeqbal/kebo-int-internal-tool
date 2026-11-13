@@ -77,7 +77,7 @@ export class QuotationsController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body(Validate(revisionMoveInput)) body: z.infer<typeof revisionMoveInput>,
   ) {
-    return this.quotations.move(user, id, body.to, body.on, body.reason, body.optionId, { customerRef: body.customerRef, route: body.route });
+    return this.quotations.move(user, id, body.to, body.on, body.reason, body.optionId, { customerRef: body.customerRef, route: body.route, via: body.via });
   }
 
   /** Email the revision to the customer (with its PDF, made by the web app) and mark it sent. */

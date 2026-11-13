@@ -30,6 +30,8 @@ const FIELD: Record<string, string> = {
   warrantyTerms: "Warranty",
   paymentTerms: "Payment terms",
   deliveryTerms: "Delivery terms",
+  warranty: "Warranty",
+  sentVia: "Sent by",
 };
 const fieldLabel = (f: string) => FIELD[f] ?? f.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 const shown = (v: string | null) =>

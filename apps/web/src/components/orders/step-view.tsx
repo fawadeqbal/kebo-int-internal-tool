@@ -276,8 +276,9 @@ export function ViewCard({
   const [open, setOpen] = useState(false);
   return (
     <Card id={id} data-target={target} data-target-card={target ? "" : undefined} className={cn("scroll-mt-24", className)}>
-      <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0">
+      {/* A phone puts wide actions under the title instead of squeezing it to a word a line. */}
+      <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3 max-sm:flex-wrap">
+        <div className="min-w-0 max-sm:grow max-sm:basis-[55%]">
           <h3 className="text-sm font-semibold text-text">{title}</h3>
           {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>

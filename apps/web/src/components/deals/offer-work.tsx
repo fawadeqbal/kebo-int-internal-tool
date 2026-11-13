@@ -167,8 +167,10 @@ export function OfferDetails({
       placeholder: "e.g. 30",
     },
     { name: "paymentTerms", label: "Payment terms (note)", value: q.paymentTerms, placeholder: "e.g. 70% before shipment, by T/T" },
+    { name: "warranty", label: "Warranty", value: q.warranty, placeholder: "e.g. 12 months from commissioning" },
     { name: "moq", label: "Minimum order", value: q.moq },
     { name: "reference", label: "Their ref.", value: q.reference, placeholder: "Their quote no." },
+    { label: "Received", value: q.receivedOn, show: dateText(q.receivedOn), uncounted: true },
     {
       label: "Quotation file",
       value: q.files.length ? q.files.map((f) => f.fileName).join(", ") : null,
