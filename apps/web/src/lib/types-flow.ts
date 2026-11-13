@@ -111,6 +111,9 @@ export interface ShipmentView {
   freightCurrency?: string | null;
   insurer?: string | null;
   insurancePolicyNo?: string | null;
+  /** prepaid | collect */
+  freightTerms?: string | null;
+  insuredValue?: string | null;
   customsDeclarationNo?: string | null;
   clearedOn?: string | null;
 }

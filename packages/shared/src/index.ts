@@ -26,6 +26,7 @@ export * from "./schemas/settings";
 export * from "./schemas/security";
 export * from "./schemas/flow";
 export * from "./schemas/checklist";
+export * from "./schemas/sections";
 export * from "./schemas/papers";
 export * from "./schemas/notes";
 export * from "./workflows/devices";
