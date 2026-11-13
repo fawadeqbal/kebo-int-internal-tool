@@ -1,37 +1,21 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ClipboardPaste, Lock, Plus, X } from "lucide-react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, ClipboardPaste, Lock, Plus, X } from "lucide-react";
 import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import { basisText, BASIS_STEP_LABEL, optionLetter } from "@kebo/shared";
 import { Badge, Button, Card, cn, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
+import { PANEL_FORM, PanelActions, PanelBody, useClosePanel, useReportDirty } from "@/components/common/panel";
 import { UNITS } from "@/components/lines/line-table";
 import type { ActionState } from "@/lib/actions";
 import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import type { Fx } from "@/lib/fx";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { shortName } from "./offer-facts";
-import {
-  asLineOf,
-  BasisCosts,
-  extraOf,
-  Fig,
-  fromDraft,
-  gapOf,
-  linesOf,
-  payload,
-  priced,
-  STEP_LINE,
-  swap,
-  valid,
-  type ChargeState,
-  type EditorState,
-  type OptionState,
-} from "./revision-editor";
+import { asLineOf, BasisCosts, extraOf, Fig, fromDraft, gapOf, linesOf, payload, priced, STEP_LINE, valid, type ChargeState, type EditorState, type OptionState } from "./revision-editor";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -44,50 +28,44 @@ const TH = "h-9 border-b border-line bg-surface-2 px-3 text-xs font-medium white
 const amount2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
- * "Edit prices" on the Quotation step (board Fix24QuoteEdit): the page itself
- * becomes the price editor, full width. The options as a row of cards; the
- * open option's lines with every column in view and a price box in each row
- * (Enter goes to the next line, a column pasted from Excel fills down); the
- * costs to reach our basis as one internal line; the charges as a plain table
- * with an entry row; the option's terms; and a bar at the bottom with the
- * totals, cost, profit and margin, Cancel and Save prices. On a phone the
- * lines are rows with their price box and the charges are summed up.
+ * "Edit lines" of a draft quotation, in the same window as an offer's lines editor: the options as tabs; the
+ * open option's lines with a price box in each row (Enter goes to the next line, a column pasted from Excel
+ * fills down); the costs to reach our basis as one internal line; charges of our own; the option's lead
+ * time; and at the bottom Save changes and Cancel with the totals, cost, profit and margin.
  *
- * Same values and endpoint as today's revision editor (the whole revision is
- * saved; numbering, costing and the "Why?" prompt are unchanged): only the
- * layout is new.
+ * Only prices are changed here. Which offers are quoted, and the terms, are in the quotation's window (Edit).
+ * The whole revision is saved, as before.
  */
+/** The option the lines window opens on (0 = A): the one shown on the card it was opened from. */
+export const OptionAt = createContext(0);
+
 export function PriceEditor({
   action,
-  number,
   initial,
   offers,
   showCosts,
-  initialOption = 0,
-  startAdding = false,
-  backHref,
 }: {
   action: Action;
-  number: number;
   initial: RevisionDraft;
   offers: QuoteOffers;
   showCosts: boolean;
-  initialOption?: number;
-  startAdding?: boolean;
-  /** The Quotation step, where Save and Cancel go back to. */
-  backHref: string;
 }) {
-  const router = useRouter();
+  const initialOption = useContext(OptionAt);
+  const close = useClosePanel();
+  const reportDirty = useReportDirty();
   const [s, setS] = useState<EditorState>(() => fromDraft(initial));
   const [saved] = useState(() => JSON.stringify(fromDraft(initial)));
   const [active, setActive] = useState(Math.min(Math.max(0, initialOption), initial.options.length - 1));
-  const [adding, setAdding] = useState(startAdding);
   const [margin, setMargin] = useState(String(offers.defaultMargin));
   const [costsOpen, setCostsOpen] = useState(false);
   const [paste, setPaste] = useState<string | null>(null);
   const [chargesOpen, setChargesOpen] = useState(false);
   const dirty = JSON.stringify(s) !== saved;
-  const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => setS((st) => ({ ...st, [k]: v }));
+  // The window asks "Discard changes?" only when a price really changed.
+  useEffect(() => {
+    reportDirty(dirty);
+    return () => reportDirty(null);
+  }, [dirty, reportDirty]);
   const setOption = (i: number, patch: Partial<OptionState> | ((o: OptionState) => Partial<OptionState>)) =>
     setS((st) => ({ ...st, options: st.options.map((o, n) => (n === i ? { ...o, ...(typeof patch === "function" ? patch(o) : patch) } : o)) }));
 
@@ -129,22 +107,6 @@ export function PriceEditor({
   const fx: Fx = { main: offers.mainCurrency, rates: offers.rates };
   const ours = basisText(s.incoterm, s.incotermPlace.trim() || null);
 
-  // What can still be added: offers not used yet, and the customer's items when no option uses them.
-  const used = new Set(s.options.map((o) => o.factoryQuoteId ?? "items"));
-  const addable = [...offers.offers.filter((o) => !used.has(o.factoryQuoteId)), ...(!used.has("items") ? [null] : [])];
-  const nOffers = addable.filter(Boolean).length;
-  const addHint = nOffers ? `${nOffers} more offer${nOffers === 1 ? "" : "s"} to add` : "the customer's items, by hand";
-  const addOption = (factoryQuoteId: string | null) => {
-    const off = offers.offers.find((o) => o.factoryQuoteId === factoryQuoteId);
-    const ls = off?.lines ?? offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
-    setS((st) => ({
-      ...st,
-      options: [...st.options, { key: rowKey(), factoryQuoteId, leadTime: off?.leadTime ?? "", discount: "", prices: priced(ls, {}, marginOk ? marginNumber : offers.defaultMargin), charges: [], costs: {} }],
-    }));
-    setActive(s.options.length);
-    setAdding(false);
-  };
-  /** "Price all at n %": every option's lines with a cost, on their landed cost. */
   const priceAll = () =>
     marginOk &&
     setS((st) => ({
@@ -271,25 +233,20 @@ export function PriceEditor({
     );
   };
 
-  const cancel = () => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && router.push(backHref);
-
   return (
-    <ActionForm action={action} onDone={() => router.push(backHref)} className="flex flex-col gap-4">
+    <PanelBody>
+    <ActionForm action={action} onDone={(state) => close(state)} className={PANEL_FORM}>
       {(st) => (
         <>
           <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
 
-          {/* What is being edited, and the margin for everything. */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/60 bg-surface px-4 py-3 shadow-card sm:px-5">
-            <div className="min-w-0">
-              <h2 className="text-base font-semibold">Edit lines · R{number}</h2>
-              <p className="text-xs text-text-2 max-sm:hidden">Type a price, Enter goes to the next line. A column copied from Excel fills the lines below.</p>
+          {/* The options as tabs, and the margin for everything. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div role="tablist" aria-label="Options" className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] max-sm:w-full">
+              {s.options.map(optionCard)}
             </div>
-            <Button variant="ghost" size="sm" className="sm:hidden" onClick={cancel}>
-              Cancel
-            </Button>
             {showCosts && (
-              <div className="flex items-center gap-2 max-sm:w-full">
+              <div className="ml-auto flex items-center gap-2 max-sm:w-full">
                 <label htmlFor="price-all" className="text-xs text-text-2">
                   Price all at
                 </label>
@@ -301,67 +258,6 @@ export function PriceEditor({
               </div>
             )}
           </div>
-
-          {/* The options. */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div role="tablist" aria-label="Options" className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] max-sm:w-full">
-              {s.options.map(optionCard)}
-              {addable.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setAdding((v) => !v)}
-                  aria-expanded={adding}
-                  className="flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-line-strong px-5 py-3 text-sm font-medium text-primary hover:border-primary"
-                >
-                  <span className="flex items-center gap-1">
-                    <Plus className="size-4" aria-hidden /> Add an option
-                  </span>
-                  <span className="text-xs font-normal text-text-2">{addHint}</span>
-                </button>
-              )}
-            </div>
-            <div className="ml-auto flex items-center gap-1 max-sm:hidden">
-              {s.options.length > 1 && (
-                <>
-                  <Button size="icon-xs" variant="ghost" disabled={at === 0} aria-label={`Move option ${letter} left`} onClick={() => (setS((x) => ({ ...x, options: swap(x.options, at, at - 1) })), setActive(at - 1))}>
-                    <ArrowLeft aria-hidden />
-                  </Button>
-                  <Button size="icon-xs" variant="ghost" disabled={at === s.options.length - 1} aria-label={`Move option ${letter} right`} onClick={() => (setS((x) => ({ ...x, options: swap(x.options, at, at + 1) })), setActive(at + 1))}>
-                    <ArrowRight aria-hidden />
-                  </Button>
-                </>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={s.options.length === 1}
-                title={s.options.length === 1 ? "A quotation keeps at least one option" : undefined}
-                onClick={() => (setS((x) => ({ ...x, options: x.options.filter((_, n) => n !== at) })), setActive(Math.max(0, at - 1)))}
-              >
-                Remove option {letter}
-              </Button>
-            </div>
-          </div>
-          {adding && (
-            <ul className="flex flex-col divide-y divide-line rounded-xl border border-line bg-surface" aria-label="Offers to add">
-              {addable.map((o) => (
-                <li key={o?.factoryQuoteId ?? "items"} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
-                  <span className="min-w-0">
-                    <span className="font-medium">{o ? o.factory.name : "The customer's items, priced by hand"}</span>
-                    <span className="block text-xs text-muted">
-                      {o ? `${o.lines.length} line${o.lines.length === 1 ? "" : "s"}${o.leadTime ? ` · ${o.leadTime}` : ""}${o.totalCost && showCosts ? ` · cost ${formatMinor(toMinor(o.totalCost), currency)}` : ""}` : "No factory prices: the items as the customer asked for them"}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    {o && <Badge tone={o.coverage.missing.length ? "warn" : "ok"}>{o.coverage.missing.length ? `Misses ${o.coverage.missing.join(", ")}` : "Covers all"}</Badge>}
-                    <Button size="xs" variant="secondary" onClick={() => addOption(o?.factoryQuoteId ?? null)}>
-                      Add as Option {optionLetter(s.options.length)}
-                    </Button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
 
           {/* The open option's lines. */}
           <Card aria-label={`Option ${letter} lines`}>
@@ -609,29 +505,25 @@ export function PriceEditor({
             </div>
           </Card>
 
-          {/* The option's terms. */}
-          <Card aria-label="Terms for this option">
-            <div className="border-b border-line px-4 py-3">
-              <h3 className="text-sm font-semibold">Terms for this option</h3>
-            </div>
-            <div className="grid gap-3 px-4 py-4 sm:grid-cols-3">
-              <TermBox label="Lead time" id={`lead-${opt.key}`} hint={`Option ${letter}`}>
-                <Input id={`lead-${opt.key}`} value={opt.leadTime} maxLength={120} placeholder="e.g. 60 days after the deposit" onChange={(e) => setOption(at, { leadTime: e.target.value })} />
-              </TermBox>
-              <TermBox label="Valid until" id={`valid-${number}`} hint="The whole quotation" error={st.errors?.validUntil}>
-                <Input id={`valid-${number}`} type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
-              </TermBox>
-              <TermBox label="Note on the quotation" id={`notes-${number}`} hint="Printed last, on the whole quotation" error={st.errors?.notes}>
-                <Input id={`notes-${number}`} value={s.notes} maxLength={2000} placeholder="e.g. Price includes wooden cases" onChange={(e) => set("notes", e.target.value)} />
-              </TermBox>
-            </div>
-          </Card>
+          {/* The option's own term. */}
+          <div className="max-w-sm">
+            <TermBox label="Lead time" id={`lead-${opt.key}`} hint={s.options.length > 1 ? `Option ${letter}` : "Printed on the quotation"}>
+              <Input id={`lead-${opt.key}`} value={opt.leadTime} maxLength={120} placeholder="e.g. 60 days after the deposit" onChange={(e) => setOption(at, { leadTime: e.target.value })} />
+            </TermBox>
+          </div>
 
           <ErrorText error={st.errors?.options ?? st.errors?.currency} />
 
-          {/* Always in view while editing: the option's money, Cancel and Save. */}
-          <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-line bg-surface/95 px-4 py-3 shadow-pop backdrop-blur sm:px-5 lg:bottom-3">
-            <dl className="flex flex-wrap items-end gap-x-6 gap-y-2 max-sm:hidden">
+          {/* Always in view: Save changes and Cancel as in every lines editor, then the option's money. */}
+          <PanelActions>
+            <SubmitButton size="sm" pendingText="Saving…" disabled={!dirty}>
+              Save changes
+            </SubmitButton>
+            <Button size="sm" variant="ghost" onClick={() => close()}>
+              Cancel
+            </Button>
+            <span className="text-xs text-muted max-lg:hidden">{dirty ? "Changes not saved yet" : "Nothing changed yet"}</span>
+            <dl className="ml-auto flex flex-wrap items-end gap-x-5 gap-y-2 max-sm:hidden">
               <Fig label="Subtotal">{fmt(totals.subtotal)}</Fig>
               <div className="flex flex-col">
                 <dt>
@@ -662,26 +554,18 @@ export function PriceEditor({
               )}
             </dl>
             {/* Phone: the total and the margin. */}
-            <div className="min-w-0 flex-1 sm:hidden">
+            <div className="ml-auto min-w-0 sm:hidden">
               <p className="text-xs text-text-2">{showCosts ? "Total · margin" : "Total"}</p>
               <p className="text-sm font-semibold tabular">
                 {fmt(totals.total)}
                 {showCosts && costing.marginPercent !== null ? ` · ${costing.marginPercent.toFixed(1)}%` : ""}
               </p>
             </div>
-            <div className="ml-auto flex items-center gap-2">
-              {dirty && <span className="text-xs text-warn max-lg:hidden">Unsaved changes</span>}
-              <Button variant="ghost" className="max-sm:hidden" onClick={cancel}>
-                Cancel
-              </Button>
-              <SubmitButton pendingText="Saving…" disabled={!dirty}>
-                Save changes
-              </SubmitButton>
-            </div>
-          </div>
+          </PanelActions>
         </>
       )}
     </ActionForm>
+    </PanelBody>
   );
 }
 

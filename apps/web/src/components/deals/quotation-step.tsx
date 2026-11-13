@@ -3,18 +3,19 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, CheckCircle2, ChevronRight, Eye, Lock, Pencil, Plus, Send } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronRight, Eye, Lock, Pencil, Send } from "lucide-react";
 import { BASIS_STEP_LABEL, LINE_TYPE_LABEL, LOST_REASON_LABEL, LOST_REASONS, PAYMENT_ROUTES, SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type PaymentRoute, type SentVia } from "@kebo/shared";
 import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelButton, ViewCard } from "@/components/orders/step-view";
 import { NextCard } from "./inquiry-nav";
-import { PANEL_FORM, PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelFooter, useClosePanel, WhatHappens } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { money, qty } from "@/lib/format";
 import type { OptionView, QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
 import { shortName } from "./offer-facts";
+import { OptionAt } from "./price-editor";
 import { CostingBox, RevisionEditor } from "./revision-editor";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -24,7 +25,11 @@ const total = (v: string, currency: string) => money(v, currency);
 
 /* ---------------------------------------------------------------- the terms panel */
 
-/** The revision's terms (today's editor, terms only) in the Edit side panel; the whole draft is saved. */
+/**
+ * The quotation's window, the same for "New quotation R1" and "Edit quotation R1": which offers to quote
+ * (each ticked one is an option), the deal, the payment and what is printed. The whole draft is saved.
+ * The prices are not here: they have their own editor (Edit lines).
+ */
 export function TermsPanel({
   number,
   initial,
@@ -32,6 +37,9 @@ export function TermsPanel({
   loadOffers,
   showCosts,
   action,
+  create = false,
+  tickAll = false,
+  onSaved,
 }: {
   number: number;
   initial: RevisionDraft;
@@ -39,6 +47,11 @@ export function TermsPanel({
   loadOffers: (currency: string) => Promise<QuoteOffers | null>;
   showCosts: boolean;
   action: Action;
+  /** A new revision ("Save draft"); else an edit of the draft ("Save changes"). */
+  create?: boolean;
+  /** A first revision: every offer with lines starts ticked. */
+  tickAll?: boolean;
+  onSaved?: () => void;
 }) {
   const close = useClosePanel();
   return (
@@ -51,10 +64,15 @@ export function TermsPanel({
         offers={offers}
         loadOffers={loadOffers}
         showCosts={showCosts}
-        submitLabel="Save terms"
-        requireChanges
-        onDone={close}
-        onCancel={close}
+        submitLabel={create ? "Save draft" : "Save changes"}
+        requireChanges={!create}
+        tickAll={tickAll}
+        footNote={create ? "A draft is seen only inside the company. It can change until it is sent." : "Once sent, a change needs a new revision."}
+        onDone={(state) => {
+          close(state);
+          onSaved?.();
+        }}
+        onCancel={() => close()}
       />
     </PanelBody>
   );
@@ -76,18 +94,11 @@ export function OptionsCard({
   edit,
 }: {
   r: RevisionView;
-  /** The draft's price editor (people who may change it), null otherwise: "Edit prices" turns the page into it. */
-  edit: {
-    showCosts: boolean;
-    /** Another offer (or the customer's items) can still become an option. */
-    canAdd: boolean;
-    /** The page in price-editing mode (then "&option=1", "&add=1"). */
-    pricesHref: string;
-  } | null;
+  /** The draft's lines editor (people who may change it), null otherwise: "Edit lines" opens it in its window, on the option shown. */
+  edit: { lines: ReactNode } | null;
 }) {
   const [at, setAt] = useState(() => Math.max(0, r.options.findIndex((o) => o.status === "accepted")));
   const o = r.options[Math.min(at, r.options.length - 1)];
-  const canAdd = !!edit && edit.canAdd;
 
   return (
     <ViewCard
@@ -96,11 +107,16 @@ export function OptionsCard({
       canEdit={false}
       actions={
         edit ? (
-          <>
-            <Link href={`${edit.pricesHref}&option=${at}`} className={buttonClass("ghost", "xs")}>
-              <Pencil aria-hidden /> Edit lines
-            </Link>
-          </>
+          <PanelButton
+            variant="ghost"
+            size="xs"
+            icon={<Pencil aria-hidden />}
+            label="Edit lines"
+            title={`Edit lines · R${r.number}`}
+            description="Type a price, Enter goes to the next line. A column copied from Excel fills the lines below. Nothing is saved until Save changes."
+            panelClassName="md:w-[1180px]"
+            body={<OptionAt.Provider value={at}>{edit.lines}</OptionAt.Provider>}
+          />
         ) : undefined
       }
     >
@@ -141,14 +157,6 @@ export function OptionsCard({
               </button>
             );
           })}
-          {edit && canAdd && (
-            <Link
-              href={`${edit.pricesHref}&add=1`}
-              className="flex min-h-16 items-center justify-center gap-1 rounded-xl border border-dashed border-line-strong px-3 py-3 text-sm font-medium text-primary hover:border-primary"
-            >
-              <Plus className="size-4" aria-hidden /> Add an option
-            </Link>
-          )}
         </div>
         {o && <OptionLines o={o} currency={r.currency} incoterm={r.incoterm} single={r.options.length === 1} />}
       </div>
@@ -494,7 +502,7 @@ function AcceptForm({
 const ROUTE_WORD: Record<PaymentRoute, string> = { informal: "Bank transfer (informal)", bank_contract: "Bank contract", letter_of_credit: "Letter of credit" };
 
 /** Lost: why (for the reports), and the sent revision recorded as rejected. */
-function LostForm({ action, today }: { action: Action; today: string }) {
+function LostForm({ action, today, number }: { action: Action; today: string; number: number }) {
   const close = useClosePanel();
   return (
     <PanelBody>
@@ -519,14 +527,15 @@ function LostForm({ action, today }: { action: Action; today: string }) {
             <Field label="Answered on" htmlFor="lost-on" optional hint="Today when empty" error={s.errors?.on}>
               <Input id="lost-on" name="on" type="date" max={today} className="w-44" defaultValue={s.values?.on} />
             </Field>
-            <PanelActions>
-              <SubmitButton size="sm" variant="danger" pendingText="Saving…">
-                Mark as lost
-              </SubmitButton>
-              <Button size="sm" variant="ghost" onClick={close}>
+            <WhatHappens lines={[<>R{number} is marked <strong>Rejected</strong>.</>, <>The inquiry closes as <strong>Lost</strong>, with the reason.</>, "Its offers and quotations stay. A manager can reopen it."]} />
+            <PanelFooter>
+              <Button type="button" variant="ghost" onClick={() => close()}>
                 Cancel
               </Button>
-            </PanelActions>
+              <SubmitButton variant="danger" pendingText="Saving…">
+                Mark as lost
+              </SubmitButton>
+            </PanelFooter>
           </>
         )}
       </ActionForm>
@@ -535,7 +544,7 @@ function LostForm({ action, today }: { action: Action; today: string }) {
 }
 
 /** Expired: the validity passed without an answer. */
-function ExpiredForm({ action, today }: { action: Action; today: string }) {
+function ExpiredForm({ action, today, number }: { action: Action; today: string; number: number }) {
   const close = useClosePanel();
   return (
     <PanelBody>
@@ -549,14 +558,15 @@ function ExpiredForm({ action, today }: { action: Action; today: string }) {
             <Field label="Expired on" htmlFor="exp-on" optional hint="Today when empty" error={s.errors?.on}>
               <Input id="exp-on" name="on" type="date" max={today} className="w-44" defaultValue={s.values?.on} />
             </Field>
-            <PanelActions>
-              <SubmitButton size="sm" pendingText="Saving…">
-                Mark expired
-              </SubmitButton>
-              <Button size="sm" variant="ghost" onClick={close}>
+            <WhatHappens lines={[<>R{number} is marked <strong>Expired</strong>.</>, "The inquiry stays open.", `“Do next” becomes “Start R${number + 1} from R${number}”.`]} />
+            <PanelFooter>
+              <Button type="button" variant="ghost" onClick={() => close()}>
                 Cancel
               </Button>
-            </PanelActions>
+              <SubmitButton pendingText="Saving…">
+                Mark R{number} expired
+              </SubmitButton>
+            </PanelFooter>
           </>
         )}
       </ActionForm>
@@ -589,7 +599,7 @@ export function QuotationNext({
   /** "QUO-2026-0410". */
   quoRef: string;
   /** The open draft: what Do next says of it, how it prints and where it is sent from (null: this person may not send it). */
-  draft: { number: number; meta: string; previewHref: string; sendHref: string | null } | null;
+  draft: { number: number; meta: string; previewHref: string; send: ReactNode | null } | null;
   /** The sent revision waiting for the answer. */
   live: { number: number; options: OptionView[]; meta: string; overdue: boolean } | null;
   /** The last revision was rejected or expired and nothing new is drafted. */
@@ -598,7 +608,7 @@ export function QuotationNext({
   today: string;
   answerAction: Action | null;
   lostAction: Action | null;
-  /** Today's "Start a new revision", opened at once (null: a draft is open, or this person may not). */
+  /** The button that opens "New quotation R{n}": "Revise (R2)" while one is with the customer, "Start R2 from R1" after a no (null: a draft is open, or this person may not). */
   startNext: ReactNode | null;
   /** "Add follow-up". */
   followUp?: ReactNode;
@@ -608,7 +618,6 @@ export function QuotationNext({
   route?: PaymentRoute | null;
 }) {
   const [order, setOrder] = useState<{ orderId: string; orderRefNo: string } | null>(null);
-  const [changes, setChanges] = useState(false);
   if (order)
     return (
       <p className="flex items-center gap-2 rounded-xl border border-ok/30 bg-ok-soft px-5 py-4 text-sm">
@@ -629,18 +638,26 @@ export function QuotationNext({
       body={<AcceptForm options={live.options} currency={currency} action={answerAction} today={today} onOrder={setOrder} route={route ?? null} />}
     />
   );
+  // Each state has its own key: a window left open in one (Send) must not reappear on the button that
+  // takes its place in the next (Lost…) when the page refreshes after a save.
   if (draft)
     return (
-      <div className="flex flex-col gap-2">
+      <div key={`draft-${draft.number}`} className="flex flex-col gap-2">
         <NextCard title={`Send R${draft.number} to ${customer}`} meta={`${quoRef} · ${draft.meta}`}>
           {accept}
           <a href={draft.previewHref} target="_blank" rel="noreferrer" className={buttonClass("secondary", "md")}>
             <Eye aria-hidden /> Preview
           </a>
-          {draft.sendHref && (
-            <Link href={draft.sendHref} className={buttonClass("primary", "md")}>
-              <Send aria-hidden /> Send R{draft.number}…
-            </Link>
+          {draft.send && (
+            <PanelButton
+              variant="primary"
+              icon={<Send aria-hidden />}
+              label={`Send R${draft.number}…`}
+              title={`Send R${draft.number} to ${customer}`}
+              description={`${quoRef} · ${draft.meta}`}
+              panelClassName="md:w-[620px]"
+              body={draft.send}
+            />
           )}
         </NextCard>
         {live && accept && (
@@ -652,11 +669,11 @@ export function QuotationNext({
     );
   if (live)
     return (
-      <div className="flex flex-col gap-3">
+      <div key={`live-${live.number}`} className="flex flex-col gap-3">
         <NextCard title={`Record ${customer}'s answer to R${live.number}`} meta={`${quoRef} · ${live.meta}`} late={live.overdue}>
           {followUp}
           {answerAction && live.overdue && (
-            <PanelButton variant="ghost" label="Expired…" title={`R${live.number} expired`} description="No answer before its validity passed." body={<ExpiredForm action={answerAction} today={today} />} />
+            <PanelButton variant="ghost" label="Expired…" title={`R${live.number} expired`} description="No answer before its validity passed." body={<ExpiredForm action={answerAction} today={today} number={live.number} />} />
           )}
           {lostAction && (
             <PanelButton
@@ -664,27 +681,23 @@ export function QuotationNext({
               label="Lost…"
               title="The customer said no"
               description={`R${live.number} is recorded as rejected and the inquiry as lost.`}
-              body={<LostForm action={lostAction} today={today} />}
+              body={<LostForm action={lostAction} today={today} number={live.number} />}
             />
           )}
-          {startNext && (
-            <Button variant="secondary" onClick={() => setChanges((v) => !v)} aria-expanded={changes}>
-              Revise (R{live.number + 1})
-            </Button>
-          )}
+          {startNext}
           {accept}
         </NextCard>
-        {changes && startNext && <div className="rounded-xl border border-line bg-surface p-3">{startNext}</div>}
       </div>
     );
   if (closed)
     return (
-      <div className="flex flex-col gap-3">
+      <div key={`closed-${closed.number}`} className="flex flex-col gap-3">
         <NextCard
           title={`R${closed.number} ${closed.how === "rejected" ? "was rejected" : "expired"}`}
           meta={`${quoRef} · try again with R${closed.number + 1} (it starts as a copy of R${closed.number}), or mark the inquiry lost in the panel beside.`}
-        />
-        {startNext && <div className="rounded-xl border border-line bg-surface p-3">{startNext}</div>}
+        >
+          {startNext}
+        </NextCard>
       </div>
     );
   return null;
