@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Package, XCircle } from "lucide-react";
-import { dayMonth, ORDER_TABS, ORDER_WORD_TONE, PAYMENT_ROUTE_SHORT, type FlowStep, type OrderTab } from "@kebo/shared";
+import { can, dayMonth, ORDER_TABS, ORDER_WORD_TONE, PAYMENT_ROUTE_SHORT, type FlowStep, type OrderTab } from "@kebo/shared";
 import { cn, PageHeader, RefCode } from "@kebo/ui";
+import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderOf, orderSectionsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
@@ -14,6 +15,7 @@ import { orderCostsSetup } from "@/components/orders/costs-data";
 import { FileToolsProvider } from "@/components/files/file-tools";
 import { OrderDrop } from "@/components/files/order-drop";
 import { docHref } from "./shared";
+import { CancelOrder } from "./cancel-order";
 
 /**
  * Every page of an order shares one top (design "the order, final"): the path, the order's name, one
@@ -24,8 +26,10 @@ import { docHref } from "./shared";
  */
 export default async function OrderLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireUser();
+  const me = await requireUser();
   const o = await orderOf(id);
+  // Cancelling is a manager's: it sits last in ⋯, away from the everyday buttons.
+  const canCancel = can(me, "orders.manage") && o.status !== "cancelled";
   const [sections, flow, costs, files] = await Promise.all([
     optional(() => orderSectionsOf(id)),
     optional(() => orderFlowOf(id)),
@@ -73,6 +77,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
     { label: `Open the inquiry ${o.inquiry.refNo}`, href: `/inquiries/${o.inquiry.id}` },
     { label: `Open the customer ${o.customer.name}`, href: `/customers/${o.customer.id}` },
     { label: "Copy link to this order", copy: base },
+    ...(canCancel ? ([{ separator: true }, { label: "Cancel the order…", panel: "cancel-order", danger: true }] satisfies MenuEntry[]) : []),
   ];
 
   // Board: SO · customer · from RFQ · QUO R2 · CPT Kabul · USD 52,400 (route and who handles it after).
@@ -170,6 +175,11 @@ export default async function OrderLayout({ children, params }: { children: Reac
         <div className="mt-5">{children}</div>
       </FileToolsProvider>
       {files?.canUpload && <OrderDrop orderId={o.id} refNo={o.refNo} />}
+      {canCancel && (
+        <Suspense fallback={null}>
+          <CancelOrder id={o.id} />
+        </Suspense>
+      )}
     </div>
   );
 }

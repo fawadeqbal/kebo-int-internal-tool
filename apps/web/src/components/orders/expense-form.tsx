@@ -53,6 +53,9 @@ export interface ExpensePrefill {
   category?: ExpenseCategory;
   description?: string;
   step?: FlowStep | null;
+  /** An amount already typed elsewhere on the order (the freight on its shipment). */
+  amount?: string;
+  currency?: string;
 }
 
 const PLACEHOLDER: Partial<Record<ExpenseCategory, string>> = {
@@ -103,8 +106,8 @@ export function OrderExpenseForm({
     expense ? (expense.step ?? "") : (prefill?.step ?? step ?? STEP_OF_CATEGORY[prefill?.category ?? "freight"] ?? ""),
   );
   const [stepTouched, setStepTouched] = useState(Boolean(expense || step || prefill?.step));
-  const [currency, setCurrencyRaw] = useState(expense?.currency ?? s0.mainCurrency);
-  const [amount, setAmount] = useState(expense?.amount ?? "");
+  const [currency, setCurrencyRaw] = useState(expense?.currency ?? prefill?.currency ?? s0.mainCurrency);
+  const [amount, setAmount] = useState(expense?.amount ?? prefill?.amount ?? "");
   const settingsRate = (c: string) => (c === s0.mainCurrency ? 1 : rateOf(s0.fx, c, s0.mainCurrency));
   const [rate, setRate] = useState(expense ? rateText(expense.rate) : "");
   const [paidBy, setPaidBy] = useState(expense?.paidBy?.id ?? s0.me ?? "");
@@ -314,7 +317,7 @@ export function OrderExpenseForm({
             <Field label="Spent on" htmlFor="oe-spentOn" error={st.errors?.spentOn}>
               <Input id="oe-spentOn" name="spentOn" type="date" max={s0.today} defaultValue={st.values?.spentOn ?? expense?.spentOn ?? s0.today} />
             </Field>
-            <Field label="Step" htmlFor="oe-step" hint={step && stepValue === step ? "from the page you opened it on" : undefined} error={st.errors?.step}>
+            <Field label="Stage" htmlFor="oe-step" error={st.errors?.step}>
               <Select
                 id="oe-step"
                 name="step"
@@ -324,10 +327,10 @@ export function OrderExpenseForm({
                   setStepTouched(true);
                 }}
               >
-                <option value="">No step</option>
+                <option value="">No stage</option>
                 {stepOptions.map((o) => (
                   <option key={o.key} value={o.key}>
-                    {o.number} · {o.label}
+                    {o.label}
                   </option>
                 ))}
               </Select>

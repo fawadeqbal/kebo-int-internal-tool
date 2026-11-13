@@ -92,3 +92,40 @@ describe("a section", () => {
     expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
   });
 });
+
+describe("the order's history", () => {
+  it("shows each change with its stage, and leaves out ids and the form's own flags", async () => {
+    // The table watches its width (jsdom has no ResizeObserver).
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    const { HistoryTable } = await import("@/components/common/history-list");
+    render(
+      <HistoryTable
+        tags={{ label: "Stage", of: { h1: "Production", h2: "Overview" } }}
+        entries={[
+          {
+            id: "h1",
+            at: "2026-11-13T10:00:00Z",
+            by: { id: "u1", name: "Sana" },
+            action: "flow.production",
+            entityType: "order",
+            summary: "SO-1: ready date told",
+            reason: null,
+            changes: [
+              { field: "factoryId", from: null, to: "1ce05c69" },
+              { field: "ask", from: null, to: "true" },
+              { field: "readyToldVia", from: null, to: "wechat" },
+            ],
+          },
+          { id: "h2", at: "2026-11-12T10:00:00Z", by: null, action: "create", entityType: "order", summary: "Order made", reason: null, changes: [] },
+        ]}
+      />,
+    );
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["When", "Who", "What changed", "Stage"]);
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows[0]!.textContent).toContain("Ready Told Via");
+    expect(rows[0]!.textContent).not.toContain("1ce05c69");
+    expect(rows[0]!.textContent).not.toContain("Ask");
+    expect(rows[0]!.textContent).toContain("Production");
+    expect(rows[1]!.textContent).toContain("Overview");
+  });
+});

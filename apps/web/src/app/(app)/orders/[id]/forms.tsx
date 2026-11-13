@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea } from "@kebo/ui";
-import { PanelBody, SidePanel } from "@/components/common/panel";
+import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
@@ -398,12 +398,12 @@ export function CancelOrderForm({
   /** What else cancelling ends ("The quotation R2 becomes void and PO-2026-0044 is cancelled."). */
   voids?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  // Opened from the order's ⋯ menu ("Cancel the order…"), kept in the URL so Back closes it.
+  const { open, close } = useSidePanel("cancel-order");
   const [customerMoney, setCustomerMoney] = useState<"credit" | "refund" | "fee">("credit");
   const [refundNow, setRefundNow] = useState(true);
   const [factoryMoney, setFactoryMoney] = useState<"refund_due" | "loss">("refund_due");
   const moneyIn = Number(received ?? 0) > 0 && currency;
-  const close = () => setOpen(false);
   const choice = (value: string, chosen: string, title: string, pick: () => void) => (
     <button
       key={value}
@@ -423,14 +423,9 @@ export function CancelOrderForm({
   const amount = (v: string) => Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 });
   return (
     <>
-      <div>
-        <Button size="sm" variant="danger-ghost" onClick={() => setOpen(true)}>
-          Cancel this order
-        </Button>
-      </div>
       {open && (
-      <Modal title={`Cancel ${refNo ?? "this order"}?`} sub={[customer, total && currency ? `${currency} ${amount(total)}` : null].filter(Boolean).join(" · ") || undefined} onClose={close}>
-        <ActionForm action={action} onDone={close} keepFields className="flex flex-col gap-4">
+      <Modal title={`Cancel ${refNo ?? "this order"}?`} sub={[customer, total && currency ? `${currency} ${amount(total)}` : null].filter(Boolean).join(" · ") || undefined} onClose={() => close()}>
+        <ActionForm action={action} onDone={() => close()} keepFields className="flex flex-col gap-4">
           {(s) => (
             <>
               <p className="rounded-[10px] bg-bad-soft px-3.5 py-2.5 text-sm text-bad">
@@ -483,7 +478,7 @@ export function CancelOrderForm({
               )}
               {!moneyIn && !factoryPaid.length && <p className="text-xs text-muted">No money was received or paid on this order.</p>}
               <div className="-mx-5 -mb-4 mt-1 flex flex-wrap justify-end gap-2 border-t border-line bg-surface-2/60 px-5 py-3.5 sm:-mx-6 sm:px-6">
-                <Button type="button" variant="secondary" onClick={close}>
+                <Button type="button" variant="secondary" onClick={() => close()}>
                   Keep the order
                 </Button>
                 <SubmitButton variant="danger" pendingText="Cancelling…">
