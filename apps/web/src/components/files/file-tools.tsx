@@ -1,5 +1,6 @@
 "use client";
 
+import { lockScroll } from "@/lib/scroll-lock";
 import {
   createContext,
   useCallback,
@@ -489,11 +490,10 @@ function FileViewer({
       else if (e.key === "ArrowRight" && next) onMove(next);
     };
     window.addEventListener("keydown", keys);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
     return () => {
       window.removeEventListener("keydown", keys);
-      document.body.style.overflow = overflow;
+      unlock();
     };
   }, [onClose, onMove, prev, next]);
   useEffect(() => {
