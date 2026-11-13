@@ -12,8 +12,11 @@ import { WindowFiles } from "./section-files";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-/** A section's button look: "edit" (✎ Edit), "main" (the page's orange one), "plain". */
-export type WindowButton = { label: string; kind?: "edit" | "main" | "plain" | "danger" };
+/** A section's button look: "edit" (✎ Edit), "main" (the page's orange one), "plain", "link" (quiet words in a table row). */
+export type WindowButton = { label: string; kind?: "edit" | "main" | "plain" | "danger" | "link" };
+
+/** The quiet words that open a window from a table row. */
+export const ROW_LINK = "text-[13px] font-medium whitespace-nowrap text-primary hover:underline";
 
 const SMALL = "h-8 px-2.5 text-[13px]";
 
@@ -70,6 +73,10 @@ export function SectionWindow({
     <>
       {kind === "edit" ? (
         <EditButton label={button.label} onClick={() => setOpen(true)} />
+      ) : kind === "link" ? (
+        <button type="button" className={ROW_LINK} onClick={() => setOpen(true)}>
+          {button.label}
+        </button>
       ) : (
         <Button size="sm" variant={kind === "main" ? "primary" : kind === "danger" ? "danger" : "secondary"} className={SMALL} onClick={() => setOpen(true)}>
           {button.label}

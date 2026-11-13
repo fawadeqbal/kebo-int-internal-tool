@@ -6,17 +6,17 @@ import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
-import { date, money } from "@/lib/format";
+import { date, dateTime, money } from "@/lib/format";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
-import { FactoryOrderWindow, PayFactoryWindow } from "@/components/order-sections/factory-windows";
+import { ChangeFactoryPaymentWindow, FactoryOrderWindow, PayFactoryWindow } from "@/components/order-sections/factory-windows";
 import { SendForm, type PurchaseOrderView } from "@/components/orders/purchase-order-card";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { PanelButton } from "@/components/orders/step-view";
 import { FactoryPlanForm } from "@/components/money/money-v2";
 import { SupplierParts, supplierPlanWords } from "@/components/money/supplier-plan";
-import { factoryPaymentAction, factoryPlanAction } from "../../../money/actions";
+import { factoryPaymentAction, factoryPlanAction, removePaymentFileAction, voidFactoryPaymentAction } from "../../../money/actions";
 import { sendPurchaseOrderAction } from "../../flow-actions";
 import { fieldsAction } from "../../light-actions";
 import { stageData } from "../stage-data";
@@ -196,7 +196,11 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                   <Th>How</Th>
                   <Th>From</Th>
                   <Th>Reference</Th>
+                  <Th>Recorded by</Th>
                   <Th className="text-right">Amount</Th>
+                  <Th>
+                    <span className="sr-only">Change</span>
+                  </Th>
                 </tr>
               </THead>
               <tbody>
@@ -207,19 +211,35 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                     <Td>{PAYMENT_METHOD_LABEL[x.method]}</Td>
                     <Td>{x.account?.name ?? <span className="text-muted">—</span>}</Td>
                     <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <span className="text-muted">—</span>}</Td>
-                    <Td className="text-right whitespace-nowrap tabular">{x.voided ? <Badge tone="neutral">Removed</Badge> : <span className="font-semibold">{money(x.amount, x.currency)}</span>}</Td>
+                    <Td className="text-[12.5px] text-text-2">
+                      {x.recordedBy?.name ?? "—"}
+                      <span className="block text-muted">{dateTime(x.recordedAt)}</span>
+                    </Td>
+                    <Td className="text-right whitespace-nowrap tabular">{x.voided ? money(x.amount, x.currency) : <span className="font-semibold">{money(x.amount, x.currency)}</span>}</Td>
+                    <Td className="text-right">
+                      {x.voided ? (
+                        <Badge tone="neutral">Removed</Badge>
+                      ) : (
+                        m.factories!.canRecord &&
+                        o.status !== "cancelled" && (
+                          <ChangeFactoryPaymentWindow
+                            sub={`${o.refNo} · ${x.factory.name} · ${date(x.paidOn)} · ${money(x.amount, x.currency)}`}
+                            payment={x}
+                            save={factoryPaymentAction.bind(null, o.id, x.id)}
+                            remove={voidFactoryPaymentAction.bind(null, o.id, x.id)}
+                            removeFile={removePaymentFileAction.bind(null, "out", x.id, o.id)}
+                            factories={m.factories!.rows}
+                            people={people ?? []}
+                            orderCurrency={o.currency}
+                            fx={fx}
+                            today={now}
+                          />
+                        )
+                      )}
+                    </Td>
                   </Tr>
                 ))}
               </tbody>
-              <tfoot>
-                <tr className="border-t border-line">
-                  <td className="px-3.5 py-2.5" colSpan={6}>
-                    <Link href={`/payments?order=${o.id}`} className="text-[12.5px] font-medium text-primary hover:underline">
-                      Change or remove a payment
-                    </Link>
-                  </td>
-                </tr>
-              </tfoot>
             </Table>
           </Section>
         ))}

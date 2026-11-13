@@ -1,28 +1,21 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState } from "react";
 import type { RequestState } from "@kebo/shared";
-import { Button, buttonClass, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Button, buttonClass, cn } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { Modal } from "@/components/common/dialog";
-import { date, dueText, money } from "@/lib/format";
+import { date, money } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
-import type { OrderMoney, SentWith } from "@/lib/types-money";
-import { requestHref, requestPdfHref, requestPrintHref, requestWords } from "@/lib/requests";
+import type { SentWith } from "@/lib/types-money";
+import { requestPdfHref, requestPrintHref, requestWords } from "@/lib/requests";
 
 /**
  * Payment requests (claude/core-plan.md, phase 1): a row of the order's plan is a payment request, with the
  * same columns as before and where it stands. The status is worked out (never typed): not sent, sent (the
  * request, the proforma for the deposit, the papers at the bank), part paid, paid, cancelled.
  */
-
-type Send = (ref: string, prev: ActionState, form: FormData) => Promise<ActionState>;
-
-const dayMonth = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-const grouped = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const STATE_CLASS: Record<RequestState | "cancelled", string> = {
   paid: "text-ok",
@@ -145,197 +138,5 @@ export function SendRequest({ primary = false, size = "sm", ...what }: SendWhat 
       </Button>
       {open && <SendDialog what={what} after="close" onClose={close} />}
     </>
-  );
-}
-
-/**
- * The plan as payment requests: the same columns (part, how, due, amount, received) with the request's
- * number, where it stands and the one thing to do next on each row.
- */
-export function PlanRequests({
-  orderId,
-  plan,
-  currency,
-  total,
-  received,
-  due,
-  send,
-  foot,
-}: {
-  /** Shown left of the totals (a quiet link to the order's payments). */
-  foot?: ReactNode;
-  orderId: string;
-  plan: OrderMoney["plan"];
-  currency: string;
-  total: string;
-  received: string;
-  due: string;
-  send: Send;
-}) {
-  // The dialog lives here, not in the row: once sent, the row's button changes and the dialog still says what to do next.
-  const [sending, setSending] = useState<SendWhat | null>(null);
-  const close = useCallback(() => setSending(null), []);
-  if (!plan.items.length && !plan.cancelled.length) return <p className="text-sm text-muted">No plan yet.</p>;
-  const quiet = "text-sm font-medium whitespace-nowrap text-primary hover:underline";
-  /** The one thing to do next on a row. */
-  const next = (i: OrderMoney["plan"]["items"][number]) => {
-    const r = i.request;
-    const open = r.state !== "paid";
-    return open && r.through === "bank" && r.state === "not_sent" ? (
-      <Link href={`/orders/${orderId}/documents`} className={quiet}>
-        Bank papers
-      </Link>
-    ) : open && plan.canSend && (r.state === "not_sent" || r.changed) ? (
-      <Button
-        size="xs"
-        variant="secondary"
-        onClick={() =>
-          setSending({
-            action: send.bind(null, i.id),
-            orderId,
-            refId: i.id,
-            number: i.number,
-            label: i.label,
-            amount: i.amount,
-            currency,
-            dueOn: i.dueOn,
-            again: r.with === "request",
-          })
-        }
-      >
-        {r.with === "request" ? "Send again" : "Send request"}
-      </Button>
-    ) : (
-      <Link href={requestHref(orderId, i.id)} className={quiet}>
-        Open
-      </Link>
-    );
-  };
-  /** The receipts of the payments that paid a row, under its status. */
-  const receipts = (i: OrderMoney["plan"]["items"][number]) =>
-    i.request.receipts.length ? (
-      <span className="block text-xs text-muted">
-        {i.request.receipts.slice(0, 2).map((x, n) => (
-          <span key={x.id}>
-            {n > 0 ? ", " : "Receipt "}
-            <a href={`/print/orders/${orderId}/payment-receipt?${new URLSearchParams({ ref: x.id, back: `/orders/${orderId}/payment` })}`} className="hover:text-primary hover:underline">
-              {x.number}
-            </a>
-          </span>
-        ))}
-        {i.request.receipts.length > 2 ? ` +${i.request.receipts.length - 2}` : ""}
-      </span>
-    ) : null;
-  return (
-    <div className="flex flex-col gap-3">
-      {/* Phones: one block per request, so the status and what to do next are never off the screen. */}
-      <ul className="flex flex-col divide-y divide-line rounded-lg border border-line sm:hidden" aria-label="Payment requests">
-        {plan.items.map((i) => (
-          <li key={i.id} className="flex flex-col gap-1.5 px-3 py-3">
-            <span className="flex items-baseline justify-between gap-3">
-              <Link href={requestHref(orderId, i.id)} className="font-medium hover:text-primary">
-                {i.number}
-              </Link>
-              <span className="font-semibold tabular">{grouped(i.amount)}</span>
-            </span>
-            <span className="text-sm text-text-2">
-              {i.label} · {dueText(i)}
-              {Number(i.paid) > 0 && i.request.state !== "paid" ? ` · ${grouped(i.paid)} received` : ""}
-            </span>
-            <span className="flex items-center justify-between gap-3">
-              <RequestStatus r={i.request} late={i.late} />
-              {next(i)}
-            </span>
-          </li>
-        ))}
-        {plan.cancelled.map((c) => (
-          <li key={c.paperId} className="flex items-center justify-between gap-3 px-3 py-3 text-sm text-muted">
-            <span>
-              {c.number} · {c.label ?? "Payment request"}
-            </span>
-            <Link href={requestHref(orderId, c.ref)} className={quiet}>
-              Cancelled
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <div className="hidden overflow-x-auto rounded-lg border border-line sm:block">
-        <Table>
-          <THead>
-            <tr>
-              <Th>Request</Th>
-              <Th>Part</Th>
-              <Th>Due</Th>
-              <Th className="text-right">Amount {currency}</Th>
-              <Th className="hidden text-right sm:table-cell">Received</Th>
-              <Th>Status</Th>
-              <Th>
-                <span className="sr-only">Next</span>
-              </Th>
-            </tr>
-          </THead>
-          <tbody>
-            {plan.items.map((i) => {
-              const r = i.request;
-              return (
-                <Tr key={i.id}>
-                  <Td className="whitespace-nowrap">
-                    <Link href={requestHref(orderId, i.id)} className="font-medium hover:text-primary">
-                      {i.number}
-                    </Link>
-                  </Td>
-                  <Td>
-                    {i.label}
-                    <span className="block text-xs text-muted">{i.how}</span>
-                  </Td>
-                  <Td className="text-sm">{dueText(i)}</Td>
-                  <Td className="text-right whitespace-nowrap tabular">{grouped(i.amount)}</Td>
-                  <Td className="hidden text-right whitespace-nowrap tabular sm:table-cell">{grouped(i.paid)}</Td>
-                  <Td>
-                    <RequestStatus r={r} late={i.late} />
-                    {receipts(i)}
-                  </Td>
-                  <Td className="text-right">{next(i)}</Td>
-                </Tr>
-              );
-            })}
-            {plan.cancelled.map((c) => (
-              <Tr key={c.paperId}>
-                <Td className="whitespace-nowrap">
-                  <Link href={requestHref(orderId, c.ref)} className="font-medium text-muted hover:text-primary">
-                    {c.number}
-                  </Link>
-                </Td>
-                <Td className="text-muted">{c.label ?? "Payment request"}</Td>
-                <Td className="text-sm text-muted">Sent {dayMonth(c.sentOn)}</Td>
-                <Td className="text-right whitespace-nowrap text-muted tabular">{c.amount ? grouped(c.amount) : ""}</Td>
-                <Td className="hidden sm:table-cell" />
-                <Td>
-                  <RequestStatus r={{ state: "cancelled", with: "request", sentOn: c.sentOn, revision: c.revision }} />
-                </Td>
-                <Td className="text-right">
-                  <Link href={requestHref(orderId, c.ref)} className={quiet}>
-                    View
-                  </Link>
-                </Td>
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
-      </div>
-      {sending && <SendDialog key={sending.refId} what={sending} onClose={close} />}
-      <div data-target="payments.received" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 text-sm">
-        {foot && <span className="mr-auto">{foot}</span>}
-        <span className="text-muted">
-          Order total <span className="font-semibold text-text tabular">{money(total, currency)}</span>
-        </span>
-        <span className="text-muted">
-          Received <span className="font-semibold text-text tabular">{money(received, currency)}</span>
-        </span>
-        <span className="text-muted">
-          Still due <span className="font-semibold text-text tabular">{money(due, currency)}</span>
-        </span>
-      </div>
-    </div>
   );
 }
