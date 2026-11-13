@@ -83,7 +83,6 @@ for (const viewport of [
     "/settings/sales",
     "/settings/reminders",
     "/settings/emails",
-    "/settings/order-checklist",
     "/settings/papers",
     "/settings/website-form",
     "/access/roles",

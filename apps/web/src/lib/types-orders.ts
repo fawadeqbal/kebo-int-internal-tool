@@ -115,7 +115,7 @@ export interface OrderView {
     to: OrderStage;
     note: string | null;
     confirmed: boolean;
-    /** Null for moves the system made (e.g. stages set when the order checklist was replaced). */ by: Person | null;
+    /** Null for moves the system made (e.g. the stage following the order's data). */ by: Person | null;
     at: string;
   }[];
   /** Null `at` on orders cancelled before the date was kept (migrated data). */

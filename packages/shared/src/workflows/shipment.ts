@@ -51,7 +51,7 @@ export function shipmentsInOrder<T extends ShipmentKey>(list: readonly T[]): T[]
 }
 
 /**
- * The order's shipment the papers, the overview, the checklist, the LC checks and the reports speak of:
+ * The order's shipment the papers, the overview, the sections, the LC checks and the reports speak of:
  * Shipment 1, the first one made. Null when the order has none yet.
  */
 export function primaryShipment<T extends ShipmentKey>(list: readonly T[]): T | null {

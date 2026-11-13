@@ -20,7 +20,7 @@ path: /orders/:id
 tab: Orders
 header: { title: refNo, sub: [customer.name, inquiry.assignee.name, total], badge: stage }
 sections:
-  - { title: Steps, custom: OrderFlow }       # do now, step chips, the step's checklist; tap a row to tick it
+  - { title: Where it stands, custom: OrderFlow }  # one row per stage: its word and a line of facts, read from the order's data
   - { title: Goods, custom: OrderLines }      # the first lines, See all, goods received, packing list
   - { title: Money, custom: OrderMoneySection }  # lib/custom/money.dart: the plan, payments and receipts, approvals, factories
   - title: Papers

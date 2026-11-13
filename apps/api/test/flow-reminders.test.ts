@@ -1,10 +1,11 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
+import { PrismaService } from "../src/database/prisma.service";
 
 /**
  * Home's "Needs attention" picks up the order flow: a factory that has not
- * answered, a production step past its date, the LC's last day to ship, and
+ * answered, a ready date passed with the goods not in, the LC's last day to ship, and
  * an open claim. The factory's page shows how it answers and what it is making.
  */
 describe("order flow on Home and the factory page", () => {
@@ -56,12 +57,16 @@ describe("order flow on Home and the factory page", () => {
     await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "accepted" }).expect(200);
     orderId = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.orders[0].id;
     const ago = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
-    await api(app, sana).put(`/orders/${orderId}/production`, { steps: [{ title: "Machining", factoryId, plannedOn: ago(4) }] }).expect(200);
+    // The factory said the goods would be ready four days ago; nothing has come in.
+    const prisma = app.get(PrismaService);
+    const line = await prisma.platform.orderLine.findFirstOrThrow({ where: { orderId, type: "goods" }, select: { companyId: true } });
+    await prisma.platform.orderFactory.deleteMany({ where: { orderId } });
+    await prisma.platform.orderFactory.create({ data: { orderId, companyId: line.companyId, factoryId, readyOn: new Date(`${ago(4)}T00:00:00Z`) } });
     await api(app, sana).patch(`/orders/${orderId}/route`, { route: "letter_of_credit" }).expect(200);
     await api(app, sana).put(`/orders/${orderId}/bank-contract`, { number: `LC-${tag}`, status: "opened", latestShipOn: ago(-2) }).expect(200);
     await api(app, sana).post(`/orders/${orderId}/claims`, { title: "Wrong voltage", openedOn: ago(1) }).expect(201);
     const t = await titles(sana);
-    expect(t).toEqual(expect.arrayContaining([expect.stringContaining(`"Machining" was due ${ago(4)}`), expect.stringContaining(`must ship by ${ago(-2)} under LC LC-${tag}`), expect.stringContaining('claim "Wrong voltage"')]));
+    expect(t).toEqual(expect.arrayContaining([expect.stringMatching(/Goods were to be ready .*: 0 of 1 received/), expect.stringContaining(`must ship by ${ago(-2)} under LC LC-${tag}`), expect.stringContaining('claim "Wrong voltage"')]));
   });
 
   it("the factory page shows how it answers and what it is making", async () => {

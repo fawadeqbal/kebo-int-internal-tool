@@ -35,7 +35,7 @@ describe("every read endpoint answers for every record", () => {
     for (const who of [manager, staff]) {
       for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true", "/orders/page", "/orders/page?status=late&q=a", "/orders/page?status=all&mine=true&page=2", "/money/payables", "/submissions?mine=true&status=all", "/me/today", "/follow-ups", "/follow-ups?mine=true&open=true", "/follow-ups?open=false&page=2", `/follow-ups?on=${today}`, `/follow-ups?from=${today}&to=${today}`]) await ok(who, path);
     }
-    for (const path of ["/reports", "/audit", "/users", "/settings", "/settings/checklist", "/submissions", "/submissions?status=all"]) await ok(admin, path);
+    for (const path of ["/reports", "/audit", "/users", "/settings", "/submissions", "/submissions?status=all"]) await ok(admin, path);
   });
 
   it("every deal, with its sourcing and quotation", async () => {
@@ -131,7 +131,6 @@ describe("every read endpoint answers for every record", () => {
       await ok(manager, `/orders/${o.id}`);
       await ok(manager, `/orders/${o.id}/payments`);
       await ok(manager, `/orders/${o.id}/flow`);
-      await ok(manager, `/orders/${o.id}/steps`);
       await ok(manager, `/orders/${o.id}/sections`);
       await ok(manager, `/orders/${o.id}/defaults`);
       await ok(manager, `/history?type=order&id=${o.id}&step=production`);

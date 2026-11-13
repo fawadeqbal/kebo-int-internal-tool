@@ -59,13 +59,6 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
   return r;
 }
 
-/** Everything ordered has come in (each goods line in full, dated today): payload { lines: [{ lineId, receivedQty }] }. */
-export async function receiptAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.put(`/orders/${orderId}/receipt`, formBody(form)), "All goods marked as received.");
-  if (r.ok) refresh(orderId);
-  return r;
-}
-
 /** The packing list: payload { shippingMarks, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] } (the container is the shipment's). */
 export async function packingAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.put(`/orders/${orderId}/packing`, formBody(form)), "Packing list saved.");
@@ -157,22 +150,6 @@ export async function issueProformaAction(orderId: string, _prev: ActionState, f
   if (r.ok) {
     refresh(orderId);
     return { ...r, message: `Proforma issued as ${(r.data as { proforma: { number: string } }).proforma.number}.` };
-  }
-  return r;
-}
-
-/** Notes and files live on the deal; the order page shows them and adds to them. */
-export async function orderRemoveFileAction(
-  orderId: string,
-  dealId: string,
-  fileId: string,
-  _prev: ActionState,
-  _form: FormData,
-): Promise<ActionState> {
-  const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
-  if (r.ok) {
-    revalidatePath(`/orders/${orderId}`, "layout");
-    revalidatePath(`/inquiries/${dealId}`);
   }
   return r;
 }

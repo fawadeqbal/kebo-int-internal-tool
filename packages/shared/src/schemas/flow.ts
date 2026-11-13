@@ -91,25 +91,6 @@ export const sendPurchaseOrderInput = z.object({
 });
 export type SendPurchaseOrderInput = z.infer<typeof sendPurchaseOrderInput>;
 
-/* ---------------------------------------------------------------- production */
-
-/** The whole production timeline, in order: steps sent with an id are kept and changed, others are added, missing ones removed. */
-export const productionInput = z.object({
-  steps: z
-    .array(
-      z.object({
-        id: optionalId,
-        title: text(120, "Name the step"),
-        factoryId: optionalId,
-        plannedOn: optionalDate,
-        doneOn: optionalDate,
-        note: optionalText(500),
-      }),
-    )
-    .max(40),
-});
-export type ProductionInput = z.infer<typeof productionInput>;
-
 /* ---------------------------------------------------------------- shipping */
 
 const shipmentFields = {
@@ -249,7 +230,7 @@ export const deliveryInput = z.object({
 });
 export type DeliveryInput = z.infer<typeof deliveryInput>;
 
-/** The whole SAT checklist, in order (like the production timeline). */
+/** Every SAT point, in order. */
 export const satInput = z.object({
   checks: z
     .array(z.object({ id: optionalId, item: text(200, "Say what is checked"), result: z.enum(SAT_RESULTS).default("pending"), note: optionalText(500) }))

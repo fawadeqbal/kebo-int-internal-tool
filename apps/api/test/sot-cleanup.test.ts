@@ -47,9 +47,13 @@ describe("no mirrors, no dead weight", () => {
     expect(Number(off)).toBe(0);
   });
 
-  it("has no production steps table (the timeline is the checklist's)", async () => {
-    const [{ t }] = await prisma.platform.$queryRaw<{ t: string | null }[]>`select to_regclass('production_steps')::text as t`;
-    expect(t).toBeNull();
+  it("has no production steps or checklist tables (an order's stages read its own data)", async () => {
+    for (const name of ["production_steps", "order_checklist_items", "checklist_templates"]) {
+      const [{ t }] = await prisma.platform.$queryRaw<{ t: string | null }[]>`select to_regclass(${name})::text as t`;
+      expect(t, name).toBeNull();
+    }
+    const cols = await prisma.platform.$queryRaw<{ c: string }[]>`select column_name as c from information_schema.columns where table_name = 'orders' and (column_name like 'originals_%' or column_name = 'checklist_seeded_at')`;
+    expect(cols).toEqual([]);
   });
 
   it("keeps no condition on the order, and no figures on a revision", async () => {

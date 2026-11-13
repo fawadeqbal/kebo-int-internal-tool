@@ -25,10 +25,17 @@ describe("purchase orders", () => {
     const db = prisma.company(FIRST_COMPANY_ID);
     // An open order whose deposit is not paid, with a supplier on its lines and its PO not sent.
     const po = await db.purchaseOrder.findFirst({
-      // (and nothing of it has left: another test's order with a shipment at sea reads "shipped" in the list)
+      // (and nothing of it has left or been delivered: another test's order with a shipment at sea, or delivered, reads "shipped" in the list)
       where: {
         sentOn: null,
-        order: { status: "open", stage: { in: ["confirmed", "in_production"] }, factoryOrderedOn: null, allocations: { none: {} }, shipments: { none: { status: { in: ["departed", "arrived", "cleared"] } } } },
+        order: {
+          status: "open",
+          stage: { in: ["confirmed", "in_production"] },
+          factoryOrderedOn: null,
+          allocations: { none: {} },
+          shipments: { none: { OR: [{ status: { in: ["departed", "arrived", "cleared"] } }, { departedOn: { not: null } }] } },
+          OR: [{ delivery: { is: null } }, { delivery: { is: { deliveredOn: null } } }],
+        },
       },
       include: { order: { select: { id: true } } },
     });

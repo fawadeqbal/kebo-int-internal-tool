@@ -136,9 +136,6 @@ export const DEFAULT_SAT_CHECKS = [
   "Manuals and spare parts handed over",
 ] as const;
 
-/** A usual production timeline; a new order's timeline can start from these. */
-export const DEFAULT_PRODUCTION_STEPS = ["Drawings approved", "Materials and parts in", "Machining and assembly", "Factory test run (FAT)", "Packed and ready"] as const;
-
 const isBank = (route: PaymentRoute | null) => route === "bank_contract" || route === "letter_of_credit";
 
 /** The papers the shipment needs, by how the customer pays and how it ships. */
@@ -187,7 +184,8 @@ export interface FlowFacts {
   /** The deposit (or everything, with no deposit) has come in. */
   depositIn: boolean;
   factoryOrderedOn: string | null;
-  production: { total: number; done: number };
+  /** The goods lines, and how many came from the factory in full. */
+  production: { lines: number; received: number };
   readyOn: string | null;
   shipments: { total: number; departed: number; arrived: number };
   documents: { required: number; ready: number };
@@ -222,7 +220,7 @@ export function flowSteps(f: FlowFacts, features: readonly string[] | null): Flo
     // The route is asked for, never a gate: an order paid (or past Confirmed) has its payment step done.
     payment: f.depositIn || after(f.stage, "confirmed"),
     factory: f.factoryOrderedOn !== null || after(f.stage, "confirmed"),
-    production: (f.production.total > 0 && f.production.done === f.production.total) || shippedStage,
+    production: (f.production.lines > 0 && f.production.received === f.production.lines) || shippedStage,
     shipping: f.shipments.total > 0 ? f.shipments.arrived === f.shipments.total : f.stage === "done",
     documents: f.documents.required > 0 && f.documents.ready >= f.documents.required && f.bankSteps.done >= f.bankSteps.required,
     delivery: f.deliveredOn !== null && f.sat.doneOn !== null && f.openClaims === 0,
@@ -230,7 +228,7 @@ export function flowSteps(f: FlowFacts, features: readonly string[] | null): Flo
   const sub: Record<FlowStep, string> = {
     payment: f.depositIn ? (f.route === null ? "Deposit received · route not chosen" : "Deposit received") : f.route === null ? "Choose how the customer pays" : "Waiting for the deposit",
     factory: f.factoryOrderedOn ? `Ordered ${f.factoryOrderedOn}` : "Place the order with the factory",
-    production: f.production.total ? `${f.production.done} of ${f.production.total} steps` : f.readyOn ? `Ready ${f.readyOn}` : "No timeline yet",
+    production: f.production.lines > 0 && f.production.received === f.production.lines ? "Goods received" : f.readyOn ? `Ready ${f.readyOn}` : "No ready date yet",
     shipping: f.shipments.total
       ? f.shipments.arrived === f.shipments.total
         ? "Arrived"

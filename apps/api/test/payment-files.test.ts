@@ -81,7 +81,7 @@ describe("payment files", () => {
     expect(audit.some((a) => /added the proof of a payment from the customer \(slip\.png\)/.test(a.summary))).toBe(true);
   });
 
-  it("a slip sent after the deposit that ticks the checklist is kept, and shows in Files with the file tools", async () => {
+  it("a slip sent after the deposit came in is kept, and shows in Files with the file tools", async () => {
     // The fix (3 Nov 2026): the web sends the slip in the same call as the payment, by the id the payment answers with.
     const orders = (await api(app, manager).get("/orders?status=open").expect(200)).body as OrderRow[];
     let order: OrderRow | null = null;
@@ -102,9 +102,9 @@ describe("payment files", () => {
     ).body;
     const id = made.createdId as string;
     expect(id).toMatch(/^[0-9a-f-]{36}$/);
-    // The deposit is in: the checklist row the form was opened from is ticked (the form leaves the page).
-    const steps = (await api(app, manager).get(`/orders/${order!.id}/steps`).expect(200)).body as { items: { key: string | null; done: boolean }[] };
-    expect(steps.items.find((i) => i.key === "deposit_in")).toMatchObject({ done: true });
+    // The deposit is in: the Payment stage says so (the form leaves the page).
+    const stands = (await api(app, manager).get(`/orders/${order!.id}/sections`).expect(200)).body.stands as { stage: string; word: string }[];
+    expect(stands.find((x) => x.stage === "payment")!.word).not.toBe("Nothing in");
     await upload(manager, `/payments/${id}/file`).attach("file", png, { filename: "bank slip.png", contentType: "image/png" }).expect(201);
     const files = (await api(app, manager).get(`/orders/${order!.id}/files`).expect(200)).body as {
       files: { id: string; name: string; kindLabel: string; href: string; viewHref: string | null; can: Record<string, boolean> }[];

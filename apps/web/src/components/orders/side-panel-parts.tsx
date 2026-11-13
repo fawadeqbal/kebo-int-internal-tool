@@ -1,14 +1,7 @@
 "use client";
 
 import { Children, useEffect, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Check, Eye } from "lucide-react";
-import { paperDone } from "@kebo/shared";
-import { buttonClass, cn } from "@kebo/ui";
-import type { OrderFile } from "@/lib/types-files";
-import { FileIcon, FileMenuButton, useFileTools } from "@/components/files/file-tools";
-import { PaperMenu, type PaperLineRow } from "./papers-table";
+import { cn } from "@kebo/ui";
 
 /** How many rows a section shows before it folds behind "Show all n" (phone); on a wide screen it scrolls after about six. */
 const ROWS = 5;
@@ -60,7 +53,7 @@ export function SideSection({
   dense,
   children,
 }: {
-  /** Where checklist links land (see goTo). */
+  /** A stable name for the section (data-target). */
   target?: string;
   title: string;
   count?: number;
@@ -120,93 +113,3 @@ export function SideSection({
   );
 }
 
-/** A paper in two lines: ✓ / • on the left, its whole name, under it its number or what it waits for ("can be made" links to make it), and its ⋯ menu. */
-export function SidePaperRow({
-  r,
-  orderId,
-  canMake,
-  canRecord,
-  sub,
-}: {
-  r: PaperLineRow;
-  orderId: string;
-  canMake: boolean;
-  canRecord: boolean;
-  /** "sent 14 Jan": the paper's own line when it has no number. */
-  sub: string | null;
-}) {
-  const router = useRouter();
-  const done = paperDone(r.state);
-  const papersHref = `/orders/${orderId}/documents?tab=all#papers`;
-  const make = r.makeable ? `/orders/${orderId}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}` : null;
-  const canMakeIt = !!make && canMake && !r.live && !r.kept && (r.state === "can" || r.state === "wait" || r.state === "draft");
-  const what = done ? (r.number ?? sub ?? r.stateLabel.toLowerCase()) : r.state === "miss" ? "missing" : r.stateLabel.toLowerCase();
-  return (
-    <li className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-line py-2 last:border-b-0">
-      <span className="grid place-items-center">
-        {done ? (
-          <Check className="size-4 text-ok" strokeWidth={3} role="img" aria-label="Ready" />
-        ) : (
-          <span role="img" aria-label="Open" className={cn("size-1.5 rounded-full", r.state === "miss" ? "bg-warn" : "bg-primary")} />
-        )}
-      </span>
-      <span className="min-w-0">
-        <Link href={canMakeIt ? make! : papersHref} className="block text-sm font-medium [overflow-wrap:anywhere] hover:text-primary">
-          {r.label}
-        </Link>
-        {canMakeIt ? (
-          <Link href={make!} className="block text-xs text-text-2 hover:text-primary hover:underline">
-            {r.state === "draft" ? "draft · continue" : what}
-          </Link>
-        ) : (
-          <span className={cn("block text-xs [overflow-wrap:anywhere] text-text-2", done && r.number && "tabular")}>{what}</span>
-        )}
-      </span>
-      <PaperMenu
-        r={r}
-        orderId={orderId}
-        canMake={canMake}
-        canRecord={canRecord}
-        size="icon-sm"
-        lead={(item) => (
-          <>
-            {canMakeIt && item(r.state === "draft" ? "Continue the draft" : "Make", () => router.push(make!))}
-            {item("Open in Papers", () => router.push(papersHref), "Documents")}
-            <span role="separator" className="my-1 block h-px bg-line" />
-          </>
-        )}
-      />
-    </li>
-  );
-}
-
-/** A file in two lines: its icon, its whole name (opens it), under it what it belongs to · who · when; 👁 and ⋯ — the order's file tools. */
-export function SideFileRow({ file, set, meta }: { file: OrderFile; set: OrderFile[]; meta: string }) {
-  const tools = useFileTools();
-  return (
-    <li data-target={`file.${file.sourceId}`} className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-line py-2 last:border-b-0">
-      <FileIcon file={file} />
-      <span className="min-w-0">
-        <button
-          type="button"
-          className="block w-full text-left text-sm font-medium [overflow-wrap:anywhere] hover:text-primary"
-          onClick={() => tools?.view(file, set)}
-        >
-          {file.name}
-        </button>
-        <span className="block text-xs [overflow-wrap:anywhere] text-text-2">{meta}</span>
-      </span>
-      <span className="flex items-center">
-        <button
-          type="button"
-          aria-label={`View ${file.name}`}
-          className={buttonClass("ghost", "icon-sm", "hidden sm:inline-flex [&_svg]:size-4")}
-          onClick={() => tools?.view(file, set)}
-        >
-          <Eye aria-hidden />
-        </button>
-        <FileMenuButton file={file} set={set} className="size-8" />
-      </span>
-    </li>
-  );
-}

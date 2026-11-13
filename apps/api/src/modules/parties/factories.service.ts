@@ -140,16 +140,21 @@ export class FactoriesService {
 
   /**
    * How the factory works with us: how often it answers when asked for a price
-   * (and how fast), and the orders it is making now with any late production step.
+   * (and how fast), and the orders it is making now, with how many are late (ready date passed, goods not all in).
    */
   private async record(id: string, user?: SessionUser) {
     const db = this.prisma.db;
-    const [requests, quotes, orders, lateSteps] = await Promise.all([
+    const [requests, quotes, orders, late] = await Promise.all([
       db.factoryRequest.findMany({ where: { factoryId: id }, select: { inquiryId: true, status: true, sentOn: true } }),
       db.factoryQuote.findMany({ where: { factoryId: id, deletedAt: null }, select: { inquiryId: true, receivedOn: true } }),
       db.order.findMany({ where: { status: "open", lines: { some: { factoryId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, factories: { where: { factoryId: id }, select: { readyOn: true } }, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" }, take: 20 }),
-      db.orderChecklistItem.count({ where: { factoryId: id, step: "production", doneAt: null, skippedAt: null, dueOn: { lt: new Date() }, order: { status: "open" } } }),
+      // Late: the ready date it gave has passed and not every line of its goods has come in.
+      db.orderFactory.findMany({
+        where: { factoryId: id, readyOn: { lt: new Date() }, order: { status: "open" } },
+        select: { order: { select: { lines: { where: { factoryId: id, type: "goods" }, select: { quantity: true, receivedQty: true } } } } },
+      }),
     ]);
+    const lateSteps = late.filter((f) => f.order.lines.some((l) => Number(l.receivedQty) < Number(l.quantity))).length;
     const answered = requests.filter((r) => r.status === "quoted" || quotes.some((q) => q.inquiryId === r.inquiryId));
     const days = answered
       .map((r) => {

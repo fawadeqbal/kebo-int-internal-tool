@@ -5,14 +5,12 @@ import {
   BANK_STEP_LABEL,
   bankStepsFor,
   can,
-  FLOW_STEP_LABEL,
   OPEN_STAGES,
   ORDER_DOCUMENT_LABEL,
   documentDone,
   documentsInUse,
   ORDER_TAB_LABEL,
   sectionReminders,
-  STEP_PATH,
 } from "@kebo/shared";
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -26,7 +24,6 @@ import { orderAccess } from "../../common/auth/order-access";
 import { SHIPMENT_ORDER } from "../orders/shipment-facts";
 import { LeaksService } from "../money/leaks.service";
 import { LimitsService } from "../../common/company/limits.service";
-import { ChecklistService } from "../checklist/checklist.service";
 
 export type ReminderLevel = "bad" | "warn" | "info";
 export type ReminderKind = "order" | "quote" | "deal" | "offer" | "money" | "ship";
@@ -67,7 +64,6 @@ export class RemindersListService {
     private readonly leaks: LeaksService,
     private readonly cache: ReadCache,
     private readonly limits: LimitsService,
-    private readonly checklist: ChecklistService,
   ) {}
 
   async list(user: SessionUser) {
@@ -338,25 +334,6 @@ export class RemindersListService {
 
     const orders = { status: "open" as const, ...orderAccess(user) };
     const handler = { inquiry: { select: { assignee: { select: { name: true } } } } };
-
-    // Checklist items past their due date (red) or due in the next days, on the orders the person may see.
-    const dated = await this.checklist.dated(user, 3);
-    for (const c of dated.slice(0, 100)) {
-      const late = days(c.due);
-      out.push({
-        key: `checklist:${c.id}:${c.due}`,
-        kind: "order",
-        level: c.late ? (late >= 3 ? "bad" : "warn") : "info",
-        title: c.late
-          ? `${c.refNo}: "${c.title}" was due ${c.due}`
-          : `${c.refNo}: "${c.title}" is due ${c.due === today ? "today" : c.due}`,
-        detail: `${FLOW_STEP_LABEL[c.step]}${c.late ? ` · ${late} day${late === 1 ? "" : "s"} late` : ""}`,
-        due: c.due,
-        href: `/orders/${c.orderId}/${STEP_PATH[c.step]}`,
-        action: "Open the step",
-        who: c.who,
-      });
-    }
 
     // What the order's sections say is late: the ready date passed and the goods not all in, a factory
     // test planned and not done (both with the production module), our ship-by date passed and nothing left.

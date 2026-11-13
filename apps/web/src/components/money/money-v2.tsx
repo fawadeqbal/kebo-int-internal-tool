@@ -13,7 +13,6 @@ import { MoneyInput } from "@/components/common/money-input";
 import { rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
 import type { CustomerCreditView, FactoryPlanView } from "@/lib/types-money";
-import { useBankBand } from "@/components/orders/bank-tracker";
 import { AccountSelect } from "./accounts";
 import { FilePicker, useSaveThenSend } from "./attachment";
 
@@ -154,7 +153,7 @@ export function ReceivedFields({
   const partMinor = part === null ? auto : toMinor(part);
   const leftMinor = a.countsMinor - partMinor;
   const tooMuch = partMinor + chargesMinor > dueMinor;
-  // The slip goes with the save itself: recording the deposit ticks the checklist row this form was opened from.
+  // The slip goes with the save itself: the page re-draws once the payment is saved.
   const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", onFileError);
   const done = () => onClose();
   return (
@@ -284,195 +283,6 @@ export function ReceivedFields({
 }
 
 /* ---------------------------------------------------------------- money reached us (the bank step) */
-
-/** A line of the money check: label and value side by side; three across under the fields when the band is mid-wide. */
-const CHECK_ROW = "flex justify-between gap-3 @2xl:flex-col @2xl:gap-0.5 @5xl:flex-row @5xl:gap-3";
-
-/**
- * "Money reached us" in the bank step's band (Documents › Through the banks):
- * credited to us (currency + amount), on, bank charges; into, reference, the
- * MT103 or bank slip; the money check on the right. Recording it records the
- * payment and ticks the bank step, as before. On a phone the band is the
- * whole screen and "Record and tick" stays at the bottom.
- */
-export function ReachedForm({
-  action,
-  currency,
-  customer,
-  due,
-  fx,
-  today,
-}: {
-  action: Action;
-  currency: string;
-  customer: string;
-  due: string;
-  depositDue: string;
-  fx: Fx;
-  today: string;
-}) {
-  const band = useBankBand();
-  const dueMinor = toMinor(due);
-  const a = useArrival(fx, currency, Number(due) > 0 ? due : "");
-  const [charges, setCharges] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const chargesMinor = toMinor(charges);
-  const partMinor = Math.max(Math.min(a.countsMinor, dueMinor - chargesMinor), 0);
-  const leftMinor = a.countsMinor - partMinor;
-  const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", band.error);
-  const leftDue = Math.max(dueMinor - a.countsMinor - chargesMinor, 0);
-  return (
-    <ActionForm action={save} onDone={band.close} keepFields className="@container flex min-h-0 flex-1 flex-col">
-      {(s) => (
-        <>
-          <input type="hidden" name="receivedCurrency" value={a.received} />
-          <input type="hidden" name="amount" value={fromMinor(Math.max(partMinor, 0))} />
-          <input type="hidden" name="method" value="bank_transfer" />
-          <input type="hidden" name="bankStep" value="bank_paid_us" />
-          <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto p-4 sm:flex-none sm:overflow-visible @5xl:grid-cols-[minmax(0,1fr)_18rem]">
-            <div className="grid content-start gap-x-3 gap-y-3.5 @lg:grid-cols-2 @2xl:grid-cols-3">
-              <Field
-                label="Credited to us"
-                htmlFor="rb-amount"
-                hint="what the bank put in our account"
-                error={s.errors?.receivedAmount ?? s.errors?.amount}
-              >
-                <div className="flex gap-2">
-                  <CurrencySelect
-                    short
-                    aria-label="Currency it arrived in"
-                    value={a.received}
-                    onChange={(e) => a.setReceived(e.target.value)}
-                    className="w-24 shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <MoneyInput
-                      id="rb-amount"
-                      name="receivedAmount"
-                      currency={a.received}
-                      value={a.amount}
-                      onChange={(e) => a.setAmount(e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-              </Field>
-              <Field label="On" htmlFor="rb-paidOn" error={s.errors?.paidOn}>
-                <Input id="rb-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
-              </Field>
-              <Field
-                label="Bank charges taken"
-                htmlFor="rb-charges"
-                optional
-                hint="advising + negotiation · a cost of this order"
-                error={s.errors?.bankCharges}
-              >
-                <MoneyInput
-                  id="rb-charges"
-                  name="bankCharges"
-                  currency={currency}
-                  value={charges}
-                  onChange={(e) => setCharges(e.target.value)}
-                  placeholder="0.00"
-                />
-              </Field>
-              <AccountSelect
-                id="rb-account"
-                label="Into"
-                currency={a.received}
-                defaultValue={s.values?.accountId}
-                error={s.errors?.accountId}
-              />
-              <Field label="Reference" htmlFor="rb-reference" optional error={s.errors?.reference}>
-                <Input
-                  id="rb-reference"
-                  name="reference"
-                  maxLength={120}
-                  defaultValue={s.values?.reference ?? ""}
-                  placeholder="MT103 / credit advice no."
-                />
-              </Field>
-              <FilePicker id="rb-file" label="Credit advice" hint="MT103 / bank slip · photo or PDF" file={file} onChange={setFile} />
-              {!a.same && (
-                <Field
-                  label="Rate"
-                  htmlFor="rb-rate"
-                  hint={
-                    a.settingsRate ? "from Settings · change it to the rate you agreed" : "no rate in Settings: type the rate you agreed"
-                  }
-                  error={s.errors?.rate}
-                >
-                  <div className="flex items-center gap-2 text-sm text-text-2">
-                    <span className="shrink-0">1 {currency} =</span>
-                    <Input
-                      id="rb-rate"
-                      name="rate"
-                      inputMode="decimal"
-                      className="w-28 tabular"
-                      value={a.rate}
-                      onChange={(e) => a.setRate(e.target.value)}
-                    />
-                    <span>{a.received}</span>
-                  </div>
-                </Field>
-              )}
-              <Field
-                label="Note"
-                htmlFor="rb-note"
-                optional
-                error={s.errors?.note}
-                className={cn(a.same ? "@lg:col-span-2 @2xl:col-span-3" : "@2xl:col-span-2")}
-              >
-                <Input id="rb-note" name="note" maxLength={1000} defaultValue={s.values?.note ?? ""} />
-              </Field>
-            </div>
-            <dl
-              className="grid gap-2 self-start rounded-lg border border-line bg-surface-2 p-3.5 text-sm @2xl:grid-cols-3 @2xl:gap-4 @5xl:grid-cols-1 @5xl:gap-2"
-              aria-label="The money check"
-            >
-              <div className={CHECK_ROW}>
-                <dt className="text-text-2">Balance due</dt>
-                <dd className="font-semibold tabular">{fmt(dueMinor, currency)}</dd>
-              </div>
-              <div className={CHECK_ROW}>
-                <dt className="text-text-2">Credited + charges</dt>
-                <dd className="font-semibold tabular">{fmt(a.countsMinor + chargesMinor, currency)}</dd>
-              </div>
-              <div
-                className={cn(
-                  CHECK_ROW,
-                  "border-t border-line pt-2 @2xl:border-t-0 @2xl:border-l @2xl:pt-0 @2xl:pl-4 @5xl:border-t @5xl:border-l-0 @5xl:pt-2 @5xl:pl-0",
-                )}
-              >
-                <dt className="font-semibold">Left due</dt>
-                <dd className={cn("font-bold tabular", leftDue === 0 ? "text-ok" : "text-text")}>{fmt(leftDue, currency)}</dd>
-              </div>
-              {leftMinor > 0 && (
-                <dd className="text-xs text-text-2 @2xl:col-span-3 @5xl:col-span-1">
-                  {fmt(leftMinor, currency)} more than is due: kept as {customer}&apos;s credit.
-                </dd>
-              )}
-            </dl>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-surface-2 px-4 py-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            <SubmitButton
-              size="sm"
-              className="max-sm:h-11 max-sm:flex-1"
-              pendingText={file ? "Recording, sending the file…" : "Recording…"}
-              disabled={a.countsMinor <= 0 || chargesMinor > dueMinor}
-            >
-              Record and tick
-            </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" className="max-sm:hidden" onClick={band.close}>
-              Cancel
-            </Button>
-            <span className="text-xs text-muted max-sm:hidden">Records the payment and ticks the bank step together.</span>
-          </div>
-        </>
-      )}
-    </ActionForm>
-  );
-}
 
 /* ---------------------------------------------------------------- credit on an order */
 

@@ -55,7 +55,7 @@ Map<String, Object?> deliveryServer() => {
       '/api/orders/o1/sat': {'ok': true},
     };
 
-/// Two factories on the order and the FAT item not done.
+/// Two factories on the order and the factory test not done.
 Map<String, Object?> visitServer() => {
       '/api/orders/o1/flow': {
         'factory': {
@@ -69,13 +69,14 @@ Map<String, Object?> visitServer() => {
           ],
         },
       },
-      '/api/orders/o1/steps': {
-        'items': [
-          {'id': 'fat1', 'step': 'production', 'title': 'FAT with video', 'paper': 'fat-report', 'done': false, 'note': null},
+      '/api/orders/o1/sections': {
+        'stands': [],
+        'production': [
+          {'factory': {'id': 'f1', 'name': 'Wenzhou Pack'}, 'readyOn': '2026-11-20', 'fat': {'plannedOn': null, 'doneOn': null, 'result': null, 'remarks': null}},
+          {'factory': {'id': 'f2', 'name': 'Henan Pack'}, 'readyOn': null, 'fat': {'plannedOn': null, 'doneOn': null, 'result': null, 'remarks': null}},
         ],
       },
-      '/api/checklist/fat1/tick': {'ok': true},
-      '/api/checklist/fat1': {'ok': true},
+      '/api/orders/o1/factory-facts': {'ok': true},
     };
 
 Map<String, Object?> _checks(bool ready) => {
@@ -236,22 +237,25 @@ void main() {
     expect((checks.first as Map)['result'], 'pending');
   });
 
-  testWidgets('factory visit: the FAT result ticks the FAT item; the ready date is left alone when not changed', (tester) async {
+  testWidgets('factory visit: the factory test\'s result is kept on Production; the ready date is left alone when not changed', (tester) async {
     final answers = visitServer();
     await pumpSheet(tester, (c) => openFactoryVisit(c, phase5Order), answers: answers, permissions: const {'orders.update'});
     expect(find.text('Factory visit'), findsOneWidget);
     expect(find.text('Wenzhou Pack'), findsOneWidget);
     expect(find.text('20 Nov 2026'), findsOneWidget);
     expect(find.text('Visit expense (taxi, hotel…)'), findsNothing, reason: 'no right to add expenses');
-    await tester.tap(find.text('Passed with notes'));
+    await tester.tap(find.text('Passed with remarks'));
     await tester.enterText(find.byType(TextField).first, 'Speed 98 bpm at test');
     await tester.pumpAndSettle();
     await expectAccessible(tester);
     await tester.tap(find.text('Save the visit'));
     await tester.pumpAndSettle();
     expect(lastServer.sent('PATCH', '/api/orders/o1/details'), isNull);
-    expect((lastServer.sent('POST', '/api/checklist/fat1/tick')!['data'] as Map)['result'], 'Passed with notes');
-    expect(lastServer.sent('PATCH', '/api/checklist/fat1')?['note'], 'Speed 98 bpm at test');
+    final test = lastServer.sent('PUT', '/api/orders/o1/factory-facts')!;
+    expect(test['factoryId'], 'f1');
+    expect(test['fatResult'], 'passed_with_remarks');
+    expect(test['fatDoneOn'], isA<String>());
+    expect(test['fatRemarks'], 'Speed 98 bpm at test');
   });
 
   testWidgets('making a paper: what is missing is typed in place, then it is made final', (tester) async {

@@ -71,23 +71,6 @@ export const STEP_OF_CATEGORY: Partial<Record<ExpenseCategory, FlowStep>> = {
   courier: "documents",
 };
 
-/**
- * The kind of expense a checklist item with the Pay tool records, from its
- * title ("Pay the sea freight" → freight); null when it is not an expense
- * (paying the factory).
- */
-export function categoryOfItem(title: string): ExpenseCategory | null {
-  const t = title.toLowerCase();
-  if (/\bfactory\b|advance|balance/.test(t) && !/inspect/.test(t)) return null;
-  if (/freight|forwarder/.test(t)) return "freight";
-  if (/port|truck|trucking|inland|haul/.test(t)) return "inland_transport";
-  if (/inspect|sgs|bureau veritas|intertek/.test(t)) return "inspection";
-  if (/insur/.test(t)) return "insurance";
-  if (/courier|dhl|fedex/.test(t)) return "courier";
-  if (/customs|duty|duties|clearance/.test(t)) return "customs";
-  return null;
-}
-
 /** Groups of the rows in "Planned and spent" that the quote did not plan for. */
 const GROUP_OF: Partial<Record<ExpenseCategory, string>> = { travel: "travel", hotel: "travel" };
 const GROUP_LABEL: Record<string, string> = { travel: "Travel and hotel" };

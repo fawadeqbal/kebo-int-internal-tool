@@ -99,14 +99,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(lastServer.calls.length, before, reason: 'nothing reached the server');
     expect(find.text('Saved on the phone · 1 thing will send when online'), findsOneWidget);
-    expect(lastSession.outbox.steps.map((s) => s.path), ['/api/checklist/fat1/tick', '/api/checklist/fat1']);
+    expect(lastSession.outbox.steps.map((s) => s.path), ['/api/orders/o1/factory-facts']);
 
     lastServer.offline = false;
     await lastSession.api.net.check();
     await tester.pumpAndSettle();
     // (Back online also reads the day's work again to keep it: GETs, left out here.)
-    expect([for (final c in lastServer.calls.skip(before)) if (c.method != 'GET') '${c.method} ${c.path}'], ['POST /api/checklist/fat1/tick', 'PATCH /api/checklist/fat1']);
-    expect((lastServer.sent('POST', '/api/checklist/fat1/tick')!['data'] as Map)['result'], 'Passed');
+    expect([for (final c in lastServer.calls.skip(before)) if (c.method != 'GET') '${c.method} ${c.path}'], ['PUT /api/orders/o1/factory-facts']);
+    expect(lastServer.sent('PUT', '/api/orders/o1/factory-facts')!['fatResult'], 'passed');
     expect(lastSession.outbox.waiting, 0);
     lastSession.api.net.stop();
   });

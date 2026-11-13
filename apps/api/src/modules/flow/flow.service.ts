@@ -6,7 +6,6 @@ import {
   can,
   CLAIM_STATUS_LABEL,
   documentDone,
-  DEFAULT_PRODUCTION_STEPS,
   DEFAULT_SAT_CHECKS,
   deliveryConditionOf,
   flowSteps,
@@ -41,14 +40,13 @@ import {
   type PaymentRouteInput,
   type Permission,
   type PlanFeature,
-  type ProductionInput,
   type SatInput,
   type ShipmentInput,
   type ShipmentUpdateInput,
   type SendPurchaseOrderInput,
 } from "@kebo/shared";
 import { fromMinor } from "@kebo/money";
-import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError } from "@kebo/utils";
+import { addDays, DomainError, ForbiddenError, GateError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { setPaymentTerms } from "../orders/payment-terms";
 import { AuditService } from "../../common/audit/audit.service";
@@ -71,9 +69,6 @@ const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 type FlowAction =
   "route" | "bank_contract" | "factory_order" | "purchase_order" | "production" | "shipment" | "document" | "bank_step" | "delivery" | "sat" | "claim";
 
-/** The production timeline is the checklist's own Production items. */
-const productionWhere = { step: "production", key: null } as const;
-
 /** What the step line is worked out from (see @kebo/shared flowSteps), for one order with its flow rows. */
 interface FlowRows {
   stage: OrderStage;
@@ -82,12 +77,11 @@ interface FlowRows {
   factoryOrderedOn: Date | null;
   /** Each factory's ready date, and the factories on the lines (the order's ready date is the latest). */
   factories: { factoryId: string | null; readyOn: Date | null }[];
-  lines: { factoryId: string | null }[];
+  /** The lines: whose factory makes each, and (goods) how much of it came from the factory. */
+  lines: { factoryId: string | null; type: string; quantity: Prisma.Decimal; receivedQty: Prisma.Decimal | null }[];
   proformaNo: string | null;
   packedAt: Date | null;
   delivery: { deliveredOn: Date | null; satDoneOn: Date | null } | null;
-  /** The production items of the checklist (done or skipped). */
-  checklist: { doneAt: Date | null; skippedAt: Date | null }[];
   shipments: { mode: ShipMode; status: ShipmentStatus }[];
   documents: { kind: OrderDocumentKind; status: OrderDocumentStatus }[];
   bankSteps: { step: BankStepKind }[];
@@ -121,13 +115,14 @@ export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly str
   const required = documentsInUse(route, o.shipments[0]?.mode ?? "sea", papersOff, (k) => documentIn(o, k));
   const ready = required.filter((kind) => documentIn(o, kind)).length;
   const bankKinds = bankStepsFor(route);
+  const goods = o.lines.filter((l) => l.type === "goods");
   return {
     stage: o.stage,
     cancelled: o.status === "cancelled",
     route,
     depositIn,
     factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
-    production: { total: o.checklist.length, done: o.checklist.filter((p) => p.doneAt || p.skippedAt).length },
+    production: { lines: goods.length, received: goods.filter((l) => Number(l.receivedQty) >= Number(l.quantity)).length },
     readyOn: readyOnOf(o),
     shipments: {
       total: o.shipments.length,
@@ -245,11 +240,6 @@ export class FlowService {
         bankContract: true,
         receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
         expenses: chargedExpenses,
-        checklist: {
-          where: productionWhere,
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          include: { factory: { select: { id: true, name: true } } },
-        },
         // Shipment 1 (the primary: the first made) first.
         shipments: { orderBy: SHIPMENT_ORDER },
         documents: {
@@ -268,6 +258,7 @@ export class FlowService {
             factory: { select: { id: true, name: true } },
             type: true,
             quantity: true,
+            receivedQty: true,
             deliveredQty: true,
             deliveredCondition: true,
           },
@@ -406,20 +397,6 @@ export class FlowService {
         readyBy: readyByOf(o).map((r) => ({ factoryId: r.factoryId, name: factories.find((f) => f.id === r.factoryId)?.name ?? null, readyOn: r.readyOn })),
         factories,
       },
-      production: has("production")
-        ? {
-            steps: o.checklist.map((p) => ({
-              id: p.id,
-              title: p.title ?? "",
-              factory: p.factory,
-              plannedOn: fromDbDateOrNull(p.dueOn),
-              doneOn: p.doneAt ? dateIn(p.doneAt, this.clock.timeZone) : null,
-              note: p.note,
-              late: !p.doneAt && !p.skippedAt && !!p.dueOn && fromDbDate(p.dueOn) < this.clock.today(),
-            })),
-            suggested: o.checklist.length ? [] : [...DEFAULT_PRODUCTION_STEPS],
-          }
-        : null,
       shipping: has("shipping") ? { shipments } : null,
       documents: has("bank_documents") ? { set: documents, bankSteps } : null,
       delivery: has("delivery_sat")
@@ -529,7 +506,7 @@ export class FlowService {
         ...termsSelect,
         factoryOrderedOn: true,
         ...readySelect,
-        lines: { select: { factoryId: true } },
+        lines: { select: { factoryId: true, type: true, quantity: true, receivedQty: true } },
         proformaNo: true,
         packedAt: true,
         delivery: { select: { deliveredOn: true, satDoneOn: true } },
@@ -541,7 +518,6 @@ export class FlowService {
         allocations: { where: livePart, select: { amount: true, bankCharges: true } },
         receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         expenses: chargedExpenses,
-        checklist: { where: productionWhere, select: { doneAt: true, skippedAt: true } },
         shipments: { orderBy: SHIPMENT_ORDER, select: { mode: true, status: true } },
         documents: { select: { kind: true, status: true } },
         bankSteps: { select: { step: true } },
@@ -784,60 +760,7 @@ export class FlowService {
     return this.purchaseOrders(user, id);
   }
 
-  /* ---------------------------------------------------------------- production */
-
-  /**
-   * The production timeline as a whole (kept for the phone app): it is the
-   * checklist's own Production items, so rows sent with their id are changed,
-   * others added (Mark done), missing ones removed.
-   */
-  async saveProduction(user: SessionUser, id: string, input: ProductionInput) {
-    await this.must(user, "orders.update", "production", "change orders");
-    await this.prisma.tx(async (tx) => {
-      const o = await this.lockOrder(tx, user, id);
-      const existing = await tx.orderChecklistItem.findMany({ where: { orderId: id, ...productionWhere } });
-      const doneAt = (on: string | null, was: { doneAt: Date | null } | undefined) =>
-        on ? (was?.doneAt && dateIn(was.doneAt, this.clock.timeZone) === on ? was.doneAt : toDbDate(on)) : null;
-      await this.replaceList(
-        tx,
-        existing.map((e) => e.id),
-        input.steps,
-        (s, i) => {
-          const was = existing.find((e) => e.id === s.id);
-          const at = doneAt(s.doneOn, was);
-          return {
-            title: s.title,
-            factoryId: s.factoryId,
-            dueOn: toDbDateOrNull(s.plannedOn),
-            doneAt: at,
-            doneById: at ? (was?.doneAt ? was.doneById : user.id) : null,
-            note: s.note,
-            sortOrder: (i + 1) * 10,
-          };
-        },
-        {
-          remove: (ids) => tx.orderChecklistItem.deleteMany({ where: { id: { in: ids }, orderId: id } }),
-          update: (rowId, data) => tx.orderChecklistItem.update({ where: { id: rowId }, data }),
-          create: (data) =>
-            tx.orderChecklistItem.create({ data: { ...data, orderId: id, step: "production", tool: "done", createdById: user.id } }),
-        },
-        "production step",
-      );
-      // The timeline was made here: the company's list is not copied in on top of it.
-      if (!o.checklistSeededAt) await tx.order.update({ where: { id }, data: { checklistSeededAt: new Date() } });
-      const done = input.steps.filter((s) => s.doneOn).length;
-      await this.log(
-        tx,
-        user,
-        id,
-        "production",
-        `${o.refNo}: production timeline saved (${done} of ${input.steps.length} done)`,
-        undefined,
-        { ...input, step: "production" },
-      );
-    });
-    return this.get(user, id);
-  }
+  /* ---------------------------------------------------------------- lists */
 
   /** Keeps rows sent with their id (changed), adds the rest, removes the ones not sent. */
   private async replaceList<I extends { id: string | null }, D>(
@@ -1306,7 +1229,7 @@ export class FlowService {
         "SAT point",
       );
       const passed = input.checks.filter((c) => c.result === "pass").length;
-      await this.log(tx, user, id, "sat", `${o.refNo}: SAT checklist saved (${passed} of ${input.checks.length} passed)`, undefined, input);
+      await this.log(tx, user, id, "sat", `${o.refNo}: SAT points saved (${passed} of ${input.checks.length} passed)`, undefined, input);
     });
     return this.get(user, id);
   }

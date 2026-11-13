@@ -108,7 +108,7 @@ export class PapersController {
     return this.papers.fix(user, id, kind, body, q.ref);
   }
 
-  /** { options? } — make the draft final: snapshot, number locked, the paper set and the checklist ticked. */
+  /** { options? } — make the draft final: snapshot, number locked, and the paper set marked ready. */
   @Post("papers/:id/final")
   @HttpCode(200)
   @RequirePermissions("documents.manage")

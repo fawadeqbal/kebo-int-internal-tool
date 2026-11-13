@@ -388,7 +388,7 @@ void main() {
     });
     expect(find.text('Order number'), findsWidgets);
     for (final t in <String>[
-      'Steps',
+      'Where it stands',
       'Goods',
       'Money',
       'Papers',

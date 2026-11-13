@@ -16,7 +16,6 @@ import {
   orderDocumentInput,
   orderDocumentUpdateInput,
   paymentRouteInput,
-  productionInput,
   satInput,
   sendPurchaseOrderInput,
   shipmentInput,
@@ -35,7 +34,6 @@ import {
   type OrderDocumentInput,
   type OrderDocumentUpdateInput,
   type PaymentRouteInput,
-  type ProductionInput,
   type SatInput,
   type SendPurchaseOrderInput,
   type ShipmentInput,
@@ -114,14 +112,6 @@ export class OrderFlowController {
     return this.flow.sendPurchaseOrder(user, id, poId, body);
   }
 
-  /** { steps: [{ id?, title, factoryId?, plannedOn?, doneOn?, note? }] } — the whole timeline, in order. */
-  @Put(":id/production")
-  @RequirePermissions("orders.update")
-  @RequireFeature("production")
-  production(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(productionInput)) body: ProductionInput) {
-    return this.flow.saveProduction(user, id, body);
-  }
-
   @Post(":id/shipments")
   @RequirePermissions("shipping.manage")
   @RequireFeature("shipping")
@@ -184,7 +174,7 @@ export class OrderFlowController {
     return this.flow.satAllPassed(user, id, body);
   }
 
-  /** { checks: [{ id?, item, result, note? }] } — the whole SAT checklist, in order. */
+  /** { checks: [{ id?, item, result, note? }] } — every SAT point, in order. */
   @Put(":id/sat")
   @RequirePermissions("delivery.manage")
   @RequireFeature("delivery_sat")

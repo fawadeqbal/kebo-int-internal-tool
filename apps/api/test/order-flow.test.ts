@@ -104,7 +104,6 @@ describe("order flow: from asking factories to SAT", () => {
     // The route the quotation's terms imply (before shipment: informal), shown "from the quotation".
     expect(f.payment).toMatchObject({ route: "informal", fromQuotation: true, depositIn: false, bankContract: null });
     expect(f.factory.factories).toEqual([{ id: henan, name: `Henan Pack ${tag}` }]);
-    expect(f.production.suggested.length).toBeGreaterThan(0);
     expect(f.delivery.suggestedSat.length).toBeGreaterThan(0);
     // The informal set of papers, the proforma counted from the order itself.
     expect(f.documents.set.map((d: { kind: string }) => d.kind)).toEqual(requiredDocuments("informal"));
@@ -146,7 +145,7 @@ describe("order flow: from asking factories to SAT", () => {
     expect(stepState(await flow())).toMatchObject({ payment: "done", factory: "current" });
   });
 
-  it("factory order and production timeline", async () => {
+  it("factory order and production", async () => {
     await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: "2099-01-01" }).expect(400);
     let f = (await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: day(-15) }).expect(200)).body;
     expect(stepState(f)).toMatchObject({ factory: "done", production: "current" });
@@ -155,27 +154,18 @@ describe("order flow: from asking factories to SAT", () => {
     expect(moved.stage).toBe("in_production");
     expect(moved.history.at(-1)).toMatchObject({ from: "confirmed", to: "in_production", note: "ordered from the factory" });
 
-    f = (
-      await api(app, sana)
-        .put(`/orders/${orderId}/production`, {
-          steps: [
-            { title: "Drawings approved", factoryId: henan, plannedOn: day(-12), doneOn: day(-13) },
-            { title: "Factory test run (FAT)", plannedOn: day(9) },
-          ],
-        })
-        .expect(200)
-    ).body;
-    expect(f.production.steps.map((s: { title: string; doneOn: string | null }) => [s.title, s.doneOn])).toEqual([
-      ["Drawings approved", day(-13)],
-      ["Factory test run (FAT)", null],
-    ]);
-    expect(f.steps.find((s: { key: string }) => s.key === "production").sub).toBe("1 of 2 steps");
-    // Changing a step keeps it; leaving one out removes it; another order's step id is refused.
-    const [first, second] = f.production.steps;
-    f = (await api(app, sana).put(`/orders/${orderId}/production`, { steps: [{ ...first, factoryId: henan }, { ...second, doneOn: day(-10) }] }).expect(200)).body;
-    expect(f.production.steps.map((s: { id: string }) => s.id)).toEqual([first.id, second.id]);
+    // Production has the ready date, the factory test and the goods from the factory; no timeline to tick.
+    await api(app, sana).put(`/orders/${orderId}/production`, { steps: [] }).expect(404);
+    await api(app, sana).put(`/orders/${orderId}/factory-facts`, { fatPlannedOn: day(9) }).expect(200);
+    f = (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body;
+    expect(f.steps.find((s: { key: string }) => s.key === "production").sub).toBe("No ready date yet");
+    expect(stepState(f)).toMatchObject({ production: "current" });
+    // Every goods line in from the factory: the production step is done.
+    const lines = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body.lines as { id: string; type: string; quantity: string }[];
+    for (const l of lines.filter((x) => x.type === "goods")) await api(app, sana).patch(`/order-lines/${l.id}`, { set: "received", receivedQty: l.quantity, receivedOn: day(-10) }).expect(200);
+    f = (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body;
+    expect(f.steps.find((s: { key: string }) => s.key === "production").sub).toBe("Goods received");
     expect(stepState(f)).toMatchObject({ production: "done", shipping: "current" });
-    await api(app, sana).put(`/orders/${orderId}/production`, { steps: [{ id: "6b65626f-0000-4000-8000-00000000abcd", title: "x" }] }).expect(400);
   });
 
   it("shipping: a sea shipment from booked to arrived", async () => {
@@ -363,7 +353,7 @@ describe("order flow: from asking factories to SAT", () => {
     await api(app, logistics).post(`/orders/${orderId}/shipments`, { mode: "air", status: "planned" }).expect(201);
     await api(app, logistics).post(`/orders/${orderId}/document-set`, { kind: "inspection", status: "ready" }).expect(403);
     await api(app, logistics).put(`/orders/${orderId}/sat`, { checks: [] }).expect(403);
-    await api(app, logistics).put(`/orders/${orderId}/production`, { steps: [] }).expect(403);
+    await api(app, logistics).put(`/orders/${orderId}/factory-facts`, { fatPlannedOn: day(9) }).expect(403);
     await api(app, logistics).patch(`/orders/${orderId}/route`, { route: "informal" }).expect(403);
     await api(app, logistics).patch(`/claims/${f.delivery.claims[0].id}`, { status: "open" }).expect(403);
   });
@@ -405,7 +395,7 @@ describe("order flow: from asking factories to SAT", () => {
       route: "informal",
       depositIn: true,
       factoryOrderedOn: day(-41),
-      production: { total: 0, done: 0 },
+      production: { lines: 0, received: 0 },
       readyOn: null,
       shipments: { total: 0, departed: 0, arrived: 0 },
       documents: { required: 4, ready: 0 },
@@ -448,10 +438,10 @@ describe("order flow tables are company tables", () => {
         join pg_class pa on pa.oid = k.confrelid
         join pg_attribute a on a.attrelid = k.conrelid and a.attnum = k.conkey[1]
        where k.contype = 'f' and cl.relrowsecurity and pa.relrowsecurity and a.attname <> 'company_id'
-         and cl.relname in ('factory_requests', 'order_bank_contracts', 'shipments', 'order_documents', 'order_bank_steps', 'sat_checks', 'order_claims', 'orders', 'order_checklist_items', 'checklist_templates', 'money_movements', 'allocations', 'invoices', 'order_papers')
+         and cl.relname in ('factory_requests', 'order_bank_contracts', 'shipments', 'order_documents', 'order_bank_steps', 'sat_checks', 'order_claims', 'orders', 'money_movements', 'allocations', 'invoices', 'order_papers')
          and not exists (select 1 from pg_trigger t where t.tgrelid = k.conrelid and t.tgname = left('same_company_' || k.conname, 63))`;
     expect(unchecked).toEqual([]);
-    for (const t of ["factory_requests", "order_bank_contracts", "shipments", "order_documents", "order_bank_steps", "sat_checks", "order_claims", "order_checklist_items", "checklist_templates", "money_movements", "allocations", "invoices", "order_papers"]) {
+    for (const t of ["factory_requests", "order_bank_contracts", "shipments", "order_documents", "order_bank_steps", "sat_checks", "order_claims", "money_movements", "allocations", "invoices", "order_papers"]) {
       const [row] = await prisma.platform.$queryRawUnsafe<{ rls: boolean; policies: bigint }[]>(
         `select c.relrowsecurity as rls, (select count(*) from pg_policies p where p.tablename = c.relname) as policies from pg_class c where c.relname = $1`,
         t,

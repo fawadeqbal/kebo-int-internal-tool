@@ -245,7 +245,7 @@ export function acceptanceDate(f: { auditOn: ISODate | null; updatedOn: ISODate;
   return { date, inferred: !f.auditOn };
 }
 
-/* ---------------------------------------------------------------- order checklist */
+/* ---------------------------------------------------------------- order stage */
 
 export interface Evidence {
   /** Document number or payment reference, quoted in the step's note. */

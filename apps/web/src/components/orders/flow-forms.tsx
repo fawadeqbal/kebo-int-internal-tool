@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   BANK_CONTRACT_STATUS_LABEL,
@@ -10,47 +10,24 @@ import {
   CLAIM_BEARERS,
   CLAIM_STATUSES,
   CURRENCIES,
-  DELIVERY_CONDITION_LABEL,
-  ORDER_DOCUMENT_KINDS,
-  appMakesDocument,
-  ORDER_DOCUMENT_LABEL,
-  ORDER_DOCUMENT_STATUS_LABEL,
-  ORDER_DOCUMENT_STATUSES,
   PAYMENT_ROUTE_LABEL,
   SAT_RESULT_LABEL,
   SAT_RESULTS,
-  SHIP_MODE_LABEL,
-  SHIP_MODES,
-  SHIPMENT_STATUS_LABEL,
-  SHIPMENT_STATUSES,
   type BalanceWhen,
   type LcTerms,
-  type OrderDocumentKind,
   type PaymentRoute,
   type SatResult,
 } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, SelectCard, SelectCardList, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
-import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
-import type { BankContract, BankStepView, ClaimView, DeliveryView, FlowDocument, SatCheckView, ShipmentView } from "@/lib/types-flow";
+import type { BankContract, ClaimView, SatCheckView } from "@/lib/types-flow";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 export const framed = "flex flex-col gap-3 rounded-lg border border-line bg-surface-2/60 p-3";
-
-/** A button that opens a form in place; the form closes itself when saved or cancelled. */
-export function Opener({ label, children, variant = "secondary", icon }: { label: ReactNode; children: (close: () => void) => ReactNode; variant?: "primary" | "secondary" | "ghost"; icon?: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  if (open) return <div className="w-full">{children(() => setOpen(false))}</div>;
-  return (
-    <Button size="sm" variant={variant} onClick={() => setOpen(true)}>
-      {icon ?? <Plus aria-hidden />} {label}
-    </Button>
-  );
-}
 
 function Actions({ save, pending, onCancel }: { save: string; pending: string; onCancel?: () => void }) {
   return (
@@ -260,108 +237,10 @@ export function BankContractForm({ action, contract, lc, currency, onDone }: { a
   );
 }
 
-/** One date: a single field with its button (factory ordered on). */
-export function DateForm({ action, name, label, value, max, save, onDone, hint }: { action: Action; name: string; label: string; value: string | null; max?: string; save: string; onDone?: () => void; hint?: string }) {
-  return (
-    <ActionForm action={action} onDone={onDone} className="flex flex-wrap items-end gap-2">
-      {(s) => (
-        <>
-          <Field label={label} htmlFor={`d-${name}`} hint={hint} error={s.errors?.[name]}>
-            <Input id={`d-${name}`} name={name} type="date" max={max} defaultValue={s.values?.[name] ?? value ?? max ?? ""} className="w-44" />
-          </Field>
-          <Actions save={save} pending="Saving…" onCancel={onDone} />
-        </>
-      )}
-    </ActionForm>
-  );
-}
-
 let seq = 0;
 const nextKey = () => `n${++seq}`;
 
 /* ---------------------------------------------------------------- shipments */
-
-/** Add or change a shipment: how, where from and to, who carries it, the numbers and the dates. */
-export function ShipmentForm({ action, shipment, defaults, today, onDone }: { action: Action; shipment?: ShipmentView; defaults?: Partial<ShipmentView>; today: string; onDone: () => void }) {
-  const base = { ...defaults, ...shipment };
-  const [mode, setMode] = useState(base.mode ?? "sea");
-  const air = mode === "air";
-  return (
-    <ActionForm action={action} onDone={onDone} className={framed}>
-      {(s) => {
-        const v = (k: keyof ShipmentView) => s.values?.[k] ?? (base[k] === null || base[k] === undefined ? "" : String(base[k]));
-        return (
-          <>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Way" htmlFor="sh-mode" error={s.errors?.mode}>
-                <Select id="sh-mode" name="mode" value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
-                  {SHIP_MODES.map((m) => (
-                    <option key={m} value={m}>
-                      {SHIP_MODE_LABEL[m]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Status" htmlFor="sh-status" error={s.errors?.status}>
-                <Select id="sh-status" name="status" defaultValue={v("status") || "planned"}>
-                  {SHIPMENT_STATUSES.map((m) => (
-                    <option key={m} value={m}>
-                      {SHIPMENT_STATUS_LABEL[m]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Forwarder" htmlFor="sh-fwd" optional error={s.errors?.forwarder}>
-                <Input id="sh-fwd" name="forwarder" maxLength={120} defaultValue={v("forwarder")} />
-              </Field>
-              <Field label={air ? "From (airport)" : "From (port)"} htmlFor="sh-pol" optional error={s.errors?.portOfLoading}>
-                <Input id="sh-pol" name="portOfLoading" maxLength={120} defaultValue={v("portOfLoading")} placeholder={air ? "e.g. Shanghai PVG" : "e.g. Ningbo"} />
-              </Field>
-              <Field label={air ? "To (airport)" : "To (port)"} htmlFor="sh-pod" optional error={s.errors?.portOfDischarge}>
-                <Input id="sh-pod" name="portOfDischarge" maxLength={120} defaultValue={v("portOfDischarge")} placeholder={air ? "e.g. Lahore LHE" : "e.g. Karachi"} />
-              </Field>
-              <Field label="Booking no." htmlFor="sh-booking" optional error={s.errors?.bookingNo}>
-                <Input id="sh-booking" name="bookingNo" maxLength={60} defaultValue={v("bookingNo")} />
-              </Field>
-              {!air && (
-                <>
-                  <Field label="Container" htmlFor="sh-ctype" optional hint="20GP, 40HQ, LCL…" error={s.errors?.containerType}>
-                    <Input id="sh-ctype" name="containerType" maxLength={20} defaultValue={v("containerType")} />
-                  </Field>
-                  <Field label="Container no." htmlFor="sh-cno" optional error={s.errors?.containerNo}>
-                    <Input id="sh-cno" name="containerNo" maxLength={120} defaultValue={v("containerNo")} />
-                  </Field>
-                  <Field label="Vessel" htmlFor="sh-vessel" optional error={s.errors?.vessel}>
-                    <Input id="sh-vessel" name="vessel" maxLength={120} defaultValue={v("vessel")} />
-                  </Field>
-                </>
-              )}
-              <Field label={air ? "Air waybill (AWB)" : "Bill of lading (B/L)"} htmlFor="sh-bl" optional error={s.errors?.blNo}>
-                <Input id="sh-bl" name="blNo" maxLength={60} defaultValue={v("blNo")} />
-              </Field>
-              <Field label="Leaves (ETD)" htmlFor="sh-etd" optional error={s.errors?.etd}>
-                <Input id="sh-etd" name="etd" type="date" defaultValue={v("etd")} />
-              </Field>
-              <Field label="Arrives (ETA)" htmlFor="sh-eta" optional error={s.errors?.eta}>
-                <Input id="sh-eta" name="eta" type="date" defaultValue={v("eta")} />
-              </Field>
-              <Field label="Left on" htmlFor="sh-dep" optional error={s.errors?.departedOn}>
-                <Input id="sh-dep" name="departedOn" type="date" max={today} defaultValue={v("departedOn")} />
-              </Field>
-              <Field label="Arrived on" htmlFor="sh-arr" optional error={s.errors?.arrivedOn}>
-                <Input id="sh-arr" name="arrivedOn" type="date" max={today} defaultValue={v("arrivedOn")} />
-              </Field>
-            </div>
-            <Field label="Note" htmlFor="sh-note" optional error={s.errors?.note}>
-              <Textarea id="sh-note" name="note" rows={2} className="min-h-0" defaultValue={v("note")} />
-            </Field>
-            <Actions save={shipment ? "Save the shipment" : "Add the shipment"} pending="Saving…" onCancel={onDone} />
-          </>
-        );
-      }}
-    </ActionForm>
-  );
-}
 
 /** Remove with a confirmation. */
 export function RemoveButton({ action, what }: { action: Action; what: string }) {
@@ -376,206 +255,7 @@ export function RemoveButton({ action, what }: { action: Action; what: string })
 
 /* ---------------------------------------------------------------- the document set */
 
-/** Record a paper (or change one): its status, number, date, and a file from the deal's files. */
-export function DocumentForm({
-  action,
-  doc,
-  kind,
-  files,
-  shipments,
-  onDone,
-}: {
-  action: Action;
-  doc?: FlowDocument;
-  /** For a new paper the shipment needs: its kind is fixed. */
-  kind?: OrderDocumentKind;
-  files: { id: string; name: string }[];
-  /** The order's shipments; a B/L or AWB row shows its shipment's number (Shipment 1's when it names none). */
-  shipments: { id: string; label: string; blNo?: string | null }[];
-  onDone: () => void;
-}) {
-  const [k, setK] = useState<OrderDocumentKind>(doc?.kind ?? kind ?? "other");
-  const fixed = !!doc || !!kind;
-  return (
-    <ActionForm action={action} onDone={onDone} className={framed}>
-      {(s) => {
-        const v = (key: keyof FlowDocument, d = "") => s.values?.[key] ?? (doc?.[key] === null || doc?.[key] === undefined ? d : String(doc[key]));
-        return (
-          <>
-            {!doc && <input type="hidden" name="kind" value={k} />}
-            <div className="grid gap-3 sm:grid-cols-3">
-              {!fixed && (
-                <Field label="Document" htmlFor="doc-kind" error={s.errors?.kind}>
-                  <Select id="doc-kind" value={k} onChange={(e) => setK(e.target.value as OrderDocumentKind)}>
-                    {/* The papers the app makes (proforma, packing list, sales contract, commercial invoice) are never recorded by hand. */}
-                    {ORDER_DOCUMENT_KINDS.filter((x) => !appMakesDocument(x)).map((x) => (
-                      <option key={x} value={x}>
-                        {ORDER_DOCUMENT_LABEL[x]}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              )}
-              {k === "other" && (
-                <Field label="What it is" htmlFor="doc-title" error={s.errors?.title}>
-                  <Input id="doc-title" name="title" maxLength={120} defaultValue={s.values?.title ?? (doc?.kind === "other" ? doc.label : "")} placeholder="e.g. Fumigation certificate" />
-                </Field>
-              )}
-              <Field label="Status" htmlFor="doc-status" error={s.errors?.status}>
-                <Select id="doc-status" name="status" defaultValue={v("status", "ready")}>
-                  {ORDER_DOCUMENT_STATUSES.map((x) => (
-                    <option key={x} value={x}>
-                      {ORDER_DOCUMENT_STATUS_LABEL[x]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              {k === "bill_of_lading" || k === "airway_bill" ? (
-                // The B/L or AWB number is the shipment's: shown here, changed on Shipping (never typed twice).
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium">Number</span>
-                  <span className="flex min-h-9 items-center rounded-md border border-line bg-surface-2/60 px-3 text-sm" aria-readonly="true">
-                    {(shipments.find((x) => x.id === doc?.shipmentId) ?? shipments[0])?.blNo ?? <span className="text-muted">—</span>}
-                  </span>
-                  <span className="text-xs text-text-2">The shipment&apos;s · change it on Shipping</span>
-                </div>
-              ) : (
-                <Field label="Number" htmlFor="doc-number" optional error={s.errors?.number}>
-                  <Input id="doc-number" name="number" maxLength={60} defaultValue={v("number")} />
-                </Field>
-              )}
-              <Field label="Issued on" htmlFor="doc-issued" optional error={s.errors?.issuedOn}>
-                <Input id="doc-issued" name="issuedOn" type="date" defaultValue={v("issuedOn")} />
-              </Field>
-              <Field label="File" htmlFor="doc-file" optional hint={files.length ? "One of the deal's files" : "Upload it to the deal's files first"} error={s.errors?.attachmentId}>
-                <Select id="doc-file" name="attachmentId" defaultValue={s.values?.attachmentId ?? doc?.file?.id ?? ""}>
-                  <option value="">No file</option>
-                  {files.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              {shipments.length > 1 && (
-                <Field label="Shipment" htmlFor="doc-ship" optional error={s.errors?.shipmentId}>
-                  <Select id="doc-ship" name="shipmentId" defaultValue={v("shipmentId")}>
-                    <option value="">All shipments</option>
-                    {shipments.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              )}
-            </div>
-            <Field label="Note" htmlFor="doc-note" optional error={s.errors?.note}>
-              <Input id="doc-note" name="note" maxLength={500} defaultValue={v("note")} placeholder="e.g. original + 3 copies" />
-            </Field>
-            <Actions save={doc ? "Save" : "Record it"} pending="Saving…" onCancel={onDone} />
-          </>
-        );
-      }}
-    </ActionForm>
-  );
-}
-
-/** Mark one step of the bank chain done: date, and for the courier the company and tracking number. */
-export function BankStepForm({ action, step, today, onDone }: { action: Action; step: BankStepView; today: string; onDone: () => void }) {
-  const courier = step.step === "couriered_to_customer_bank";
-  return (
-    <ActionForm action={action} onDone={onDone} className={cn(framed, "mt-2")}>
-      {(s) => (
-        <>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="On" htmlFor={`bs-${step.step}-on`} error={s.errors?.doneOn}>
-              <Input id={`bs-${step.step}-on`} name="doneOn" type="date" max={today} defaultValue={s.values?.doneOn ?? step.doneOn ?? today} />
-            </Field>
-            {courier && (
-              <Field label="Courier" htmlFor={`bs-${step.step}-courier`} optional error={s.errors?.courier}>
-                <Input id={`bs-${step.step}-courier`} name="courier" maxLength={60} defaultValue={s.values?.courier ?? step.courier ?? "DHL"} />
-              </Field>
-            )}
-            <Field label={courier ? "Tracking no." : "Reference"} htmlFor={`bs-${step.step}-ref`} optional error={s.errors?.reference}>
-              <Input id={`bs-${step.step}-ref`} name="reference" maxLength={120} defaultValue={s.values?.reference ?? step.reference ?? ""} />
-            </Field>
-          </div>
-          <Actions save="Mark done" pending="Saving…" onCancel={onDone} />
-        </>
-      )}
-    </ActionForm>
-  );
-}
-
 /* ---------------------------------------------------------------- delivery and SAT */
-
-/**
- * Delivery date, and the SAT plan: engineer and date. Signing off is its own button. The condition is the
- * goods lines' (the worst of them): shown here, set per line, or all at once with "every line arrived good".
- */
-export function DeliveryForm({ action, d, people, today, onDone }: { action: Action; d: DeliveryView; people: { id: string; name: string }[]; today: string; onDone: () => void }) {
-  return (
-    <ActionForm action={action} onDone={onDone} className={framed}>
-      {(s) => (
-        <>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Delivered on" htmlFor="dv-on" optional error={s.errors?.deliveredOn}>
-              <Input id="dv-on" name="deliveredOn" type="date" max={today} defaultValue={s.values?.deliveredOn ?? d.deliveredOn ?? ""} />
-            </Field>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Condition</span>
-              <span className="text-sm">{d.condition ? DELIVERY_CONDITION_LABEL[d.condition] : <span className="text-muted">Not checked</span>}</span>
-              <span className="text-xs text-muted">From the goods lines (the worst of them).</span>
-            </div>
-            <Field label="Our engineer" htmlFor="dv-eng" optional error={s.errors?.satEngineerId}>
-              <Select id="dv-eng" name="satEngineerId" defaultValue={s.values?.satEngineerId ?? d.satEngineer?.id ?? ""}>
-                <option value="">—</option>
-                {people.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="SAT planned on" htmlFor="dv-sat" optional error={s.errors?.satPlannedOn}>
-              <Input id="dv-sat" name="satPlannedOn" type="date" defaultValue={s.values?.satPlannedOn ?? d.satPlannedOn ?? ""} />
-            </Field>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="allLinesGood" defaultChecked={s.values?.allLinesGood === "on"} className="size-4 accent-primary" /> Every line arrived in
-            full and in good condition
-          </label>
-          <Field label="Note on the delivery" htmlFor="dv-note" optional error={s.errors?.deliveryNote}>
-            <Textarea id="dv-note" name="deliveryNote" rows={2} className="min-h-0" defaultValue={s.values?.deliveryNote ?? d.note ?? ""} placeholder="e.g. all cases dry and intact, 12 photos in the deal's files" />
-          </Field>
-          <Actions save="Save" pending="Saving…" onCancel={onDone} />
-        </>
-      )}
-    </ActionForm>
-  );
-}
-
-/** Sign the SAT off: the date and who signed for the customer. */
-export function SatSignOffForm({ action, today, onDone }: { action: Action; today: string; onDone: () => void }) {
-  return (
-    <ActionForm action={action} onDone={onDone} className={framed}>
-      {(s) => (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="SAT passed on" htmlFor="so-on" error={s.errors?.satDoneOn}>
-              <Input id="so-on" name="satDoneOn" type="date" max={today} defaultValue={s.values?.satDoneOn ?? today} />
-            </Field>
-            <Field label="Signed for the customer by" htmlFor="so-by" optional error={s.errors?.satSignedBy}>
-              <Input id="so-by" name="satSignedBy" maxLength={120} defaultValue={s.values?.satSignedBy ?? ""} placeholder="e.g. Mr. Imran, QA head" />
-            </Field>
-          </div>
-          <Actions save="Sign off the SAT" pending="Saving…" onCancel={onDone} />
-        </>
-      )}
-    </ActionForm>
-  );
-}
 
 interface CheckRow {
   key: string;
@@ -592,7 +272,7 @@ const RESULT_STYLE: Record<SatResult, string> = {
   not_applicable: "border-line bg-surface-3 text-text-2",
 };
 
-/** The SAT checklist: each point with Pass / Fail / N/A buttons and a note; saved together. */
+/** The SAT points: each point with Pass / Fail / N/A buttons and a note; saved together. */
 export function SatEditor({ action, checks, suggested, locked }: { action: Action; checks: SatCheckView[]; suggested: string[]; locked: boolean }) {
   const [rows, setRows] = useState<CheckRow[]>(() =>
     checks.length ? checks.map((c) => ({ key: c.id, id: c.id, item: c.item, result: c.result, note: c.note ?? "" })) : suggested.map((t) => ({ key: nextKey(), id: null, item: t, result: "pending" as SatResult, note: "" })),
@@ -657,7 +337,7 @@ export function SatEditor({ action, checks, suggested, locked }: { action: Actio
             <Plus aria-hidden /> Add a point
           </Button>
           <SubmitButton size="sm" pendingText="Saving…" disabled={!dirty}>
-            Save the checklist
+            Save the points
           </SubmitButton>
         </div>
       )}
@@ -748,18 +428,3 @@ export function ClaimUpdateForm({ action, claim, onDone }: { action: Action; cla
   );
 }
 
-/** An edit button that swaps a block for its form. */
-export function EditSwap({ view, form, label = "Edit", allowed }: { view: ReactNode; form: (close: () => void) => ReactNode; label?: string; allowed: boolean }) {
-  const [open, setOpen] = useState(false);
-  if (open) return <>{form(() => setOpen(false))}</>;
-  return (
-    <div className="flex flex-col gap-2">
-      {view}
-      {allowed && (
-        <div>
-          <EditButton label={label} onClick={() => setOpen(true)} />
-        </div>
-      )}
-    </div>
-  );
-}

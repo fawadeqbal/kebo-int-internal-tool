@@ -4,12 +4,13 @@ import { Injectable } from "@nestjs/common";
 import { zipSync } from "fflate";
 import {
   ATTACHMENT_KIND_LABEL,
-  autoTitle,
   can,
   FLOW_STEP_LABEL,
   isOrderSection,
   ORDER_SECTION_LABEL,
   ORDER_SECTION_TAB,
+  ORDER_TAB_LABEL,
+  orderSteps,
   sectionStep,
   type OrderSection,
   ORDER_DOCUMENT_KINDS,
@@ -40,7 +41,6 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { canWorkOn, InquiriesService } from "../inquiries/inquiries.service";
 import { OrdersService } from "../orders/orders.service";
 import { PapersService } from "../papers/papers.service";
-import { ChecklistService } from "../checklist/checklist.service";
 import { FlowService } from "../flow/flow.service";
 import { PaymentFilesService } from "../treasury/payment-files.service";
 import { MoneyService } from "../money/money.service";
@@ -82,7 +82,7 @@ export interface OrderFileView {
 
 /** Where a file can be attached ("Attach to…"). */
 export interface AttachTarget {
-  to: "paper" | "checklist" | "step" | "section";
+  to: "paper" | "step" | "section";
   target: string;
   label: string;
   step: FlowStep;
@@ -104,7 +104,7 @@ const MAX_ZIP = 300 * 1024 * 1024;
  * rule: factory offers' and factory payments' files for people who see factory
  * prices, expense receipts for managers); changing a file needs the permission
  * of what it is attached to — documents.manage for a paper's file,
- * orders.update for a checklist item's or a step's file, payments.record for a
+ * orders.update for a section's or a step's file, payments.record for a
  * payment's proof, expenses.manage for a receipt; the deal's own files follow
  * the deal (its handler, a manager, or whoever uploaded it). Every change is
  * noted in the order's history as file.* (with its step).
@@ -122,7 +122,6 @@ export class OrderFilesService {
     private readonly inquiries: InquiriesService,
     private readonly orders: OrdersService,
     private readonly papers: PapersService,
-    private readonly checklist: ChecklistService,
     private readonly flow: FlowService,
     private readonly paymentFiles: PaymentFilesService,
     private readonly money: MoneyService,
@@ -137,10 +136,10 @@ export class OrderFilesService {
     const open = o.status !== "cancelled";
     const seeCosts = can(user, "sourcing.manage");
     const seeExpenses = can(user, "expenses.manage") && (await this.limits.allows("expenses"));
-    const [inquiry, papers, steps, attachments, offers, payments, factoryPaid, expenses, docs] = await Promise.all([
+    const [inquiry, papers, features, attachments, offers, payments, factoryPaid, expenses, docs] = await Promise.all([
       db.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId }, select: { id: true, refNo: true, assigneeId: true, createdById: true } }),
       this.papers.list(user, orderId),
-      this.checklist.view(user, orderId),
+      this.limits.features(),
       db.attachment.findMany({
         where: { inquiryId: o.inquiryId, deletedAt: null, factoryQuoteId: null, OR: [{ orderId: null }, { orderId }] },
         include: { uploadedBy: { select: { id: true, name: true } } },
@@ -196,7 +195,7 @@ export class OrderFilesService {
         })
       : [];
 
-    // What each of the deal's files is attached to: a paper, a checklist item, a step (else the deal itself).
+    // What each of the deal's files is attached to: a paper, a section, a step (else the deal itself).
     const paperOf = new Map<string, { label: string; step: FlowStep }>();
     for (const r of papers.papers) if (r.doc?.file) paperOf.set(r.doc.file.id, { label: r.label, step: r.step });
     for (const d of docs)
@@ -205,12 +204,6 @@ export class OrderFilesService {
           label: d.kind === "other" && d.title ? d.title : ORDER_DOCUMENT_LABEL[d.kind],
           step: STEPS_OF_DOC[d.kind] ?? "documents",
         });
-    const itemOf = new Map<string, { title: string; step: FlowStep }>();
-    for (const i of steps.items) {
-      if (i.file) itemOf.set(i.file.id, { title: i.title, step: i.step });
-      for (const f of i.fields) if (f.type === "file" && i.values[f.key]) itemOf.set(i.values[f.key]!, { title: i.title, step: i.step });
-    }
-
     // Earlier versions (kept when replaced), for each newest file.
     const earlier = attachments.length
       ? await db.attachment.findMany({
@@ -235,19 +228,16 @@ export class OrderFilesService {
 
     for (const a of attachments.filter((x) => !x.replacedById)) {
       const paper = paperOf.get(a.id);
-      const item = itemOf.get(a.id);
       const section = isOrderSection(a.section) ? a.section : null;
-      const step = (paper?.step ?? item?.step ?? (a.step as FlowStep | null)) || null;
-      const link: OrderFileLink = paper ? "paper" : item ? "checklist" : section ? "section" : a.orderId ? "step" : "inquiry";
+      const step = (paper?.step ?? (a.step as FlowStep | null)) || null;
+      const link: OrderFileLink = paper ? "paper" : section ? "section" : a.orderId ? "step" : "inquiry";
       const mayChange =
         open &&
         (link === "paper"
           ? can(user, "documents.manage")
-          : link === "checklist"
-            ? can(user, "orders.update")
-            : link === "step" || link === "section"
-              ? can(user, "orders.update") || isMine(a.uploadedById)
-              : dealRule || isMine(a.uploadedById));
+          : link === "step" || link === "section"
+            ? can(user, "orders.update") || isMine(a.uploadedById)
+            : dealRule || isMine(a.uploadedById));
       files.push({
         id: `attachment:${a.id}`,
         source: "attachment",
@@ -261,9 +251,7 @@ export class OrderFilesService {
         attachedTo:
           link === "paper"
             ? { link, label: `Paper · ${paper!.label}`, href: `${base}/documents?tab=all#papers` }
-            : link === "checklist"
-              ? { link, label: `Checklist · ${item!.title}`, href: stepHref(item!.step) }
-              : link === "section"
+            : link === "section"
                 ? { link, label: ORDER_SECTION_LABEL[section!], href: `${base}/${ORDER_SECTION_TAB[section!] === "overview" ? "" : ORDER_SECTION_TAB[section!]}`.replace(/\/$/, "") }
               : link === "step"
                 ? {
@@ -419,17 +407,13 @@ export class OrderFilesService {
       number
     >;
 
-    // Where a file can be attached: the papers recorded in the document set, the checklist's items, the steps.
+    // Where a file can be attached: the papers recorded in the document set, and the stages.
     const targets: AttachTarget[] = [];
     if (papers.canRecord)
       for (const r of papers.papers)
         if (r.docKind && (r.source === "upload" || r.doc))
           targets.push({ to: "paper", target: r.doc ? `doc:${r.doc.id}` : r.docKind, label: r.label, step: r.step });
-    if (can(user, "orders.update"))
-      for (const i of steps.items)
-        if (!i.key?.startsWith("doc:") && !i.key?.startsWith("bank:") && (i.key || i.id))
-          targets.push({ to: "checklist", target: i.key ?? i.id!, label: i.title, step: i.step });
-    for (const s of steps.steps) targets.push({ to: "step", target: s.key, label: s.label, step: s.key });
+    for (const s of orderSteps(features)) targets.push({ to: "step", target: s, label: ORDER_TAB_LABEL[s], step: s });
 
     return {
       orderId: o.id,
@@ -473,7 +457,7 @@ export class OrderFilesService {
 
   /* ---------------------------------------------------------------- adding */
 
-  /** POST /orders/:id/files — a file added on the order (Upload, or dropped on a step), optionally attached to a paper or a checklist item. */
+  /** POST /orders/:id/files — a file added on the order (Upload, or dropped on a step), optionally attached to a paper. */
   async upload(user: SessionUser, orderId: string, file: Upload, meta: OrderFileUploadInput) {
     const o = await this.orders.load(user, orderId);
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
@@ -492,7 +476,7 @@ export class OrderFilesService {
     });
     if (meta.attachTo) {
       const [to, ...rest] = meta.attachTo.split(":");
-      await this.attach(user, orderId, "attachment", row.id, { to: to as "paper" | "checklist", target: rest.join(":") });
+      await this.attach(user, orderId, "attachment", row.id, { to: to as "paper", target: rest.join(":") });
     }
     return { id: `attachment:${row.id}`, sourceId: row.id, name: row.fileName };
   }
@@ -542,7 +526,7 @@ export class OrderFilesService {
     return this.list(user, orderId);
   }
 
-  /** POST /orders/:id/files/:source/:fileId/attach — to a paper, a checklist item, or a step. */
+  /** POST /orders/:id/files/:source/:fileId/attach — to a paper, a section, or a step. */
   async attach(user: SessionUser, orderId: string, source: OrderFileSource, fileId: string, input: OrderFileAttachInput) {
     if (source !== "attachment") throw new DomainError("A payment's proof and an expense's receipt stay with what they prove.");
     const { f } = await this.one(user, orderId, source, fileId);
@@ -585,21 +569,6 @@ export class OrderFilesService {
           });
         label = ORDER_DOCUMENT_LABEL[kind];
         step = STEPS_OF_DOC[kind] ?? "documents";
-      }
-    } else if (input.to === "checklist") {
-      const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.target);
-      if (isId) {
-        const item = await this.prisma.db.orderChecklistItem.findFirst({ where: { id: input.target, orderId } });
-        if (!item) throw new NotFoundError("Checklist item");
-        if (item.key) await this.checklist.auto(user, orderId, item.key, { attachmentId: fileId });
-        else await this.checklist.update(user, item.id, { attachmentId: fileId });
-        label = item.title ?? autoTitle(item.key ?? "");
-        step = item.step as FlowStep;
-      } else {
-        if (input.target.startsWith("doc:") || input.target.startsWith("bank:")) throw new DomainError("Attach it to the paper instead.");
-        await this.checklist.auto(user, orderId, input.target, { attachmentId: fileId });
-        label = autoTitle(input.target);
-        step = null;
       }
     } else if (input.to === "section") {
       step = sectionStep(input.target);
@@ -666,18 +635,6 @@ export class OrderFilesService {
         await tx.attachment.update({ where: { id: old.id }, data: { replacedById: row.id } });
         // Whatever the old file was attached to now has the new one.
         await fileReplaced(tx, old.id, row.id);
-        await tx.orderChecklistItem.updateMany({ where: { attachmentId: old.id }, data: { attachmentId: row.id } });
-        const items = await tx.orderChecklistItem.findMany({ where: { orderId, key: null } });
-        for (const i of items) {
-          const data = (i.data && typeof i.data === "object" && !Array.isArray(i.data) ? i.data : {}) as Record<string, unknown>;
-          if (!Object.values(data).includes(old.id)) continue;
-          await tx.orderChecklistItem.update({
-            where: { id: i.id },
-            data: {
-              data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v === old.id ? row.id : v])) as Record<string, string>,
-            },
-          });
-        }
         await this.log(tx, user, o, "replace", `replaced ${old.fileName} with ${name} (version ${row.version}, the old one kept)`, f.step, {
           file: name,
           version: row.version,
@@ -703,7 +660,6 @@ export class OrderFilesService {
       await tx.attachment.update({ where: { id: fileId }, data: { deletedAt: new Date() } });
       // A paper that was only its upload is missing again; a made paper keeps its own state.
       await fileRemoved(tx, fileId);
-      await tx.orderChecklistItem.updateMany({ where: { attachmentId: fileId }, data: { attachmentId: null } });
       await this.log(
         tx,
         user,

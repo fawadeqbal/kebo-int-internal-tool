@@ -85,8 +85,8 @@ describe("plans follow the dates", () => {
   const flow = async (id: string) => (await api(app, sana).get(`/orders/${id}/flow`).expect(200)).body;
   const plan = async (id: string) =>
     (await money(id)).plan.items as { id: string; label: string; amount: string; dueOn: string | null; dueRule: string | null; dueDays: number | null; rule: string | null }[];
-  const steps = async (id: string) =>
-    (await api(app, sana).get(`/orders/${id}/steps`).expect(200)).body.items as { key: string; done: boolean; needs: string | null; data: [string, string][] }[];
+  /** The Production stage's word, read from what is stored. */
+  const production = async (id: string) => ((await api(app, sana).get(`/orders/${id}/sections`).expect(200)).body.stands as { stage: string; word: string; fact: string; missing: string }[]).find((x) => x.stage === "production")!;
   const poDoc = async (id: string, ref: string) => (await api(app, manager).get(`/orders/${id}/papers/purchase-order/doc?ref=${ref}`).expect(200)).body.doc;
   const details = (id: string, body: object) => api(app, sana).patch(`/orders/${id}/details`, body).expect(200);
   const savePlan = (id: string, items: object[], reason?: string) => api(app, sana).put(`/orders/${id}/payment-plan`, { items, reason }).expect(200);
@@ -121,16 +121,13 @@ describe("plans follow the dates", () => {
         expect.objectContaining({ factoryId: b, readyOn: null }),
       ]),
     );
-    let ready = (await steps(o.id)).find((i) => i.key === "ready_date")!;
-    expect(ready.done).toBe(false);
-    expect(ready.needs).toMatch(/Second Works/);
+    // One factory has not said yet: the order has no ready date.
+    expect((await production(o.id)).word).toBe("Not started");
     // The second factory says later: the order's ready date is the latest.
     await details(o.id, { readyBy: [{ factoryId: b, readyOn: day(40) }] });
     ord = await order(o.id);
     expect(ord.readyOn).toBe(day(40));
-    ready = (await steps(o.id)).find((i) => i.key === "ready_date")!;
-    expect(ready.done).toBe(true);
-    expect(ready.data.map(([, v]) => v).sort()).toEqual([day(20), day(40)]);
+    expect((await production(o.id)).word).toMatch(/^Ready /);
     expect((await flow(o.id)).factory.readyBy).toHaveLength(2);
 
     // Each factory's plan: its balance is due on its own ready date.

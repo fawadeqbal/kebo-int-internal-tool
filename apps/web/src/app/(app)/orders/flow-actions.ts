@@ -1,14 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { BankStepKind } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
 
 /**
  * The order flow after acceptance (see the API's /orders/:id/flow). The API's
  * schemas take form strings (an empty field clears it), so most forms send
- * their fields as they are; lists (production, SAT) send a JSON `payload`.
+ * their fields as they are; lists (the SAT points) send a JSON `payload`.
  */
 
 const refresh = (orderId: string) => {
@@ -46,26 +45,7 @@ export async function bankContractAction(orderId: string, _prev: ActionState, fo
   return run(orderId, form, () => api.put(`/orders/${orderId}/bank-contract`, pick(form, CONTRACT)), "Saved.");
 }
 
-export async function factoryOrderAction(orderId: string, _prev: ActionState, form: FormData) {
-  const v = formValues(form);
-  const body = {
-    ...("factoryOrderedOn" in v ? { factoryOrderedOn: v.factoryOrderedOn || null } : {}),
-    ...("factoryOrderNo" in v ? { factoryOrderNo: v.factoryOrderNo || null } : {}),
-  };
-  return run(orderId, form, () => api.patch(`/orders/${orderId}/factory-order`, body), "Saved.");
-}
-
 /* ---------------------------------------------------------------- shipping */
-
-const SHIPMENT = ["mode", "status", "forwarder", "bookingNo", "blNo", "vessel", "portOfLoading", "portOfDischarge", "containerNo", "containerType", "sealNo", "loadedOn", "vgmKg", "etd", "eta", "departedOn", "arrivedOn", "note", "forwarderContact", "forwarderPhone", "customsBroker", "trackingNo", "freightAmount", "freightCurrency", "insurer", "insurancePolicyNo", "customsDeclarationNo", "clearedOn"];
-
-export async function addShipmentAction(orderId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.post(`/orders/${orderId}/shipments`, pick(form, SHIPMENT)), "Shipment added.");
-}
-
-export async function updateShipmentAction(orderId: string, shipmentId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.patch(`/shipments/${shipmentId}`, pick(form, SHIPMENT)), "Shipment saved.");
-}
 
 export async function removeShipmentAction(orderId: string, shipmentId: string, _prev: ActionState, form: FormData) {
   return run(orderId, form, () => api.delete(`/shipments/${shipmentId}`), "Shipment removed.");
@@ -83,39 +63,11 @@ export async function updateDocumentAction(orderId: string, docId: string, _prev
   return run(orderId, form, () => api.patch(`/order-documents/${docId}`, pick(form, DOCUMENT)), "Document saved.");
 }
 
-export async function removeDocumentAction(orderId: string, docId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.delete(`/order-documents/${docId}`), "Document removed.");
-}
-
-export async function bankStepAction(orderId: string, step: BankStepKind, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.put(`/orders/${orderId}/bank-steps/${step}`, pick(form, ["doneOn", "courier", "reference", "note"])), "Step recorded.");
-}
-
-export async function clearBankStepAction(orderId: string, step: BankStepKind, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.delete(`/orders/${orderId}/bank-steps/${step}`), "Step undone.");
-}
-
 /* ---------------------------------------------------------------- delivery, SAT, claims */
-
-const DELIVERY = ["deliveredOn", "deliveryNote", "deliveryReceivedBy", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy"];
-
-/** The condition is the lines': "every line arrived good" marks them all (and dates the delivery), then the rest is saved. */
-export async function deliveryAction(orderId: string, _prev: ActionState, form: FormData) {
-  const body = pick(form, DELIVERY);
-  return run(
-    orderId,
-    form,
-    async () => {
-      if (form.get("allLinesGood") === "on") await api.post(`/orders/${orderId}/delivery/all-good`, { deliveredOn: body.deliveredOn || null });
-      return api.patch(`/orders/${orderId}/delivery`, body);
-    },
-    "Saved.",
-  );
-}
 
 /** payload: { checks: [{ id?, item, result, note? }] } */
 export async function satAction(orderId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.put(`/orders/${orderId}/sat`, formBody(form)), "SAT checklist saved.");
+  return run(orderId, form, () => api.put(`/orders/${orderId}/sat`, formBody(form)), "SAT points saved.");
 }
 
 export async function addClaimAction(orderId: string, _prev: ActionState, form: FormData) {
@@ -138,9 +90,3 @@ export async function sendPurchaseOrderAction(orderId: string, poId: string, _pr
   return r;
 }
 
-/** The production steps (board OrderProduction): payload { steps: [{ id?, title, factoryId?, plannedOn?, doneOn?, note? }] }. */
-export async function productionStepsAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.put(`/orders/${orderId}/production`, formBody(form)), "Production steps saved.");
-  if (r.ok) revalidatePath(`/orders/${orderId}`, "layout");
-  return r;
-}

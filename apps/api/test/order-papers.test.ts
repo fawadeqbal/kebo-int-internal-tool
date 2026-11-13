@@ -10,7 +10,7 @@ import { CompaniesService } from "../src/common/company/companies.service";
  * Order flow v3, papers: the app makes papers from the order in one template.
  * Numbers follow the order; a draft becomes final once its data is in (typed on
  * the Make page, saved where it belongs); final keeps a snapshot that never
- * changes, sets the document set's paper to ready (ticking the checklist) and
+ * changes, sets the document set's paper to ready and
  * "Make again" starts version 2. Making needs documents.manage; bank papers need
  * their module and route; the purchase order needs sourcing.manage.
  */
@@ -57,10 +57,9 @@ describe("order papers", () => {
   const list = async (who = sana) =>
     (await api(app, who).get(`/orders/${orderId}/papers`).expect(200)).body as { canMake: boolean; papers: Row[] };
   const doc = async (kind: string, q = "") => (await api(app, sana).get(`/orders/${orderId}/papers/${kind}/doc${q}`).expect(200)).body;
-  const steps = async () =>
-    (await api(app, sana).get(`/orders/${orderId}/steps`).expect(200)).body as {
-      items: { key: string | null; title: string; done: boolean; id: string | null }[];
-    };
+  /** The Documents stage's line: how many papers are ready, and which are still to come. */
+  const papersStand = async () =>
+    ((await api(app, sana).get(`/orders/${orderId}/sections`).expect(200)).body.stands as { stage: string; word: string; fact: string; missing: string }[]).find((x) => x.stage === "documents")!;
   const modulesOff = async (off: string[]) => {
     await prisma.platform.company.update({ where: { id: FIRST_COMPANY_ID }, data: { featuresOff: off } });
     app.get(CompaniesService).forget(FIRST_COMPANY_ID);
@@ -212,10 +211,9 @@ describe("order papers", () => {
 
     const done = (await api(app, sana).post(`/papers/${saved.paper!.id}/final`, {}).expect(200)).body as Checks;
     expect(done).toMatchObject({ state: "ready", paper: { status: "final", version: 1 } });
-    // The document set's paper is ready, made by the app, and its checklist item ticks.
+    // The document set's paper is ready, made by the app.
     const row = await prisma.company(FIRST_COMPANY_ID).orderDocument.findFirst({ where: { orderId, kind: "commercial_invoice" } });
     expect(row).toMatchObject({ status: "ready", number: saved.paper!.number, paperId: saved.paper!.id });
-    expect((await steps()).items.find((i) => i.key === "doc:commercial_invoice")).toMatchObject({ done: true });
     expect((await list()).papers.find((p) => p.kind === "commercial-invoice")).toMatchObject({ state: "ready" });
     // It is in the order's history under Shipping.
     const history = (await api(app, sana).get(`/history?type=order&id=${orderId}&step=shipping`).expect(200)).body;
@@ -243,20 +241,10 @@ describe("order papers", () => {
     await api(app, sana).get(`/orders/${orderId}/papers/commercial-invoice/doc?v=9`).expect(404);
     await api(app, sana).post(`/orders/${orderId}/papers/commercial-invoice/again`, {}).expect(400);
     await api(app, sana).post(`/papers/${again.paper!.id}/final`, {}).expect(200);
-    // The document row now points at version 2; the checklist stays ticked.
+    // The document row now points at version 2.
     const row = await prisma.company(FIRST_COMPANY_ID).orderDocument.findFirst({ where: { orderId, kind: "commercial_invoice" } });
     expect(row).toMatchObject({ status: "ready", paperId: again.paper!.id });
     expect(await prisma.company(FIRST_COMPANY_ID).orderDocument.count({ where: { orderId, kind: "commercial_invoice" } })).toBe(1);
-  });
-
-  it("an own Send item for the shipping advice ticks when it is made final", async () => {
-    const advice = (await steps()).items.find((i) => i.title === "Shipping advice to the customer")!;
-    expect(advice).toMatchObject({ done: false });
-    const c = await checks("shipping-advice");
-    expect(c.ready).toBe(true);
-    const saved = (await api(app, sana).post(`/orders/${orderId}/papers/shipping-advice`, {}).expect(201)).body as Checks;
-    await api(app, sana).post(`/papers/${saved.paper!.id}/final`, {}).expect(200);
-    expect((await steps()).items.find((i) => i.id === advice.id)).toMatchObject({ done: true });
   });
 
   it("every paper renders for the order (or says why not)", async () => {
@@ -388,7 +376,7 @@ describe("order papers", () => {
         issuedOn: day(0),
       })
       .expect(201);
-    expect((await steps()).items.find((i) => i.key === "doc:certificate_of_origin")).toMatchObject({ done: true });
+    expect((await papersStand()).missing).not.toContain("origin");
     const co = (await list()).papers.find((p) => p.kind === "certificate_of_origin")!;
     expect(co).toMatchObject({ state: "else", inSet: true, doc: { status: "elsewhere" } });
     expect((await list()).papers.find((p) => p.kind === "bill_of_lading")).toMatchObject({
@@ -398,7 +386,7 @@ describe("order papers", () => {
     });
   });
 
-  it("Settings › Papers we use: every paper starts on; one switched off leaves the lists, counts, checklist and warnings, unless already made", async () => {
+  it("Settings › Papers we use: every paper starts on; one switched off leaves the lists, counts and warnings, unless already made", async () => {
     // Nothing is hidden by default.
     expect((await api(app, sana).get("/settings").expect(200)).body.papers).toEqual({ off: [] });
     const kinds = async () => (await list()).papers.map((p) => p.kind);
@@ -406,8 +394,8 @@ describe("order papers", () => {
     expect(before).toEqual(
       expect.arrayContaining(["bill-of-exchange", "beneficiary-certificate", "bank-cover-letter", "insurance", "customer-statement", "commercial-invoice", "certificate_of_origin"]),
     );
-    const docItems = async () => (await steps()).items.filter((i) => i.key?.startsWith("doc:")).map((i) => i.key);
-    expect(await docItems()).toEqual(expect.arrayContaining(["doc:insurance", "doc:commercial_invoice", "doc:certificate_of_origin"]));
+    const papersOf = async () => Number(/of (\d+) papers/.exec((await papersStand()).word)![1]);
+    const countedBefore = await papersOf();
     const flow = async () =>
       (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body as {
         steps: { key: string; sub: string }[];
@@ -434,10 +422,8 @@ describe("order papers", () => {
       expect(after).toEqual(expect.arrayContaining(["beneficiary-certificate", "bank-cover-letter"]));
       // Made (final commercial invoice) or recorded (certificate of origin kept elsewhere): still shown.
       expect(after).toEqual(expect.arrayContaining(["commercial-invoice", "certificate_of_origin"]));
-      // The checklist: the switched-off paper that is not in leaves the Documents step; the ones in stay.
-      const items = await docItems();
-      expect(items).not.toContain("doc:insurance");
-      expect(items).toEqual(expect.arrayContaining(["doc:commercial_invoice", "doc:certificate_of_origin"]));
+      // Where it stands: the switched-off paper that is not in is no longer counted; the ones in stay.
+      expect(await papersOf()).toBe(countedBefore - 1);
       // The step's numbers: one paper fewer to wait for.
       expect(Number(/of (\d+) papers/.exec(await papersLine())![1])).toBe(requiredBefore - 1);
       expect((await flow()).documents!.set.find((d) => d.kind === "insurance")?.required ?? false).toBe(false);

@@ -47,7 +47,7 @@ class OrderScreen extends StatelessWidget {
       ),
     ],
     sections: (x) => [
-      CustomSection('Steps', OrderFlow(x, title: 'Steps')),
+      CustomSection('Where it stands', OrderFlow(x, title: 'Where it stands')),
       CustomSection('Goods', OrderLines(x, title: 'Goods')),
       CustomSection('Money', OrderMoneySection(x, title: 'Money')),
       CustomSection('Papers', OrderPapers(x, title: 'Papers')),

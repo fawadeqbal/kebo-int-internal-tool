@@ -8,7 +8,7 @@ import { date, TZ } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { getPeople } from "@/lib/loaders";
 import { PanelButton } from "@/components/orders/step-view";
-import { SIDE_COLUMNS } from "@/components/orders/step-page";
+import { SIDE_COLUMNS } from "@/components/common/side-columns";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { assignAction, holdAction, moveStageAction, noteAction } from "../actions";
 import { AssignForm, AssignSelect, DecisionButtons, NoteForm } from "./panels";

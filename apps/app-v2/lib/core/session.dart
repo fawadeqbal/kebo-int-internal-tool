@@ -163,7 +163,7 @@ class Session extends ChangeNotifier {
       final orders = await api.getList('/api/orders/page', query: {'status': 'open', 'mine': 'true'});
       for (final o in orders.take(30)) {
         final id = o.str('id');
-        for (final p in ['', '/steps', '/flow', '/money', '/payments', '/papers', '/files', '/notes']) {
+        for (final p in ['', '/sections', '/flow', '/money', '/payments', '/papers', '/files', '/notes']) {
           await read('/api/orders/$id$p');
         }
         await read('/api/follow-ups', {'orderId': id});

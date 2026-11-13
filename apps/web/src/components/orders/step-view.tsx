@@ -67,7 +67,7 @@ export interface DetailField {
   hint?: string;
   /** Shown in the card when it is empty, instead of "+ Add" or "—" (e.g. a file's own add button). */
   empty?: ReactNode;
-  /** Its checklist link name when it has no `name` (or another one): the card's target + "." + this. */
+  /** Its stable name (data-target) when it has no `name` (or another one): the card's target + "." + this. */
   target?: string;
   /** Filled, it is not changed in place (only in the panel). */
   fixed?: boolean;
@@ -267,7 +267,7 @@ export function ViewCard({
   className,
 }: {
   id?: string;
-  /** Where a checklist item's link lands (data-target, see goTo). */
+  /** A stable name for the card (data-target). */
   target?: string;
   title: ReactNode;
   description?: ReactNode;
@@ -332,7 +332,7 @@ export function DetailsCard({
   /** The panel's width, when its body needs more than the usual (a window with three columns). */
   panelClassName?: string;
   id?: string;
-  /** Where checklist links land: the card is `target`, each value `target.name` (see goTo). */
+  /** Stable names (data-target): the card is `target`, each value `target.name`. */
   target?: string;
   title: ReactNode;
   description?: ReactNode;
@@ -373,7 +373,7 @@ export function DetailsCard({
         hasPanel
           ? {
               title: panelTitle ?? `Edit ${typeof title === "string" ? title.toLowerCase() : "the details"}`,
-              description: panelDescription ?? "Everything about it in one place. Saving updates the checklist.",
+              description: panelDescription ?? "Everything about it in one place.",
               className: panelClassName,
               body: panelBody ?? <FieldsForm action={action!} fields={fields} edit={edits?.ref} card={edits?.card} plain={edits?.plain} />,
             }
@@ -433,7 +433,7 @@ export function LinesCard({
   phone?: ReactNode;
   actions?: ReactNode;
   editLabel?: string;
-  /** Where checklist links land ("lines.packing"; see goTo). */
+  /** A stable name for the card ("lines.packing"; data-target). */
   target?: string;
   panelTitle?: string;
   panelDescription?: ReactNode;
@@ -500,11 +500,6 @@ export function LinesCard({
   );
 }
 
-/** A small error line for client calls. */
-export function InlineError({ message }: { message: string | null }) {
-  return message ? <Alert tone="error">{message}</Alert> : null;
-}
-
 /** A button that opens a side panel (the header's "Split into two shipments", a card's own tools). */
 export function PanelButton({
   label,
@@ -543,23 +538,3 @@ export function PanelButton({
   );
 }
 
-/** The way a thing moves through its states, as one bar: done ones filled, the one now in the accent, the rest plain. */
-export function StatusBar({ states, at }: { states: { key: string; label: string }[]; at: string }) {
-  const here = Math.max(0, states.findIndex((s) => s.key === at));
-  return (
-    <ol aria-label="Status" className="flex overflow-x-auto rounded-lg bg-surface-2 text-sm font-semibold">
-      {states.map((s, i) => (
-        <li
-          key={s.key}
-          aria-current={i === here ? "step" : undefined}
-          className={cn(
-            "min-w-28 flex-1 px-3.5 py-2.5 whitespace-nowrap first:rounded-l-lg last:rounded-r-lg",
-            i < here ? "bg-primary-solid text-primary-fg" : i === here ? "bg-action-solid text-white" : "text-text-2",
-          )}
-        >
-          {s.label}
-        </li>
-      ))}
-    </ol>
-  );
-}

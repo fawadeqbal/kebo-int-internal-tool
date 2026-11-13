@@ -354,9 +354,6 @@ model User {
   relOrderFatAttendee      OrderFactory[]       @relation("OrderFatAttendee")
   relPersonTarget          PersonTarget[]       @relation("PersonTargetOwner")
   relPersonTargetUpdater   PersonTarget[]       @relation("PersonTargetUpdater")
-  relChecklistAssignee     OrderChecklistItem[] @relation("ChecklistAssignee")
-  relChecklistDoneBy       OrderChecklistItem[] @relation("ChecklistDoneBy")
-  relChecklistCreator      OrderChecklistItem[] @relation("ChecklistCreator")
   relMovementRecorder      MoneyMovement[]      @relation("MovementRecorder")
   relPapersMade            OrderPaper[]         @relation("PaperMadeBy")
   relOrderFacts            OrderFact[]          @relation("OrderFactHandledBy")
@@ -574,7 +571,6 @@ model Party {
   factoryExpenses    Expense[]            @relation("ExpenseFactory")
   orderLines         OrderLine[]          @relation("OrderLineFactory")
   requests           FactoryRequest[]     @relation("FactoryRequestFactory")
-  checklistItems     OrderChecklistItem[] @relation("OrderChecklistItemFactory")
   payables           Invoice[]            @relation("SupplierInvoices")
   orderParts         OrderFactory[]       @relation("OrderFactoryFactory")
   factoryOrderFacts  FactoryOrderFact[]   @relation("FactoryOrderFactFactory")
@@ -813,7 +809,6 @@ model Attachment {
   version        Int              @default(1)
 
   orderDocuments OrderDocument[]
-  checklistItems OrderChecklistItem[]
 
   @@index([inquiryId])
   @@index([orderId])
@@ -1078,7 +1073,7 @@ model QuoteLine {
 }
 
 // ============================================================================
-// Orders: made when a revision is accepted; the checklist lives here
+// Orders: made when a revision is accepted
 // ============================================================================
 
 model Order {
@@ -1148,13 +1143,6 @@ model Order {
   /// The factory's own number for our order ("their order no.").
   factoryOrderNo      String?           @map("factory_order_no") @db.VarChar(60)
   closedAt            DateTime?         @map("closed_at") @db.Timestamptz
-  /// The original papers couriered to the customer (routes without a bank; with one, the bank's steps say it).
-  originalsCourier    String?           @map("originals_courier") @db.VarChar(60)
-  originalsTrackingNo String?           @map("originals_tracking_no") @db.VarChar(80)
-  originalsSentOn     DateTime?         @map("originals_sent_on") @db.Date
-  originalsNote       String?           @map("originals_note") @db.VarChar(500)
-  /// When the company's checklist was copied into the order (null: not yet; it is copied on first read).
-  checklistSeededAt   DateTime?         @map("checklist_seeded_at") @db.Timestamptz
   createdById         String            @map("created_by") @db.Uuid
   createdBy           User              @relation("OrderCreator", fields: [createdById], references: [id])
   createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz
@@ -1175,7 +1163,6 @@ model Order {
   bankSteps    OrderBankStep[]
   satChecks    SatCheck[]
   claims       OrderClaim[]
-  checklist    OrderChecklistItem[]
   files        Attachment[]
   /// What its suppliers invoice: each supplier's instalments on the order.
   payables     Invoice[]            @relation("OrderPayables")
@@ -1281,7 +1268,6 @@ model OrderCost {
   @@map("order_costs")
 }
 
-/// One step of the order checklist (see @kebo/shared workflows/order).
 /// Every move of an order between stages, with who and why.
 model OrderStageChange {
   id        String      @id @default(uuid()) @db.Uuid
@@ -1440,81 +1426,6 @@ model OrderBankContract {
 
   @@index([companyId])
   @@map("order_bank_contracts")
-}
-
-/// One item of an order's checklist (see @kebo/shared workflows/checklist). Items with a `key` are the
-/// automatic ones (ticked from the order's data): their row only keeps overrides (due date, person, skip,
-/// note). Items without a key are the company's own (copied from its list, or added on the order).
-model OrderChecklistItem {
-  id           String        @id @default(uuid()) @db.Uuid
-  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company      Company       @relation(fields: [companyId], references: [id])
-  orderId      String        @map("order_id") @db.Uuid
-  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  /// payment | factory | production | shipping | documents | delivery
-  step         String        @db.VarChar(20)
-  /// The automatic item this row overrides ("deposit_in", "doc:bill_of_lading"); null for own items.
-  key          String?       @db.VarChar(80)
-  title        String?       @db.VarChar(200)
-  /// done | fill | upload | pay | make | send
-  tool         String        @default("done") @db.VarChar(10)
-  /// The fill tool's fields: [{ key, label, type: text | date | number | file }].
-  fields       Json          @default("[]")
-  /// What the item collected, by field key.
-  data         Json          @default("{}")
-  /// Make and Send items: the paper the app makes (sales-contract, shipping-advice…).
-  paper        String?       @db.VarChar(40)
-  /// Only for orders paid this way.
-  route        PaymentRoute?
-  /// The factory a production item is about (from the old production timeline).
-  factoryId    String?       @map("factory_id") @db.Uuid
-  factory      Party?        @relation("OrderChecklistItemFactory", fields: [factoryId], references: [id], onDelete: SetNull)
-  dueOn        DateTime?     @map("due_on") @db.Date
-  assigneeId   String?       @map("assignee_id") @db.Uuid
-  assignee     User?         @relation("ChecklistAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  doneAt       DateTime?     @map("done_at") @db.Timestamptz
-  doneById     String?       @map("done_by") @db.Uuid
-  doneBy       User?         @relation("ChecklistDoneBy", fields: [doneById], references: [id], onDelete: SetNull)
-  skippedAt    DateTime?     @map("skipped_at") @db.Timestamptz
-  skipReason   String?       @map("skip_reason") @db.VarChar(300)
-  note         String?       @db.VarChar(1000)
-  attachmentId String?       @map("attachment_id") @db.Uuid
-  attachment   Attachment?   @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
-  sortOrder    Int           @default(0) @map("sort_order")
-  createdById  String        @map("created_by") @db.Uuid
-  createdBy    User          @relation("ChecklistCreator", fields: [createdById], references: [id])
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
-
-  @@unique([orderId, key])
-  @@index([orderId, step, sortOrder])
-  @@index([companyId])
-  @@map("order_checklist_items")
-}
-
-/// The company's own checklist (Settings › Order checklist): copied into each new order the first time
-/// its checklist is opened. Later changes never touch orders that already have theirs.
-model ChecklistTemplate {
-  id        String        @id @default(uuid()) @db.Uuid
-  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company   Company       @relation(fields: [companyId], references: [id])
-  step      String        @db.VarChar(20)
-  title     String        @db.VarChar(200)
-  tool      String        @default("done") @db.VarChar(10)
-  fields    Json          @default("[]")
-  /// Make and Send items: the paper the app makes.
-  paper     String?       @db.VarChar(40)
-  route     PaymentRoute?
-  /// Due this many days after the order date (empty: no due date).
-  dueDays   Int?          @map("due_days")
-  sortOrder Int           @default(0) @map("sort_order")
-  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz
-
-  @@index([companyId, step, sortOrder])
-  @@map("checklist_templates")
 }
 
 /// One shipment of an order (an order can go in more than one). The only place for its B/L, the day it left,
@@ -2222,8 +2133,6 @@ model Company {
   orderBankSteps      OrderBankStep[]
   satChecks           SatCheck[]
   orderClaims         OrderClaim[]
-  checklistItems      OrderChecklistItem[]
-  checklistTemplates  ChecklistTemplate[]
   moneyMovements      MoneyMovement[]
   orderFactories      OrderFactory[]
   orderPapers         OrderPaper[]

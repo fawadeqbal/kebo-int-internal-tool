@@ -83,11 +83,6 @@ export const paperOrderInclude = {
     include: { attachment: { select: { id: true, fileName: true, deletedAt: true } } },
   },
   satChecks: { orderBy: { sortOrder: "asc" } },
-  checklist: {
-    where: { key: null },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    include: { doneBy: { select: { name: true } }, attachment: { select: { fileName: true, deletedAt: true } } },
-  },
   papers: { orderBy: [{ version: "asc" }] },
   delivery: { include: { satEngineer: { select: { name: true } } } },
   inquiry: { select: { id: true, contactId: true } },
@@ -131,8 +126,6 @@ export interface PaperCtx {
   options: PaperOptions;
   /** Which payment, plan item ("balance": the rest) or factory. */
   ref: string;
-  /** File names of the checklist's file fields. */
-  fileNames: Map<string, string>;
   statement: StatementData | null;
   /** The paper's own number when it has one: a purchase order's PO-2026-0044 (purchase_orders), not one made from the order's. */
   number?: string | null;
@@ -825,15 +818,7 @@ function paymentRequest(c: PaperCtx): Built {
   };
 }
 
-/**
- * The checklist's own item a report is made from: the Fill in item bound to it by its `paper` (the FAT or
- * the inspection), whatever its title; one for another payment route does not count.
- */
-export function reportItem(c: { o: PaperOrder }, kind: "fat-report" | "inspection-report") {
-  return c.o.checklist.find((i) => i.paper === kind && (!i.route || i.route === routeOf(c.o))) ?? null;
-}
-
-/** The factory test kept on Production (the order without checklists): the one done, else the one planned. */
+/** The factory test kept on Production: the one done, else the one planned. */
 export function fatOf(c: { o: PaperOrder }) {
   return c.o.factories.find((f) => f.fatDoneOn || f.fatResult) ?? c.o.factories.find((f) => f.fatPlannedOn) ?? null;
 }
@@ -871,75 +856,25 @@ function fatReport(c: PaperCtx, t: NonNullable<ReturnType<typeof fatOf>>): Built
   };
 }
 
-function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {
-  const test = kind === "fat-report" ? fatOf(c) : null;
+/** The FAT report; without a factory test on Production there is nothing to print yet. */
+function report(c: PaperCtx): Built {
+  const test = fatOf(c);
   if (test) return fatReport(c, test);
-  const item = reportItem(c, kind);
-  const fields = (Array.isArray(item?.fields) ? item.fields : []) as unknown as { key: string; label: string; type: string }[];
-  const values = (item?.data && typeof item.data === "object" && !Array.isArray(item.data) ? item.data : {}) as Record<string, string>;
-  const pairs = fields
-    .filter((f) => values[f.key])
-    .map((f) => ({
-      label: `${f.label}:`,
-      value: (f.type === "file" ? `${c.fileNames.get(values[f.key]!) ?? "file"} (kept with the order)` : values[f.key]) as PaperCell,
-      type: f.type,
-      key: f.key,
-    }));
-  const day = pairs.find((p) => p.type === "date")?.value as string | undefined;
-  const result = values.result ?? values.passed ?? null;
-  const done = !!item?.doneAt;
-  const what = kind === "fat-report" ? "FAT" : "inspection";
   return {
-    checks: [
-      check(
-        "item",
-        kind === "fat-report" ? "The FAT item" : "The inspection item",
-        item?.title ?? `no ${what} item on the Production checklist`,
-        !!item,
-        { required: true, href: "production" },
-      ),
-      check(
-        "done",
-        "Recorded",
-        done
-          ? pairs
-              .filter((p) => p.type !== "file")
-              .map((p) => `${p.label} ${p.value}`)
-              .join(" · ") || "ticked"
-          : "not ticked yet",
-        done,
-        { required: true, href: "production" },
-      ),
-      ...(item?.attachment && !item.attachment.deletedAt ? [check("file", "File", item.attachment.fileName, true)] : []),
-    ],
+    checks: [check("item", "The factory test", "no factory test on Production yet", false, { required: true, href: "production" })],
     doc: {
-      date: day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : item?.doneAt ? item.doneAt.toISOString().slice(0, 10) : c.today,
-      meta: [{ label: "Order No.", value: c.o.refNo }, ...(result ? [{ label: "Result", value: result }] : [])],
+      date: c.today,
+      meta: [{ label: "Order No.", value: c.o.refNo }],
       heading: c.o.documentTitle,
-      columns: [COL.no, COL.item, COL.qty, { key: "result", label: "Result", width: 90, wrap: true }],
-      rows: itemRows(c, true).map((r) => ({
-        no: r.cells.no!,
-        item: r.cells.item!,
-        qty: r.cells.qty!,
-        result: result ?? (done ? "Passed" : ""),
-      })),
+      columns: [COL.no, COL.item, COL.qty],
+      rows: itemRows(c, true).map((r) => ({ no: r.cells.no!, item: r.cells.item!, qty: r.cells.qty! })),
       sums: [],
       total: null,
       foot: null,
-      boxTitle: kind === "fat-report" ? "Factory acceptance test" : "Inspection",
-      bullets: [
-        ...pairs
-          .filter((p) => p.type !== "date" || p.value !== day)
-          .map((p) => ({ label: p.label, value: p.type === "date" ? date(p.value as string) : p.value })),
-        ...(day ? [{ label: "Date:", value: date(day) }] : []),
-        ...(item?.attachment && !item.attachment.deletedAt
-          ? [{ label: "File:", value: `${item.attachment.fileName} (kept with the order)` }]
-          : []),
-        ...(item?.note ? [item.note] : []),
-        ...(item?.doneBy ? [{ label: "Recorded by:", value: item.doneBy.name }] : []),
-      ],
+      boxTitle: "Factory acceptance test",
+      bullets: [],
       bank: null,
-      signatures: { left: kind === "fat-report" ? "Tested by" : "Inspected by", right: "Witnessed by" },
+      signatures: { left: "Tested by", right: "Witnessed by" },
     },
   };
 }
@@ -1319,8 +1254,7 @@ export const BUILDERS: Record<PaperKind, (c: PaperCtx) => Built> = {
   "payment-receipt": paymentReceipt,
   "customer-statement": customerStatement,
   "purchase-order": purchaseOrder,
-  "fat-report": (c) => report(c, "fat-report"),
-  "inspection-report": (c) => report(c, "inspection-report"),
+  "fat-report": (c) => report(c),
   "commercial-invoice": commercialInvoice,
   "shipping-advice": shippingAdvice,
   "bill-of-exchange": billOfExchange,

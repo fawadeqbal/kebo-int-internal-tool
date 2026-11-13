@@ -596,52 +596,6 @@ void main() {{{''.join(cases)}
 """
 
 
-def ticks(spec: Spec) -> str:
-    """lib/generated/ticks.g.dart: what each checklist item asks and where it writes."""
-    def val(v) -> str:
-        if isinstance(v, bool):
-            return "true" if v else "false"
-        if isinstance(v, (int, float)):
-            return str(v)
-        return q(str(v))
-
-    rows = []
-    for key, t in (spec.ticks.get("ticks") or {}).items():
-        method, _, path = t["write"].partition(" ")
-        fields = ", ".join(field_def(spec, None, f) for f in inline_fields(key, t.get("fields") or {}, "ticks.yaml"))
-        send = ", ".join(f"{q(k)}: {val(v)}" for k, v in (t.get("send") or {}).items())
-        prefill = ", ".join(
-            f"{q(k)}: [{', '.join(q(x) for x in (v if isinstance(v, list) else [v]))}]" for k, v in (t.get("prefill") or {}).items()
-        )
-        args = [f"method: {q(method)}", f"path: {q(path)}", f"fields: [{fields}]"]
-        if send:
-            args.append(f"send: {{{send}}}")
-        if prefill:
-            args.append(f"prefill: {{{prefill}}}")
-        if t.get("hint"):
-            args.append(f"hint: {q(t['hint'])}")
-        if t.get("file"):
-            f = t["file"]
-            args.append(f"file: TickFile(step: {q(f['step'])}, kind: {q(f.get('kind', 'other'))}, asField: {q(f['as']) if f.get('as') else 'null'})")
-        rows.append(f"  {q(key)}: TickForm({', '.join(args)}),")
-    web = "\n".join(f"  {q(k)}: {q(v)}," for k, v in (spec.ticks.get("web") or {}).items())
-    return f"""{HEAD}import '../ds/fields.dart';
-import '../ds/tick.dart';
-import 'enums.g.dart';
-
-/// Checklist items the phone ticks: what each asks and where its answer is saved (spec/ticks.yaml).
-/// "doc:*" and "bank:*" stand for every paper and bank step.
-const tickForms = <String, TickForm>{{
-{chr(10).join(rows)}
-}};
-
-/// Items ticked on the web for now, and why.
-const tickOnWeb = <String, String>{{
-{web}
-}};
-"""
-
-
 def all_files(spec: Spec) -> dict[str, str]:
     files = {
         "lib/ds/tokens.g.dart": tokens(),
@@ -650,7 +604,6 @@ def all_files(spec: Spec) -> dict[str, str]:
         "lib/generated/models.g.dart": models(spec),
         "lib/generated/repos.g.dart": repos(spec),
         "lib/generated/routes.g.dart": routes(spec),
-        "lib/generated/ticks.g.dart": ticks(spec),
         "test/generated/generated_test.dart": tests(spec),
     }
     for s in spec.screens.values():

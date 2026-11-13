@@ -1,7 +1,6 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FIRST_COMPANY_ID } from "@kebo/database";
-import { orderStatusLine, type ProgressItem } from "@kebo/shared";
 import { api, signIn, startApp } from "./app";
 import { today } from "./dates";
 import { PrismaService } from "../src/database/prisma.service";
@@ -9,7 +8,7 @@ import { PrismaService } from "../src/database/prisma.service";
 type Row = { id: string; refNo: string; stage: string; word: string; status: string };
 
 /**
- * One word for where an order stands, the same everywhere: the list row, the order itself and its to-do items
+ * One word for where an order stands, the same everywhere: the list row and the order itself
  * say the same thing, because the word is worked out from what is stored and never from the stage someone set.
  */
 describe("the order's one status word", () => {
@@ -27,15 +26,11 @@ describe("the order's one status word", () => {
     await app?.close();
   });
 
-  it("is the same in the list, on the order and in its to-do items", async () => {
+  it("is the same in the list and on the order", async () => {
     const rows = ((await api(app, manager).get("/orders?status=open&limit=12").expect(200)).body as Row[]).slice(0, 12);
     for (const r of rows) {
       const o = (await api(app, manager).get(`/orders/${r.id}`).expect(200)).body as { word: string };
       expect(o.word, r.refNo).toBe(r.word);
-      const steps = (await api(app, manager).get(`/orders/${r.id}/steps`).expect(200)).body as { items: ProgressItem[] };
-      const fromItems = orderStatusLine(steps.items, {}, today);
-      // The items alone call an order with everything ticked "Done"; the word says so only once it is closed.
-      if (fromItems.stage !== "Done") expect(fromItems.stage, r.refNo).toBe(r.word);
     }
   });
 

@@ -9,7 +9,7 @@ import { leadDays } from "../src/modules/flow/flow.service";
 import { Clock } from "../src/common/time/clock.service";
 
 /**
- * Order v4, light checklist: the few fields the rows ask for (the factory's
+ * Order v4, light rows: the few fields the rows ask for (the factory's
  * order no., the container's seal, loaded on, VGM, who received the goods),
  * changed one at a time from the view's "+ Add"; what the rows fill in from
  * earlier orders and the quote (GET /orders/:id/defaults); the one-tap items
@@ -33,9 +33,9 @@ describe("order v4: light steps", () => {
   let today = new Date().toISOString().slice(0, 10);
   const day = (n: number) => new Date(Date.parse(`${today}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
-  type Item = { key: string | null; done: boolean; doneOn: string | null; data: [string, string][]; file: { id: string; name: string } | null; note: string | null };
-  const items = async (id: string, who = sana) => (await api(app, who).get(`/orders/${id}/steps`).expect(200)).body.items as Item[];
-  const auto = async (id: string, key: string) => (await items(id)).find((i) => i.key === key)!;
+  /** Where one stage of the order stands: its word and its line of facts, read from what is stored. */
+  const stand = async (id: string, stage: string, who = sana) =>
+    ((await api(app, who).get(`/orders/${id}/sections`).expect(200)).body.stands as { stage: string; word: string; fact: string }[]).find((x) => x.stage === stage)!;
   const flow = async (id: string, who = sana) => (await api(app, who).get(`/orders/${id}/flow`).expect(200)).body;
   const history = async (id: string) => (await api(app, sana).get(`/history?type=order&id=${id}`).expect(200)).body as { action: string; summary: string }[];
   const modulesOff = async (off: string[]) => {
@@ -93,12 +93,9 @@ describe("order v4: light steps", () => {
     // Only the date: the number stays (the phone app sends the date alone).
     f = (await api(app, sana).patch(`/orders/${first}/factory-order`, { factoryOrderedOn: today }).expect(200)).body;
     expect(f.factory).toMatchObject({ orderNo: "HP-2026-118", orderedOn: today });
-    const ordered = await auto(first, "factory_ordered");
-    expect(ordered.done).toBe(true);
-    expect(ordered.data).toEqual([
-      ["Their no.", "HP-2026-118"],
-      ["Ordered", today],
-    ]);
+    const ordered = await stand(first, "factory");
+    expect(ordered.word).toBe("PO sent");
+    expect(ordered.fact).toContain("their no. HP-2026-118");
     await api(app, sana).patch(`/orders/${first}/factory-order`, { factoryOrderNo: "x".repeat(61) }).expect(422);
     await api(app, sana).patch(`/orders/${first}/factory-order`, { factoryOrderedOn: day(3) }).expect(400);
     // Not this person's deal: not found; the history says what changed, under Factory order.
@@ -109,7 +106,7 @@ describe("order v4: light steps", () => {
     expect(factorySteps.some((e) => e.action === "flow.factory_order")).toBe(true);
   });
 
-  it("a shipment keeps its seal, the day it was loaded and the VGM; Loaded ticks with them", async () => {
+  it("a shipment keeps its seal, the day it was loaded and the VGM", async () => {
     let f = (
       await api(app, sana)
         .post(`/orders/${first}/shipments`, { mode: "sea", status: "booked", forwarder: "Sino Trans", bookingNo: "NGB-77812", portOfLoading: "Ningbo", portOfDischarge: "Karachi", etd: day(10) })
@@ -125,16 +122,10 @@ describe("order v4: light steps", () => {
     expect(f.shipping.shipments[0]).toMatchObject({ vgmKg: "21500.5", sealNo: "0048812", bookingNo: "NGB-77812" });
     await api(app, sana).patch(`/shipments/${s.id}`, { vgmKg: "-1" }).expect(422);
     await api(app, sana).patch(`/shipments/${s.id}`, { sealNo: "S".repeat(41) }).expect(422);
-    const loaded = await auto(first, "loaded");
-    expect(loaded).toMatchObject({ done: true, doneOn: today });
-    expect(loaded.data).toEqual([
-      ["Container", "MSKU 7741203"],
-      ["Seal", "0048812"],
-      ["Loaded", today],
-    ]);
+    expect((await stand(first, "shipping")).word).toBe("Booked");
   });
 
-  it("a file is kept with an automatic item (loading photos), only one of the deal's files", async () => {
+  it("a file is kept with a section (loading photos), only on an order the person works on", async () => {
     const dealId = (await api(app, sana).get(`/orders/${first}`)).body.inquiry.id;
     const photo = (
       await request(app.getHttpServer())
@@ -143,15 +134,14 @@ describe("order v4: light steps", () => {
         .attach("file", Buffer.from("%PDF-1.4 photos"), { filename: "Loading photos.pdf", contentType: "application/pdf" })
         .expect(201)
     ).body;
-    await api(app, sana).put(`/orders/${first}/checklist/auto/loaded`, { attachmentId: photo.id, note: "Lashing checked" }).expect(200);
-    expect(await auto(first, "loaded")).toMatchObject({ file: { id: photo.id, name: "Loading photos.pdf" }, note: "Lashing checked" });
-    // Another deal's file, or none at all, is refused.
+    await api(app, sana).post(`/orders/${first}/files/attachment/${photo.id}/attach`, { to: "section", target: "container" }).expect(200);
+    const files = (await api(app, sana).get(`/orders/${first}/files`).expect(200)).body.files as { sourceId: string; section: string | null; sectionLabel: string | null }[];
+    expect(files.find((f) => f.sourceId === photo.id)).toMatchObject({ section: "container", sectionLabel: "Container and loading" });
+    // Another deal's file is not this order's; not this person's deal: not found.
     const other = await newOrder();
     second = other.id;
-    await api(app, sana).put(`/orders/${other.id}/checklist/auto/loaded`, { attachmentId: photo.id }).expect(400);
-    await api(app, sana).put(`/orders/${first}/checklist/auto/loaded`, { attachmentId: "00000000-0000-4000-8000-000000000000" }).expect(400);
-    await api(app, bilal).put(`/orders/${first}/checklist/auto/loaded`, { attachmentId: photo.id }).expect(404); // not this person's deal
-    expect((await history(first)).some((e) => /kept a file with "Loaded"/.test(e.summary))).toBe(true);
+    await api(app, sana).post(`/orders/${other.id}/files/attachment/${photo.id}/attach`, { to: "section", target: "container" }).expect(404);
+    await api(app, bilal).post(`/orders/${first}/files/attachment/${photo.id}/attach`, { to: "section", target: "container" }).expect(404);
   });
 
   it("fills in the forwarder of the last order on the route, this customer's banks and the quote's lead time", async () => {
@@ -204,7 +194,7 @@ describe("order v4: light steps", () => {
     expect(f.delivery).toMatchObject({ deliveredOn: today, condition: "good", receivedBy: null });
     f = (await api(app, sana).patch(`/orders/${second}/delivery`, { deliveryReceivedBy: "Mr. Imran, stores" }).expect(200)).body;
     expect(f.delivery).toMatchObject({ receivedBy: "Mr. Imran, stores", deliveredOn: today });
-    expect((await auto(second, "delivered")).done).toBe(true);
+    expect((await stand(second, "delivery")).word).toMatch(/^Delivered /);
     await api(app, sana).post(`/orders/${second}/delivery/all-good`, { deliveredOn: day(2) }).expect(400);
     expect((await history(second)).some((e) => e.action === "flow.delivery" && /all delivered in good condition/.test(e.summary))).toBe(true);
   });
@@ -216,7 +206,7 @@ describe("order v4: light steps", () => {
     expect(f.delivery.sat.length).toBeGreaterThan(0);
     expect(f.delivery.sat.every((c: { result: string }) => c.result === "pass")).toBe(true);
     expect(f.delivery).toMatchObject({ satDoneOn: today, satSignedBy: "Mr. Ali, QA head" });
-    expect((await auto(second, "sat_done")).done).toBe(true);
+    expect((await stand(second, "delivery")).word).toMatch(/^SAT signed /);
     // Points marked N/A stay N/A.
     const third = (await newOrder()).id;
     await api(app, sana).post(`/orders/${third}/delivery/all-good`, {}).expect(200);

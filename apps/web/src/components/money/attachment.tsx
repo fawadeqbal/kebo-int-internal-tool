@@ -34,7 +34,7 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 /**
  * A form's save with its chosen file sent right after, inside the same call
  * (see saveThenSend): the file goes even when saving takes the form off the
- * page (a payment that ticks the checklist row it was opened from), and the
+ * page (a payment that changes the section it was opened from), and the
  * page is refreshed once it is in, so it shows in Files with the file tools.
  * `onError` hears when the file did not follow; with the form gone, the
  * browser says it instead.

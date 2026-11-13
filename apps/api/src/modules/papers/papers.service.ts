@@ -78,7 +78,6 @@ import {
   positionOf,
   receiptMark,
   fatOf,
-  reportItem,
   type PaperCtx,
   type PaperOrder,
   type StatementData,
@@ -268,12 +267,6 @@ export class PapersService implements OnModuleInit {
 
   private async ctx(user: SessionUser | null, o: PaperOrder, kind: PaperKind | null, options: PaperOptions, ref: string): Promise<PaperCtx> {
     const [settings, features, customer] = await Promise.all([this.settings.get(), this.limits.features(), this.customerOf(o)]);
-    const fileIds = o.checklist
-      .flatMap((i) => Object.values((i.data ?? {}) as Record<string, string>))
-      .filter((v) => typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v));
-    const files = fileIds.length
-      ? await this.prisma.db.attachment.findMany({ where: { id: { in: fileIds }, deletedAt: null }, select: { id: true, fileName: true } })
-      : [];
     return {
       o,
       today: this.clock.today(),
@@ -283,7 +276,6 @@ export class PapersService implements OnModuleInit {
       features,
       options,
       ref,
-      fileNames: new Map(files.map((f) => [f.id, f.fileName])),
       statement: kind === "customer-statement" && user ? await this.statementOf(user, o.customerId) : null,
       number:
         kind === "purchase-order" && /^[0-9a-f-]{36}$/i.test(ref)
@@ -649,13 +641,8 @@ export class PapersService implements OnModuleInit {
         );
         continue;
       }
-      if (
-        (kind === "fat-report" || kind === "inspection-report") &&
-        !reportItem(c, kind) &&
-        !(kind === "fat-report" && fatOf(c)) &&
-        !(kind === "inspection-report" && set.includes("inspection"))
-      )
-        continue;
+      // The FAT report shows once Production has a factory test.
+      if (kind === "fat-report" && !fatOf(c)) continue;
       const docKind = PAPER_DOCUMENT[kind] ?? null;
       const refs = PER_FACTORY_PAPERS.includes(kind) ? factoriesOf(o).map((f) => ({ ref: f.id, name: f.name })) : [{ ref: "", name: "" }];
       if (PER_FACTORY_PAPERS.includes(kind) && !refs.length) continue;
@@ -844,11 +831,6 @@ export class PapersService implements OnModuleInit {
         // What it asked for: the row shows "changed since it was sent" when it no longer says the same.
         options: { amount, dueOn: item?.dueOn ?? null, label: item?.label ?? "Balance due on the order" },
       });
-      // Own items that send this paper tick themselves.
-      await tx.orderChecklistItem.updateMany({
-        where: { orderId: o.id, key: null, paper: kind, doneAt: null },
-        data: { doneAt: new Date(), doneById: user.id, skippedAt: null, skipReason: null, data: { number: doc.number } },
-      });
       await this.audit.record(tx, {
         userId: user.id,
         action: "paper.sent",
@@ -960,7 +942,6 @@ export class PapersService implements OnModuleInit {
       const { doc, checks } = this.build(kind, await this.ctx(user, o, kind, options, row.ref));
       const missing = checks.filter((x) => x.required && !x.ok);
       if (missing.length) throw new DomainError(`Still needed before it is final: ${missing.map((x) => inSentence(x.label)).join(", ")}.`);
-      const now = new Date();
       const snapshot = { ...doc, number: row.number } as unknown as Prisma.InputJsonValue;
       await makeFinal(tx, row, { orderId: o.id, kind, ref: row.ref, number: row.number, byId: user.id, snapshot, options });
       // The document set's paper is ready, made by the app.
@@ -969,11 +950,6 @@ export class PapersService implements OnModuleInit {
         const existing = o.documents.find((d) => d.kind === docKind && (d.paperId !== null || !documentDone(d.status))) ?? null;
         await paperReady(tx, { orderId: o.id, kind: docKind, rowId: existing?.id ?? null, paperId: row.id, number: row.number, today: this.clock.today() });
       }
-      // Own items that make this paper tick themselves.
-      await tx.orderChecklistItem.updateMany({
-        where: { orderId: o.id, key: null, paper: kind, doneAt: null },
-        data: { doneAt: now, doneById: user.id, skippedAt: null, skipReason: null, data: { number: row.number } },
-      });
       await this.log(tx, user, o, "final", kind, `${PAPER_LABEL[kind]} ${row.number} made final (version ${row.version})`, {
         number: row.number,
         version: row.version,

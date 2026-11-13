@@ -13,7 +13,7 @@ const stepOfPath = (path: string): FlowStep | null => {
 
 /**
  * Drop anywhere on an order's pages: the overlay says where the files go.
- * Dropped on a checklist row or a paper (an element with data-drop-attach),
+ * Dropped on a paper (an element with data-drop-attach),
  * they are attached there; anywhere else they become that step's files (on the
  * Overview and History: the order's files without a step).
  */
@@ -93,7 +93,7 @@ export function OrderDrop({ orderId, refNo }: { orderId: string; refNo: string }
             <p className="text-base font-semibold text-primary tabular">Drop to add to {refNo}</p>
             <p className="mt-0.5 text-xs text-text-2">
               {over.label === "kept with this step's files" || over.label === "kept with the order's files"
-                ? `Dropped on a checklist row or a paper, it's attached there; here it is ${over.label}.`
+                ? `Dropped on a paper, it's attached there; here it is ${over.label}.`
                 : `It will be ${over.label}.`}
             </p>
           </div>

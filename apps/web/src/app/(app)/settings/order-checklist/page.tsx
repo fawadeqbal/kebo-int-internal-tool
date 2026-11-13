@@ -1,13 +1,6 @@
-import { SettingsPage } from "../section";
-import { OrderChecklistCard } from "./card";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Order checklist · Settings" };
-
-/** Settings › Order checklist: what every new order starts with. */
-export default function Page() {
-  return (
-    <SettingsPage href="/settings/order-checklist" description="The list every new order starts with. Orders already made keep theirs.">
-      <OrderChecklistCard />
-    </SettingsPage>
-  );
+/** The order checklist is gone (an order's stages read its own data): its old address opens Settings. */
+export default function OrderChecklistGone() {
+  redirect("/settings/company");
 }
