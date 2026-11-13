@@ -865,6 +865,8 @@ export class MoneyService {
     await this.prisma.tx(async (tx) => {
       await tx.expense.update({ where: { id: e.id }, data: what === "skip" ? { repeatSkip: month } : { repeats: false } });
       await this.expenseAudit(tx, user, e.id, null, what === "skip" ? `skipped "${e.description}" for ${month}` : `"${e.description}" no longer repeats`, "expense_edit");
+      // No amount changes; posting again keeps the rule "every write to money goes through the ledger" (it finds nothing to change).
+      await this.ledger.post(tx, [{ type: "expense", id: e.id }], { userId: user.id });
     });
     return this.repeatingCosts(user);
   }
