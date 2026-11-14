@@ -337,6 +337,13 @@ export interface RevisionDraft {
   warranty: string | null;
   notes: string | null;
   options: OptionValues[];
+  /** A first revision: where its starting values came from (said under the field; all can be changed). */
+  from?: {
+    customer: string | null;
+    currency: "customer" | "settings";
+    delivery: "last_quotation" | "settings";
+    lastQuotation: string | null;
+  };
 }
 
 /** A line of a factory offer as the quotation editor shows it (locked; costs in the quotation currency). */

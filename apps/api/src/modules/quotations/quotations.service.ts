@@ -11,9 +11,11 @@ import {
   canQuote,
   canStartRevision,
   coverage,
+  CURRENCIES,
   draftsDiscardedBy,
   isEditable,
   latestRevision,
+  QUOTED_STATUSES,
   type Currency,
   lineNumbers,
   numberQuoteLines,
@@ -96,6 +98,17 @@ type Db = Tx | PrismaService["db"];
  * priced by hand.) A revision is edited only as a draft; sending freezes it;
  * the customer accepts exactly one option, which becomes the order.
  */
+/** Where a first revision's starting values came from (said under each field; all of them can be changed). */
+export interface DraftFrom {
+  customer: string | null;
+  /** The customer's own currency, or the company's (Settings). */
+  currency: "customer" | "settings";
+  /** Incoterm and place: from the last quotation sent to this customer, or the company's usual (Settings). */
+  delivery: "last_quotation" | "settings";
+  /** That quotation's inquiry number. */
+  lastQuotation: string | null;
+}
+
 @Injectable()
 export class QuotationsService {
   constructor(
@@ -361,8 +374,8 @@ export class QuotationsService {
    * whose offer was removed are left out), or for R1 the offer that covers the
    * most items at the lowest cost, priced at the default margin.
    */
-  async draft(user: SessionUser, inquiryId: string): Promise<RevisionInput & { number: number }> {
-    await this.inquiries.find(user, inquiryId); // only for people who may see the deal
+  async draft(user: SessionUser, inquiryId: string): Promise<RevisionInput & { number: number; from?: DraftFrom }> {
+    const inquiry = await this.inquiries.find(user, inquiryId); // only for people who may see the deal
     const settings = await this.settings.get();
     const q = await this.prisma.db.quotation.findUnique({
       where: { inquiryId },
@@ -370,7 +383,19 @@ export class QuotationsService {
     });
     const latest = q?.revisions[0];
     const validUntil = addDays(this.clock.today(), settings.sales.quotationValidityDays);
-    const available = await this.offers(user, inquiryId, latest?.currency ?? settings.sales.currency);
+    // A first revision starts from what is already known about this customer (every field can be changed):
+    // their own currency, when Settings has a rate for it, and the delivery terms of the last quotation to them.
+    const customer = latest ? null : await this.prisma.db.party.findUnique({ where: { id: inquiry.customerId }, select: { name: true, defaultCurrency: true } });
+    const theirs = CURRENCIES.find((c) => c === customer?.defaultCurrency?.trim().toUpperCase()) ?? null;
+    const currency = theirs && fxRate(theirs, settings.sales.currency, settings.sales.currency, settings.sales.exchangeRates) !== null ? theirs : settings.sales.currency;
+    const before = latest
+      ? null
+      : await this.prisma.db.quotationRevision.findFirst({
+          where: { deletedAt: null, status: { in: [...QUOTED_STATUSES] }, quotation: { inquiry: { customerId: inquiry.customerId, deletedAt: null, id: { not: inquiryId } } } },
+          orderBy: { createdAt: "desc" },
+          select: { incoterm: true, incotermPlace: true, quotation: { select: { inquiry: { select: { refNo: true } } } } },
+        });
+    const available = await this.offers(user, inquiryId, latest?.currency ?? currency);
     if (latest) {
       const input = this.asInput(latest);
       const live = new Set(available.offers.map((o) => o.factoryQuoteId));
@@ -411,9 +436,9 @@ export class QuotationsService {
         };
     return {
       number: 1,
-      currency: settings.sales.currency,
-      incoterm: settings.sales.defaultIncoterm,
-      incotermPlace: null,
+      currency,
+      incoterm: before?.incoterm ?? settings.sales.defaultIncoterm,
+      incotermPlace: before?.incotermPlace ?? null,
       depositPercent: settings.sales.defaultDepositPercent,
       balanceTerms: settings.sales.defaultBalanceTerms,
       validUntil,
@@ -423,6 +448,12 @@ export class QuotationsService {
       warranty: settings.sales.warrantyTerms?.replace(/^warranty\s*:\s*/i, "").slice(0, 300) || null,
       notes: null,
       options: [option],
+      from: {
+        customer: customer?.name ?? null,
+        currency: currency === theirs && currency !== settings.sales.currency ? "customer" : "settings",
+        delivery: before ? "last_quotation" : "settings",
+        lastQuotation: before?.quotation.inquiry.refNo ?? null,
+      },
     };
   }
 
