@@ -34,8 +34,9 @@ export class AccountsService {
     const u = await this.prisma.company(companyId).user.findUniqueOrThrow({ where: { id: userId } });
     const token = await this.tokens.signPurpose("set_password", { uid: u.id, cid: companyId, pw: fingerprint(u.passwordHash) }, "7d");
     // At the company's own address (once companies have addresses).
-    const c = await this.prisma.platform.company.findUniqueOrThrow({ where: { id: companyId }, select: { slug: true } });
-    return `${companyOrigin(c.slug, this.env.BASE_DOMAIN, this.env.APP_URL)}/set-password?token=${encodeURIComponent(token)}`;
+    const c = await this.prisma.platform.company.findUniqueOrThrow({ where: { id: companyId }, select: { slug: true, ownDomain: true, ownDomainStatus: true } });
+    const own = c.ownDomainStatus === "connected" ? c.ownDomain : null;
+    return `${companyOrigin(c.slug, this.env.BASE_DOMAIN, this.env.APP_URL, own)}/set-password?token=${encodeURIComponent(token)}`;
   }
 
   /** What a set-password link is for (the page shows it before the password is chosen). */

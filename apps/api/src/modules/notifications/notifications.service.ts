@@ -122,8 +122,8 @@ export class NotificationsService implements OnModuleInit {
     if (!s.notifications[kind] || !s.notifications.emails.length) return;
     try {
       // Links go to the company's own address (once companies have addresses).
-      const slug = CompanyContext.current()?.slug;
-      const origin = slug ? companyOrigin(slug, this.env.BASE_DOMAIN, this.env.APP_URL) : this.env.APP_URL;
+      const company = CompanyContext.current();
+      const origin = company ? companyOrigin(company.slug, this.env.BASE_DOMAIN, this.env.APP_URL, company.domain) : this.env.APP_URL;
       const { html, text } = renderEmail({
         ...content,
         link: content.link ? new URL(content.link, origin).toString() : undefined,
@@ -150,8 +150,8 @@ export class NotificationsService implements OnModuleInit {
       if (!mailer.enabled) return false;
       const to = await this.prisma.db.user.findFirst({ where: { id: userId, isActive: true, isSystem: false, platformAdminId: null }, select: { email: true } });
       if (!to?.email) return false;
-      const slug = CompanyContext.current()?.slug;
-      const origin = slug ? companyOrigin(slug, this.env.BASE_DOMAIN, this.env.APP_URL) : this.env.APP_URL;
+      const company = CompanyContext.current();
+      const origin = company ? companyOrigin(company.slug, this.env.BASE_DOMAIN, this.env.APP_URL, company.domain) : this.env.APP_URL;
       const s = await this.settings.get();
       const { html, text } = renderEmail({
         ...content,

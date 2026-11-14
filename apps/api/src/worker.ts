@@ -7,6 +7,7 @@ import { PrismaModule, PrismaService } from "./database/prisma.service";
 import { CommonModule } from "./common/common.module";
 import { EventsModule } from "./common/events/event-bus";
 import { CompaniesModule } from "./common/company/companies.service";
+import { OwnDomainModule, OwnDomainService } from "./common/company/own-domain.service";
 import { LimitsModule } from "./common/company/limits.service";
 import { toInfo } from "./common/company/companies.service";
 import { CompanyContext } from "./common/company/company-context";
@@ -32,13 +33,15 @@ import { LedgerService } from "./modules/ledger/ledger.service";
  * caught up on every tick, and once a day (the first tick of the day, so at start too) worked out again in
  * full, compared, and every difference logged and fixed; and the ledger (once a day: what a save did not post is posted, then
  * it is checked against today's figures; a difference goes to the platform log). Follow-ups' reminders (the day's, and 30 minutes
- * before a set time) also run on their own, shorter schedule (FOLLOW_UP_INTERVAL_MINUTES, default 5).
+ * before a set time) also run on their own, shorter schedule (FOLLOW_UP_INTERVAL_MINUTES, default 5); on that
+ * beat companies' own domains that are due are looked up again too (OwnDomainService.sweep).
  */
 @Module({
   imports: [
     EnvModule,
     PrismaModule,
     CompaniesModule,
+    OwnDomainModule,
     LimitsModule,
     CommonModule,
     EventsModule,
@@ -66,6 +69,7 @@ async function main() {
   const facts = app.get(FactsService);
   const clock = app.get(Clock);
   const ledger = app.get(LedgerService);
+  const domains = app.get(OwnDomainService);
   let checkedOn: string | null = null;
   const minutes = Math.max(Number(process.env.REMINDER_INTERVAL_MINUTES) || 60, 1);
   const log = new Logger("Worker");
@@ -105,6 +109,8 @@ async function main() {
     } catch (e) {
       log.error(`follow-up reminders failed: ${(e as Error).stack ?? e}`);
     } finally {
+      // Companies' own domains: the ones waiting for their record, and now and then the connected ones.
+      await domains.sweep().catch((e) => log.error(`own domains check failed: ${(e as Error).stack ?? e}`));
       followingUp = false;
     }
   };

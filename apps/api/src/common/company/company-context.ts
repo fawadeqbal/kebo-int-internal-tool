@@ -13,6 +13,8 @@ export interface CompanyInfo {
   planId: string | null;
   /** Modules switched off for this company by the platform admin. */
   featuresOff: string[];
+  /** The company's own domain, while it is connected ("erp.acme.com"): its address then. Null: its address under ours. */
+  domain: string | null;
 }
 
 const storage = new AsyncLocalStorage<{ company: CompanyInfo | null }>();

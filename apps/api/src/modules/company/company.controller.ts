@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { Body, Controller, Get, HttpCode, Inject, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { fromDbDateOrNull } from "@kebo/database";
@@ -13,6 +13,7 @@ import { Validate } from "../../common/http/zod.pipe";
 import { AuditService } from "../../common/audit/audit.service";
 import { CompanyContext } from "../../common/company/company-context";
 import { CompaniesService } from "../../common/company/companies.service";
+import { OwnDomainService } from "../../common/company/own-domain.service";
 import { SettingsService } from "../settings/settings.service";
 import { LimitsService } from "../../common/company/limits.service";
 
@@ -30,6 +31,7 @@ export class CompanyController {
     private readonly companies: CompaniesService,
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
+    private readonly domains: OwnDomainService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -117,6 +119,60 @@ export class CompanyController {
       },
     });
     return { slug: body.slug, url: companyOrigin(body.slug, this.env.BASE_DOMAIN, this.env.APP_URL) };
+  }
+
+  /* ---------------------------------------------------------------- the company's own domain */
+
+  /** In the company's history and the platform log, like a change of address. */
+  private async domainLog(user: SessionUser, summary: string, platformSummary: string) {
+    const c = CompanyContext.require();
+    await this.prisma.tx((tx) => this.audit.record(tx, { userId: user.id, action: "update", entityType: "settings", summary }));
+    await this.prisma.platform.platformLog.create({ data: { action: "update", adminName: `${user.name} (${c.name})`, summary: platformSummary, companyId: c.id } });
+  }
+
+  /** The company's own domain: none, waiting for its record, connected or lost; and the one record to add. `enabled`: offered on this server. */
+  @Get("domain")
+  @RequirePermissions("settings.manage", "security.manage")
+  async domain(@CurrentUser() user: SessionUser) {
+    return { enabled: this.domains.enabled, ...(await this.domains.get(CompanyContext.require().id, await this.mayChange(user))) };
+  }
+
+  /** Connects a domain the company owns (Super Admin): kept, and looked up at once. */
+  @Put("domain")
+  @RequirePermissions("settings.manage", "security.manage")
+  async connectDomain(@CurrentUser() user: SessionUser, @Body(Validate(z.object({ domain: z.string().trim().min(1, "Type the domain").max(260) }))) body: { domain: string }) {
+    const c = CompanyContext.require();
+    if (!(await this.mayChange(user))) throw new ForbiddenError("Only a Super Admin can connect the company's own domain.");
+    const row = await this.domains.connect(c.id, body.domain);
+    await this.domainLog(
+      user,
+      `Connected the company's own domain ${row.ownDomain}${row.ownDomainStatus === "connected" ? "" : " (waiting for its record)"}`,
+      `${c.name} connected its own domain ${row.ownDomain}${row.ownDomainStatus === "connected" ? "" : " (waiting for its record)"}`,
+    );
+    return this.domain(user);
+  }
+
+  /** Looks the domain up now ("Check now"). */
+  @Post("domain/check")
+  @HttpCode(200)
+  @RequirePermissions("settings.manage", "security.manage")
+  async checkDomain(@CurrentUser() user: SessionUser) {
+    await this.domains.check(CompanyContext.require().id);
+    return this.domain(user);
+  }
+
+  /** Removes it (Super Admin): the company is at its address under ours only. */
+  @Delete("domain")
+  @RequirePermissions("settings.manage", "security.manage")
+  async removeDomain(@CurrentUser() user: SessionUser) {
+    const c = CompanyContext.require();
+    if (!(await this.mayChange(user))) throw new ForbiddenError("Only a Super Admin can remove the company's own domain.");
+    const before = await this.domains.get(c.id, true);
+    if (before.domain) {
+      await this.domains.remove(c.id);
+      await this.domainLog(user, `Removed the company's own domain ${before.domain} (back to ${before.ours})`, `${c.name} removed its own domain ${before.domain}`);
+    }
+    return this.domain(user);
   }
 
   /* ---------------------------------------------------------------- website form */

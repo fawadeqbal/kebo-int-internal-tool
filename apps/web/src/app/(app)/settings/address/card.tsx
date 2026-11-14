@@ -4,7 +4,7 @@ import { AddressEdit } from "./form";
 import type { AddressView } from "./types";
 
 /** The company's own address (<short name>.<BASE_DOMAIN>), and changing it. */
-export async function AddressCard() {
+export async function AddressCard({ sendsTo }: { /** The company's own domain, while it is connected: this address sends people on to it. */ sendsTo?: string | null }) {
   const view = await api.get<AddressView>("/company/address");
   const host = view.url.replace(/^https:\/\//, "");
   const wait = view.nextChangeOn
@@ -24,6 +24,7 @@ export async function AddressCard() {
           <a href={view.url} className="mt-1 inline-block font-mono text-base font-medium text-primary hover:underline">
             {host}
           </a>
+          {sendsTo && <p className="mt-1 text-xs text-text-2">Sends people on to {sendsTo}</p>}
         </div>
         {!view.canChange ? (
           <Alert tone="info">Only a Super Admin can change the company&apos;s address.</Alert>
