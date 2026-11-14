@@ -56,7 +56,10 @@ describe("every read endpoint answers for every record", () => {
       await ok(manager, `/customers/${c.id}/credit`);
       await ok(manager, `/payments?customerId=${c.id}`);
     }
-    for (const f of (await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]) await ok(manager, `/factories/${f.id}`);
+    for (const f of (await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]) {
+      await ok(manager, `/factories/${f.id}`);
+      await ok(manager, `/factories/${f.id}/last-offer`);
+    }
   });
 
   it("every record's notes and follow-ups, and every follow-up", async () => {

@@ -5,7 +5,7 @@ import { factoryQuoteInput } from "@kebo/shared";
 import { api, ApiError } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
-import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
+import type { FactoryOption, FactoryQuoteView, LastOffer } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
@@ -16,6 +16,15 @@ export async function searchFactoriesAction(q: string): Promise<FactoryOption[]>
     return res.rows.map((f) => ({ id: f.id, name: f.name, contactPerson: f.contactPerson }));
   } catch {
     return [];
+  }
+}
+
+/** What this factory said on its last offer (null: none yet, or it could not be read): a new offer starts from it. */
+export async function lastOfferAction(factoryId: string): Promise<LastOffer | null> {
+  try {
+    return (await api.get<{ offer: LastOffer | null }>(`/factories/${factoryId}/last-offer`)).offer;
+  } catch {
+    return null;
   }
 }
 
