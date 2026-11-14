@@ -7,9 +7,10 @@
  * a group whose pages are all hidden is hidden. Reports is one page (its reports are tabs on it), so
  * it is a link of its own like Home; notifications open from the bell.
  *
- * Clean-up (14 Nov 2026): Shipments and Purchase orders are no longer pages of their own (a shipment
- * and a purchase order are on their order); Settings is two groups, the company's own settings
- * (managers too) and the admin's (people, roles, sign-ins, sessions, the activity log).
+ * Clean-up (14 Nov 2026): Shipments is no longer a page of its own (a shipment is on its order);
+ * Purchase orders has its list again, and each one a page of its own that shows it (it is still made
+ * from, and changed on, its sales order); Settings is two groups, the company's own settings (managers
+ * too) and the admin's (people, roles, sign-ins, sessions, email sending, the activity log).
  */
 
 export type ModuleKey = "sales" | "purchasing" | "money" | "reports" | "company" | "admin";
@@ -50,11 +51,13 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     ],
   },
   {
-    // One page of the group's own name: a link of its own, like Reports (purchase orders are on their order).
     key: "purchasing",
-    title: "Suppliers",
+    title: "Purchasing",
     icon: "purchasing",
-    pages: [{ href: "/factories", label: "Suppliers" }],
+    pages: [
+      { href: "/operations/purchase-orders", label: "Purchase orders" },
+      { href: "/factories", label: "Suppliers" },
+    ],
   },
   {
     key: "money",
@@ -197,6 +200,7 @@ export function buildModules({
     "/audit": can("audit.view") && feature("audit_log"),
     "/settings/website-form": settings,
     "/factories": sourcing,
+    "/operations/purchase-orders": sourcing,
     "/money/company-costs": sourcing && managers && feature("expenses"),
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
     "/settings/company": settings,

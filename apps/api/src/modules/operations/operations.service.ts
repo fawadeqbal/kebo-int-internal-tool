@@ -82,11 +82,11 @@ export class OperationsService {
    * order number (the factory step), that supplier's ready date, and what we owe and paid it (Billing's rule).
    * `open`: only those with something still to pay or not ready yet.
    */
-  async purchaseOrders(user: SessionUser, open: boolean, withCancelled = false) {
+  async purchaseOrders(user: SessionUser, open: boolean, withCancelled = false, orderId?: string) {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
     const fx = fxOf(await this.settings.get(), await this.limits.allows("expenses"));
     const orders = await this.prisma.db.order.findMany({
-      where: { ...orderAccess(user), ...(withCancelled ? {} : { status: { not: "cancelled" } }), lines: { some: { factoryId: { not: null } } } },
+      where: { ...orderAccess(user), ...(orderId ? { id: orderId } : {}), ...(withCancelled ? {} : { status: { not: "cancelled" } }), lines: { some: { factoryId: { not: null } } } },
       select: {
         id: true,
         refNo: true,
