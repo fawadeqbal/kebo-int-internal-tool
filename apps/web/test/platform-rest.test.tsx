@@ -110,6 +110,7 @@ describe("platform menu", () => {
       "/platform/leads",
       "/platform/plans",
       "/platform/log",
+      "/platform/dev-tools",
       "/platform/settings",
     ]);
     expect(within(nav).getByRole("link", { name: /Plans/ }).getAttribute("aria-current")).toBe("page");
