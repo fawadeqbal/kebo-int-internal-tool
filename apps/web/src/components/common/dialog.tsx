@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@kebo/ui";
+import { useChanges, watchChanges } from "./changes";
 
 const noop = () => () => {};
 /** True in the browser, false while rendering on the server. */
@@ -153,8 +154,10 @@ export function ConfirmDialog({
 
 /**
  * A dialog over the page (board OrderCancel): a title and one line under it,
- * the close button, the body, and the footer's buttons. Escape or the backdrop
- * closes it (unless busy); focus stays inside while it is open.
+ * the close button, the body, and the footer's buttons. Escape, × or the
+ * backdrop closes it (unless busy): at once when nothing in it was changed,
+ * after "Discard changes?" when something was (the same rule as the side
+ * panel). Focus stays inside while it is open.
  */
 export function Modal({
   title,
@@ -176,20 +179,28 @@ export function Modal({
   const id = useId();
   const box = useRef<HTMLDivElement>(null);
   const mounted = useMounted();
+  const [asking, setAsking] = useState(false);
+  const changes = useChanges(box);
   useFocusTrap(box, mounted);
+  const close = () => {
+    if (busy) return;
+    if (changes.changed()) setAsking(true);
+    else onClose();
+  };
   if (!mounted) return null;
   return createPortal(
     <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto p-4" data-layer>
-      <div aria-hidden className="fixed inset-0 bg-black/40" onClick={() => !busy && onClose()} />
+      <div aria-hidden className="fixed inset-0 bg-black/40" onClick={close} />
       <div
         ref={box}
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-t`}
+        {...watchChanges(changes)}
         onKeyDown={(e) => {
           if (e.key !== "Escape") return;
           e.stopPropagation();
-          if (!busy) onClose();
+          close();
         }}
         className={`relative flex max-h-[calc(100dvh-2rem)] w-full animate-in flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-pop ${size === "lg" ? "max-w-3xl" : "max-w-xl"}`}
       >
@@ -200,13 +211,28 @@ export function Modal({
             </h2>
             {sub && <p className="text-sm text-text-2">{sub}</p>}
           </div>
-          <Button size="sm" variant="secondary" aria-label="Close" onClick={onClose} disabled={busy} className="size-9 px-0">
+          <Button size="sm" variant="secondary" aria-label="Close" onClick={close} disabled={busy} className="size-9 px-0">
             <span aria-hidden>×</span>
           </Button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">{children}</div>
         {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line bg-surface-2/60 px-5 py-3.5 sm:px-6">{footer}</div>}
       </div>
+      {asking && (
+        <ConfirmDialog
+          title="Discard changes?"
+          confirmLabel="Discard"
+          cancelLabel="Keep editing"
+          danger
+          onCancel={() => setAsking(false)}
+          onConfirm={() => {
+            setAsking(false);
+            onClose();
+          }}
+        >
+          What you changed here is not saved yet.
+        </ConfirmDialog>
+      )}
     </div>,
     document.body,
   );

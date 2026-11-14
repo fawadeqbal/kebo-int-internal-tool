@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { Modal } from "@/components/common/dialog";
 import { PanelActions, PanelBody, SidePanel, useClosePanel } from "@/components/common/panel";
 
 function Form({ onSubmit }: { onSubmit: () => void }) {
@@ -157,5 +158,121 @@ describe("SidePanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Pretend saved" }));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  describe("knows whether something was changed", () => {
+    /** A window on a record that has values, a tick, a choice kept in a hidden field, and a field that announces itself. */
+    function Editor({ late }: { late?: boolean }) {
+      const [unit, setUnit] = useState("set");
+      const [city, setCity] = useState("");
+      const hidden = useRef<HTMLInputElement>(null);
+      // Like the logo field: it tells the form about itself when it appears.
+      useEffect(() => {
+        hidden.current?.dispatchEvent(new Event("input", { bubbles: true }));
+      }, []);
+      // A value that arrives a moment after the window opens.
+      useEffect(() => {
+        if (!late) return;
+        const t = setTimeout(() => setCity("Lahore"), 10);
+        return () => clearTimeout(t);
+      }, [late]);
+      return (
+        <PanelBody>
+          <input aria-label="Name" name="name" defaultValue="Lahore Pharma" />
+          <input aria-label="City" name="city" value={city} onChange={(e) => setCity(e.target.value)} />
+          <input aria-label="Active" name="active" type="checkbox" defaultChecked />
+          <input ref={hidden} type="hidden" name="unit" value={unit} />
+          <button type="button" onClick={() => setUnit(unit === "set" ? "pcs" : "set")}>
+            Unit: {unit}
+          </button>
+        </PanelBody>
+      );
+    }
+    const show = (late?: boolean) => {
+      const onClose = vi.fn();
+      render(
+        <SidePanel title="Edit customer · Lahore Pharma" onClose={onClose}>
+          <Editor late={late} />
+        </SidePanel>,
+      );
+      return onClose;
+    };
+    /** As a person types: the key first, then the field changes. */
+    const type = (el: HTMLElement, value: string) => {
+      fireEvent.keyDown(el, { key: value.slice(-1) || "Backspace" });
+      fireEvent.input(el, { target: { value } });
+    };
+    const close = () => fireEvent.click(screen.getByRole("button", { name: "Close the panel" }));
+    const asks = () => screen.queryByRole("alertdialog", { name: "Discard changes?" }) !== null;
+
+    it("opened and closed with nothing touched: closes at once (a field that announces itself is not a change)", () => {
+      const onClose = show();
+      fireEvent.pointerDown(screen.getByLabelText("Name"));
+      close();
+      expect(asks()).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("typed and put back as it was: nothing changed", () => {
+      const onClose = show();
+      type(screen.getByLabelText("Name"), "Lahore Pharma Ltd");
+      close();
+      expect(asks()).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+      type(screen.getByLabelText("Name"), "Lahore Pharma");
+      close();
+      expect(asks()).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("a tick or a choice with no typing is a change; put back, it is not", () => {
+      const onClose = show();
+      fireEvent.pointerDown(screen.getByLabelText("Active"));
+      fireEvent.click(screen.getByLabelText("Active"));
+      close();
+      expect(asks()).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+      fireEvent.click(screen.getByLabelText("Active"));
+      // The choice kept in a hidden field.
+      fireEvent.pointerDown(screen.getByRole("button", { name: "Unit: set" }));
+      fireEvent.click(screen.getByRole("button", { name: "Unit: set" }));
+      close();
+      expect(asks()).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+      fireEvent.click(screen.getByRole("button", { name: "Unit: pcs" }));
+      close();
+      expect(asks()).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("what the form fills in by itself after it opens is not a change", async () => {
+      const onClose = show(true);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 30));
+      });
+      expect((screen.getByLabelText("City") as HTMLInputElement).value).toBe("Lahore");
+      fireEvent.keyDown(screen.getByLabelText("Name"), { key: "Escape" });
+      expect(asks()).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("the small window follows the same rule", () => {
+      const onClose = vi.fn();
+      render(
+        <Modal title="Cancel the order?" onClose={onClose}>
+          <input aria-label="Reason" name="reason" />
+        </Modal>,
+      );
+      // Untouched: Escape closes it.
+      fireEvent.keyDown(screen.getByLabelText("Reason"), { key: "Escape" });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      // Something typed: it asks; Discard closes.
+      type(screen.getByLabelText("Reason"), "Customer changed their mind");
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      expect(asks()).toBe(true);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+      expect(onClose).toHaveBeenCalledTimes(2);
+    });
   });
 });

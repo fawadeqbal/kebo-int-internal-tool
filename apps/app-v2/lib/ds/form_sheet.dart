@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -139,7 +140,37 @@ class _FormSheetState extends State<FormSheet> {
   final errors = <String, String>{};
   String? problem;
   bool busy = false;
-  bool changed = false;
+
+  /// What the form started with. Leaving asks "Discard changes?" only when the values differ from it now:
+  /// typed and put back as it was is not a change.
+  late final String _start;
+
+  @override
+  void initState() {
+    super.initState();
+    _start = _text(values);
+  }
+
+  bool get changed => _text(values) != _start;
+
+  /// The values as one text to compare: keys in order, and an empty field the same as no value.
+  static String _text(Json j) {
+    Object? plain(Object? v) {
+      if (v is Map) {
+        final keys = [for (final k in v.keys) '$k']..sort();
+        return {
+          for (final k in keys)
+            if (plain(v[k]) != null) k: plain(v[k]),
+        };
+      }
+      if (v is List) return [for (final x in v) plain(x)];
+      if (v is String) return v.trim().isEmpty ? null : v.trim();
+      if (v == null || v is num || v is bool) return v;
+      return '$v';
+    }
+
+    return jsonEncode(plain(j));
+  }
 
   static Json _copy(Json j) => {
         for (final e in j.entries)
@@ -150,7 +181,6 @@ class _FormSheetState extends State<FormSheet> {
 
   void _set(Json target, String key, Object? v) => setState(() {
         target[key] = v;
-        changed = true;
         if (identical(target, values)) {
           final r = widget.onChange?.call(values, key);
           if (r is Future) r.then((_) => mounted ? setState(() {}) : null);
@@ -335,7 +365,6 @@ class _FormSheetState extends State<FormSheet> {
                 TextButton(
                   onPressed: () => setState(() {
                     (values[l.key] as List<dynamic>).removeAt(i);
-                    changed = true;
                   }),
                   child: Text('Remove', style: TextStyle(color: c.bad)),
                 ),
@@ -360,7 +389,6 @@ class _FormSheetState extends State<FormSheet> {
           label: Text(l.addLabel),
           onPressed: () => setState(() {
             values[l.key] = [..._items(l.key), l.blank()];
-            changed = true;
           }),
         ),
       ));
