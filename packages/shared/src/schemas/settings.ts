@@ -131,6 +131,55 @@ export const papersSettings = z.object({
     .transform((list) => [...new Set(list.filter(isPaperSwitch))]),
 });
 
+/* ---------------------------------------------------------------- a company's own outgoing email */
+
+/** How a company sends its email: its Gmail account, any SMTP server, or Resend. */
+export const MAIL_PROVIDERS = ["gmail", "smtp", "resend"] as const;
+export type MailProvider = (typeof MAIL_PROVIDERS)[number];
+export const MAIL_PROVIDER_LABEL: Record<MailProvider, string> = { gmail: "Gmail", smtp: "SMTP server", resend: "Resend" };
+/** The ports a mail server listens on (nothing else is dialled from the server). */
+export const SMTP_PORTS = [25, 465, 587, 2525] as const;
+
+/**
+ * Admin settings › Email sending. `secret` is the Gmail app password, the SMTP password or the Resend API
+ * key: sent only when it is typed (left out: the one already stored is kept), never sent back.
+ */
+export const mailSettingsInput = z
+  .object({
+    provider: z.enum(MAIL_PROVIDERS),
+    fromName: z.string().trim().max(80).default(""),
+    fromEmail: z.string().trim().toLowerCase().email("Type the email address it is sent from").max(200),
+    host: z.string().trim().toLowerCase().max(200).optional(),
+    port: z.coerce.number().int().optional(),
+    username: z.string().trim().max(200).optional(),
+    secret: z.string().max(500).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.provider !== "smtp") return;
+    if (!v.host || !/^[a-z0-9.-]+$/.test(v.host)) ctx.addIssue({ code: "custom", path: ["host"], message: "Type the mail server's name, like smtp.example.com" });
+    if (!v.port || !(SMTP_PORTS as readonly number[]).includes(v.port)) ctx.addIssue({ code: "custom", path: ["port"], message: `Use port ${SMTP_PORTS.join(", ")}` });
+  });
+export type MailSettingsInput = z.infer<typeof mailSettingsInput>;
+
+export const mailTestInput = z.object({ to: z.string().trim().toLowerCase().email("Type an email address to send the test to").max(200) });
+export type MailTestInput = z.infer<typeof mailTestInput>;
+
+/** What the page is given: everything but the secret. */
+export interface MailSettingsView {
+  /** null: the company has not set its own; its email goes through the server's, when the server has one. */
+  provider: MailProvider | null;
+  fromName: string;
+  fromEmail: string;
+  host: string;
+  port: number | null;
+  username: string;
+  hasSecret: boolean;
+  /** The server has its own email set up (used while the company has none). */
+  serverDefault: boolean;
+  /** Email can be sent right now, one way or the other. */
+  enabled: boolean;
+}
+
 export const SETTINGS = {
   company: companySettings,
   sales: salesSettings,

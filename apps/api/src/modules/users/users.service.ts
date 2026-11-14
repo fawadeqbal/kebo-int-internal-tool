@@ -5,7 +5,8 @@ import { can, PERMISSION_GROUPS, permissionsInPlan, PRESET_ROLES } from "@kebo/s
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { NotificationsService } from "../notifications/notifications.service";
 import { Clock } from "../../common/time/clock.service";
-import { getMailer, renderEmail } from "../../common/notify/mailer";
+import { renderEmail } from "../../common/notify/mailer";
+import { CompanyMail } from "../../common/notify/company-mail";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { ENV, type Env } from "../../config/env";
@@ -62,6 +63,7 @@ export class UsersService {
     private readonly limits: LimitsService,
     private readonly notifications: NotificationsService,
     private readonly clock: Clock,
+    private readonly mail: CompanyMail,
   ) {}
 
   /* ---------------------------------------------------------------- shared with sign-in */
@@ -237,7 +239,7 @@ export class UsersService {
       dedupeKey: `two-step:${id}:${today}`,
     });
     if (sent) {
-      const mailer = getMailer();
+      const mailer = await this.mail.mailer();
       if (mailer.enabled) {
         const content = renderEmail({
           heading: "Please turn on two-step sign-in",
