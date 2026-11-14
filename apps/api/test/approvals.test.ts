@@ -207,9 +207,9 @@ describe("money sent for approval", () => {
 
     // Managers are told and see it in their list; staff see only their own.
     expect(
-      (await notes(manager)).find((n) => n.type === "approval.waiting" && n.title === `To approve: money received · ${refNo}`),
+      (await notes(manager)).find((n) => n.type === "approval.waiting" && n.title === `To approve: USD 100 received from Approve Co ${tag} (${refNo})`),
     ).toMatchObject({
-      body: `Sana added USD 100.00 from Approve Co ${tag}`,
+      body: `${refNo} · Check it against the bank, then approve or send it back.`,
       link: "/approvals",
     });
     expect((await notes(sana)).some((n) => n.type === "approval.waiting")).toBe(false);
@@ -264,7 +264,7 @@ describe("money sent for approval", () => {
     ).toBe(true);
     expect(history.some((h) => h.summary.startsWith(`${refNo}: received USD 100.00`))).toBe(true);
     expect((await notes(sana)).find((n) => n.type === "approval.approved")).toMatchObject({
-      title: `Approved: money received · ${refNo} · USD 100.00`,
+      title: `Approved: USD 100 received from Approve Co ${tag} (${refNo})`,
       link: `/orders/${orderId}`,
     });
 
@@ -290,8 +290,8 @@ describe("money sent for approval", () => {
       .body as Submission;
     expect(back).toMatchObject({ status: "sent_back", reason: "The slip shows USD 60", decidedBy: { name: "Manager" } });
     expect((await notes(sana)).find((n) => n.type === "approval.sentBack")).toMatchObject({
-      title: `Sent back: money received · ${refNo} · USD 50.00`,
-      body: "The slip shows USD 60",
+      title: `Sent back: USD 50 received from Approve Co ${tag} (${refNo})`,
+      body: `${refNo} · Fix it and send it again: \u201cThe slip shows USD 60\u201d`,
       link: "/approvals?mine=true",
     });
     await api(app, manager).post(`/submissions/${sent.id}/approve`).expect(409);
@@ -345,7 +345,7 @@ describe("money sent for approval", () => {
     expect(spent.order).toMatchObject({ id: orderId });
     // Nothing spent yet.
     expect(await prisma.company(FIRST_COMPANY_ID).expense.count({ where: { orderId } })).toBe(0);
-    expect((await notes(manager)).some((n) => n.type === "approval.waiting" && n.title === "To approve: expense · USD 25.00")).toBe(true);
+    expect((await notes(manager)).some((n) => n.type === "approval.waiting" && n.title === `To approve: expense USD 25, Taxi to the factory (${refNo})`)).toBe(true);
 
     const accountsList = (await api(app, accounts).get("/submissions").expect(200)).body as List;
     expect(accountsList.approves).toEqual(["payment"]);

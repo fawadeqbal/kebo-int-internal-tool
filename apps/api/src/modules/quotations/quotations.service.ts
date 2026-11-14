@@ -837,6 +837,8 @@ export class QuotationsService {
       events.unshift({
         type: "revision.statusChanged",
         inquiryId: inquiry.id,
+        revisionId: r.id,
+        reason: reason ?? null,
         refNo: `${r.quotation.refNo} R${r.number}`,
         revision: r.number,
         status: to,

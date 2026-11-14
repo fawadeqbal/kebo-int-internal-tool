@@ -20,12 +20,15 @@ const KINDS: [test: string, label: string, tone: Tone][] = [
   ["inquiry.created", "New inquiry", "info"],
   ["inquiry.assigned", "Given to you", "neutral"],
   ["inquiry.won", "Inquiry won", "ok"],
+  ["quotation.sent", "Quotation sent", "info"],
   ["inquiry.lost", "Inquiry lost", "bad"],
   ["inquiry.", "Inquiry moved", "info"],
   ["quotation.accepted", "Quotation accepted", "ok"],
   ["quotation.rejected", "Quotation turned down", "bad"],
   ["quotation.", "Quotation", "info"],
   ["order.created", "Order made", "ok"],
+  ["order.purchaseOrderSent", "Purchase order", "info"],
+  ["order.shipped", "Shipped", "ok"],
   ["order.", "Order moved", "info"],
   ["reminder.orderEscalated", "Order late", "bad"],
   ["reminder.order", "Order needs you", "warn"],
@@ -42,8 +45,12 @@ const KINDS: [test: string, label: string, tone: Tone][] = [
   ["two_step", "Your account", "warn"],
 ];
 
-/** The label and colour of a notification's type ("Payment to verify", ok). */
-export function alertKind(type: string): { label: string; tone: Tone } {
+/**
+ * The label and colour of a notification ("Payment to verify", ok): its message's own label when it has one
+ * (and red when it needs action today), else from its type.
+ */
+export function alertKind(type: string, message?: { tag?: string; urgent?: boolean } | null): { label: string; tone: Tone } {
   const hit = KINDS.find(([t]) => (t.endsWith(".") ? type.startsWith(t) : type === t)) ?? KINDS.find(([t]) => type.startsWith(t));
-  return hit ? { label: hit[1], tone: hit[2] } : { label: "Update", tone: "neutral" };
+  const kind = hit ? { label: hit[1], tone: hit[2] } : { label: "Update", tone: "neutral" as Tone };
+  return { label: message?.tag || kind.label, tone: message?.urgent ? "bad" : kind.tone };
 }

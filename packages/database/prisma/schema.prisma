@@ -451,6 +451,9 @@ model Notification {
   title     String    @db.VarChar(255)
   body      String?
   link      String?   @db.VarChar(255)
+  /// The whole message (@kebo/shared Message): what happened, where, who, money, next. Kept so the web and the
+  /// phone can show it in full later; title (its subject) and body (its record and next step) are its short form.
+  message   Json?
   /// Stops the reminder job sending the same reminder twice.
   dedupeKey String?   @map("dedupe_key") @db.VarChar(200)
   readAt    DateTime? @map("read_at") @db.Timestamptz

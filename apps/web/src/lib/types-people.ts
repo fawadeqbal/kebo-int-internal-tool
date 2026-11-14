@@ -210,6 +210,8 @@ export interface AuditRow {
 }
 
 export interface NotificationItem {
+  /** The whole message (what happened, where, who, money, next), for those sent since messages have one shape. */
+  message?: { tag?: string; urgent?: boolean } | null;
   id: string;
   type: string;
   title: string;

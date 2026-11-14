@@ -1,12 +1,19 @@
 import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { companyOrigin, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, ORDER_STAGE_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
+import { companyOrigin, messageLine, type Message } from "@kebo/shared";
 import { CompanyContext } from "../../common/company/company-context";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { ENV, type Env } from "../../config/env";
 import { renderEmail } from "../../common/notify/mailer";
+import { renderMessageEmail } from "../../common/notify/message-email";
+import { Clock } from "../../common/time/clock.service";
 import { CompanyMail } from "../../common/notify/company-mail";
 import { sendPush } from "../../common/notify/fcm";
+import { fromDbDateOrNull } from "@kebo/database";
+import { toMinor } from "@kebo/money";
+import { factoryPlansOf, fxOf } from "../billing/api";
+import { day, inquiryFacts, money, orderFacts, revisionFacts } from "./facts";
+import { inquiryLost, inquiryNew, inquiryYours, paymentIn, purchaseOrderSent, quotationAccepted, quotationRejected, quotationSent, shipped } from "./messages";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { LimitsService } from "../../common/company/limits.service";
@@ -54,6 +61,7 @@ export class NotificationsService implements OnModuleInit {
     @Inject(ENV) private readonly env: Env,
     private readonly limits: LimitsService,
     private readonly mail: CompanyMail,
+    private readonly clock: Clock,
   ) {}
 
   /* ---------------------------------------------------------------- sending */
@@ -92,6 +100,88 @@ export class NotificationsService implements OnModuleInit {
     const fresh = res.map((r) => r.userId);
     if (fresh.length) void this.push(fresh, n);
     return fresh.length;
+  }
+
+  /**
+   * The one way to tell people something (claude/messages-design.md): the message is kept in each person's bell
+   * (its subject, and its record and next step), pushed to their phones, and emailed to them in full. `to`:
+   * groups of people with what they are to it ("who handles it", "a manager"), said at the foot of the email;
+   * someone in two groups is told once, as the first. Nobody is told about their own action. `dedupeKey`: never
+   * the same twice to the same person. `email: false`: bell and phone only (a reminder 30 minutes before).
+   * `copy`: also emailed to the admin list in Company settings › Emails when that kind is switched on there.
+   * Returns how many people were told (new ones only).
+   */
+  async send(
+    m: Message,
+    to: { ids: (string | null | undefined)[]; as: string }[],
+    opts: { actorId?: string | null; dedupeKey?: string | null; email?: boolean; copy?: "newInquiry" | "dealWonOrLost" | "paymentReceived" } = {},
+  ): Promise<number> {
+    const as = new Map<string, string>();
+    for (const g of to) for (const id of g.ids) if (id && id !== opts.actorId && !as.has(id)) as.set(id, g.as);
+    let fresh: string[] = [];
+    if (as.size) {
+      const res = await this.prisma.db.notification.createManyAndReturn({
+        data: [...as.keys()].map((userId) => ({
+          userId,
+          type: m.kind,
+          title: m.subject.slice(0, 255),
+          body: messageLine(m),
+          link: m.link,
+          dedupeKey: opts.dedupeKey ?? null,
+          message: m as unknown as object,
+        })),
+        skipDuplicates: true,
+        select: { userId: true },
+      });
+      fresh = res.map((r) => r.userId);
+      if (fresh.length) void this.push(fresh, { type: m.kind, title: m.subject, body: m.next, link: m.link });
+    }
+    if (opts.email !== false && fresh.length) await this.emailMessage(m, fresh.map((id) => ({ id, as: as.get(id)! })));
+    if (opts.copy) await this.copyToList(m, opts.copy);
+    return fresh.length;
+  }
+
+  /** Where links in emails go, and how the company and the time read in them. */
+  private async emailContext() {
+    const company = CompanyContext.current();
+    const origin = company ? companyOrigin(company.slug, this.env.BASE_DOMAIN, this.env.APP_URL, company.domain) : this.env.APP_URL;
+    const at = new Intl.DateTimeFormat("en-GB", { timeZone: this.clock.timeZone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(this.clock.now());
+    return { company: (await this.settings.get()).company.name || company?.name || "Kebo ERP", origin, at };
+  }
+
+  /** The message, emailed to each person at their own address (active people with an email; nothing when email is not set up). */
+  async emailMessage(m: Message, people: { id: string; as: string }[]) {
+    try {
+      const mailer = await this.mail.mailer();
+      if (!mailer.enabled || !people.length) return;
+      const users = await this.prisma.db.user.findMany({
+        where: { id: { in: people.map((p) => p.id) }, isActive: true, isSystem: false, platformAdminId: null },
+        select: { id: true, email: true },
+      });
+      const ctx = await this.emailContext();
+      for (const p of people) {
+        const email = users.find((u) => u.id === p.id)?.email;
+        if (!email) continue;
+        const { subject, html, text } = renderMessageEmail(m, { ...ctx, why: p.as });
+        await mailer.send({ to: email, subject, html, text }).catch((e: Error) => this.log.warn(`email to a person failed: ${e.message}`));
+      }
+    } catch (e) {
+      this.log.warn(`email failed: ${(e as Error).message}`);
+    }
+  }
+
+  /** A copy to the admin list (Company settings › Emails), for the kinds switched on there. */
+  private async copyToList(m: Message, kind: "newInquiry" | "dealWonOrLost" | "paymentReceived" | "dailySummary") {
+    const s = await this.settings.get();
+    if (!s.notifications[kind] || !s.notifications.emails.length) return;
+    try {
+      const mailer = await this.mail.mailer();
+      if (!mailer.enabled) return;
+      const { subject, html, text } = renderMessageEmail(m, { ...(await this.emailContext()), why: "your email is on the list in Company settings › Emails" });
+      await mailer.send({ to: s.notifications.emails, subject, html, text });
+    } catch (e) {
+      this.log.warn(`email to the list failed: ${(e as Error).message}`);
+    }
   }
 
   private async push(userIds: string[], n: NewNotification) {
@@ -173,113 +263,159 @@ export class NotificationsService implements OnModuleInit {
     this.bus.on("inquiry.assigned", (e) => this.inquiryAssigned(e));
     this.bus.on("inquiry.stageChanged", (e) => this.stageChanged(e));
     this.bus.on("revision.statusChanged", (e) => this.revisionChanged(e));
-    this.bus.on("order.created", (e) =>
-      this.notify(
-        e.notify,
-        {
-          type: "order.created",
-          title: `Order ${e.refNo} confirmed — send the proforma invoice and wait for the deposit`,
-          link: links.order(e.orderId),
-        },
-        e.actorId,
-      ).then(() => undefined),
-    );
-    this.bus.on("order.stageChanged", (e) =>
-      this.notify(
-        e.notify,
-        {
-          type: "order.stage",
-          title: `${e.refNo}: ${ORDER_STAGE_LABEL[e.from]} → ${ORDER_STAGE_LABEL[e.to]}`,
-          link: links.order(e.orderId),
-        },
-        e.actorId,
-      ).then(() => undefined),
-    );
+    // A sales order is made only when the customer accepts: "Customer accepted" says it (one message, not three).
+    this.bus.on("order.stageChanged", (e) => this.orderStage(e));
+    this.bus.on("purchaseOrder.sent", (e) => this.purchaseOrderSent(e));
     this.bus.on("payment.recorded", (e) => this.paymentRecorded(e));
   }
 
+  private nameOf = async (id: string | null | undefined) =>
+    id ? ((await this.prisma.db.user.findUnique({ where: { id }, select: { name: true } }))?.name ?? null) : null;
+
+  private async orderOf(id: string) {
+    const s = await this.settings.get();
+    return orderFacts(this.prisma.db, id, s, await this.limits.allows("expenses"), this.clock.today());
+  }
+
   private async inquiryCreated(e: Extract<DomainEvent, { type: "inquiry.created" }>) {
-    await this.notify(
-      await this.managerIds(),
-      {
-        type: "inquiry.created",
-        title: `New inquiry ${e.refNo}: ${e.title}`,
-        body: e.channel === "website" ? "From the website form — assign someone" : null,
-        link: links.deal(e.inquiryId),
-      },
-      e.actorId,
-    );
-    await this.emailAdmins("newInquiry", `New inquiry ${e.refNo}: ${e.title}`, {
-      heading: `New inquiry ${e.refNo}`,
-      rows: [
-        ["What", e.title],
-        ["Came in by", e.channel],
-      ],
-      link: links.deal(e.inquiryId),
-      linkLabel: "Open the inquiry",
+    const i = await inquiryFacts(this.prisma.db, e.inquiryId);
+    if (!i) return;
+    await this.send(inquiryNew(i, await this.nameOf(e.actorId)), [{ ids: await this.managerIds(), as: "a manager" }], {
+      actorId: e.actorId,
+      copy: "newInquiry",
     });
   }
 
   private async inquiryAssigned(e: Extract<DomainEvent, { type: "inquiry.assigned" }>) {
     if (!e.assigneeId) return;
-    await this.notify(
-      [e.assigneeId],
-      {
-        type: "inquiry.assigned",
-        title: `${e.refNo} is yours: ${e.title}`,
-        body: "Next: get factory prices",
-        link: links.deal(e.inquiryId),
-      },
-      e.actorId,
-    );
-  }
-
-  private async stageChanged(e: Extract<DomainEvent, { type: "inquiry.stageChanged" }>) {
-    if (e.to !== "won" && e.to !== "lost") return;
-    const title = `${e.refNo} ${e.to === "won" ? "won" : "lost"}: ${e.title}`;
-    await this.notify(
-      [...e.notify, ...(await this.managerIds())],
-      { type: `inquiry.${e.to}`, title, link: links.deal(e.inquiryId) },
-      e.actorId,
-    );
-    const deal = await this.prisma.db.inquiry.findUnique({ where: { id: e.inquiryId }, select: { lostReason: true, lostNote: true } });
-    await this.emailAdmins("dealWonOrLost", title, {
-      heading: title,
-      rows: [
-        ["Stage", `${INQUIRY_STAGE_LABEL[e.from]} → ${INQUIRY_STAGE_LABEL[e.to]}`],
-        ["Reason", e.to === "lost" && deal?.lostReason ? LOST_REASON_LABEL[deal.lostReason] : null],
-      ],
-      body: e.to === "lost" ? deal?.lostNote : null,
-      link: links.deal(e.inquiryId),
-      linkLabel: "Open the inquiry",
+    const i = await inquiryFacts(this.prisma.db, e.inquiryId);
+    if (!i) return;
+    await this.send(inquiryYours(i, e.actorId === e.assigneeId ? null : await this.nameOf(e.actorId)), [{ ids: [e.assigneeId], as: "the person it is given to" }], {
+      actorId: e.actorId,
     });
   }
 
+  private async stageChanged(e: Extract<DomainEvent, { type: "inquiry.stageChanged" }>) {
+    // Won: said by "Customer accepted".
+    if (e.to !== "lost") return;
+    const i = await inquiryFacts(this.prisma.db, e.inquiryId);
+    if (!i) return;
+    const last = await this.prisma.db.quotationRevision.findFirst({
+      where: { quotation: { inquiryId: i.id }, deletedAt: null, status: { not: "draft" } },
+      orderBy: { number: "desc" },
+      select: { id: true },
+    });
+    const r = last ? await revisionFacts(this.prisma.db, last.id) : null;
+    const cancelled = e.from === "won" ? await this.prisma.db.order.findFirst({ where: { inquiryId: i.id, status: "cancelled" }, orderBy: { createdAt: "desc" }, select: { refNo: true } }) : null;
+    await this.send(
+      inquiryLost(i, await this.nameOf(e.actorId), r?.headline ?? null, cancelled?.refNo ?? null),
+      [
+        { ids: e.notify, as: "who handles it" },
+        { ids: await this.managerIds(), as: "a manager" },
+      ],
+      { actorId: e.actorId, copy: "dealWonOrLost" },
+    );
+  }
+
   private async revisionChanged(e: Extract<DomainEvent, { type: "revision.statusChanged" }>) {
-    if (e.status === "sent") return;
-    await this.notify(
-      e.notify,
-      {
-        type: `quotation.${e.status}`,
-        title: `${e.refNo}: ${REVISION_STATUS_LABEL[e.status].toLowerCase()} by the customer`,
-        link: links.deal(e.inquiryId),
+    if (e.status !== "sent" && e.status !== "accepted" && e.status !== "rejected") return;
+    const [i, r] = await Promise.all([inquiryFacts(this.prisma.db, e.inquiryId), e.revisionId ? revisionFacts(this.prisma.db, e.revisionId) : null]);
+    if (!i || !r) return;
+    const by = await this.nameOf(e.actorId);
+    const managers = { ids: await this.managerIds(), as: "a manager" };
+    const team = [
+      { ids: [i.assigneeId], as: "who handles it" },
+      { ids: [r.createdById], as: "who made the quotation" },
+      managers,
+    ];
+    if (e.status === "sent") await this.send(quotationSent(i, r, by), [managers], { actorId: e.actorId });
+    else if (e.status === "accepted") {
+      const o = r.order ? await this.orderOf(r.order.id) : null;
+      await this.send(quotationAccepted(i, r, o, by), team, { actorId: e.actorId, copy: "dealWonOrLost" });
+    } else await this.send(quotationRejected(i, r, by, e.reason ?? null), team, { actorId: e.actorId });
+  }
+
+  private async orderStage(e: Extract<DomainEvent, { type: "order.stageChanged" }>) {
+    if (e.to !== "shipped") return;
+    const o = await this.orderOf(e.orderId);
+    if (!o) return;
+    const sh = await this.prisma.db.shipment.findFirst({
+      where: { orderId: o.id, departedOn: { not: null } },
+      orderBy: { departedOn: "desc" },
+      select: { departedOn: true, eta: true, vessel: true, blNo: true, portOfLoading: true, portOfDischarge: true, forwarder: true, containerNo: true, containerType: true },
+    });
+    const message = shipped(o, {
+      departedOn: fromDbDateOrNull(sh?.departedOn ?? null),
+      eta: fromDbDateOrNull(sh?.eta ?? null),
+      vessel: sh?.vessel ?? null,
+      blNo: sh?.blNo ?? null,
+      port: sh?.portOfLoading ?? null,
+      to: sh?.portOfDischarge ?? null,
+      forwarder: sh?.forwarder ?? null,
+      container: [sh?.containerType, sh?.containerNo].filter(Boolean).join(" ") || null,
+    });
+    await this.send(
+      message,
+      [
+        { ids: [o.handlerId], as: "who handles the order" },
+        { ids: await this.managerIds(), as: "a manager" },
+      ],
+      { actorId: e.actorId, dedupeKey: `shipped:${o.id}` },
+    );
+  }
+
+  private async purchaseOrderSent(e: Extract<DomainEvent, { type: "purchaseOrder.sent" }>) {
+    const o = await this.orderOf(e.orderId);
+    const po = await this.prisma.db.purchaseOrder.findUnique({
+      where: { id: e.purchaseOrderId },
+      select: {
+        number: true,
+        sentEarlyReason: true,
+        supplierId: true,
+        supplier: { select: { name: true, contacts: { where: { deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], take: 1, select: { name: true, phone: true, whatsapp: true, wechat: true, email: true } } } },
       },
-      e.actorId,
+    });
+    if (!o || !po) return;
+    const s = await this.settings.get();
+    const plan = (await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, this.clock.today(), s.reminders.dueSoonDays, fxOf(s, await this.limits.allows("expenses")))).find(
+      (f) => f.factory.id === po.supplierId,
+    );
+    const c = po.supplier.contacts[0];
+    const owed = plan ? toMinor(plan.owed) : 0;
+    const first = plan?.rows.find((r) => r.status !== "paid") ?? null;
+    await this.send(
+      purchaseOrderSent(o, {
+        number: po.number,
+        factory: po.supplier.name,
+        contact: c ? [c.name, c.wechat ? `WeChat ${c.wechat}` : c.whatsapp || c.phone].filter(Boolean).join(" · ") : null,
+        amount: owed > 0 && plan ? money(owed, plan.currency) : null,
+        advance: first && plan ? `${money(toMinor(first.open), plan.currency)} · ${first.label.toLowerCase()}${first.due ? `, due ${day(first.due)}` : ""}` : null,
+        by: await this.nameOf(e.actorId),
+        early: po.sentEarlyReason,
+      }),
+      [
+        { ids: [o.handlerId], as: "who handles the order" },
+        { ids: await this.managerIds(), as: "a manager" },
+      ],
+      { actorId: e.actorId, dedupeKey: `po-sent:${e.purchaseOrderId}` },
     );
   }
 
   private async paymentRecorded(e: Extract<DomainEvent, { type: "payment.recorded" }>) {
-    await this.notify(
-      e.notify,
-      { type: "payment.in", title: `${e.refNo}: received ${e.amount}`, link: links.orderMoney(e.orderId) },
-      e.actorId,
+    const o = await this.orderOf(e.orderId);
+    if (!o) return;
+    const amount = (() => {
+      const [cur, value] = e.amount.split(" ");
+      return cur && value ? money(toMinor(value), cur) : e.amount;
+    })();
+    await this.send(
+      paymentIn(o, amount, await this.nameOf(e.actorId), e.paidOn ?? null),
+      [
+        { ids: [...e.notify, o.handlerId], as: "who handles the order" },
+        { ids: await this.managerIds(), as: "a manager" },
+      ],
+      { actorId: e.actorId, copy: "paymentReceived" },
     );
-    await this.emailAdmins("paymentReceived", `Payment received on ${e.refNo}: ${e.amount}`, {
-      heading: `Payment received: ${e.amount}`,
-      rows: [["Order", e.refNo]],
-      link: links.orderMoney(e.orderId),
-      linkLabel: "Open the order",
-    });
   }
 
   /* ---------------------------------------------------------------- reading */
