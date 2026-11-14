@@ -15,7 +15,7 @@ import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import type { Fx } from "@/lib/fx";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { shortName } from "./offer-facts";
-import { againstTarget, asLineOf, BasisCosts, Fig, fromDraft, gapOf, marginOf, optionTotals, payload, pricedAll, startMargin, STEP_LINE, targetOf, valid, type ChargeState, type EditorState, type OptionState } from "./revision-editor";
+import { asLineOf, BasisCosts, Fig, fromDraft, gapOf, marginOf, optionTotals, payload, pricedAll, startMargin, STEP_LINE, valid, type ChargeState, type EditorState, type OptionState } from "./revision-editor";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -127,12 +127,8 @@ export function PriceEditor({
     const m = showCosts && cost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), cost) : null;
     const part = l.no.includes(".");
     const second = [l.model ? `model ${l.model}` : null, opt.factoryQuoteId && l.answersNo ? `for item ${l.answersNo}` : null, offer && !part ? shortName(offer.factory.name) : null].filter(Boolean).join(" · ");
-    // The price the customer hopes for (the item this line answers), and ours against it.
-    const target = targetOf(l, offers);
-    return { l, i, price, cost, m, part, second, target, against: againstTarget(price, target) };
+    return { l, i, price, cost, m, part, second };
   });
-  // The target column only shows when the customer gave a target for a line of this option.
-  const hasTargets = lineView.some((v) => v.target !== null && Number(v.target) > 0);
   const setPrice = (id: string, v: string) => setOption(at, (o) => ({ prices: { ...o.prices, [id]: v } }));
 
   /* ---------- the charges */
@@ -274,7 +270,6 @@ export function PriceEditor({
                   <col />
                   <col className="w-24" />
                   {showCosts && <col className="w-32" />}
-                  {hasTargets && <col className="w-32" />}
                   <col className="w-40" />
                   {showCosts && <col className="w-24" />}
                   <col className="w-32" />
@@ -285,14 +280,13 @@ export function PriceEditor({
                     <th className={cn(TH, "text-left")}>Description</th>
                     <th className={cn(TH, "text-right")}>Qty</th>
                     {showCosts && <th className={cn(TH, "text-right")}>{extra.minor > 0 ? "Cost (landed)" : "Cost"}</th>}
-                    {hasTargets && <th className={cn(TH, "text-right")}>Customer&rsquo;s target</th>}
                     <th className={cn(TH, "text-right")}>Unit price {currency}</th>
                     {showCosts && <th className={cn(TH, "text-right")}>Margin</th>}
                     <th className={cn(TH, "text-right")}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lineView.map(({ l, i, price, cost, m, part, second, target, against }) => (
+                  {lineView.map(({ l, i, price, cost, m, part, second }) => (
                     <tr key={l.id} className="[&>td]:border-b [&>td]:border-line last:[&>td]:border-b-0">
                       <td className="px-3 py-2.5 align-middle text-xs text-muted tabular">{l.no}</td>
                       <td className={cn("px-3 py-2 align-middle", part && "pl-7")}>
@@ -307,18 +301,6 @@ export function PriceEditor({
                       {showCosts && (
                         <td className="px-3 py-2 text-right align-middle whitespace-nowrap text-text-2 tabular" title={cost !== null && extra.minor > 0 && l.unitCost !== null ? `Factory ${fmt(toMinor(l.unitCost))} + its share of the costs to reach ${s.incoterm}` : undefined}>
                           {cost === null ? "—" : amount2(Number(fromMinor(cost)))}
-                        </td>
-                      )}
-                      {hasTargets && (
-                        <td className="px-3 py-1.5 text-right align-middle whitespace-nowrap tabular">
-                          {target !== null && Number(target) > 0 ? (
-                            <>
-                              <span className="block text-text-2">{amount2(Number(target))}</span>
-                              {against && <span className={cn("block text-xs font-medium", against.over ? "text-warn" : "text-ok")}>{against.text}</span>}
-                            </>
-                          ) : (
-                            <span className="text-xs text-muted">not said</span>
-                          )}
                         </td>
                       )}
                       <td className="px-3 py-1.5 align-middle">
@@ -341,7 +323,7 @@ export function PriceEditor({
             </div>
             {/* Phone: one row per line, its price box on the right. */}
             <ul className="flex flex-col divide-y divide-line px-4 sm:hidden">
-              {lineView.map(({ l, i, price, cost, m, part, target, against }) => (
+              {lineView.map(({ l, i, price, cost, m, part }) => (
                 <li key={l.id} className={cn("flex items-center gap-3 py-2.5", part && "pl-3")}>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm">
@@ -352,12 +334,6 @@ export function PriceEditor({
                       {showCosts && cost !== null ? ` · cost ${Math.round(Number(fromMinor(cost))).toLocaleString("en-US")}` : ""}
                       {showCosts && m !== null && <span className={tone(m)}> · {m.toFixed(1)}%</span>}
                     </span>
-                    {target !== null && Number(target) > 0 && (
-                      <span className="block text-xs text-text-2 tabular">
-                        target {amount2(Number(target))}
-                        {against && <span className={against.over ? "text-warn" : "text-ok"}> · {against.text}</span>}
-                      </span>
-                    )}
                   </span>
                   <PriceInput
                     aria-label={`Unit price for ${l.no}`}

@@ -137,7 +137,7 @@ export class QuotationsService {
    * items for an option without factory prices.
    */
   async offers(user: SessionUser, inquiryId: string, currency: string, db: Db = this.prisma.db) {
-    const inquiry = await this.inquiries.find(user, inquiryId, db);
+    await this.inquiries.find(user, inquiryId, db);
     const { sales } = await this.settings.get();
     const items = await this.items(db, inquiryId);
     const refs = items.map((i) => ({ id: i.id, parentId: i.parentId, no: i.no }));
@@ -178,8 +178,6 @@ export class QuotationsService {
         receivedOn: fromDbDate(q.receivedOn),
         validUntil: fromDbDateOrNull(q.validUntil),
         leadTime: q.leadTime,
-        /** The warranty the factory gives (said beside ours, which is the one printed). */
-        warranty: q.warranty,
         coverage: coverage(
           refs,
           q.lines.map((l) => l.requestedItemId),
@@ -198,9 +196,6 @@ export class QuotationsService {
       /** For costs entered in other currencies (freight in USD, trucking in CNY): 1 main currency buys N. */
       mainCurrency: sales.currency,
       rates: sales.exchangeRates,
-      /** Today, and the day the customer wants the goods: each offer's lead time is read against it. */
-      today: this.clock.today(),
-      wantedBy: fromDbDateOrNull(inquiry.requiredBy),
       offers,
       /** The customer's items, for an option priced by hand (no factory prices). */
       items: items.map((i) => ({
@@ -211,8 +206,6 @@ export class QuotationsService {
         model: i.model,
         quantity: i.quantity.toString(),
         unit: i.unit,
-        /** The price the customer hopes for, per unit (shown beside ours while pricing). */
-        targetPrice: i.targetPrice === null ? null : i.targetPrice.toString(),
       })),
     };
   }

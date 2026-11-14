@@ -1,12 +1,10 @@
 import type { INestApplication } from "@nestjs/common";
-import { leadDays, readyAgainst } from "@kebo/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
 
 /**
- * Reuse along the deal: a first quotation starts from what is already known — the customer's own currency,
- * the delivery terms of the last quotation sent to them — and the window is told the day the customer wants
- * the goods, the price they hope for and the warranty each factory gives. Everything can be typed over.
+ * Reuse along the deal: a first quotation starts from what is already known — the customer's own currency
+ * and the delivery terms of the last quotation sent to them. Everything can be typed over.
  */
 describe("a quotation starts from what is known", () => {
   let app: INestApplication;
@@ -59,29 +57,12 @@ describe("a quotation starts from what is known", () => {
       .expect(201);
   };
 
-  it("reads a lead time as days, against the day the customer wants it", () => {
-    expect(leadDays("45 days after the deposit")).toBe(45);
-    expect(leadDays("soon")).toBeNull();
-    expect(readyAgainst("45 days", "2026-11-14", "2026-12-20")).toEqual({ days: 45, readyOn: "2026-12-29", late: 9 });
-    expect(readyAgainst("30 days", "2026-11-14", "2026-12-20")).toEqual({ days: 30, readyOn: "2026-12-14", late: -6 });
-    expect(readyAgainst("30 days", "2026-11-14", null)).toBeNull();
-    expect(readyAgainst("ASAP", "2026-11-14", "2026-12-20")).toBeNull();
-  });
-
   it("starts R1 in the customer's currency and says so", async () => {
     first = await inquiry("2026-12-20");
     await offer(first.id, "Jiangsu Known", { leadTime: "45 days", warranty: "12 months" });
     const draft = (await api(app, sana).get(`/inquiries/${first.id}/quotation/draft`).expect(200)).body;
     expect(draft).toMatchObject({ number: 1, currency: "CNY" });
     expect(draft.from).toMatchObject({ customer: `Yuan Buyer ${tag}`, currency: "customer", delivery: "settings", lastQuotation: null });
-  });
-
-  it("tells the window the wanted day, the target price and the factory's warranty", async () => {
-    const o = (await api(app, sana).get(`/inquiries/${first.id}/quotation/offers?currency=CNY`).expect(200)).body;
-    expect(o.wantedBy).toBe("2026-12-20");
-    expect(o.today).toMatch(/^\d{4}-\d\d-\d\d$/);
-    expect(o.offers[0]).toMatchObject({ leadTime: "45 days", warranty: "12 months" });
-    expect(o.items.map((i: { targetPrice: string | null }) => i.targetPrice)).toEqual(["85000", null]);
   });
 
   it("starts the next quotation to that customer with the delivery terms of the last one sent", async () => {
@@ -98,9 +79,6 @@ describe("a quotation starts from what is known", () => {
     next = (await api(app, sana).get(`/inquiries/${second.id}/quotation/draft`).expect(200)).body;
     expect(next).toMatchObject({ number: 1, currency: "CNY", incoterm: "CIF", incotermPlace: "Apapa, Lagos" });
     expect(next.from).toMatchObject({ delivery: "last_quotation", lastQuotation: first.refNo });
-    // No wanted day on this one.
-    const o = (await api(app, sana).get(`/inquiries/${second.id}/quotation/offers?currency=CNY`).expect(200)).body;
-    expect(o.wantedBy).toBeNull();
     // It is only where the window starts: the person saves what they choose.
     const saved = (await api(app, sana).post(`/inquiries/${second.id}/quotation/revisions`, { ...next, incoterm: "FOB", incotermPlace: "Qingdao" }).expect(201)).body;
     expect(saved).toMatchObject({ incoterm: "FOB", incotermPlace: "Qingdao" });

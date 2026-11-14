@@ -367,9 +367,6 @@ export interface QuoteOffers {
   /** Settings' exchange rates (1 mainCurrency buys N), for costs entered in other currencies. */
   mainCurrency: string;
   rates: Record<string, number>;
-  /** Today, and the day the customer wants the goods (each offer's lead time is read against it). */
-  today?: string;
-  wantedBy?: string | null;
   offers: {
     factoryQuoteId: string;
     factory: { id: string; name: string };
@@ -379,15 +376,13 @@ export interface QuoteOffers {
     receivedOn: string;
     validUntil: string | null;
     leadTime: string | null;
-    /** The warranty the factory gives. */
-    warranty?: string | null;
     coverage: Coverage;
     missingRate: boolean;
     totalCost: string | null;
     lines: OfferLine[];
   }[];
   /** The customer's items, for an option priced by hand. */
-  items: { id: string; no: string; parentId: string | null; description: string; model: string | null; quantity: string; unit: string; /** The price the customer hopes for, per unit. */ targetPrice?: string | null }[];
+  items: { id: string; no: string; parentId: string | null; description: string; model: string | null; quantity: string; unit: string }[];
 }
 
 /* ---------------------------------------------------------------- reports */
