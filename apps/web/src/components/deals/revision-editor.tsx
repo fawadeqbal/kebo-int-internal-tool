@@ -347,6 +347,10 @@ export function RevisionEditor({
   const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => setS((st) => ({ ...st, [k]: v }));
   const setOption = (i: number, patch: Partial<OptionState> | ((o: OptionState) => Partial<OptionState>)) =>
     setS((st) => ({ ...st, options: st.options.map((o, n) => (n === i ? { ...o, ...(typeof patch === "function" ? patch(o) : patch) } : o)) }));
+  // A first revision says where a value came from, for as long as it still shows that value.
+  const fromCustomer = initial.from?.currency === "customer" && s.currency.trim().toUpperCase() === initial.currency;
+  const fromLast = initial.from?.delivery === "last_quotation";
+  const lastWords = `from the last quotation to ${initial.from?.customer ?? "this customer"}${initial.from?.lastQuotation ? ` (${initial.from.lastQuotation})` : ""}`;
 
   const currency = /^[A-Za-z]{3}$/.test(s.currency.trim()) ? s.currency.trim().toUpperCase() : "—";
   const fmt = (minor: number) => formatMinor(minor, currency);
@@ -637,14 +641,22 @@ export function RevisionEditor({
                     label="Currency"
                     htmlFor={`cur-${number}`}
                     error={st.errors?.currency}
-                    hint={converted ? <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span> : "Changing it converts the prices"}
+                    hint={
+                      converted ? (
+                        <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span>
+                      ) : fromCustomer ? (
+                        `${initial.from?.customer ?? "The customer"} is quoted in ${initial.currency} (from the customer)`
+                      ) : (
+                        "Changing it converts the prices"
+                      )
+                    }
                   >
                     <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
                   </Field>
                   <Field label="Valid until" htmlFor={`valid-${number}`} error={st.errors?.validUntil}>
                     <Input id={`valid-${number}`} type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
                   </Field>
-                  <Field label="Delivery (incoterm)" htmlFor={`inco-${number}`} error={st.errors?.incoterm}>
+                  <Field label="Delivery (incoterm)" htmlFor={`inco-${number}`} error={st.errors?.incoterm} hint={fromLast && s.incoterm === initial.incoterm ? lastWords : undefined}>
                     <Select id={`inco-${number}`} value={s.incoterm} onChange={(e) => set("incoterm", e.target.value as Incoterm)}>
                       {INCOTERMS.map((t) => (
                         <option key={t} value={t}>
@@ -653,7 +665,13 @@ export function RevisionEditor({
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Place" htmlFor={`place-${number}`} optional error={st.errors?.incotermPlace} hint="The port or place for the incoterm">
+                  <Field
+                    label="Place"
+                    htmlFor={`place-${number}`}
+                    optional
+                    error={st.errors?.incotermPlace}
+                    hint={fromLast && initial.incotermPlace && s.incotermPlace === initial.incotermPlace ? lastWords : "The port or place for the incoterm"}
+                  >
                     <Input id={`place-${number}`} value={s.incotermPlace} maxLength={80} placeholder="e.g. Karachi" onChange={(e) => set("incotermPlace", e.target.value)} />
                   </Field>
                 </PanelSection>
