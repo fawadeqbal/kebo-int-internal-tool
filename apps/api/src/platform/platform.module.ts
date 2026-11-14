@@ -10,6 +10,7 @@ import { PlatformAuthService, PlatformGuard } from "./platform-auth";
 import { PlatformAuthController, PlatformController, PlatformPublicController } from "./platform.controller";
 import { PlatformMail } from "./platform-mail";
 import { SiteService } from "./site.service";
+import { AppErrors, RequestStats } from "./watch";
 
 /** The platform: companies, plans, client inquiries, demos and trials, and the platform admins. */
 @Module({
@@ -26,7 +27,9 @@ import { SiteService } from "./site.service";
     PlansService,
     PlatformMail,
     SiteService,
+    RequestStats,
+    AppErrors,
   ],
-  exports: [PlatformAuthService, AccountsService, LifecycleService],
+  exports: [PlatformAuthService, AccountsService, LifecycleService, RequestStats, AppErrors],
 })
 export class PlatformModule {}

@@ -8,6 +8,7 @@ import { CompanyResolver } from "./common/company/company-resolver";
 import { CompanyContext } from "./common/company/company-context";
 import { FactsService } from "./modules/insights/facts/facts.service";
 import type { Env } from "./config/env";
+import { RequestStats } from "./platform/watch";
 
 /** Everything main.ts and the tests share: prefix, security headers, CORS, errors, API docs. */
 
@@ -16,6 +17,8 @@ export function configureApp(app: INestApplication, env: Env) {
   // req.ip honours X-Forwarded-For only for the configured number of proxy hops.
   (app.getHttpAdapter().getInstance() as { set(key: string, value: unknown): void }).set("trust proxy", env.TRUST_PROXY);
   app.use(helmet());
+  // Dev tools: how fast each route answers, and its server errors (RequestStats).
+  app.use(app.get(RequestStats).middleware());
   // Room for the company stamp image in the settings (a data URL of up to ~400 KB).
   (app as NestExpressApplication).useBodyParser("json", { limit: "1mb" });
   app.enableCors({ origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : false, credentials: true });

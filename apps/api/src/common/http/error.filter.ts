@@ -1,5 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from "@nestjs/common";
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { ZodError, z } from "zod";
 import { ConflictError, DomainError, DuplicateError, ForbiddenError, GateError, NotFoundError, ReasonNeededError } from "@kebo/utils";
 import { DB_ERROR, isDbError } from "@kebo/database";
@@ -12,6 +12,8 @@ import { DB_ERROR, isDbError } from "@kebo/database";
 @Catch()
 export class ErrorFilter implements ExceptionFilter {
   private readonly log = new Logger("Error");
+  /** Set by Dev tools (AppErrors): each unexpected error is also counted there. */
+  static report?: (error: unknown, req: Request) => void;
 
   catch(error: unknown, host: ArgumentsHost) {
     const res = host.switchToHttp().getResponse<Response>();
@@ -42,6 +44,7 @@ export class ErrorFilter implements ExceptionFilter {
       });
     }
     this.log.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
+    ErrorFilter.report?.(error, host.switchToHttp().getRequest<Request>());
     return send(500, { error: "Something went wrong. Please try again." });
   }
 }

@@ -1,0 +1,38 @@
+# The outside watcher (Dev tools › Big picture): every 5 minutes, from GitHub's servers, the site must
+# answer. When it does not answer three times in a row, this run fails, and GitHub emails the owner
+# of the repository (Settings › Notifications › Actions: "failed workflows only"). The server cannot
+# warn about itself when it is down; this can.
+# The address: the repository variable WATCH_URL (Settings › Secrets and variables › Actions ›
+# Variables), else the live site.
+name: Watch the site
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: The site answers
+        env:
+          URL: ${{ vars.WATCH_URL || 'https://rfq.fawadiqbal.dev' }}
+        run: |
+          for try in 1 2 3; do
+            if curl -fsS --max-time 20 -o /dev/null "$URL/api/health?from=outside"; then
+              echo "$URL answers"
+              exit 0
+            fi
+            echo "no answer (try $try)"
+            sleep 30
+          done
+          echo "::error::$URL did not answer three times in a row"
+          exit 1

@@ -3,7 +3,7 @@
  * warn = needs you this week, bad = needs you now, off = not set up or not checked.
  */
 export type DevLevel = "ok" | "warn" | "bad" | "off";
-export type DevTab = "picture" | "services" | "data";
+export type DevTab = "picture" | "services" | "data" | "speed";
 /** The map's columns, in the order a request travels. */
 export const DEV_LANES = [
   { key: "addresses", label: "Addresses" },
@@ -45,7 +45,7 @@ export interface DevService {
 
 export interface DevEvent {
   at: string;
-  kind: "deploy" | "deployFailed" | "restart" | "stopped" | "warning" | "backup" | "backupFailed";
+  kind: "deploy" | "deployFailed" | "restart" | "stopped" | "warning" | "backup" | "backupFailed" | "error";
   level: DevLevel;
   text: string;
 }
@@ -73,6 +73,14 @@ export interface DevOverview {
     backupAt: string | null;
     backupLevel: DevLevel;
     services: { running: number; all: number };
+    /** Last 24 hours: half answered faster than typicalMs; all but the slowest 5% faster than slowMs. */
+    typicalMs: number | null;
+    slowMs: number | null;
+    requests24h: number;
+    errors24h: number;
+    /** The API answered the server's own check, share of the minutes in the last 7 days. */
+    upPercent: number | null;
+    lastDown: string | null;
   };
   host: { os: string | null; uptimeSec: number | null; docker: string | null } | null;
   deploys: DevDeploy[];
@@ -118,6 +126,47 @@ export interface DevDataView {
     longestQuerySec: number | null;
     tables: { name: string; rows: number; mb: number }[];
   };
+}
+
+export interface DevError {
+  id: string;
+  source: string;
+  name: string;
+  message: string;
+  where: string;
+  stack: string | null;
+  count: number;
+  companyName: string | null;
+  userName: string | null;
+  path: string | null;
+  firstAt: string;
+  lastAt: string;
+  status: "open" | "fixed";
+  /** The deploy it first came after (a hint at what caused it). */
+  afterDeploy: string | null;
+}
+
+export interface DevRoute {
+  route: string;
+  count: number;
+  errors: number;
+  typicalMs: number | null;
+  slowMs: number | null;
+}
+
+export interface DevSpeedView {
+  range: "24h" | "7d";
+  requests: number;
+  errors: number;
+  typicalMs: number | null;
+  slowMs: number | null;
+  upPercent: number | null;
+  /** Every hour (24h) or every 6 hours (7d). */
+  chart: { t: string; count: number; typicalMs: number | null; slowMs: number | null }[];
+  slowest: DevRoute[];
+  errorsList: DevError[];
+  fixedCount: number;
+  outside: { lastAt: string | null; checks24h: number };
 }
 
 export interface DevLogLine {
