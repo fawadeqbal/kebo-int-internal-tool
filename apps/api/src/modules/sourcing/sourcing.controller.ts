@@ -55,6 +55,13 @@ export class SourcingController {
     return this.sourcing.quote(user, id);
   }
 
+  /** What a factory said on its last offer (currency, basis, tax, terms): where a new offer from it starts. */
+  @Get("factories/:id/last-offer")
+  @RequirePermissions("sourcing.manage")
+  async lastOffer(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return { offer: await this.sourcing.lastOffer(user, id) };
+  }
+
   /* One change at a time from the line table; each answers with the whole offer. */
 
   @Post("factory-quotes/:id/lines")

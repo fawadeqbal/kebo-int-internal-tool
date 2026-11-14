@@ -7,7 +7,8 @@ import { INCOTERMS, type Incoterm } from "@kebo/shared";
 import { Button, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
-import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
+import type { FactoryOption, FactoryQuoteView, LastOffer } from "@/lib/types-deals";
+import { date } from "@/lib/format";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
@@ -298,6 +299,41 @@ function payload(s: QuoteState, convertible?: boolean) {
   };
 }
 
+/** What a factory's last offer can fill in a new one (its lines, dates, reference and notes are always the new offer's own). */
+const FROM_LAST = ["currency", "basis", "basisPlace", "taxIncluded", "taxRate", "leadTime", "paymentTerms", "advancePercent", "warranty"] as const;
+export type FromLast = Partial<Pick<QuoteState, (typeof FROM_LAST)[number]>>;
+
+/** The last offer as the form's values; what it did not say is left out. */
+export function lastOfferValues(last: LastOffer): FromLast {
+  const v: FromLast = {
+    currency: last.currency,
+    taxIncluded: last.taxIncluded,
+    taxRate: String(last.taxRate),
+    ...(last.basis ? { basis: last.basis } : {}),
+    ...(last.basisPlace ? { basisPlace: last.basisPlace } : {}),
+    ...(last.leadTime ? { leadTime: last.leadTime } : {}),
+    ...(last.paymentTerms ? { paymentTerms: last.paymentTerms } : {}),
+    ...(last.advancePercent === null ? {} : { advancePercent: String(last.advancePercent) }),
+    ...(last.warranty ? { warranty: last.warranty } : {}),
+  };
+  return v;
+}
+
+/** Fill a new offer from the factory's last one: only the fields nobody has typed in yet (still as the window opened). */
+export function fillFromLast(s: QuoteState, start: QuoteState, values: FromLast): QuoteState {
+  const next = { ...s };
+  for (const k of FROM_LAST) if (values[k] !== undefined && s[k] === start[k]) Object.assign(next, { [k]: values[k] });
+  return next;
+}
+
+/** "Start empty", or another factory chosen: what was filled and not typed over goes back to how the window opened. */
+export function unfill(s: QuoteState, start: QuoteState, values: FromLast | null | undefined): QuoteState {
+  if (!values) return s;
+  const next = { ...s };
+  for (const k of FROM_LAST) if (values[k] !== undefined && s[k] === values[k]) Object.assign(next, { [k]: start[k] });
+  return next;
+}
+
 /** Choose a known factory, or type a new one's name (it is added to the factory list on save). */
 export function FactoryPicker({
   value,
@@ -436,6 +472,7 @@ export function OfferHeaderForm({
   mainCurrency,
   rates,
   searchFactories,
+  lastOffer,
   onDone,
   defaults,
   files,
@@ -448,6 +485,8 @@ export function OfferHeaderForm({
   mainCurrency: string;
   rates: Record<string, number>;
   searchFactories: (q: string) => Promise<FactoryOption[]>;
+  /** A new offer: what the chosen factory said on its last offer (the window starts from it). */
+  lastOffer?: (factoryId: string) => Promise<LastOffer | null>;
   onDone: (state: ActionState) => void;
   /** A new offer's tax: the company's default (Settings). */
   defaults?: { taxIncluded: boolean; taxRate: number };
@@ -457,11 +496,37 @@ export function OfferHeaderForm({
   note?: ReactNode;
   footer: ReactNode;
 }) {
-  const [s, setS] = useState<QuoteState>(() => ({
+  // How the window opens; a field still like this has not been typed in.
+  const [start] = useState<QuoteState>(() => ({
     ...initialState(quote, today),
     ...(!quote && defaults ? { taxIncluded: defaults.taxIncluded, taxRate: String(defaults.taxRate) } : {}),
   }));
+  const [s, setS] = useState<QuoteState>(start);
   const set = <K extends keyof QuoteState>(k: K, v: QuoteState[K]) => setS((st) => ({ ...st, [k]: v }));
+  // A new offer starts from the chosen factory's last one; what was filled, so each field can say so.
+  const [filled, setFilled] = useState<{ last: LastOffer; values: FromLast } | null>(null);
+  const asked = useRef(0);
+  const pickFactory = async (f: QuoteState["factory"]) => {
+    const n = ++asked.current;
+    const before = filled?.values;
+    setS((st) => ({ ...unfill(st, start, before), factory: f }));
+    setFilled(null);
+    if (quote || !f?.id || !lastOffer) return;
+    const last = await lastOffer(f.id);
+    if (n !== asked.current || !last) return;
+    const values = lastOfferValues(last);
+    setS((st) => fillFromLast(st, start, values));
+    setFilled({ last, values });
+  };
+  const startEmpty = () => {
+    const before = filled?.values;
+    setS((st) => unfill(st, start, before));
+    setFilled(null);
+  };
+  /** This field still shows what the last offer said. */
+  const from = (...keys: (keyof FromLast)[]) => !!filled && keys.every((k) => filled.values[k] !== undefined && s[k] === filled.values[k]);
+  const FROM = "from their last offer";
+  const hintOf = (k: keyof FromLast, rest?: string) => (from(k) ? [FROM, rest].filter(Boolean).join(" · ") : rest);
   const currency = s.currency.trim().toUpperCase();
   const fx = { main: mainCurrency, rates };
   const rate = fxRate(currency, mainCurrency, mainCurrency, rates);
@@ -509,9 +574,21 @@ export function OfferHeaderForm({
         {(st) => (
           <>
             <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
+            {filled && s.factory && (
+              <p role="status" className="rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
+                Filled from {s.factory.name}’s last offer:{" "}
+                <strong>
+                  {filled.last.inquiryRef} · {date(filled.last.receivedOn)}
+                </strong>
+                .{" "}
+                <button type="button" onClick={startEmpty} className="font-semibold text-info underline underline-offset-2 hover:no-underline">
+                  Start empty
+                </button>
+              </p>
+            )}
             <PanelSection title="Who" first className="md:grid-cols-3">
               <Field label="Factory" htmlFor="factory" required error={st.errors?.factoryId ?? st.errors?.newFactoryName} className="md:col-span-2">
-                <FactoryPicker value={s.factory} search={searchFactories} error={st.errors?.factoryId} onChange={(f) => set("factory", f)} />
+                <FactoryPicker value={s.factory} search={searchFactories} error={st.errors?.factoryId} onChange={(f) => void pickFactory(f)} />
               </Field>
               <Field label="Their reference" htmlFor="reference" optional error={st.errors?.reference}>
                 <Input id="reference" value={s.reference} onChange={(e) => set("reference", e.target.value)} maxLength={80} placeholder="Their quote no." />
@@ -528,7 +605,7 @@ export function OfferHeaderForm({
                 label="Currency"
                 htmlFor="currency"
                 error={st.errors?.currency}
-                hint={rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined)}
+                hint={hintOf("currency", rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined))}
               >
                 <CurrencySelect id="currency" value={s.currency} onChange={(e) => set("currency", e.target.value)} />
               </Field>
@@ -536,7 +613,7 @@ export function OfferHeaderForm({
                 label="Price basis"
                 htmlFor="basis"
                 error={st.errors?.basis}
-                hint={s.basis ? BASIS_HINT[s.basis] : "What their prices already pay for: needed to work out freight and the like"}
+                hint={hintOf("basis", s.basis ? BASIS_HINT[s.basis] : "What their prices already pay for: needed to work out freight and the like")}
               >
                 <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")}>
                   <option value="">Not said</option>
@@ -548,7 +625,7 @@ export function OfferHeaderForm({
                   ))}
                 </Select>
               </Field>
-              <Field label={s.basis === "EXW" ? "Town" : "Port"} htmlFor="basisPlace" optional error={st.errors?.basisPlace}>
+              <Field label={s.basis === "EXW" ? "Town" : "Port"} htmlFor="basisPlace" optional error={st.errors?.basisPlace} hint={hintOf("basisPlace")}>
                 <PortPicker id="basisPlace" value={s.basisPlace} onChange={(v) => set("basisPlace", v)} exw={s.basis === "EXW"} />
               </Field>
               {recurrencyBox(st)}
@@ -560,17 +637,17 @@ export function OfferHeaderForm({
                 onIncluded={(v) => set("taxIncluded", v)}
                 onRate={(v) => set("taxRate", v)}
                 error={st.errors?.taxRate ?? st.errors?.taxIncluded}
-                note={quote ? taxRateNote(quote.lines, quote.taxRate, s.taxRate) : undefined}
+                note={quote ? taxRateNote(quote.lines, quote.taxRate, s.taxRate) : from("taxIncluded", "taxRate") ? `As on their last offer. Applies to every line; a line can still have its own %.` : undefined}
               />
               <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq}>
                 <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} placeholder="e.g. 1 set" />
               </Field>
             </PanelSection>
             <PanelSection title="Terms" className="md:grid-cols-3">
-              <Field label="Lead time" htmlFor="leadTime" optional error={st.errors?.leadTime}>
+              <Field label="Lead time" htmlFor="leadTime" optional error={st.errors?.leadTime} hint={hintOf("leadTime")}>
                 <Input id="leadTime" value={s.leadTime} onChange={(e) => set("leadTime", e.target.value)} maxLength={120} placeholder="e.g. 25 days after deposit" />
               </Field>
-<Field label="Advance when we order" htmlFor="advancePercent" optional hint="Starts the factory's payment plan; printed on the PO" error={st.errors?.advancePercent}>
+              <Field label="Advance when we order" htmlFor="advancePercent" optional hint={hintOf("advancePercent", "Starts the factory's payment plan; printed on the PO")} error={st.errors?.advancePercent}>
                 <div className="flex items-center gap-1.5">
                   <Input
                     id="advancePercent"
@@ -583,10 +660,10 @@ export function OfferHeaderForm({
                   <span className="text-sm text-text-2">%</span>
                 </div>
               </Field>
-              <Field label="Warranty" htmlFor="fq-warranty" optional error={st.errors?.warranty}>
+              <Field label="Warranty" htmlFor="fq-warranty" optional error={st.errors?.warranty} hint={hintOf("warranty")}>
                 <Input id="fq-warranty" value={s.warranty} onChange={(e) => set("warranty", e.target.value)} maxLength={300} placeholder="e.g. 12 months from commissioning" />
               </Field>
-              <Field label="Payment terms (note)" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms} className="md:col-span-3">
+              <Field label="Payment terms (note)" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms} hint={hintOf("paymentTerms")} className="md:col-span-3">
                 <Input id="paymentTerms" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} placeholder="e.g. 30% advance, 70% before shipping, by T/T" />
               </Field>
             </PanelSection>

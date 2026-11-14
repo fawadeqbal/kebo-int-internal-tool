@@ -470,6 +470,34 @@ export class SourcingService {
     return view.quotes.find((x) => x.id === quoteId)!;
   }
 
+  /**
+   * What this factory said on its last offer (the latest received, on any inquiry): a new offer from the
+   * same factory starts from it, and every field can be typed over. Null: it has not offered before.
+   */
+  async lastOffer(user: SessionUser, factoryId: string) {
+    this.assertCan(user);
+    const q = await this.prisma.db.factoryQuote.findFirst({
+      where: { factoryId, deletedAt: null, inquiry: { deletedAt: null } },
+      orderBy: [{ receivedOn: "desc" }, { createdAt: "desc" }],
+      include: { inquiry: { select: { refNo: true } } },
+    });
+    if (!q) return null;
+    return {
+      inquiryRef: q.inquiry.refNo,
+      receivedOn: fromDbDate(q.receivedOn),
+      currency: q.currency,
+      taxIncluded: q.taxIncluded,
+      taxRate: Number(q.taxRate),
+      basis: q.basis,
+      basisPlace: q.basisPlace,
+      leadTime: q.leadTime,
+      moq: q.moq,
+      paymentTerms: q.paymentTerms,
+      advancePercent: q.advancePercent === null ? null : Number(q.advancePercent),
+      warranty: q.warranty,
+    };
+  }
+
   /** The offer's lines in display order: each line, then its parts. */
   private async linesOf(tx: Tx, quoteId: string) {
     const rows = await tx.factoryQuoteLine.findMany({
