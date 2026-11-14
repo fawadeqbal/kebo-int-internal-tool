@@ -1,0 +1,13 @@
+[Unit]
+Description=RFQ Desk: live logs for Dev tools (follows the containers' logs into files)
+After=docker.service
+Requires=docker.service
+
+[Service]
+ExecStart=/usr/bin/env python3 /usr/local/sbin/kebo-logs
+Restart=always
+RestartSec=5
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

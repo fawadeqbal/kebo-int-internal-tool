@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Building2, ClipboardList, Gauge, Inbox, LogOut, Package, ScrollText, Settings } from "lucide-react";
+import { Activity, Building2, ClipboardList, Gauge, Inbox, LogOut, Package, ScrollText, Settings } from "lucide-react";
 import { Avatar, cn } from "@kebo/ui";
 import { platformLogoutAction } from "@/app/platform/actions";
 
@@ -15,6 +15,7 @@ const NAV = [
   { href: "/platform/leads", label: "Client inquiries", icon: Inbox, count: "newLeads", countLabel: "new" },
   { href: "/platform/plans", label: "Plans", icon: Package, count: "plans" },
   { href: "/platform/log", label: "Platform log", icon: ScrollText },
+  { href: "/platform/dev-tools", label: "Dev tools", icon: Activity },
   { href: "/platform/settings", label: "Settings", icon: Settings },
 ] as const;
 
