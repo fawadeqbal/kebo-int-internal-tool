@@ -21,12 +21,15 @@ export class OperationsController {
     return this.operations.shipments(user, q.all === "true");
   }
 
-  /** ?all=true: every purchase order (default: those still to pay or not shipped). People who see costs. */
+  /**
+   * ?all=true: every purchase order (default: those still to pay or not shipped). ?order=: one sales order's
+   * (the purchase order's own page). People who see costs.
+   */
   @Get("purchase-orders")
   purchaseOrders(
     @CurrentUser() user: SessionUser,
-    @Query(Validate(z.object({ all: z.enum(["true", "false"]).optional() }))) q: { all?: string },
+    @Query(Validate(z.object({ all: z.enum(["true", "false"]).optional(), order: z.string().uuid().optional() }))) q: { all?: string; order?: string },
   ) {
-    return this.operations.purchaseOrders(user, q.all !== "true", q.all === "true");
+    return this.operations.purchaseOrders(user, q.all !== "true", q.all === "true", q.order);
   }
 }

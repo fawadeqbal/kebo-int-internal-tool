@@ -62,9 +62,6 @@ export const orderPaymentTarget = (orderId: string) => `/orders/${orderId}/payme
 /** Shipments was a list of its own: a shipment is on its order, so the old address opens the orders that are shipped. */
 export const shipmentsTarget = (q: Query = {}): string => buildHref("/orders", {}, { stage: "shipped", q: q.q });
 
-/** Purchase orders was a list of its own: a purchase order is on its order (the Factory tab), so the old address opens Orders. */
-export const purchaseOrdersTarget = (q: Query = {}): string => buildHref("/orders", {}, { q: q.q });
-
 /* ------------------------------------------------------------------ /insights?section=&view= */
 
 /** Insights' sections as pages: the tabs of Reports. */

@@ -49,6 +49,11 @@ describe("operations lists", () => {
     const same = m.factories.rows.find((r) => r.factory.id === one.supplier.id && r.currency === one.currency)!;
     expect([one.owed, one.paid]).toEqual([same.owed, same.paid]);
     expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
+    // One sales order's purchase orders (the purchase order's own page reads these): the same rows, only that order's.
+    const ofOne = (await api(app, manager).get(`/operations/purchase-orders?all=true&order=${one.order.id}`).expect(200)).body as Po[];
+    expect(ofOne.length).toBeGreaterThan(0);
+    expect(ofOne).toEqual(rows.filter((r) => r.order.id === one.order.id));
+    await api(app, manager).get("/operations/purchase-orders?order=not-an-id").expect(422);
     // Staff see factory costs (sourcing), on the orders they handle only.
     const staff = (await api(app, bilal).get("/operations/purchase-orders?all=true").expect(200)).body as Po[];
     expect(staff.length).toBeLessThanOrEqual(rows.length);

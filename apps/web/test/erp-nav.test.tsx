@@ -63,16 +63,16 @@ afterEach(() => vi.useRealTimers());
 describe("the groups", () => {
   it("are six, with plain names, for someone who may open everything", () => {
     const m = everything();
-    expect(titles(m)).toEqual(["Sales", "Suppliers", "Money", "Reports", "Company settings", "Admin settings"]);
-    // Clean-up (14 Nov 2026): a shipment and a purchase order are on their order, not pages of their own.
+    expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Company settings", "Admin settings"]);
+    // Clean-up (14 Nov 2026): a shipment is on its order, not a page of its own.
     expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Customers", "Follow-ups"]);
-    expect(pages(m, "purchasing")).toEqual(["Suppliers"]);
+    // Purchase orders keep their list (each one has a page of its own that shows it).
+    expect(pages(m, "purchasing")).toEqual(["Purchase orders", "Suppliers"]);
     // Money, simple (14 Nov 2026): four pages. To verify and the Ledger keep their addresses and left the menu.
     expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments", "Cash & bank", "Company costs"]);
     // Reports is one page (its reports are tabs on it): the menu shows it as a link, like Home.
     expect(pages(m, "reports")).toEqual(["Reports"]);
-    // So is Suppliers, now that purchase orders left the menu.
-    expect(m.filter(isSingle).map((x) => x.key)).toEqual(["purchasing", "reports"]);
+    expect(m.filter(isSingle).map((x) => x.key)).toEqual(["reports"]);
     // Settings is two groups: the company's own (managers too), and the admin's.
     expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form"]);
     expect(pages(m, "admin")).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Email sending", "Activity log"]);
@@ -95,6 +95,7 @@ describe("the groups", () => {
         "/orders/board",
         "/customers",
         "/follow-ups",
+        "/operations/purchase-orders",
         "/factories",
         "/money/due",
         "/payments",
@@ -117,7 +118,7 @@ describe("the groups", () => {
       ].sort(),
     );
     // Tabs on the page, the bell, and the pages that left the menu: not menu items.
-    for (const tab of ["/reports/profit", "/reports/customers", "/reports/factories", "/reports/cash", "/reports/people", "/reports/funnel", "/reports/print", "/finance/profit", "/finance/leaks", "/notifications", "/approvals", "/finance/ledger", "/finance/invoices", "/finance/to-receive", "/purchasing/to-pay", "/operations/shipments", "/operations/purchase-orders"])
+    for (const tab of ["/reports/profit", "/reports/customers", "/reports/factories", "/reports/cash", "/reports/people", "/reports/funnel", "/reports/print", "/finance/profit", "/finance/leaks", "/notifications", "/approvals", "/finance/ledger", "/finance/invoices", "/finance/to-receive", "/purchasing/to-pay", "/operations/shipments"])
       expect(hrefs).not.toContain(tab);
   });
 
@@ -148,7 +149,7 @@ describe("the groups", () => {
   it("a manager sees money, reports and the company's settings; of the admin's only what their permissions allow", () => {
     const MANAGER = new Set(["sourcing.manage", "expenses.manage", "payments.record", "reports.view", "settings.manage", "audit.view", "inquiries.create"]);
     const m = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 4, approves: true, companyAddresses: false });
-    expect(titles(m)).toEqual(["Sales", "Suppliers", "Money", "Reports", "Company settings", "Admin settings"]);
+    expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Company settings", "Admin settings"]);
     expect(pages(m, "reports")).toEqual(["Reports"]);
     expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form"]);
     // No people, roles, sign-ins, sessions or email sending: those are the admin's.
@@ -189,8 +190,8 @@ describe("the groups", () => {
     expect(moduleOf("/money/due", all)).toBe("money");
     expect(moduleOf("/audit", all)).toBe("admin");
     expect(moduleOf("/settings/sales", all)).toBe("company");
-    // One page of the group's own name says it once.
-    expect(crumbsFor("/factories")).toEqual([{ label: "Suppliers" }]);
+    expect(crumbsFor("/factories")).toEqual([{ label: "Purchasing" }, { label: "Suppliers" }]);
+    expect(pageOf("/operations/purchase-orders/0b6c/9a1b", flat)?.label).toBe("Purchase orders");
     expect(crumbsFor("/users")).toEqual([{ label: "Admin settings" }, { label: "People" }]);
     expect(moduleOf("/factories/9a1b", all)).toBe("purchasing");
     expect(moduleOf("/dashboard", all)).toBeUndefined();
@@ -205,9 +206,8 @@ describe("the menu down the left", () => {
     at.path = "/finance/cash-book";
     shell(everything());
     expect(menu().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
-    // Suppliers and Reports are one page each: links, not groups to open.
-    expect(menu().getAllByRole("button").map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Money", "Company settings", "Admin settings"]);
-    expect(menu().getByRole("link", { name: "Suppliers" }).getAttribute("href")).toBe("/factories");
+    // Reports is one page: a link, not a group to open.
+    expect(menu().getAllByRole("button").map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Purchasing", "Money", "Company settings", "Admin settings"]);
     expect(menu().getByRole("link", { name: "Reports" }).getAttribute("href")).toBe("/reports");
     expect(menu().getByRole("button", { name: "Money" }).getAttribute("aria-expanded")).toBe("true");
     expect(menu().getByRole("button", { name: "Sales" }).getAttribute("aria-expanded")).toBe("false");
@@ -306,8 +306,7 @@ describe("the folded strip", () => {
     at.path = "/finance/cash-book";
     shell(everything(2));
     expect(strip().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
-    expect(strip().getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Sales", "Money, 2 to look at", "Company settings", "Admin settings"]);
-    expect(strip().getByRole("link", { name: "Suppliers" }).getAttribute("href")).toBe("/factories");
+    expect(strip().getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Sales", "Purchasing", "Money, 2 to look at", "Company settings", "Admin settings"]);
     expect(strip().getByRole("link", { name: "Reports" }).getAttribute("href")).toBe("/reports");
     expect(strip().getByRole("button", { name: /^Money/ }).className).toContain("bg-primary-soft");
     expect(strip().getByRole("button", { name: "Sales" }).className).not.toContain("bg-primary-soft");
