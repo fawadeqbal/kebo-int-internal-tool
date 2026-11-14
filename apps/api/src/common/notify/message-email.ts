@@ -26,7 +26,7 @@ export interface MessageEmailContext {
   origin: string;
   /** When it was sent, as people read it ("14 Nov 2026, 09:12"). */
   at: string;
-  /** Why this person gets it: "who handles it", "a manager". */
+  /** Why this person gets it: "who handles it", "a manager" (said as "You get this as …"), or a whole sentence ending with a full stop. */
   why: string;
 }
 
@@ -45,10 +45,11 @@ function rowsTable(title: string, rows: MessageRow[] | undefined) {
 }
 
 function listTable(rows: MessageListRow[]) {
+  // Two lines a row, so it reads on a phone: the number, then who and what; when on the right.
   const r = rows
     .map(
       (x) =>
-        `<tr><td style="padding:8px 10px 8px 0;border-bottom:1px solid ${LINE};font-family:${MONO};font-size:12px;font-weight:600;color:${BRAND};white-space:nowrap;vertical-align:top">${esc(x.ref)}</td><td style="padding:8px 10px 8px 0;border-bottom:1px solid ${LINE};font-size:13px;font-weight:600;vertical-align:top">${esc(x.party)}</td><td style="padding:8px 10px 8px 0;border-bottom:1px solid ${LINE};font-size:13px;vertical-align:top">${esc(x.what)}</td><td style="padding:8px 0;border-bottom:1px solid ${LINE};font-size:12.5px;text-align:right;white-space:nowrap;vertical-align:top;color:${x.late ? "#A12020" : SOFT};font-weight:${x.late ? 700 : 500}">${esc(x.when)}</td></tr>`,
+        `<tr><td style="padding:8px 10px 8px 0;border-bottom:1px solid ${LINE};vertical-align:top"><div style="font-family:${MONO};font-size:11.5px;font-weight:600;color:${BRAND}">${esc(x.ref)}</div><div style="margin-top:2px;font-size:13.5px;color:${INK}">${x.party ? `<b style="font-weight:600">${esc(x.party)}</b> · ` : ""}${esc(x.what)}</div></td><td style="padding:8px 0;border-bottom:1px solid ${LINE};font-size:12.5px;text-align:right;white-space:nowrap;vertical-align:top;color:${x.late ? "#A12020" : SOFT};font-weight:${x.late ? 700 : 500}">${esc(x.when)}</td></tr>`,
     )
     .join("");
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-top:1px solid ${LINE}">${r}</table>`;
@@ -101,7 +102,7 @@ export function renderMessageEmail(m: Message, ctx: MessageEmailContext) {
   </div>
   <a href="${esc(link)}" style="display:inline-block;margin-top:18px;background:${ORANGE};color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:9px;font-size:14px;font-weight:700">${esc(m.button)}</a>
 </td></tr>
-<tr><td style="padding:12px 22px 14px;border-top:1px solid ${LINE};background:${BG};font-size:12px;line-height:1.5;color:${SOFT};border-radius:0 0 14px 14px">You get this as ${esc(ctx.why)}.</td></tr>
+<tr><td style="padding:12px 22px 14px;border-top:1px solid ${LINE};background:${BG};font-size:12px;line-height:1.5;color:${SOFT};border-radius:0 0 14px 14px">${esc(ctx.why.endsWith(".") ? ctx.why : `You get this as ${ctx.why}.`)}</td></tr>
 </table>
 </td></tr></table>
 </body></html>`;
@@ -122,7 +123,7 @@ export function renderMessageEmail(m: Message, ctx: MessageEmailContext) {
     `What to do next: ${m.next}`,
     `${m.button}: ${link}`,
     "",
-    `${ctx.company} · you get this as ${ctx.why}.`,
+    `${ctx.company} · ${ctx.why.endsWith(".") ? ctx.why : `you get this as ${ctx.why}.`}`,
   ].join("\n");
   return { subject: m.subject, html, text };
 }

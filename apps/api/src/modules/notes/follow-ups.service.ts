@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { claimOnce, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
+import { fromDbDate, toDbDate, type Prisma } from "@kebo/database";
 import { can, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, QUOTE_FOLLOW_UP_DAYS, REMINDER_HOUR, rowsOf, type FollowUpDoneInput, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
 import { addDays, daysBetween, DomainError, ForbiddenError, GateError, NotFoundError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -7,6 +7,8 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { NotificationsService } from "../notifications/notifications.service";
+import { followUpMissed, followUpsMissed, followUpToday } from "../notifications/messages";
+import { DayBook, splitLabel } from "../notifications/day-book";
 import { recordLabels, seeRecord, type RecordRef, type RecordType } from "./records";
 
 /** Where follow-ups without a record (and the list) open. */
@@ -513,7 +515,7 @@ export class FollowUpsService {
    * Each alert carries a dedupe key with its day (and time), so running again sends nothing twice.
    * `force`: without waiting for the morning hour (an admin pressed "run now").
    */
-  async remind(force = false): Promise<number> {
+  async remind(force = false, book?: DayBook): Promise<number> {
     const tz = this.clock.timeZone;
     const moment = this.clock.now();
     const today = this.clock.today();
@@ -532,69 +534,45 @@ export class FollowUpsService {
       const t = targetOf(r);
       return t ? labels.get(`${t.type}:${t.id}`) : undefined;
     };
+    const plain = (r: FollowUpRow) => ({ title: r.title, dueOn: fromDbDate(r.dueOn), dueAt: r.dueAt, place: r.place, note: r.note });
+    const one = { email: false } as const;
     let sent = 0;
-    type Missed = { row: FollowUpRow; days: number; label: string | undefined; link: string };
+    type Missed = { row: FollowUpRow; days: number; ref: RecordRef | undefined };
     const missedFor = new Map<string, Missed[]>();
-    const todayFor = new Map<string, FollowUpRow[]>();
     for (const r of rows) {
       const dueOn = fromDbDate(r.dueOn);
       const ref = refOf(r);
-      const link = ref?.link ?? FOLLOW_UPS_LINK;
       if (dueOn < today) {
-        missedFor.set(r.assigneeId, [...(missedFor.get(r.assigneeId) ?? []), { row: r, days: daysBetween(dueOn, today), label: ref?.label, link }]);
+        missedFor.set(r.assigneeId, [...(missedFor.get(r.assigneeId) ?? []), { row: r, days: daysBetween(dueOn, today), ref }]);
         continue;
       }
-      if (dueOn === today) todayFor.set(r.assigneeId, [...(todayFor.get(r.assigneeId) ?? []), r]);
+      if (dueOn === today) book?.add([r.assigneeId], "Follow-ups today", { ...splitLabel(ref?.label), what: r.title, when: r.dueAt ?? "today" });
       const at = r.dueAt ? momentIn(dueOn, r.dueAt, tz) : null;
       const soon = at ? moment.getTime() >= at.getTime() - 30 * 60_000 : false;
+      const to = [{ ids: [r.assigneeId], as: "the person it is for" }];
       // The day's reminder: made before the day began, and not already inside the half hour before its time.
       if (morning && dueOn === today && r.createdAt < startOfDayIn(dueOn, tz) && !soon)
-        sent += await this.notifications.notify([r.assigneeId], {
-          type: "followUp.due",
-          title: `Today: ${r.title}${r.dueAt ? ` · ${r.dueAt}` : ""}`,
-          body: [ref?.label, r.place].filter(Boolean).join(" · ") || null,
-          link,
-          dedupeKey: `followup:${r.id}:day:${dueOn}`,
-        });
+        sent += await this.notifications.send(followUpToday(plain(r), ref ?? null, null), to, { ...one, dedupeKey: `followup:${r.id}:day:${dueOn}` });
       if (at && soon && moment.getTime() <= at.getTime()) {
         const minutes = Math.max(Math.round((at.getTime() - moment.getTime()) / 60_000), 0);
-        sent += await this.notifications.notify([r.assigneeId], {
-          type: "followUp.due",
-          title: `At ${r.dueAt}: ${r.title}`,
-          body: [minutes ? `in ${minutes} min` : "now", ref?.label, r.place].filter(Boolean).join(" · "),
-          link,
-          dedupeKey: `followup:${r.id}:at:${dueOn}T${r.dueAt}`,
-        });
+        sent += await this.notifications.send(followUpToday(plain(r), ref ?? null, minutes), to, { ...one, dedupeKey: `followup:${r.id}:at:${dueOn}T${r.dueAt}` });
       }
     }
     if (!morning) return sent;
 
     const daysWords = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
-    const LATE_LINK = `${FOLLOW_UPS_LINK}?status=late`;
-    const lineOf = (m: Missed, who = false) => `${who ? `${m.row.assignee.name}: ` : ""}${m.row.title} — missed ${daysWords(m.days)}${m.label ? ` · ${m.label}` : ""}`;
-    const listOf = (items: Missed[], who = false) => items.slice(0, 8).map((m) => lineOf(m, who)).join("\n") + (items.length > 8 ? `\n…and ${items.length - 8} more` : "");
+    const rowOf = (m: Missed, who = false) => ({ ...splitLabel(m.ref?.label), what: `${who ? `${m.row.assignee.name}: ` : ""}${m.row.title}`, when: `missed ${daysWords(m.days)}`, late: true });
 
-    // Every morning, to the person it is for: the oldest first; many as one summary so a backlog does not bury them.
+    // Every morning, to the person it is for: the oldest first; many as one list so a backlog does not bury them.
     for (const [userId, items] of missedFor) {
       items.sort((a, b) => b.days - a.days);
+      for (const m of items) book?.add([userId], "Missed", rowOf(m));
+      const to = [{ ids: [userId], as: "the person it is for" }];
       if (items.length <= 3) {
-        for (const m of items)
-          sent += await this.notifications.notify([userId], {
-            type: "followUp.missed",
-            title: `Missed ${daysWords(m.days)}: ${m.row.title}`,
-            body: [m.label, m.row.place].filter(Boolean).join(" · ") || null,
-            link: m.link,
-            dedupeKey: `followup:${m.row.id}:missed:${today}`,
-          });
+        for (const m of items) sent += await this.notifications.send(followUpMissed(plain(m.row), m.ref ?? null, m.days, null), to, { ...one, dedupeKey: `followup:${m.row.id}:missed:${today}` });
       } else {
         const x = items[0]!;
-        sent += await this.notifications.notify([userId], {
-          type: "followUp.missed",
-          title: `${items.length} follow-ups missed — the oldest, ${daysWords(x.days)}: ${x.row.title}`,
-          body: listOf(items),
-          link: LATE_LINK,
-          dedupeKey: `followup:missed:${today}:${userId}`,
-        });
+        sent += await this.notifications.send(followUpsMissed(items.map((m) => rowOf(m)), false, `${daysWords(x.days)}: ${x.row.title}`), to, { ...one, dedupeKey: `followup:missed:${today}:${userId}` });
       }
     }
 
@@ -607,56 +585,16 @@ export class FollowUpsService {
           if (to !== userId) toldFor.set(to, [...(toldFor.get(to) ?? []), m]);
     for (const [to, items] of toldFor) {
       items.sort((a, b) => b.days - a.days);
+      for (const m of items) book?.add([to], "Missed by your team", rowOf(m, true));
+      const who = [{ ids: [to], as: "a manager, or who gave it" }];
       if (items.length <= 3) {
         for (const m of items)
-          sent += await this.notifications.notify([to], {
-            type: "followUp.missedTold",
-            title: `${m.row.assignee.name} missed a follow-up for ${daysWords(m.days)}: ${m.row.title}`,
-            body: m.label ?? null,
-            link: m.link,
-            dedupeKey: `followup:${m.row.id}:missed-told:${today}`,
-          });
+          sent += await this.notifications.send(followUpMissed(plain(m.row), m.ref ?? null, m.days, m.row.assignee.name), who, { ...one, dedupeKey: `followup:${m.row.id}:missed-told:${today}` });
       } else {
         const x = items[0]!;
-        sent += await this.notifications.notify([to], {
-          type: "followUp.missedTold",
-          title: `${items.length} follow-ups are missed by ${FOLLOW_UP_ESCALATE_DAYS} days or more — the oldest, ${x.row.assignee.name}: ${x.row.title} (${daysWords(x.days)})`,
-          body: listOf(items, true),
-          link: LATE_LINK,
+        sent += await this.notifications.send(followUpsMissed(items.map((m) => rowOf(m, true)), true, `${x.row.assignee.name}: ${x.row.title} (${daysWords(x.days)})`), who, {
+          ...one,
           dedupeKey: `followup:missed-told:${today}:${to}`,
-        });
-      }
-    }
-
-    // One email a morning: to each person their follow-ups today and the missed ones; to each manager (and giver) the missed ones they were told of.
-    if (await this.notifications.canEmail()) {
-      const stamp = today.replaceAll("-", "");
-      for (const userId of new Set([...todayFor.keys(), ...missedFor.keys()])) {
-        if (!(await claimOnce(this.prisma.db, `fm${stamp}${userId}`))) continue;
-        const now = todayFor.get(userId) ?? [];
-        const missed = missedFor.get(userId) ?? [];
-        const parts = [now.length ? `${now.length} today` : null, missed.length ? `${missed.length} missed` : null].filter(Boolean).join(", ");
-        await this.notifications.emailUser(userId, `Your follow-ups: ${parts}`, {
-          heading: `Your follow-ups: ${parts}`,
-          body: [
-            now.length ? `Today\n${now.map((r) => `• ${r.title}${r.dueAt ? ` · ${r.dueAt}` : ""}${refOf(r)?.label ? ` · ${refOf(r)!.label}` : ""}`).join("\n")}` : null,
-            missed.length ? `Missed\n${missed.map((m) => `• ${lineOf(m)}`).join("\n")}` : null,
-          ]
-            .filter(Boolean)
-            .join("\n\n"),
-          link: missed.length ? LATE_LINK : FOLLOW_UPS_LINK,
-          linkLabel: "Open my follow-ups",
-          footer: "A follow-up is reminded every morning until it is done or moved to another day.",
-        });
-      }
-      for (const [to, items] of toldFor) {
-        if (!(await claimOnce(this.prisma.db, `fx${stamp}${to}`))) continue;
-        await this.notifications.emailUser(to, `Missed follow-ups: ${items.length}`, {
-          heading: `${items.length} follow-up${items.length === 1 ? " is" : "s are"} missed by ${FOLLOW_UP_ESCALATE_DAYS} days or more`,
-          body: items.map((m) => `• ${lineOf(m, true)}`).join("\n"),
-          link: LATE_LINK,
-          linkLabel: "Open the missed follow-ups",
-          footer: "You are told every morning until each one is done or moved to another day.",
         });
       }
     }

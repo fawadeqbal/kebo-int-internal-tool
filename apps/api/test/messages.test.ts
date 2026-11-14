@@ -7,6 +7,11 @@ import { PrismaService } from "../src/database/prisma.service";
 import { CompanyMail } from "../src/common/notify/company-mail";
 import { Clock } from "../src/common/time/clock.service";
 import { renderMessageEmail } from "../src/common/notify/message-email";
+import { CompanyContext } from "../src/common/company/company-context";
+import { toInfo } from "../src/common/company/companies.service";
+import { RemindersService } from "../src/modules/notifications/reminders.service";
+import { factoryPayment, orderWaiting, paymentDue, yourDay } from "../src/modules/notifications/messages";
+import type { OrderFacts } from "../src/modules/notifications/facts";
 import type { MailMessage } from "../src/common/notify/mailer";
 
 type Row = { type: string; title: string; body: string; link: string; message: Message | null };
@@ -147,5 +152,67 @@ describe("messages", () => {
         { label: "Paid so far", value: "USD 35,850 of USD 119,500" },
       ]),
     );
+  });
+
+  it("reminders say who, how much and what to do, in trade words", () => {
+    const o = {
+      id: "o1",
+      refNo: "SO-2026-0412",
+      title: "Complete water bottling plant",
+      currency: "USD",
+      customerName: "Lagos Water",
+      customer: "Lagos Water · Nigeria",
+      contact: "Ade Bello · +2348035550142",
+      handler: "Sana",
+      factories: ["Jiangsu Filling"],
+      value: "USD 119,500",
+      paidSoFar: "USD 35,850 of USD 119,500",
+    } as unknown as OrderFacts;
+    const lateMoney = paymentDue(o, { label: "Balance", openMinor: 8365000, dueOn: "2026-12-05" }, 4);
+    expect(lateMoney).toMatchObject({ tag: "Payment late", urgent: true, subject: "Late: Lagos Water has not paid USD 83,650 (balance, SO-2026-0412)", link: "/orders/o1/payment" });
+    expect(lateMoney.sentence).toBe("The balance of SO-2026-0412 was due on 5 Dec 2026. It is 4 days late.");
+    expect(paymentDue(o, { label: "Balance", openMinor: 8365000, dueOn: "2026-12-05" }, null).subject).toBe("Lagos Water owes USD 83,650 (balance, SO-2026-0412) by 5 Dec 2026");
+    const pay = factoryPayment(o, { factory: "Jiangsu Filling", contact: "Mr Wang · WeChat wang88", currency: "CNY", owed: "760000.00", paid: "0.00" }, { label: "Advance", open: "304000.00", due: "2026-11-14", lateBy: null });
+    expect(pay).toMatchObject({ tag: "Pay the factory", subject: "Pay Jiangsu Filling: CNY 304,000 advance (SO-2026-0412) — due 14 Nov 2026", button: "Pay the factory", link: "/orders/o1/factory" });
+    expect(pay.money).toContainEqual({ label: "Paid to the factory", value: "CNY 0 of CNY 760,000" });
+    const ready = orderWaiting(o, { title: "Ask the factory for the ready date", due: "2026-11-10", lateBy: 4 });
+    expect(ready).toMatchObject({ tag: "Ready date missing", next: "Ask the factory when the goods will be ready and enter the date.", link: "/orders/o1/production", urgent: true });
+    const day = yourDay("Sana Khan", [
+      { title: "Missed", rows: [{ ref: "RFQ-1", party: "Lagos Water", what: "Call Ade", when: "missed 2 days", late: true }] },
+      { title: "Money to collect", rows: [{ ref: "SO-1", party: "Lagos Water", what: "Balance USD 83,650", when: "due 2026-12-05" }, { ref: "SO-2", party: "Plan Foods", what: "Balance USD 41,000", when: "9 days late", late: true }] },
+      { title: "Pay the factory", rows: [] },
+    ]);
+    expect(day).toMatchObject({ tag: "Your day", subject: "Good morning Sana: 1 missed, 2 payments to collect" });
+    expect(day.tiles).toEqual([
+      { value: "1", label: "missed", bad: true },
+      { value: "2", label: "payments to collect", bad: false },
+    ]);
+    expect(day.sections!.map((x) => x.title)).toEqual(["Missed", "Money to collect"]);
+  });
+
+  it("a quotation that ends without an answer: the bell and phone at once, and the morning email lists it", async () => {
+    const customerId = (await api(app, sana).post("/customers", { name: `Quiet Buyer ${tag}`, country: "KE", contacts: [{ name: "Wanjiru", email: `wq-${tag}@qb.test` }] }).expect(201)).body.id;
+    const inquiry = (await api(app, sana).post("/inquiries", { customerId, category: "Machinery", assigneeId: sanaId, items: [{ description: "Capper", quantity: 1, unit: "set" }] }).expect(201)).body;
+    const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
+    await api(app, sana)
+      .post(`/inquiries/${inquiry.id}/factory-quotes`, { newFactoryName: `Henan ${tag}`, receivedOn: "2026-11-01", currency: "CNY", lines: [{ requestedItemId: item.id, description: "Capper", quantity: 1, unitPrice: 50000 }] })
+      .expect(201);
+    const draft = (await api(app, sana).get(`/inquiries/${inquiry.id}/quotation/draft`)).body;
+    const r = (await api(app, sana).post(`/inquiries/${inquiry.id}/quotation/revisions`, draft).expect(201)).body;
+    await api(app, sana).post(`/revisions/${r.id}/status`, { to: "sent" }).expect(200);
+    await prisma.company(FIRST_COMPANY_ID).quotationRevision.update({ where: { id: r.id }, data: { validUntil: new Date(Date.now() - 3 * 86_400_000) } });
+    sent = [];
+    const company = await prisma.platform.company.findUniqueOrThrow({ where: { id: FIRST_COMPANY_ID } });
+    await CompanyContext.run(toInfo(company), () => app.get(RemindersService).run(true));
+    const mine = ((await api(app, sana).get("/notifications?take=200").expect(200)).body.items as Row[]).filter((n) => n.type === "reminder.quotationExpired" && n.title.includes(`Quiet Buyer ${tag}`));
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({ title: expect.stringMatching(new RegExp(`^Quotation to Quiet Buyer ${tag} ended without an answer \\(QUO-`)), message: expect.objectContaining({ tag: "Quotation ended", urgent: true }) });
+    // Not emailed on its own: it is in the one morning email.
+    const sanaEmail = (await prisma.company(FIRST_COMPANY_ID).user.findUniqueOrThrow({ where: { id: sanaId } })).email!;
+    expect(mailTo(sanaEmail, /ended without an answer/)).toHaveLength(0);
+    const day = mailTo(sanaEmail, /^Good morning Sana/);
+    expect(day).toHaveLength(1);
+    expect(day[0]!.html).toContain("Quotations ending");
+    expect(day[0]!.html).toContain(`Quiet Buyer ${tag}`);
   });
 });

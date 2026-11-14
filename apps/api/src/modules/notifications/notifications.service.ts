@@ -4,7 +4,6 @@ import { CompanyContext } from "../../common/company/company-context";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { ENV, type Env } from "../../config/env";
-import { renderEmail } from "../../common/notify/mailer";
 import { renderMessageEmail } from "../../common/notify/message-email";
 import { Clock } from "../../common/time/clock.service";
 import { CompanyMail } from "../../common/notify/company-mail";
@@ -76,6 +75,16 @@ export class NotificationsService implements OnModuleInit {
           isSystem: false,
           platformAdminId: null,
         },
+        select: { id: true },
+      })
+    ).map((u) => u.id);
+  }
+
+  /** Active people of the company whose role has this permission (or is Super Admin). */
+  async idsWith(permission: string) {
+    return (
+      await this.prisma.db.user.findMany({
+        where: { access: { OR: [{ superAdmin: true }, { permissions: { has: permission } }] }, isActive: true, isSystem: false, platformAdminId: null },
         select: { id: true },
       })
     ).map((u) => u.id);
@@ -170,6 +179,11 @@ export class NotificationsService implements OnModuleInit {
     }
   }
 
+  /** The company's own reports (the morning summary, the month): to the admin list, when switched on there. */
+  async emailList(m: Message, kind: "dailySummary") {
+    await this.copyToList(m, kind);
+  }
+
   /** A copy to the admin list (Company settings › Emails), for the kinds switched on there. */
   private async copyToList(m: Message, kind: "newInquiry" | "dealWonOrLost" | "paymentReceived" | "dailySummary") {
     const s = await this.settings.get();
@@ -202,58 +216,9 @@ export class NotificationsService implements OnModuleInit {
     }
   }
 
-  /** Email the admin list (Settings → notifications), when that kind of event is switched on. */
-  async emailAdmins(
-    kind: "newInquiry" | "dealWonOrLost" | "paymentReceived" | "dailySummary",
-    subject: string,
-    content: Parameters<typeof renderEmail>[0],
-  ) {
-    const s = await this.settings.get();
-    if (!s.notifications[kind] || !s.notifications.emails.length) return;
-    try {
-      // Links go to the company's own address (once companies have addresses).
-      const company = CompanyContext.current();
-      const origin = company ? companyOrigin(company.slug, this.env.BASE_DOMAIN, this.env.APP_URL, company.domain) : this.env.APP_URL;
-      const { html, text } = renderEmail({
-        ...content,
-        link: content.link ? new URL(content.link, origin).toString() : undefined,
-        footer: `${s.company.name} · you get this because your email is on the notification list in Settings.`,
-      });
-      await (await this.mail.mailer()).send({ to: s.notifications.emails, subject, html, text });
-    } catch (e) {
-      this.log.warn(`email failed: ${(e as Error).message}`);
-    }
-  }
-
   /** Email can be sent now: the company's own (Admin settings › Email sending), or the server's. */
   async canEmail(): Promise<boolean> {
     return (await this.mail.mailer()).enabled;
-  }
-
-  /**
-   * An email to one person of the company, at their own address (their reminders). Nothing when they are
-   * not active or email is not set up; a failure is logged and never stops the work that sent it.
-   */
-  async emailUser(userId: string, subject: string, content: Parameters<typeof renderEmail>[0]): Promise<boolean> {
-    try {
-      const mailer = await this.mail.mailer();
-      if (!mailer.enabled) return false;
-      const to = await this.prisma.db.user.findFirst({ where: { id: userId, isActive: true, isSystem: false, platformAdminId: null }, select: { email: true } });
-      if (!to?.email) return false;
-      const company = CompanyContext.current();
-      const origin = company ? companyOrigin(company.slug, this.env.BASE_DOMAIN, this.env.APP_URL, company.domain) : this.env.APP_URL;
-      const s = await this.settings.get();
-      const { html, text } = renderEmail({
-        ...content,
-        link: content.link ? new URL(content.link, origin).toString() : undefined,
-        footer: `${s.company.name}${content.footer ? ` · ${content.footer}` : ""}`,
-      });
-      await mailer.send({ to: to.email, subject, html, text });
-      return true;
-    } catch (e) {
-      this.log.warn(`email to a person failed: ${(e as Error).message}`);
-      return false;
-    }
   }
 
   /* ---------------------------------------------------------------- reacting to events */
