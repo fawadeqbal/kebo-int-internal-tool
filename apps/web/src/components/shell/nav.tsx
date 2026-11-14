@@ -3,26 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import {
-  Bell,
-  Building2,
-  ChevronRight,
-  ClipboardList,
-  House,
-  LogOut,
-  Menu as MenuIcon,
-  Package,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
-  Search,
-  Settings,
-  ShoppingCart,
-  TrendingUp,
-  User,
-  Wallet,
-  X,
-} from "lucide-react";
+import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
 import { Avatar, buttonClass, cn, Kbd } from "@kebo/ui";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
@@ -35,7 +16,8 @@ const ICONS: Record<NavIcon, typeof House> = {
   purchasing: ShoppingCart,
   money: Wallet,
   reports: TrendingUp,
-  settings: Settings,
+  company: Settings,
+  admin: ShieldCheck,
 };
 
 const isActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);

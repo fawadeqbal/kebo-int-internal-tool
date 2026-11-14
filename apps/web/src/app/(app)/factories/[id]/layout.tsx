@@ -21,7 +21,7 @@ export default async function FactoryLayout({ children, params }: { children: Re
   return (
     <div>
       <PageHeader
-        crumbs={[{ label: "Purchasing" }, { label: "Suppliers", href: "/factories" }, { label: f.name }]}
+        crumbs={[{ label: "Suppliers", href: "/factories" }, { label: f.name }]}
         icon={Factory}
         phoneStack
         title={f.name}

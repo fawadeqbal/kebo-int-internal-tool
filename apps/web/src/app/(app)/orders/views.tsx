@@ -125,7 +125,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
           sub={c.lateInProduction ? `${c.lateInProduction} late` : undefined}
           href={href({ status: undefined, stage: "in_production" })}
         />
-        <StatTile icon={Ship} iconColor={4} label="At sea" value={atSea.length} sub={nextEta ? `next ETA ${date(nextEta)}` : undefined} href="/operations/shipments" />
+        <StatTile icon={Ship} iconColor={4} label="At sea" value={atSea.length} sub={nextEta ? `next ETA ${date(nextEta)}` : undefined} href={href({ status: undefined, stage: "shipped" })} />
         {yearRow && (
           <StatTile
             icon={PieChart}

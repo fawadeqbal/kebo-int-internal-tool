@@ -145,15 +145,14 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
     title: "Administration",
     items: [
       { permission: "users.manage", label: "People", hint: "Add people, give them a role, set passwords, switch them off." },
-      { permission: "settings.manage", label: "Company settings" },
+      { permission: "settings.manage", label: "Company settings", hint: "The company's details, sales and quotation defaults, document templates, reminders, email texts and the website form." },
       { permission: "security.manage", label: "Security", hint: "Roles, two-step rules, everyone's sessions and sign-in history." },
     ],
   },
 ];
 
-const MANAGER: readonly Permission[] = PERMISSIONS.filter(
-  (p) => p !== "users.manage" && p !== "settings.manage" && p !== "security.manage",
-);
+// A manager runs the company's own settings (Company settings in the menu); people, roles and security stay with the admin.
+const MANAGER: readonly Permission[] = PERMISSIONS.filter((p) => p !== "users.manage" && p !== "security.manage");
 
 const STAFF: readonly Permission[] = [
   "dashboard.view",

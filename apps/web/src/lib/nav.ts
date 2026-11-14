@@ -1,14 +1,18 @@
 /**
- * The menu: Home, then five groups and their pages (13 Nov 2026: two levels, plain names).
+ * The menu: Home, then the groups and their pages (13 Nov 2026: two levels, plain names).
  * A group has one name; a page sits in one group; nothing opens under a page. One address per
  * page: addresses did not move, only the grouping and the names changed. The group's name is the
  * first part of the path above a page's title ("Sales / Inquiries"), the page's name is its title.
  * The layout keeps only the pages a person may open (each page's own permission and plan checks);
  * a group whose pages are all hidden is hidden. Reports is one page (its reports are tabs on it), so
  * it is a link of its own like Home; notifications open from the bell.
+ *
+ * Clean-up (14 Nov 2026): Shipments and Purchase orders are no longer pages of their own (a shipment
+ * and a purchase order are on their order); Settings is two groups, the company's own settings
+ * (managers too) and the admin's (people, roles, sign-ins, sessions, the activity log).
  */
 
-export type ModuleKey = "sales" | "purchasing" | "money" | "reports" | "settings";
+export type ModuleKey = "sales" | "purchasing" | "money" | "reports" | "company" | "admin";
 
 export type NavIcon = "home" | ModuleKey;
 
@@ -41,19 +45,16 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
       { href: "/inquiries", label: "Inquiries" },
       { href: "/orders", label: "Orders" },
       { href: "/orders/board", label: "Order board" },
-      { href: "/operations/shipments", label: "Shipments" },
       { href: "/customers", label: "Customers" },
       { href: "/follow-ups", label: "Follow-ups" },
     ],
   },
   {
+    // One page of the group's own name: a link of its own, like Reports (purchase orders are on their order).
     key: "purchasing",
-    title: "Purchasing",
+    title: "Suppliers",
     icon: "purchasing",
-    pages: [
-      { href: "/operations/purchase-orders", label: "Purchase orders" },
-      { href: "/factories", label: "Suppliers" },
-    ],
+    pages: [{ href: "/factories", label: "Suppliers" }],
   },
   {
     key: "money",
@@ -76,9 +77,9 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     pages: [{ href: "/reports", label: "Reports" }],
   },
   {
-    key: "settings",
-    title: "Settings",
-    icon: "settings",
+    key: "company",
+    title: "Company settings",
+    icon: "company",
     pages: [
       { href: "/settings/company", label: "Company" },
       { href: "/settings/address", label: "Company address" },
@@ -87,7 +88,14 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
       { href: "/settings/reminders", label: "Reminders" },
       { href: "/settings/emails", label: "Emails" },
       { href: "/settings/website-form", label: "Website form" },
-      { href: "/users", label: "People", lineBefore: true },
+    ],
+  },
+  {
+    key: "admin",
+    title: "Admin settings",
+    icon: "admin",
+    pages: [
+      { href: "/users", label: "People" },
       { href: "/access/roles", label: "Roles" },
       { href: "/access/sign-ins", label: "Sign-ins" },
       { href: "/access/sessions", label: "Sessions" },
@@ -190,7 +198,6 @@ export function buildModules({
     "/factories": sourcing,
     "/money/company-costs": sourcing && managers && feature("expenses"),
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
-    "/operations/purchase-orders": sourcing,
     "/settings/company": settings,
     "/settings/sales": settings,
     "/settings/reminders": settings,

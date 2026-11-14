@@ -61,17 +61,21 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("the groups", () => {
-  it("are five, with plain names, for someone who may open everything", () => {
+  it("are six, with plain names, for someone who may open everything", () => {
     const m = everything();
-    expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Settings"]);
-    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Shipments", "Customers", "Follow-ups"]);
-    expect(pages(m, "purchasing")).toEqual(["Purchase orders", "Suppliers"]);
+    expect(titles(m)).toEqual(["Sales", "Suppliers", "Money", "Reports", "Company settings", "Admin settings"]);
+    // Clean-up (14 Nov 2026): a shipment and a purchase order are on their order, not pages of their own.
+    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Customers", "Follow-ups"]);
+    expect(pages(m, "purchasing")).toEqual(["Suppliers"]);
     // Money, simple (14 Nov 2026): four pages. To verify and the Ledger keep their addresses and left the menu.
     expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments", "Cash & bank", "Company costs"]);
     // Reports is one page (its reports are tabs on it): the menu shows it as a link, like Home.
     expect(pages(m, "reports")).toEqual(["Reports"]);
-    expect(m.filter(isSingle).map((x) => x.key)).toEqual(["reports"]);
-    expect(pages(m, "settings")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form", "People", "Roles", "Sign-ins", "Sessions", "Activity log"]);
+    // So is Suppliers, now that purchase orders left the menu.
+    expect(m.filter(isSingle).map((x) => x.key)).toEqual(["purchasing", "reports"]);
+    // Settings is two groups: the company's own (managers too), and the admin's.
+    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form"]);
+    expect(pages(m, "admin")).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Activity log"]);
   });
 
   it("have one name each, and two levels: a group and its pages", () => {
@@ -89,10 +93,8 @@ describe("the groups", () => {
         "/inquiries",
         "/orders",
         "/orders/board",
-        "/operations/shipments",
         "/customers",
         "/follow-ups",
-        "/operations/purchase-orders",
         "/factories",
         "/money/due",
         "/payments",
@@ -114,21 +116,21 @@ describe("the groups", () => {
       ].sort(),
     );
     // Tabs on the page, the bell, and the pages that left the menu: not menu items.
-    for (const tab of ["/reports/profit", "/reports/customers", "/reports/factories", "/reports/cash", "/reports/people", "/reports/funnel", "/reports/print", "/finance/profit", "/finance/leaks", "/notifications", "/approvals", "/finance/ledger", "/finance/invoices", "/finance/to-receive", "/purchasing/to-pay"])
+    for (const tab of ["/reports/profit", "/reports/customers", "/reports/factories", "/reports/cash", "/reports/people", "/reports/funnel", "/reports/print", "/finance/profit", "/finance/leaks", "/notifications", "/approvals", "/finance/ledger", "/finance/invoices", "/finance/to-receive", "/purchasing/to-pay", "/operations/shipments", "/operations/purchase-orders"])
       expect(hrefs).not.toContain(tab);
   });
 
   it("Company address shows only when companies have their own addresses", () => {
-    expect(pages(everything(), "settings")).not.toContain("Company address");
+    expect(pages(everything(), "company")).not.toContain("Company address");
     const m = buildModules({ can: () => true, feature: () => true, approvals: 0, approves: true, companyAddresses: true });
-    expect(pages(m, "settings")?.slice(0, 2)).toEqual(["Company", "Company address"]);
+    expect(pages(m, "company")?.slice(0, 2)).toEqual(["Company", "Company address"]);
   });
 
   it("hide the pages a person may not open, and a group with none left", () => {
     const m = staff();
     // What customers owe on the orders a person sees, and Payments, are open to everyone who sees orders.
     expect(titles(m)).toEqual(["Sales", "Money"]);
-    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Shipments", "Customers", "Follow-ups"]);
+    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Customers", "Follow-ups"]);
     expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments"]);
     const none = buildModules({ can: () => false, feature: () => true, approvals: null, approves: false, companyAddresses: false });
     expect(titles(none)).toEqual(["Sales", "Money"]);
@@ -139,15 +141,21 @@ describe("the groups", () => {
     const m = buildModules({ can: () => true, feature: (f) => !["cash_book", "expenses", "insights", "audit_log"].includes(f), approvals: 0, approves: true, companyAddresses: false });
     expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments"]);
     expect(titles(m)).not.toContain("Reports");
-    expect(pages(m, "settings")).not.toContain("Activity log");
+    expect(pages(m, "admin")).not.toContain("Activity log");
   });
 
-  it("a manager sees money and reports, and of Settings only what their permissions allow", () => {
-    const MANAGER = new Set(["sourcing.manage", "expenses.manage", "payments.record", "reports.view", "users.manage", "inquiries.create"]);
+  it("a manager sees money, reports and the company's settings; of the admin's only what their permissions allow", () => {
+    const MANAGER = new Set(["sourcing.manage", "expenses.manage", "payments.record", "reports.view", "settings.manage", "audit.view", "inquiries.create"]);
     const m = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 4, approves: true, companyAddresses: false });
-    expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Settings"]);
+    expect(titles(m)).toEqual(["Sales", "Suppliers", "Money", "Reports", "Company settings", "Admin settings"]);
     expect(pages(m, "reports")).toEqual(["Reports"]);
-    expect(pages(m, "settings")).toEqual(["People"]);
+    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form"]);
+    // No people, roles, sign-ins or sessions: those are the admin's.
+    expect(pages(m, "admin")).toEqual(["Activity log"]);
+    // Someone who only manages people sees Admin settings alone.
+    const people = buildModules({ can: (p) => p === "users.manage", feature: () => true, approvals: null, approves: false, companyAddresses: false });
+    expect(titles(people)).toEqual(["Sales", "Money", "Admin settings"]);
+    expect(pages(people, "admin")).toEqual(["People"]);
     // A recorder without expenses: what is to receive and to pay; Reports opens without its Profit and Cash tabs.
     const recorder = buildModules({ can: (p) => ["sourcing.manage", "payments.record", "reports.view"].includes(p), feature: () => true, approvals: 0, approves: true, companyAddresses: false });
     expect(pages(recorder, "money")).toEqual(["To receive and to pay", "Payments"]);
@@ -155,16 +163,14 @@ describe("the groups", () => {
   });
 
   it("keep the thin line between a group's two kinds of page, whatever is hidden", () => {
-    // Money is four pages of one kind: no line. Settings has three kinds: the company, its people, the record.
+    // Money and Company settings are pages of one kind: no line. Admin settings has two: the people, and the record.
     expect(lines(everything(), "money")).toEqual([]);
-    expect(lines(everything(), "settings")).toEqual(["People", "Activity log"]);
-    // Only People is left in Settings: no line above the first page.
-    const onlyPeople = buildModules({ can: (p) => p === "users.manage", feature: () => true, approvals: null, approves: false, companyAddresses: false });
-    expect(pages(onlyPeople, "settings")).toEqual(["People"]);
-    expect(lines(onlyPeople, "settings")).toEqual([]);
-    // People is hidden: the next page of that part carries the line.
-    const security = buildModules({ can: (p) => p === "settings.manage" || p === "security.manage", feature: () => true, approvals: null, approves: false, companyAddresses: false });
-    expect(lines(security, "settings")).toEqual(["Roles"]);
+    expect(lines(everything(), "company")).toEqual([]);
+    expect(lines(everything(), "admin")).toEqual(["Activity log"]);
+    // Only the record is left: no line above the first page.
+    const onlyLog = buildModules({ can: (p) => p === "audit.view", feature: () => true, approvals: null, approves: false, companyAddresses: false });
+    expect(pages(onlyLog, "admin")).toEqual(["Activity log"]);
+    expect(lines(onlyLog, "admin")).toEqual([]);
   });
 
   it("know which page and group an address is in (the longest address wins)", () => {
@@ -179,7 +185,11 @@ describe("the groups", () => {
     expect(moduleOf("/reports/cash", all)).toBe("reports");
     expect(moduleOf("/orders/board", all)).toBe("sales");
     expect(moduleOf("/money/due", all)).toBe("money");
-    expect(moduleOf("/audit", all)).toBe("settings");
+    expect(moduleOf("/audit", all)).toBe("admin");
+    expect(moduleOf("/settings/sales", all)).toBe("company");
+    // One page of the group's own name says it once.
+    expect(crumbsFor("/factories")).toEqual([{ label: "Suppliers" }]);
+    expect(crumbsFor("/users")).toEqual([{ label: "Admin settings" }, { label: "People" }]);
     expect(moduleOf("/factories/9a1b", all)).toBe("purchasing");
     expect(moduleOf("/dashboard", all)).toBeUndefined();
     // The path above a page's title: the group, then the page. Two levels.
@@ -193,8 +203,9 @@ describe("the menu down the left", () => {
     at.path = "/finance/cash-book";
     shell(everything());
     expect(menu().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
-    // Reports is one page: a link, not a group to open.
-    expect(menu().getAllByRole("button").map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Purchasing", "Money", "Settings"]);
+    // Suppliers and Reports are one page each: links, not groups to open.
+    expect(menu().getAllByRole("button").map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Money", "Company settings", "Admin settings"]);
+    expect(menu().getByRole("link", { name: "Suppliers" }).getAttribute("href")).toBe("/factories");
     expect(menu().getByRole("link", { name: "Reports" }).getAttribute("href")).toBe("/reports");
     expect(menu().getByRole("button", { name: "Money" }).getAttribute("aria-expanded")).toBe("true");
     expect(menu().getByRole("button", { name: "Sales" }).getAttribute("aria-expanded")).toBe("false");
@@ -218,15 +229,15 @@ describe("the menu down the left", () => {
   it("a click on a group opens or closes it, and it is remembered", () => {
     at.path = "/inquiries";
     shell(everything());
-    const purchasing = menu().getByRole("button", { name: "Purchasing" });
-    fireEvent.click(purchasing);
-    expect(purchasing.getAttribute("aria-expanded")).toBe("true");
-    expect(menu().getByRole("link", { name: "Suppliers" })).toBeTruthy();
+    const company = menu().getByRole("button", { name: "Company settings" });
+    fireEvent.click(company);
+    expect(company.getAttribute("aria-expanded")).toBe("true");
+    expect(menu().getByRole("link", { name: "Sales & quotations" })).toBeTruthy();
     // Sales stays open: two groups can be open at once.
     expect(menu().getByRole("button", { name: "Sales" }).getAttribute("aria-expanded")).toBe("true");
-    expect(document.cookie).toContain("nav-open=purchasing");
-    fireEvent.click(purchasing);
-    expect(purchasing.getAttribute("aria-expanded")).toBe("false");
+    expect(document.cookie).toContain("nav-open=company");
+    fireEvent.click(company);
+    expect(company.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("shows what waits: on the page when its group is open, on the group when it is closed", () => {
@@ -245,8 +256,9 @@ describe("the menu down the left", () => {
     at.path = "/users";
     shell(everything());
     const li = (name: string) => menu().getByRole("link", { name: new RegExp(`^${name}`) }).closest("li")!;
-    expect(li("People").className).toContain("before:bg-line");
+    expect(li("Activity log").className).toContain("before:bg-line");
     expect(li("Roles").className).not.toContain("before:bg-line");
+    expect(li("People").className).not.toContain("before:bg-line");
   });
 });
 
@@ -292,7 +304,8 @@ describe("the folded strip", () => {
     at.path = "/finance/cash-book";
     shell(everything(2));
     expect(strip().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
-    expect(strip().getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Sales", "Purchasing", "Money, 2 to look at", "Settings"]);
+    expect(strip().getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Sales", "Money, 2 to look at", "Company settings", "Admin settings"]);
+    expect(strip().getByRole("link", { name: "Suppliers" }).getAttribute("href")).toBe("/factories");
     expect(strip().getByRole("link", { name: "Reports" }).getAttribute("href")).toBe("/reports");
     expect(strip().getByRole("button", { name: /^Money/ }).className).toContain("bg-primary-soft");
     expect(strip().getByRole("button", { name: "Sales" }).className).not.toContain("bg-primary-soft");
@@ -301,10 +314,10 @@ describe("the folded strip", () => {
   it("an icon shows its group's name and pages beside it on hover, and hides them after the mouse leaves", () => {
     vi.useFakeTimers();
     shell(everything());
-    const li = strip().getByRole("button", { name: "Purchasing" }).closest("li")!;
+    const li = strip().getByRole("button", { name: "Admin settings" }).closest("li")!;
     fireEvent.mouseEnter(li);
-    const m = screen.getByRole("menu", { name: "Purchasing" });
-    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["Purchase orders", "Suppliers"]);
+    const m = screen.getByRole("menu", { name: "Admin settings" });
+    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Activity log"]);
     fireEvent.mouseLeave(li);
     act(() => vi.advanceTimersByTime(300));
     expect(screen.queryByRole("menu")).toBeNull();

@@ -57,6 +57,14 @@ export function companyCostsTarget(q: Query = {}): string {
 /** A payment request and an order's invoice were pages of their own: the order's Payment tab holds them now. */
 export const orderPaymentTarget = (orderId: string) => `/orders/${orderId}/payment`;
 
+/* ------------------------------------------------------------------ clean-up (14 Nov 2026) */
+
+/** Shipments was a list of its own: a shipment is on its order, so the old address opens the orders that are shipped. */
+export const shipmentsTarget = (q: Query = {}): string => buildHref("/orders", {}, { stage: "shipped", q: q.q });
+
+/** Purchase orders was a list of its own: a purchase order is on its order (the Factory tab), so the old address opens Orders. */
+export const purchaseOrdersTarget = (q: Query = {}): string => buildHref("/orders", {}, { q: q.q });
+
 /* ------------------------------------------------------------------ /insights?section=&view= */
 
 /** Insights' sections as pages: the tabs of Reports. */
