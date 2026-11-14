@@ -6,25 +6,26 @@ import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button, buttonClass, cn, type ButtonSize, type ButtonVariant } from "@kebo/ui";
+import { useChanges, watchChanges } from "./changes";
 import { ConfirmDialog, focusables, useFocusTrap, useMounted } from "./dialog";
 
 /* ---------------------------------------------------------------- closing */
 
-/** What a form's onDone gets: a state that saved (`ok`) closes the panel at once; anything else asks first when there are changes. */
+/** What a form's onDone gets: a state that saved (`ok`) closes the panel at once; anything else asks first when something was changed. */
 type CloseArg = { ok?: boolean } | unknown;
 const PanelClose = createContext<(arg?: CloseArg) => void>(() => {});
 
 /**
  * Inside a side panel: closes it. Pass it as a form's `onDone` (a saved form
- * closes it straight away) or as Cancel's onClick (with unsaved changes it
- * asks "Discard changes?" first).
+ * closes it straight away) or as Cancel's onClick (it asks "Discard
+ * changes?" first, only when something was really changed).
  */
 export const useClosePanel = () => useContext(PanelClose);
 
 const PanelDirty = createContext<(dirty: boolean | null) => void>(() => {});
 /**
- * Inside a side panel: tells it whether there are unsaved changes, for an editor whose changes are not typing
- * in its fields (a table of lines kept in the page). `null` goes back to noticing typing.
+ * Inside a side panel: tells it whether there are unsaved changes, for an editor that knows by itself (a table
+ * of lines kept in the page). `null` goes back to the panel comparing its fields with how they started.
  */
 export const useReportDirty = () => useContext(PanelDirty);
 
@@ -42,8 +43,9 @@ const saved = (arg: CloseArg) => !!arg && typeof arg === "object" && "ok" in arg
  *
  * For everyone: role=dialog, aria-modal, named by its title; focus starts on
  * the first field, stays inside while it is open and goes back to the button
- * that opened it. Escape, ✕ or a click beside it closes it — after "Discard
- * changes?" when something was typed; Ctrl+Enter (⌘+Enter) saves.
+ * that opened it. Escape, ✕, Cancel or a click beside it closes it at once
+ * when nothing was changed, and after "Discard changes?" when something was
+ * (typed and put back as it was is not a change); Ctrl+Enter (⌘+Enter) saves.
  *
  * Open it with state (`onClose`) or from the URL with useSidePanel, so a link
  * opens it and Back closes it.
@@ -59,7 +61,7 @@ export function SidePanel({
   title: string;
   description?: ReactNode;
   onClose: () => void;
-  /** Unsaved changes, when the panel cannot tell by itself (it notices typing in its fields). */
+  /** Unsaved changes, when the panel cannot tell by itself (it compares its fields with how they started). */
   dirty?: boolean;
   children: ReactNode;
   className?: string;
@@ -68,18 +70,17 @@ export function SidePanel({
   const box = useRef<HTMLDivElement>(null);
   const head = useRef<HTMLHeadingElement>(null);
   const mounted = useMounted();
-  const [typed, setTyped] = useState(false);
   const [asking, setAsking] = useState(false);
   const [reported, setReported] = useState<boolean | null>(null);
-  const dirty = dirtyProp ?? reported ?? typed;
+  const changes = useChanges(box);
   useFocusTrap(box, mounted);
 
   const request = useCallback(
     (arg?: CloseArg) => {
-      if (saved(arg) || !dirty) onClose();
+      if (saved(arg) || !(dirtyProp ?? reported ?? changes.changed())) onClose();
       else setAsking(true);
     },
-    [dirty, onClose],
+    [dirtyProp, reported, changes, onClose],
   );
 
   useEffect(() => lockScroll(), []);
@@ -103,8 +104,7 @@ export function SidePanel({
         aria-modal="true"
         aria-labelledby={`${id}-title`}
         aria-describedby={description ? `${id}-desc` : undefined}
-        onChange={() => setTyped(true)}
-        onInput={() => setTyped(true)}
+        {...watchChanges(changes)}
         onKeyDown={(e) => {
           const t = e.target as HTMLElement;
           // A menu or a confirm on top handles its own keys.
