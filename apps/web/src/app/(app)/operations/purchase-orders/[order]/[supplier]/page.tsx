@@ -94,13 +94,14 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         crumbs={[{ label: "Purchasing" }, { label: "Purchase orders", href: PURCHASE_ORDERS }, { label: po.number }]}
         icon={ShoppingCart}
         title={`${po.number} · ${po.supplier.name}`}
+        phoneStack
+        badge={status ? <StatusBadge meaning={status.meaning}>{status.label}</StatusBadge> : undefined}
         summary={
-          <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-            {status && <StatusBadge meaning={status.meaning}>{status.label}</StatusBadge>}
+          <p className="min-w-0">
             {meta.map((x, i) => (
               <span key={i}>
-                {(i > 0 || status) && (
-                  <span aria-hidden className="pr-1.5 text-muted">
+                {i > 0 && (
+                  <span aria-hidden className="px-1.5 text-muted">
                     ·
                   </span>
                 )}
