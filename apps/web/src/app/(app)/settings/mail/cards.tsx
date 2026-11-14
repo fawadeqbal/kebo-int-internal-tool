@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MAIL_PROVIDER_LABEL, MAIL_PROVIDERS, SMTP_PORTS, type MailProvider, type MailSettingsView } from "@kebo/shared";
-import { Badge, Card, CardBody, CardHeader, cn, Field, Input, Select } from "@kebo/ui";
+import { Card, CardBody, CardHeader, cn, Field, Input, Select } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -33,7 +33,7 @@ export function MailCards({ view, me, saveAction, removeAction, testAction }: { 
   return (
     <div className="flex flex-col gap-4">
       <Card className="overflow-hidden p-0">
-        <CardHeader title="How email is sent" actions={<Badge tone={status.tone}>{status.text}</Badge>} />
+        <CardHeader title="How email is sent" description={<span className={cn("font-medium", status.tone === "ok" ? "text-ok" : status.tone === "warn" ? "text-warn" : undefined)}>{status.text}</span>} />
         <CardBody>
           <ActionForm action={saveAction} keepFields className="flex flex-col gap-4">
             {(st) => (
