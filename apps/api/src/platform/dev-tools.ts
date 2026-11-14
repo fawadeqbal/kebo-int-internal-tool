@@ -19,8 +19,11 @@ import type {
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
 import { PlatformRoute } from "./platform-auth";
-import { BACKUP_MAX_AGE_HOURS, readStatus, type BackupStatus } from "./server-health";
+import { BACKUP_MAX_AGE_HOURS, readStatus, type BackupStatus, type RestoreStatus } from "./server-health";
 import { OUTSIDE_ROUTE, quantileMs, REQUEST_STEPS_MS } from "./watch";
+import { DevToolsMoreService, OPEN_PORTS } from "./dev-tools-more";
+
+export { OPEN_PORTS };
 
 /* ---------------------------------------------------------------- what deploy/server writes */
 
@@ -74,15 +77,14 @@ const infoOf = (name: string) => SERVICE_INFO[name] ?? { label: name, role: "", 
 
 /** The status is late after this long (the timer writes it every minute). */
 export const STALE_MINUTES = 5;
-/** Ports that may be open to the outside: SSH and the web. */
-export const OPEN_PORTS = [22, 80, 443];
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 const pct = (n: number) => `${Math.round(n)}%`;
 const gb = (n: number) => `${n >= 10 ? Math.round(n) : Math.round(n * 10) / 10} GB`;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const dayText = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+const dayText = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 
 async function readJsonl<T>(file: string, last = 5000): Promise<T[]> {
   let text: string;
@@ -162,6 +164,12 @@ export interface CheckInput {
   errors?: { lastHour: number; open24h: number };
   /** The outside watcher's last check (null: never). */
   outsideAt?: string | null;
+  /** Emails and phone notifications today. */
+  deliveries?: { email: { sent: number; failed: number }; push: { sent: number; failed: number } };
+  /** The monthly restore test (null: not run yet). */
+  restore?: RestoreStatus | null;
+  /** The Security tab's checks, shown as one. */
+  security?: DevCheck[];
 }
 
 /** No check from outside for this long: the watcher stopped, or the site could not be reached. */
@@ -193,10 +201,14 @@ export function buildChecks(i: CheckInput): DevCheck[] {
   // Addresses
   out.push(service("addresses", "proxy", "Address server"));
   const certs = s?.certificates ?? null;
-  if (!certs?.length) out.push({ key: "certs", lane: "addresses", name: "Certificates", line: "not checked yet", level: "off", tab: "picture" });
+  if (!certs?.length)
+    out.push({ key: "certs", lane: "addresses", name: "Certificates", line: "not checked yet", level: "off", tab: "picture" });
   else {
     const bad = certs.filter((c) => !c.ok);
-    const ends = certs.filter((c) => c.ok && c.endsAt).map((c) => c.endsAt!).sort();
+    const ends = certs
+      .filter((c) => c.ok && c.endsAt)
+      .map((c) => c.endsAt!)
+      .sort();
     const days = ends.length ? Math.floor((Date.parse(ends[0]!) - i.now.getTime()) / DAY) : null;
     out.push({
       key: "certs",
@@ -205,7 +217,11 @@ export function buildChecks(i: CheckInput): DevCheck[] {
       line: bad.length ? `${bad[0]!.host}: could not check` : `${certs.length} · first ends ${dayText(ends[0]!)}`,
       level: bad.length || (days !== null && days < 3) ? "bad" : days !== null && days < 14 ? "warn" : "ok",
       tab: "picture",
-      fix: bad.length ? "Open the address in a browser; if it fails, see the Address server's live log." : days !== null && days < 14 ? "Caddy renews them by itself: see the Address server's log if it does not." : undefined,
+      fix: bad.length
+        ? "Open the address in a browser; if it fails, see the Address server's live log."
+        : days !== null && days < 14
+          ? "Caddy renews them by itself: see the Address server's log if it does not."
+          : undefined,
     });
   }
   const d = i.ownDomains;
@@ -213,16 +229,48 @@ export function buildChecks(i: CheckInput): DevCheck[] {
     key: "domains",
     lane: "addresses",
     name: "Companies' own domains",
-    line: d.connected + d.lost + d.waiting === 0 ? "none yet" : `${d.connected} connected${d.lost ? ` · ${d.lost} lost` : ""}${d.waiting ? ` · ${d.waiting} waiting` : ""}`,
+    line:
+      d.connected + d.lost + d.waiting === 0
+        ? "none yet"
+        : `${d.connected} connected${d.lost ? ` · ${d.lost} lost` : ""}${d.waiting ? ` · ${d.waiting} waiting` : ""}`,
     level: d.lost ? "warn" : d.connected ? "ok" : "off",
     tab: "picture",
     fix: d.lost ? "A company's domain no longer points here: see its company page, Address." : undefined,
   });
 
   // Server
-  if (!s) out.push({ key: "status", lane: "server", name: "Server status", line: "not set up yet", level: "off", tab: "picture", fix: "The next deploy installs it (deploy/server/install.sh)." });
+  if (i.security?.length) {
+    const needs = i.security.filter((c) => c.level === "warn" || c.level === "bad");
+    out.push({
+      key: "security",
+      lane: "server",
+      name: "Security",
+      line: needs.length ? needs.map((c) => c.name.toLowerCase()).join(", ") : "nothing to look at",
+      level: needs.some((c) => c.level === "bad") ? "bad" : needs.length ? "warn" : "ok",
+      tab: "security",
+      fix: needs.length ? "See Security." : undefined,
+    });
+  }
+  if (!s)
+    out.push({
+      key: "status",
+      lane: "server",
+      name: "Server status",
+      line: "not set up yet",
+      level: "off",
+      tab: "picture",
+      fix: "The next deploy installs it (deploy/server/install.sh).",
+    });
   else if (age > STALE_MINUTES)
-    out.push({ key: "status", lane: "server", name: "Server status", line: `last written ${Math.round(age)} min ago`, level: "bad", tab: "picture", fix: "On the server: sudo systemctl status kebo-status.timer" });
+    out.push({
+      key: "status",
+      lane: "server",
+      name: "Server status",
+      line: `last written ${Math.round(age)} min ago`,
+      level: "bad",
+      tab: "picture",
+      fix: "On the server: sudo systemctl status kebo-status.timer",
+    });
   if (s) {
     const cpu = i.cpu15 ?? s.cpu?.percent ?? null;
     out.push({
@@ -255,25 +303,38 @@ export function buildChecks(i: CheckInput): DevCheck[] {
       fix: k && k.percent >= 80 ? "See what uses the space in Disk, database and backups." : undefined,
     });
     const u = s.updates;
-    out.push({
-      key: "updates",
-      lane: "server",
-      name: "Updates",
-      line: !u ? "not checked yet" : u.security ? `${plural(u.security, "security update")} waiting` : u.reboot ? "a restart is needed" : "up to date",
-      level: !u ? "off" : u.security || u.reboot ? "warn" : "ok",
-      tab: "picture",
-      fix: u && (u.security || u.reboot) ? "On the server, at a quiet hour: sudo apt upgrade (or dnf upgrade), then sudo reboot." : undefined,
-    });
+    if (!i.security?.length)
+      out.push({
+        key: "updates",
+        lane: "server",
+        name: "Updates",
+        line: !u
+          ? "not checked yet"
+          : u.security
+            ? `${plural(u.security, "security update")} waiting`
+            : u.reboot
+              ? "a restart is needed"
+              : "up to date",
+        level: !u ? "off" : u.security || u.reboot ? "warn" : "ok",
+        tab: "picture",
+        fix:
+          u && (u.security || u.reboot)
+            ? "On the server, at a quiet hour: sudo apt upgrade (or dnf upgrade), then sudo reboot."
+            : undefined,
+      });
     const extra = (s.ports ?? []).filter((p) => !OPEN_PORTS.includes(p));
-    out.push({
-      key: "ports",
-      lane: "server",
-      name: "Open ports",
-      line: extra.length ? `${extra.join(", ")} open to the outside` : `only ${(s.ports ?? OPEN_PORTS).join(", ") || "none"}${s.firewall === "on" ? " · firewall on" : ""}`,
-      level: extra.length ? "warn" : "ok",
-      tab: "picture",
-      fix: extra.length ? "Close what should not be reachable from the internet (firewall, or bind it to 127.0.0.1)." : undefined,
-    });
+    if (!i.security?.length)
+      out.push({
+        key: "ports",
+        lane: "server",
+        name: "Open ports",
+        line: extra.length
+          ? `${extra.join(", ")} open to the outside`
+          : `only ${(s.ports ?? OPEN_PORTS).join(", ") || "none"}${s.firewall === "on" ? " · firewall on" : ""}`,
+        level: extra.length ? "warn" : "ok",
+        tab: "picture",
+        fix: extra.length ? "Close what should not be reachable from the internet (firewall, or bind it to 127.0.0.1)." : undefined,
+      });
   }
 
   // App
@@ -289,7 +350,10 @@ export function buildChecks(i: CheckInput): DevCheck[] {
       key: "speed",
       lane: "app",
       name: "Speed",
-      line: !sp.requests || sp.slowMs === null ? "no requests in the last 15 min" : `typical ${sp.typicalMs} ms · slowest 5% ${msText(sp.slowMs)}`,
+      line:
+        !sp.requests || sp.slowMs === null
+          ? "no requests in the last 15 min"
+          : `typical ${sp.typicalMs} ms · slowest 5% ${msText(sp.slowMs)}`,
       level: sp.slowMs === null ? "ok" : sp.slowMs >= 5000 ? "bad" : sp.slowMs >= 2000 ? "warn" : "ok",
       tab: "speed",
       fix: sp.slowMs !== null && sp.slowMs >= 2000 ? "Slow for 15 minutes: see the slowest pages in Speed and errors." : undefined,
@@ -301,7 +365,11 @@ export function buildChecks(i: CheckInput): DevCheck[] {
       key: "errors",
       lane: "app",
       name: "Errors",
-      line: e.lastHour ? `${plural(e.lastHour, "error")} in the last hour` : e.open24h ? `${plural(e.open24h, "kind")} open, seen today` : "none in 24 hours",
+      line: e.lastHour
+        ? `${plural(e.lastHour, "error")} in the last hour`
+        : e.open24h
+          ? `${plural(e.open24h, "kind")} open, seen today`
+          : "none in 24 hours",
       level: e.lastHour >= 10 ? "bad" : e.lastHour || e.open24h ? "warn" : "ok",
       tab: "speed",
       fix: e.lastHour || e.open24h ? "See them in Speed and errors; Copy for Claude to get them fixed." : undefined,
@@ -316,19 +384,43 @@ export function buildChecks(i: CheckInput): DevCheck[] {
     key: "db",
     lane: "data",
     name: "Database",
-    line: !conn.ok ? "not answering" : conn.connections !== null ? `${conn.connections} of ${conn.maxConnections} connections` : "answering",
+    line: !conn.ok
+      ? "not answering"
+      : conn.connections !== null
+        ? `${conn.connections} of ${conn.maxConnections} connections`
+        : "answering",
     level: !conn.ok ? "bad" : (db && db.level !== "ok") || busy >= 0.8 ? "warn" : "ok",
     tab: "data",
-    fix: !conn.ok ? "See the Database's live log in Services." : busy >= 0.8 ? "Almost every connection is in use: see the API's log." : undefined,
+    fix: !conn.ok
+      ? "See the Database's live log in Services."
+      : busy >= 0.8
+        ? "Almost every connection is in use: see the API's log."
+        : undefined,
   });
   out.push(service("data", "minio", "Files"));
+  if (i.restore !== undefined) {
+    const r = i.restore;
+    out.push({
+      key: "restore",
+      lane: "data",
+      name: "Restore test",
+      line: !r ? "not run yet: once a month" : r.ok ? `worked ${dayText(r.at)}` : "failed",
+      level: !r ? "off" : r.ok ? "ok" : "bad",
+      tab: "jobs",
+      fix: r && !r.ok ? `${r.message ?? "See the Backup's live log"}. A backup that cannot be put back is no backup.` : undefined,
+    });
+  }
   const b = i.backup;
   const goodAge = b?.lastGoodAt ? (i.now.getTime() - Date.parse(b.lastGoodAt)) / HOUR : Infinity;
   out.push({
     key: "backup",
     lane: "data",
     name: "Backup",
-    line: !b ? "none recorded yet" : b.lastGoodAt ? `last good ${agoShort(b.lastGoodAt, i.now)}${b.ok ? "" : " · last try failed"}` : "never worked",
+    line: !b
+      ? "none recorded yet"
+      : b.lastGoodAt
+        ? `last good ${agoShort(b.lastGoodAt, i.now)}${b.ok ? "" : " · last try failed"}`
+        : "never worked",
     level: !b ? (s ? "warn" : "off") : goodAge > BACKUP_MAX_AGE_HOURS ? "bad" : b.ok ? "ok" : "warn",
     tab: "data",
     fix: !b || goodAge > BACKUP_MAX_AGE_HOURS || !b.ok ? "See the Backup's live log in Services, and docs/restore.md." : undefined,
@@ -338,10 +430,22 @@ export function buildChecks(i: CheckInput): DevCheck[] {
     key: "offsite",
     lane: "data",
     name: "Off-site copy",
-    line: off === "ok" ? "made with the last backup" : off === "failed" ? "failed" : off === "off" ? "off: backups are on this server only" : "not known yet",
+    line:
+      off === "ok"
+        ? "made with the last backup"
+        : off === "failed"
+          ? "failed"
+          : off === "off"
+            ? "off: backups are on this server only"
+            : "not known yet",
     level: off === "ok" ? "ok" : off === "failed" ? "bad" : off === "off" ? "warn" : "off",
     tab: "data",
-    fix: off === "off" ? "Set it up: deploy/server/enable-offsite.sh (docs/restore.md)." : off === "failed" ? "See the Backup's live log in Services." : undefined,
+    fix:
+      off === "off"
+        ? "Set it up: deploy/server/enable-offsite.sh (docs/restore.md)."
+        : off === "failed"
+          ? "See the Backup's live log in Services."
+          : undefined,
   });
 
   // Outside services
@@ -361,6 +465,24 @@ export function buildChecks(i: CheckInput): DevCheck[] {
             ? "No check from outside lately: see GitHub Actions › Watch the site (it emails you when the site is down)."
             : undefined,
     });
+  }
+  if (i.deliveries) {
+    for (const [key, name, d] of [
+      ["email", "Email sending", i.deliveries.email],
+      ["push", "Phone notifications", i.deliveries.push],
+    ] as const) {
+      const all = d.sent + d.failed;
+      out.push({
+        key,
+        lane: "outside",
+        name,
+        line: all ? `${d.sent} today${d.failed ? ` · ${d.failed} not delivered` : ""}` : "none sent today",
+        // One mailbox full now and then is normal: warn from 5 not delivered or 5% of them.
+        level: all >= 5 && d.failed / all >= 0.2 ? "bad" : d.failed >= 5 || (all && d.failed / all >= 0.05) ? "warn" : "ok",
+        tab: "jobs",
+        fix: d.failed >= 5 || (all && d.failed / all >= 0.05) ? "See why in Jobs and emails." : undefined,
+      });
+    }
   }
   const dep = i.lastDeploy;
   out.push({
@@ -387,7 +509,7 @@ function upFor(startedAt: string | null, now: Date) {
 function agoShort(iso: string, now: Date) {
   const h = (now.getTime() - Date.parse(iso)) / HOUR;
   if (h < 1) return `${Math.max(1, Math.round(h * 60))} min ago`;
-  if (h < 48) return `${Math.round(h)} hours ago`;
+  if (h < 48) return `${Math.round(h)} hour${Math.round(h) === 1 ? "" : "s"} ago`;
   return `${Math.round(h / 24)} days ago`;
 }
 
@@ -415,7 +537,11 @@ export function logLine(raw: string): DevLogLine {
   const clean = raw.replace(ANSI, "");
   const m = TS.exec(clean);
   const text = m ? clean.slice(m[0].length) : clean;
-  return { at: m ? m[1]!.replace(/\.(\d{3})\d*Z$/, ".$1Z") : null, text, level: ERR.test(text) ? "error" : WARN.test(text) ? "warn" : null };
+  return {
+    at: m ? m[1]!.replace(/\.(\d{3})\d*Z$/, ".$1Z") : null,
+    text,
+    level: ERR.test(text) ? "error" : WARN.test(text) ? "warn" : null,
+  };
 }
 
 /** The first read: the end of the file. Later reads: what was written since `after` (at most this much). */
@@ -458,6 +584,7 @@ export class DevToolsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(ENV) private readonly env: Env,
+    private readonly more: DevToolsMoreService,
   ) {}
 
   private file(name: string) {
@@ -520,7 +647,16 @@ export class DevToolsService {
         tables: tables.map((t) => ({ name: t.name, rows: Number(t.rows), mb: Math.round((Number(t.bytes) / 1048576) * 10) / 10 })),
       };
     } catch {
-      return { ok: false, version: null, sizeMb: null, connections: null, maxConnections: null, cacheHit: null, longestQuerySec: null, tables: [] };
+      return {
+        ok: false,
+        version: null,
+        sizeMb: null,
+        connections: null,
+        maxConnections: null,
+        cacheHit: null,
+        longestQuerySec: null,
+        tables: [],
+      };
     }
   }
 
@@ -549,7 +685,10 @@ export class DevToolsService {
     const routes = counts
       .filter((r) => r.route !== OUTSIDE_ROUTE)
       .map((r) => ({ route: r.route, count: Number(r.count), errors: Number(r.errors), buckets: buckets.get(r.route) ?? [] }));
-    const all = routes.reduce((acc, r) => acc.map((v, k) => v + (r.buckets[k] ?? 0)), new Array(REQUEST_STEPS_MS.length + 1).fill(0) as number[]);
+    const all = routes.reduce(
+      (acc, r) => acc.map((v, k) => v + (r.buckets[k] ?? 0)),
+      new Array(REQUEST_STEPS_MS.length + 1).fill(0) as number[],
+    );
     return {
       routes,
       requests: routes.reduce((a, r) => a + r.count, 0),
@@ -591,10 +730,13 @@ export class DevToolsService {
         select: { at: true, summary: true },
       }),
     ]);
-    const [last24, quarter, lastHour, openErrors, outside, up, newErrors] = await Promise.all([
+    const today = new Date(now.toISOString().slice(0, 10));
+    const [last24, quarter, lastHour, openErrors, outside, up, newErrors, deliveryRows, restore, security] = await Promise.all([
       this.routeStats(new Date(now.getTime() - DAY)),
       this.routeStats(new Date(now.getTime() - 15 * 60000)),
-      this.prisma.platform.$queryRaw<{ n: bigint }[]>`select coalesce(sum(errors), 0)::bigint as n from request_minutes where minute >= ${new Date(now.getTime() - HOUR)}`,
+      this.prisma.platform.$queryRaw<
+        { n: bigint }[]
+      >`select coalesce(sum(errors), 0)::bigint as n from request_minutes where minute >= ${new Date(now.getTime() - HOUR)}`,
       this.prisma.platform.appError.count({ where: { status: "open", lastAt: { gte: new Date(now.getTime() - DAY) } } }),
       this.outside(),
       this.up(),
@@ -604,7 +746,22 @@ export class DevToolsService {
         take: 20,
         select: { firstAt: true, message: true, where: true },
       }),
+      this.prisma.platform.deliveryDay.findMany({ where: { day: today } }),
+      (async () => {
+        const f = this.file("restore-status.json");
+        if (!f) return null;
+        const r = await readStatus<RestoreStatus>(f);
+        return r.state === "ok" ? r.value : null;
+      })(),
+      this.more
+        .security(now)
+        .then((v) => v.checks)
+        .catch(() => []),
     ]);
+    const dd = (c: string) => {
+      const r = deliveryRows.find((x) => x.channel === c);
+      return { sent: r?.sent ?? 0, failed: r?.failed ?? 0 };
+    };
     const services = servicesFrom(status, events, logs, now);
     const recent = history.filter((h) => Date.parse(h.t) >= now.getTime() - 15 * 60000 && h.cpu !== null);
     const cpu15 = recent.length ? recent.reduce((a, h) => a + (h.cpu ?? 0), 0) / recent.length : null;
@@ -621,16 +778,21 @@ export class DevToolsService {
       speed: { requests: quarter.requests, slowMs: quarter.slowMs, typicalMs: quarter.typicalMs },
       errors: { lastHour: Number(lastHour[0]?.n ?? 0), open24h: openErrors },
       outsideAt: outside.lastAt,
+      deliveries: { email: dd("email"), push: dd("push") },
+      restore,
+      security,
     });
 
     const week = now.getTime() - 7 * DAY;
     const timeline: DevEvent[] = [
-      ...deploys.filter((d) => Date.parse(d.at) >= week).map((d): DevEvent => ({
-        at: d.at,
-        kind: d.ok ? "deploy" : "deployFailed",
-        level: d.ok ? "ok" : "warn",
-        text: d.ok ? `Deployed ${d.commit}: ${d.title}` : `Deploy of ${d.commit} failed; the previous version kept running`,
-      })),
+      ...deploys
+        .filter((d) => Date.parse(d.at) >= week)
+        .map((d): DevEvent => ({
+          at: d.at,
+          kind: d.ok ? "deploy" : "deployFailed",
+          level: d.ok ? "ok" : "warn",
+          text: d.ok ? `Deployed ${d.commit}: ${d.title}` : `Deploy of ${d.commit} failed; the previous version kept running`,
+        })),
       ...events
         .filter((e) => e.kind !== "replaced" && Date.parse(e.at) >= week)
         .map((e): DevEvent => ({
@@ -639,15 +801,27 @@ export class DevToolsService {
           level: e.kind === "stopped" ? "bad" : "warn",
           text: `${infoOf(e.service).label} ${e.kind === "stopped" ? "stopped" : "restarted"}${e.why ? `: ${e.why}` : ""}`,
         })),
-      ...warnings.map((w): DevEvent => ({ at: w.at.toISOString(), kind: "warning", level: "warn", text: `${w.summary}: emailed to the platform admins` })),
-      ...newErrors.map((e): DevEvent => ({ at: e.firstAt.toISOString(), kind: "error", level: "bad", text: `New error on ${e.where}: ${e.message.slice(0, 120)}` })),
+      ...warnings.map((w): DevEvent => ({
+        at: w.at.toISOString(),
+        kind: "warning",
+        level: "warn",
+        text: `${w.summary}: emailed to the platform admins`,
+      })),
+      ...newErrors.map((e): DevEvent => ({
+        at: e.firstAt.toISOString(),
+        kind: "error",
+        level: "bad",
+        text: `New error on ${e.where}: ${e.message.slice(0, 120)}`,
+      })),
     ];
     if (backup?.at && Date.parse(backup.at) >= week)
       timeline.push({
         at: backup.at,
         kind: backup.ok ? "backup" : "backupFailed",
         level: backup.ok ? "ok" : "bad",
-        text: backup.ok ? `Database backup made${backup.offsite === "ok" ? ", and copied off the server" : ""}` : `Backup failed: ${backup.message ?? "no reason given"}`,
+        text: backup.ok
+          ? `Database backup made${backup.offsite === "ok" ? ", and copied off the server" : ""}`
+          : `Backup failed: ${backup.message ?? "no reason given"}`,
       });
     timeline.sort((a, b) => b.at.localeCompare(a.at));
 
@@ -685,7 +859,9 @@ export class DevToolsService {
         upPercent: up.percent,
         lastDown: up.lastDown,
       },
-      host: status?.host ? { os: status.host.os ?? null, uptimeSec: status.host.uptimeSec ?? null, docker: status.host.docker ?? null } : null,
+      host: status?.host
+        ? { os: status.host.os ?? null, uptimeSec: status.host.uptimeSec ?? null, docker: status.host.docker ?? null }
+        : null,
       deploys: deploys.slice(-5).reverse(),
       events: timeline.slice(0, 60),
       chart,
@@ -699,7 +875,22 @@ export class DevToolsService {
     for (const name of logs)
       if (!services.some((s) => s.key === name)) {
         const info = infoOf(name);
-        services.push({ key: name, label: info.label, role: info.role, state: "unknown", level: "off", status: "Not checked", startedAt: null, restarts: 0, restarts24h: 0, lastRestart: null, cpu: null, memMb: null, memLimitMb: null, hasLog: true });
+        services.push({
+          key: name,
+          label: info.label,
+          role: info.role,
+          state: "unknown",
+          level: "off",
+          status: "Not checked",
+          startedAt: null,
+          restarts: 0,
+          restarts24h: 0,
+          lastRestart: null,
+          cpu: null,
+          memMb: null,
+          memLimitMb: null,
+          hasLog: true,
+        });
       }
     return { checkedAt: status?.at ?? null, services, logs, logsOn: !!this.env.LIVE_LOGS_DIR };
   }
@@ -723,7 +914,13 @@ export class DevToolsService {
       spaceAt: status?.space?.at ?? null,
       days: days.slice(-30),
       backup: {
-        level: !backup ? "off" : goodAge > BACKUP_MAX_AGE_HOURS || backup.offsite === "failed" ? "bad" : !backup.ok || backup.offsite === "off" ? "warn" : "ok",
+        level: !backup
+          ? "off"
+          : goodAge > BACKUP_MAX_AGE_HOURS || backup.offsite === "failed"
+            ? "bad"
+            : !backup.ok || backup.offsite === "off"
+              ? "warn"
+              : "ok",
         lastGoodAt: backup?.lastGoodAt ?? null,
         lastTryAt: backup?.at ?? null,
         ok: backup?.ok ?? null,
@@ -762,7 +959,12 @@ export class DevToolsService {
     const origin = Date.parse("2000-01-01T00:00:00Z");
     for (let t = origin + Math.floor((since.getTime() - origin) / stepMs) * stepMs; t <= now.getTime(); t += stepMs) {
       const b = steps.get(t);
-      chart.push({ t: new Date(t).toISOString(), count: b ? b.reduce((a, x) => a + x, 0) : 0, typicalMs: b ? quantileMs(b, 0.5) : null, slowMs: b ? quantileMs(b, 0.95) : null });
+      chart.push({
+        t: new Date(t).toISOString(),
+        count: b ? b.reduce((a, x) => a + x, 0) : 0,
+        typicalMs: b ? quantileMs(b, 0.5) : null,
+        slowMs: b ? quantileMs(b, 0.95) : null,
+      });
     }
     const afterDeploy = (at: Date) => [...deploys].reverse().find((d) => d.ok && Date.parse(d.at) <= at.getTime())?.commit ?? null;
     return {
@@ -775,27 +977,31 @@ export class DevToolsService {
       chart,
       slowest: stats.routes
         .filter((r) => r.count >= 5)
-        .map((r) => ({ route: r.route, count: r.count, errors: r.errors, typicalMs: quantileMs(r.buckets, 0.5), slowMs: quantileMs(r.buckets, 0.95) }))
+        .map((r) => ({
+          route: r.route,
+          count: r.count,
+          errors: r.errors,
+          typicalMs: quantileMs(r.buckets, 0.5),
+          slowMs: quantileMs(r.buckets, 0.95),
+        }))
         .sort((a, b) => (b.slowMs ?? 0) - (a.slowMs ?? 0))
         .slice(0, 10),
-      errorsList: errors.map(
-        (e): DevError => ({
-          id: e.id,
-          source: e.source,
-          name: e.name,
-          message: e.message,
-          where: e.where,
-          stack: e.stack,
-          count: e.count,
-          companyName: e.companyName,
-          userName: e.userName,
-          path: e.path,
-          firstAt: e.firstAt.toISOString(),
-          lastAt: e.lastAt.toISOString(),
-          status: e.status === "fixed" ? "fixed" : "open",
-          afterDeploy: afterDeploy(e.firstAt),
-        }),
-      ),
+      errorsList: errors.map((e): DevError => ({
+        id: e.id,
+        source: e.source,
+        name: e.name,
+        message: e.message,
+        where: e.where,
+        stack: e.stack,
+        count: e.count,
+        companyName: e.companyName,
+        userName: e.userName,
+        path: e.path,
+        firstAt: e.firstAt.toISOString(),
+        lastAt: e.lastAt.toISOString(),
+        status: e.status === "fixed" ? "fixed" : "open",
+        afterDeploy: afterDeploy(e.firstAt),
+      })),
       fixedCount,
       outside,
     };
@@ -819,7 +1025,28 @@ export class DevToolsService {
 @ApiTags("platform")
 @Controller("platform/dev-tools")
 export class DevToolsController {
-  constructor(private readonly dev: DevToolsService) {}
+  constructor(
+    private readonly dev: DevToolsService,
+    private readonly more: DevToolsMoreService,
+  ) {}
+
+  @PlatformRoute()
+  @Get("jobs")
+  jobs() {
+    return this.more.jobs();
+  }
+
+  @PlatformRoute()
+  @Get("security")
+  security() {
+    return this.more.security();
+  }
+
+  @PlatformRoute()
+  @Get("companies")
+  companies() {
+    return this.more.companies();
+  }
 
   @PlatformRoute()
   @Get("overview")

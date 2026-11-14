@@ -32,10 +32,34 @@ export interface DiskStatus {
 
 export interface ServerWarning {
   /** Stable per kind of problem: the same one is emailed at most once a day. */
-  key: "backup_old" | "backup_failed" | "offsite_failed" | "status_unreadable" | "disk_full";
+  key: "backup_old" | "backup_failed" | "offsite_failed" | "status_unreadable" | "disk_full" | "service_down" | "errors" | "certificate" | "restore_failed";
   title: string;
   detail: string;
 }
+
+/** backups/status/restore-status.json, written by docker/backup.sh after its monthly restore test. */
+export interface RestoreStatus {
+  at: string;
+  ok: boolean;
+  message?: string | null;
+  dump?: string | null;
+  tookSec?: number | null;
+  tables?: number | null;
+  companies?: number | null;
+  orders?: number | null;
+}
+
+/** What Dev tools' server status adds to the checks (server.json, written every minute by deploy/server). */
+export interface ServerFacts {
+  at: string;
+  services?: { name: string; state: string }[];
+  certificates?: { host: string; ok: boolean; endsAt?: string; error?: string }[] | null;
+}
+
+/** Server errors in an hour from this many: emailed. */
+export const ERRORS_WARN_PER_HOUR = 10;
+/** A certificate ending within this many days: emailed. */
+export const CERT_WARN_DAYS = 14;
 
 /** A status file: missing, unreadable, or read. */
 export type Read<T> = { state: "missing" } | { state: "unreadable"; error: string } | { state: "ok"; value: T };
@@ -55,6 +79,9 @@ export function serverWarnings(input: {
   watchingSince: Date;
   backup: Read<BackupStatus>;
   disk: Read<DiskStatus>;
+  server?: Read<ServerFacts>;
+  restore?: Read<RestoreStatus>;
+  errorsLastHour?: number;
 }): ServerWarning[] {
   const { now, backup, disk } = input;
   const out: ServerWarning[] = [];
@@ -102,6 +129,36 @@ export function serverWarnings(input: {
       title: `The server's disk is ${disk.value.percent}% full`,
       detail: `${disk.value.freeGb ?? "?"} GB free after the nightly Docker cleanup.`,
     });
+
+  const server = input.server?.state === "ok" ? input.server.value : null;
+  if (server && age(now, server.at) <= 0.25) {
+    const down = (server.services ?? []).filter((x) => x.state !== "running");
+    if (down.length)
+      out.push({
+        key: "service_down",
+        title: `${down.map((x) => x.name).join(", ")} ${down.length === 1 ? "is" : "are"} not running`,
+        detail: `See Dev tools › Services and the live log. On the server: sudo docker compose ps`,
+      });
+    const ends = (server.certificates ?? []).filter((c) => !c.ok || (c.endsAt && (Date.parse(c.endsAt) - now.getTime()) / 86_400_000 < CERT_WARN_DAYS));
+    if (ends.length)
+      out.push({
+        key: "certificate",
+        title: `A certificate needs a look: ${ends[0]!.host}`,
+        detail: ends[0]!.ok ? `It ends on ${ends[0]!.endsAt!.slice(0, 10)}. Caddy renews it by itself; see the Address server's live log if it does not.` : `It could not be checked: ${ends[0]!.error ?? "no answer"}.`,
+      });
+  }
+  if ((input.errorsLastHour ?? 0) >= ERRORS_WARN_PER_HOUR)
+    out.push({
+      key: "errors",
+      title: `${input.errorsLastHour} server errors in the last hour`,
+      detail: "See Dev tools › Speed and errors: each error with its stack, and Copy for Claude.",
+    });
+  if (input.restore?.state === "ok" && !input.restore.value.ok && age(now, input.restore.value.at) <= 24 * 7)
+    out.push({
+      key: "restore_failed",
+      title: "The monthly restore test failed",
+      detail: `${input.restore.value.message ?? "No reason given"}. A backup that cannot be put back is no backup: see docs/restore.md.`,
+    });
   return out;
 }
 
@@ -145,6 +202,16 @@ export class ServerHealthService {
     @Inject(ENV) private readonly env: Env,
   ) {}
 
+  private async errorsLastHour(now: Date) {
+    try {
+      const [r] = await this.prisma.platform.$queryRaw<{ n: bigint }[]>`
+        select coalesce(sum(errors), 0)::bigint as n from request_minutes where minute >= ${new Date(now.getTime() - HOUR)}`;
+      return Number(r?.n ?? 0);
+    } catch {
+      return 0;
+    }
+  }
+
   async run(now = new Date()) {
     const dir = this.env.SERVER_STATUS_DIR;
     if (!dir) return [];
@@ -153,6 +220,9 @@ export class ServerHealthService {
       watchingSince: this.startedAt,
       backup: await readStatus<BackupStatus>(path.join(dir, "last-status.json")),
       disk: await readStatus<DiskStatus>(path.join(dir, "disk.json")),
+      server: await readStatus<ServerFacts>(path.join(dir, "server.json")),
+      restore: await readStatus<RestoreStatus>(path.join(dir, "restore-status.json")),
+      errorsLastHour: await this.errorsLastHour(now),
     });
     if (!warnings.length) return [];
     const since = new Date(now.getTime() - WARNING_REPEAT_HOURS * HOUR);
@@ -178,7 +248,7 @@ export class ServerHealthService {
           ["Server", this.env.APP_URL],
           ["Checked", this.mail.when(now)],
         ],
-        body: `${w.detail}\n\nWhat to do: docs/restore.md (backups) and deploy/server/ (disk). This email comes again once a day until it is fixed.`,
+        body: `${w.detail}\n\nMore in Platform admin › Dev tools. This email comes again once a day until it is fixed.`,
       });
     }
     return due;

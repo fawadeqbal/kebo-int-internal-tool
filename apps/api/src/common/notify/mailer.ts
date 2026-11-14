@@ -3,6 +3,8 @@
  * implementation can be replaced (e.g. by an API-based provider) without
  * changing business code.
  */
+import { delivered, maskAddress } from "./delivery";
+
 export interface MailMessage {
   to: string | string[];
   subject: string;
@@ -51,12 +53,18 @@ export function smtpMailer(o: SmtpOptions): Mailer {
         greetingTimeout: 10_000,
         socketTimeout: 20_000,
       });
-      await transport.sendMail({
-        from: o.from,
-        ...message,
-        to: [message.to].flat().join(", "),
-        cc: message.cc ? [message.cc].flat().join(", ") : undefined,
-      });
+      try {
+        await transport.sendMail({
+          from: o.from,
+          ...message,
+          to: [message.to].flat().join(", "),
+          cc: message.cc ? [message.cc].flat().join(", ") : undefined,
+        });
+      } catch (e) {
+        delivered({ channel: "email", ok: false, what: message.subject, to: maskAddress(message.to), reason: (e as Error).message });
+        throw e;
+      }
+      delivered({ channel: "email", ok: true, what: message.subject });
     },
   };
 }
@@ -85,8 +93,11 @@ export function resendMailer(o: { apiKey: string; from: string }, post: typeof f
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(`Resend answered ${res.status}${body?.message ? `: ${body.message}` : ""}`);
+        const reason = `Resend answered ${res.status}${body?.message ? `: ${body.message}` : ""}`;
+        delivered({ channel: "email", ok: false, what: message.subject, to: maskAddress(message.to), reason });
+        throw new Error(reason);
       }
+      delivered({ channel: "email", ok: true, what: message.subject });
     },
   };
 }

@@ -1,4 +1,5 @@
 import { createSign } from "node:crypto";
+import { delivered } from "./delivery";
 import { existsSync, readFileSync } from "node:fs";
 
 /**
@@ -92,17 +93,23 @@ export async function sendPush(tokens: string[], message: PushMessage): Promise<
           }),
           signal: AbortSignal.timeout(15_000),
         });
-        if (res.ok) return;
+        if (res.ok) {
+          delivered({ channel: "push", ok: true, what: message.title });
+          return;
+        }
         const err = (await res.json().catch(() => ({}))) as { error?: { status?: string; message?: string; details?: { errorCode?: string }[] } };
         const code = err.error?.details?.find((d) => d.errorCode)?.errorCode ?? err.error?.status;
         if (res.status === 404 || code === "UNREGISTERED" || (code === "INVALID_ARGUMENT" && /token/i.test(err.error?.message ?? ""))) {
           dead.push(token);
+          delivered({ channel: "push", ok: false, what: message.title, to: "a phone", reason: "the app is no longer on that phone (removed from the list)" });
         } else {
           if (res.status === 401) cached = null;
           console.error(`[push] send failed (${res.status} ${code ?? ""}): ${err.error?.message ?? ""}`);
+          delivered({ channel: "push", ok: false, what: message.title, to: "a phone", reason: `Firebase answered ${res.status}${code ? ` ${code}` : ""}` });
         }
       } catch (error) {
         console.error("[push] send failed", error);
+        delivered({ channel: "push", ok: false, what: message.title, to: "a phone", reason: (error as Error).message ?? "could not reach Firebase" });
       }
     }),
   );

@@ -8,7 +8,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { currentStep, newTotpSecret, sealSecret, totpAt } from "../src/common/auth/totp";
 import { PrismaService } from "../src/database/prisma.service";
 import { buildChecks, fullIn, logLine, readLog, servicesFrom, type ServerStatus } from "../src/platform/dev-tools";
-import { AppErrors, fingerprintOf, quantileMs, RequestStats, stepOf } from "../src/platform/watch";
+import { AppErrors, Deliveries, fingerprintOf, JobRuns, quantileMs, RequestStats, stepOf } from "../src/platform/watch";
+import { delivered } from "../src/common/notify/delivery";
+import { serverWarnings } from "../src/platform/server-health";
 import { signIn, startApp } from "./app";
 
 const NOW = new Date("2026-11-15T02:44:00Z");
@@ -179,6 +181,7 @@ describe("dev tools: the pages' data", () => {
     await writeFile(path.join(statusDir, "server.json"), JSON.stringify(status({ at: new Date().toISOString() })));
     await writeFile(path.join(statusDir, "deploys.jsonl"), `${JSON.stringify({ at: new Date().toISOString(), commit: "abc1234", title: "Dev tools", ok: true })}\n`);
     await writeFile(path.join(statusDir, "last-status.json"), JSON.stringify({ at: new Date().toISOString(), ok: true, lastGoodAt: new Date().toISOString(), offsite: "off" }));
+    await writeFile(path.join(statusDir, "restore-status.json"), JSON.stringify({ at: new Date().toISOString(), ok: true, tables: 77, companies: 2, orders: 9, tookSec: 40 }));
     await writeFile(path.join(logsDir, "api.log"), `${new Date().toISOString()} hello from the api\n`);
     process.env.SERVER_STATUS_DIR = statusDir;
     process.env.LIVE_LOGS_DIR = logsDir;
@@ -250,5 +253,71 @@ describe("dev tools: the pages' data", () => {
     const o = (await get("/overview").expect(200)).body;
     expect(o.checks.find((c: { key: string }) => c.key === "outside").level).toBe("ok");
     expect(o.events.some((x: { kind: string; text: string }) => x.kind === "error" && x.text.includes(tag))).toBe(true);
+  });
+
+  it("writes down each worker job, and each email and phone notification", async () => {
+    const jobs = app.get(JobRuns);
+    await jobs.track("reminders", async () => 4, (n) => `${n} companies`);
+    await jobs.track("company-rules", async () => {
+      throw new Error(`demo rule broke ${tag}`);
+    });
+    delivered({ channel: "email", ok: true, what: "Good morning" });
+    delivered({ channel: "email", ok: false, what: `Your day ${tag}`, to: "s***@codecrood.com", reason: "Mailbox full" });
+    delivered({ channel: "push", ok: true, what: "Payment received" });
+    await app.get(Deliveries).flush();
+
+    const v = (await get("/jobs").expect(200)).body;
+    const job = (k: string) => v.jobs.find((j: { key: string }) => j.key === k);
+    expect(job("reminders")).toMatchObject({ ok: true, result: "4 companies", level: "ok", by: "worker" });
+    expect(job("company-rules")).toMatchObject({ ok: false, level: "warn" });
+    expect(job("company-rules").result).toContain(tag);
+    expect(job("restore-test")).toMatchObject({ ok: true, level: "ok", result: "worked: 77 tables, 2 companies, 9 orders" });
+    expect(job("backup")).toMatchObject({ ok: true, by: "server" });
+    expect(v.email.today.sent).toBeGreaterThanOrEqual(1);
+    expect(v.email.today.failed).toBeGreaterThanOrEqual(1);
+    expect(v.failures.find((f: { what: string }) => f.what.includes(tag))).toMatchObject({ reason: "Mailbox full", to: "s***@codecrood.com" });
+    expect(v.limits.find((l: { label: string }) => l.label.startsWith("The monthly restore test")).level).toBe("ok");
+    // The failed job is an error to fix too.
+    const errors = await app.get(PrismaService).platform.appError.findMany({ where: { source: "worker", where: "company-rules" } });
+    expect(errors.some((e) => e.message.includes(tag))).toBe(true);
+  });
+
+  it("shows sign-ins, two-step and the server's safety, and how each company is doing", async () => {
+    await request(app.getHttpServer()).post("/api/auth/login").send({ email: "admin@example.com", password: "wrong-password-1" });
+    const s = (await get("/security").expect(200)).body;
+    expect(s.signIns.failed24h).toBeGreaterThanOrEqual(1);
+    expect(s.signIns.rows.find((r: { who: string }) => r.who === "a***@example.com")).toMatchObject({ result: "Wrong password" });
+    expect(s.platformAdmins.withTwoStep).toBe(s.platformAdmins.all);
+    expect(s.server.updates).toMatchObject({ security: 6 });
+    expect(s.checks.find((c: { key: string }) => c.key === "sec-updates").level).toBe("warn");
+    const c = (await get("/companies").expect(200)).body;
+    expect(c.busyHours).toHaveLength(24);
+    const kebo = c.companies.find((x: { slug: string }) => x.slug === "kebo");
+    expect(kebo.users).toBeGreaterThan(0);
+    expect(kebo.orders).toBeGreaterThan(0);
+  });
+});
+
+describe("dev tools: the warning emails", () => {
+  it("also warns about a stopped service, many errors, a certificate ending and a failed restore test", () => {
+    const now = new Date("2026-11-15T03:00:00Z");
+    const w = serverWarnings({
+      now,
+      watchingSince: new Date("2026-11-14T00:00:00Z"),
+      backup: { state: "ok", value: { at: "2026-11-15T02:00:00Z", ok: true, lastGoodAt: "2026-11-15T02:00:00Z", offsite: "ok" } },
+      disk: { state: "missing" },
+      server: {
+        state: "ok",
+        value: {
+          at: "2026-11-15T02:59:00Z",
+          services: [{ name: "worker", state: "exited" }, { name: "api", state: "running" }],
+          certificates: [{ host: "rfq.example.com", ok: true, endsAt: "2026-11-20T00:00:00Z" }],
+        },
+      },
+      restore: { state: "ok", value: { at: "2026-11-14T02:10:00Z", ok: false, message: "The backup did not go back in" } },
+      errorsLastHour: 14,
+    });
+    expect(w.map((x) => x.key).sort()).toEqual(["certificate", "errors", "restore_failed", "service_down"]);
+    expect(w.find((x) => x.key === "service_down")!.title).toBe("worker is not running");
   });
 });

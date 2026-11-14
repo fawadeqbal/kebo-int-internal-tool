@@ -37,7 +37,7 @@ export function ServicesTab({ v, picked }: { v: DevServicesView; picked?: string
               <Th>Up for</Th>
               <Th className="text-right">Restarts today</Th>
               <Th className="text-right">CPU</Th>
-              <Th>Memory</Th>
+              <Th>Memory (RAM) used, of its limit</Th>
             </Tr>
           </THead>
           <tbody>
@@ -69,7 +69,9 @@ export function ServicesTab({ v, picked }: { v: DevServicesView; picked?: string
             })}
           </tbody>
         </Table>
-        <p className="border-t border-line bg-surface-2 px-4 py-2.5 text-xs text-muted">Checked {agoText(v.checkedAt)} · every minute</p>
+        <p className="border-t border-line bg-surface-2 px-4 py-2.5 text-xs text-muted">
+          Checked {agoText(v.checkedAt)} · every minute · Memory is working memory (RAM), not disk: the limit is the most a service may use, not space set aside. Disk space is under Disk, database and backups.
+        </p>
       </Card>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         {v.logsOn ? (
@@ -87,7 +89,7 @@ export function ServicesTab({ v, picked }: { v: DevServicesView; picked?: string
                 { label: "Running since", value: service.startedAt && service.state === "running" ? new Date(service.startedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : null },
                 { label: "Restarts today", value: String(service.restarts24h) },
                 { label: "Last restart", value: service.lastRestart ? `${agoText(service.lastRestart.at)}: ${service.lastRestart.why}` : "none" },
-                { label: "Memory limit", value: service.memLimitMb ? mbText(service.memLimitMb) : "no limit" },
+                { label: "Memory (RAM) limit", value: service.memLimitMb ? `${mbText(service.memLimitMb)}: the most it may use` : "no limit" },
               ]}
             />
             {service.lastRestart?.why === "out of memory" && (

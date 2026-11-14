@@ -12,6 +12,8 @@
 #
 #   sh /backup.sh            a backup now, then every night (the container's command)
 #   sh /backup.sh once       one backup now; the exit code says whether it worked
+#   sh /backup.sh restore-test   put the newest database backup into a spare database and check it (also once
+#                            a month by itself, after the nightly backup): backups/status/restore-status.json
 #   sh /backup.sh rclone …   rclone with the remotes "minio" (the app's files) and "offsite" ready (restores)
 set -eu
 # The image's sh (busybox ash) has pipefail: a failed pg_dump fails the run even though gzip succeeded.
@@ -189,6 +191,55 @@ once() {
   step="finish"
 }
 
+# The newest database backup, put back into a spare database (kebo_restore_test) and checked: it has the
+# tables, the companies and the orders. Proves the backups can be restored, before they are needed.
+# The spare database is dropped again. Result: backups/status/restore-status.json (Dev tools shows it; the
+# worker emails the platform admins when it failed).
+restore_test() {
+  scratch=kebo_restore_test
+  latest=$(ls -1t "$DIR"/db-*.sql.gz 2>/dev/null | head -n 1 || true)
+  start=$(date +%s)
+  write_restore() { # ok message tables companies orders
+    tmp="$STATUS/.restore-status.json.tmp"
+    printf '{"at":"%s","ok":%s,"message":%s,"dump":%s,"tookSec":%s,"tables":%s,"companies":%s,"orders":%s}\n' \
+      "$(now_utc)" "$1" "$(json_str "$2")" "$(json_str "$(basename "${latest:-}")")" "$(($(date +%s) - start))" "${3:-null}" "${4:-null}" "${5:-null}" >"$tmp"
+    chmod 644 "$tmp"
+    mv "$tmp" "$STATUS/restore-status.json"
+  }
+  if [ -z "$latest" ]; then
+    write_restore false "There is no database backup to try."
+    return 1
+  fi
+  log "restore test: $latest into $scratch"
+  if ! psql -q -d postgres -v ON_ERROR_STOP=1 -c "drop database if exists $scratch" -c "create database $scratch" -c "alter database $scratch set timezone to 'UTC'" >/dev/null; then
+    write_restore false "Could not make the spare database."
+    return 1
+  fi
+  if ! gunzip -c "$latest" | psql -q -d "$scratch" -v ON_ERROR_STOP=1 >/dev/null 2>"$STATUS/.restore-errors"; then
+    msg=$(tail -n 1 "$STATUS/.restore-errors" 2>/dev/null | cut -c1-200)
+    psql -q -d postgres -c "drop database if exists $scratch" >/dev/null 2>&1 || true
+    rm -f "$STATUS/.restore-errors"
+    write_restore false "The backup did not go back in: ${msg:-psql failed}"
+    return 1
+  fi
+  rm -f "$STATUS/.restore-errors"
+  tables=$(psql -At -d "$scratch" -c "select count(*) from pg_tables where schemaname = 'public'" 2>/dev/null || echo 0)
+  companies=$(psql -At -d "$scratch" -c "select count(*) from companies" 2>/dev/null || echo 0)
+  orders=$(psql -At -d "$scratch" -c "select count(*) from orders" 2>/dev/null || echo 0)
+  psql -q -d postgres -c "drop database if exists $scratch" >/dev/null 2>&1 || true
+  if [ "${tables:-0}" -lt 10 ] || [ "${companies:-0}" -lt 1 ]; then
+    write_restore false "It went back in, but holds only $tables tables and $companies companies." "$tables" "$companies" "$orders"
+    return 1
+  fi
+  write_restore true "" "$tables" "$companies" "$orders"
+  log "restore test: worked ($tables tables, $companies companies, $orders orders)"
+}
+
+# Once a month: when the last restore test is 30 days old or there is none.
+restore_test_due() {
+  [ ! -f "$STATUS/restore-status.json" ] || [ -n "$(find "$STATUS/restore-status.json" -mtime +29 2>/dev/null)" ]
+}
+
 prepare() {
   mkdir -p "$DIR" "$STATUS"
   chgrp "$BACKUP_GID" "$DIR" && chmod 750 "$DIR"
@@ -202,6 +253,11 @@ case "${1:-}" in
     once
     exit 0
     ;;
+  restore-test)
+    prepare
+    restore_test
+    exit $?
+    ;;
   rclone)
     shift
     setup_rclone
@@ -209,7 +265,7 @@ case "${1:-}" in
     ;;
   "") ;;
   *)
-    echo "usage: sh /backup.sh [once | rclone …]" >&2
+    echo "usage: sh /backup.sh [once | restore-test | rclone …]" >&2
     exit 2
     ;;
 esac
@@ -218,6 +274,7 @@ prepare
 while true; do
   # A failed run is in the log, in backups/status/last-status.json and, through the worker, in an email.
   sh "$0" once || log "the backup failed (see above); next try at the next BACKUP_HOUR" >&2
+  if restore_test_due; then sh "$0" restore-test || log "the restore test failed (see backups/status/restore-status.json)" >&2; fi
   # Sleep until the next BACKUP_HOUR:00.
   now=$(date +%s)
   hour=$(printf "%02d" "${BACKUP_HOUR:-2}")

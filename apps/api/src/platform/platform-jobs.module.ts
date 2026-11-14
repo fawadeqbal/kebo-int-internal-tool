@@ -4,11 +4,12 @@ import { CompanyDataService } from "./company-data";
 import { LifecycleService } from "./lifecycle.service";
 import { PlatformMail } from "./platform-mail";
 import { ServerHealthService } from "./server-health";
+import { WatchModule } from "./watch";
 
 /** What the background worker needs of the platform: the automatic rules for companies, the server check. */
 @Module({
-  imports: [StorageModule],
+  imports: [StorageModule, WatchModule],
   providers: [CompanyDataService, LifecycleService, PlatformMail, ServerHealthService],
-  exports: [LifecycleService, ServerHealthService],
+  exports: [LifecycleService, ServerHealthService, WatchModule],
 })
 export class PlatformJobsModule {}

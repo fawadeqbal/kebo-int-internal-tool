@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, Module, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
 import type { NextFunction, Request, Response } from "express";
 import { CompanyContext } from "../common/company/company-context";
+import { onDelivery, type Delivery } from "../common/notify/delivery";
 import { ErrorFilter } from "../common/http/error.filter";
 import { PrismaService } from "../database/prisma.service";
 
@@ -50,7 +51,8 @@ export function quantileMs(buckets: number[], q: number): number | null {
   return REQUEST_STEPS_MS.at(-1)! * 2;
 }
 
-export const addBuckets = (a: number[], b: number[]) => Array.from({ length: Math.max(a.length, b.length) }, (_, i) => (a[i] ?? 0) + (b[i] ?? 0));
+export const addBuckets = (a: number[], b: number[]) =>
+  Array.from({ length: Math.max(a.length, b.length) }, (_, i) => (a[i] ?? 0) + (b[i] ?? 0));
 
 interface Tally {
   count: number;
@@ -144,7 +146,10 @@ export function fingerprintOf(source: string, where: string, error: { name?: str
       .find((l) => /at /.test(l) && !l.includes("node_modules") && !l.includes("node:"))
       ?.trim()
       .replace(/:\d+:\d+\)?$/, "") ?? "";
-  return createHash("sha256").update([source, where, error.name ?? "Error", message, frame].join("|")).digest("hex").slice(0, 64);
+  return createHash("sha256")
+    .update([source, where, error.name ?? "Error", message, frame].join("|"))
+    .digest("hex")
+    .slice(0, 64);
 }
 
 @Injectable()
@@ -167,7 +172,12 @@ export class AppErrors implements OnModuleInit {
   }
 
   /** Counts an unexpected error once per kind; one marked fixed opens again when it comes back. */
-  async record(source: string, where: string, error: unknown, ctx: { company?: string | null; user?: string | null; path?: string | null } = {}) {
+  async record(
+    source: string,
+    where: string,
+    error: unknown,
+    ctx: { company?: string | null; user?: string | null; path?: string | null } = {},
+  ) {
     try {
       const e = error instanceof Error ? error : new Error(String(error));
       const fingerprint = fingerprintOf(source, where, e);
@@ -186,3 +196,120 @@ export class AppErrors implements OnModuleInit {
     }
   }
 }
+
+/* ---------------------------------------------------------------- emails and phone notifications */
+
+@Injectable()
+export class Deliveries implements OnModuleInit, OnModuleDestroy {
+  private readonly log = new Logger("Deliveries");
+  private days = new Map<string, { sent: number; failed: number }>();
+  private failures: { at: Date; channel: string; what: string; to: string | null; company: string | null; reason: string }[] = [];
+  private timer?: NodeJS.Timeout;
+  private lastPrune = 0;
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  onModuleInit() {
+    onDelivery((d) => this.add(d));
+    this.timer = setInterval(() => void this.flush(), 60_000);
+    this.timer.unref();
+  }
+
+  async onModuleDestroy() {
+    if (this.timer) clearInterval(this.timer);
+    onDelivery(null);
+    await this.flush();
+  }
+
+  add(d: Delivery, at = new Date()) {
+    const key = `${at.toISOString().slice(0, 10)}|${d.channel}`;
+    const t = this.days.get(key) ?? { sent: 0, failed: 0 };
+    if (d.ok) t.sent += 1;
+    else t.failed += 1;
+    this.days.set(key, t);
+    if (!d.ok && this.failures.length < 500)
+      this.failures.push({
+        at,
+        channel: d.channel,
+        what: d.what.slice(0, 200),
+        to: d.to?.slice(0, 120) ?? null,
+        company: CompanyContext.current()?.name ?? null,
+        reason: (d.reason ?? "no reason given").slice(0, 300),
+      });
+  }
+
+  async flush() {
+    const days = [...this.days.entries()];
+    const failures = this.failures;
+    this.days = new Map();
+    this.failures = [];
+    try {
+      for (const [key, t] of days) {
+        const [day, channel] = key.split("|") as [string, string];
+        await this.prisma.platform.$executeRaw`
+          insert into delivery_days (day, channel, sent, failed) values (${day}::date, ${channel}, ${t.sent}, ${t.failed})
+          on conflict (day, channel) do update set sent = delivery_days.sent + excluded.sent, failed = delivery_days.failed + excluded.failed`;
+      }
+      if (failures.length)
+        await this.prisma.platform.deliveryFailure.createMany({
+          data: failures.map((f) => ({ at: f.at, channel: f.channel, what: f.what, to: f.to, companyName: f.company, reason: f.reason })),
+        });
+      if (Date.now() - this.lastPrune > 3_600_000) {
+        this.lastPrune = Date.now();
+        const old = new Date(Date.now() - KEEP_DAYS * 86_400_000);
+        await this.prisma.platform.deliveryFailure.deleteMany({ where: { at: { lt: old } } });
+        await this.prisma.platform.jobRun.deleteMany({ where: { startedAt: { lt: old } } });
+        await this.prisma.platform.deliveryDay.deleteMany({ where: { day: { lt: new Date(Date.now() - 90 * 86_400_000) } } });
+      }
+    } catch (e) {
+      this.log.warn(`could not record deliveries: ${(e as Error).message}`);
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- the worker's jobs */
+
+@Injectable()
+export class JobRuns {
+  private readonly log = new Logger("Worker");
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly errors: AppErrors,
+  ) {}
+
+  /**
+   * Runs one job and writes down how it went (how long, what it did, or why it failed). A failure is
+   * logged and counted in Dev tools' errors, never thrown: the other jobs still run.
+   */
+  async track<T>(job: string, fn: () => Promise<T>, describe?: (result: T) => string | null | undefined): Promise<T | undefined> {
+    const started = new Date();
+    let ok = true;
+    let result: string | null;
+    let value: T | undefined;
+    try {
+      value = await fn();
+      result = describe ? (describe(value) ?? null) : null;
+    } catch (e) {
+      ok = false;
+      result = ((e as Error).message ?? String(e)).slice(0, 300);
+      this.log.error(`${job} failed: ${(e as Error).stack ?? e}`);
+      await this.errors.record("worker", job, e);
+    }
+    try {
+      await this.prisma.platform.jobRun.create({
+        data: { job, startedAt: started, tookMs: Date.now() - started.getTime(), ok, result: result?.slice(0, 300) ?? null },
+      });
+    } catch (e) {
+      this.log.warn(`could not record the run of ${job}: ${(e as Error).message}`);
+    }
+    return value;
+  }
+}
+
+/** Dev tools' recorders, one of each for the API and the worker. */
+@Module({
+  providers: [RequestStats, AppErrors, Deliveries, JobRuns],
+  exports: [RequestStats, AppErrors, Deliveries, JobRuns],
+})
+export class WatchModule {}
