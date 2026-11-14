@@ -8,12 +8,15 @@ import { addressOf, adminOrigin, marketingOrigin } from "@kebo/shared";
  *    with every call (X-Company); a renamed company's old name redirects to the
  *    new one for a while; an unknown name shows "no company here".
  *  - admin.<BASE_DOMAIN>: the platform area (/platform).
- *  - get.<BASE_DOMAIN>: the marketing site (/ is app/site, /sign-in finds a
- *    company's address by email; request a demo, sign up).
- *  - <BASE_DOMAIN>: sends people on to ROOT_COMPANY's own address (same page),
- *    except the marketing pages (to get.), set-password links from older emails,
- *    and the phone app's PDFs (Bearer, not a cookie). The API under /api is not
- *    a page and is never sent anywhere, so the phone app keeps working.
+ *  - <BASE_DOMAIN>: the marketing site (/ is app/site, /sign-in finds a
+ *    company's address by email; request a demo, sign up). Any other page is
+ *    sent on to ROOT_COMPANY's own address (same page), so links people kept
+ *    from before the addresses still open; without ROOT_COMPANY, to the
+ *    marketing page. Set-password links from older emails and the phone app's
+ *    PDFs (Bearer, not a cookie) are served here. The API under /api is not a
+ *    page and is never sent anywhere, so the phone app keeps working.
+ *  - get.<BASE_DOMAIN>: the marketing site's old address; sends people on to
+ *    the plain one (same page).
  */
 const MARKETING_PATHS = ["/request-a-demo", "/sign-up"];
 const isMarketingPath = (path: string) => MARKETING_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
@@ -53,15 +56,13 @@ export async function proxy(req: NextRequest) {
   }
   if (path.startsWith("/platform")) return NextResponse.redirect(`${admin}${path}${req.nextUrl.search}`);
   const marketing = marketingOrigin(base, "");
-  if (a.kind === "marketing") {
-    if (isMarketingPath(path) || path.startsWith("/site")) return pass();
-    // The page itself and "Sign in" (find your company), at short paths.
-    if (path === "/") return NextResponse.rewrite(new URL(`/site${req.nextUrl.search}`, req.url), { request: { headers } });
-    if (path === "/sign-in") return NextResponse.rewrite(new URL(`/site/sign-in${req.nextUrl.search}`, req.url), { request: { headers } });
-    return NextResponse.redirect(`${marketing}/`);
-  }
-  // The marketing site's pages live at its own address only.
-  if (path === "/site" || path.startsWith("/site/")) return NextResponse.redirect(`${marketing}${path.slice(5) || "/"}${req.nextUrl.search}`);
+  const search = req.nextUrl.search;
+  // The marketing site's pages have short paths (its files are under /site).
+  const short = path === "/site" ? "/" : path.startsWith("/site/") ? path.slice(5) : path;
+  // Its old address: on to the plain one, same page.
+  if (a.kind === "marketing") return NextResponse.redirect(`${marketing}${short}${search}`);
+  // The marketing site's pages live at the plain address only, at their short paths.
+  if (short !== path) return NextResponse.redirect(`${marketing}${short}${search}`);
   if (a.kind === "company") {
     const slug = await companyAt(a.slug);
     if (!slug) return NextResponse.rewrite(new URL("/no-company", req.url));
@@ -70,11 +71,15 @@ export async function proxy(req: NextRequest) {
     return pass();
   }
   if (a.kind === "root") {
-    if (isMarketingPath(path)) return NextResponse.redirect(`${marketing}${path}${req.nextUrl.search}`);
+    // The marketing site: the page itself and "Sign in" (find your company), request a demo, sign up.
+    if (path === "/") return NextResponse.rewrite(new URL(`/site${search}`, req.url), { request: { headers } });
+    if (path === "/sign-in") return NextResponse.rewrite(new URL(`/site/sign-in${search}`, req.url), { request: { headers } });
+    if (isMarketingPath(path)) return pass();
     // Links from emails sent before the addresses (the token says which company) and the phone app's PDFs.
     if (path === "/set-password" || (path.startsWith("/pdf/") && req.headers.has("authorization"))) return pass();
+    // Any other page (a link kept from before the addresses): the same page at the first company's address.
     const root = process.env.ROOT_COMPANY;
-    return NextResponse.redirect(root ? `https://${root}.${base}${path}${req.nextUrl.search}` : `${marketing}/`);
+    return NextResponse.redirect(root ? `https://${root}.${base}${path}${search}` : `${marketing}/`);
   }
   return pass();
 }

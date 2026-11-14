@@ -2,7 +2,7 @@ import { marketingOrigin, type LeadOrigin } from "@kebo/shared";
 import { originQuery } from "@/lib/origin";
 import type { SiteLinks } from "@/components/site/marketing";
 
-/** The marketing site's own paths: at get.<BASE_DOMAIN> they are short; without addresses they live under /site. */
+/** The marketing site's own paths: at <BASE_DOMAIN> they are short; without addresses they live under /site. */
 export const sitePath = (path: string) => (process.env.BASE_DOMAIN ? path : `/site${path === "/" ? "" : path}`);
 
 /** The page's links, each carrying where the visitor came from and which button they pressed. */

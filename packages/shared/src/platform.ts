@@ -279,12 +279,15 @@ export const slugField = z
 
 export type Address = { kind: "root" } | { kind: "admin" } | { kind: "marketing" } | { kind: "company"; slug: string } | { kind: "other" };
 
-/** The marketing site's sub-address (get.<BASE_DOMAIN>): what RFQ Desk is, plans, request a demo, sign up. */
+/**
+ * The marketing site's old sub-address (get.<BASE_DOMAIN>). The site (what RFQ Desk is, plans, request a
+ * demo, sign up) is at the plain address <BASE_DOMAIN> now; get. sends people on to it and stays reserved.
+ */
 export const MARKETING_SUB = "get";
 
 /**
  * What a host name is, with addresses per company: the platform's own address
- * (root), the platform admin's (admin.), the marketing site (get.), a company's
+ * (root: the marketing site), the platform admin's (admin.), the marketing site's old one (get.), a company's
  * (<short name>.), or none of these.
  */
 export function addressOf(host: string | null | undefined, baseDomain: string): Address {
@@ -304,8 +307,8 @@ export const companyOrigin = (slug: string, baseDomain: string | undefined, fall
   baseDomain ? `https://${slug}.${baseDomain}` : fallback.replace(/\/$/, "");
 export const adminOrigin = (baseDomain: string | undefined, fallback: string) =>
   baseDomain ? `https://admin.${baseDomain}` : fallback.replace(/\/$/, "");
-export const marketingOrigin = (baseDomain: string | undefined, fallback: string) =>
-  baseDomain ? `https://${MARKETING_SUB}.${baseDomain}` : fallback.replace(/\/$/, "");
+/** The marketing site: the plain address itself ("https://rfq.example.com"). */
+export const marketingOrigin = (baseDomain: string | undefined, fallback: string) => (baseDomain ? `https://${baseDomain}` : fallback.replace(/\/$/, ""));
 
 /* ---------------------------------------------------------------- lifecycle */
 
