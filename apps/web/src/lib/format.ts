@@ -30,6 +30,8 @@ export function setRequestZone(zone: string | null | undefined) {
   if (zone) requestZone().zone = zone;
 }
 const zone = () => requestZone().zone;
+/** The time zone this request shows times in. */
+export const currentZone = () => zone();
 export const date = (d: ISODate | Date | string | null | undefined) => fmtDate(d ?? null, zone());
 export const dateTime = (d: Date | string | null | undefined) => fmtDateTime(d ?? null, zone());
 export const timeAgo = (d: Date | string) => ago(d, zone());

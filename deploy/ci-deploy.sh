@@ -226,6 +226,7 @@ main() {
     fi
     say "this deploy's migrations stay applied; to undo them too, restore ${COPY:-the pre-deploy copy} (docs/restore.md)."
     echo "$(date -Is) FAILED $(short "$TARGET"), back on ${DEPLOYED:+$(short "$DEPLOYED")}" >>"$LOG"
+    record_deploy false
     exit 1
   fi
   dc ps --format '{{.Service}}: {{.Status}}'
@@ -234,6 +235,7 @@ main() {
   echo "$TARGET" >"$STATE"
   echo "$(date -Is) deployed $(short "$TARGET")" >>"$LOG"
   say "deployed $(short "$TARGET")"
+  record_deploy true
   ledger_step
   server_setup
 }
@@ -253,7 +255,20 @@ ledger_step() {
     say "WARNING: the ledger differs from today's figures (above): see docs/ledger.md"
 }
 
-# The server's own pieces (deploy/server: the nightly Docker cleanup and its timer), installed or
+# The deploy, for Dev tools (Big picture: the version running and the last deploys): one line in
+# backups/status/deploys.jsonl, the last 200 kept. Never fails the deploy.
+record_deploy() {
+  local file=backups/status/deploys.jsonl title
+  title=$(git log -1 --format=%s "$TARGET" 2>/dev/null || true)
+  command -v python3 >/dev/null || return 0
+  sudo mkdir -p backups/status || return 0
+  python3 -c 'import json,sys; print(json.dumps({"at": sys.argv[1], "commit": sys.argv[2], "title": sys.argv[3], "ok": sys.argv[4] == "true"}, separators=(",", ":")))' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(short "$TARGET")" "$title" "$1" | sudo tee -a "$file" >/dev/null || return 0
+  sudo sh -c "tail -n 200 '$file' > '$file.tmp' && chmod 644 '$file.tmp' && mv '$file.tmp' '$file'" || true
+}
+
+# The server's own pieces (deploy/server: the nightly Docker cleanup, the status every minute and the live
+# logs for Dev tools), installed or
 # updated when this commit's copy differs from the installed one. Never fails the deploy.
 server_setup() {
   local changed=""
@@ -261,12 +276,18 @@ server_setup() {
   cmp -s deploy/server/docker-cleanup.service /etc/systemd/system/docker-cleanup.service || changed=1
   cmp -s deploy/server/docker-cleanup.timer /etc/systemd/system/docker-cleanup.timer || changed=1
   systemctl is-enabled -q docker-cleanup.timer 2>/dev/null || changed=1
+  cmp -s deploy/server/kebo-status.py /usr/local/sbin/kebo-status || changed=1
+  cmp -s deploy/server/kebo-logs.py /usr/local/sbin/kebo-logs || changed=1
+  for unit in kebo-status.service kebo-status.timer kebo-logs.service; do
+    cmp -s "deploy/server/$unit" "/etc/systemd/system/$unit" || changed=1
+  done
+  systemctl is-enabled -q kebo-status.timer 2>/dev/null || changed=1
   [ -n "$changed" ] || return 0
-  say "installing the server's nightly cleanup (deploy/server)"
+  say "installing the server's pieces (deploy/server: cleanup, status, live logs)"
   if bash deploy/server/install.sh >/dev/null; then
-    say "nightly cleanup installed"
+    say "server pieces installed"
   else
-    say "WARNING: could not install the nightly cleanup: run bash deploy/server/install.sh by hand"
+    say "WARNING: could not install the server pieces: run bash deploy/server/install.sh by hand"
   fi
 }
 

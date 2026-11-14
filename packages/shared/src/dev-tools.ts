@@ -1,0 +1,153 @@
+/**
+ * Dev tools (platform admin): what the API sends, what the web shows. Levels: ok = fine,
+ * warn = needs you this week, bad = needs you now, off = not set up or not checked.
+ */
+export type DevLevel = "ok" | "warn" | "bad" | "off";
+export type DevTab = "picture" | "services" | "data";
+/** The map's columns, in the order a request travels. */
+export const DEV_LANES = [
+  { key: "addresses", label: "Addresses" },
+  { key: "server", label: "Server" },
+  { key: "app", label: "App" },
+  { key: "data", label: "Data" },
+  { key: "outside", label: "Outside services" },
+] as const;
+export type DevLane = (typeof DEV_LANES)[number]["key"];
+
+export interface DevCheck {
+  key: string;
+  lane: DevLane;
+  name: string;
+  /** One line: what it is now ("81% full · 19 GB free"). */
+  line: string;
+  level: DevLevel;
+  tab: DevTab;
+  /** What to do, when it needs you. */
+  fix?: string;
+}
+
+export interface DevService {
+  key: string;
+  label: string;
+  role: string;
+  state: string;
+  level: DevLevel;
+  status: string;
+  startedAt: string | null;
+  restarts: number;
+  restarts24h: number;
+  lastRestart: { at: string; why: string } | null;
+  cpu: number | null;
+  memMb: number | null;
+  memLimitMb: number | null;
+  hasLog: boolean;
+}
+
+export interface DevEvent {
+  at: string;
+  kind: "deploy" | "deployFailed" | "restart" | "stopped" | "warning" | "backup" | "backupFailed";
+  level: DevLevel;
+  text: string;
+}
+
+export interface DevDeploy {
+  at: string;
+  commit: string;
+  title: string;
+  ok: boolean;
+}
+
+export interface DevOverview {
+  /** When the API answered (the page's "now"). */
+  now: string;
+  /** When the server last wrote its status; null: never (not set up). */
+  checkedAt: string | null;
+  stale: boolean;
+  checks: DevCheck[];
+  tiles: {
+    cpu: number | null;
+    load: number | null;
+    cores: number | null;
+    memory: { usedMb: number; totalMb: number; percent: number } | null;
+    disk: { usedGb: number; totalGb: number; freeGb: number; percent: number } | null;
+    backupAt: string | null;
+    backupLevel: DevLevel;
+    services: { running: number; all: number };
+  };
+  host: { os: string | null; uptimeSec: number | null; docker: string | null } | null;
+  deploys: DevDeploy[];
+  events: DevEvent[];
+  /** CPU and memory, last 24 hours, every 15 minutes. */
+  chart: { t: string; cpu: number | null; mem: number | null }[];
+}
+
+export interface DevServicesView {
+  checkedAt: string | null;
+  services: DevService[];
+  /** Services with a live log. */
+  logs: string[];
+  /** Live logs are set up (the folder is mounted). */
+  logsOn: boolean;
+}
+
+export interface DevDataView {
+  checkedAt: string | null;
+  disk: { usedGb: number; totalGb: number; freeGb: number; percent: number } | null;
+  /** At the growth of the last 14 days; null: not growing (or not known yet). */
+  fullInDays: number | null;
+  growthGbPerDay: number | null;
+  space: { key: string; label: string; gb: number }[];
+  spaceAt: string | null;
+  days: { day: string; percent: number; usedGb: number }[];
+  backup: {
+    level: DevLevel;
+    lastGoodAt: string | null;
+    lastTryAt: string | null;
+    ok: boolean | null;
+    message: string | null;
+    dump: string | null;
+    offsite: "off" | "ok" | "failed" | null;
+  };
+  database: {
+    ok: boolean;
+    version: string | null;
+    sizeMb: number | null;
+    connections: number | null;
+    maxConnections: number | null;
+    cacheHit: number | null;
+    longestQuerySec: number | null;
+    tables: { name: string; rows: number; mb: number }[];
+  };
+}
+
+export interface DevLogLine {
+  at: string | null;
+  text: string;
+  level: "error" | "warn" | null;
+}
+
+export interface DevLogs {
+  service: string;
+  lines: DevLogLine[];
+  /** Ask again with after=next for the lines written since. */
+  next: number;
+  missing: boolean;
+}
+
+/** "3 min ago", "5 hours ago", "2 days ago". */
+export function agoText(iso: string | null | undefined, now = new Date()): string {
+  if (!iso) return "never";
+  const s = Math.max(0, (now.getTime() - Date.parse(iso)) / 1000);
+  if (s < 90) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 48 * 3600) return `${Math.round(s / 3600)} hour${Math.round(s / 3600) === 1 ? "" : "s"} ago`;
+  return `${Math.round(s / 86400)} days ago`;
+}
+
+/** "6 days", "5 hours", "12 min". */
+export function forText(sec: number | null | undefined): string {
+  if (sec == null || !Number.isFinite(sec)) return "—";
+  if (sec < 3600) return `${Math.max(1, Math.round(sec / 60))} min`;
+  if (sec < 48 * 3600) return `${Math.round(sec / 3600)} hours`;
+  return `${Math.round(sec / 86400)} days`;
+}

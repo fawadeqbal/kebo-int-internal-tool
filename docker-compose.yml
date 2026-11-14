@@ -83,12 +83,16 @@ services:
     build: { context: ., dockerfile: docker/api.Dockerfile }
     image: kebo-desk-api:${APP_VERSION:-latest}
     restart: unless-stopped
-    environment: *server-env
+    environment:
+      <<: *server-env
+      # Dev tools (platform admin): the server's status and the live logs, written by deploy/server.
+      SERVER_STATUS_DIR: /server-status
+      LIVE_LOGS_DIR: /server-logs
     depends_on:
       db: { condition: service_healthy }
       minio: { condition: service_started }
     ports: ["${API_BIND:-127.0.0.1}:${API_HOST_PORT:-3421}:4000"]
-    volumes: [./secrets:/app/secrets:ro]
+    volumes: [./secrets:/app/secrets:ro, ./backups/status:/server-status:ro, ./logs/live:/server-logs:ro]
     mem_limit: ${API_MEMORY:-768m}
     logging: *logging
 

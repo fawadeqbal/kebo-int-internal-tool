@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AccountsService } from "./accounts.service";
 import { PlatformCompaniesService } from "./companies.platform";
 import { CompanyDataService } from "./company-data";
+import { DevToolsController, DevToolsService } from "./dev-tools";
 import { LeadsService } from "./leads.service";
 import { LifecycleService } from "./lifecycle.service";
 import { PlansService } from "./plans.service";
@@ -12,13 +13,14 @@ import { SiteService } from "./site.service";
 
 /** The platform: companies, plans, client inquiries, demos and trials, and the platform admins. */
 @Module({
-  controllers: [PlatformAuthController, PlatformPublicController, PlatformController],
+  controllers: [PlatformAuthController, PlatformPublicController, PlatformController, DevToolsController],
   providers: [
     PlatformAuthService,
     PlatformGuard,
     AccountsService,
     PlatformCompaniesService,
     CompanyDataService,
+    DevToolsService,
     LeadsService,
     LifecycleService,
     PlansService,

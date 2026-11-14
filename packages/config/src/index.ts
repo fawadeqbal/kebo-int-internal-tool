@@ -91,6 +91,8 @@ export const serverEnvSchema = z.object({
    * worker): the worker emails the platform admins when backups are old or failed, or the disk is full.
    */
   SERVER_STATUS_DIR: z.string().trim().optional(),
+  /** The live logs of each container (logs/live on the server, mounted into the API), for Dev tools. */
+  LIVE_LOGS_DIR: z.string().trim().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

@@ -28,3 +28,6 @@ packages/database/src/generated/
 
 # Files uploaded while running the API locally or in tests
 apps/api/storage/
+
+# Dev tools: the live logs written on the server by deploy/server/kebo-logs.py
+/logs/

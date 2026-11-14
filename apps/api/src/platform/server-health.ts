@@ -113,7 +113,7 @@ export function warningsToSend(warnings: ServerWarning[], lastSent: Map<string, 
   });
 }
 
-async function readStatus<T>(file: string): Promise<Read<T>> {
+export async function readStatus<T>(file: string): Promise<Read<T>> {
   let text: string;
   try {
     text = await readFile(file, "utf8");

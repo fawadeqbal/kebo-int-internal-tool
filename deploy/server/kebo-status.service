@@ -1,0 +1,10 @@
+[Unit]
+Description=RFQ Desk: the server's status for Dev tools (CPU, memory, disk, containers)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env python3 /usr/local/sbin/kebo-status
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=300
