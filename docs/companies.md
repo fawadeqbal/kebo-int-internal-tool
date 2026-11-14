@@ -152,8 +152,8 @@ When on (`BASE_DOMAIN=rfq.fawadiqbal.dev`, `ROOT_COMPANY=kebo`):
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `acme.rfq.fawadiqbal.dev`    | the company with the short name `acme`: its sign-in page shows its name, only its accounts can sign in there, and a session from another company is refused.                                                                  |
 | `admin.rfq.fawadiqbal.dev`   | the platform area (`/platform` anywhere else is sent there). Opening a company takes the platform admin to the company's address with a one-time link (2 minutes).                                                            |
-| `get.rfq.fawadiqbal.dev`     | the marketing site (request a demo, sign up).                                                                                                                                                                                 |
-| `rfq.fawadiqbal.dev`         | sends every page on to `kebo.rfq.fawadiqbal.dev` (same path), except the marketing pages (to `get.`), set-password links from older emails, and the phone app's PDFs. `/api` is not a page: the phone app keeps working here. |
+| `rfq.fawadiqbal.dev`         | the marketing site (what it is, plans, request a demo, sign up; "Sign in" finds a company's address by email). Any other page is sent on to `kebo.rfq.fawadiqbal.dev` (same path) while `ROOT_COMPANY=kebo` is set, so links kept from before the addresses still open; with it empty, to the marketing page. Set-password links from older emails and the phone app's PDFs are served here. `/api` is not a page: the phone app keeps working here. |
+| `get.rfq.fawadiqbal.dev`     | the marketing site's old address: sends people on to `rfq.fawadiqbal.dev` (same page). |
 | a renamed company's old name | sends people on to the new one for 30 days, and stays held that long                                                                                                                                                          |
 | an unknown name              | "There is no company at this address"                                                                                                                                                                                         |
 
@@ -171,7 +171,7 @@ To switch on:
 
 Switching off is the reverse of step 3: empty `BASE_DOMAIN`.
 
-## The marketing site (get.rfq.fawadiqbal.dev)
+## The marketing site (rfq.fawadiqbal.dev)
 
 The page people find RFQ Desk on: what it does, the plans, request a demo, ask a question, sign in. Without addresses per company it is at `/site`.
 
@@ -180,4 +180,4 @@ The page people find RFQ Desk on: what it does, the plans, request a demo, ask a
 - **Sign in**: asks for the work email and emails the sign-in address of each company that email has an account in (the answer is the same whether or not it has one, so nobody learns who uses RFQ Desk).
 - **Numbers** (platform Overview, Website card): visitors, leads, how many reached a demo or trial and how many pay, this month against the last, the last 30 days, and per channel. Visits are counted by the web server without cookies: each visitor once a day, told apart by a one-way hash of the day, their address and browser, kept two days; crawlers and link previews are left out. Leads count in the month they came in, by how far they have got now.
 
-Tag the links in ads and posts so their visitors and leads show per source, e.g. `https://get.rfq.fawadiqbal.dev/?utm_source=facebook&utm_campaign=november`.
+Tag the links in ads and posts so their visitors and leads show per source, e.g. `https://rfq.fawadiqbal.dev/?utm_source=facebook&utm_campaign=november`.

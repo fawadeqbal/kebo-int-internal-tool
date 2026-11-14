@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-/** The marketing page (get.<BASE_DOMAIN>): the published words and plans. Each view is counted, without cookies. */
+/** The marketing page (<BASE_DOMAIN>): the published words and plans. Each view is counted, without cookies. */
 export default async function SitePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [sp, h, site, signUp] = await Promise.all([
     searchParams,
