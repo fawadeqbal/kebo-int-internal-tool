@@ -135,10 +135,10 @@ describe("follow-ups never stop reminding", () => {
     expect(await alerts(giver.id, "followUp.missedTold")).toHaveLength(0);
     expect((await alerts(managerId, "followUp.missedTold")).filter((n) => n.title.includes(tag))).toHaveLength(0);
 
-    // Two days missed: the person again, and now the managers and who gave it. One email each (when email is set up).
+    // Two days missed: the person again, and now the managers and who gave it. In the morning email too (when email is set up).
     const notifications = app.get(NotificationsService);
     vi.spyOn(notifications, "canEmail").mockResolvedValue(true);
-    const mails = vi.spyOn(notifications, "emailUser").mockResolvedValue(true);
+    const mails = vi.spyOn(notifications, "emailMessage").mockResolvedValue(undefined);
     setNow("08:05", addDays(day, 2));
     await run();
     await run();
@@ -146,11 +146,20 @@ describe("follow-ups never stop reminding", () => {
     const told = `${me.name} missed a follow-up for 2 days: Call Ade ${tag}`;
     expect((await alerts(giver.id, "followUp.missedTold")).map((n) => n.title)).toEqual([told]);
     expect((await alerts(managerId, "followUp.missedTold")).map((n) => n.title)).toContain(told);
-    const sentTo = (id: string) => mails.mock.calls.filter((c) => c[0] === id).map((c) => c[1]);
-    expect(sentTo(me.id)).toEqual(["Your follow-ups: 1 missed"]);
-    expect(sentTo(giver.id)).toEqual(["Missed follow-ups: 1"]);
-    expect(sentTo(managerId)).toEqual(["Missed follow-ups: 1"]);
-    expect(String(mails.mock.calls.find((c) => c[0] === me.id)![2].body)).toContain(`Call Ade ${tag} — missed 2 days`);
+    // The bell and the phone only: the email is the one "Your day" a morning, from the reminders run.
+    expect(mails).not.toHaveBeenCalled();
+    await CompanyContext.run(toInfo(company), () => app.get(RemindersService).run(true));
+    await CompanyContext.run(toInfo(company), () => app.get(RemindersService).run(true));
+    const dayOf = (id: string) => mails.mock.calls.filter((c) => c[1].some((p) => p.id === id)).map((c) => c[0]);
+    const mine = dayOf(me.id);
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({ tag: "Your day", subject: "Good morning Forgetful: 1 missed" });
+    expect(mine[0]!.sections).toEqual([{ title: "Missed", rows: [{ ref: "—", party: "", what: `Call Ade ${tag}`, when: "missed 2 days", late: true }] }]);
+    const theirs = dayOf(giver.id);
+    expect(theirs).toHaveLength(1);
+    expect(theirs[0]!.subject).toBe("Good morning Giver: 1 missed by your team");
+    expect(theirs[0]!.sections![0]!.rows[0]).toMatchObject({ what: `${me.name}: Call Ade ${tag}`, when: "missed 2 days" });
+    expect(dayOf(managerId)[0]!.sections!.find((x) => x.title === "Missed by your team")!.rows.map((r) => r.what)).toContain(`${me.name}: Call Ade ${tag}`);
 
     // Moved to another day: it stops. Missed again after that day: it starts again.
     await api(app, me.token).patch(`/follow-ups/${f.id}`, { dueOn: addDays(day, 5) }).expect(200);
@@ -182,6 +191,7 @@ describe("follow-ups never stop reminding", () => {
     const got = await alerts(me.id, "followUp.missed");
     expect(got).toHaveLength(1);
     expect(got[0]).toMatchObject({ title: `4 follow-ups missed — the oldest, 2 days: Job 1 ${tag}`, link: "/follow-ups?status=late" });
-    expect(got[0]!.body).toContain(`Job 3 ${tag} — missed 1 day`);
+    // The list is in the message (the email and, later, the phone show it); the bell says what to do.
+    expect((got[0]!.message as { list: { what: string; when: string }[] }).list).toContainEqual(expect.objectContaining({ what: `Job 3 ${tag}`, when: "missed 1 day" }));
   });
 });

@@ -276,7 +276,7 @@ describe("money", () => {
     const rows = Array.isArray(mine) ? mine : (mine.rows ?? mine.items);
     expect(
       rows.find((n: { type: string; title: string }) => n.type === "reminder.instalmentLate" && n.title.includes(m.refNo))?.title,
-    ).toMatch(/Second: USD 650\.00 due .* not paid yet/);
+    ).toMatch(/^Late: .* has not paid USD 650 \(second, SO-/);
   });
 
   it("dates the balance when the order ships", async () => {

@@ -522,9 +522,10 @@ describe("notes and follow-ups", () => {
     // (Others' missed follow-ups are reminded in the same run: only this person's are counted below.)
     expect(sent).toBeGreaterThanOrEqual(3);
     const first = await due();
-    expect(first.map((n) => n.title).sort()).toEqual(["At 08:20: Factory visit", "Today: Call Kofi", "Today: Meet the bank · 09:00"]);
-    expect(first.find((n) => n.title === "Today: Call Kofi")).toMatchObject({ link: `/orders/${orderId}`, body: `${refNo} · ${customerName}` });
-    expect(first.find((n) => n.title === "At 08:20: Factory visit")).toMatchObject({ link: "/follow-ups", body: "in 20 min · Wenzhou" });
+    expect(first.map((n) => n.title).sort()).toEqual(["At 08:20: Factory visit", "Today at 09:00: Meet the bank", "Today: Call Kofi"]);
+    expect(first.find((n) => n.title === "Today: Call Kofi")).toMatchObject({ link: `/orders/${orderId}`, body: `${refNo} · Call Kofi. When done, say what happened and set the next one.` });
+    expect((first.find((n) => n.title === "Today: Call Kofi")!.message as { where: { title: string } }).where.title).toBe(customerName);
+    expect(first.find((n) => n.title === "At 08:20: Factory visit")).toMatchObject({ link: "/follow-ups", message: expect.objectContaining({ tag: "In 20 minutes", sentence: "Your follow-up is in 20 minutes, at Wenzhou." }) });
     // Running again (the worker runs every few minutes, the hourly job too) sends nothing twice.
     expect(await run()).toBe(0);
     expect((await due()).length).toBe(3);
@@ -532,7 +533,7 @@ describe("notes and follow-ups", () => {
     // 08:35: half an hour before 09:00.
     setNow("08:35");
     expect(await run()).toBe(1);
-    expect((await due()).at(-1)).toMatchObject({ title: "At 09:00: Meet the bank", body: "in 25 min" });
+    expect((await due()).at(-1)).toMatchObject({ title: "At 09:00: Meet the bank", message: expect.objectContaining({ tag: "In 25 minutes" }) });
     expect(await run()).toBe(0);
     // After its time, nothing more; moving it to another time reminds again, once.
     setNow("09:10");
