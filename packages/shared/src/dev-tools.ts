@@ -3,7 +3,7 @@
  * warn = needs you this week, bad = needs you now, off = not set up or not checked.
  */
 export type DevLevel = "ok" | "warn" | "bad" | "off";
-export type DevTab = "picture" | "services" | "data" | "speed";
+export type DevTab = "picture" | "services" | "data" | "speed" | "jobs" | "security" | "companies";
 /** The map's columns, in the order a request travels. */
 export const DEV_LANES = [
   { key: "addresses", label: "Addresses" },
@@ -167,6 +167,84 @@ export interface DevSpeedView {
   errorsList: DevError[];
   fixedCount: number;
   outside: { lastAt: string | null; checks24h: number };
+}
+
+export interface DevJob {
+  key: string;
+  label: string;
+  /** Who runs it: the app's worker, or the server. */
+  by: "worker" | "server";
+  schedule: string;
+  lastAt: string | null;
+  tookMs: number | null;
+  ok: boolean | null;
+  result: string | null;
+  level: DevLevel;
+  /** Failed runs in the last 7 days. */
+  failed7d: number;
+}
+
+export interface DevDeliveryFailure {
+  at: string;
+  channel: "email" | "push" | string;
+  what: string;
+  to: string | null;
+  companyName: string | null;
+  reason: string;
+}
+
+export interface DevJobsView {
+  jobs: DevJob[];
+  email: { today: { sent: number; failed: number }; days: { day: string; sent: number; failed: number }[] };
+  push: { today: { sent: number; failed: number }; days: { day: string; sent: number; failed: number }[]; phones: number };
+  failures: DevDeliveryFailure[];
+  /** When the platform admins get an email, and how it stands now. */
+  limits: { label: string; now: string; level: DevLevel }[];
+}
+
+export interface DevSecurityView {
+  signIns: {
+    ok24h: number;
+    failed24h: number;
+    blocked24h: number;
+    rows: { result: string; who: string; company: string | null; ip: string; times: number; lastAt: string; level: DevLevel }[];
+  };
+  platformAdmins: { all: number; withTwoStep: number; locked: number };
+  users: { all: number; withoutTwoStep: number; managersWithout: number };
+  withoutTwoStep: { company: string; users: number; of: number; managers: number }[];
+  server: {
+    checkedAt: string | null;
+    updates: { all: number; security: number; reboot: boolean | null } | null;
+    ports: number[] | null;
+    firewall: "on" | "off" | null;
+    sshPassword: boolean | null;
+    certificates: { host: string; ok: boolean; endsAt?: string; error?: string }[];
+  };
+  checks: DevCheck[];
+}
+
+export interface DevCompany {
+  id: string;
+  name: string;
+  slug: string;
+  kind: string;
+  status: string;
+  plan: string | null;
+  endsAt: string | null;
+  users: number;
+  usedThisWeek: number;
+  lastUsedAt: string | null;
+  errors7d: number;
+  filesMb: number;
+  orders: number;
+  level: DevLevel;
+  note: string;
+}
+
+export interface DevCompaniesView {
+  companies: DevCompany[];
+  /** All companies: requests by hour of the day (the server's time zone), last 7 days. */
+  busyHours: number[];
 }
 
 export interface DevLogLine {

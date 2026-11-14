@@ -19,6 +19,7 @@ import { NotesModule } from "./modules/notes/notes.module";
 import { PlatformJobsModule } from "./platform/platform-jobs.module";
 import { LifecycleService } from "./platform/lifecycle.service";
 import { ServerHealthService } from "./platform/server-health";
+import { JobRuns } from "./platform/watch";
 import { FactsService } from "./modules/insights/facts/facts.service";
 import { Clock } from "./common/time/clock.service";
 import { LedgerPostingModule } from "./modules/ledger/posting.service";
@@ -70,6 +71,8 @@ async function main() {
   const clock = app.get(Clock);
   const ledger = app.get(LedgerService);
   const domains = app.get(OwnDomainService);
+  // Each job's run is written down for Dev tools (Jobs and emails); a failure is logged there and never stops the others.
+  const jobs = app.get(JobRuns);
   let checkedOn: string | null = null;
   const minutes = Math.max(Number(process.env.REMINDER_INTERVAL_MINUTES) || 60, 1);
   const log = new Logger("Worker");
@@ -78,21 +81,27 @@ async function main() {
     if (running) return;
     running = true;
     try {
-      await lifecycle.run().catch((e) => log.error(`company rules failed: ${(e as Error).stack ?? e}`));
-      await server.run().catch((e) => log.error(`server check failed: ${(e as Error).stack ?? e}`));
-      // Insights' tables: the full check once a day (nightly), otherwise catching up on what was queued.
+      await jobs.track("company-rules", () => lifecycle.run());
       const today = clock.today();
       if (checkedOn !== today) {
-        await facts.nightly().catch((e) => log.error(`Insights check failed: ${(e as Error).stack ?? e}`));
-        await ledger.nightly().catch((e) => log.error(`ledger check failed: ${(e as Error).stack ?? e}`));
+        await jobs.track("insights-nightly", () => facts.nightly());
+        await jobs.track("ledger-nightly", () => ledger.nightly());
         checkedOn = today;
       } else await facts.eachCompany("catching up the Insights tables", () => facts.drain());
       const companies = await prisma.platform.company.findMany({ where: { status: "active" }, orderBy: { createdAt: "asc" } });
-      for (const c of companies) {
-        await CompanyContext.run(toInfo(c), () => reminders.run()).catch((e) =>
-          log.error(`reminders for ${c.slug} failed: ${(e as Error).stack ?? e}`),
-        );
-      }
+      let failed = 0;
+      await jobs.track(
+        "reminders",
+        async () => {
+          for (const c of companies)
+            await CompanyContext.run(toInfo(c), () => reminders.run()).catch((e) => {
+              failed += 1;
+              log.error(`reminders for ${c.slug} failed: ${(e as Error).stack ?? e}`);
+            });
+          if (failed) throw new Error(`failed for ${failed} of ${companies.length} companies (see the worker's log)`);
+        },
+        () => `${companies.length} companies`,
+      );
     } finally {
       running = false;
     }
@@ -104,13 +113,23 @@ async function main() {
     if (followingUp || running) return;
     followingUp = true;
     try {
-      const companies = await prisma.platform.company.findMany({ where: { status: "active" }, orderBy: { createdAt: "asc" } });
-      for (const c of companies) await CompanyContext.run(toInfo(c), () => reminders.followUps());
-    } catch (e) {
-      log.error(`follow-up reminders failed: ${(e as Error).stack ?? e}`);
+      await jobs.track(
+        "follow-ups",
+        async () => {
+          const companies = await prisma.platform.company.findMany({ where: { status: "active" }, orderBy: { createdAt: "asc" } });
+          for (const c of companies) await CompanyContext.run(toInfo(c), () => reminders.followUps());
+          return companies.length;
+        },
+        (n) => `${n} companies`,
+      );
     } finally {
-      // Companies' own domains: the ones waiting for their record, and now and then the connected ones.
-      await domains.sweep().catch((e) => log.error(`own domains check failed: ${(e as Error).stack ?? e}`));
+      await jobs.track("own-domains", () => domains.sweep());
+      // The server's checks (backups, disk, services, errors, certificates): every few minutes, each problem emailed once a day.
+      await jobs.track(
+        "server-check",
+        () => server.run(),
+        (w) => (w.length ? `${w.length} warnings emailed` : "all fine"),
+      );
       followingUp = false;
     }
   };

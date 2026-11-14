@@ -2847,3 +2847,46 @@ model AppError {
   @@index([lastAt])
   @@map("app_errors")
 }
+
+/// Dev tools: each run of a worker job (reminders, company rules, the nightly checks …), kept 30 days. Platform table.
+model JobRun {
+  id        String   @id @default(uuid()) @db.Uuid
+  job       String   @db.VarChar(60)
+  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz
+  tookMs    Int      @map("took_ms")
+  ok        Boolean
+  /// What it did ("4 companies"), or why it failed.
+  result    String?  @db.VarChar(300)
+
+  @@index([job, startedAt])
+  @@index([startedAt])
+  @@map("job_runs")
+}
+
+/// Dev tools: emails and phone notifications sent and not delivered, a day at a time. Platform table.
+model DeliveryDay {
+  day     DateTime @db.Date
+  /// email or push.
+  channel String   @db.VarChar(10)
+  sent    Int      @default(0)
+  failed  Int      @default(0)
+
+  @@id([day, channel])
+  @@map("delivery_days")
+}
+
+/// Dev tools: an email or phone notification that was not delivered, and why (kept 30 days). Platform table.
+model DeliveryFailure {
+  id          String   @id @default(uuid()) @db.Uuid
+  at          DateTime @default(now()) @db.Timestamptz
+  channel     String   @db.VarChar(10)
+  /// The email's subject, or the notification's title.
+  what        String   @db.VarChar(200)
+  /// Partly hidden: "s***@codecrood.com".
+  to          String?  @db.VarChar(120)
+  companyName String?  @map("company_name") @db.VarChar(120)
+  reason      String   @db.VarChar(300)
+
+  @@index([at])
+  @@map("delivery_failures")
+}
