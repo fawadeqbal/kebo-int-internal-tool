@@ -99,6 +99,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
       { href: "/access/roles", label: "Roles" },
       { href: "/access/sign-ins", label: "Sign-ins" },
       { href: "/access/sessions", label: "Sessions" },
+      { href: "/settings/mail", label: "Email sending", lineBefore: true },
       { href: "/audit", label: "Activity log", lineBefore: true },
     ],
   },
@@ -208,6 +209,7 @@ export function buildModules({
     "/access/roles": security,
     "/access/sessions": security,
     "/access/sign-ins": security,
+    "/settings/mail": security,
   };
   // Payments waiting to be verified show on Payments, where its strip opens them.
   const badges: Record<string, Pick<NavPage, "badge" | "badgeLabel">> = {

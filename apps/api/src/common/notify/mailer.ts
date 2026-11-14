@@ -26,28 +26,81 @@ class ConsoleMailer implements Mailer {
   }
 }
 
-class SmtpMailer implements Mailer {
-  readonly enabled = true;
-  async send(message: MailMessage) {
-    const nodemailer = await import("nodemailer");
-    const port = Number(process.env.SMTP_PORT ?? 587);
-    const transport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port,
-      secure: port === 465,
-      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
-    });
-    await transport.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      ...message,
-      to: [message.to].flat().join(", "),
-      cc: message.cc ? [message.cc].flat().join(", ") : undefined,
-    });
-  }
+export interface SmtpOptions {
+  host: string;
+  port: number;
+  user?: string | null;
+  password?: string | null;
+  /** "Name <address>" or the address alone. */
+  from: string;
 }
 
+/** Sends through an SMTP server (the server's own, a company's, or Gmail's with an app password). */
+export function smtpMailer(o: SmtpOptions): Mailer {
+  return {
+    enabled: true,
+    async send(message) {
+      const nodemailer = await import("nodemailer");
+      const transport = nodemailer.createTransport({
+        host: o.host,
+        port: o.port,
+        secure: o.port === 465,
+        auth: o.user ? { user: o.user, pass: o.password ?? "" } : undefined,
+        // A wrong host or port answers in seconds, not minutes.
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 20_000,
+      });
+      await transport.sendMail({
+        from: o.from,
+        ...message,
+        to: [message.to].flat().join(", "),
+        cc: message.cc ? [message.cc].flat().join(", ") : undefined,
+      });
+    },
+  };
+}
+
+/** Sends through Resend's API (POST /emails with the company's key). `post` is replaceable in tests. */
+export function resendMailer(o: { apiKey: string; from: string }, post: typeof fetch = fetch): Mailer {
+  return {
+    enabled: true,
+    async send(message) {
+      const res = await post("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { authorization: `Bearer ${o.apiKey}`, "content-type": "application/json" },
+        signal: AbortSignal.timeout(20_000),
+        body: JSON.stringify({
+          from: o.from,
+          to: [message.to].flat(),
+          subject: message.subject,
+          text: message.text,
+          ...(message.html ? { html: message.html } : {}),
+          ...(message.cc ? { cc: [message.cc].flat() } : {}),
+          ...(message.replyTo ? { reply_to: message.replyTo } : {}),
+          ...(message.attachments?.length
+            ? { attachments: message.attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64"), ...(a.contentType ? { content_type: a.contentType } : {}) })) }
+            : {}),
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(`Resend answered ${res.status}${body?.message ? `: ${body.message}` : ""}`);
+      }
+    },
+  };
+}
+
+/** The server's own mail (SMTP_HOST…): what a company without its own email setting sends through. */
 export function getMailer(): Mailer {
-  return process.env.SMTP_HOST ? new SmtpMailer() : new ConsoleMailer();
+  if (!process.env.SMTP_HOST) return new ConsoleMailer();
+  return smtpMailer({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    user: process.env.SMTP_USER,
+    password: process.env.SMTP_PASSWORD,
+    from: process.env.SMTP_FROM || process.env.SMTP_USER || "",
+  });
 }
 
 /** Escape text for use inside an HTML email. */

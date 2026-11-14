@@ -4,7 +4,8 @@ import { CompanyContext } from "../../common/company/company-context";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { ENV, type Env } from "../../config/env";
-import { getMailer, renderEmail } from "../../common/notify/mailer";
+import { renderEmail } from "../../common/notify/mailer";
+import { CompanyMail } from "../../common/notify/company-mail";
 import { sendPush } from "../../common/notify/fcm";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
@@ -52,6 +53,7 @@ export class NotificationsService implements OnModuleInit {
     private readonly settings: SettingsService,
     @Inject(ENV) private readonly env: Env,
     private readonly limits: LimitsService,
+    private readonly mail: CompanyMail,
   ) {}
 
   /* ---------------------------------------------------------------- sending */
@@ -127,7 +129,7 @@ export class NotificationsService implements OnModuleInit {
         link: content.link ? new URL(content.link, origin).toString() : undefined,
         footer: `${s.company.name} · you get this because your email is on the notification list in Settings.`,
       });
-      await getMailer().send({ to: s.notifications.emails, subject, html, text });
+      await (await this.mail.mailer()).send({ to: s.notifications.emails, subject, html, text });
     } catch (e) {
       this.log.warn(`email failed: ${(e as Error).message}`);
     }

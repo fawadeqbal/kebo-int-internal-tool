@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, ParseEnumPipe, Put } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseEnumPipe, Post, Put } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { SETTINGS, type SettingsKey } from "@kebo/shared";
+import { mailSettingsInput, mailTestInput, SETTINGS, type MailSettingsInput, type MailTestInput, type SettingsKey } from "@kebo/shared";
 import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
+import { Validate } from "../../common/http/zod.pipe";
+import { CompanyMail } from "../../common/notify/company-mail";
 import { SettingsService } from "./settings.service";
 
 const KEYS = Object.fromEntries(Object.keys(SETTINGS).map((k) => [k, k])) as Record<SettingsKey, SettingsKey>;
@@ -30,4 +32,42 @@ class SettingsController {
   }
 }
 
-export { SettingsController };
+/**
+ * Admin settings › Email sending: how the company's own email goes out (Gmail, an SMTP server or Resend).
+ * Admins only; the password or key is taken in and never given back.
+ */
+@ApiTags("settings")
+@Controller("mail-settings")
+class MailSettingsController {
+  constructor(private readonly mail: CompanyMail) {}
+
+  @Get()
+  @RequirePermissions("security.manage")
+  view(@CurrentUser() user: SessionUser) {
+    return this.mail.view(user);
+  }
+
+  @Put()
+  @RequirePermissions("security.manage")
+  save(@CurrentUser() user: SessionUser, @Body(Validate(mailSettingsInput)) body: MailSettingsInput) {
+    return this.mail.save(user, body);
+  }
+
+  /** Back to the server's own email. */
+  @Delete()
+  @HttpCode(200)
+  @RequirePermissions("security.manage")
+  remove(@CurrentUser() user: SessionUser) {
+    return this.mail.remove(user);
+  }
+
+  /** { to }: one email, sent the way it is set now. */
+  @Post("test")
+  @HttpCode(200)
+  @RequirePermissions("security.manage")
+  test(@CurrentUser() user: SessionUser, @Body(Validate(mailTestInput)) body: MailTestInput) {
+    return this.mail.test(user, body.to);
+  }
+}
+
+export { MailSettingsController, SettingsController };

@@ -40,7 +40,7 @@ import { OrdersService } from "../orders/orders.service";
 import { requireReason } from "../../common/audit/reason";
 import { customerSnapshot } from "../orders/buyer";
 import { figuresOf } from "./revision-figures";
-import { getMailer } from "../../common/notify/mailer";
+import { CompanyMail } from "../../common/notify/company-mail";
 
 /** NUMERIC(14,2) can hold up to this; totals above it are refused with a clear message. */
 const MAX_TOTAL_MINOR = 999_999_999_999_99;
@@ -107,6 +107,7 @@ export class QuotationsService {
     private readonly inquiries: InquiriesService,
     private readonly stages: StagesService,
     private readonly orders: OrdersService,
+    private readonly mail: CompanyMail,
   ) {}
 
   /* ---------------------------------------------------------------- what can be offered */
@@ -679,9 +680,10 @@ export class QuotationsService {
     const { r, inquiry } = await this.loadRevision(user, revisionId, this.prisma.db);
     await this.inquiries.findWorkable(user, inquiry.id, this.prisma.db);
     if (r.status !== "draft" && r.status !== "sent") throw new GateError(`A ${r.status} revision is not sent again.`, "revision_move");
-    const mailer = getMailer();
+    // The company's own email (Admin settings › Email sending), else the server's.
+    const mailer = await this.mail.mailer();
     if (!mailer.enabled)
-      throw new DomainError("Email is not set up on this server yet. Download the PDF, send it yourself, then use “Sent another way — mark as sent”.");
+      throw new DomainError("Email is not set up yet (an admin sets it under Admin settings › Email sending). Download the PDF, send it yourself, then use “Sent another way — mark as sent”.");
     await mailer.send({
       to: input.to,
       cc: input.cc.length ? input.cc : undefined,

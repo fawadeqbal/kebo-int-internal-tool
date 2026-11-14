@@ -75,7 +75,7 @@ describe("the groups", () => {
     expect(m.filter(isSingle).map((x) => x.key)).toEqual(["purchasing", "reports"]);
     // Settings is two groups: the company's own (managers too), and the admin's.
     expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form"]);
-    expect(pages(m, "admin")).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Activity log"]);
+    expect(pages(m, "admin")).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Email sending", "Activity log"]);
   });
 
   it("have one name each, and two levels: a group and its pages", () => {
@@ -113,6 +113,7 @@ describe("the groups", () => {
         "/access/roles",
         "/access/sign-ins",
         "/access/sessions",
+        "/settings/mail",
       ].sort(),
     );
     // Tabs on the page, the bell, and the pages that left the menu: not menu items.
@@ -150,7 +151,7 @@ describe("the groups", () => {
     expect(titles(m)).toEqual(["Sales", "Suppliers", "Money", "Reports", "Company settings", "Admin settings"]);
     expect(pages(m, "reports")).toEqual(["Reports"]);
     expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form"]);
-    // No people, roles, sign-ins or sessions: those are the admin's.
+    // No people, roles, sign-ins, sessions or email sending: those are the admin's.
     expect(pages(m, "admin")).toEqual(["Activity log"]);
     // Someone who only manages people sees Admin settings alone.
     const people = buildModules({ can: (p) => p === "users.manage", feature: () => true, approvals: null, approves: false, companyAddresses: false });
@@ -166,7 +167,8 @@ describe("the groups", () => {
     // Money and Company settings are pages of one kind: no line. Admin settings has two: the people, and the record.
     expect(lines(everything(), "money")).toEqual([]);
     expect(lines(everything(), "company")).toEqual([]);
-    expect(lines(everything(), "admin")).toEqual(["Activity log"]);
+    // Admin settings has three kinds: the people and their access, how email goes out, the record.
+    expect(lines(everything(), "admin")).toEqual(["Email sending", "Activity log"]);
     // Only the record is left: no line above the first page.
     const onlyLog = buildModules({ can: (p) => p === "audit.view", feature: () => true, approvals: null, approves: false, companyAddresses: false });
     expect(pages(onlyLog, "admin")).toEqual(["Activity log"]);
@@ -317,7 +319,7 @@ describe("the folded strip", () => {
     const li = strip().getByRole("button", { name: "Admin settings" }).closest("li")!;
     fireEvent.mouseEnter(li);
     const m = screen.getByRole("menu", { name: "Admin settings" });
-    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Activity log"]);
+    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Email sending", "Activity log"]);
     fireEvent.mouseLeave(li);
     act(() => vi.advanceTimersByTime(300));
     expect(screen.queryByRole("menu")).toBeNull();
