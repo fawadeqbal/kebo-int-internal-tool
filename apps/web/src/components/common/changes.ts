@@ -11,6 +11,8 @@ type FieldEl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 export function fieldValues(box: HTMLElement): string {
   const out: string[] = [];
   for (const el of box.querySelectorAll<FieldEl>("input, select, textarea")) {
+    // A picker that only moves to another record (Which order) holds nothing to lose.
+    if (el.closest("[data-no-change]")) continue;
     let value: string;
     if (el instanceof HTMLInputElement) {
       // Buttons hold nothing; a search box only looks things up.

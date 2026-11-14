@@ -5,6 +5,7 @@ import { LIFECYCLE, suggestSlug } from "@kebo/shared";
 import { Checkbox, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { FormButtons } from "@/components/common/route-window";
 import type { Plan } from "@/lib/types-platform";
 import { createCompanyAction } from "@/app/platform/actions";
 
@@ -118,9 +119,9 @@ export function NewCompanyForm({ plans, prefill }: { plans: Plan[]; prefill: Pre
           <Field label="Notes" htmlFor="notes" optional error={s.errors?.notes}>
             <Textarea id="notes" name="notes" rows={3} defaultValue={s.values?.notes} />
           </Field>
-          <div>
+          <FormButtons cancelHref="/platform/companies">
             <SubmitButton pendingText="Making it…">{kind === "demo" ? "Make the demo" : "Make the company"}</SubmitButton>
-          </div>
+          </FormButtons>
         </>
       )}
     </ActionForm>

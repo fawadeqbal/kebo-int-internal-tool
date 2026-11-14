@@ -3,6 +3,7 @@
 import { Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { FormButtons } from "@/components/common/route-window";
 import { createLeadAction } from "@/app/platform/actions";
 
 export function NewLeadForm() {
@@ -39,9 +40,9 @@ export function NewLeadForm() {
           <Field label="What they need" htmlFor="message" optional>
             <Textarea id="message" name="message" rows={4} defaultValue={s.values?.message} />
           </Field>
-          <div>
-            <SubmitButton>Add</SubmitButton>
-          </div>
+          <FormButtons cancelHref="/platform/leads">
+            <SubmitButton>Add client inquiry</SubmitButton>
+          </FormButtons>
         </>
       )}
     </ActionForm>

@@ -74,7 +74,7 @@ describe("SidePanel", () => {
     // From the last control, Tab goes round to the first (✕ in the header).
     screen.getByRole("button", { name: "Cancel" }).focus();
     fireEvent.keyDown(document.activeElement!, { key: "Tab" });
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close the panel" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
     // And Shift+Tab from the first goes to the last.
     fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
@@ -121,7 +121,7 @@ describe("SidePanel", () => {
     render(<Harness onClose={onClose} />);
     openPanel();
     fireEvent.input(screen.getByLabelText("City"), { target: { value: "Lahore" } });
-    fireEvent.click(screen.getByRole("button", { name: "Close the panel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.keyDown(screen.getByRole("button", { name: "Keep editing" }), { key: "Escape" });
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(screen.getByRole("dialog")).toBeTruthy();
@@ -202,7 +202,7 @@ describe("SidePanel", () => {
       fireEvent.keyDown(el, { key: value.slice(-1) || "Backspace" });
       fireEvent.input(el, { target: { value } });
     };
-    const close = () => fireEvent.click(screen.getByRole("button", { name: "Close the panel" }));
+    const close = () => fireEvent.click(screen.getByRole("button", { name: "Close" }));
     const asks = () => screen.queryByRole("alertdialog", { name: "Discard changes?" }) !== null;
 
     it("opened and closed with nothing touched: closes at once (a field that announces itself is not a change)", () => {

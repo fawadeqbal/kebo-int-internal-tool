@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Alert } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import { ReasonPrompt } from "./reason-prompt";
+import { useWindowDone } from "./route-window";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -46,6 +47,8 @@ export function ActionForm({
 }) {
   const [state, formAction] = useActionState(action, {});
   const router = useRouter();
+  // In a page shown as a window (Record payment): saving closes it, back to the page under it.
+  const windowDone = useWindowDone();
   const formRef = useRef<HTMLFormElement>(null);
   const seen = useRef<ActionState | null>(null);
   useEffect(() => {
@@ -55,8 +58,9 @@ export function ActionForm({
       if (resetOnSuccess) formRef.current?.reset();
       router.refresh();
       onDone?.(state);
+      windowDone?.();
     }
-  }, [state, router, onDone, resetOnSuccess]);
+  }, [state, router, onDone, resetOnSuccess, windowDone]);
   return (
     <form
       ref={formRef}
