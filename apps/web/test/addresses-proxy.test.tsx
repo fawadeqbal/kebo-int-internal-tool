@@ -17,7 +17,14 @@ describe("addresses", () => {
     vi.stubEnv("ROOT_COMPANY", "");
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => (String(url).includes("slug=acme") ? new Response(JSON.stringify({ slug: "acme" })) : new Response("{}", { status: 404 }))),
+      vi.fn(async (url: string) => {
+        const u = String(url);
+        if (u.includes("slug=acme")) return new Response(JSON.stringify({ slug: "acme" }));
+        // Lahore Pharma connected its own domain.
+        if (u.includes("slug=lahore")) return new Response(JSON.stringify({ slug: "lahore", domain: "erp.lahorepharma.com" }));
+        if (u.includes("host=erp.lahorepharma.com")) return new Response(JSON.stringify({ slug: "lahore" }));
+        return new Response("{}", { status: 404 });
+      }),
     );
   });
   afterEach(() => {
@@ -65,5 +72,16 @@ describe("addresses", () => {
     expect(shows(await at("https://nobody.rfq.test/orders"))).toBe("https://nobody.rfq.test/no-company");
     // The marketing site is not at a company's address.
     expect(to(await at("https://acme.rfq.test/site"))).toBe("https://rfq.test/");
+  });
+
+  it("a company's own domain is its address while it is connected; its address under ours sends people on", async () => {
+    const res = await at("https://erp.lahorepharma.com/orders?tab=money", { "x-company": "someone-else" });
+    expect(passes(res)).toBe(true);
+    expect(res.headers.get("x-middleware-request-x-company")).toBe("lahore");
+    expect(to(await at("https://lahore.rfq.test/orders?tab=money"))).toBe("https://erp.lahorepharma.com/orders?tab=money");
+    // The platform area stays at admin.
+    expect(to(await at("https://erp.lahorepharma.com/platform"))).toBe("https://admin.rfq.test/platform");
+    // A domain nobody connected (or one still waiting for its record) is no company's.
+    expect(shows(await at("https://erp.someone-else.com/login"))).toBe("https://erp.someone-else.com/no-company");
   });
 });

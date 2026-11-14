@@ -18,6 +18,7 @@ export const toInfo = (c: Company): CompanyInfo => ({
   endsAt: c.endsAt,
   planId: c.planId,
   featuresOff: c.featuresOff ?? [],
+  domain: c.ownDomainStatus === "connected" ? c.ownDomain : null,
 });
 
 /**

@@ -224,6 +224,8 @@ export const RESERVED_SLUGS = new Set([
   "mx",
   "info",
   "news",
+  // What a company's own domain points to (connect.<BASE_DOMAIN>).
+  "connect",
   // The marketing site and words it may use later.
   "get",
   "go",
@@ -302,9 +304,77 @@ export function addressOf(host: string | null | undefined, baseDomain: string): 
   return { kind: "company", slug: sub };
 }
 
-/** A company's address ("https://acme.rfq.example.com"), or the one shared address when there are none. */
-export const companyOrigin = (slug: string, baseDomain: string | undefined, fallback: string) =>
-  baseDomain ? `https://${slug}.${baseDomain}` : fallback.replace(/\/$/, "");
+/**
+ * A company's address: its own domain when it has connected one ("https://erp.acme.com"), else its address
+ * under ours ("https://acme.rfq.example.com"), or the one shared address when there are none.
+ */
+export const companyOrigin = (slug: string, baseDomain: string | undefined, fallback: string, ownDomain?: string | null) =>
+  baseDomain ? `https://${ownDomain || `${slug}.${baseDomain}`}` : fallback.replace(/\/$/, "");
+
+/* ---------------------------------------------------------------- a company's own domain */
+
+/** What a company's own domain is pointed to (one CNAME record): connect.<BASE_DOMAIN>. The same for every company, so renaming a company never breaks its record. */
+export const CONNECT_SUB = "connect";
+export const connectTarget = (baseDomain: string) => `${CONNECT_SUB}.${baseDomain.toLowerCase()}`;
+
+/**
+ * A company's own domain, as it stands: waiting (its record is not found yet, or the address does not answer
+ * yet), connected (people work there), lost (it was connected and its record went away: people are back at
+ * our address until it returns).
+ */
+export const OWN_DOMAIN_STATUSES = ["waiting", "connected", "lost"] as const;
+export type OwnDomainStatus = (typeof OWN_DOMAIN_STATUSES)[number];
+/** What the last check found wrong: the record is not there, or it is and the address does not answer yet. */
+export type OwnDomainProblem = "no_record" | "not_answering";
+
+/** A domain as typed, tidied: no "https://", no path, small letters ("HTTPS://ERP.Acme.com/" → "erp.acme.com"). */
+export const tidyDomain = (typed: string) =>
+  typed
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z]+:\/\//, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/:\d+$/, "")
+    .replace(/\.$/, "");
+
+/**
+ * Why this cannot be a company's own domain (null: it can). It is a part of a domain the company owns
+ * ("erp.acme.com"): the domain itself ("acme.com") cannot carry the record, and our own addresses are ours.
+ */
+export function domainProblem(domain: string, baseDomain: string): string | null {
+  const d = domain;
+  const labels = d.split(".");
+  const ok = d.length <= 253 && labels.length >= 2 && labels.every((l) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(l)) && /[a-z]/.test(labels.at(-1)!);
+  if (!ok) return "Type a domain like erp.yourcompany.com.";
+  const base = baseDomain.toLowerCase();
+  if (d === base || d.endsWith(`.${base}`)) return "This is one of our own addresses. Type a domain you own.";
+  if (labels.length < 3) return `Use a part of your domain, like erp.${d}.`;
+  return null;
+}
+
+/** GET /company/domain: the company's own domain and the one record that connects it. */
+export interface OwnDomainView {
+  /** Only a Super Admin (or the platform admin visiting) connects or removes it. */
+  canChange: boolean;
+  /** The company's address under ours ("acme.rfq.example.com"): always works. */
+  ours: string;
+  domain: string | null;
+  status: OwnDomainStatus | null;
+  problem: OwnDomainProblem | null;
+  checkedAt: string | null;
+  /** Connected since. */
+  since: string | null;
+  /** Lost: when its record was last seen. */
+  lostAt: string | null;
+  /** The record to add where the domain is managed. */
+  record: { type: "CNAME"; name: string; value: string; zone: string } | null;
+}
+
+/** The record for a domain: its first part is the name, the rest is where it is added ("erp" in "acme.com"). */
+export function ownDomainRecord(domain: string, baseDomain: string): NonNullable<OwnDomainView["record"]> {
+  const [name, ...rest] = domain.split(".");
+  return { type: "CNAME", name: name!, value: connectTarget(baseDomain), zone: rest.join(".") };
+}
 export const adminOrigin = (baseDomain: string | undefined, fallback: string) =>
   baseDomain ? `https://admin.${baseDomain}` : fallback.replace(/\/$/, "");
 /** The marketing site: the plain address itself ("https://rfq.example.com"). */

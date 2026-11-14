@@ -36,6 +36,7 @@ import {
 import { DomainError, NotFoundError } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
 import { CompaniesService } from "../common/company/companies.service";
+import { OwnDomainService } from "../common/company/own-domain.service";
 import { Validate } from "../common/http/zod.pipe";
 import { Public } from "../common/auth/decorators";
 import { PrismaService } from "../database/prisma.service";
@@ -85,6 +86,7 @@ export class PlatformPublicController {
     private readonly accounts: AccountsService,
     private readonly companies: CompaniesService,
     private readonly site: SiteService,
+    private readonly domains: OwnDomainService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -174,7 +176,9 @@ export class PlatformPublicController {
       a.kind === "root" ||
       a.kind === "admin" ||
       a.kind === "marketing" ||
-      (a.kind === "company" && !!(await this.companies.bySlug(a.slug)));
+      (a.kind === "company" && !!(await this.companies.bySlug(a.slug))) ||
+      // A company's own domain (not one of ours).
+      (a.kind === "other" && (await this.domains.isOwnDomain(domain)));
     res.status(ok ? 200 : 404);
     return { ok };
   }
@@ -190,7 +194,17 @@ export class PlatformPublicController {
   async company(@Query("slug") slug = "") {
     const c = await this.companies.bySlug(slug);
     if (!c) throw new NotFoundError("Company");
-    return { exists: true, slug: c.slug, name: c.status === "active" ? c.name : null };
+    // Its own domain, only while one is connected: its address under ours then sends people on to it.
+    return { exists: true, slug: c.slug, name: c.status === "active" ? c.name : null, ...(this.domains.enabled && c.domain ? { domain: c.domain } : {}) };
+  }
+
+  /** The company whose own domain an address is (connected ones only): its short name, for the web app. 404: none. */
+  @Public()
+  @Get("company-at")
+  async companyAt(@Query("host") host = "") {
+    const c = await this.domains.companyAt(host);
+    if (!c) throw new NotFoundError("Company");
+    return { slug: c.slug };
   }
 
   @Public()

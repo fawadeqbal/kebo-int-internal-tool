@@ -2090,6 +2090,17 @@ model Company {
   /// The previous short name, kept working until previousSlugUntil after a rename.
   previousSlug      String?       @map("previous_slug") @db.VarChar(30)
   previousSlugUntil DateTime?     @map("previous_slug_until") @db.Timestamptz
+  /// The company's own domain ("erp.acme.com"), when it connected one (Settings › Company address). Its address under ours keeps working.
+  ownDomain          String?   @unique @map("own_domain") @db.VarChar(253)
+  /// waiting | connected | lost (OWN_DOMAIN_STATUSES); none: no domain of its own.
+  ownDomainStatus    String?   @map("own_domain_status") @db.VarChar(10)
+  /// What the last check found wrong: no_record | not_answering; none: nothing.
+  ownDomainProblem   String?   @map("own_domain_problem") @db.VarChar(20)
+  ownDomainCheckedAt DateTime? @map("own_domain_checked_at") @db.Timestamptz
+  /// Connected since.
+  ownDomainSince     DateTime? @map("own_domain_since") @db.Timestamptz
+  /// Lost: when its record was last seen.
+  ownDomainLostAt    DateTime? @map("own_domain_lost_at") @db.Timestamptz
   contactName       String?       @map("contact_name") @db.VarChar(120)
   contactEmail      String?       @map("contact_email") @db.VarChar(254)
   /// Phone or WhatsApp of the main contact, with the country code.

@@ -163,7 +163,25 @@ New companies get their address from the short name made when they are created. 
 
 **Certificates**: Caddy makes one per address the first time it is opened (on-demand TLS), and only for addresses the API says are real (`/api/platform/public/domain-check`: the platform's own, the marketing site, existing companies and recently renamed ones). Let's Encrypt allows about 50 new certificates a week for the domain; past that, switch to one wildcard certificate (DNS challenge with the Namecheap API).
 
-To switch on:
+## A company's own domain
+
+A company keeps its address under ours (`acme.rfq.fawadiqbal.dev`), or connects a domain it owns (`erp.acme.com`) on Settings → Company address, in the card "Your own domain" (a Super Admin).
+
+- **One record**: a CNAME from the domain to `connect.rfq.fawadiqbal.dev` (the same name for every company, so renaming a company never breaks its record; `connect` is a short name no company can take). Only a part of a domain (`erp.acme.com`), not the domain itself (`acme.com`).
+- **Waiting**: until the record is found. "Check now" looks at once; the worker looks every 10 minutes.
+- **Connected**: the domain is the company's address. Its address under ours sends people on to it (same page), links in emails go to it, and everyone signs in once more there. Caddy makes its certificate at the first visit.
+- **Lost**: connected domains are looked up once a day. A record that is gone, and still gone an hour later, makes it lost: the company is at its address under ours again until the record returns (looked up every hour). A look-up that fails (the resolver, not the record) changes nothing.
+- **Remove**: back to the address under ours only.
+- A domain can be connected to one company. Connecting and removing are in the company's history and the platform log.
+
+**Switching it on** (off by default; while off the card is not shown and no domain is served):
+
+1. **Caddy**: add the block from `deploy/Caddyfile.domains` to the server's Caddyfile (it takes every address no other block names), validate, reload.
+2. **`.env`** on the server: `OWN_DOMAINS=true`, then `sudo docker compose up -d`.
+
+Do step 1 first: with the setting on and no such block, a connected company would be sent to a domain that does not answer.
+
+## Switching the addresses on
 
 1. **DNS**: an A record `*.rfq` → `145.241.156.60` (the one for `rfq` stays).
 2. **Caddy** (the shared server Caddy, `/opt/global-proxy/Caddyfile`): the `on_demand_tls { ask … }` global option at the very top, and the site block from `deploy/Caddyfile.companies` (with `__DOMAIN__` = `rfq.fawadiqbal.dev`); reload Caddy.
