@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, Check, Download, Factory, FileText, LayoutGrid, List as ListIcon, Lock, MessageSquare, Package, PieChart, Ship, X } from "lucide-react";
 import { ORDER_STAGE_LABEL, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
-import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage } from "@kebo/ui";
+import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, Segmented, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -12,6 +12,36 @@ import { FilterCard } from "@/components/common/filter-card";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { Paged } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
+
+/** Orders is one page with two views: the list and the board. The same switch on both (one item in the menu). */
+function ViewSwitch({ view, mine }: { view: "list" | "board"; mine: boolean }) {
+  const q = mine ? "?mine=1" : "";
+  return (
+    <Segmented
+      label="View"
+      options={[
+        {
+          href: `/orders${q}`,
+          active: view === "list",
+          label: (
+            <span className="inline-flex items-center gap-1.5">
+              <ListIcon className="size-4" aria-hidden /> List
+            </span>
+          ),
+        },
+        {
+          href: `/orders/board${q}`,
+          active: view === "board",
+          label: (
+            <span className="inline-flex items-center gap-1.5">
+              <LayoutGrid className="size-4" aria-hidden /> Board
+            </span>
+          ),
+        },
+      ]}
+    />
+  );
+}
 
 export type Params = Record<string, string | undefined>;
 
@@ -96,9 +126,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         description="An order is made when a customer accepts a quotation"
         actions={
           <>
-            <ButtonLink href="/orders/board">
-              <LayoutGrid aria-hidden /> Board
-            </ButtonLink>
+            <ViewSwitch view="list" mine={mine} />
             <ButtonLink href={buildHref("/sheets/export/orders", { status, mine: keep.mine, q: sp.q, format: "csv" }, {})}>
               <Download aria-hidden /> Export CSV
             </ButtonLink>
@@ -318,15 +346,11 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
   return (
     <div>
       <PageHeader
-        crumbs={[{ label: "Sales" }, { label: "Order board" }]}
-        icon={LayoutGrid}
-        title="Order board"
+        crumbs={crumbsFor("/orders")}
+        icon={Package}
+        title="Sales orders"
         description="Orders by stage. A card moves when its step is done."
-        actions={
-          <ButtonLink href={mine ? "/orders?mine=1" : "/orders"}>
-            <ListIcon aria-hidden /> List
-          </ButtonLink>
-        }
+        actions={<ViewSwitch view="board" mine={mine} />}
       />
       <LinkTabs
         label="Boards"

@@ -8,7 +8,7 @@ export const metadata = { title: "Company address · Settings" };
 export default function Page() {
   if (!process.env.BASE_DOMAIN) notFound();
   return (
-    <SettingsPage href="/settings/address" description="Where your team signs in: your company's own address.">
+    <SettingsPage href="/settings/address" adminOnly description="Where your team signs in: your company's own address.">
       <AddressCard />
     </SettingsPage>
   );

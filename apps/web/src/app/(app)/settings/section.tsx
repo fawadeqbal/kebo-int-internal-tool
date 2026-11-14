@@ -16,8 +16,9 @@ import { getSettings } from "@/lib/loaders";
  * for the side panel, or switches that save at once. Changes apply to new quotations and orders,
  * not ones already made.
  */
-export async function SettingsPage({ href, description, children }: { href: string; description: ReactNode; children: ReactNode }) {
+export async function SettingsPage({ href, description, children, adminOnly }: { href: string; description: ReactNode; children: ReactNode; /** For admins only (the company's address, the website form): not for a manager. */ adminOnly?: boolean }) {
   await requirePermission("settings.manage");
+  if (adminOnly) await requirePermission("security.manage");
   return (
     <div>
       <PageHeader crumbs={crumbsFor(href)} title={labelFor(href)} description={description} />

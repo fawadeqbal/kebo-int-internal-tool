@@ -65,7 +65,8 @@ describe("the groups", () => {
     const m = everything();
     expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Company settings", "Admin settings"]);
     // Clean-up (14 Nov 2026): a shipment is on its order, not a page of its own.
-    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Customers", "Follow-ups"]);
+    // The order list and the board are two views of one page (a switch on it): one item.
+    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Customers", "Follow-ups"]);
     // Purchase orders keep their list (each one has a page of its own that shows it).
     expect(pages(m, "purchasing")).toEqual(["Purchase orders", "Suppliers"]);
     // Money, simple (14 Nov 2026): four pages. To verify and the Ledger keep their addresses and left the menu.
@@ -92,7 +93,6 @@ describe("the groups", () => {
       [
         "/inquiries",
         "/orders",
-        "/orders/board",
         "/customers",
         "/follow-ups",
         "/operations/purchase-orders",
@@ -118,7 +118,7 @@ describe("the groups", () => {
       ].sort(),
     );
     // Tabs on the page, the bell, and the pages that left the menu: not menu items.
-    for (const tab of ["/reports/profit", "/reports/customers", "/reports/factories", "/reports/cash", "/reports/people", "/reports/funnel", "/reports/print", "/finance/profit", "/finance/leaks", "/notifications", "/approvals", "/finance/ledger", "/finance/invoices", "/finance/to-receive", "/purchasing/to-pay", "/operations/shipments"])
+    for (const tab of ["/reports/profit", "/reports/customers", "/reports/factories", "/reports/cash", "/reports/people", "/reports/funnel", "/reports/print", "/finance/profit", "/finance/leaks", "/notifications", "/approvals", "/finance/ledger", "/finance/invoices", "/finance/to-receive", "/purchasing/to-pay", "/operations/shipments", "/orders/board"])
       expect(hrefs).not.toContain(tab);
   });
 
@@ -132,7 +132,7 @@ describe("the groups", () => {
     const m = staff();
     // What customers owe on the orders a person sees, and Payments, are open to everyone who sees orders.
     expect(titles(m)).toEqual(["Sales", "Money"]);
-    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Order board", "Customers", "Follow-ups"]);
+    expect(pages(m, "sales")).toEqual(["Inquiries", "Orders", "Customers", "Follow-ups"]);
     expect(pages(m, "money")).toEqual(["To receive and to pay", "Payments"]);
     const none = buildModules({ can: () => false, feature: () => true, approvals: null, approves: false, companyAddresses: false });
     expect(titles(none)).toEqual(["Sales", "Money"]);
@@ -151,7 +151,10 @@ describe("the groups", () => {
     const m = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 4, approves: true, companyAddresses: false });
     expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Company settings", "Admin settings"]);
     expect(pages(m, "reports")).toEqual(["Reports"]);
-    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form"]);
+    // The company's web address and its website form are the admin's too: a manager does not see them.
+    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails"]);
+    const withAddresses = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 0, approves: true, companyAddresses: true });
+    expect(pages(withAddresses, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails"]);
     // No people, roles, sign-ins, sessions or email sending: those are the admin's.
     expect(pages(m, "admin")).toEqual(["Activity log"]);
     // Someone who only manages people sees Admin settings alone.
@@ -179,7 +182,8 @@ describe("the groups", () => {
   it("know which page and group an address is in (the longest address wins)", () => {
     const all = everything();
     const flat = all.flatMap((m) => m.pages);
-    expect(pageOf("/orders/board", flat)?.label).toBe("Order board");
+    // The board is a view of Orders: the same item is marked.
+    expect(pageOf("/orders/board", flat)?.label).toBe("Orders");
     expect(pageOf("/orders/0b6c", flat)?.label).toBe("Orders");
     expect(pageOf("/reports/people/targets", flat)?.label).toBe("Reports");
     // One name, said once above the title.
