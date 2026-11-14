@@ -1,11 +1,12 @@
 import { open, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { BadRequestException, Controller, Get, Inject, Injectable, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, HttpCode, Inject, Injectable, Param, ParseUUIDPipe, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import type {
   DevCheck,
   DevDataView,
   DevDeploy,
+  DevError,
   DevEvent,
   DevLevel,
   DevLogLine,
@@ -13,11 +14,13 @@ import type {
   DevOverview,
   DevService,
   DevServicesView,
+  DevSpeedView,
 } from "@kebo/shared";
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
 import { PlatformRoute } from "./platform-auth";
 import { BACKUP_MAX_AGE_HOURS, readStatus, type BackupStatus } from "./server-health";
+import { OUTSIDE_ROUTE, quantileMs, REQUEST_STEPS_MS } from "./watch";
 
 /* ---------------------------------------------------------------- what deploy/server writes */
 
@@ -41,6 +44,8 @@ export interface ServerStatus {
     memMb?: number | null;
     memLimitMb?: number | null;
   }[];
+  /** The API answered the server's own check this minute. */
+  api?: { ok: boolean; ms: number } | null;
   ports?: number[];
   firewall?: "on" | "off" | null;
   sshPassword?: boolean | null;
@@ -151,7 +156,16 @@ export interface CheckInput {
   database: { ok: boolean; connections: number | null; maxConnections: number | null };
   ownDomains: { connected: number; lost: number; waiting: number };
   lastDeploy: DevDeploy | null;
+  /** The last 15 minutes. */
+  speed?: { requests: number; slowMs: number | null; typicalMs: number | null };
+  /** Server errors in the last hour; open errors seen in the last 24 hours. */
+  errors?: { lastHour: number; open24h: number };
+  /** The outside watcher's last check (null: never). */
+  outsideAt?: string | null;
 }
+
+/** No check from outside for this long: the watcher stopped, or the site could not be reached. */
+export const OUTSIDE_LATE_MINUTES = 45;
 
 /**
  * Everything watched, each fine (ok), for this week (warn), for now (bad), or not set up (off),
@@ -264,8 +278,35 @@ export function buildChecks(i: CheckInput): DevCheck[] {
 
   // App
   out.push(service("app", "web", "Web"));
-  out.push(service("app", "api", "API"));
+  const api = service("app", "api", "API");
+  if (s?.api && !s.api.ok && age <= STALE_MINUTES)
+    Object.assign(api, { line: "does not answer", level: "bad", fix: "See the API's live log in Services." });
+  out.push(api);
   out.push(service("app", "worker", "Worker"));
+  if (i.speed) {
+    const sp = i.speed;
+    out.push({
+      key: "speed",
+      lane: "app",
+      name: "Speed",
+      line: !sp.requests || sp.slowMs === null ? "no requests in the last 15 min" : `typical ${sp.typicalMs} ms · slowest 5% ${msText(sp.slowMs)}`,
+      level: sp.slowMs === null ? "ok" : sp.slowMs >= 5000 ? "bad" : sp.slowMs >= 2000 ? "warn" : "ok",
+      tab: "speed",
+      fix: sp.slowMs !== null && sp.slowMs >= 2000 ? "Slow for 15 minutes: see the slowest pages in Speed and errors." : undefined,
+    });
+  }
+  if (i.errors) {
+    const e = i.errors;
+    out.push({
+      key: "errors",
+      lane: "app",
+      name: "Errors",
+      line: e.lastHour ? `${plural(e.lastHour, "error")} in the last hour` : e.open24h ? `${plural(e.open24h, "kind")} open, seen today` : "none in 24 hours",
+      level: e.lastHour >= 10 ? "bad" : e.lastHour || e.open24h ? "warn" : "ok",
+      tab: "speed",
+      fix: e.lastHour || e.open24h ? "See them in Speed and errors; Copy for Claude to get them fixed." : undefined,
+    });
+  }
 
   // Data
   const db = svc("db");
@@ -304,6 +345,23 @@ export function buildChecks(i: CheckInput): DevCheck[] {
   });
 
   // Outside services
+  if (i.outsideAt !== undefined) {
+    const late = i.outsideAt ? (i.now.getTime() - Date.parse(i.outsideAt)) / 60000 : null;
+    out.push({
+      key: "outside",
+      lane: "outside",
+      name: "Outside watcher",
+      line: late === null ? "no check from outside yet" : `checked ${agoShort(i.outsideAt!, i.now)} from GitHub`,
+      level: late === null ? "off" : late > OUTSIDE_LATE_MINUTES ? "warn" : "ok",
+      tab: "speed",
+      fix:
+        late === null
+          ? "GitHub Actions › Watch the site checks every 5 minutes once it runs on main."
+          : late > OUTSIDE_LATE_MINUTES
+            ? "No check from outside lately: see GitHub Actions › Watch the site (it emails you when the site is down)."
+            : undefined,
+    });
+  }
   const dep = i.lastDeploy;
   out.push({
     key: "deploys",
@@ -316,6 +374,8 @@ export function buildChecks(i: CheckInput): DevCheck[] {
   });
   return out;
 }
+
+const msText = (ms: number) => (ms >= 1000 ? `${Math.round(ms / 100) / 10} s` : `${ms} ms`);
 
 function upFor(startedAt: string | null, now: Date) {
   if (!startedAt) return "—";
@@ -470,6 +530,50 @@ export class DevToolsService {
     return { connected: n("connected"), lost: n("lost"), waiting: n("waiting") };
   }
 
+  /** Each route's requests, server errors and answer times since a moment (the outside check apart). */
+  async routeStats(since: Date) {
+    const db = this.prisma.platform;
+    const [counts, steps] = await Promise.all([
+      db.$queryRaw<{ route: string; count: bigint; errors: bigint }[]>`
+        select route, sum(count)::bigint as count, sum(errors)::bigint as errors from request_minutes where minute >= ${since} group by route`,
+      db.$queryRaw<{ route: string; i: bigint; n: bigint }[]>`
+        select route, u.i, sum(u.b)::bigint as n from request_minutes, unnest(buckets) with ordinality as u(b, i)
+        where minute >= ${since} group by route, u.i`,
+    ]);
+    const buckets = new Map<string, number[]>();
+    for (const r of steps) {
+      const b = buckets.get(r.route) ?? new Array(REQUEST_STEPS_MS.length + 1).fill(0);
+      b[Number(r.i) - 1] = Number(r.n);
+      buckets.set(r.route, b);
+    }
+    const routes = counts
+      .filter((r) => r.route !== OUTSIDE_ROUTE)
+      .map((r) => ({ route: r.route, count: Number(r.count), errors: Number(r.errors), buckets: buckets.get(r.route) ?? [] }));
+    const all = routes.reduce((acc, r) => acc.map((v, k) => v + (r.buckets[k] ?? 0)), new Array(REQUEST_STEPS_MS.length + 1).fill(0) as number[]);
+    return {
+      routes,
+      requests: routes.reduce((a, r) => a + r.count, 0),
+      errors: routes.reduce((a, r) => a + r.errors, 0),
+      typicalMs: quantileMs(all, 0.5),
+      slowMs: quantileMs(all, 0.95),
+    };
+  }
+
+  private async outside() {
+    const [row] = await this.prisma.platform.$queryRaw<{ last: Date | null; n: bigint }[]>`
+      select max(minute) as last, coalesce(sum(count) filter (where minute >= now() - interval '24 hours'), 0)::bigint as n
+      from request_minutes where route = ${OUTSIDE_ROUTE}`;
+    return { lastAt: row?.last ? row.last.toISOString() : null, checks24h: Number(row?.n ?? 0) };
+  }
+
+  private async up(): Promise<{ percent: number | null; lastDown: string | null }> {
+    const h = await this.jsonl<{ t: string; up?: boolean }>("history.jsonl", 7 * 1440);
+    const seen = h.filter((x) => typeof x.up === "boolean");
+    if (!seen.length) return { percent: null, lastDown: null };
+    const down = seen.filter((x) => !x.up);
+    return { percent: Math.round((1000 * (seen.length - down.length)) / seen.length) / 10, lastDown: down.at(-1)?.t ?? null };
+  }
+
   async overview(now = new Date()): Promise<DevOverview> {
     const [status, events, history, backup, database, ownDomains, deploys, logs, warnings] = await Promise.all([
       this.status(),
@@ -487,11 +591,37 @@ export class DevToolsService {
         select: { at: true, summary: true },
       }),
     ]);
+    const [last24, quarter, lastHour, openErrors, outside, up, newErrors] = await Promise.all([
+      this.routeStats(new Date(now.getTime() - DAY)),
+      this.routeStats(new Date(now.getTime() - 15 * 60000)),
+      this.prisma.platform.$queryRaw<{ n: bigint }[]>`select coalesce(sum(errors), 0)::bigint as n from request_minutes where minute >= ${new Date(now.getTime() - HOUR)}`,
+      this.prisma.platform.appError.count({ where: { status: "open", lastAt: { gte: new Date(now.getTime() - DAY) } } }),
+      this.outside(),
+      this.up(),
+      this.prisma.platform.appError.findMany({
+        where: { firstAt: { gte: new Date(now.getTime() - 7 * DAY) } },
+        orderBy: { firstAt: "desc" },
+        take: 20,
+        select: { firstAt: true, message: true, where: true },
+      }),
+    ]);
     const services = servicesFrom(status, events, logs, now);
     const recent = history.filter((h) => Date.parse(h.t) >= now.getTime() - 15 * 60000 && h.cpu !== null);
     const cpu15 = recent.length ? recent.reduce((a, h) => a + (h.cpu ?? 0), 0) / recent.length : null;
     const lastDeploy = deploys.at(-1) ?? null;
-    const checks = buildChecks({ now, status, services, cpu15, backup, database, ownDomains, lastDeploy });
+    const checks = buildChecks({
+      now,
+      status,
+      services,
+      cpu15,
+      backup,
+      database,
+      ownDomains,
+      lastDeploy,
+      speed: { requests: quarter.requests, slowMs: quarter.slowMs, typicalMs: quarter.typicalMs },
+      errors: { lastHour: Number(lastHour[0]?.n ?? 0), open24h: openErrors },
+      outsideAt: outside.lastAt,
+    });
 
     const week = now.getTime() - 7 * DAY;
     const timeline: DevEvent[] = [
@@ -510,6 +640,7 @@ export class DevToolsService {
           text: `${infoOf(e.service).label} ${e.kind === "stopped" ? "stopped" : "restarted"}${e.why ? `: ${e.why}` : ""}`,
         })),
       ...warnings.map((w): DevEvent => ({ at: w.at.toISOString(), kind: "warning", level: "warn", text: `${w.summary}: emailed to the platform admins` })),
+      ...newErrors.map((e): DevEvent => ({ at: e.firstAt.toISOString(), kind: "error", level: "bad", text: `New error on ${e.where}: ${e.message.slice(0, 120)}` })),
     ];
     if (backup?.at && Date.parse(backup.at) >= week)
       timeline.push({
@@ -547,6 +678,12 @@ export class DevToolsService {
         backupAt: backup?.lastGoodAt ?? null,
         backupLevel: backupCheck?.level ?? "off",
         services: { running: services.filter((s) => s.state === "running").length, all: services.length },
+        typicalMs: last24.typicalMs,
+        slowMs: last24.slowMs,
+        requests24h: last24.requests,
+        errors24h: last24.errors,
+        upPercent: up.percent,
+        lastDown: up.lastDown,
       },
       host: status?.host ? { os: status.host.os ?? null, uptimeSec: status.host.uptimeSec ?? null, docker: status.host.docker ?? null } : null,
       deploys: deploys.slice(-5).reverse(),
@@ -598,6 +735,78 @@ export class DevToolsService {
     };
   }
 
+  async speed(range: "24h" | "7d", status: "open" | "fixed" = "open", now = new Date()): Promise<DevSpeedView> {
+    const span = range === "7d" ? 7 * DAY : DAY;
+    const since = new Date(now.getTime() - span);
+    const stepMs = range === "7d" ? 6 * HOUR : HOUR;
+    const [stats, rows, errors, fixedCount, outside, up, deploys] = await Promise.all([
+      this.routeStats(since),
+      this.prisma.platform.$queryRaw<{ t: Date; i: bigint; n: bigint; c: bigint }[]>`
+        select date_bin(${`${stepMs / 1000} seconds`}::interval, minute, timestamptz '2000-01-01') as t, u.i, sum(u.b)::bigint as n, 0::bigint as c
+        from request_minutes, unnest(buckets) with ordinality as u(b, i)
+        where minute >= ${since} and route <> ${OUTSIDE_ROUTE} group by 1, u.i order by 1`,
+      this.prisma.platform.appError.findMany({ where: { status }, orderBy: { lastAt: "desc" }, take: 50 }),
+      this.prisma.platform.appError.count({ where: { status: "fixed" } }),
+      this.outside(),
+      this.up(),
+      this.jsonl<DevDeploy>("deploys.jsonl", 200),
+    ]);
+    const steps = new Map<number, number[]>();
+    for (const r of rows) {
+      const k = r.t.getTime();
+      const b = steps.get(k) ?? new Array(REQUEST_STEPS_MS.length + 1).fill(0);
+      b[Number(r.i) - 1] = Number(r.n);
+      steps.set(k, b);
+    }
+    const chart: DevSpeedView["chart"] = [];
+    const origin = Date.parse("2000-01-01T00:00:00Z");
+    for (let t = origin + Math.floor((since.getTime() - origin) / stepMs) * stepMs; t <= now.getTime(); t += stepMs) {
+      const b = steps.get(t);
+      chart.push({ t: new Date(t).toISOString(), count: b ? b.reduce((a, x) => a + x, 0) : 0, typicalMs: b ? quantileMs(b, 0.5) : null, slowMs: b ? quantileMs(b, 0.95) : null });
+    }
+    const afterDeploy = (at: Date) => [...deploys].reverse().find((d) => d.ok && Date.parse(d.at) <= at.getTime())?.commit ?? null;
+    return {
+      range,
+      requests: stats.requests,
+      errors: stats.errors,
+      typicalMs: stats.typicalMs,
+      slowMs: stats.slowMs,
+      upPercent: up.percent,
+      chart,
+      slowest: stats.routes
+        .filter((r) => r.count >= 5)
+        .map((r) => ({ route: r.route, count: r.count, errors: r.errors, typicalMs: quantileMs(r.buckets, 0.5), slowMs: quantileMs(r.buckets, 0.95) }))
+        .sort((a, b) => (b.slowMs ?? 0) - (a.slowMs ?? 0))
+        .slice(0, 10),
+      errorsList: errors.map(
+        (e): DevError => ({
+          id: e.id,
+          source: e.source,
+          name: e.name,
+          message: e.message,
+          where: e.where,
+          stack: e.stack,
+          count: e.count,
+          companyName: e.companyName,
+          userName: e.userName,
+          path: e.path,
+          firstAt: e.firstAt.toISOString(),
+          lastAt: e.lastAt.toISOString(),
+          status: e.status === "fixed" ? "fixed" : "open",
+          afterDeploy: afterDeploy(e.firstAt),
+        }),
+      ),
+      fixedCount,
+      outside,
+    };
+  }
+
+  /** Marks an error fixed (it opens again if it comes back), or open again. */
+  async markError(id: string, status: "open" | "fixed") {
+    await this.prisma.platform.appError.update({ where: { id }, data: { status, fixedAt: status === "fixed" ? new Date() : null } });
+    return { ok: true };
+  }
+
   async logs(service: string, after: number | null): Promise<DevLogs> {
     if (!/^[A-Za-z0-9_.-]{1,40}$/.test(service)) throw new BadRequestException("Unknown service");
     const dir = this.env.LIVE_LOGS_DIR;
@@ -628,6 +837,27 @@ export class DevToolsController {
   @Get("data")
   data() {
     return this.dev.data();
+  }
+
+  /** Speed and errors: the last 24 hours (or 7 days), the slowest routes, and the errors (open, or fixed). */
+  @PlatformRoute()
+  @Get("speed")
+  speed(@Query("range") range?: string, @Query("errors") errors?: string) {
+    return this.dev.speed(range === "7d" ? "7d" : "24h", errors === "fixed" ? "fixed" : "open");
+  }
+
+  @PlatformRoute()
+  @Post("errors/:id/fixed")
+  @HttpCode(200)
+  fixed(@Param("id", ParseUUIDPipe) id: string) {
+    return this.dev.markError(id, "fixed");
+  }
+
+  @PlatformRoute()
+  @Post("errors/:id/open")
+  @HttpCode(200)
+  reopen(@Param("id", ParseUUIDPipe) id: string) {
+    return this.dev.markError(id, "open");
   }
 
   /** A service's live log: the end of it, or (after=) what was written since. */

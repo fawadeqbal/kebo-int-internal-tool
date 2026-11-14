@@ -2802,3 +2802,48 @@ model PurchaseOrder {
   @@index([companyId])
   @@map("purchase_orders")
 }
+
+/// Dev tools: the API's requests, counted a minute and a route at a time ("GET /api/orders/:id"),
+/// kept 30 days. Platform table (not granted to company connections).
+model RequestMinute {
+  minute  DateTime @db.Timestamptz
+  route   String   @db.VarChar(160)
+  count   Int
+  /// Answered with a server error (500 and up).
+  errors  Int      @default(0)
+  totalMs BigInt   @map("total_ms")
+  /// How many answered within each step of REQUEST_STEPS_MS; the last: slower than all of them.
+  buckets Int[]
+
+  @@id([minute, route])
+  @@index([route, minute])
+  @@map("request_minutes")
+}
+
+/// Dev tools: each unexpected error (a 500), counted once per kind (its fingerprint), open until a
+/// platform admin marks it fixed; seen again after that, it opens again. Platform table.
+model AppError {
+  id          String    @id @default(uuid()) @db.Uuid
+  fingerprint String    @unique @db.VarChar(64)
+  /// api or worker.
+  source      String    @default("api") @db.VarChar(20)
+  name        String    @db.VarChar(120)
+  message     String
+  /// "GET /api/payments" (the route), or the worker's job.
+  where       String    @db.VarChar(200)
+  stack       String?
+  count       Int       @default(1)
+  /// The last time: the company and the person it happened to (names only).
+  companyName String?   @map("company_name") @db.VarChar(120)
+  userName    String?   @map("user_name") @db.VarChar(120)
+  /// The last request's path (no query).
+  path        String?   @db.VarChar(300)
+  firstAt     DateTime  @default(now()) @map("first_at") @db.Timestamptz
+  lastAt      DateTime  @default(now()) @map("last_at") @db.Timestamptz
+  /// open or fixed.
+  status      String    @default("open") @db.VarChar(10)
+  fixedAt     DateTime? @map("fixed_at") @db.Timestamptz
+
+  @@index([lastAt])
+  @@map("app_errors")
+}

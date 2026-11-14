@@ -3,6 +3,7 @@ import { agoText, forText, type DevOverview } from "@kebo/shared";
 import { Card, CardHeader, EmptyState, StatRow, StatTile } from "@kebo/ui";
 import { currentZone } from "@/lib/format";
 import { CheckMap, Dot, LineChart, NeedsYou, Timeline, UseBar, gbText } from "./parts";
+import { msText } from "./speed";
 
 const hour = (iso: string, zone: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: zone });
 
@@ -27,13 +28,28 @@ export function BigPicture({ o, days }: { o: DevOverview; days: 1 | 7 }) {
       )}
       <NeedsYou checks={o.checks} />
       <StatRow>
-        <StatTile size="sm" label="CPU" value={t.cpu === null ? "—" : `${Math.round(t.cpu)}%`} sub={t.cores ? `${t.cores} cores · busy ${t.load ?? "—"} on average` : undefined} bar={t.cpu !== null ? <UseBar percent={t.cpu} /> : undefined} />
         <StatTile
           size="sm"
-          label="Memory"
-          value={t.memory ? `${gbText(t.memory.usedMb / 1024)} of ${gbText(t.memory.totalMb / 1024)}` : "—"}
-          bar={t.memory ? <UseBar percent={t.memory.percent} /> : undefined}
-          sub={t.memory ? `${Math.round(t.memory.percent)}% used` : undefined}
+          label="Up, last 7 days"
+          value={t.upPercent === null ? "—" : `${t.upPercent}%`}
+          sub={t.lastDown ? `last down ${agoText(t.lastDown)}` : t.upPercent === null ? "from the next minute" : "not down once"}
+          tone={t.upPercent !== null && t.upPercent < 99 ? "warn" : undefined}
+        />
+        <StatTile
+          size="sm"
+          label="Speed"
+          value={t.typicalMs === null ? "—" : msText(t.typicalMs)}
+          sub={t.slowMs === null ? "no requests yet" : `a typical answer · slowest 5% ${msText(t.slowMs)}`}
+          tone={t.slowMs !== null && t.slowMs >= 2000 ? "warn" : undefined}
+          href="/platform/dev-tools?tab=speed"
+        />
+        <StatTile
+          size="sm"
+          label="Errors, 24 hours"
+          value={String(t.errors24h)}
+          sub={`out of ${t.requests24h.toLocaleString("en-US")} requests`}
+          tone={t.errors24h ? "bad" : undefined}
+          href="/platform/dev-tools?tab=speed"
         />
         <StatTile
           size="sm"
@@ -51,14 +67,6 @@ export function BigPicture({ o, days }: { o: DevOverview; days: 1 | 7 }) {
           tone={t.backupLevel === "bad" ? "bad" : t.backupLevel === "warn" ? "warn" : undefined}
           sub={t.backupLevel === "ok" ? "and copied off the server" : t.backupLevel === "warn" ? "see Disk, database and backups" : t.backupLevel === "bad" ? "too old: see Backups" : undefined}
           href="/platform/dev-tools?tab=data"
-        />
-        <StatTile
-          size="sm"
-          label="Services running"
-          value={t.services.all ? `${t.services.running} of ${t.services.all}` : "—"}
-          tone={t.services.all && t.services.running < t.services.all ? "bad" : undefined}
-          sub={t.services.all && t.services.running < t.services.all ? "one has stopped" : "web, API, worker, database …"}
-          href="/platform/dev-tools?tab=services"
         />
       </StatRow>
 

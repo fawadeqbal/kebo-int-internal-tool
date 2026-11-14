@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { currentStep, newTotpSecret, sealSecret, totpAt } from "../src/common/auth/totp";
 import { PrismaService } from "../src/database/prisma.service";
 import { buildChecks, fullIn, logLine, readLog, servicesFrom, type ServerStatus } from "../src/platform/dev-tools";
+import { AppErrors, fingerprintOf, quantileMs, RequestStats, stepOf } from "../src/platform/watch";
 import { signIn, startApp } from "./app";
 
 const NOW = new Date("2026-11-15T02:44:00Z");
@@ -102,6 +103,46 @@ describe("dev tools: the checks", () => {
   });
 });
 
+describe("dev tools: speed and errors", () => {
+  it("works out typical and slow answer times from the counts per step", () => {
+    expect(stepOf(10)).toBe(0);
+    expect(stepOf(150)).toBe(3);
+    expect(stepOf(99_999)).toBe(9);
+    // 90 answers within 50–100 ms, 10 within 800–1600 ms.
+    const b = [0, 0, 90, 0, 0, 0, 10, 0, 0, 0];
+    expect(quantileMs(b, 0.5)).toBe(78);
+    expect(quantileMs(b, 0.95)).toBe(1200);
+    expect(quantileMs([0, 0, 0], 0.5)).toBeNull();
+  });
+
+  it("counts the same error once, whatever the ids in its message", () => {
+    const a = fingerprintOf("api", "GET /api/orders/:id", { name: "TypeError", message: 'Order "SO-1" 3f2c1a9e-1111-4222-8333-944455556666 failed' });
+    const b = fingerprintOf("api", "GET /api/orders/:id", { name: "TypeError", message: 'Order "SO-22" 0f2c1a9e-1111-4222-8333-944455556667 failed' });
+    expect(a).toBe(b);
+    expect(fingerprintOf("api", "GET /api/payments", { name: "TypeError", message: "x" })).not.toBe(a);
+  });
+
+  it("says when pages are slow, errors come, or the outside watcher is quiet", () => {
+    const checks = buildChecks({
+      now: NOW,
+      status: status(),
+      services: servicesFrom(status(), [], [], NOW),
+      cpu15: 10,
+      backup: { at: ago(45), ok: true, lastGoodAt: ago(45), offsite: "ok" },
+      database: { ok: true, connections: 2, maxConnections: 200 },
+      ownDomains: { connected: 0, lost: 0, waiting: 0 },
+      lastDeploy: null,
+      speed: { requests: 400, typicalMs: 120, slowMs: 2600 },
+      errors: { lastHour: 12, open24h: 1 },
+      outsideAt: ago(90),
+    });
+    const by = (k: string) => checks.find((c) => c.key === k)!;
+    expect(by("speed")).toMatchObject({ level: "warn", line: "typical 120 ms · slowest 5% 2.6 s", tab: "speed" });
+    expect(by("errors")).toMatchObject({ level: "bad", line: "12 errors in the last hour" });
+    expect(by("outside")).toMatchObject({ level: "warn", line: "checked 2 hours ago from GitHub" });
+  });
+});
+
 describe("dev tools: live logs", () => {
   it("reads the end of a log, then only what was written since", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "logs-"));
@@ -178,5 +219,36 @@ describe("dev tools: the pages' data", () => {
     await get("/logs?service=../etc").expect(400);
     // A company's user, or nobody: not allowed.
     await get("/overview", company).expect(401);
+  });
+
+  it("times every request by its route, counts errors once, and hears the outside watcher", async () => {
+    const stats = app.get(RequestStats);
+    await request(app.getHttpServer()).get("/api/health?from=outside").expect(200);
+    await get("/overview").expect(200);
+    const route = `GET /api/test-${tag}`;
+    for (let k = 0; k < 6; k++) stats.add(route, 2500, false);
+    await stats.flush();
+    const errors = app.get(AppErrors);
+    const boom = new TypeError(`Cannot read properties of undefined (reading 'currency') ${tag}`);
+    await errors.record("api", "GET /api/payments", boom, { company: "Codecrood", user: "Sana", path: "/api/payments" });
+    await errors.record("api", "GET /api/payments", boom, { company: "Codecrood", user: "Sana", path: "/api/payments" });
+
+    const v = (await get("/speed").expect(200)).body;
+    expect(v.outside.lastAt).toBeTruthy();
+    expect(v.slowest.find((r: { route: string }) => r.route === route)).toMatchObject({ count: 6, slowMs: 3120 });
+    const prisma = app.get(PrismaService);
+    const routes = await prisma.platform.requestMinute.findMany({ where: { route: { startsWith: "GET /api/platform/dev-tools" } }, select: { route: true } });
+    expect(routes.map((r) => r.route)).toContain("GET /api/platform/dev-tools/overview");
+    const e = v.errorsList.find((x: { message: string }) => x.message.includes(tag));
+    expect(e).toMatchObject({ count: 2, where: "GET /api/payments", companyName: "Codecrood", status: "open" });
+
+    await request(app.getHttpServer()).post(`/api/platform/dev-tools/errors/${e.id}/fixed`).set("authorization", `Bearer ${token}`).expect(200);
+    expect((await get("/speed?errors=fixed").expect(200)).body.errorsList.some((x: { id: string }) => x.id === e.id)).toBe(true);
+    // It comes back: open again.
+    await errors.record("api", "GET /api/payments", boom);
+    expect((await prisma.platform.appError.findUniqueOrThrow({ where: { id: e.id } })).status).toBe("open");
+    const o = (await get("/overview").expect(200)).body;
+    expect(o.checks.find((c: { key: string }) => c.key === "outside").level).toBe("ok");
+    expect(o.events.some((x: { kind: string; text: string }) => x.kind === "error" && x.text.includes(tag))).toBe(true);
   });
 });

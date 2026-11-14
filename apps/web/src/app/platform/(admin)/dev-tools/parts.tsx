@@ -7,6 +7,7 @@ export const TAB_HREF: Record<DevTab, string> = {
   picture: "/platform/dev-tools",
   services: "/platform/dev-tools?tab=services",
   data: "/platform/dev-tools?tab=data",
+  speed: "/platform/dev-tools?tab=speed",
 };
 
 const DOT: Record<DevLevel, string> = { ok: "bg-ok", warn: "bg-warn", bad: "bg-bad", off: "bg-line-strong" };

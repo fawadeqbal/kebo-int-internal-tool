@@ -7,7 +7,7 @@ Writes into <KEBO_STATUS_DIR> (default /opt/kebo-desk/backups/status, mounted re
 API and the worker as /server-status):
   server.json      CPU, memory, disk, each container (state, restarts, CPU, memory), open ports,
                    firewall, security updates, certificates: what Dev tools shows
-  history.jsonl    one line a minute (CPU, memory, disk), the last 7 days
+  history.jsonl    one line a minute (CPU, memory, disk, the API answering), the last 7 days
   disk-days.jsonl  one line a day (disk used), the last 120 days
   events.jsonl     a container restarted or stopped (with why), the last 2000
 The app is never given the Docker socket: this script reads Docker and writes plain files.
@@ -22,6 +22,7 @@ import socket
 import ssl
 import subprocess
 import time
+import urllib.request
 
 APP_DIR = os.environ.get("KEBO_DESK_DIR", "/opt/kebo-desk")
 OUT = os.environ.get("KEBO_STATUS_DIR", os.path.join(APP_DIR, "backups", "status"))
@@ -352,6 +353,20 @@ def certificates():
     return out
 
 
+# ---------------------------------------------------------------- the API answers (every minute)
+
+
+def api_health():
+    port = env_file().get("API_HOST_PORT") or "3421"
+    start = time.time()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=10) as r:
+            ok = r.status == 200
+    except Exception:
+        ok = False
+    return {"ok": ok, "ms": round((time.time() - start) * 1000)}
+
+
 # ---------------------------------------------------------------- one run
 
 
@@ -374,6 +389,7 @@ def main():
         cached["safetyAt"] = NOW
     write(".slow.json", cached)
 
+    health = api_health()
     load = os.getloadavg()
     write(
         "server.json",
@@ -384,6 +400,7 @@ def main():
             "memory": mem,
             "disk": dsk,
             "services": services,
+            "api": health,
             "ports": ports(),
             "firewall": cached.get("firewall"),
             "sshPassword": cached.get("sshPassword"),
@@ -392,7 +409,7 @@ def main():
             "certificates": cached.get("certificates"),
         },
     )
-    append("history.jsonl", [{"t": iso(), "cpu": cpu, "mem": mem and mem["percent"], "disk": dsk["percent"]}], 7 * 1440)
+    append("history.jsonl", [{"t": iso(), "cpu": cpu, "mem": mem and mem["percent"], "disk": dsk["percent"], "up": health["ok"]}], 7 * 1440)
     today = iso()[:10]
     days = []
     try:
