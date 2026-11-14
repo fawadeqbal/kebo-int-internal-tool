@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { companyCostsTarget, dueTarget, insightsTarget, moneyTarget, orderPaymentTarget, ordersBoardTarget, paymentsTabTarget, profitTarget, reportsOverviewQuery, reportsPrintTarget, securityTarget, settingsTarget } from "@/lib/old-addresses";
+import { companyCostsTarget, dueTarget, insightsTarget, moneyTarget, orderPaymentTarget, ordersBoardTarget, paymentsTabTarget, profitTarget, purchaseOrdersTarget, reportsOverviewQuery, reportsPrintTarget, securityTarget, settingsTarget, shipmentsTarget } from "@/lib/old-addresses";
 
 // Every old address keeps working (design page 33): old → new, with the rest of the query.
 
@@ -171,5 +171,14 @@ describe("/security/…", () => {
     };
     for (const p of ["/security", "/security/roles/manager", "/security/sessions", "/security/sign-ins"]) expect(match(p)).toBe(securityTarget(p));
     expect(rules.filter((r) => r.source.startsWith("/security")).every((r) => r.permanent === false)).toBe(true);
+  });
+});
+
+describe("the lists that left the menu in the clean-up", () => {
+  it("Shipments opens the orders that are shipped; Purchase orders opens Orders; a search is kept", () => {
+    expect(shipmentsTarget()).toBe("/orders?stage=shipped");
+    expect(shipmentsTarget({ q: "MSKU", page: "2", status: "sailing" })).toBe("/orders?stage=shipped&q=MSKU");
+    expect(purchaseOrdersTarget()).toBe("/orders");
+    expect(purchaseOrdersTarget({ q: "PO-2026", status: "sent" })).toBe("/orders?q=PO-2026");
   });
 });

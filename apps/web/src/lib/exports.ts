@@ -680,46 +680,7 @@ async function factoryList(q: Q): Promise<SheetSpec> {
   };
 }
 
-/** Purchase orders (Operations › Purchase orders): every one, with what it costs and where it stands. */
-async function purchaseOrders(): Promise<SheetSpec> {
-  type Row = { po: { number: string } | null; status: string; supplier: { name: string }; order: { refNo: string }; customer: { name: string }; currency: string; owed: string; paid: string; toPay: string; readyOn: string | null; orderedOn: string | null; supplierRef: string | null };
-  const rows = await api.get<Row[]>("/operations/purchase-orders", { all: "true" });
-  return {
-    name: `Purchase orders ${stamp()}`,
-    title: "Purchase orders",
-    columns: [text("PO", 16), text("Supplier", 30), text("Sales order", 16), text("Customer", 28), text("Currency", 9), money("Total"), money("Paid"), money("To pay"), text("Ready"), text("Sent"), text("Their no.", 16), text("Status", 16)],
-    rows: rows.map((r): Cell[] => [
-      r.po?.number ?? null,
-      r.supplier.name,
-      r.order.refNo,
-      r.customer.name,
-      r.currency,
-      Number(r.owed),
-      Number(r.paid),
-      Number(r.toPay),
-      day(r.readyOn),
-      day(r.orderedOn),
-      r.supplierRef,
-      r.status.replace(/_/g, " "),
-    ]),
-  };
-}
-
-/** Shipments (Operations › Shipments): every one, with its route, container and dates. */
-async function shipmentsSheet(): Promise<SheetSpec> {
-  type Row = { order: { refNo: string }; customer: { name: string }; mode: string; status: string; portOfLoading: string | null; portOfDischarge: string | null; containerNo: string | null; blNo: string | null; vessel: string | null; etd: string | null; eta: string | null; departedOn: string | null; arrivedOn: string | null };
-  const rows = await api.get<Row[]>("/operations/shipments", { all: "true" });
-  return {
-    name: `Shipments ${stamp()}`,
-    title: "Shipments",
-    columns: [text("Order", 16), text("Customer", 28), text("Mode", 8), text("From", 16), text("To", 16), text("Container", 18), text("B/L / AWB", 18), text("Vessel", 18), text("ETD"), text("ETA"), text("Left"), text("Arrived"), text("Status", 12)],
-    rows: rows.map((r): Cell[] => [r.order.refNo, r.customer.name, r.mode, r.portOfLoading, r.portOfDischarge, r.containerNo, r.blNo, r.vessel, day(r.etd), day(r.eta), day(r.departedOn), day(r.arrivedOn), r.status]),
-  };
-}
-
 export const EXPORTS = {
-  "purchase-orders": purchaseOrders,
-  shipments: shipmentsSheet,
   inquiries: deals,
   orders,
   customers,
