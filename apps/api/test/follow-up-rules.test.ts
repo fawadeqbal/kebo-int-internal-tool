@@ -63,7 +63,9 @@ describe("follow-ups never stop reminding", () => {
     const get = async (id: string) => (await api(app, sana).get(`/follow-ups/${id}`).expect(200)).body as FollowUp;
 
     // Its only open follow-up: finishing it asks for the next one, and it cannot be removed.
-    const first = await add("Reply to the customer");
+    // (The system set it when the inquiry was made: step 2.)
+    const first = ((await api(app, sana).get(`/follow-ups?inquiryId=${inquiry.id}`).expect(200)).body.rows as FollowUp[])[0]!;
+    expect(first.title).toBe("Reply to the customer");
     expect(first).toMatchObject({ needsNext: true, can: { done: true, delete: false } });
     const refused = await api(app, sana).post(`/follow-ups/${first.id}/done`, { note: "Called" }).expect(409);
     expect(refused.body).toMatchObject({ code: "next_follow_up" });
