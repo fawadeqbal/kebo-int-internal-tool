@@ -3,7 +3,7 @@ import { liveFile, isCustomer } from "@kebo/database";
 import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, toMinor } from "@kebo/money";
-import { can, expenseInput, paymentInput, type ExpenseInput, type PaymentInput } from "@kebo/shared";
+import { can, expenseInput, PAYMENT_METHOD_LABEL, paymentInput, rowsOf, type ExpenseInput, type Message, type PaymentInput } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { z } from "zod";
 import { removeProof, setProof } from "../../common/storage/proofs";
@@ -16,6 +16,7 @@ import { orderAccess } from "../../common/auth/order-access";
 import { CustomerPaymentsService } from "../treasury/customer-payments.service";
 import { MoneyService } from "../money/money.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { day, money } from "../notifications/facts";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { customerAccess } from "../parties/customers.service";
 
@@ -380,19 +381,74 @@ export class ApprovalsService {
     });
   }
 
-  private async tellApprovers(row: Row, actor: SessionUser) {
+  /** An approval's message: money received or an expense, with the order and customer it is on. */
+  private approvalMessage(kind: "waiting" | "approved" | "sentBack", row: Row, by: string, extra: { reason?: string | null; orderId?: string | null; refNo?: string | null } = {}): Message {
     const s = this.summary(row.kind, row.body);
-    const amount = s.amount !== null && s.currency ? formatMinor(toMinor(s.amount), s.currency) : "";
-    await this.notifications.notify(
-      await this.approverIds(row.kind as SubmissionKind, row.order),
-      {
-        type: "approval.waiting",
-        title: row.kind === "payment" ? `To approve: money received · ${row.order?.refNo ?? ""}` : `To approve: expense · ${amount}`,
-        body: `${actor.name} added ${row.kind === "payment" ? `${amount} from ${row.order?.customer.name ?? "the customer"}` : `${s.description ?? "an expense"}${row.order ? ` on ${row.order.refNo}` : ""}`}`,
+    const amount = s.amount !== null && s.currency ? money(toMinor(s.amount), s.currency) : "";
+    const payment = row.kind === "payment";
+    const refNo = extra.refNo ?? row.order?.refNo ?? null;
+    const customer = row.order?.customer.name ?? null;
+    const what = payment ? `${amount} received${customer ? ` from ${customer}` : ""}` : `expense ${amount}${s.description ? `, ${s.description}` : ""}`;
+    const on = refNo ? ` (${refNo})` : "";
+    const method = s.method ? PAYMENT_METHOD_LABEL[s.method as keyof typeof PAYMENT_METHOD_LABEL]?.toLowerCase() : null;
+    const when = payment ? s.paidOn : s.spentOn;
+    const details = [amount, method, when ? day(when) : null, s.reference ? `ref ${s.reference}` : null].filter(Boolean).join(" · ");
+    const orderId = extra.orderId ?? row.orderId;
+    const base = {
+      group: "approvals" as const,
+      where: refNo ? { ref: refNo, title: [customer, payment ? "money received" : s.description ?? "expense"].filter(Boolean).join(" · ") } : null,
+      money: rowsOf([[payment ? "Amount" : "Expense", details]]),
+    };
+    if (kind === "waiting")
+      return {
+        ...base,
+        kind: "approval.waiting",
+        tag: "To approve",
+        subject: `To approve: ${what}${on}`,
+        sentence: `${by} recorded ${payment ? "money received" : "an expense"} and it needs your approval before it counts.`,
+        people: rowsOf([
+          ["Customer", customer],
+          ["Recorded by", by],
+        ]),
+        next: payment ? "Check it against the bank, then approve or send it back." : "Check the receipt, then approve or send it back.",
+        button: "Open approvals",
         link: links.approvals,
-      },
-      actor.id,
-    );
+      };
+    if (kind === "approved")
+      return {
+        ...base,
+        kind: "approval.approved",
+        tag: "Approved",
+        subject: `Approved: ${what}${on}`,
+        sentence: `${by} approved the ${payment ? "money received" : "expense"} you recorded. It counts now.`,
+        people: rowsOf([
+          ["Customer", customer],
+          ["Approved by", by],
+        ]),
+        next: "Nothing to do.",
+        button: orderId ? "Open the order" : "Open my approvals",
+        link: orderId ? links.order(orderId) : links.mine,
+      };
+    return {
+      ...base,
+      kind: "approval.sentBack",
+      tag: "Sent back",
+      subject: `Sent back: ${what}${on}`,
+      sentence: `${by} sent back the ${payment ? "money received" : "expense"} you recorded.${extra.reason ? ` “${extra.reason}”` : ""}`,
+      people: rowsOf([
+        ["Customer", customer],
+        ["Sent back by", by],
+      ]),
+      next: extra.reason ? `Fix it and send it again: \u201c${extra.reason}\u201d` : "Fix it and send it again.",
+      button: "Open my approvals",
+      link: links.mine,
+    };
+  }
+
+  private async tellApprovers(row: Row, actor: SessionUser) {
+    await this.notifications.send(this.approvalMessage("waiting", row, actor.name), [{ ids: await this.approverIds(row.kind as SubmissionKind, row.order), as: "one of the people who approve" }], {
+      actorId: actor.id,
+    });
   }
 
   /* ---------------------------------------------------------------- sending */
@@ -546,16 +602,9 @@ export class ApprovalsService {
     }
 
     const after = await this.find(id);
-    await this.notifications.notify(
-      [row.submittedById],
-      {
-        type: "approval.approved",
-        title: `Approved: ${this.describe(kind, body as Prisma.JsonValue, after.order?.refNo)}`,
-        body: `Approved by ${user.name}. It counts now.`,
-        link: after.orderId ? links.order(after.orderId) : links.mine,
-      },
-      user.id,
-    );
+    await this.notifications.send(this.approvalMessage("approved", row, user.name, { orderId: after.orderId, refNo: after.order?.refNo }), [{ ids: [row.submittedById], as: "who sent it" }], {
+      actorId: user.id,
+    });
     return { submission: await this.view(user, id), createdId };
   }
 
@@ -580,16 +629,7 @@ export class ApprovalsService {
         },
       );
     });
-    await this.notifications.notify(
-      [row.submittedById],
-      {
-        type: "approval.sentBack",
-        title: `Sent back: ${this.describe(row.kind, row.body, row.order?.refNo)}`,
-        body: reason,
-        link: links.mine,
-      },
-      user.id,
-    );
+    await this.notifications.send(this.approvalMessage("sentBack", row, user.name, { reason }), [{ ids: [row.submittedById], as: "who sent it" }], { actorId: user.id });
     return this.view(user, id);
   }
 

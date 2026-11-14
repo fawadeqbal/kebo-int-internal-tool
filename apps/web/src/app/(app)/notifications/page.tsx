@@ -88,7 +88,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
           <ul aria-label="Alerts">
             {items.map((n, i) => {
               const fresh = !n.readAt;
-              const kind = alertKind(n.type);
+              const kind = alertKind(n.type, n.message);
               return (
                 <li
                   key={n.id}

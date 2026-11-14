@@ -549,6 +549,7 @@ export class CustomerPaymentsService {
         orderId,
         refNo: o.refNo,
         amount: `${o.currency} ${fromMinor(thisMinor)}`,
+        paidOn: input.paidOn ?? null,
         actorId: user.id,
         notify: [o.inquiry.assigneeId].filter((v): v is string => !!v),
       };
@@ -697,6 +698,7 @@ export class CustomerPaymentsService {
         orderId: p.order.id,
         refNo: p.order.refNo,
         amount: `${input.currency} ${fromMinor(p.amountMinor)}`,
+        paidOn: input.paidOn ?? null,
         actorId: user.id,
         notify: [p.order.inquiry.assigneeId].filter((v): v is string => !!v),
       }));

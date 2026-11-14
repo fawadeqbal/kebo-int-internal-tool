@@ -5,7 +5,6 @@ import { can, PERMISSION_GROUPS, permissionsInPlan, PRESET_ROLES } from "@kebo/s
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { NotificationsService } from "../notifications/notifications.service";
 import { Clock } from "../../common/time/clock.service";
-import { renderEmail } from "../../common/notify/mailer";
 import { CompanyMail } from "../../common/notify/company-mail";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -231,23 +230,22 @@ export class UsersService {
     if (full.totpEnabledAt) throw new DomainError(`${full.name} already signs in with two-step.`);
     if (!full.isActive) throw new DomainError(`${full.name} is switched off.`);
     const today = this.clock.today();
-    const sent = await this.notifications.notify([id], {
-      type: "two_step",
-      title: "Please turn on two-step sign-in",
-      body: `${actor.name} asks you to protect your account with a code from your phone. It takes two minutes.`,
-      link: "/account?tab=two-step",
-      dedupeKey: `two-step:${id}:${today}`,
-    });
+    const sent = await this.notifications.send(
+      {
+        kind: "two_step",
+        group: "people",
+        tag: "Your account",
+        subject: "Please turn on two-step sign-in",
+        sentence: `${actor.name} asks you to protect your account with a code from your phone (Google Authenticator, Microsoft Authenticator…). It takes two minutes.`,
+        people: [{ label: "Asked by", value: actor.name }],
+        next: "Open your account and choose \u201cTurn on two-step\u201d.",
+        button: "Turn it on",
+        link: "/account?tab=two-step",
+      },
+      [{ ids: [id], as: "the person asked" }],
+      { actorId: actor.id, dedupeKey: `two-step:${id}:${today}` },
+    );
     if (sent) {
-      const mailer = await this.mail.mailer();
-      if (mailer.enabled) {
-        const content = renderEmail({
-          heading: "Please turn on two-step sign-in",
-          body: `${actor.name} asks you to protect your account with a code from your phone (Google Authenticator, Microsoft Authenticator…). Sign in, open My account, and choose "Turn on two-step".`,
-          linkLabel: "Open My account",
-        });
-        void mailer.send({ to: full.email, subject: "Turn on two-step sign-in", ...content }).catch(() => undefined);
-      }
       await this.prisma.tx((tx) => this.audit.record(tx, { userId: actor.id, action: "update", entityType: "user", entityId: id, summary: `Reminded ${user.email} to turn on two-step sign-in` }));
     }
     return { sent: sent > 0 };

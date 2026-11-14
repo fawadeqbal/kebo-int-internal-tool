@@ -4,6 +4,7 @@ import { ForbiddenError, NotFoundError } from "@kebo/utils";
 import { z } from "zod";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { canAddTo, managesNotesOf, seeRecord, type RecordRef, type RecordType } from "./records";
@@ -64,6 +65,7 @@ export class NotesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly clock: Clock,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private view(user: SessionUser, target: RecordRef, n: NoteRow) {
@@ -151,8 +153,10 @@ export class NotesService {
         `${target.label}: ${user.name} ${VERB[kind]}${row.contact && kind !== "note" ? ` with ${row.contact.name}` : ""}: ${quote(row.body)}`,
         { new: { note: row.id, kind, at: row.at.toISOString(), ...(row.contact ? { contact: row.contact.name } : {}) } },
       );
-      await this.mentions(tx, user, type, id, target.label, row.body);
       return { row, target };
+    }).then(async (done) => {
+      await this.mentions(user, type, id, done.target.label, done.row.body);
+      return done;
     });
   }
 
@@ -160,10 +164,10 @@ export class NotesService {
    * "@Fawad can we hold the PO?": everyone named after an @ (their first name or full name, any case) who
    * can sign in gets an alert ("Mentioned you") that opens the record. Not the writer.
    */
-  private async mentions(tx: Tx, user: SessionUser, type: RecordType, id: string, label: string, body: string) {
+  private async mentions(user: SessionUser, type: RecordType, id: string, label: string, body: string) {
     const asked = [...body.matchAll(/@([\p{L}][\p{L}\p{N}._-]*(?:\s[\p{L}][\p{L}\p{N}._-]*)?)/gu)].map((m) => m[1]!.toLowerCase());
     if (!asked.length) return;
-    const people = await tx.user.findMany({ where: { isActive: true, platformAdminId: null, id: { not: user.id } }, select: { id: true, name: true } });
+    const people = await this.prisma.db.user.findMany({ where: { isActive: true, platformAdminId: null, id: { not: user.id } }, select: { id: true, name: true } });
     const named = people.filter((p) => {
       const full = p.name.toLowerCase();
       const first = full.split(/\s+/)[0]!;
@@ -171,10 +175,24 @@ export class NotesService {
     });
     if (!named.length) return;
     const link = type === "inquiry" ? `/inquiries/${id}` : type === "order" ? `/orders/${id}/history` : type === "customer" ? `/customers/${id}/notes` : `/factories/${id}/notes`;
-    const text = body.length > 140 ? `${body.slice(0, 137)}…` : body;
-    await tx.notification.createMany({
-      data: named.map((p) => ({ userId: p.id, type: `mention.${type}`, title: `${user.name.split(" ")[0]}: ${text}`, body: label, link })),
-    });
+    const [ref, ...rest] = label.split(" · ");
+    const what = { inquiry: "inquiry", order: "order", customer: "customer", factory: "supplier" }[type];
+    await this.notifications.send(
+      {
+        kind: `mention.${type}`,
+        group: "people",
+        tag: "Mentioned",
+        subject: `${user.name} mentioned you on ${ref}: \u201c${body.length > 120 ? `${body.slice(0, 117)}…` : body}\u201d`,
+        sentence: `\u201c${body.length > 600 ? `${body.slice(0, 597)}…` : body}\u201d`,
+        where: { ref: ref!, title: rest.join(" · ") || what },
+        people: [{ label: "Written by", value: user.name }],
+        next: `Reply in the ${what}'s notes.`,
+        button: "Open the note",
+        link,
+      },
+      [{ ids: named.map((p) => p.id), as: "the person mentioned" }],
+      { actorId: user.id },
+    );
   }
 
   /** POST /orders|customers|factories/:id/notes → the note as lists show it. */

@@ -366,12 +366,13 @@ describe("notes and follow-ups", () => {
       await api(app, sana).post("/follow-ups", { title: "Visit the factory with Ali", kind: "visit", dueOn: addDays(today, 1), dueAt: "14:00", place: "Wenzhou", orderId, assigneeId: bilalId }).expect(201)
     ).body as FollowUp;
     expect(forBilal.assignee).toEqual({ id: bilalId, name: "Bilal" });
-    const told = (await notificationsOf(bilalId, "followUp.assigned")).find((n) => n.title.includes("Visit the factory with Ali"));
-    expect(told).toMatchObject({ title: "Sana gave you a follow-up: Visit the factory with Ali", link: `/orders/${orderId}` });
-    expect(told!.body).toContain(`14:00 · ${refNo} · ${customerName} · Wenzhou`);
+    const told = (await notificationsOf(bilalId, "followUp.assigned")).findLast((n) => n.title.includes("Visit the factory with Ali"));
+    expect(told).toMatchObject({ link: `/orders/${orderId}` });
+    expect(told!.title).toMatch(/^Sana gave you a follow-up: Visit the factory with Ali, \w{3} \d+ \w{3} 14:00$/);
+    expect(told!.body).toMatch(new RegExp(`^${refNo} · Visit the factory with Ali, .* 14:00 at Wenzhou\\. When done`));
     const general = (await api(app, bilal).post("/follow-ups", { title: "Send Sana the price list", dueOn: today, assigneeId: sanaId }).expect(201)).body as FollowUp;
     expect(general).toMatchObject({ target: null, link: "/follow-ups", kind: "other" });
-    expect((await notificationsOf(sanaId, "followUp.assigned")).find((n) => n.title === "Bilal gave you a follow-up: Send Sana the price list")?.link).toBe("/follow-ups");
+    expect((await notificationsOf(sanaId, "followUp.assigned")).find((n) => n.title.startsWith("Bilal gave you a follow-up: Send Sana the price list"))?.link).toBe("/follow-ups");
 
     // Bilal does not see the order, but the follow-up is his: he reads it and ticks it.
     expect((await api(app, bilal).get(`/follow-ups/${forBilal.id}`).expect(200)).body.target.label).toBe(`${refNo} · ${customerName}`);
@@ -428,7 +429,7 @@ describe("notes and follow-ups", () => {
     // Changing: the fields sent; a new person is told; another record (one they see).
     const moved = (await api(app, sana).patch(`/follow-ups/${mine.id}`, { dueAt: null, place: "Their office", assigneeId: bilalId, customerId }).expect(200)).body as FollowUp;
     expect(moved).toMatchObject({ title: "Call Ali about the LC balance", dueAt: null, place: "Their office", assignee: { id: bilalId }, target: { type: "customer", id: customerId, label: customerName }, link: `/customers/${customerId}` });
-    expect((await notificationsOf(bilalId, "followUp.assigned")).some((n) => n.title === "Sana gave you a follow-up: Call Ali about the LC balance" && n.link === `/customers/${customerId}`)).toBe(true);
+    expect((await notificationsOf(bilalId, "followUp.assigned")).some((n) => n.title.startsWith("Sana gave you a follow-up: Call Ali about the LC balance, ") && n.link === `/customers/${customerId}`)).toBe(true);
     const general2 = (await api(app, sana).patch(`/follow-ups/${mine.id}`, { customerId: null }).expect(200)).body as FollowUp;
     expect(general2).toMatchObject({ target: null, link: "/follow-ups" });
     const elsewhere = (await api(app, manager).post("/customers", { name: `Elsewhere ${tag}`, country: "KE", contacts: [{ name: "X", email: `x-${tag}@notes.test` }] }).expect(201)).body;

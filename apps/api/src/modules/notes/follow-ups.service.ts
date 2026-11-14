@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { claimOnce, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
-import { can, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, QUOTE_FOLLOW_UP_DAYS, REMINDER_HOUR, type FollowUpDoneInput, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
+import { can, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, QUOTE_FOLLOW_UP_DAYS, REMINDER_HOUR, rowsOf, type FollowUpDoneInput, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
 import { addDays, daysBetween, DomainError, ForbiddenError, GateError, NotFoundError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -205,15 +205,27 @@ export class FollowUpsService {
   }
 
   private async tellAssignee(actor: SessionUser, row: FollowUpRow, ref: RecordRef | null) {
-    await this.notifications.notify(
-      [row.assigneeId],
+    const when = dueWords(fromDbDate(row.dueOn), row.dueAt);
+    const [refNo, ...rest] = (ref?.label ?? "").split(" · ");
+    const kind = FOLLOW_UP_KIND_LABEL[row.kind as FollowUpKind].toLowerCase();
+    await this.notifications.send(
       {
-        type: "followUp.assigned",
-        title: `${actor.name} gave you a follow-up: ${row.title}`,
-        body: [dueWords(fromDbDate(row.dueOn), row.dueAt), ref?.label, row.place].filter(Boolean).join(" · "),
+        kind: "followUp.assigned",
+        group: "followups",
+        tag: "Follow-up for you",
+        subject: `${actor.name} gave you a follow-up: ${row.title}, ${when}`,
+        sentence: `${actor.name} planned ${kind === "other" ? "a follow-up" : `a ${kind}`} for you on ${when}${row.place ? ` at ${row.place}` : ""}.${row.note ? `\n${row.note}` : ""}`,
+        where: ref ? { ref: refNo!, title: rest.join(" · ") || row.title } : null,
+        people: rowsOf([
+          ["About", ref?.label],
+          ["Given by", actor.name],
+        ]),
+        next: `${row.title}, ${when}${row.place ? ` at ${row.place}` : ""}. When done, say what happened and set the next one.`,
+        button: "Open the follow-up",
         link: ref?.link ?? FOLLOW_UPS_LINK,
       },
-      actor.id,
+      [{ ids: [row.assigneeId], as: "the person it is for" }],
+      { actorId: actor.id },
     );
   }
 

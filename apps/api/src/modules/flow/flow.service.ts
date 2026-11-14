@@ -761,6 +761,7 @@ export class FlowService {
       return !o.factoryOrderedOn;
     });
     if (first) await this.setFactoryOrder(user, id, { factoryOrderedOn: input.sentOn, ...(input.supplierRef ? { factoryOrderNo: input.supplierRef } : {}) });
+    await this.orders.announce({ type: "purchaseOrder.sent", orderId: id, purchaseOrderId: poId, actorId: user.id });
     return this.purchaseOrders(user, id);
   }
 
