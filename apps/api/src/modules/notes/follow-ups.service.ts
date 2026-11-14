@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, toDbDate, type Prisma } from "@kebo/database";
-import { can, FOLLOW_UP_KIND_LABEL, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
-import { addDays, DomainError, ForbiddenError, NotFoundError, startOfDayIn, type ISODate } from "@kebo/utils";
+import { claimOnce, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
+import { can, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, REMINDER_HOUR, type FollowUpDoneInput, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
+import { addDays, daysBetween, DomainError, ForbiddenError, GateError, NotFoundError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -83,7 +83,24 @@ export class FollowUpsService {
     return can(user, "followups.viewAll") || r.assigneeId === user.id || r.createdById === user.id;
   }
 
-  private views(user: SessionUser, rows: FollowUpRow[], labels: Map<string, RecordRef>) {
+  /**
+   * The follow-ups, among these, that are the last open one of an open inquiry. An open inquiry is never left
+   * without a next follow-up, so finishing one of these needs the next one (and it cannot be removed).
+   */
+  private async lastOpenOnInquiry(rows: { id: string; inquiryId: string | null; doneAt: Date | null }[]): Promise<Set<string>> {
+    const mine = rows.filter((r) => !r.doneAt && r.inquiryId);
+    const ids = [...new Set(mine.map((r) => r.inquiryId!))];
+    if (!ids.length) return new Set();
+    const [open, counts] = await Promise.all([
+      this.prisma.db.inquiry.findMany({ where: { id: { in: ids }, deletedAt: null, stage: { in: [...OPEN_STAGES] } }, select: { id: true } }),
+      this.prisma.db.followUp.groupBy({ by: ["inquiryId"], where: { inquiryId: { in: ids }, doneAt: null }, _count: { _all: true } }),
+    ]);
+    const openIds = new Set(open.map((i) => i.id));
+    const left = new Map(counts.map((c) => [c.inquiryId, c._count._all]));
+    return new Set(mine.filter((r) => openIds.has(r.inquiryId!) && (left.get(r.inquiryId) ?? 0) <= 1).map((r) => r.id));
+  }
+
+  private views(user: SessionUser, rows: FollowUpRow[], labels: Map<string, RecordRef>, last: Set<string> = new Set()) {
     const { today, time } = this.now();
     return rows.map((r) => {
       const t = targetOf(r);
@@ -113,14 +130,16 @@ export class FollowUpsService {
         doneBy: r.doneBy,
         doneNote: r.doneNote,
         late: isLate({ doneAt: r.doneAt, dueOn, dueAt: r.dueAt }, today, time),
-        can: { edit: mayChange, done: mayChange, delete: mayChange },
+        /** The last open follow-up of an open inquiry: finishing it asks for the next one. */
+        needsNext: last.has(r.id),
+        can: { edit: mayChange, done: mayChange, delete: mayChange && !last.has(r.id) },
       };
     });
   }
 
   private async viewsOf(user: SessionUser, rows: FollowUpRow[]) {
     const refs = rows.map(targetOf).filter((t): t is { type: RecordType; id: string } => !!t);
-    return this.views(user, rows, await recordLabels(this.prisma.db, refs));
+    return this.views(user, rows, await recordLabels(this.prisma.db, refs), await this.lastOpenOnInquiry(rows));
   }
 
   private async view(user: SessionUser, id: string) {
@@ -357,18 +376,51 @@ export class FollowUpsService {
     return this.view(user, id);
   }
 
-  /** Ticks it done (again: no change), with what came of it. */
-  async done(user: SessionUser, id: string, note: string | null) {
+  /**
+   * Ticks it done (again: no change), with what came of it. The last open follow-up of an open inquiry is
+   * finished together with the next one (`next`), made in the same save: the inquiry is never left alone.
+   */
+  async done(user: SessionUser, id: string, note: string | null, next?: FollowUpDoneInput["next"]) {
     const row = await this.forChange(user, id);
+    let made: FollowUpRow | null = null;
     if (!row.doneAt) {
+      const last = (await this.lastOpenOnInquiry([row])).has(row.id);
+      if (last && !next) throw new GateError("Set the next follow-up for this inquiry (or mark the inquiry won or lost).", "next_follow_up");
+      if (next && next.dueOn < this.clock.today()) throw new DomainError("Choose today or a later day for the next follow-up.");
+      const nextFor = next?.assigneeId ?? row.assigneeId;
+      if (next && nextFor !== row.assigneeId && nextFor !== user.id) await this.checkAssignee(nextFor);
       const ref = await this.labelOf(row);
-      await this.prisma.tx(async (tx) => {
+      made = await this.prisma.tx(async (tx) => {
         const done = await tx.followUp.updateMany({ where: { id, doneAt: null }, data: { doneAt: this.clock.now(), doneById: user.id, doneNote: note } });
-        if (!done.count) return;
+        if (!done.count) return null;
         await this.history(tx, user, ref, "follow_up.done", id, `${user.name} did "${row.title}"${note ? `: ${note}` : ""}`);
+        if (!next) return null;
+        const after = await tx.followUp.create({
+          data: {
+            title: next.title ?? row.title,
+            kind: row.kind,
+            dueOn: toDbDate(next.dueOn),
+            dueAt: next.dueAt,
+            inquiryId: row.inquiryId,
+            orderId: row.orderId,
+            customerId: row.customerId,
+            factoryId: row.factoryId,
+            assigneeId: nextFor,
+            createdById: user.id,
+            createdAt: this.clock.now(),
+          },
+          include: followUpInclude,
+        });
+        await this.history(tx, user, ref, "follow_up.added", after.id, `${user.name} set the next follow-up for ${nextFor === user.id ? "themselves" : after.assignee.name} on ${dueWords(next.dueOn, next.dueAt)}: ${after.title}`, {
+          assignee: after.assignee.name,
+          dueOn: next.dueOn,
+          dueAt: next.dueAt,
+        });
+        return after;
       });
+      if (made && made.assigneeId !== user.id) await this.tellAssignee(user, made, ref);
     }
-    return this.view(user, id);
+    return { ...(await this.view(user, id)), next: made ? await this.view(user, made.id) : null };
   }
 
   /** Not done after all (again: no change). */
@@ -387,6 +439,8 @@ export class FollowUpsService {
 
   async remove(user: SessionUser, id: string) {
     const row = await this.forChange(user, id);
+    if ((await this.lastOpenOnInquiry([row])).has(row.id))
+      throw new GateError("This is the inquiry's only open follow-up. Move it to another day, or finish it and set the next one.", "last_follow_up");
     const ref = await this.labelOf(row);
     await this.prisma.tx(async (tx) => {
       await tx.followUp.delete({ where: { id } });
@@ -403,38 +457,54 @@ export class FollowUpsService {
   /* ---------------------------------------------------------------- reminders */
 
   /**
-   * The worker's reminders (every few minutes, each company in its own context): `followUp.due` to the
-   * person it is for at the start of the day it is due (only for those made before that day began) and,
-   * when it has a time, again from 30 minutes before it until the time. Each carries a dedupe key with its
-   * day (and time), so nothing is sent twice; moving it to another day or time reminds again.
+   * The worker's reminders (every few minutes, each company in its own context). A follow-up never stops
+   * reminding until it is done or moved to another day:
+   *  - the day it is due, from the morning hour (REMINDER_HOUR): `followUp.due` to the person it is for
+   *    (those made before that day began), and when it has a time, again from 30 minutes before it;
+   *  - every morning after, while it is not done: `followUp.missed` to the person (one by one up to
+   *    three, more as one summary);
+   *  - from FOLLOW_UP_ESCALATE_DAYS missed, every morning: `followUp.missedTold` to the managers and to
+   *    who gave it;
+   *  - and one email a morning to each of them with the whole list (when the company's email is set up).
+   * Each alert carries a dedupe key with its day (and time), so running again sends nothing twice.
+   * `force`: without waiting for the morning hour (an admin pressed "run now").
    */
-  async remind(): Promise<number> {
+  async remind(force = false): Promise<number> {
     const tz = this.clock.timeZone;
     const moment = this.clock.now();
     const today = this.clock.today();
+    const morning = force || Number(timeIn(moment, tz).slice(0, 2)) >= REMINDER_HOUR;
     const rows = await this.prisma.db.followUp.findMany({
-      where: {
-        doneAt: null,
-        dueOn: { gte: toDbDate(today), lte: toDbDate(addDays(today, 1)) },
-        assignee: { isActive: true },
-      },
+      where: { doneAt: null, dueOn: { lte: toDbDate(addDays(today, 1)) }, assignee: { isActive: true } },
       include: followUpInclude,
+      orderBy: [{ dueOn: "asc" }, { createdAt: "asc" }],
     });
     if (!rows.length) return 0;
     const labels = await recordLabels(
       this.prisma.db,
       rows.map(targetOf).filter((t): t is { type: RecordType; id: string } => !!t),
     );
+    const refOf = (r: FollowUpRow) => {
+      const t = targetOf(r);
+      return t ? labels.get(`${t.type}:${t.id}`) : undefined;
+    };
     let sent = 0;
+    type Missed = { row: FollowUpRow; days: number; label: string | undefined; link: string };
+    const missedFor = new Map<string, Missed[]>();
+    const todayFor = new Map<string, FollowUpRow[]>();
     for (const r of rows) {
       const dueOn = fromDbDate(r.dueOn);
-      const t = targetOf(r);
-      const ref = t ? labels.get(`${t.type}:${t.id}`) : undefined;
+      const ref = refOf(r);
       const link = ref?.link ?? FOLLOW_UPS_LINK;
+      if (dueOn < today) {
+        missedFor.set(r.assigneeId, [...(missedFor.get(r.assigneeId) ?? []), { row: r, days: daysBetween(dueOn, today), label: ref?.label, link }]);
+        continue;
+      }
+      if (dueOn === today) todayFor.set(r.assigneeId, [...(todayFor.get(r.assigneeId) ?? []), r]);
       const at = r.dueAt ? momentIn(dueOn, r.dueAt, tz) : null;
       const soon = at ? moment.getTime() >= at.getTime() - 30 * 60_000 : false;
       // The day's reminder: made before the day began, and not already inside the half hour before its time.
-      if (dueOn === today && r.createdAt < startOfDayIn(dueOn, tz) && !soon)
+      if (morning && dueOn === today && r.createdAt < startOfDayIn(dueOn, tz) && !soon)
         sent += await this.notifications.notify([r.assigneeId], {
           type: "followUp.due",
           title: `Today: ${r.title}${r.dueAt ? ` · ${r.dueAt}` : ""}`,
@@ -450,6 +520,99 @@ export class FollowUpsService {
           body: [minutes ? `in ${minutes} min` : "now", ref?.label, r.place].filter(Boolean).join(" · "),
           link,
           dedupeKey: `followup:${r.id}:at:${dueOn}T${r.dueAt}`,
+        });
+      }
+    }
+    if (!morning) return sent;
+
+    const daysWords = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
+    const LATE_LINK = `${FOLLOW_UPS_LINK}?status=late`;
+    const lineOf = (m: Missed, who = false) => `${who ? `${m.row.assignee.name}: ` : ""}${m.row.title} — missed ${daysWords(m.days)}${m.label ? ` · ${m.label}` : ""}`;
+    const listOf = (items: Missed[], who = false) => items.slice(0, 8).map((m) => lineOf(m, who)).join("\n") + (items.length > 8 ? `\n…and ${items.length - 8} more` : "");
+
+    // Every morning, to the person it is for: the oldest first; many as one summary so a backlog does not bury them.
+    for (const [userId, items] of missedFor) {
+      items.sort((a, b) => b.days - a.days);
+      if (items.length <= 3) {
+        for (const m of items)
+          sent += await this.notifications.notify([userId], {
+            type: "followUp.missed",
+            title: `Missed ${daysWords(m.days)}: ${m.row.title}`,
+            body: [m.label, m.row.place].filter(Boolean).join(" · ") || null,
+            link: m.link,
+            dedupeKey: `followup:${m.row.id}:missed:${today}`,
+          });
+      } else {
+        const x = items[0]!;
+        sent += await this.notifications.notify([userId], {
+          type: "followUp.missed",
+          title: `${items.length} follow-ups missed — the oldest, ${daysWords(x.days)}: ${x.row.title}`,
+          body: listOf(items),
+          link: LATE_LINK,
+          dedupeKey: `followup:missed:${today}:${userId}`,
+        });
+      }
+    }
+
+    // Missed long enough: the managers and who gave it are told too, every morning until it is done.
+    const managers = await this.notifications.managerIds();
+    const toldFor = new Map<string, Missed[]>();
+    for (const [userId, items] of missedFor)
+      for (const m of items.filter((x) => x.days >= FOLLOW_UP_ESCALATE_DAYS))
+        for (const to of new Set([...managers, m.row.createdById]))
+          if (to !== userId) toldFor.set(to, [...(toldFor.get(to) ?? []), m]);
+    for (const [to, items] of toldFor) {
+      items.sort((a, b) => b.days - a.days);
+      if (items.length <= 3) {
+        for (const m of items)
+          sent += await this.notifications.notify([to], {
+            type: "followUp.missedTold",
+            title: `${m.row.assignee.name} missed a follow-up for ${daysWords(m.days)}: ${m.row.title}`,
+            body: m.label ?? null,
+            link: m.link,
+            dedupeKey: `followup:${m.row.id}:missed-told:${today}`,
+          });
+      } else {
+        const x = items[0]!;
+        sent += await this.notifications.notify([to], {
+          type: "followUp.missedTold",
+          title: `${items.length} follow-ups are missed by ${FOLLOW_UP_ESCALATE_DAYS} days or more — the oldest, ${x.row.assignee.name}: ${x.row.title} (${daysWords(x.days)})`,
+          body: listOf(items, true),
+          link: LATE_LINK,
+          dedupeKey: `followup:missed-told:${today}:${to}`,
+        });
+      }
+    }
+
+    // One email a morning: to each person their follow-ups today and the missed ones; to each manager (and giver) the missed ones they were told of.
+    if (await this.notifications.canEmail()) {
+      const stamp = today.replaceAll("-", "");
+      for (const userId of new Set([...todayFor.keys(), ...missedFor.keys()])) {
+        if (!(await claimOnce(this.prisma.db, `fm${stamp}${userId}`))) continue;
+        const now = todayFor.get(userId) ?? [];
+        const missed = missedFor.get(userId) ?? [];
+        const parts = [now.length ? `${now.length} today` : null, missed.length ? `${missed.length} missed` : null].filter(Boolean).join(", ");
+        await this.notifications.emailUser(userId, `Your follow-ups: ${parts}`, {
+          heading: `Your follow-ups: ${parts}`,
+          body: [
+            now.length ? `Today\n${now.map((r) => `• ${r.title}${r.dueAt ? ` · ${r.dueAt}` : ""}${refOf(r)?.label ? ` · ${refOf(r)!.label}` : ""}`).join("\n")}` : null,
+            missed.length ? `Missed\n${missed.map((m) => `• ${lineOf(m)}`).join("\n")}` : null,
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+          link: missed.length ? LATE_LINK : FOLLOW_UPS_LINK,
+          linkLabel: "Open my follow-ups",
+          footer: "A follow-up is reminded every morning until it is done or moved to another day.",
+        });
+      }
+      for (const [to, items] of toldFor) {
+        if (!(await claimOnce(this.prisma.db, `fx${stamp}${to}`))) continue;
+        await this.notifications.emailUser(to, `Missed follow-ups: ${items.length}`, {
+          heading: `${items.length} follow-up${items.length === 1 ? " is" : "s are"} missed by ${FOLLOW_UP_ESCALATE_DAYS} days or more`,
+          body: items.map((m) => `• ${lineOf(m, true)}`).join("\n"),
+          link: LATE_LINK,
+          linkLabel: "Open the missed follow-ups",
+          footer: "You are told every morning until each one is done or moved to another day.",
         });
       }
     }

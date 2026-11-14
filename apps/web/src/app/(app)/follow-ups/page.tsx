@@ -27,7 +27,7 @@ import type { DealRow, Paged, Person } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
 import type { FollowUp, FollowUpList } from "@/lib/types-notes";
 import { PanelButton } from "@/components/orders/step-view";
-import { FollowUpCheck, FollowUpFields, type AboutOption } from "@/components/notes/note-forms";
+import { FollowUpCheck, FollowUpDoneNext, FollowUpFields, type AboutOption } from "@/components/notes/note-forms";
 import { dueText, todayHere } from "@/components/notes/kinds";
 import { DataTable } from "@/components/common/data-table";
 import { addFollowUpAction, editFollowUpAction, followUpDoneAction, followUpReopenAction } from "./actions";
@@ -283,13 +283,16 @@ export default async function FollowUpsPage({
                     return (
                       <tr key={f.id} className="border-t border-surface-2">
                         <Td>
-                          {f.can.done && (
-                            <FollowUpCheck
-                              action={(f.done ? followUpReopenAction : followUpDoneAction).bind(null, f.id)}
-                              done={f.done}
-                              what={f.title}
-                            />
-                          )}
+                          {f.can.done &&
+                            (!f.done && f.needsNext ? (
+                              <FollowUpDoneNext action={followUpDoneAction.bind(null, f.id)} title={f.title} what={f.title} inquiryHref={f.link} as="check" />
+                            ) : (
+                              <FollowUpCheck
+                                action={(f.done ? followUpReopenAction : followUpDoneAction).bind(null, f.id)}
+                                done={f.done}
+                                what={f.title}
+                              />
+                            ))}
                         </Td>
                         <Td>
                           <span className={cn("block font-semibold text-text [overflow-wrap:anywhere]", f.done && "line-through")}>

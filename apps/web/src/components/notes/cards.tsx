@@ -14,7 +14,7 @@ import {
 } from "@/app/(app)/follow-ups/actions";
 import type { FollowUp, Note, RecordKey } from "@/lib/types-notes";
 import { dueText, KindIcon, todayHere, whenText } from "./kinds";
-import { FollowUpForm, FollowUpToggle, NoteAddForm } from "./note-forms";
+import { FollowUpForm, FollowUpToggle, NoteAddForm, FollowUpDoneNext } from "./note-forms";
 
 /**
  * A record's notes and call logs (orders, customers, factories): the add form on top for those who may
@@ -128,9 +128,12 @@ export function FollowUpRow({
         </p>
         {f.done && f.doneNote && <p className="mt-1 text-xs text-text-2">{f.doneNote}</p>}
       </div>
-      {f.can.done && (
-        <FollowUpToggle action={(f.done ? followUpReopenAction : followUpDoneAction).bind(null, f.id)} done={f.done} what={what} />
-      )}
+      {f.can.done &&
+        (!f.done && f.needsNext ? (
+          <FollowUpDoneNext action={followUpDoneAction.bind(null, f.id)} title={f.title} what={what} inquiryHref={f.link} />
+        ) : (
+          <FollowUpToggle action={(f.done ? followUpReopenAction : followUpDoneAction).bind(null, f.id)} done={f.done} what={what} />
+        ))}
       {removable && f.can.delete && (
         <ConfirmAction
           action={removeFollowUpAction.bind(null, f.id)}

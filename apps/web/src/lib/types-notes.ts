@@ -35,6 +35,8 @@ export interface FollowUp {
   doneBy: { id: string; name: string } | null;
   doneNote: string | null;
   late: boolean;
+  /** The last open follow-up of an open inquiry: finishing it asks for the next one (the inquiry is never left without). */
+  needsNext?: boolean;
   can: { edit: boolean; done: boolean; delete: boolean };
 }
 

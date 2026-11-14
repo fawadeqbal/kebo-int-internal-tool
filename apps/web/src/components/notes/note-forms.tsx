@@ -5,7 +5,9 @@ import { Check, RotateCcw } from "lucide-react";
 import { FOLLOW_UP_KIND_LABEL, FOLLOW_UP_KINDS, NOTE_KIND_LABEL, NOTE_KINDS } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
+import Link from "next/link";
 import { ActionForm } from "@/components/common/action-form";
+import { Modal } from "@/components/common/dialog";
 import { PANEL_FORM, PanelActions, PanelBody, PanelSection, useClosePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { NOTE_ICON } from "./kinds";
@@ -183,6 +185,66 @@ export function FollowUpToggle({ action, done, what }: { action: Action; done: b
         {done ? "Reopen" : "Done"}
       </SubmitButton>
     </ActionForm>
+  );
+}
+
+/**
+ * Finishing the last open follow-up of an open inquiry: a small window asks what happened and when the next
+ * one is, because an open inquiry is never left without a next follow-up. The other way out is closing the
+ * inquiry (won or lost), on its page. Drawn as the row's "Done" button or the list's tick box.
+ */
+export function FollowUpDoneNext({ action, title, what, inquiryHref, as = "button" }: { action: Action; title: string; what: string; inquiryHref: string; as?: "button" | "check" }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  // Three days on, to start with: the person sets the day they mean.
+  const [start] = useState(() => {
+    const d = new Date(Date.now() + 3 * 86_400_000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  return (
+    <>
+      {as === "check" ? (
+        <input type="checkbox" checked={false} readOnly aria-label={`Mark done: ${what}`} onClick={(e) => (e.preventDefault(), setOpen(true))} className="size-[18px] cursor-pointer accent-primary-solid" />
+      ) : (
+        <Button size="sm" variant="secondary" aria-label={`Mark done: ${what}`} onClick={() => setOpen(true)}>
+          <Check aria-hidden /> Done
+        </Button>
+      )}
+      {open && (
+        <Modal title="Done, and the next follow-up" sub={title} onClose={() => setOpen(false)}>
+          <ActionForm action={action} onDone={() => setOpen(false)} showSuccess={false} className="flex flex-col gap-4 px-5 py-4 sm:px-6">
+            {(s) => (
+              <>
+                <Field label="What happened" htmlFor={`${id}-note`} optional error={s.errors?.note}>
+                  <Input id={`${id}-note`} name="note" maxLength={2000} defaultValue={s.values?.note} placeholder="e.g. called, no answer" />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
+                  <Field label="Next follow-up on" htmlFor={`${id}-on`} required error={s.errors?.["next.dueOn"] ?? s.errors?.next}>
+                    <Input id={`${id}-on`} name="nextDueOn" type="date" required defaultValue={s.values?.nextDueOn ?? start} />
+                  </Field>
+                  <Field label="Time" htmlFor={`${id}-at`} optional error={s.errors?.["next.dueAt"]}>
+                    <Input id={`${id}-at`} name="nextDueAt" type="time" defaultValue={s.values?.nextDueAt} />
+                  </Field>
+                </div>
+                <Field label="What to do next" htmlFor={`${id}-title`} error={s.errors?.["next.title"]}>
+                  <Input id={`${id}-title`} name="nextTitle" maxLength={200} defaultValue={s.values?.nextTitle ?? title} />
+                </Field>
+                <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+                  <Link href={inquiryHref} className="text-[13px] font-medium text-text-2 hover:text-primary hover:underline">
+                    Or mark the inquiry won or lost
+                  </Link>
+                  <span className="flex-1" />
+                  <Button variant="ghost" onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                  <SubmitButton>Done, set the next</SubmitButton>
+                </div>
+              </>
+            )}
+          </ActionForm>
+        </Modal>
+      )}
+    </>
   );
 }
 

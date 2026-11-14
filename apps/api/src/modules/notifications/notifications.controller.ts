@@ -54,6 +54,6 @@ export class NotificationsController {
   @HttpCode(200)
   @RequirePermissions("settings.manage")
   run() {
-    return this.reminders.run();
+    return this.reminders.run(true);
   }
 }

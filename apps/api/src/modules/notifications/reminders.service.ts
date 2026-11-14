@@ -2,7 +2,7 @@ import { PROFIT_LABEL } from "@kebo/money";
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { claimOnce, livePart, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
-import { instalmentSentence, orderNeeds, PERMISSIONS, planStatus, shippedOnOf } from "@kebo/shared";
+import { instalmentSentence, orderNeeds, PERMISSIONS, planStatus, REMINDER_HOUR, shippedOnOf } from "@kebo/shared";
 import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -16,7 +16,7 @@ import { chargedExpenses, fxOf, moneyFacts, positionOf } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
 import { readyOnOf, readySelect } from "@kebo/database";
 import { livePlansOf } from "../billing/api";
-import { FollowUpsService } from "../notes/follow-ups.service";
+import { FollowUpsService, timeIn } from "../notes/follow-ups.service";
 
 /**
  * The safety net, run every hour by the worker. Every reminder carries a
@@ -37,10 +37,16 @@ export class RemindersService {
     private readonly limits: LimitsService,
   ) {}
 
-  async run() {
+  /**
+   * `force`: now, without waiting for the morning hour (an admin pressed "run now"). The worker's own runs
+   * send the day's reminders from REMINDER_HOUR on, so nobody's phone buzzes just after midnight; before
+   * that hour only what is tied to a time of day goes out (a follow-up 30 minutes before its time).
+   */
+  async run(force = false) {
     const s = await this.settings.get();
     const today = this.clock.today();
     const now = this.clock.now();
+    if (!force && Number(timeIn(now, this.clock.timeZone).slice(0, 2)) < REMINDER_HOUR) return { sent: await this.followUps() };
     const managers = await this.notifications.managerIds();
     let sent = 0;
     const note = async (to: (string | null | undefined)[], n: Parameters<NotificationsService["notify"]>[1]) => {
@@ -185,7 +191,7 @@ export class RemindersService {
     }
 
     // 7. Follow-ups due today: on the day and before their time (the worker also runs these every few minutes).
-    sent += await this.followUps();
+    sent += await this.followUps(force);
 
     // 8. The morning summary email, once a day (the counter row is the "already sent" mark). Email reports are a plan feature.
     const reports = await this.limits.allows("email_reports");
@@ -207,9 +213,9 @@ export class RemindersService {
    * Follow-ups' reminders (followUp.due), for the current company. The notes module holds them; it is
    * looked up here (as Insights is below) since it sends through this module's notifications.
    */
-  async followUps(): Promise<number> {
+  async followUps(force = false): Promise<number> {
     try {
-      return await this.modules.get(FollowUpsService, { strict: false }).remind();
+      return await this.modules.get(FollowUpsService, { strict: false }).remind(force);
     } catch (e) {
       this.log.warn(`follow-up reminders failed: ${(e as Error).message}`);
       return 0;

@@ -1,12 +1,15 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { can, CHANNEL_LABEL } from "@kebo/shared";
+import { can, CHANNEL_LABEL, isOpen } from "@kebo/shared";
 import { cn } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
+import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { date, TZ } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { getPeople } from "@/lib/loaders";
+import type { FollowUpList } from "@/lib/types-notes";
+import { dueText } from "@/components/notes/kinds";
 import { PanelButton } from "@/components/orders/step-view";
 import { SIDE_COLUMNS } from "@/components/common/side-columns";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
@@ -36,7 +39,14 @@ export async function InquirySide({ id }: { id: string }) {
   const me = await requireUser();
   const d = await dealOf(id);
   const sourcing = can(me, "sourcing.manage");
-  const [people, facts, s] = await Promise.all([getPeople().catch(() => []), sourcing ? offerFactsOf(id) : null, sourcing ? sourcingOf(id).catch(() => null) : null]);
+  const [people, facts, s, followUps] = await Promise.all([
+    getPeople().catch(() => []),
+    sourcing ? offerFactsOf(id) : null,
+    sourcing ? sourcingOf(id).catch(() => null) : null,
+    api.get<FollowUpList>("/follow-ups", { inquiryId: id, open: "true" }).catch(() => null),
+  ]);
+  // The next follow-up: the earliest one still open. An open inquiry is never meant to be without one.
+  const nextUp = [...(followUps?.rows ?? [])].sort((a, b) => `${a.dueOn}${a.dueAt ?? ""}`.localeCompare(`${b.dueOn}${b.dueAt ?? ""}`))[0];
   const base = `/inquiries/${d.id}`;
   const status = statusWords(d, facts, todayIn(TZ));
   const contact = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
@@ -97,6 +107,13 @@ export async function InquirySide({ id }: { id: string }) {
           </Row>
         )}
         <Row label="Needed by">{d.requiredBy ? date(d.requiredBy) : <span className="font-normal text-muted">Not said</span>}</Row>
+        {(nextUp || (followUps && isOpen(d.stage))) && (
+          <Row label="Next follow-up">
+            <Link href={`${base}/history#follow-ups`} className={cn("hover:underline", !nextUp || nextUp.late ? "text-bad" : "text-primary")}>
+              {nextUp ? `${dueText(nextUp.dueOn, nextUp.dueAt)}${nextUp.late ? " · missed" : ""}` : "None · set one"}
+            </Link>
+          </Row>
+        )}
         <Row label="Came by">
           {CHANNEL_LABEL[d.channel]} · {date(d.createdAt)}
         </Row>
