@@ -196,6 +196,54 @@ export function priced(lines: OfferLine[], prices: Record<string, string>, margi
   return next;
 }
 
+/** An option's lines, totals and costing (what it costs us to reach our terms, and the margin that leaves). */
+export function optionTotals(o: OptionState, offers: QuoteOffers, incoterm: Incoterm, currency: string) {
+  const lines = linesOf(o, offers) ?? [];
+  const rows = [
+    ...lines.map((l) => ({ quantity: numberText(l.quantity) || 0, unitPrice: numberText(o.prices[l.id] ?? "") || 0, cost: l.unitCost })),
+    ...o.charges.map((c) => ({ quantity: numberText(c.quantity) || 0, unitPrice: numberText(c.unitPrice) || 0, cost: valid(c.unitCost) ? numberText(c.unitCost) : null })),
+  ];
+  const totals = documentTotals(rows, numberText(o.discount) || 0);
+  const extra = extraOf(o, offers, incoterm, currency);
+  const costing = costSummary(
+    rows.map((r) => ({ quantity: r.quantity, unitPriceMinor: toMinor(r.unitPrice), unitCostMinor: r.cost === null || r.cost === undefined ? null : toMinor(r.cost) })),
+    totals.discount,
+    extra.minor,
+  );
+  return { lines, totals, costing, extra };
+}
+
+const currencyOf = (s: EditorState) => (/^[A-Za-z]{3}$/.test(s.currency.trim()) ? s.currency.trim().toUpperCase() : "—");
+
+/**
+ * What the margin box starts with: the margin the quotation's options have now, when they share one (to one
+ * decimal), so the box says what is there. Options at different margins, or none with a cost: the usual
+ * margin from Settings, which only prices what is added.
+ */
+export function startMargin(s: EditorState, offers: QuoteOffers): string {
+  const margins = s.options
+    .map((o) => optionTotals(o, offers, s.incoterm, currencyOf(s)).costing.marginPercent)
+    .filter((m): m is number => m !== null)
+    .map((m) => Math.round(m * 10) / 10);
+  const one = margins.length > 0 && margins.every((m) => m === margins[0]) ? margins[0]! : null;
+  return String(one !== null && one >= 0 && one < 100 ? one : offers.defaultMargin);
+}
+
+/**
+ * Every option priced at one margin on its landed cost (its lines' costs plus the costs to reach our terms).
+ * A line without a cost, and an option priced by hand (the customer's items), keep their prices.
+ */
+export function pricedAll(s: EditorState, offers: QuoteOffers, margin: number): OptionState[] {
+  const currency = currencyOf(s);
+  return s.options.map((o) => ({ ...o, prices: priced(linesOf(o, offers) ?? [], o.prices, margin, extraOf(o, offers, s.incoterm, currency).minor) }));
+}
+
+/** A margin typed in the box: a number from 0 up to (not) 100. */
+export function marginOf(text: string): number | null {
+  const n = Number(numberText(text));
+  return text.trim() !== "" && Number.isFinite(n) && n >= 0 && n < 100 ? n : null;
+}
+
 /**
  * The editor for a draft revision: terms, then the options (A, B…) the
  * customer chooses from. Each option is one factory's offer — its lines exactly
@@ -291,7 +339,10 @@ export function RevisionEditor({
   /** The terms alone, in the Quotation step's side panel: sections and the panel's footer. */
   const inPanel = part === "terms";
   const options = part !== "terms";
-  const [margin, setMargin] = useState(String(initialOffers.defaultMargin));
+  // The box starts with the margin the options have (the last revision's, or the usual one on a first quotation).
+  const [margin, setMargin] = useState(() => startMargin(startState(), initialOffers));
+  /** The margin every ticked offer was last priced at from the box in this window (said under it). */
+  const [pricedAt, setPricedAt] = useState<number | null>(null);
   const dirty = JSON.stringify(s) !== saved;
   const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => setS((st) => ({ ...st, [k]: v }));
   const setOption = (i: number, patch: Partial<OptionState> | ((o: OptionState) => Partial<OptionState>)) =>
@@ -321,25 +372,23 @@ export function RevisionEditor({
     { key: "total", label: "Total", width: "7.5rem", align: "right", format: (v) => fmt(Math.round(amountOf(v.unitPrice) * (Number(numberText(v.quantity ?? "")) || 0))) },
   ];
   const marginNumber = Number(numberText(margin));
-  const marginOk = margin.trim() !== "" && Number.isFinite(marginNumber) && marginNumber >= 0 && marginNumber < 100;
+  const marginOk = marginOf(margin) !== null;
+  /**
+   * The margin box of the window that starts a revision: a margin typed there prices every ticked offer at
+   * once, so the totals beside each offer are the ones that will be saved. (It used to price only an offer
+   * ticked afterwards: typing a margin and saving changed nothing.)
+   */
+  const priceEveryOffer = (text: string) => {
+    setMargin(text);
+    const m = marginOf(text);
+    if (m === null) return;
+    setS((st) => ({ ...st, options: pricedAll(st, offers, m) }));
+    setPricedAt(m);
+  };
   const opt = s.options[Math.min(active, s.options.length - 1)]!;
   const at = s.options.indexOf(opt);
 
-  const totalsOf = (o: OptionState) => {
-    const lines = linesOf(o, offers) ?? [];
-    const rows = [
-      ...lines.map((l) => ({ quantity: numberText(l.quantity) || 0, unitPrice: numberText(o.prices[l.id] ?? "") || 0, cost: l.unitCost })),
-      ...o.charges.map((c) => ({ quantity: numberText(c.quantity) || 0, unitPrice: numberText(c.unitPrice) || 0, cost: valid(c.unitCost) ? numberText(c.unitCost) : null })),
-    ];
-    const totals = documentTotals(rows, numberText(o.discount) || 0);
-    const extra = extraOf(o, offers, s.incoterm, currency);
-    const costing = costSummary(
-      rows.map((r) => ({ quantity: r.quantity, unitPriceMinor: toMinor(r.unitPrice), unitCostMinor: r.cost === null || r.cost === undefined ? null : toMinor(r.cost) })),
-      totals.discount,
-      extra.minor,
-    );
-    return { lines, totals, costing, extra };
-  };
+  const totalsOf = (o: OptionState) => optionTotals(o, offers, s.incoterm, currency);
 
   // The list keeps the order it opened with (options A, B… first, then the other offers), so a tick never moves a row.
   const [firstOrder] = useState(() => s.options.map((o) => o.factoryQuoteId));
@@ -557,11 +606,19 @@ export function RevisionEditor({
                     )}
                   </ul>
                   {showCosts && (
-                    <p className="flex flex-wrap items-center gap-2 text-[13px] text-text-2">
-                      <label htmlFor={`margin-${number}`}>A newly ticked offer is priced at</label>
-                      <Input id={`margin-${number}`} inputMode="decimal" className="h-9 w-16 text-right tabular" value={margin} onChange={(e) => setMargin(e.target.value)} />
-                      <span>% on our cost. Each price can be changed after, in Edit lines.</span>
-                    </p>
+                    <div className="flex flex-col gap-1 text-[13px] text-text-2">
+                      <p className="flex flex-wrap items-center gap-2">
+                        <label htmlFor={`margin-${number}`}>Price every ticked offer at</label>
+                        <Input id={`margin-${number}`} inputMode="decimal" className="h-9 w-16 text-right tabular" value={margin} onChange={(e) => priceEveryOffer(e.target.value)} />
+                        <span>% on our cost. Each price can be changed after, in Edit lines.</span>
+                      </p>
+                      {pricedAt !== null && marginOk && (
+                        <p role="status" className="text-text">
+                          {s.options.length === 1 ? "The offer is" : `All ${s.options.length} offers are`} priced at {pricedAt}% now: the totals above are the new ones. Prices typed by hand before are replaced when you save.
+                        </p>
+                      )}
+                      {!marginOk && margin.trim() !== "" && <p className="text-bad">Type a margin from 0 to 99.</p>}
+                    </div>
                   )}
                   {initial.options
                     .map((o, i) => ({ o, i }))

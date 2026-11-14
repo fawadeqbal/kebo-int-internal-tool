@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardPaste, Lock, Plus, X } from "lucide-react";
-import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
+import { convertMinor, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import { basisText, BASIS_STEP_LABEL, optionLetter } from "@kebo/shared";
 import { Badge, Button, Card, cn, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
@@ -15,7 +15,7 @@ import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import type { Fx } from "@/lib/fx";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { shortName } from "./offer-facts";
-import { asLineOf, BasisCosts, extraOf, Fig, fromDraft, gapOf, linesOf, payload, priced, STEP_LINE, valid, type ChargeState, type EditorState, type OptionState } from "./revision-editor";
+import { asLineOf, BasisCosts, Fig, fromDraft, gapOf, marginOf, optionTotals, payload, pricedAll, startMargin, STEP_LINE, valid, type ChargeState, type EditorState, type OptionState } from "./revision-editor";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -56,7 +56,8 @@ export function PriceEditor({
   const [s, setS] = useState<EditorState>(() => fromDraft(initial));
   const [saved] = useState(() => JSON.stringify(fromDraft(initial)));
   const [active, setActive] = useState(Math.min(Math.max(0, initialOption), initial.options.length - 1));
-  const [margin, setMargin] = useState(String(offers.defaultMargin));
+  // The box starts with the margin the options have now (not the usual one from Settings).
+  const [margin, setMargin] = useState(() => startMargin(fromDraft(initial), offers));
   const [costsOpen, setCostsOpen] = useState(false);
   const [paste, setPaste] = useState<string | null>(null);
   const [chargesOpen, setChargesOpen] = useState(false);
@@ -73,25 +74,11 @@ export function PriceEditor({
   const fmt = (minor: number) => formatMinor(minor, currency);
   const amountOf = (v: string | undefined) => (valid(v ?? "") ? toMinor(numberText(v ?? "")) : 0);
   const marginNumber = Number(numberText(margin));
-  const marginOk = margin.trim() !== "" && Number.isFinite(marginNumber) && marginNumber >= 0 && marginNumber < 100;
+  const marginOk = marginOf(margin) !== null;
   // A little under the usual margin is fine; more than two points under it shows amber, below cost red.
   const tone = (m: number | null) => (m === null ? "text-muted" : m < 0 ? "text-bad" : m < offers.defaultMargin - 2 ? "text-warn" : "text-ok");
 
-  const totalsOf = (o: OptionState) => {
-    const lines = linesOf(o, offers) ?? [];
-    const rows = [
-      ...lines.map((l) => ({ quantity: numberText(l.quantity) || 0, unitPrice: numberText(o.prices[l.id] ?? "") || 0, cost: l.unitCost })),
-      ...o.charges.map((c) => ({ quantity: numberText(c.quantity) || 0, unitPrice: numberText(c.unitPrice) || 0, cost: valid(c.unitCost) ? numberText(c.unitCost) : null })),
-    ];
-    const totals = documentTotals(rows, numberText(o.discount) || 0);
-    const extra = extraOf(o, offers, s.incoterm, currency);
-    const costing = costSummary(
-      rows.map((r) => ({ quantity: r.quantity, unitPriceMinor: toMinor(r.unitPrice), unitCostMinor: r.cost === null || r.cost === undefined ? null : toMinor(r.cost) })),
-      totals.discount,
-      extra.minor,
-    );
-    return { lines, totals, costing, extra };
-  };
+  const totalsOf = (o: OptionState) => optionTotals(o, offers, s.incoterm, currency);
 
   const opt = s.options[Math.min(active, s.options.length - 1)]!;
   const at = s.options.indexOf(opt);
@@ -107,12 +94,7 @@ export function PriceEditor({
   const fx: Fx = { main: offers.mainCurrency, rates: offers.rates };
   const ours = basisText(s.incoterm, s.incotermPlace.trim() || null);
 
-  const priceAll = () =>
-    marginOk &&
-    setS((st) => ({
-      ...st,
-      options: st.options.map((o) => ({ ...o, prices: priced(linesOf(o, offers) ?? [], o.prices, marginNumber, extraOf(o, offers, st.incoterm, currency).minor) })),
-    }));
+  const priceAll = () => marginOk && setS((st) => ({ ...st, options: pricedAll(st, offers, marginNumber) }));
 
   const nameOf = (o: OptionState) => (o.factoryQuoteId ? (offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.factory.name ?? "a removed offer") : "the customer's items");
 
