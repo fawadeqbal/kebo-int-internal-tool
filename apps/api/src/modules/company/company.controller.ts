@@ -60,7 +60,7 @@ export class CompanyController {
 
   /** The company's address, and whether a new short name is free (?slug=, for the live check while typing). */
   @Get("address")
-  @RequirePermissions("settings.manage")
+  @RequirePermissions("settings.manage", "security.manage")
   async address(@CurrentUser() user: SessionUser, @Query("slug") wanted?: string) {
     const c = CompanyContext.require();
     const slug = wanted?.trim().toLowerCase().slice(0, 63);
@@ -85,7 +85,7 @@ export class CompanyController {
 
   /** A new address (Super Admin): the old one sends people on for a while, then becomes free. */
   @Put("address")
-  @RequirePermissions("settings.manage")
+  @RequirePermissions("settings.manage", "security.manage")
   async changeAddress(@CurrentUser() user: SessionUser, @Body(Validate(z.object({ slug: slugField }))) body: { slug: string }) {
     const c = CompanyContext.require();
     if (!(await this.mayChange(user))) throw new ForbiddenError("Only a Super Admin can change the company's address.");
@@ -123,7 +123,7 @@ export class CompanyController {
 
   /** The company's website form: its key and the snippet to paste (Super Admin). */
   @Get("website-form")
-  @RequirePermissions("settings.manage")
+  @RequirePermissions("settings.manage", "security.manage")
   async websiteForm(@CurrentUser() user: SessionUser) {
     const c = CompanyContext.require();
     if (!(await this.mayChange(user))) throw new ForbiddenError("Only a Super Admin can see the website form's key.");
@@ -134,7 +134,7 @@ export class CompanyController {
   /** A new key: the old one stops working at once (paste the new snippet). */
   @Post("website-form/new-key")
   @HttpCode(200)
-  @RequirePermissions("settings.manage")
+  @RequirePermissions("settings.manage", "security.manage")
   async newFormKey(@CurrentUser() user: SessionUser) {
     const c = CompanyContext.require();
     if (!(await this.mayChange(user))) throw new ForbiddenError("Only a Super Admin can change the website form's key.");

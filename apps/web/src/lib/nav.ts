@@ -44,8 +44,8 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     icon: "sales",
     pages: [
       { href: "/inquiries", label: "Inquiries" },
+      // The list and the board are two views of one page (a switch on it): one item.
       { href: "/orders", label: "Orders" },
-      { href: "/orders/board", label: "Order board" },
       { href: "/customers", label: "Customers" },
       { href: "/follow-ups", label: "Follow-ups" },
     ],
@@ -198,7 +198,8 @@ export function buildModules({
   const show: Record<string, boolean> = {
     "/reports": reports,
     "/audit": can("audit.view") && feature("audit_log"),
-    "/settings/website-form": settings,
+    // The company's own web address and its website form's key are the admin's (managers run the rest of Company settings).
+    "/settings/website-form": settings && security,
     "/factories": sourcing,
     "/operations/purchase-orders": sourcing,
     "/money/company-costs": sourcing && managers && feature("expenses"),
@@ -208,7 +209,7 @@ export function buildModules({
     "/settings/reminders": settings,
     "/settings/emails": settings,
     "/settings/papers": settings,
-    "/settings/address": settings && companyAddresses,
+    "/settings/address": settings && security && companyAddresses,
     "/users": can("users.manage"),
     "/access/roles": security,
     "/access/sessions": security,

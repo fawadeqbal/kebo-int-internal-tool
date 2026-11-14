@@ -25,6 +25,8 @@ import { getSettings } from "@/lib/loaders";
 const copyHref = (id: string, back: string | undefined, internal: boolean) =>
   `/print/revisions/${id}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
 const numberOf = (r: RevisionDoc) => `${r.quotation.refNo}-R${r.number}`;
+/** A draft is marked DRAFT across the page, except on the copy being sent to the customer (which is what sends it). */
+const draftMark = (status: string, sending: string | undefined) => (status === "draft" && sending !== "1" ? "DRAFT" : null);
 
 export async function generateMetadata({
   params,
@@ -48,7 +50,7 @@ export default async function QuotationPrint({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ back?: string; copy?: string; embed?: string }>;
+  searchParams: Promise<{ back?: string; copy?: string; embed?: string; sending?: string }>;
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const r = await load(() => api.get<RevisionDoc>(`/revisions/${id}`));
@@ -178,7 +180,8 @@ export default async function QuotationPrint({
             <span />
           ) : null
         }
-        watermark={r.status === "draft" ? "DRAFT" : null}
+        // ?sending=1: the copy attached to the email that sends a draft; it reaches the customer as the sent quotation.
+        watermark={draftMark(r.status, sp.sending)}
       />
     </>
   );

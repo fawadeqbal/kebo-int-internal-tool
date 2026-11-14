@@ -123,7 +123,8 @@ export async function emailRevisionAction(dealId: string, revisionId: string, fi
   if (v.attach === "on") {
     const session = (await cookies()).get(SESSION_COOKIE)?.value;
     if (!session) return { ok: false, message: "Your session ended. Please sign in again.", values: v };
-    const made = await withChromium(session, (render) => render(`/print/revisions/${revisionId}`));
+    // Sending it is what makes a draft the sent quotation: the copy that goes out is printed as sent, without the DRAFT mark.
+    const made = await withChromium(session, (render) => render(`/print/revisions/${revisionId}?sending=1`));
     if (made instanceof Response) return { ok: false, message: `The PDF could not be made: ${await made.text()}`, values: v };
     pdf = Buffer.from(made).toString("base64");
   }
