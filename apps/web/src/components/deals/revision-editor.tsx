@@ -12,6 +12,7 @@ import {
   basisText,
   INCOTERMS,
   optionLetter,
+  readyAgainst,
   type BalanceTerms,
   type BasisStep,
   type Incoterm,
@@ -25,6 +26,7 @@ import { LineTable, type LineColumn } from "@/components/lines/line-table";
 import { localLineHandlers } from "@/components/lines/local-lines";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
+import { date } from "@/lib/format";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { PANEL_FORM, PanelFooter, PanelSection } from "@/components/common/panel";
 
@@ -151,6 +153,40 @@ export function linesOf(o: OptionState, offers: QuoteOffers): OfferLine[] | null
   if (!o.factoryQuoteId) return offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
   return offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.lines ?? null;
 }
+
+/**
+ * An offer's lead time against the day the customer wants the goods, if we ordered today:
+ * "45 days: ready about 29 Dec 2026, 9 days after the customer wants it". Null when either is not known.
+ */
+export function readyLine(leadTime: string | null | undefined, today: string | undefined, wantedBy: string | null | undefined): { text: string; late: boolean } | null {
+  const r = today ? readyAgainst(leadTime, today, wantedBy) : null;
+  if (!r) return null;
+  const start = `${leadTime!.trim()}: ready about ${date(r.readyOn)}`;
+  return r.late > 0 ? { text: `${start}, ${r.late} day${r.late === 1 ? "" : "s"} after the customer wants it`, late: true } : { text: `${start}, in time`, late: false };
+}
+
+/** What the factories of the ticked offers give as warranty ("Jiangsu gives 12 months · Henan Pack gives 18 months"), beside ours. */
+export function factoryWarranties(s: EditorState, offers: QuoteOffers): string | null {
+  const said = s.options
+    .map((o) => offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId))
+    .filter((o): o is QuoteOffers["offers"][number] => !!o?.warranty?.trim())
+    .map((o) => `${o.factory.name} gives ${o.warranty!.trim()}`);
+  return said.length ? [...new Set(said)].join(" · ") : null;
+}
+
+/** Our unit price against the price the customer hopes for: "4.0% over" or "2.8% under" (null: no target, or no price yet). */
+export function againstTarget(price: string, target: string | null | undefined): { text: string; over: boolean } | null {
+  const t = Number(target);
+  if (!target || !(t > 0) || !valid(price)) return null;
+  const p = Number(numberText(price));
+  if (!(p > 0)) return null;
+  const diff = ((p - t) / t) * 100;
+  if (Math.abs(diff) < 0.05) return { text: "on target", over: false };
+  return { text: `${Math.abs(diff).toFixed(1)}% ${diff > 0 ? "over" : "under"}`, over: diff > 0 };
+}
+
+/** The customer's target for a line: the item it answers (or the item itself, when priced by hand). */
+export const targetOf = (l: OfferLine, offers: QuoteOffers) => offers.items.find((i) => i.id === (l.requestedItemId ?? l.id))?.targetPrice ?? null;
 
 export function payload(s: EditorState, offers: QuoteOffers) {
   const costsOf = (o: OptionState) =>
@@ -347,6 +383,10 @@ export function RevisionEditor({
   const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => setS((st) => ({ ...st, [k]: v }));
   const setOption = (i: number, patch: Partial<OptionState> | ((o: OptionState) => Partial<OptionState>)) =>
     setS((st) => ({ ...st, options: st.options.map((o, n) => (n === i ? { ...o, ...(typeof patch === "function" ? patch(o) : patch) } : o)) }));
+  // A first revision says where a value came from, for as long as it still shows that value.
+  const fromCustomer = initial.from?.currency === "customer" && s.currency.trim().toUpperCase() === initial.currency;
+  const fromLast = initial.from?.delivery === "last_quotation";
+  const lastWords = `from the last quotation to ${initial.from?.customer ?? "this customer"}${initial.from?.lastQuotation ? ` (${initial.from.lastQuotation})` : ""}`;
 
   const currency = /^[A-Za-z]{3}$/.test(s.currency.trim()) ? s.currency.trim().toUpperCase() : "—";
   const fmt = (minor: number) => formatMinor(minor, currency);
@@ -560,9 +600,11 @@ export function RevisionEditor({
                       const t = on ? totalsOf(s.options[i]!) : null;
                       const none = off.lines.length === 0;
                       const last = on && s.options.length === 1;
+                      // Its lead time against the day the customer wants the goods (when both are known).
+                      const ready = none ? null : readyLine(off.leadTime, offers.today, offers.wantedBy);
                       const facts = [
                         none ? "No lines yet: add its lines on Factory offers to quote it" : off.coverage.missing.length ? `Does not include item ${off.coverage.missing.join(", ")}` : "Covers every item",
-                        off.leadTime,
+                        ready ? null : off.leadTime,
                         showCosts && off.totalCost ? `cost ${formatMinor(toMinor(off.totalCost), currency)}` : null,
                         showCosts && t && t.costing.marginPercent !== null ? `margin ${t.costing.marginPercent.toFixed(1)}%` : null,
                       ].filter(Boolean);
@@ -580,6 +622,7 @@ export function RevisionEditor({
                             <span className="min-w-0 flex-1">
                               <span className="block font-semibold">{off.factory.name}</span>
                               <span className="block text-xs text-text-2">{facts.join(" · ")}</span>
+                              {ready && <span className={cn("block text-xs font-medium", ready.late ? "text-bad" : "text-ok")}>{ready.text}</span>}
                             </span>
                             <span className="shrink-0 font-semibold tabular">{t ? fmt(t.totals.total) : "—"}</span>
                           </label>
@@ -637,14 +680,22 @@ export function RevisionEditor({
                     label="Currency"
                     htmlFor={`cur-${number}`}
                     error={st.errors?.currency}
-                    hint={converted ? <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span> : "Changing it converts the prices"}
+                    hint={
+                      converted ? (
+                        <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span>
+                      ) : fromCustomer ? (
+                        `${initial.from?.customer ?? "The customer"} is quoted in ${initial.currency} (from the customer)`
+                      ) : (
+                        "Changing it converts the prices"
+                      )
+                    }
                   >
                     <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
                   </Field>
                   <Field label="Valid until" htmlFor={`valid-${number}`} error={st.errors?.validUntil}>
                     <Input id={`valid-${number}`} type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
                   </Field>
-                  <Field label="Delivery (incoterm)" htmlFor={`inco-${number}`} error={st.errors?.incoterm}>
+                  <Field label="Delivery (incoterm)" htmlFor={`inco-${number}`} error={st.errors?.incoterm} hint={fromLast && s.incoterm === initial.incoterm ? lastWords : undefined}>
                     <Select id={`inco-${number}`} value={s.incoterm} onChange={(e) => set("incoterm", e.target.value as Incoterm)}>
                       {INCOTERMS.map((t) => (
                         <option key={t} value={t}>
@@ -653,7 +704,13 @@ export function RevisionEditor({
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Place" htmlFor={`place-${number}`} optional error={st.errors?.incotermPlace} hint="The port or place for the incoterm">
+                  <Field
+                    label="Place"
+                    htmlFor={`place-${number}`}
+                    optional
+                    error={st.errors?.incotermPlace}
+                    hint={fromLast && initial.incotermPlace && s.incotermPlace === initial.incotermPlace ? lastWords : "The port or place for the incoterm"}
+                  >
                     <Input id={`place-${number}`} value={s.incotermPlace} maxLength={80} placeholder="e.g. Karachi" onChange={(e) => set("incotermPlace", e.target.value)} />
                   </Field>
                 </PanelSection>
@@ -681,7 +738,13 @@ export function RevisionEditor({
                   <Field label="Delivery terms" htmlFor={`del-terms-${number}`} optional error={st.errors?.deliveryTerms} hint="Printed under the delivery time">
                     <Textarea id={`del-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. packing, inspection" value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
                   </Field>
-                  <Field label="Warranty" htmlFor={`warranty-${number}`} optional error={st.errors?.warranty} hint="Starts from the company's usual warranty; change it for this quotation">
+                  <Field
+                    label="Warranty"
+                    htmlFor={`warranty-${number}`}
+                    optional
+                    error={st.errors?.warranty}
+                    hint={showCosts && factoryWarranties(s, offers) ? factoryWarranties(s, offers) : "Starts from the company's usual warranty; change it for this quotation"}
+                  >
                     <Input id={`warranty-${number}`} maxLength={300} placeholder="e.g. 12 months from commissioning" value={s.warranty} onChange={(e) => set("warranty", e.target.value)} />
                   </Field>
                   <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last">

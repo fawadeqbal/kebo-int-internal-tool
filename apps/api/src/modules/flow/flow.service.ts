@@ -9,6 +9,7 @@ import {
   DEFAULT_SAT_CHECKS,
   deliveryConditionOf,
   flowSteps,
+  leadDays,
   ORDER_DOCUMENT_LABEL,
   portsOf,
   appMakesDocument,
@@ -1476,13 +1477,5 @@ export class FlowService {
   }
 }
 
-/** "45 days", "8-10 weeks", "2 months after the deposit" → days (the longer end of a range); null when it says no number. */
-export function leadDays(text: string | null): number | null {
-  if (!text) return null;
-  const m = /(\d+)(?:\s*(?:-|–|to)\s*(\d+))?\s*(working days?|days?|weeks?|wks?|months?)/i.exec(text);
-  if (!m) return null;
-  const n = Number(m[2] ?? m[1]);
-  const unit = m[3]!.toLowerCase();
-  const days = unit.startsWith("month") ? n * 30 : unit.startsWith("w") && !unit.startsWith("working") ? n * 7 : unit.startsWith("working") ? Math.ceil((n * 7) / 5) : n;
-  return days > 0 && days <= 730 ? days : null;
-}
+// The lead time read as days lives with the quotation rules (the quotation window uses it too).
+export { leadDays };

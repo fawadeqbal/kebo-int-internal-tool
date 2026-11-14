@@ -181,3 +181,29 @@ export function revisionWorth<O extends OptionRef>(
   const highMinor = Math.max(...all);
   return { lowMinor, highMinor, accepted: false, label: lowMinor === highMinor ? "" : `lowest–highest of ${options.length} options` };
 }
+
+/** "45 days", "8-10 weeks", "2 months after the deposit" → days (the longer end of a range); null when it says no number. */
+export function leadDays(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const m = /(\d+)(?:\s*(?:-|–|to)\s*(\d+))?\s*(working days?|days?|weeks?|wks?|months?)/i.exec(text);
+  if (!m) return null;
+  const n = Number(m[2] ?? m[1]);
+  const unit = m[3]!.toLowerCase();
+  const days = unit.startsWith("month") ? n * 30 : unit.startsWith("w") && !unit.startsWith("working") ? n * 7 : unit.startsWith("working") ? Math.ceil((n * 7) / 5) : n;
+  return days > 0 && days <= 730 ? days : null;
+}
+
+const DAY = 86_400_000;
+const utc = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+
+/**
+ * A lead time against the day the customer wants the goods: ordered today it is ready on `readyOn`,
+ * `late` days after the wanted day (0 or less: in time). Null when the lead time says no number or
+ * the customer gave no day.
+ */
+export function readyAgainst(leadTime: string | null | undefined, today: string, wantedBy: string | null | undefined): { days: number; readyOn: string; late: number } | null {
+  const days = leadDays(leadTime);
+  if (days === null || !wantedBy) return null;
+  const ready = utc(today) + days * DAY;
+  return { days, readyOn: new Date(ready).toISOString().slice(0, 10), late: Math.round((ready - utc(wantedBy)) / DAY) };
+}

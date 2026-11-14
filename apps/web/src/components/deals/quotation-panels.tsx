@@ -6,6 +6,7 @@ import { FilePlus2 } from "lucide-react";
 import { Button, ButtonLink, Card, cn, EmptyState } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
+import { date } from "@/lib/format";
 import { SidePanel } from "@/components/common/panel";
 import { TermsPanel } from "./quotation-step";
 
@@ -113,7 +114,11 @@ export function StartRevision({
   return (
     <SidePanel
       title={`New quotation R${draft.number}`}
-      description={first ? "Which offers to quote, and the terms. The number is given on save." : `Starts as a copy of R${draft.number - 1}. Change what is different, then save the draft.`}
+      description={
+        first
+          ? `Which offers to quote, and the terms.${offers.wantedBy ? ` The customer wants it by ${date(offers.wantedBy)}.` : " The number is given on save."}`
+          : `Starts as a copy of R${draft.number - 1}. Change what is different, then save the draft.`
+      }
       className="md:w-[860px]"
       onClose={close}
     >
