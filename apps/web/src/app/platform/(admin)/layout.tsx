@@ -7,13 +7,14 @@ import type { PlatformCounts } from "@/lib/types-platform";
 
 export const metadata = { title: { template: "%s · Platform", default: "Platform" } };
 
-export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
+export default async function PlatformLayout({ children, window: win }: { children: React.ReactNode; window: React.ReactNode }) {
   const admin = await requirePlatformAdmin();
   const counts = await platformApi.get<PlatformCounts>("/counts").catch(() => ({}));
   return (
     <>
       <PlatformShell admin={admin} counts={counts}>
         {children}
+        {win}
       </PlatformShell>
       <Suspense>
         <Toast />

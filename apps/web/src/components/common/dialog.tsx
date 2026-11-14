@@ -2,7 +2,9 @@
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import { Button } from "@kebo/ui";
+import { lockScroll } from "@/lib/scroll-lock";
 import { useChanges, watchChanges } from "./changes";
 
 const noop = () => () => {};
@@ -152,12 +154,61 @@ export function ConfirmDialog({
   );
 }
 
+/* ---------------------------------------------------------------- the one window */
+
 /**
- * A dialog over the page (board OrderCancel): a title and one line under it,
- * the close button, the body, and the footer's buttons. Escape, × or the
- * backdrop closes it (unless busy): at once when nothing in it was changed,
- * after "Discard changes?" when something was (the same rule as the side
- * panel). Focus stays inside while it is open.
+ * The frame every window shares (Modal and the URL-kept SidePanel): one look and one way everywhere.
+ * Tablet and up: a window in the middle of the screen, as tall as its content (88% of the screen at most),
+ * its width chosen for its form; a phone: the whole screen. Title and one line under it, ✕ on the right.
+ */
+export const WINDOW_LAYER = "fixed inset-0 flex md:items-start md:justify-center md:overflow-y-auto md:px-6 md:py-[6vh]";
+export const WINDOW_BOX =
+  "relative flex h-dvh w-full animate-in flex-col bg-surface shadow-pop md:h-auto md:max-h-[88vh] md:max-w-[calc(100vw-3rem)] md:overflow-hidden md:rounded-2xl md:border md:border-line";
+
+export function WindowHead({
+  id,
+  title,
+  description,
+  onClose,
+  disabled,
+  headRef,
+}: {
+  id: string;
+  title: ReactNode;
+  description?: ReactNode;
+  onClose: () => void;
+  disabled?: boolean;
+  headRef?: RefObject<HTMLHeadingElement | null>;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
+      <div className="min-w-0">
+        <h2 id={`${id}-title`} ref={headRef} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none">
+          {title}
+        </h2>
+        {description && (
+          <p id={`${id}-desc`} className="mt-0.5 text-[13px] text-text-2">
+            {description}
+          </p>
+        )}
+      </div>
+      <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled}>
+        <X aria-hidden />
+      </Button>
+    </div>
+  );
+}
+
+/** A window's buttons: Cancel and the save on the right, at the bottom, always in view. */
+export const WINDOW_FOOTER =
+  "flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-6";
+
+const MODAL_WIDTH = { md: "md:w-[600px]", lg: "md:w-[760px]" } as const;
+
+/**
+ * A window over the page (cancel an order, a file, a request): the same frame as every other window.
+ * Escape, ✕ or a click beside it closes it (unless busy): at once when nothing in it was changed, after
+ * "Discard changes?" when something was. Focus stays inside while it is open.
  */
 export function Modal({
   title,
@@ -182,6 +233,7 @@ export function Modal({
   const [asking, setAsking] = useState(false);
   const changes = useChanges(box);
   useFocusTrap(box, mounted);
+  useEffect(() => lockScroll(), []);
   const close = () => {
     if (busy) return;
     if (changes.changed()) setAsking(true);
@@ -189,34 +241,25 @@ export function Modal({
   };
   if (!mounted) return null;
   return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto p-4" data-layer>
-      <div aria-hidden className="fixed inset-0 bg-black/40" onClick={close} />
+    <div className={`${WINDOW_LAYER} z-[100]`} data-layer>
+      <div aria-hidden className="fixed inset-0 animate-in bg-black/40" onClick={close} />
       <div
         ref={box}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={`${id}-t`}
+        aria-labelledby={`${id}-title`}
+        aria-describedby={sub ? `${id}-desc` : undefined}
         {...watchChanges(changes)}
         onKeyDown={(e) => {
           if (e.key !== "Escape") return;
           e.stopPropagation();
           close();
         }}
-        className={`relative flex max-h-[calc(100dvh-2rem)] w-full animate-in flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-pop ${size === "lg" ? "max-w-3xl" : "max-w-xl"}`}
+        className={`${WINDOW_BOX} ${MODAL_WIDTH[size]}`}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
-          <div className="min-w-0">
-            <h2 id={`${id}-t`} className="text-lg font-semibold">
-              {title}
-            </h2>
-            {sub && <p className="text-sm text-text-2">{sub}</p>}
-          </div>
-          <Button size="sm" variant="secondary" aria-label="Close" onClick={close} disabled={busy} className="size-9 px-0">
-            <span aria-hidden>×</span>
-          </Button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">{children}</div>
-        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line bg-surface-2/60 px-5 py-3.5 sm:px-6">{footer}</div>}
+        <WindowHead id={id} title={title} description={sub} onClose={close} disabled={busy} />
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 sm:px-6">{children}</div>
+        {footer && <div className={WINDOW_FOOTER}>{footer}</div>}
       </div>
       {asking && (
         <ConfirmDialog

@@ -4,10 +4,9 @@ import { lockScroll } from "@/lib/scroll-lock";
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { X } from "lucide-react";
-import { Button, buttonClass, cn, type ButtonSize, type ButtonVariant } from "@kebo/ui";
+import { buttonClass, cn, type ButtonSize, type ButtonVariant } from "@kebo/ui";
 import { useChanges, watchChanges } from "./changes";
-import { ConfirmDialog, focusables, useFocusTrap, useMounted } from "./dialog";
+import { ConfirmDialog, focusables, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
 
 /* ---------------------------------------------------------------- closing */
 
@@ -21,6 +20,8 @@ const PanelClose = createContext<(arg?: CloseArg) => void>(() => {});
  * changes?" first, only when something was really changed).
  */
 export const useClosePanel = () => useContext(PanelClose);
+/** For a window that is not a SidePanel (a page shown as a window) to give its forms the same Cancel. */
+export const PanelCloseProvider = PanelClose.Provider;
 
 const PanelDirty = createContext<(dirty: boolean | null) => void>(() => {});
 /**
@@ -34,12 +35,11 @@ const saved = (arg: CloseArg) => !!arg && typeof arg === "object" && "ok" in arg
 /* ---------------------------------------------------------------- the panel */
 
 /**
- * The one way to create and edit (design system: side panel). It comes in
- * from the right over the page you are on: 600px on a desktop, 520px on a
- * laptop (≤1279px), the whole screen under 768px with Save pinned at the
- * bottom. Its title says which ("New customer", "Edit customer · Lahore
- * Pharma"); the body is a form in titled groups (PanelSection) with Save /
- * Cancel in a footer that stays in view (PanelActions).
+ * The one way to create and edit: a window in the middle of the page you are on (the same frame as every
+ * other window, see WindowHead), 720px wide unless its form needs more; the whole screen on a phone, with
+ * Save pinned at the bottom. Its title says which ("New customer", "Edit customer · Lahore Pharma"); the
+ * body is a form in titled groups (PanelSection) with Save / Cancel in a footer that stays in view
+ * (PanelActions).
  *
  * For everyone: role=dialog, aria-modal, named by its title; focus starts on
  * the first field, stays inside while it is open and goes back to the button
@@ -95,8 +95,8 @@ export function SidePanel({
 
   if (!mounted) return null;
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex justify-end md:items-start md:justify-center md:overflow-y-auto md:px-6 md:py-[6vh]">
-      {/* The dim page beside it: a click closes (the keyboard has Escape and ✕). */}
+    <div className={cn(WINDOW_LAYER, "z-[80]")}>
+      {/* The dim page behind it: a click closes (the keyboard has Escape and ✕). */}
       <div aria-hidden className="absolute inset-0 animate-in bg-black/40" onClick={() => request()} />
       <div
         ref={box}
@@ -119,27 +119,9 @@ export function SidePanel({
             form.requestSubmit();
           }
         }}
-        className={cn(
-          // Phone: the whole screen. Tablet and up: a window in the middle (Kebo ERP look), as tall as its form.
-          "relative flex h-dvh w-full animate-panel-in flex-col bg-surface shadow-pop md:h-auto md:max-h-[88vh] md:w-[720px] md:max-w-[calc(100vw-3rem)] md:animate-in md:overflow-hidden md:rounded-2xl md:border md:border-line",
-          className,
-        )}
+        className={cn(WINDOW_BOX, "md:w-[720px]", className)}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
-          <div className="min-w-0">
-            <h2 id={`${id}-title`} ref={head} tabIndex={-1} className="text-xl font-bold tracking-tight outline-none">
-              {title}
-            </h2>
-            {description && (
-              <p id={`${id}-desc`} className="mt-0.5 text-[13px] text-text-2">
-                {description}
-              </p>
-            )}
-          </div>
-          <Button size="icon-sm" variant="ghost" aria-label="Close the panel" onClick={() => request()}>
-            <X aria-hidden />
-          </Button>
-        </div>
+        <WindowHead id={id} title={title} description={description} onClose={() => request()} headRef={head} />
         <PanelClose.Provider value={request}>
           <PanelDirty.Provider value={setReported}>{children}</PanelDirty.Provider>
         </PanelClose.Provider>

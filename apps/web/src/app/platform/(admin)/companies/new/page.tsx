@@ -1,24 +1,13 @@
 import Link from "next/link";
 import { Card, CardBody, PageHeader } from "@kebo/ui";
-import { platformApi } from "@/lib/api";
-import type { LeadDetail, Plan } from "@/lib/types-platform";
-import { NewCompanyForm, type Prefill } from "./form";
+import { newCompanyData } from "./data";
+import { NewCompanyForm } from "./form";
 
 export const metadata = { title: "New company or demo" };
 
+/** New company or demo as its own page (a new tab or a reload); from a button it opens as a window (@window/(.)companies/new). */
 export default async function NewCompanyPage({ searchParams }: { searchParams: Promise<{ lead?: string; kind?: string }> }) {
-  const sp = await searchParams;
-  const [plans, lead] = await Promise.all([
-    platformApi.get<Plan[]>("/plans"),
-    sp.lead ? platformApi.get<LeadDetail>(`/leads/${sp.lead}`).catch(() => null) : null,
-  ]);
-  const prefill: Prefill = {
-    kind: sp.kind === "demo" ? "demo" : sp.kind === "client" ? "client" : lead ? "demo" : "client",
-    name: lead?.companyName,
-    adminName: lead?.name,
-    adminEmail: lead?.email,
-    leadId: lead?.id,
-  };
+  const { plans, lead, prefill } = await newCompanyData(await searchParams);
   return (
     <div className="max-w-3xl">
       <PageHeader

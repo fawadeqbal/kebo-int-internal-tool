@@ -549,7 +549,18 @@ export function Kbd({ children }: { children: ReactNode }) {
 }
 
 /** Sub-tabs as chips (the page's sections), as links: URL-driven, so they work without JavaScript. The current one is soft green. */
-export function LinkTabs({ tabs, className, label }: { tabs: { href: string; label: ReactNode; count?: number; active: boolean; alert?: boolean }[]; className?: string; label: string }) {
+export function LinkTabs({
+  tabs,
+  className,
+  label,
+  replace,
+}: {
+  tabs: { href: string; label: ReactNode; count?: number; active: boolean; alert?: boolean }[];
+  className?: string;
+  label: string;
+  /** Switch in place (no new history step): tabs inside a window. */
+  replace?: boolean;
+}) {
   return (
     <ScrollFade
       as="nav"
@@ -560,6 +571,8 @@ export function LinkTabs({ tabs, className, label }: { tabs: { href: string; lab
         <Link
           key={t.href}
           href={t.href}
+          replace={replace}
+          scroll={replace ? false : undefined}
           aria-current={t.active ? "page" : undefined}
           className={cn(
             "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap transition-colors [&_svg]:size-4",

@@ -22,7 +22,7 @@ function logoUrl(logo: string | undefined) {
   return `/company-logo?v=${logo.length.toString(36)}${(h >>> 0).toString(36)}`;
 }
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children, window: win }: { children: React.ReactNode; window: React.ReactNode }) {
   const me = await requireUser();
   const [{ unread }, settings, company] = await Promise.all([
     api.get<{ unread: number }>("/notifications", { take: 1 }),
@@ -91,6 +91,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <FeaturesProvider features={company?.features ?? null}>
           <AccountsProvider accounts={accounts} me={me.name} canAdd={has("expenses.manage") && feature("cash_book")}>
             {children}
+            {win}
           </AccountsProvider>
         </FeaturesProvider>
       </AppShell>
