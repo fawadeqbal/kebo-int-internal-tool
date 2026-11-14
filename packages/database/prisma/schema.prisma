@@ -2650,6 +2650,9 @@ model FollowUp {
   doneBy      User?     @relation("FollowUpDoneBy", fields: [doneById], references: [id], onDelete: SetNull)
   /// What came of it (said when ticking it done).
   doneNote    String?   @map("done_note") @db.VarChar(2000)
+  /// Set by the system, and closed by it when what it waits for happens: "reply" (a new inquiry: reply to
+  /// the customer), "quote1".."quote3" (a quotation sent: follow up after 3, 7, 14 days). None: made by a person.
+  auto        String?   @db.VarChar(10)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 

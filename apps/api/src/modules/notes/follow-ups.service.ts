@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { claimOnce, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
-import { can, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, REMINDER_HOUR, type FollowUpDoneInput, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
+import { can, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, QUOTE_FOLLOW_UP_DAYS, REMINDER_HOUR, type FollowUpDoneInput, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
 import { addDays, daysBetween, DomainError, ForbiddenError, GateError, NotFoundError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -52,6 +52,16 @@ export function dueWords(dueOn: ISODate, dueAt: string | null) {
   return dueAt ? `${day} ${dueAt}` : day;
 }
 
+/**
+ * After a follow-up the system set on a sent quotation ("quote1": 3 days after), the one that comes next
+ * ("quote2", 4 days later: 7 days after it was sent), or null after the last (then the person sets the next).
+ */
+export function nextQuoteStep(auto: string | null): { auto: string; gap: number } | null {
+  const n = Number(/^quote(\d)$/.exec(auto ?? "")?.[1] ?? 0);
+  if (!n || n >= QUOTE_FOLLOW_UP_DAYS.length) return null;
+  return { auto: `quote${n + 1}`, gap: QUOTE_FOLLOW_UP_DAYS[n]! - QUOTE_FOLLOW_UP_DAYS[n - 1]! };
+}
+
 /** Late: not done, and its day has passed, or it is today and its time has passed. */
 export const isLate = (r: { doneAt: Date | null; dueOn: ISODate; dueAt: string | null }, today: ISODate, now: string) =>
   !r.doneAt && (r.dueOn < today || (r.dueOn === today && r.dueAt !== null && r.dueAt < now));
@@ -87,17 +97,19 @@ export class FollowUpsService {
    * The follow-ups, among these, that are the last open one of an open inquiry. An open inquiry is never left
    * without a next follow-up, so finishing one of these needs the next one (and it cannot be removed).
    */
-  private async lastOpenOnInquiry(rows: { id: string; inquiryId: string | null; doneAt: Date | null }[]): Promise<Set<string>> {
+  private async lastOpenOnInquiry(rows: { id: string; inquiryId: string | null; doneAt: Date | null; auto: string | null }[]): Promise<Set<string>> {
     const mine = rows.filter((r) => !r.doneAt && r.inquiryId);
     const ids = [...new Set(mine.map((r) => r.inquiryId!))];
     if (!ids.length) return new Set();
     const [open, counts] = await Promise.all([
-      this.prisma.db.inquiry.findMany({ where: { id: { in: ids }, deletedAt: null, stage: { in: [...OPEN_STAGES] } }, select: { id: true } }),
+      this.prisma.db.inquiry.findMany({ where: { id: { in: ids }, deletedAt: null, stage: { in: [...OPEN_STAGES] } }, select: { id: true, stage: true } }),
       this.prisma.db.followUp.groupBy({ by: ["inquiryId"], where: { inquiryId: { in: ids }, doneAt: null }, _count: { _all: true } }),
     ]);
-    const openIds = new Set(open.map((i) => i.id));
+    const stageOf = new Map(open.map((i) => [i.id, i.stage]));
     const left = new Map(counts.map((c) => [c.inquiryId, c._count._all]));
-    return new Set(mine.filter((r) => openIds.has(r.inquiryId!) && (left.get(r.inquiryId) ?? 0) <= 1).map((r) => r.id));
+    // While the customer has not answered a quotation, the system sets the next one itself (after 3, 7, 14 days).
+    const systemGoesOn = (r: (typeof mine)[number]) => stageOf.get(r.inquiryId!) === "quoted" && nextQuoteStep(r.auto) !== null;
+    return new Set(mine.filter((r) => stageOf.has(r.inquiryId!) && (left.get(r.inquiryId) ?? 0) <= 1 && !systemGoesOn(r)).map((r) => r.id));
   }
 
   private views(user: SessionUser, rows: FollowUpRow[], labels: Map<string, RecordRef>, last: Set<string> = new Set()) {
@@ -389,38 +401,58 @@ export class FollowUpsService {
       if (next && next.dueOn < this.clock.today()) throw new DomainError("Choose today or a later day for the next follow-up.");
       const nextFor = next?.assigneeId ?? row.assigneeId;
       if (next && nextFor !== row.assigneeId && nextFor !== user.id) await this.checkAssignee(nextFor);
+      // A quotation's follow-up set by the system, and the customer has not answered: the system sets the one after it.
+      const step = next ? null : await this.quoteStepAfter(row);
       const ref = await this.labelOf(row);
       made = await this.prisma.tx(async (tx) => {
         const done = await tx.followUp.updateMany({ where: { id, doneAt: null }, data: { doneAt: this.clock.now(), doneById: user.id, doneNote: note } });
         if (!done.count) return null;
         await this.history(tx, user, ref, "follow_up.done", id, `${user.name} did "${row.title}"${note ? `: ${note}` : ""}`);
-        if (!next) return null;
+        if (!next && !step) return null;
+        const dueOn = next ? next.dueOn : step!.dueOn;
         const after = await tx.followUp.create({
           data: {
-            title: next.title ?? row.title,
+            title: next?.title ?? row.title,
             kind: row.kind,
-            dueOn: toDbDate(next.dueOn),
-            dueAt: next.dueAt,
+            dueOn: toDbDate(dueOn),
+            dueAt: next?.dueAt ?? null,
             inquiryId: row.inquiryId,
             orderId: row.orderId,
             customerId: row.customerId,
             factoryId: row.factoryId,
             assigneeId: nextFor,
-            createdById: user.id,
+            createdById: next ? user.id : row.createdById,
+            auto: next ? null : step!.auto,
             createdAt: this.clock.now(),
           },
           include: followUpInclude,
         });
-        await this.history(tx, user, ref, "follow_up.added", after.id, `${user.name} set the next follow-up for ${nextFor === user.id ? "themselves" : after.assignee.name} on ${dueWords(next.dueOn, next.dueAt)}: ${after.title}`, {
-          assignee: after.assignee.name,
-          dueOn: next.dueOn,
-          dueAt: next.dueAt,
-        });
+        const who = nextFor === user.id ? "themselves" : after.assignee.name;
+        await this.history(
+          tx,
+          user,
+          ref,
+          "follow_up.added",
+          after.id,
+          next ? `${user.name} set the next follow-up for ${who} on ${dueWords(dueOn, after.dueAt)}: ${after.title}` : `The next follow-up is set for ${dueWords(dueOn, null)}: ${after.title}`,
+          { assignee: after.assignee.name, dueOn, dueAt: after.dueAt },
+        );
         return after;
       });
-      if (made && made.assigneeId !== user.id) await this.tellAssignee(user, made, ref);
+      if (made && next && made.assigneeId !== user.id) await this.tellAssignee(user, made, ref);
     }
     return { ...(await this.view(user, id)), next: made ? await this.view(user, made.id) : null };
+  }
+
+  /** The system's next follow-up on a sent quotation the customer has not answered: 7, then 14 days after it was sent, and never before tomorrow. */
+  private async quoteStepAfter(row: FollowUpRow): Promise<{ auto: string; dueOn: ISODate } | null> {
+    const step = nextQuoteStep(row.auto);
+    if (!step || !row.inquiryId) return null;
+    const inquiry = await this.prisma.db.inquiry.findFirst({ where: { id: row.inquiryId, deletedAt: null, stage: "quoted" }, select: { id: true } });
+    if (!inquiry) return null;
+    const planned = addDays(fromDbDate(row.dueOn), step.gap);
+    const tomorrow = addDays(this.clock.today(), 1);
+    return { auto: step.auto, dueOn: planned > tomorrow ? planned : tomorrow };
   }
 
   /** Not done after all (again: no change). */

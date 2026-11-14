@@ -134,6 +134,11 @@ export const REMINDER_HOUR = 8;
 /** A follow-up missed this many days is told to the managers and to who gave it, every morning until it is done. */
 export const FOLLOW_UP_ESCALATE_DAYS = 2;
 
+/** A new inquiry: the system sets "Reply to the customer" this many days on, for who handles it. */
+export const REPLY_WITHIN_DAYS = 1;
+/** A quotation sent: the system sets a follow-up this many days after, one after the other, until the customer answers. */
+export const QUOTE_FOLLOW_UP_DAYS = [3, 7, 14] as const;
+
 /**
  * POST /follow-ups/:id/done — what came of it (optional), and the next follow-up. An open inquiry is never
  * left without a next follow-up: finishing its last open one needs `next` (the day, and optionally a time,
