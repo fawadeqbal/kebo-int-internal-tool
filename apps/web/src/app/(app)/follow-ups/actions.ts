@@ -80,7 +80,9 @@ export async function editFollowUpAction(id: string, _prev: ActionState, form: F
 
 export async function followUpDoneAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/follow-ups/${id}/done`, { note: v.note || null }), "Done.");
+  // The last open follow-up of an open inquiry is finished together with the next one (its day is asked for).
+  const next = v.nextDueOn ? { dueOn: v.nextDueOn, dueAt: v.nextDueAt || null, title: v.nextTitle?.trim() || undefined } : undefined;
+  const r = await attempt(form, () => api.post(`/follow-ups/${id}/done`, { note: v.note || null, ...(next ? { next } : {}) }), next ? "Done. The next follow-up is set." : "Done.");
   if (r.ok) revalidatePath("/", "layout");
   return r;
 }

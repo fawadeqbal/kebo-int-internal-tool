@@ -129,8 +129,27 @@ export const followUpEditInput = z
   .superRefine(oneTarget);
 export type FollowUpEditInput = z.infer<typeof followUpEditInput>;
 
-/** POST /follow-ups/:id/done — what came of it (optional). */
-export const followUpDoneInput = z.object({ note: optionalText(2000) });
+/** The hour the day's reminders go out (business time zone): not at midnight, when the day begins. */
+export const REMINDER_HOUR = 8;
+/** A follow-up missed this many days is told to the managers and to who gave it, every morning until it is done. */
+export const FOLLOW_UP_ESCALATE_DAYS = 2;
+
+/**
+ * POST /follow-ups/:id/done — what came of it (optional), and the next follow-up. An open inquiry is never
+ * left without a next follow-up: finishing its last open one needs `next` (the day, and optionally a time,
+ * what to do and who), which is made in the same save. The other way out is closing the inquiry (won or lost).
+ */
+export const followUpDoneInput = z.object({
+  note: optionalText(2000),
+  next: z
+    .object({
+      dueOn: isoDate("Choose the day of the next follow-up"),
+      dueAt: timeOfDay,
+      title: z.preprocess(blank, z.string().trim().max(200).optional()),
+      assigneeId: optionalId,
+    })
+    .nullish(),
+});
 export type FollowUpDoneInput = z.infer<typeof followUpDoneInput>;
 
 const flag = z

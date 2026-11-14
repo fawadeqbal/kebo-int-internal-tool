@@ -135,6 +135,37 @@ export class NotificationsService implements OnModuleInit {
     }
   }
 
+  /** Email can be sent now: the company's own (Admin settings › Email sending), or the server's. */
+  async canEmail(): Promise<boolean> {
+    return (await this.mail.mailer()).enabled;
+  }
+
+  /**
+   * An email to one person of the company, at their own address (their reminders). Nothing when they are
+   * not active or email is not set up; a failure is logged and never stops the work that sent it.
+   */
+  async emailUser(userId: string, subject: string, content: Parameters<typeof renderEmail>[0]): Promise<boolean> {
+    try {
+      const mailer = await this.mail.mailer();
+      if (!mailer.enabled) return false;
+      const to = await this.prisma.db.user.findFirst({ where: { id: userId, isActive: true, isSystem: false, platformAdminId: null }, select: { email: true } });
+      if (!to?.email) return false;
+      const slug = CompanyContext.current()?.slug;
+      const origin = slug ? companyOrigin(slug, this.env.BASE_DOMAIN, this.env.APP_URL) : this.env.APP_URL;
+      const s = await this.settings.get();
+      const { html, text } = renderEmail({
+        ...content,
+        link: content.link ? new URL(content.link, origin).toString() : undefined,
+        footer: `${s.company.name}${content.footer ? ` · ${content.footer}` : ""}`,
+      });
+      await mailer.send({ to: to.email, subject, html, text });
+      return true;
+    } catch (e) {
+      this.log.warn(`email to a person failed: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
   /* ---------------------------------------------------------------- reacting to events */
 
   onModuleInit() {

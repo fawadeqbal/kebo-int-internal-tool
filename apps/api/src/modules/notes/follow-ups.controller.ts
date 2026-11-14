@@ -51,7 +51,7 @@ export class FollowUpsController {
   @Post("follow-ups/:id/done")
   @HttpCode(200)
   done(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(followUpDoneInput)) body: FollowUpDoneInput) {
-    return this.followUps.done(user, id, body.note);
+    return this.followUps.done(user, id, body.note, body.next);
   }
 
   @Post("follow-ups/:id/reopen")
