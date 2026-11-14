@@ -70,7 +70,7 @@ export default async function CustomerInquiries({
                 </ButtonLink>
               ) : can(me, "inquiries.create") ? (
                 <ButtonLink href={`/inquiries?panel=new-inquiry&for=${c.id}`}>
-                  <Plus aria-hidden /> New inquiry
+                  <Plus aria-hidden /> Add inquiry
                 </ButtonLink>
               ) : undefined
             }

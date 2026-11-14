@@ -4,9 +4,7 @@ import { Check, Clock, Filter, Pencil, Plus, TriangleAlert, User, Users } from "
 import {
   Badge,
   Button,
-  ButtonLink,
   Card,
-  CardHeader,
   cn,
   EmptyState,
   LinkTabs,
@@ -30,6 +28,7 @@ import { PanelButton } from "@/components/orders/step-view";
 import { FollowUpCheck, FollowUpDoneNext, FollowUpFields, type AboutOption } from "@/components/notes/note-forms";
 import { dueText, todayHere } from "@/components/notes/kinds";
 import { DataTable } from "@/components/common/data-table";
+import { NewFollowUpBody } from "@/components/notes/new-follow-up";
 import { addFollowUpAction, editFollowUpAction, followUpDoneAction, followUpReopenAction } from "./actions";
 import { getPeople } from "@/lib/loaders";
 
@@ -136,10 +135,14 @@ export default async function FollowUpsPage({
         title="Follow-ups"
         summary="Your reminders to call, visit or chase"
         primary={
-          <ButtonLink href="#new-follow-up" variant="primary">
-            <Plus aria-hidden />
-            New follow-up
-          </ButtonLink>
+          <PanelButton
+            variant="primary"
+            icon={<Plus aria-hidden />}
+            label="Add follow-up"
+            title="New follow-up"
+            description="Shows on the dashboard on its day, with a reminder."
+            body={<NewFollowUpBody action={addFollowUpAction.bind(null, null)} people={people} meId={me.id} today={today} about={aboutOptions} />}
+          />
         }
       />
       <LinkTabs
@@ -248,7 +251,7 @@ export default async function FollowUpsPage({
           Filter
         </Button>
       </form>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex flex-col gap-4">
         <Card className="overflow-clip p-0">
           {list.rows.length === 0 ? (
             <EmptyState
@@ -324,7 +327,7 @@ export default async function FollowUpsPage({
                               label={<span className="sr-only">Edit {f.title}</span>}
                               title="Edit follow-up"
                               body={
-                                <div className="p-5">
+                                <div className="p-5 sm:px-6">
                                   <FollowUpFields
                                     action={editFollowUpAction.bind(null, f.id)}
                                     people={people}
@@ -345,19 +348,6 @@ export default async function FollowUpsPage({
             </DataTable>
           )}
           <Pager base="/follow-ups" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} />
-        </Card>
-        <Card id="new-follow-up" className="scroll-mt-24">
-          <CardHeader title="New follow-up" />
-          <div className="p-5">
-            <FollowUpFields
-              action={addFollowUpAction.bind(null, null)}
-              people={people}
-              meId={me.id}
-              today={today}
-              about={aboutOptions}
-              submit="Save follow-up"
-            />
-          </div>
         </Card>
       </div>
     </>

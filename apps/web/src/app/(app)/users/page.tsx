@@ -92,9 +92,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           </>
         }
         primary={
-          <OpenPanelButton panel="new-user" variant="primary" label="Add a person">
+          <OpenPanelButton panel="new-user" variant="primary" label="Add person">
             <Plus aria-hidden /> <span className="sm:hidden">Add</span>
-            <span className="max-sm:hidden">Add a person</span>
+            <span className="max-sm:hidden">Add person</span>
           </OpenPanelButton>
         } />
       {without.length > 0 && (

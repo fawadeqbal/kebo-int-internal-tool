@@ -112,9 +112,9 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
         }
         primary={
           canCreate && (
-            <OpenPanelButton panel="new-inquiry" variant="primary" label="New inquiry">
-              <Plus aria-hidden /> <span className="sm:hidden">New</span>
-              <span className="max-sm:hidden">New inquiry</span>
+            <OpenPanelButton panel="new-inquiry" variant="primary" label="Add inquiry">
+              <Plus aria-hidden /> <span className="sm:hidden">Add</span>
+              <span className="max-sm:hidden">Add inquiry</span>
             </OpenPanelButton>
           )
         }

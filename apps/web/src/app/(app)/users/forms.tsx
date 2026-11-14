@@ -74,7 +74,7 @@ export function NewUserPanel({ action, roles }: { action: Action; roles: RoleRow
   };
   const start = roles.some((r) => r.key === "staff" && r.givable) ? "staff" : (roles.find((r) => r.givable)?.key ?? "");
   return (
-    <SidePanel title="Add a person" description="They can sign in as soon as you save. Choose the smallest role that lets them do their work." onClose={() => panel.close()}>
+    <SidePanel title="New person" description="They can sign in as soon as you save. Choose the smallest role that lets them do their work." onClose={() => panel.close()}>
       <PanelForm action={action} onSaved={saved} save="Add the person" pending="Adding…">
         {(s) => (
           <>
