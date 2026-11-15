@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ORDER_TAB_LABEL } from "@kebo/shared";
 import { Alert, Badge, buttonClass, cn } from "@kebo/ui";
-import { date, money, whole } from "@/lib/format";
+import { money, whole, dayMonth } from "@/lib/format";
 import type { CostSheetRow } from "@/lib/types-money";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
@@ -161,7 +161,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
               const how = [e.paidBy?.name, paidHow(e)].filter(Boolean).join(" · ");
               return (
                 <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-[13px]">
-                  <span className="w-14 shrink-0 text-text-2 tabular">{date(e.spentOn).replace(/ \d{4}$/, "")}</span>
+                  <span className="w-14 shrink-0 text-text-2 tabular">{dayMonth(e.spentOn)}</span>
                   <span className="min-w-0 flex-1">
                     {e.description} <Badge tone="neutral">{costKind(e.category)}</Badge>
                     {how && <span className="block text-xs text-text-2">{how}</span>}

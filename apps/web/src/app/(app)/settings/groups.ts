@@ -50,6 +50,31 @@ export interface SettingGroup {
 
 const days = (name: string, label: string, hint: string): SettingField => ({ name, label, hint, kind: "number", unit: "days" });
 
+/** Every time zone, with how far it is from UTC now: "Asia/Karachi (GMT+5)". */
+const ZONES = (() => {
+  const zones = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : ["UTC"];
+  const offset = (zone: string) => {
+    try {
+      return new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "shortOffset" }).formatToParts(new Date()).find((p) => p.type === "timeZoneName")?.value ?? "";
+    } catch {
+      return "";
+    }
+  };
+  return zones.map((z) => ({ value: z, label: `${z.replace(/_/g, " ")} (${offset(z)})` }));
+})();
+
+/** How a date and a time are written, each shown as it looks. */
+const DATE_FORMAT_OPTIONS = [
+  { value: "d_mmm_yyyy", label: "14 Nov 2026" },
+  { value: "dd_mm_yyyy", label: "14/11/2026 (day first)" },
+  { value: "mm_dd_yyyy", label: "11/14/2026 (month first)" },
+  { value: "yyyy_mm_dd", label: "2026-11-14" },
+];
+const TIME_FORMAT_OPTIONS = [
+  { value: "24h", label: "24-hour (15:30)" },
+  { value: "12h", label: "12-hour (3:30 PM)" },
+];
+
 export const SETTING_GROUPS: SettingGroup[] = [
   {
     key: "company",
@@ -80,6 +105,16 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "invoiceFooter", label: "Invoice footer", kind: "textarea", wide: true, hint: "A line at the bottom of every invoice, e.g. thanks or payment notes" },
       { name: "proformaPrefix", label: "Proforma number starts with", kind: "text", hint: "e.g. ABC in ABC260916TN07 (then the issue date, the customer's letters and the handler's count this year)" },
       { name: "stamp", label: "Company stamp", kind: "image", wide: true, noun: "stamp", hint: "The red seal printed on proforma invoices. A PNG or JPEG under 300 KB, scanned on white." },
+      {
+        name: "timeZone",
+        label: "Time zone",
+        kind: "select",
+        wide: true,
+        options: ZONES,
+        hint: "Today, due dates, late or not, the morning reminders and every time shown follow it, for everyone in the company.",
+      },
+      { name: "dateFormat", label: "Dates", kind: "select", options: DATE_FORMAT_OPTIONS },
+      { name: "timeFormat", label: "Times", kind: "select", options: TIME_FORMAT_OPTIONS },
     ],
     cards: [
       {
@@ -100,6 +135,12 @@ export const SETTING_GROUPS: SettingGroup[] = [
         title: "On invoices",
         description: "How customers pay you, the line at the bottom, the proforma number and the stamp.",
         fields: ["bankDetails", "invoiceFooter", "proformaPrefix", "stamp"],
+      },
+      {
+        key: "time",
+        title: "Time and dates",
+        description: "The company's time zone and how dates and times are written, on every page, email and reminder.",
+        fields: ["timeZone", "dateFormat", "timeFormat"],
       },
     ],
   },

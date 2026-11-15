@@ -4,9 +4,9 @@ import { Fragment, Suspense } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, expenseShort, FACTORY_DUE_RULE_LABEL } from "@kebo/shared";
 import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
-import { addDays, daysBetween, todayIn } from "@kebo/utils";
+import { addDays, daysBetween } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { date, money, TZ, whole } from "@/lib/format";
+import { date, money, whole, companyToday } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
@@ -49,7 +49,7 @@ export default async function DuePage({ searchParams }: { searchParams: Promise<
   const sp = await searchParams;
   const seesSuppliers = can(me, "sourcing.manage");
   const suppliers = seesSuppliers && sp.side === "suppliers";
-  const today = todayIn(TZ);
+  const today = companyToday();
   return (
     <div>
       <PageHeader crumbs={crumbsFor(HERE)} title="To receive and to pay" summary="What customers owe us and what we owe" />

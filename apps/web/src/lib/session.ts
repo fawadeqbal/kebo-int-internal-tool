@@ -1,4 +1,5 @@
-import { setRequestZone } from "@/lib/format";
+import { SERVER_TZ, setCompanyTime } from "@/lib/format";
+import type { DateFormat, TimeFormat, TimeStyle } from "@kebo/utils";
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
@@ -18,10 +19,20 @@ export interface Me {
   /** A platform admin working in this company. */
   viaPlatform?: boolean;
   company?: { slug: string; name: string; kind: "client" | "demo" | "trial"; status: "active" | "read_only" | "off" | "deleted"; statusReason: string | null; endsAt: string | null } | null;
-  /** Their own language (en, zh, ur) and time zone (empty: the company's). */
+  /** Their own language (en, zh, ur). */
   language?: string;
-  timeZone?: string | null;
+  /** The company's time zone and how it writes dates and times (Company settings › Time and dates). */
+  timeZone?: string;
+  dateFormat?: DateFormat;
+  timeFormat?: TimeFormat;
 }
+
+/** The company's time, as the session says it (the server's zone until it is known). */
+export const timeStyleOf = (me: Pick<Me, "timeZone" | "dateFormat" | "timeFormat">): TimeStyle => ({
+  zone: me.timeZone || SERVER_TZ,
+  date: me.dateFormat ?? "d_mmm_yyyy",
+  time: me.timeFormat ?? "24h",
+});
 
 /** The company the person is signed in to: its plan, usage, features and the notices to show. */
 export interface CompanyView {
@@ -54,8 +65,8 @@ export const requireUser = cache(async (): Promise<Me> => {
   try {
     const me = await api.get<Me>("/auth/me");
     if (me.twoStepSetupRequired) redirect(TWO_STEP_SETUP_PATH);
-    // Times on this request's pages read in their own time zone.
-    setRequestZone(me.timeZone);
+    // Every date and time on this request's pages is the company's.
+    setCompanyTime(timeStyleOf(me));
     return me;
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) redirect("/login");
@@ -89,3 +100,8 @@ export const docBrand = cache(async (): Promise<{ logo: string | null; mark: str
   const b = await api.get<{ logo: string | null; mark: string; tagline: string | null }>("/company/brand").catch(() => null);
   return b ? { logo: b.logo, mark: b.mark, tagline: b.tagline } : null;
 });
+
+/** The company's time zone, read from the session: for server actions, which run outside a page's render. */
+export async function companyZone(): Promise<string> {
+  return timeStyleOf(await requireUser()).zone;
+}

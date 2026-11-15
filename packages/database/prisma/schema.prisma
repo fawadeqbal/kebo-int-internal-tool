@@ -299,10 +299,9 @@ model User {
   platformAdminId String?   @map("platform_admin_id") @db.Uuid
   name            String    @db.VarChar(120)
   email           String    @db.VarChar(254)
-  /// Their own phone, language (en) and time zone (IANA; empty: the company's), set on My account.
+  /// Their own phone and language (en), set on My account. Times are the company's (Company settings › Time and dates).
   phone           String?   @db.VarChar(40)
   language        String    @default("en") @db.VarChar(10)
-  timeZone        String?   @map("time_zone") @db.VarChar(60)
   passwordHash    String    @map("password_hash")
   /// The role's key.
   role            String    @db.VarChar(40)
@@ -2110,6 +2109,11 @@ model Company {
   contactPhone      String?       @map("contact_phone") @db.VarChar(40)
   notes             String?
   lastActiveAt      DateTime?     @map("last_active_at") @db.Timestamptz
+  /// The company's time zone (IANA): its today, due dates, reminders and every time shown. Null: the server's (APP_TIME_ZONE).
+  timeZone          String?       @map("time_zone") @db.VarChar(60)
+  /// How it writes dates (DATE_FORMATS: d_mmm_yyyy 14 Nov 2026, dd_mm_yyyy, mm_dd_yyyy, yyyy_mm_dd) and times (24h, 12h).
+  dateFormat        String        @default("d_mmm_yyyy") @map("date_format") @db.VarChar(12)
+  timeFormat        String        @default("24h") @map("time_format") @db.VarChar(3)
   /// The company website form's key: the form sends it, and it decides the company (Settings → Website form).
   formKey           String        @unique @default(dbgenerated("replace(((gen_random_uuid())::text || (gen_random_uuid())::text), '-'::text, ''::text)")) @map("form_key") @db.VarChar(64)
   deletedAt         DateTime?     @map("deleted_at") @db.Timestamptz

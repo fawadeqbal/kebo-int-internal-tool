@@ -1,26 +1,23 @@
-import { dateTime, TZ } from "@/lib/format";
+import { clockTime, companyToday, currentZone, dateTime, dayMonth, date } from "@/lib/format";
 import type { HistoryEntry } from "@/lib/types";
-import { today } from "@/components/orders/today";
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** "2026-11-03" and "10:12" of a moment, in the business time zone. */
 function partsOf(iso: string) {
   const p = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    new Intl.DateTimeFormat("en-CA", { timeZone: currentZone(), year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
       .formatToParts(new Date(iso))
       .map((x) => [x.type, x.value]),
   );
   return { day: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
 }
-/** "today 10:12", "03 Nov", or "03 Nov 2025" for another year. */
+/** "today 10:12", "3 Nov", or "03 Nov 2025" for another year: company time, the company's way. */
 function when(iso: string, now: string) {
   const { day, time } = partsOf(iso);
-  if (day === now) return `today ${time}`;
-  return `${day.slice(8, 10)} ${MONTHS[Number(day.slice(5, 7)) - 1]}${day.slice(0, 4) === now.slice(0, 4) ? "" : ` ${day.slice(0, 4)}`}`;
+  if (day === now) return `today ${clockTime(time)}`;
+  return day.slice(0, 4) === now.slice(0, 4) ? dayMonth(day) : date(day);
 }
-/** "03 Nov" of a YYYY-MM-DD. */
-const dayOf = (d: string) => `${d.slice(8, 10)} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
+/** "3 Nov" of a YYYY-MM-DD. */
+const dayOf = (d: string) => dayMonth(d);
 
 const PAPER_STEPS = /^paper\.(draft|final|again|delete)$/;
 const PAPER_OF = /^(.*?\b[A-Z]{2,4}-\d{4}-\d+(?:-\d+)?)\b/;
@@ -42,7 +39,7 @@ export interface ChangeLine {
  * finals and remakes fold into one line (the newest); History keeps every one.
  */
 export function compactChanges(entries: (HistoryEntry & { step?: string | null })[]): ChangeLine[] {
-  const now = today();
+  const now = companyToday();
   const out: (ChangeLine & { paper?: string; all: string[] })[] = [];
   for (const e of entries) {
     const who = e.by?.name ?? "System";

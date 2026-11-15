@@ -5,6 +5,7 @@ import { restateRates } from "@kebo/money";
 import { brandMarkOf, CURRENCIES, CURRENCY_LABEL } from "@kebo/shared";
 import { Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import type { SettingField } from "./groups";
+import { useTime } from "@/lib/time-client";
 
 /** A picture made at most `max` pixels wide and high (keeps its shape), as a PNG data URL. */
 function shrink(dataUrl: string, max: number): Promise<string> {
@@ -164,11 +165,12 @@ export function CurrenciesControl({
   dates?: Record<string, string>;
   today?: string;
 }) {
+  const { date } = useTime();
   const ageOf = (c: string) => {
     const d = dates[c];
     if (!d || !today) return null;
     const days = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000);
-    const when = new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+    const when = date(d);
     return { text: days <= 0 ? `Updated today` : `Updated ${when}${days >= 14 ? ` · ${days >= 60 ? `${Math.round(days / 30)} months` : days >= 21 ? `${Math.round(days / 7)} weeks` : `${days} days`} old` : ""}`, old: days >= 30 };
   };
   const [main, setMain] = useState(initialMain);

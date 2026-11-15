@@ -8,15 +8,17 @@ import { EditsChip, editedMark } from "@/components/edits/edits";
 import { useEditSave } from "@/components/edits/use-edit-save";
 import type { EditCard, EditRef } from "@/lib/types-edits";
 import type { ActionState } from "@/lib/actions";
+import { formatDate, type TimeStyle } from "@kebo/utils";
+import { timeStyle } from "@/lib/format";
+import { useTime } from "@/lib/time-client";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /* ---------------------------------------------------------------- helpers */
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
-/** "14 Jan 2027" in the browser (the server's formatter stays on the server). */
-export const dayLabel = (iso: string | null | undefined) =>
-  iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }) : "";
+/** "14 Jan 2027", the company's way. */
+export const dayLabel = (iso: string | null | undefined, style: TimeStyle = timeStyle()) => (iso ? formatDate(iso, style) : "");
 
 /* ---------------------------------------------------------------- the side panel (common/panel) */
 
@@ -75,7 +77,7 @@ export interface DetailField {
 
 const filled = (f: DetailField) => f.value !== null && f.value !== undefined && f.value !== "";
 /** How a filled value reads: its own `show`, a date as "14 Jan 2027", or the value. */
-const shownOf = (f: DetailField): ReactNode => f.show ?? (f.type === "date" && f.value && ISO.test(f.value) ? dayLabel(f.value) : f.value);
+const shownOf = (f: DetailField, style: TimeStyle): ReactNode => f.show ?? (f.type === "date" && f.value && ISO.test(f.value) ? dayLabel(f.value, style) : f.value);
 
 function Control({ f, id, value, onChange, autoFocus, onKeyDown }: { f: DetailField; id: string; value?: string; onChange?: (v: string) => void; autoFocus?: boolean; onKeyDown?: (e: React.KeyboardEvent) => void }) {
   const common = {
@@ -349,6 +351,7 @@ export function DetailsCard({
   /** Where its edits are kept, and what they are so far ("Edited n×"). */
   edits?: { ref: EditRef; card?: EditCard | null; plain?: boolean };
 }) {
+  const { style } = useTime();
   const editable = canEdit && !!action;
   const shown = fields.filter((f) => !f.panelOnly);
   const counted = shown.filter((f) => !f.uncounted);
@@ -392,7 +395,7 @@ export function DetailsCard({
               {f.name && editedMark(edits?.card, f.name)}
             </dt>
             <dd className="min-w-0 text-sm font-medium break-words text-text tabular">
-              {filled(f) ? shownOf(f) : f.empty !== undefined ? f.empty : <span className="font-normal text-muted">—</span>}
+              {filled(f) ? shownOf(f, style) : f.empty !== undefined ? f.empty : <span className="font-normal text-muted">—</span>}
             </dd>
           </div>
         ))}

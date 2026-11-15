@@ -2,11 +2,10 @@ import { notFound } from "next/navigation";
 import { Banknote, Printer } from "lucide-react";
 import { can } from "@kebo/shared";
 import { ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requirePermission, hasFeature } from "@/lib/session";
 import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
-import { date, TZ, whole } from "@/lib/format";
+import { date, whole, companyToday } from "@/lib/format";
 import type { ExpenseList } from "@/lib/types-money";
 import type { FactoryOrders } from "@/lib/types-facts";
 import type { LedgerParty } from "@/lib/types-ledger";
@@ -38,7 +37,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const me = await requirePermission("sourcing.manage");
   if (!(can(me, "expenses.manage") && (await hasFeature("expenses")))) notFound();
-  const today = todayIn(TZ);
+  const today = companyToday();
   const ledgerOn = can(me, "ledger.view");
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
   const [f, costs, payables, pos, ledger] = await Promise.all([

@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { CompanyKind, CompanyStatus } from "@kebo/database";
+import type { DateFormat, TimeFormat } from "@kebo/utils";
 
 /** The company a request (or a background job) works in. */
 export interface CompanyInfo {
@@ -15,6 +16,11 @@ export interface CompanyInfo {
   featuresOff: string[];
   /** The company's own domain, while it is connected ("erp.acme.com"): its address then. Null: its address under ours. */
   domain: string | null;
+  /** Its time zone (IANA): its today, due dates, reminders and every time shown. Null: the server's (Clock falls back). */
+  timeZone: string | null;
+  /** How it writes dates and times. */
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
 }
 
 const storage = new AsyncLocalStorage<{ company: CompanyInfo | null }>();

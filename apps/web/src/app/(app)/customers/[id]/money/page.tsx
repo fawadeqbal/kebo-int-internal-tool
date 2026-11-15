@@ -1,14 +1,13 @@
 import { Banknote, Printer } from "lucide-react";
 import { can, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
 import { ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { CustomerAccount, ExpenseList } from "@/lib/types-money";
 import { CustomerSpending, WhereMoneyWent } from "@/components/money/customer-spending";
 import { customerOf, customerPaymentsOf } from "@/lib/party-data";
-import { date, TZ, whole } from "@/lib/format";
+import { date, whole, companyToday } from "@/lib/format";
 import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
 import { late } from "../shared";
@@ -40,7 +39,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
   const { id } = await params;
   const me = await requireUser();
   const ledgerOn = can(me, "ledger.view");
-  const today = todayIn(TZ);
+  const today = companyToday();
   // Where their money went and what was spent on them: managers with expenses.
   const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
   const [c, pay, ledger, account, spent, people, settings] = await Promise.all([

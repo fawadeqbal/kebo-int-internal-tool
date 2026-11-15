@@ -5,13 +5,13 @@ import { startOfDayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { attempt, formValues, type ActionState } from "@/lib/actions";
 import type { RecordKey } from "@/lib/types-notes";
-import { TZ } from "@/lib/format";
+import { companyZone } from "@/lib/session";
 
 /** "2026-11-04T09:02" typed in the company's time zone → the moment, as the API takes it. Empty: now. */
-function happenedAt(local: string | undefined): string | undefined {
+async function happenedAt(local: string | undefined): Promise<string | undefined> {
   const m = local?.trim().match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
   if (!m) return local?.trim() || undefined;
-  return new Date(startOfDayIn(m[1]!, TZ).getTime() + (Number(m[2]) * 60 + Number(m[3])) * 60_000).toISOString();
+  return new Date(startOfDayIn(m[1]!, await companyZone()).getTime() + (Number(m[2]) * 60 + Number(m[3])) * 60_000).toISOString();
 }
 
 /** The record's notes endpoint. */
@@ -20,9 +20,10 @@ const NOTES_PATH = { orderId: "orders", customerId: "customers", factoryId: "fac
 /** A note or call log on an order, customer or factory: { body, kind, contactId, at }. */
 export async function addNoteAction(on: RecordKey, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
+  const at = await happenedAt(v.at);
   const r = await attempt(
     form,
-    () => api.post(`/${NOTES_PATH[on.key]}/${on.id}/notes`, { body: v.body, kind: v.kind || undefined, contactId: v.contactId || null, at: happenedAt(v.at) }),
+    () => api.post(`/${NOTES_PATH[on.key]}/${on.id}/notes`, { body: v.body, kind: v.kind || undefined, contactId: v.contactId || null, at }),
     "Note saved.",
   );
   if (r.ok) revalidatePath("/", "layout");

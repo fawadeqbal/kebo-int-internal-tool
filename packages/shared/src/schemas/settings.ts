@@ -2,6 +2,17 @@ import { z } from "zod";
 import { BALANCE_TERMS, CURRENCIES, INCOTERMS } from "../enums";
 import { DEFAULT_ORDER_REMINDER_DAYS } from "../workflows/order";
 import { isPaperSwitch } from "../workflows/papers";
+import { DATE_FORMATS, TIME_FORMATS } from "@kebo/utils";
+
+/** A time zone the system knows ("Asia/Karachi"); empty: the server's. */
+const isZone = (v: string) => {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: v });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Everything an admin can change, grouped. Each group is stored as one JSON
@@ -15,7 +26,17 @@ const days = (fallback: number, max = 365) => z.coerce.number().int().min(0).max
  * the company fills it in under Settings → Company (nothing here belongs to any
  * one company).
  */
+/** The company's time and date settings: kept on the company row, never in the stored settings. */
+export const COMPANY_TIME_KEYS = ["timeZone", "dateFormat", "timeFormat"] as const;
+
 export const companySettings = z.object({
+  /**
+   * Time and dates: the company's time zone (IANA) and how it writes dates and times. Kept on the company itself
+   * (the platform's table, so every request and job knows it at once); shown and changed here with the rest.
+   */
+  timeZone: z.string().trim().max(60).refine((v) => !v || isZone(v), "Choose a time zone from the list").default(""),
+  dateFormat: z.enum(DATE_FORMATS).default("d_mmm_yyyy"),
+  timeFormat: z.enum(TIME_FORMATS).default("24h"),
   name: z.string().trim().min(1).max(200).default("Company"),
   nameLocal: z.string().trim().max(120).default(""),
   address: z.string().trim().max(500).default(""),
@@ -195,7 +216,10 @@ export type Settings = { [K in SettingsKey]: z.infer<(typeof SETTINGS)[K]> };
 export function readSettings(stored: Partial<Record<string, unknown>>): Settings {
   const out = {} as Record<SettingsKey, unknown>;
   for (const key of Object.keys(SETTINGS) as SettingsKey[]) {
-    const parsed = SETTINGS[key].safeParse(stored[key] ?? {});
+    let raw = stored[key] ?? {};
+    // Time and dates come from the company row; a stray copy in the stored JSON is ignored (and never breaks the rest).
+    if (key === "company" && raw && typeof raw === "object") raw = Object.fromEntries(Object.entries(raw).filter(([k]) => !(COMPANY_TIME_KEYS as readonly string[]).includes(k)));
+    const parsed = SETTINGS[key].safeParse(raw);
     out[key] = parsed.success ? parsed.data : SETTINGS[key].parse({});
   }
   return out as Settings;

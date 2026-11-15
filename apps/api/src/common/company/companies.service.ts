@@ -1,6 +1,7 @@
 import { Global, Inject, Injectable, Module } from "@nestjs/common";
 import type { CompanyModel as Company, PlanModel as Plan } from "@kebo/database";
 import { companyFeatures, LIFECYCLE, slugProblem } from "@kebo/shared";
+import { DATE_FORMATS, TIME_FORMATS, type DateFormat, type TimeFormat } from "@kebo/utils";
 import { ENV, type Env } from "../../config/env";
 import { PrismaService } from "../../database/prisma.service";
 import type { CompanyInfo } from "./company-context";
@@ -19,6 +20,9 @@ export const toInfo = (c: Company): CompanyInfo => ({
   planId: c.planId,
   featuresOff: c.featuresOff ?? [],
   domain: c.ownDomainStatus === "connected" ? c.ownDomain : null,
+  timeZone: c.timeZone,
+  dateFormat: (DATE_FORMATS as readonly string[]).includes(c.dateFormat) ? (c.dateFormat as DateFormat) : "d_mmm_yyyy",
+  timeFormat: (TIME_FORMATS as readonly string[]).includes(c.timeFormat) ? (c.timeFormat as TimeFormat) : "24h",
 });
 
 /**

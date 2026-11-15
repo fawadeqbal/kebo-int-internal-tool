@@ -5,7 +5,7 @@ import { CURRENCIES, LEDGER_ENTRY_TYPE_LABEL, LEDGER_ENTRY_TYPES, type LedgerEnt
 import { Badge, buildHref, cn, FilterChip } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
 import { addDays } from "@kebo/utils";
-import { date, money } from "@/lib/format";
+import { date, money, dayMonth } from "@/lib/format";
 import type { AgeingBucketView, LedgerListRow } from "@/lib/types-ledger";
 
 /* ---------------------------------------------------------------- what a row is */
@@ -86,7 +86,7 @@ export function span(from: string, to: string) {
 }
 
 /** "04 Nov" for this year's days, "04 Nov 2025" for another's. */
-export const day = (d: string, today: string) => (d.slice(0, 4) === today.slice(0, 4) ? date(d).replace(/ \d{4}$/, "") : date(d));
+export const day = (d: string, today: string) => (d.slice(0, 4) === today.slice(0, 4) ? dayMonth(d) : date(d));
 
 /* ---------------------------------------------------------------- filters */
 

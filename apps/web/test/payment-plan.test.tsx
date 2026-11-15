@@ -68,7 +68,7 @@ describe("the order's payment plan", () => {
     expect(within(deposit!).getByText("Paid 16 Nov")).toBeTruthy();
     expect(within(deposit!).getByRole("link", { name: "Receipt" }).getAttribute("href")).toBe("/print/orders/o1/payment-receipt?ref=p1&back=%2Forders%2Fo1%2Fpayment");
     expect(within(deposit!).queryByRole("button")).toBeNull();
-    expect(within(balance!).getByText("Sent 3 Dec")).toBeTruthy();
+    expect(within(balance!).getByText("Sent 03 Dec")).toBeTruthy();
     // Sent and not changed: nothing to send again; the kept copy opens from its number.
     expect(within(balance!).queryByRole("button", { name: /Send/ })).toBeNull();
     expect(within(balance!).getByRole("link", { name: "PR-2026-0001-2" }).getAttribute("href")).toBe("/print/orders/o1/payment-request?ref=i2&back=%2Forders%2Fo1%2Fpayment");

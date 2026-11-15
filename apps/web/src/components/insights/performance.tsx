@@ -1,6 +1,6 @@
 import { can, type Permission } from "@kebo/shared";
 import { api } from "@/lib/api";
-import { date, TZ, plural } from "@/lib/format";
+import { date, plural, companyToday } from "@/lib/format";
 import { bigMoney, percent } from "@/lib/insights-period";
 import { hasFeature } from "@/lib/session";
 import type { Aging, FactoryGroups, FactOrders, InquiryGroups, OrderGroups } from "@/lib/types-facts";
@@ -33,7 +33,7 @@ export async function PerformanceCard({
   balances?: boolean;
 }) {
   if (!can(me, "reports.view") || !(await hasFeature("insights"))) return null;
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
+  const today = companyToday();
   const yearFrom = `${today.slice(0, 4)}-01-01`;
   // A person's spending, for managers with expenses: Spent, Profit after all costs, Owed back.
   const spend = kind === "user" && can(me, "expenses.manage") && (await hasFeature("expenses"));

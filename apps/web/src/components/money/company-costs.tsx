@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kebo/ui";
 import { repeatingAction } from "@/app/(app)/money/actions";
-import { date, money } from "@/lib/format";
+import { money } from "@/lib/format";
+import { useTime } from "@/lib/time-client";
 import type { RepeatingCosts } from "@/lib/types-money";
 import { companyKind } from "./company-kinds";
 import { ConfirmCost, type CostSetup } from "./cost-window";
@@ -13,6 +14,7 @@ type Waiting = RepeatingCosts["waiting"][number];
 
 /** One cost that comes every month and is not in this month yet: Skip (this month only), or Confirm with what was paid. */
 export function RepeatingRow({ w, setup }: { w: Waiting; setup: CostSetup }) {
+  const { date } = useTime();
   const [busy, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();

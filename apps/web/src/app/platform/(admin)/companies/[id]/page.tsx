@@ -5,7 +5,7 @@ import { Alert, Banner, buttonClass, PageHeader, SectionList, StatusBadge, toPag
 import { todayIn } from "@kebo/utils";
 import { platformApi } from "@/lib/api";
 import { loadPlatform, readFlash } from "@/lib/platform";
-import { date, TZ } from "@/lib/format";
+import { date, SERVER_TZ } from "@/lib/format";
 import type { CompanyDetail, CompanyHistory, Plan } from "@/lib/types-platform";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import {
@@ -48,7 +48,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
     readFlash(id),
     section === "history" ? platformApi.get<CompanyHistory>(`/companies/${id}/history`, sp.kind ? { kind: sp.kind } : undefined) : null,
   ]);
-  const today = todayIn(TZ);
+  const today = todayIn(SERVER_TZ);
   const live = c.status !== "deleted";
   const off = c.status === "off";
   const head = headline(c);

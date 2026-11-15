@@ -2,7 +2,7 @@ import { CalendarClock, Mail, MapPin, MessageCircle, Phone, StickyNote, Users, t
 import { FOLLOW_UP_KIND_LABEL, NOTE_KIND_LABEL, type FollowUpKind, type NoteKind } from "@kebo/shared";
 import { todayIn } from "@kebo/utils";
 import { cn } from "@kebo/ui";
-import { TZ } from "@/lib/format";
+import { companyToday, currentZone, date, dayMonth, time, clockTime } from "@/lib/format";
 
 export const NOTE_ICON: Record<NoteKind, LucideIcon> = {
   note: StickyNote,
@@ -25,23 +25,21 @@ export function KindIcon({ kind, of, className }: { kind: string; of: "note" | "
   );
 }
 
-const time = (d: Date) =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "numeric", minute: "2-digit", hourCycle: "h23" }).format(d);
-const day = (d: Date, year: boolean) =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: TZ, day: "numeric", month: "short", ...(year ? { year: "numeric" } : {}) }).format(d);
+// Company time, written the company's way.
+const day = (d: Date, year: boolean) => (year ? date(d) : dayMonth(d));
 
 /** When a note's call or visit happened: "9:02" today, "28 Oct 9:02" this year, "28 Oct 2025" before. */
 export function whenText(iso: string) {
   const d = new Date(iso);
-  const today = todayIn(TZ);
-  const on = todayIn(TZ, d);
+  const today = companyToday();
+  const on = todayIn(currentZone(), d);
   if (on === today) return time(d);
   if (on.slice(0, 4) === today.slice(0, 4)) return `${day(d, false)} ${time(d)}`;
   return day(d, true);
 }
 
 /** When a follow-up is due: "today 11:00", "tomorrow", "Thu 5 Nov 14:00". */
-export function dueText(dueOn: string, dueAt: string | null, today = todayIn(TZ)) {
+export function dueText(dueOn: string, dueAt: string | null, today = companyToday()) {
   const tomorrow = new Date(`${today}T00:00:00Z`);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   const d =
@@ -49,9 +47,9 @@ export function dueText(dueOn: string, dueAt: string | null, today = todayIn(TZ)
       ? "today"
       : dueOn === tomorrow.toISOString().slice(0, 10)
         ? "tomorrow"
-        : new Date(`${dueOn}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-  return dueAt ? `${d} ${dueAt}` : d;
+        : `${new Date(`${dueOn}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })} ${dayMonth(dueOn)}`;
+  return dueAt ? `${d} ${clockTime(dueAt)}` : d;
 }
 
 /** Today in the company's time zone (the date field's default). */
-export const todayHere = () => todayIn(TZ);
+export const todayHere = () => companyToday();

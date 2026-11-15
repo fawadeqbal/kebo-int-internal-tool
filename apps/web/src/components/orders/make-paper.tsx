@@ -10,12 +10,11 @@ import { FileActions } from "@/components/common/file-actions";
 import type { ActionState } from "@/lib/actions";
 import type { PaperChecks } from "@/lib/types-papers";
 import type { PaperOp } from "@/app/(app)/orders/papers-actions";
+import { useTime } from "@/lib/time-client";
 
 /** paperAction bound to the order, the paper and its ref: (op, paper id, …). */
 export type PaperRun = (op: PaperOp, paperId: string | null, prev: ActionState, form: FormData) => Promise<ActionState>;
 
-/** "02 Nov 2026" in the person's own time zone. */
-const when = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
 /** The sheet's own width (A4 at 96 dpi plus a margin): the preview is scaled down to fit. */
 const SHEET = 860;
@@ -254,6 +253,7 @@ function BuyerBox({
   pending: boolean;
   onRefresh: (reason: string) => Promise<boolean>;
 }) {
+  const { date } = useTime();
   const [open, setOpen] = useState(false);
   if (!p.buyer) return null;
   const { buyer: b, changes } = p.buyer;
@@ -282,7 +282,7 @@ function BuyerBox({
       ) : (
         <p className="mt-2 text-xs text-muted">
           {b.from === "customer" ? "Refreshed from the customer" : "Taken when the order was made"}
-          {b.takenOn ? ` · ${when(b.takenOn)}` : ""} · the same as the customer now.
+          {b.takenOn ? ` · ${date(b.takenOn)}` : ""} · the same as the customer now.
         </p>
       )}
       <RefreshBuyer
@@ -350,6 +350,7 @@ export function MakePaper({
   backHref: string;
   send?: { email: string | null; phone: string | null; text: string; subject: string };
 }) {
+  const { date } = useTime();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -502,7 +503,7 @@ export function MakePaper({
           final ? (
             <div className="flex flex-col gap-2">
               <p className="text-sm text-text-2">
-                Version {p.paper!.version} is final{p.paper!.finalAt ? ` since ${when(p.paper!.finalAt)}` : ""}: it stays exactly as it was
+                Version {p.paper!.version} is final{p.paper!.finalAt ? ` since ${date(p.paper!.finalAt)}` : ""}: it stays exactly as it was
                 printed.
               </p>
               <div className="flex flex-wrap gap-2">
@@ -556,7 +557,7 @@ export function MakePaper({
               {p.versions.map((v) => (
                 <li key={v.id} className="flex items-center justify-between gap-2">
                   <span>
-                    Version {v.version} · {v.status === "final" ? `final${v.finalAt ? ` ${when(v.finalAt)}` : ""}` : "draft"}
+                    Version {v.version} · {v.status === "final" ? `final${v.finalAt ? ` ${date(v.finalAt)}` : ""}` : "draft"}
                   </span>
                   <a
                     href={`/print/orders/${p.orderId}/${p.kind}?${new URLSearchParams({ v: String(v.version), ...(p.ref ? { ref: p.ref } : {}) })}`}

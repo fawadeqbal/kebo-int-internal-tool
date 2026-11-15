@@ -4,7 +4,8 @@ import { CLAIM_BEARER_LABEL, CLAIM_STATUS_TONE, type ClaimBearer } from "@kebo/s
 import { Badge, Field, Input, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { ClaimView } from "@/lib/types-flow";
-import { date, money } from "@/lib/format";
+import { money } from "@/lib/format";
+import { useTime } from "@/lib/time-client";
 import { ClaimForm, ClaimUpdateForm } from "@/components/orders/flow-forms";
 import { FormWindow } from "./form-window";
 import { FieldRow, SectionWindow } from "./section-window";
@@ -67,6 +68,7 @@ export function ClaimAddWindow({ sub, action, today, main }: { sub: string; acti
 
 /** The order's claims as a table; a claim opens in its window. */
 export function ClaimsTable({ claims, currency, sub, actions }: { claims: ClaimView[]; currency: string; sub: string; /** By claim id; none: read only. */ actions: Record<string, Action> | null }) {
+  const { date } = useTime();
   return (
     <Table>
       <THead>

@@ -1,9 +1,21 @@
 import { cache } from "react";
 import { formatMinor, toMinor } from "@kebo/money";
-import { formatDate as fmtDate, formatDateTime as fmtDateTime, timeAgo as ago, type ISODate } from "@kebo/utils";
+import {
+  formatClock,
+  formatDate as fmtDate,
+  formatDateTime as fmtDateTime,
+  formatDayMonth,
+  formatTime,
+  hourIn,
+  timeAgo as ago,
+  todayIn,
+  type ISODate,
+  type TimeStyle,
+} from "@kebo/utils";
 
-/** The business time zone: every date on a screen, and "today", is in it. The one definition. */
-export const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
+/** The server's own time zone: the platform's pages (not a company's), and a company's until its time is known. */
+export const SERVER_TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
+const SERVER_STYLE: TimeStyle = { zone: SERVER_TZ, date: "d_mmm_yyyy", time: "24h" };
 
 /** "1 order", "3 orders"; a third word for irregular plurals ("1 inquiry", "2 inquiries"). */
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -22,32 +34,48 @@ export const short = (amount: string | number | null | undefined, currency: stri
   return `${currency} ${Math.round(v).toLocaleString("en-US")}`;
 };
 /**
- * The time zone of this request (server pages): the signed-in person's own when they set one on My
- * account, else the company's. React's cache keeps one per request; in the browser it is the company's.
+ * The company's time (Company settings › Time and dates): its zone and how it writes dates and times. Every date
+ * and time on a page, and "today", goes through it; nothing else holds a time zone. Server pages: set from the
+ * session (requireUser), once per request (React's cache keeps one per request). Browser: set by <CompanyTime>
+ * in the app's layout; client components read it with useTime() (lib/time-client), so the server's render and
+ * the browser's agree.
  */
-const requestZone = cache((): { zone: string } => ({ zone: TZ }));
-export function setRequestZone(zone: string | null | undefined) {
-  if (zone) requestZone().zone = zone;
+const requestTime = cache((): { style: TimeStyle } => ({ style: SERVER_STYLE }));
+let browserStyle: TimeStyle | null = null;
+export function setCompanyTime(style: TimeStyle) {
+  if (typeof window === "undefined") requestTime().style = style;
+  else browserStyle = style;
 }
-const zone = () => requestZone().zone;
-/** The time zone this request shows times in. */
-export const currentZone = () => zone();
-export const date = (d: ISODate | Date | string | null | undefined) => fmtDate(d ?? null, zone());
-export const dateTime = (d: Date | string | null | undefined) => fmtDateTime(d ?? null, zone());
-export const timeAgo = (d: Date | string) => ago(d, zone());
+/** The company's zone and formats on this request. */
+export const timeStyle = (): TimeStyle => (typeof window !== "undefined" ? (browserStyle ?? SERVER_STYLE) : requestTime().style);
+/** The company's time zone. */
+export const currentZone = () => timeStyle().zone;
+/** Today, company time ("2026-11-15"). */
+export const companyToday = () => todayIn(currentZone());
+/** The hour now (0–23), company time: "Good morning" before 12. */
+export const hourNow = () => hourIn(currentZone());
+/** A day or a moment's day, the company's way ("14 Nov 2026", "14/11/2026"). */
+export const date = (d: ISODate | Date | string | null | undefined) => fmtDate(d ?? null, timeStyle());
+/** A day without its year ("14 Nov", "14/11"). */
+export const dayMonth = (d: ISODate | Date | string | null | undefined) => formatDayMonth(d ?? null, timeStyle());
+/** A moment's day and time ("14 Nov 2026, 15:30" / "…, 3:30 PM"). */
+export const dateTime = (d: Date | string | null | undefined) => fmtDateTime(d ?? null, timeStyle());
+/** A moment's time of day ("15:30", "3:30 PM"). */
+export const time = (d: Date | string | null | undefined) => formatTime(d ?? null, timeStyle());
+/** A typed time of day ("15:30"), the company's way. */
+export const clockTime = (hhmm: string | null | undefined) => formatClock(hhmm, timeStyle());
+export const timeAgo = (d: Date | string) => ago(d, timeStyle());
 export const qty = (q: string | number) => Number(q).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
-/** "1 Apr" (a calendar day, no year). */
-const dayMonth = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
 /**
  * When an instalment falls due, as its rule says and with the date it gives now: "On the ready date (1 Apr)",
  * "14 days after shipping (15 Apr)", "On the ready date · not known yet"; a fixed one: its date.
  */
-export function dueText(i: { dueOn: string | null; rule?: string | null; when?: string | null }): string {
+export function dueText(i: { dueOn: string | null; rule?: string | null; when?: string | null }, style: TimeStyle = timeStyle()): string {
   const rule = i.rule ? i.rule.charAt(0).toUpperCase() + i.rule.slice(1) : null;
-  if (rule) return i.dueOn ? `${rule} (${dayMonth(i.dueOn)})` : `${rule} · not known yet`;
-  if (i.dueOn) return date(i.dueOn);
+  if (rule) return i.dueOn ? `${rule} (${formatDayMonth(i.dueOn, style)})` : `${rule} · not known yet`;
+  if (i.dueOn) return fmtDate(i.dueOn, style);
   return i.when ? i.when.charAt(0).toUpperCase() + i.when.slice(1) : "No date yet";
 }
 

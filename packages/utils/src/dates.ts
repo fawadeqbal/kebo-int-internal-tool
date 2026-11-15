@@ -64,25 +64,103 @@ export function daysBetween(from: ISODate, to: ISODate): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
-export function formatDate(value: ISODate | Date | null | undefined, timeZone = "UTC"): string {
-  if (!value) return "—";
-  const isDay = typeof value === "string" && value.length === 10;
-  const d = typeof value === "string" ? new Date(isDay ? `${value}T00:00:00Z` : value) : value;
-  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: isDay ? "UTC" : timeZone }).format(
-    d,
-  );
+/* ---------------------------------------------------------------- how a company writes dates and times */
+
+/** How a company writes a date: 14 Nov 2026 · 14/11/2026 · 11/14/2026 · 2026-11-14. */
+export const DATE_FORMATS = ["d_mmm_yyyy", "dd_mm_yyyy", "mm_dd_yyyy", "yyyy_mm_dd"] as const;
+export type DateFormat = (typeof DATE_FORMATS)[number];
+/** 24-hour (15:30) or 12-hour (3:30 PM). */
+export const TIME_FORMATS = ["24h", "12h"] as const;
+export type TimeFormat = (typeof TIME_FORMATS)[number];
+
+/** A company's time zone and how it writes dates and times: every date and time shown goes through it. */
+export interface TimeStyle {
+  zone: string;
+  date: DateFormat;
+  time: TimeFormat;
 }
 
-export function formatDateTime(value: Date | string | null | undefined, timeZone: string): string {
+export const DEFAULT_DATE_FORMAT: DateFormat = "d_mmm_yyyy";
+export const DEFAULT_TIME_FORMAT: TimeFormat = "24h";
+
+/** A style from a zone alone (the usual date and time), or a full style as it is. */
+const styleOf = (s: TimeStyle | string | undefined): TimeStyle =>
+  typeof s === "string" || s === undefined ? { zone: s ?? "UTC", date: DEFAULT_DATE_FORMAT, time: DEFAULT_TIME_FORMAT } : s;
+
+/** Day, month (two digits) and year of a moment in a zone. */
+function partsOf(d: Date, zone: string) {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: zone, day: "2-digit", month: "2-digit", year: "numeric" }).formatToParts(d);
+  const get = (t: string) => p.find((x) => x.type === t)?.value ?? "";
+  return { day: get("day"), month: get("month"), year: get("year") };
+}
+
+/** A day as the company writes it; `year: false` leaves the year out ("14 Nov", "14/11"). */
+function dayText(d: Date, zone: string, f: DateFormat, year = true): string {
+  if (f === "d_mmm_yyyy")
+    return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", ...(year ? { year: "numeric" as const } : {}), timeZone: zone }).format(d);
+  const { day, month, year: y } = partsOf(d, zone);
+  if (f === "dd_mm_yyyy") return year ? `${day}/${month}/${y}` : `${day}/${month}`;
+  if (f === "mm_dd_yyyy") return year ? `${month}/${day}/${y}` : `${month}/${day}`;
+  return year ? `${y}-${month}-${day}` : `${month}-${day}`;
+}
+
+/** A time of day as the company writes it: "15:30" or "3:30 PM". */
+function clockText(d: Date, zone: string, t: TimeFormat): string {
+  return t === "12h"
+    ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: zone }).format(d)
+    : new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: zone }).format(d);
+}
+
+/**
+ * A date: a calendar day ("2026-11-14", the same everywhere) or the day of a moment in the style's zone, written
+ * the company's way. A plain zone for the second argument means the usual way (14 Nov 2026).
+ */
+export function formatDate(value: ISODate | Date | null | undefined, style: TimeStyle | string = "UTC"): string {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(new Date(value));
+  const s = styleOf(style);
+  const isDay = typeof value === "string" && value.length === 10;
+  const d = typeof value === "string" ? new Date(isDay ? `${value}T00:00:00Z` : value) : value;
+  return dayText(d, isDay ? "UTC" : s.zone, s.date);
+}
+
+/** A day without its year ("14 Nov", "14/11"), the company's way. */
+export function formatDayMonth(value: ISODate | Date | null | undefined, style: TimeStyle | string = "UTC"): string {
+  if (!value) return "—";
+  const s = styleOf(style);
+  const isDay = typeof value === "string" && value.length === 10;
+  const d = typeof value === "string" ? new Date(isDay ? `${value}T00:00:00Z` : value) : value;
+  return dayText(d, isDay ? "UTC" : s.zone, s.date, false);
+}
+
+/** A moment: its day and time in the style's zone ("14 Nov 2026, 15:30"). */
+export function formatDateTime(value: Date | string | null | undefined, style: TimeStyle | string): string {
+  if (!value) return "—";
+  const s = styleOf(style);
+  const d = new Date(value);
+  return `${dayText(d, s.zone, s.date)}, ${clockText(d, s.zone, s.time)}`;
+}
+
+/** The time of day of a moment in the style's zone ("15:30", "3:30 PM"). */
+export function formatTime(value: Date | string | null | undefined, style: TimeStyle | string): string {
+  if (!value) return "—";
+  const s = styleOf(style);
+  return clockText(new Date(value), s.zone, s.time);
+}
+
+/** A time of day typed as "HH:MM" (a follow-up's time), written the company's way: "15:30" or "3:30 PM". */
+export function formatClock(hhmm: string | null | undefined, style: TimeStyle | string): string {
+  if (!hhmm) return "";
+  const s = styleOf(style);
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm);
+  if (!m) return hhmm;
+  if (s.time === "24h") return `${m[1]!.padStart(2, "0")}:${m[2]}`;
+  const h = Number(m[1]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** The hour of the day (0–23) of a moment in a zone: "Good morning" before 12. */
+export function hourIn(timeZone: string, now: Date = new Date()): number {
+  return Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone }).format(now));
 }
 
 /** "3d 4h", "2h 5m", "45m". */
@@ -97,7 +175,7 @@ export function formatDuration(ms: number | null | undefined): string {
 }
 
 /** "just now", "25m ago", "3h ago", "Yesterday", "4d ago", or a short date. */
-export function timeAgo(value: Date | string, timeZone: string, now: Date = new Date()): string {
+export function timeAgo(value: Date | string, style: TimeStyle | string, now: Date = new Date()): string {
   const d = new Date(value);
   const mins = Math.floor((now.getTime() - d.getTime()) / 60_000);
   if (mins < 1) return "just now";
@@ -107,5 +185,6 @@ export function timeAgo(value: Date | string, timeZone: string, now: Date = new 
   const days = Math.floor(hours / 24);
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days}d ago`;
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone }).format(d);
+  const st = styleOf(style);
+  return dayText(d, st.zone, st.date, false);
 }

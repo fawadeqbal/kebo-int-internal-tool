@@ -5,7 +5,8 @@ import { Button, buttonClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { Modal } from "@/components/common/dialog";
-import { date, money } from "@/lib/format";
+import { money } from "@/lib/format";
+import { useTime } from "@/lib/time-client";
 import type { ActionState } from "@/lib/actions";
 import { requestPdfHref, requestPrintHref } from "@/lib/requests";
 
@@ -27,6 +28,7 @@ interface SendWhat {
  * give it to the customer. Sent again: the form asks why (R2); the first copy stays as it was.
  */
 export function SendDialog({ what, after = "links", onClose }: { what: SendWhat; after?: "links" | "close"; onClose: () => void }) {
+  const { date } = useTime();
   const [sent, setSent] = useState(false);
   const done = useCallback(() => (after === "close" ? onClose() : setSent(true)), [after, onClose]);
   const { orderId, refId, number, again } = what;

@@ -1,13 +1,13 @@
 import { REQUEST_STATE_LABEL, type RequestState } from "@kebo/shared";
 import type { SentWith } from "@/lib/types-money";
+import { formatDayMonth, type TimeStyle } from "@kebo/utils";
+import { timeStyle } from "@/lib/format";
 
 /**
  * Payment requests: where their pages are and their status in words. Plain functions, so the server's
  * pages and the browser's components both use them.
  */
 
-const dayMonth = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
 export const requestPrintHref = (orderId: string, ref: string, q: { now?: boolean; v?: number; back?: string } = {}) =>
   `/print/orders/${orderId}/payment-request?${new URLSearchParams({ ref, ...(q.now ? { now: "1" } : {}), ...(q.v ? { v: String(q.v) } : {}), ...(q.back ? { back: q.back } : {}) })}`;
@@ -21,7 +21,8 @@ export function requestWords(r: {
   sentOn: string | null;
   revision: number | null;
   through?: "customer" | "bank";
-}): string {
+}, style: TimeStyle = timeStyle()): string {
+  const dayMonth = (iso: string) => formatDayMonth(iso, style);
   if (r.state === "cancelled") return "Cancelled";
   // A bank route's balance is asked for with the papers: until they go to our bank it waits for them.
   if (r.state === "not_sent" && r.through === "bank") return "Papers not at the bank yet";

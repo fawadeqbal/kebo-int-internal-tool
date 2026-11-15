@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, List, Plus, TriangleAlert } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow, type PaymentSum } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage } from "@kebo/ui";
-import { addDays, todayIn } from "@kebo/utils";
+import { addDays } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
-import { date, money, TZ, whole } from "@/lib/format";
+import { date, money, whole, companyToday } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { hasFeature, requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
@@ -49,7 +49,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   if (old) redirect(old);
   // People who see no payments used to land on the requests of their orders: that list is there too.
   if (!opensPayments(me)) redirect(DUE);
-  const today = todayIn(TZ);
+  const today = companyToday();
   const order = UUID.test(sp.order ?? "") ? sp.order : undefined;
   const party = UUID.test(sp.party ?? "") ? sp.party : undefined;
   const account = UUID.test(sp.account ?? "") ? sp.account : undefined;

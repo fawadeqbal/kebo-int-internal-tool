@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { PageHeader } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { PlanOff } from "@/components/common/plan-off";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { requirePermission } from "@/lib/session";
-import { CashBody, moneyAccess, TZ, VaultOverview, type Search } from "../sections";
+import { CashBody, moneyAccess, VaultOverview, type Search } from "../sections";
+import { companyToday } from "@/lib/format";
 import Link from "next/link";
 import { Landmark } from "lucide-react";
 import { api } from "@/lib/api";
@@ -20,7 +20,7 @@ export default async function CashBookPage({ searchParams }: { searchParams: Pro
   const crumbs = crumbsFor("/finance/cash-book");
   if (!a.cashBook) return <PlanOff title={labelFor("/finance/cash-book")} what="The cash book" crumbs={crumbs} />;
   const sp = await searchParams;
-  const today = todayIn(TZ);
+  const today = companyToday();
   // The overview first (board Vault); an account, a period, or "the whole cash book" opens the book itself.
   const book = !!(sp.acct || sp.p || sp.cur || (sp as { book?: string }).book);
   const accounts = await api.get<AccountRow[]>("/money/accounts");

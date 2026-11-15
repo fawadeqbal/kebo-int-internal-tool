@@ -5,15 +5,12 @@ import { REASON_CHOICES } from "@kebo/shared";
 import { Button, cn, Field, Textarea } from "@kebo/ui";
 import { Modal } from "@/components/common/dialog";
 import type { EditCard } from "@/lib/types-edits";
+import { formatDayMonth, formatTime, todayIn, type TimeStyle } from "@kebo/utils";
+import { useTime } from "@/lib/time-client";
 
-const DAY_TIME = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-/** "today 10:40", "10 Nov 16:02". */
-export function whenText(iso: string) {
-  const d = new Date(iso);
-  const today = new Date();
-  return d.toDateString() === today.toDateString()
-    ? `today ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
-    : DAY_TIME.format(d);
+/** "today 10:40", "10 Nov 16:02": company time, the company's way. */
+export function whenText(iso: string, style: TimeStyle) {
+  return todayIn(style.zone, new Date(iso)) === todayIn(style.zone) ? `today ${formatTime(iso, style)}` : `${formatDayMonth(iso, style)} ${formatTime(iso, style)}`;
 }
 
 /**
@@ -21,6 +18,7 @@ export function whenText(iso: string) {
  * after the first save. A click shows each edit: who, when, why and what. Nothing when never edited.
  */
 export function EditsChip({ card, title = "This card" }: { card: EditCard | null | undefined; title?: string }) {
+  const { style } = useTime();
   const [open, setOpen] = useState(false);
   if (!card || card.count === 0) return null;
   const last = card.edits[0];
@@ -32,7 +30,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
         className="inline-flex h-6 items-center rounded-full bg-warn-soft px-2.5 text-xs font-semibold whitespace-nowrap text-warn hover:ring-2 hover:ring-warn/30"
         title="What changed, who and why"
       >
-        Edited {card.count}×{last?.by ? ` · last by ${last.by.split(" ")[0]}, ${whenText(last.at)}` : ""}
+        Edited {card.count}×{last?.by ? ` · last by ${last.by.split(" ")[0]}, ${whenText(last.at, style)}` : ""}
       </button>
       {open && (
         <Modal title={`${title} · edited ${card.count}× since first saved`} onClose={() => setOpen(false)}>
@@ -42,7 +40,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
                 <span className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-bold text-warn">Edit {e.n}</span>
                   <b>{e.by ?? "Someone"}</b>
-                  <span className="text-xs text-muted">{whenText(e.at)}</span>
+                  <span className="text-xs text-muted">{whenText(e.at, style)}</span>
                 </span>
                 {e.reason && (
                   <span className="text-sm">
@@ -63,7 +61,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
               <li className="flex flex-wrap items-center gap-2 py-3 text-sm">
                 <span className="rounded-full bg-ok-soft px-2 py-0.5 text-xs font-bold text-ok">First saved</span>
                 <b>{card.first.by ?? "Someone"}</b>
-                <span className="text-xs text-muted">{whenText(card.first.at)}</span>
+                <span className="text-xs text-muted">{whenText(card.first.at, style)}</span>
               </li>
             )}
           </ol>

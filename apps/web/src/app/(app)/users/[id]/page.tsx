@@ -4,7 +4,7 @@ import { can } from "@kebo/shared";
 import { PageHeader, StageBadge, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
-import { date, dateTime, timeAgo, TZ } from "@/lib/format";
+import { date, dateTime, timeAgo, companyToday } from "@/lib/format";
 import type { DealRow, HistoryEntry, Paged } from "@/lib/types";
 import type { AuditRow, RoleRow, UserRow } from "@/lib/types-people";
 import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -52,7 +52,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   const seeAudit = can(me, "audit.view") && (await hasFeature("audit_log"));
   // What they spent and what is owed back to them: managers with expenses.
   const seeSpending = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
+  const today = companyToday();
   const [users, all, inquiries, audit, spending] = await Promise.all([
     api.get<UserRow[]>("/users"),
     api.get<RoleRow[]>("/roles"),

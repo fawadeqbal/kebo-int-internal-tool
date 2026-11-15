@@ -1,11 +1,10 @@
 import { X } from "lucide-react";
 import { ORDER_WORD_TONE } from "@kebo/shared";
 import { ButtonLink, Card, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead, toPage, type StatusMeaning } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { customerOf, customerPaymentsOf } from "@/lib/party-data";
-import { date, TZ, whole } from "@/lib/format";
+import { date, whole, companyToday } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
 import type { CustomerPayments } from "@/lib/types-money";
 import { DataTable } from "@/components/common/data-table";
@@ -47,7 +46,7 @@ export default async function CustomerOrders({
     customerPaymentsOf(id),
     api.get<Paged<DealRow>>("/inquiries", { customerId: id, stage: "won", pageSize: 100 }).catch(() => null),
   ]);
-  const today = todayIn(TZ);
+  const today = companyToday();
   const byOrder = new Map((deals?.rows ?? []).filter((d) => d.order).map((d) => [d.order!.id, d]));
   // Without the payments (people who may not see them): the orders alone, money columns blank.
   const all: PayOrder[] = [

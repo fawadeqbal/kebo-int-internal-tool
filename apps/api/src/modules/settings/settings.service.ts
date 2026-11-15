@@ -9,6 +9,9 @@ import { requireReason } from "../../common/audit/reason";
 import { CompanyContext } from "../../common/company/company-context";
 import { DomainError } from "@kebo/utils";
 import { LedgerPosting } from "../ledger/posting.service";
+import { CompaniesService } from "../../common/company/companies.service";
+import { ENV, type Env } from "../../config/env";
+import { Inject } from "@nestjs/common";
 
 const SETTING_LABEL = {
   exchangeRates: "exchange rates",
@@ -29,16 +32,20 @@ export class SettingsService {
     private readonly audit: AuditService,
     private readonly clock: Clock,
     private readonly ledger: LedgerPosting,
+    private readonly companies: CompaniesService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   async get(): Promise<Settings> {
-    const company = CompanyContext.require().id;
-    const hit = this.cache.get(company);
-    if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
-    const rows = await this.prisma.db.setting.findMany();
-    const value = readSettings(Object.fromEntries(rows.map((r) => [r.key, r.value])));
-    this.cache.set(company, { at: Date.now(), value });
-    return value;
+    const c = CompanyContext.require();
+    const hit = this.cache.get(c.id);
+    const value =
+      hit && Date.now() - hit.at < CACHE_MS
+        ? hit.value
+        : readSettings(Object.fromEntries((await this.prisma.db.setting.findMany()).map((r) => [r.key, r.value])));
+    if (!hit || hit.value !== value) this.cache.set(c.id, { at: Date.now(), value });
+    // Time and dates live on the company itself (every request knows them): shown here as they are now.
+    return { ...value, company: { ...value.company, timeZone: c.timeZone ?? this.env.APP_TIME_ZONE, dateFormat: c.dateFormat, timeFormat: c.timeFormat } };
   }
 
   /**
@@ -104,11 +111,25 @@ export class SettingsService {
       : typeof given === "string"
         ? given.slice(0, 500)
         : null;
+    // Time and dates are kept on the company (the one place every request and job reads them), not in the JSON.
+    let stored: unknown = value;
+    if (key === "company") {
+      const { timeZone, dateFormat, timeFormat, ...rest } = value as Settings["company"];
+      stored = rest;
+      const c = CompanyContext.require();
+      const zone = timeZone || this.env.APP_TIME_ZONE;
+      if (zone !== (c.timeZone ?? this.env.APP_TIME_ZONE) || dateFormat !== c.dateFormat || timeFormat !== c.timeFormat) {
+        await this.prisma.platform.company.update({ where: { id: c.id }, data: { timeZone: zone, dateFormat, timeFormat } });
+        this.companies.forget(c.id);
+        // This request goes on in the new time at once.
+        CompanyContext.set({ ...c, timeZone: zone, dateFormat, timeFormat });
+      }
+    }
     await this.prisma.tx(async (tx) => {
       await tx.setting.upsert({
         where: { companyId_key: { companyId: user.companyId, key } },
-        create: { key, value: value as Prisma.InputJsonValue },
-        update: { value: value as Prisma.InputJsonValue },
+        create: { key, value: stored as Prisma.InputJsonValue },
+        update: { value: stored as Prisma.InputJsonValue },
       });
       await this.audit.record(tx, {
         userId: user.id,

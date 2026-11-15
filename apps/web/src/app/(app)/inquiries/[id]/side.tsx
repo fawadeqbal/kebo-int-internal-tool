@@ -2,10 +2,9 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { can, CHANNEL_LABEL, isOpen } from "@kebo/shared";
 import { cn } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { date, TZ } from "@/lib/format";
+import { date, companyToday } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { getPeople } from "@/lib/loaders";
 import type { FollowUpList } from "@/lib/types-notes";
@@ -48,7 +47,7 @@ export async function InquirySide({ id }: { id: string }) {
   // The next follow-up: the earliest one still open. An open inquiry is never meant to be without one.
   const nextUp = [...(followUps?.rows ?? [])].sort((a, b) => `${a.dueOn}${a.dueAt ?? ""}`.localeCompare(`${b.dueOn}${b.dueAt ?? ""}`))[0];
   const base = `/inquiries/${d.id}`;
-  const status = statusWords(d, facts, todayIn(TZ));
+  const status = statusWords(d, facts, companyToday());
   const contact = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
   const phone = contact?.whatsapp ?? contact?.phone ?? null;
   const order = d.orders.find((o) => o.status !== "cancelled");

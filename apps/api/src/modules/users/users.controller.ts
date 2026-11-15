@@ -71,12 +71,6 @@ const ownProfileInput = z.object({
   name: z.string().trim().min(1, "Enter your name").max(120),
   phone: z.string().trim().max(40).nullish(),
   language: z.enum(["en", "zh", "ur"]).optional(),
-  timeZone: z
-    .string()
-    .trim()
-    .max(60)
-    .refine((v) => !v || Intl.supportedValuesOf("timeZone").includes(v), "Choose a time zone from the list")
-    .nullish(),
 });
 
 @ApiTags("me")
@@ -84,13 +78,13 @@ const ownProfileInput = z.object({
 export class AccountController {
   constructor(private readonly users: UsersService) {}
 
-  /** { name, phone, language, timeZone }: your own profile (the email and role are changed by who manages people). */
+  /** { name, phone, language }: your own profile (the email and role are changed by who manages people; times are the company's). */
   @Patch()
   rename(@CurrentUser() actor: SessionUser, @Body(Validate(ownProfileInput)) body: z.infer<typeof ownProfileInput>) {
-    return this.users.renameSelf(actor, body.name, { phone: body.phone, language: body.language, timeZone: body.timeZone });
+    return this.users.renameSelf(actor, body.name, { phone: body.phone, language: body.language });
   }
 
-  /** Your phone, language and time zone (My account). */
+  /** Your phone and language (My account). */
   @Get("profile")
   profile(@CurrentUser() actor: SessionUser) {
     return this.users.ownProfile(actor);

@@ -24,7 +24,8 @@ import { FilePicker, useSaveThenSend } from "./attachment";
 import { MoneyInput } from "@/components/common/money-input";
 import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
-import { date, dueText, money } from "@/lib/format";
+import { dueText, money } from "@/lib/format";
+import { useTime } from "@/lib/time-client";
 import type { Person } from "@/lib/types";
 import type { FactoryOwed, FactoryPaymentView, OrderMoney } from "@/lib/types-money";
 
@@ -80,6 +81,7 @@ export function PaymentPlan({
   /** The plan is shown elsewhere (the line table): only the "Change the plan" button until editing. */
   buttonOnly?: boolean;
 }) {
+  const { date, style } = useTime();
   const [editing, setEditing] = useState(startOpen);
   /** What a part's request says about changing it: paid, part paid or already sent. */
   const noteOf = (id: string | null): { text: string; warn: boolean } | null => {
@@ -158,9 +160,9 @@ export function PaymentPlan({
                 <tr key={i.id} className="border-t border-line">
                   <td className="px-3 py-2.5 align-top">
                     <span className="font-medium">{i.label}</span>
-                    <span className="block text-xs text-muted sm:hidden">{dueText(i)}</span>
+                    <span className="block text-xs text-muted sm:hidden">{dueText(i, style)}</span>
                   </td>
-                  <td className={cn("hidden px-3 py-2.5 align-top sm:table-cell", i.dueOn ? "text-text-2" : "text-muted")}>{dueText(i)}</td>
+                  <td className={cn("hidden px-3 py-2.5 align-top sm:table-cell", i.dueOn ? "text-text-2" : "text-muted")}>{dueText(i, style)}</td>
                   <td className="px-3 py-2.5 text-right align-top tabular">{money(i.amount, currency)}</td>
                   <td className={cn("hidden px-3 py-2.5 text-right align-top tabular sm:table-cell", Number(i.paid) > 0 ? "" : "text-muted")}>{money(i.paid, currency)}</td>
                   <td className="px-3 py-2.5 align-top">

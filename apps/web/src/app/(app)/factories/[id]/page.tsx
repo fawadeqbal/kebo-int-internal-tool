@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { can, ORDER_WORD_TONE } from "@kebo/shared";
-import { todayIn } from "@kebo/utils";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { api } from "@/lib/api";
 import type { FactoryGroups, FactoryOrders } from "@/lib/types-facts";
@@ -23,7 +22,7 @@ import {
   Tr,
   type StatusMeaning,
 } from "@kebo/ui";
-import { date, plural, TZ, whole } from "@/lib/format";
+import { date, plural, whole, companyToday } from "@/lib/format";
 import { getPeople } from "@/lib/loaders";
 import type { Person } from "@/lib/types";
 import { DetailsCard } from "@/components/common/record";
@@ -72,7 +71,7 @@ export default async function FactoryOverview({
   ]);
   const r = f.record;
   const toPay = payables.filter((p) => Number(p.toPay) > 0.005);
-  const today = todayIn(TZ);
+  const today = companyToday();
   const perf = groups?.rows[0] ?? null;
   // Bought, paid and owed, per currency, from its orders.
   const sums = [...new Set((pos?.rows ?? []).map((o) => o.currency))].map((cur) => {
