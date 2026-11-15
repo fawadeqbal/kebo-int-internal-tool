@@ -1,15 +1,15 @@
 "use client";
 
-import Form from "next/form";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
-import { Avatar, buttonClass, cn, Kbd } from "@kebo/ui";
+import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
+import { Avatar, buttonClass, cn } from "@kebo/ui";
 import { NavMemoryKeeper } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
 import { PRODUCT_NAME } from "@/lib/product";
+import { PhoneSearch, TopSearch } from "./global-search";
 
 export type { NavModule, NavPage } from "@/lib/nav";
 
@@ -795,27 +795,9 @@ export function AppShell({
             <button type="button" className={cn(buttonClass("ghost", "icon"), "hidden xl:inline-flex")} onClick={onFoldButton} aria-label={folded ? "Open the menu" : "Fold the menu"} aria-pressed={folded}>
               {folded ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
             </button>
-            <Form action="/inquiries" role="search" aria-label="Search inquiries" className="relative hidden max-w-[380px] flex-1 md:block">
-              <label htmlFor="global-search" className="sr-only">
-                Search inquiries
-              </label>
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
-              <input
-                id="global-search"
-                name="q"
-                type="search"
-                placeholder="Search inquiries, customers, numbers…"
-                className="h-9 w-full rounded-[10px] border border-line-strong bg-[#f8faf9] pr-10 pl-9 text-[13px] text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none dark:bg-surface-2"
-              />
-              <input type="hidden" name="status" value="all" />
-              <span className="pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 lg:inline-flex">
-                <Kbd>/</Kbd>
-              </span>
-            </Form>
+            <TopSearch />
             <div className="ml-auto flex items-center gap-1.5">
-              <Link href="/inquiries" className={cn(buttonClass("ghost", "icon"), "md:hidden")} aria-label="Search inquiries">
-                <Search aria-hidden />
-              </Link>
+              <PhoneSearch />
               {newItems.length > 0 && (
                 <span className="hidden md:block">
                   <NewMenu items={newItems} />

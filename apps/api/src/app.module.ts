@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { SectionsModule } from "./modules/sections/sections.module";
 import { FlowModule } from "./modules/flow/flow.module";
+import { SearchModule } from "./modules/search/search.module";
 import { PapersModule } from "./modules/papers/papers.module";
 import { OrderFilesModule } from "./modules/files/order-files.module";
 import { EnvModule } from "./config/env";
@@ -43,6 +44,6 @@ import { PlatformModule } from "./platform/platform.module";
  */import { InsightsModule } from "./modules/insights/insights.module";
 
 @Module({
-  imports: [EnvModule, PrismaModule, CompaniesModule, OwnDomainModule, LimitsModule, CommonModule, StorageModule, EventsModule, LedgerPostingModule, AuthCoreModule, HealthModule, AuthModule, SectionsModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, TreasuryModule, CancellationModule, OperationsModule, ApprovalsModule, LedgerModule, NotesModule, SecurityModule, InsightsModule, FlowModule, PapersModule, OrderFilesModule, CompanyModule, PlatformModule],
+  imports: [EnvModule, PrismaModule, CompaniesModule, OwnDomainModule, LimitsModule, CommonModule, StorageModule, EventsModule, LedgerPostingModule, AuthCoreModule, HealthModule, AuthModule, SectionsModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, TreasuryModule, CancellationModule, OperationsModule, ApprovalsModule, LedgerModule, NotesModule, SecurityModule, InsightsModule, FlowModule, SearchModule, PapersModule, OrderFilesModule, CompanyModule, PlatformModule],
 })
 export class AppModule {}
