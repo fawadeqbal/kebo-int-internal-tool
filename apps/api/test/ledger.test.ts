@@ -47,6 +47,7 @@ describe("the ledger", () => {
   let sana: string;
   let manager: string;
   let admin: string;
+  let sales0: Record<string, unknown> = {};
   let bilal: string;
   let me: string;
   let managerId: string;
@@ -140,6 +141,7 @@ describe("the ledger", () => {
     bilal = await signIn(app, "bilal@example.com");
     manager = await signIn(app, "manager@example.com", "Manager@12345");
     admin = await signIn(app, "admin@example.com", "Admin@12345");
+    sales0 = (await api(app, admin).get("/settings").expect(200)).body.sales;
     me = (await api(app, sana).get("/auth/me")).body.id;
     managerId = (await api(app, manager).get("/auth/me")).body.id;
     customerId = (
@@ -167,6 +169,7 @@ describe("the ledger", () => {
   });
 
   afterAll(async () => {
+    await api(app, admin).put("/settings/sales", { ...sales0, reason: "Test: rates as they were" });
     await app?.close();
   });
 
@@ -543,7 +546,7 @@ describe("the ledger", () => {
   it("transfers between accounts and opening balances (a changed opening balance posts the difference)", async () => {
     const pkr = (
       await api(app, manager)
-        .post("/money/accounts", { name: `Ledger PKR ${tag}`, kind: "cash", currency: "PKR", openingBalance: 0, openingOn: day(-10) })
+        .post("/money/accounts", { name: `Ledger PKR ${tag}`, kind: "cash", currency: "PKR", openingBalance: 0, openingOn: day(-10), rate: 280 })
         .expect(201)
     ).body.id;
     expect(await rowsOf("account", pkr)).toEqual([]);
