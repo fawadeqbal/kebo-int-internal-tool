@@ -288,8 +288,14 @@ describe("papers that never move", () => {
     const o = await newOrder();
     await api(app, manager).post(`/orders/${o.id}/proforma`).expect(200);
     const printed = await proforma(o.id);
-    // As before this change: issued, no version kept.
-    await asCompany(() => prisma.db.orderPaper.deleteMany({ where: { orderId: o.id, kind: "proforma" } }));
+    // As before this change: issued, no version kept. (A final version is history: only a repair that says so
+    // may remove it.)
+    await asCompany(() =>
+      prisma.db.$transaction(async (tx) => {
+        await tx.$executeRaw`set local kebo.history_rewrite = 'on'`;
+        await tx.orderPaper.deleteMany({ where: { orderId: o.id, kind: "proforma" } });
+      }),
+    );
     expect(await app.get(DocumentsService).rebuildAll()).toBeGreaterThanOrEqual(1);
     const rebuilt = await proforma(o.id);
     // Rebuilt today: the clock's day now (a run can cross midnight in the company's time zone).
