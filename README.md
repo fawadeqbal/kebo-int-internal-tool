@@ -67,6 +67,10 @@ Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up
 
 The API tests run against a real database: migrate and seed with `--demo` first (CI does this).
 
+**Coverage**: `COVERAGE=1 pnpm test` also measures how much of each package's `src/` its tests run (CI does this and shows a table on the check job's summary page). Each package has a floor in its vitest config, what it was when set rounded down to the nearest 5: the tests fail under it, so raise it as tests are added.
+
+**In a browser** (`apps/web-e2e`, CI's browser job): with the API (4000), the web app (3000) and `node apps/web-e2e/proxy.mjs` (8080, the stand-in for Caddy) running on the demo data, `pnpm --filter @kebo/web-e2e e2e` signs in, records a new inquiry and a payment received the way a person does, and opens every page at laptop and phone width: no errors in the browser, nothing wider than the screen, WCAG 2.2 AA (axe). The pages come from the app's folders, so a new page is checked without being listed; a page with an id in its address is opened at a link the app itself shows. On a laptop it uses the running servers (`CHROME_PATH=/path/to/chrome` if Playwright's own browser is not installed); in CI it starts them. A failure leaves a trace: `npx playwright show-trace apps/web-e2e/test-results/<test>/trace.zip` (in CI: the browser-report artifact).
+
 ### Migrations
 
 Production applies them to real data, in name order. So:

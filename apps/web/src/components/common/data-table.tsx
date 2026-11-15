@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@kebo/ui";
 
@@ -37,6 +37,20 @@ export function DataTable({
   const pathname = usePathname();
   const box = useRef<HTMLDivElement>(null);
   const once = clearParam ? params.get(clearParam) : null;
+  // Wider than its card (a phone, a narrow window), the list scrolls sideways: then its box takes the keyboard
+  // (arrow keys scroll it), as the design system's Table does. A list with no link in it (a ledger) had no other
+  // way in. Where it fits, the box is not a stop on the way through the page.
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const check = () => setScrolls(el.scrollWidth > el.clientWidth + 1);
+    const watch = new ResizeObserver(check);
+    watch.observe(el);
+    if (el.firstElementChild) watch.observe(el.firstElementChild);
+    check();
+    return () => watch.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!clearParam || !once) return;
@@ -52,12 +66,15 @@ export function DataTable({
   return (
     <div
       ref={box}
+      tabIndex={scrolls ? 0 : undefined}
+      role={scrolls ? "region" : undefined}
+      aria-label={scrolls ? label : undefined}
       className={cn(
         // Where every list fits its card (`fits`, see globals.css) the header row sticks under the app's top row
         // while the list scrolls; narrower, a wide table scrolls sideways instead of losing its last columns.
         // relative: a hidden (sr-only) label in a cell is placed inside the scrolling box, never past the screen's edge.
         "relative w-full overflow-x-auto fits:overflow-x-visible [&_thead_th]:bg-surface-2",
-        "fits:[&_thead_th]:sticky fits:[&_thead_th]:top-14 fits:[&_thead_th]:z-[1]",
+        "fits:[&_thead_th]:sticky fits:[&_thead_th]:top-14 fits:[&_thead_th]:z-[1] focus-visible:-outline-offset-2",
         className,
       )}
       onClick={(e) => {

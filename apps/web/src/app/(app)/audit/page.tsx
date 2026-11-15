@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -83,7 +83,7 @@ function Changes({ r }: { r: AuditRow }) {
         <span className="hidden group-open:inline">{diff.changed ? "Hide changes" : "Hide values"}</span>
       </summary>
       {!diff.changed && <p className="mt-1.5 text-xs text-text-2">None of these fields changed{r.entityType === "customer" ? " (only contacts were edited)" : ""}.</p>}
-      <div className="mt-2 overflow-x-auto rounded-lg border border-line">
+      <ScrollFade scrollLabel="What changed" className="mt-2 overflow-x-auto rounded-lg border border-line">
         <table className="w-full text-xs">
           <thead className="bg-surface-2/60 text-text-2">
             <tr>
@@ -102,7 +102,7 @@ function Changes({ r }: { r: AuditRow }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollFade>
     </details>
   );
 }

@@ -1,0 +1,5 @@
+{
+  "extends": "@kebo/config/tsconfig/base.json",
+  "compilerOptions": { "lib": ["ES2023", "DOM"], "noEmit": true, "declaration": false, "sourceMap": false },
+  "include": ["*.ts", "tests"]
+}

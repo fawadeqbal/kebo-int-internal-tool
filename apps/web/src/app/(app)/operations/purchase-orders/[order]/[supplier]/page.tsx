@@ -149,7 +149,8 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 label: "Sales order",
                 value: (
                   <>
-                    <Link href={orderHref} className="text-primary hover:underline">
+                    {/* Underlined: in a line of text a link must not be told apart by its colour alone (WCAG 1.4.1). */}
+                    <Link href={orderHref} className="text-primary underline underline-offset-2 hover:opacity-80">
                       {o.refNo}
                     </Link>{" "}
                     · {o.customer.name}

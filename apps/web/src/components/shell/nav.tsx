@@ -390,7 +390,8 @@ function MenuContent({
         <Link href={HOME_HREF} className={cn("flex min-w-0 items-center gap-2.5 rounded-lg", big && "pr-10")} aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
           <Logo companyName={companyName} logo={logo} size={32} />
           <span className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-[15.5px] font-bold tracking-tight text-text">{PRODUCT_NAME}</span>
+            <span className="truncate text-[15.5px] font-bold tracking-tight text-text">{PRODUCT_NAME}</span>{" "}
+            {/* The space keeps the two names apart in the link's text, so what is read out matches what is shown (WCAG 2.5.3). */}
             <span className="truncate text-xs text-muted">{companyName}</span>
           </span>
         </Link>

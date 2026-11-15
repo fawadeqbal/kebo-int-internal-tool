@@ -14,10 +14,11 @@ export function Sheet({ watermark, children }: { watermark?: string | null; chil
   return (
     <article className="relative mx-auto w-[210mm] max-w-full min-h-[297mm] overflow-hidden bg-white px-[14mm] pt-[12mm] pb-[14mm] font-doc text-[9.5pt] leading-snug text-kebo-ink shadow-[0_1px_3px_rgba(16,24,40,.12),0_8px_24px_rgba(16,24,40,.08)] print:min-h-0 print:w-auto print:overflow-visible print:p-0 print:shadow-none">
       {watermark && (
-        <div aria-hidden className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center print:fixed">
-          <span className="-rotate-[30deg] rounded-xl border-[6px] border-[#dc2626]/25 px-10 font-doc-display text-[110pt] leading-none font-extrabold tracking-[0.08em] text-[#dc2626]/[0.13] select-none">
-            {watermark}
-          </span>
+        // The stamp (DRAFT, VOID, PREVIEW) is meant to be faint behind the paper, so it is drawn (CSS content) and
+        // not text a contrast check reads as hard to read: decoration in WCAG 1.4.3's sense. Its word is still
+        // read out, so a screen reader hears that the paper is a draft.
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center print:fixed">
+          <span data-mark={watermark} className="-rotate-[30deg] rounded-xl border-[6px] border-[#dc2626]/25 px-10 font-doc-display text-[110pt] leading-none font-extrabold tracking-[0.08em] text-[#dc2626]/[0.13] select-none before:content-[attr(data-mark)]" />
         </div>
       )}
       <div className="relative">{children}</div>

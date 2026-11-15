@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Check, ClipboardList, Mail, MessageCircle, Minus, Phone, Plus } from "lucide-react";
+import { ScrollFade } from "@kebo/ui";
 import { PLAN_FEATURE_KEYS, PLAN_FEATURES, planFeatureName, type LeadOrigin, type SiteContent } from "@kebo/shared";
 import type { ActionState } from "@/lib/actions";
 import { ContactForm } from "./contact-form";
@@ -294,7 +295,7 @@ function ContactLines({ contact }: { contact: SiteContent["contact"] }) {
 function PlansTable({ plans, demo }: { plans: SitePlan[]; demo: (cta: string) => string }) {
   const per = (p: string) => (p === "year" ? "a year" : "a month");
   return (
-    <div className="mt-12 overflow-x-auto rounded-xl border border-(--s-line) bg-white">
+    <ScrollFade scrollLabel="The plans compared" className="mt-12 overflow-x-auto rounded-xl border border-(--s-line) bg-white">
       <table className="w-full min-w-[40rem] border-collapse text-left">
         <caption className="sr-only">The plans compared</caption>
         <thead>
@@ -353,7 +354,7 @@ function PlansTable({ plans, demo }: { plans: SitePlan[]; demo: (cta: string) =>
           </tr>
         </tbody>
       </table>
-    </div>
+    </ScrollFade>
   );
 }
 

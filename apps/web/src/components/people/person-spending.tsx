@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Card, cn } from "@kebo/ui";
+import { Card, cn, ScrollFade } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
 import { date, money, dayMonth } from "@/lib/format";
@@ -115,7 +115,7 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
             On orders: already in those orders&apos; profit. For the company: on Company costs. The others are what Profit after all costs takes off
             {Number(s.outside) > 0 ? ` (${money(s.outside, c)})` : ""}.
           </p>
-          <div className="overflow-x-auto border-t border-line">
+          <ScrollFade scrollLabel="Spending, kind by kind" className="overflow-x-auto border-t border-line">
             <table className="w-full min-w-[560px] border-collapse text-[13px]">
               <thead>
                 <tr className="bg-surface-2 text-left text-xs text-text-2">
@@ -159,7 +159,7 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollFade>
         </>
       )}
     </Card>

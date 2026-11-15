@@ -6,21 +6,32 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.mjs", "require": "./dist/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
     "./eslint": "./eslint.config.mjs",
     "./tsconfig/*": "./tsconfig/*"
   },
-  "files": ["dist", "tsconfig", "eslint.config.mjs"],
+  "files": [
+    "dist",
+    "tsconfig",
+    "eslint.config.mjs"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "dependencies": { "zod": "4.6.7" },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "5.0.5",
     "eslint": "^10.13.0",
     "tsup": "^8.5.0",
     "typescript": "~6.0.3",
