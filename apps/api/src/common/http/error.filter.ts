@@ -33,6 +33,14 @@ export class ErrorFilter implements ExceptionFilter {
     if (isDbError(error, DB_ERROR.uniqueViolation)) return send(409, { error: "That already exists (someone may have just saved it). Reload and try again." });
     // Another company's row (row-level security refused it): as if it did not exist.
     if (error instanceof Error && /row-level security/i.test(error.message)) return send(404, { error: "This record no longer exists. Reload and try again." });
+    // A database rule kept history as it was written (the ledger, the audit trail, stage moves, final papers).
+    // The app never asks for that, so it is logged and counted like any surprise; the person reads why.
+    const kept = keptAsWritten(error);
+    if (kept) {
+      this.log.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
+      ErrorFilter.report?.(error, host.switchToHttp().getRequest<Request>());
+      return send(409, { error: kept });
+    }
     if (error instanceof HttpException) {
       const r = error.getResponse();
       const message = typeof r === "string" ? r : ((r as { message?: string | string[] }).message ?? error.message);
@@ -47,4 +55,17 @@ export class ErrorFilter implements ExceptionFilter {
     ErrorFilter.report?.(error, host.switchToHttp().getRequest<Request>());
     return send(500, { error: "Something went wrong. Please try again." });
   }
+}
+
+/** What the database rules that keep history as it was written say (migrations ledger and history_append_only). */
+const KEPT = [
+  "Ledger entries are never changed or deleted: post a correction instead",
+  "History is never changed or deleted: it stays as it was written",
+  "A final version stays as it was printed: make it again for a new version",
+];
+
+function keptAsWritten(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : "";
+  const said = KEPT.find((k) => message.includes(k));
+  return said ? `${said}.` : null;
 }
