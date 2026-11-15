@@ -35,7 +35,7 @@ List<Json> ordered(List<Json> items) {
 }
 
 /// The customer's items in a full screen made for long lists: rows load as you scroll, search,
-/// ⋯ on a line (Edit, Add a part, Move up / down, Delete), and Add with Save & add another.
+/// ⋯ on a line (Edit, Add a part, Move up / down, Delete), and Add.
 /// Returns the new list, or null when nothing changed.
 Future<List<Json>?> openItems(BuildContext context, {required List<Json> items, required List<FieldDef> fields, required Json Function() blank, String title = 'Items'}) =>
     Navigator.of(context, rootNavigator: true)
@@ -67,7 +67,6 @@ class _ItemsScreenState extends State<_ItemsScreen> {
     final isNew = item == null;
     var v = {...?item};
     if (isNew) v = {...widget.blank(), '_key': _newKey(), '_parent': parent};
-    var version = 0;
     final errors = <String, String>{};
     await showModalBottomSheet<void>(
       context: context,
@@ -85,7 +84,7 @@ class _ItemsScreenState extends State<_ItemsScreen> {
             return errors.isEmpty;
           }
 
-          void save({bool another = false}) {
+          void save() {
             if (!check()) return;
             final next = [...items];
             final at = next.indexWhere((i) => i['_key'] == v['_key']);
@@ -95,14 +94,7 @@ class _ItemsScreenState extends State<_ItemsScreen> {
               next.add(v);
             }
             _apply(next);
-            if (another) {
-              set(() {
-                v = {...widget.blank(), '_key': _newKey(), '_parent': parent};
-                version++;
-              });
-            } else {
-              Navigator.pop(ctx);
-            }
+            Navigator.pop(ctx);
           }
 
           final n = items.where((i) => i['_parent'] == null).length;
@@ -115,19 +107,12 @@ class _ItemsScreenState extends State<_ItemsScreen> {
                   header: true,
                   child: Text(isNew ? (parent == null ? 'Item ${n + 1}' : 'A part') : 'Item ${item['no'] ?? ''}', style: ctx.text.titleLarge),
                 ),
-                if (isNew) Text('Save & add another keeps this open', style: ctx.text.bodySmall?.copyWith(color: ctx.colors.text2)),
                 const SizedBox(height: Gap.md),
                 for (final f in widget.fields) ...[
-                  FieldEditor(key: ValueKey('$version.${f.key}'), def: f, value: v[f.key], error: errors[f.key], onChanged: (x) => set(() => v[f.key] = x)),
+                  FieldEditor(key: ValueKey(f.key), def: f, value: v[f.key], error: errors[f.key], onChanged: (x) => set(() => v[f.key] = x)),
                   const SizedBox(height: Gap.md),
                 ],
-                Row(children: [
-                  Expanded(child: OutlinedButton(onPressed: save, child: const Text('Save'))),
-                  if (isNew) ...[
-                    const SizedBox(width: Gap.md),
-                    Expanded(flex: 2, child: FilledButton(onPressed: () => save(another: true), child: const Text('Save & add another'))),
-                  ],
-                ]),
+                FilledButton(onPressed: save, child: const Text('Save')),
               ]),
             ),
           );
