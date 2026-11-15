@@ -80,9 +80,13 @@ export class StagesService {
    */
   async undoLost(tx: Tx, subject: StageSubject, actorId: string, now: Date) {
     if (subject.stage !== "lost") throw new DomainError(`${subject.refNo} is not lost now.`);
-    const last = await tx.inquiryStageChange.findFirst({ where: { inquiryId: subject.id }, orderBy: { changedAt: "desc" } });
-    const fresh = !!last && now.getTime() - last.changedAt.getTime() <= UNDO_LOST_MS;
-    if (!last || last.toStage !== "lost" || last.cause !== "manual" || last.changedById !== actorId || !fresh)
+    // The moves of the last two minutes, newest first (a few seconds' grace for the database's clock). Rows dated
+    // later than now are left out: a demo inquiry's "created" row is dated at midnight of the company's day.
+    const last = await tx.inquiryStageChange.findFirst({
+      where: { inquiryId: subject.id, changedAt: { gte: new Date(now.getTime() - UNDO_LOST_MS), lte: new Date(now.getTime() + 5_000) } },
+      orderBy: { changedAt: "desc" },
+    });
+    if (!last || last.toStage !== "lost" || last.cause !== "manual" || last.changedById !== actorId)
       throw new DomainError(`It can no longer be undone here: a manager can reopen ${subject.refNo}.`);
     const event = await this.write(tx, subject, last.fromStage as InquiryStage, "undo", actorId, { reason: "Mark as lost undone" });
     return { event, since: last.changedAt };

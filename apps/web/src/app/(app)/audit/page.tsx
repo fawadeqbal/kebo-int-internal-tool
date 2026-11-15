@@ -78,7 +78,8 @@ function Changes({ r }: { r: AuditRow }) {
   if (!diff.rows.length) return null;
   return (
     <details className="group mt-1.5" data-no-row>
-      <summary className="cursor-pointer text-xs font-medium text-primary select-none hover:underline">
+      {/* A target a thumb can hit: 24px tall at least (WCAG 2.2), even under a phone row's link. */}
+      <summary className="inline-flex min-h-6 cursor-pointer items-center text-xs font-medium text-primary select-none hover:underline">
         <span className="group-open:hidden">{diff.changed ? `Show ${diff.rows.length} change${diff.rows.length === 1 ? "" : "s"}` : "Show recorded values"}</span>
         <span className="hidden group-open:inline">{diff.changed ? "Hide changes" : "Hide values"}</span>
       </summary>

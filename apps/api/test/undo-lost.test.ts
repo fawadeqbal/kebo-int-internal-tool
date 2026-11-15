@@ -1,6 +1,8 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { FIRST_COMPANY_ID } from "@kebo/database";
 import { api, signIn, startApp } from "./app";
+import { PrismaService } from "../src/database/prisma.service";
 
 /**
  * "Mark as lost" has an Undo in its note (design "knowing what happened"): whoever marked it can take it back
@@ -65,6 +67,18 @@ describe("undoing Mark as lost", () => {
     expect(await open()).toBe(0);
     await api(app, sana).post(`/inquiries/${id}/undo-lost`, {}).expect(200);
     expect(await open()).toBe(before);
+  });
+
+  it("is not confused by a history row dated later than now (a demo inquiry's day starts ahead in China)", async () => {
+    const id = await newInquiry();
+    // As the demo data writes "created": midnight of the company's day, which can still be ahead of now.
+    await app
+      .get(PrismaService)
+      .company(FIRST_COMPANY_ID)
+      .inquiryStageChange.create({ data: { inquiryId: id, toStage: "new", cause: "created", changedAt: new Date(Date.now() + 4 * 3600_000) } });
+    await api(app, sana).post(`/inquiries/${id}/stage`, { to: "lost", lostReason: "no_reply" }).expect(200);
+    await api(app, sana).post(`/inquiries/${id}/undo-lost`, {}).expect(200);
+    expect(await stageOf(id)).not.toBe("lost");
   });
 
   it("is only for whoever marked it, and only while that is the last move", async () => {
