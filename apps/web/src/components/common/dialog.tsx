@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { Button } from "@kebo/ui";
 import { lockScroll } from "@/lib/scroll-lock";
 import { useChanges, watchChanges } from "./changes";
@@ -154,6 +154,72 @@ export function ConfirmDialog({
   );
 }
 
+/**
+ * Asked when a form with something typed in it is closed: what was typed would be lost. One wording for
+ * every form: "Throw away your changes?", Keep editing (focused, so Enter never loses anything) or Throw away.
+ */
+export function ThrowAwayConfirm({ what, onKeep, onThrow }: { what?: ReactNode; onKeep: () => void; onThrow: () => void }) {
+  return (
+    <ConfirmDialog title="Throw away your changes?" confirmLabel="Throw away" cancelLabel="Keep editing" danger onCancel={onKeep} onConfirm={onThrow}>
+      {what ? (
+        <>
+          What you typed in &ldquo;{what}&rdquo; is not saved yet.
+        </>
+      ) : (
+        "What you typed here is not saved yet."
+      )}
+    </ConfirmDialog>
+  );
+}
+
+/* ---------------------------------------------------------------- the phone's Back */
+
+/** The browser's Navigation API, where it has one (Chrome, Edge, Android; Safari and Firefox lately). */
+interface NavigateLike extends Event {
+  navigationType: string;
+  cancelable: boolean;
+  userInitiated?: boolean;
+  destination?: { index: number };
+}
+type Nav = { currentEntry: { index: number } | null; addEventListener(t: "navigate", f: (e: Event) => void): void; removeEventListener(t: "navigate", f: (e: Event) => void): void };
+const navigationApi = () => (typeof window === "undefined" ? undefined : (window as unknown as { navigation?: Nav }).navigation);
+
+/** The forms open now, the top one last: Back is for the top one. */
+const guards: { handle: () => void; wants: () => boolean }[] = [];
+function onNavigate(e: Event) {
+  const ev = e as NavigateLike;
+  const top = guards.at(-1);
+  if (!top || ev.navigationType !== "traverse" || !ev.cancelable || ev.userInitiated === false || !top.wants()) return;
+  // Only a step Back (not Forward): the form takes it.
+  const now = navigationApi()?.currentEntry?.index ?? -1;
+  if ((ev.destination?.index ?? -1) < 0 || now < 0 || (ev.destination?.index ?? 0) >= now) return;
+  ev.preventDefault();
+  top.handle();
+}
+
+/**
+ * The browser's Back (a phone's back button or swipe) while a form is open goes to the form, not the page
+ * under it, when `wants` says so: a form that is not in the address closes; one with something typed asks
+ * "Throw away your changes?" first. Where the browser cannot hold Back (no Navigation API), it leaves as before.
+ */
+export function useBackGuard(handle: () => void, wants: () => boolean) {
+  const latest = useRef({ handle, wants });
+  useEffect(() => {
+    latest.current = { handle, wants };
+  });
+  useEffect(() => {
+    const nav = navigationApi();
+    if (!nav) return;
+    const guard = { handle: () => latest.current.handle(), wants: () => latest.current.wants() };
+    guards.push(guard);
+    if (guards.length === 1) nav.addEventListener("navigate", onNavigate);
+    return () => {
+      guards.splice(guards.indexOf(guard), 1);
+      if (!guards.length) nav.removeEventListener("navigate", onNavigate);
+    };
+  }, []);
+}
+
 /* ---------------------------------------------------------------- the one window */
 
 /**
@@ -181,8 +247,9 @@ export function WindowHead({
   headRef?: RefObject<HTMLHeadingElement | null>;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
-      <div className="min-w-0">
+    // On a phone (the form fills the screen) the way out is ← at the top left, as on a record; elsewhere ✕ on the right.
+    <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 max-md:min-h-14 max-md:items-center max-md:justify-start max-md:gap-1 max-md:py-1.5 max-md:pr-4 max-md:pl-1 sm:px-6">
+      <div className="min-w-0 max-md:order-2 max-md:flex-1">
         <h2 id={`${id}-title`} ref={headRef} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none">
           {title}
         </h2>
@@ -192,8 +259,9 @@ export function WindowHead({
           </p>
         )}
       </div>
-      <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled}>
-        <X aria-hidden />
+      <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled} className="max-md:order-1 max-md:size-11 max-md:rounded-full max-md:[&_svg]:size-[22px]">
+        <ArrowLeft className="md:hidden" aria-hidden />
+        <X className="max-md:hidden" aria-hidden />
       </Button>
     </div>
   );
@@ -207,8 +275,8 @@ const MODAL_WIDTH = { md: "md:w-[600px]", lg: "md:w-[760px]" } as const;
 
 /**
  * A window over the page (cancel an order, a file, a request): the same frame as every other window.
- * Escape, ✕ or a click beside it closes it (unless busy): at once when nothing in it was changed, after
- * "Discard changes?" when something was. Focus stays inside while it is open.
+ * Escape, ✕ (← on a phone), the phone's Back or a click beside it closes it (unless busy): at once when nothing
+ * in it was changed, after "Throw away your changes?" when something was. Focus stays inside while it is open.
  */
 export function Modal({
   title,
@@ -239,6 +307,8 @@ export function Modal({
     if (changes.changed()) setAsking(true);
     else onClose();
   };
+  // A window is not a page: the phone's Back closes it (asking first when something was typed).
+  useBackGuard(close, () => !busy);
   if (!mounted) return null;
   return createPortal(
     <div className={`${WINDOW_LAYER} z-[100]`} data-layer>
@@ -262,19 +332,13 @@ export function Modal({
         {footer && <div className={WINDOW_FOOTER}>{footer}</div>}
       </div>
       {asking && (
-        <ConfirmDialog
-          title="Discard changes?"
-          confirmLabel="Discard"
-          cancelLabel="Keep editing"
-          danger
-          onCancel={() => setAsking(false)}
-          onConfirm={() => {
+        <ThrowAwayConfirm
+          onKeep={() => setAsking(false)}
+          onThrow={() => {
             setAsking(false);
             onClose();
           }}
-        >
-          What you changed here is not saved yet.
-        </ConfirmDialog>
+        />
       )}
     </div>,
     document.body,

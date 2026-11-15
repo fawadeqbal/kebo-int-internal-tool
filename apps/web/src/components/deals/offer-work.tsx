@@ -274,7 +274,7 @@ function OfferWindow({
       onAnother?.();
       return;
     }
-    // Saved: close without asking "Discard changes?".
+    // Saved: close without asking "Throw away your changes?".
     close(st);
     // One button, one action: the offer opens on the page; its lines editor waits for "Add lines".
     if (!q) router.push(`/inquiries/${dealId}/sourcing?offer=${id}`);

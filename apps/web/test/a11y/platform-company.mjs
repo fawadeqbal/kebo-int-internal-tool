@@ -206,7 +206,7 @@ for (const viewport of [
   const phone = `+92 300 ${stamp}${w}`.slice(0, 40);
   await page.fill("#ct-phone", phone);
   await page.keyboard.press("Escape");
-  ok(await page.getByRole("alertdialog").isVisible(), "Esc with changes asks “Discard changes?”");
+  ok(await page.getByRole("alertdialog").isVisible(), "Esc with changes asks “Throw away your changes?”");
   await page.getByRole("button", { name: "Keep editing" }).click();
   await page.keyboard.press("Control+Enter");
   await page.locator("[role=dialog]").waitFor({ state: "detached", timeout: 30_000 });

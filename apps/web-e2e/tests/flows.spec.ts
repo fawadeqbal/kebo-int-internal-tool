@@ -154,3 +154,24 @@ test("Back on a phone: a record's top bar is ← and its number; the bottom bar 
   await expect(page.locator("[data-shell-top]")).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("a form on a phone: ← at the top left; the phone's Back asks before throwing away what was typed", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/customers");
+  await page.getByRole("link", { name: "Add customer" }).click();
+  const form = page.getByRole("dialog", { name: "New customer" });
+  await expect(form).toBeVisible();
+  await form.getByRole("textbox", { name: "Name", exact: true }).fill("Kabul Medical Supplies");
+  // The phone's Back is held while something is typed (the browser lets the page ask first).
+  await page.goBack({ timeout: 1500 }).catch(() => {});
+  await expect(page.getByRole("alertdialog", { name: "Throw away your changes?" })).toBeVisible();
+  await page.getByRole("button", { name: "Keep editing" }).click();
+  await expect(form.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Kabul Medical Supplies");
+  // ← (Close) asks the same; Throw away closes the form, back on Customers.
+  await form.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Throw away" }).click();
+  await expect(form).toBeHidden();
+  await expect(page).toHaveURL((u) => u.pathname === "/customers" && !u.searchParams.has("panel"));
+  expect(errors).toEqual([]);
+});

@@ -301,7 +301,7 @@ function SentForm({ number, action, today, doneHref }: { number: number; action:
   const [how, setHow] = useState<SentVia>("whatsapp");
   // Marked from the send screen: back to the quotation, where the next step (the customer's answer) now is.
   const done = (st: ActionState) => {
-    // Saved: close without asking "Discard changes?".
+    // Saved: close without asking "Throw away your changes?".
     close(st);
     if (doneHref) router.push(doneHref);
   };

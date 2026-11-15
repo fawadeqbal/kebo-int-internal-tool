@@ -286,7 +286,7 @@ async function dialogCheck(page, where, opener, label) {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(150);
   if (await page.locator("[role=alertdialog]").count()) {
-    // "Discard changes?" because Tab passed a field that marks itself changed: the way back is fine.
+    // "Throw away your changes?" because Tab passed a field that marks itself changed: the way back is fine.
     await page.keyboard.press("Escape");
   }
   try {
