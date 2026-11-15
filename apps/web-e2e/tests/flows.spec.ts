@@ -236,3 +236,18 @@ test("Mark as lost has Undo: the note takes it back, the inquiry is as it was", 
   await expect(page.getByRole("button", { name: "Mark lost…" })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("Orders: a status tab filters the list and stays the list (never jumps to the board)", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/orders");
+  for (const name of ["In production", "Confirmed", "Shipped", "Done"]) {
+    await page.getByRole("navigation", { name: "Which orders" }).getByRole("link", { name: new RegExp(`^${name}`) }).click();
+    await expect(page).toHaveURL((u) => u.pathname === "/orders" && u.searchParams.has("stage"));
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sales orders");
+  }
+  // The tiles above go to the list too.
+  await page.goto("/orders");
+  await page.getByRole("link", { name: /^In production/ }).first().click();
+  await expect(page).toHaveURL((u) => u.pathname === "/orders");
+  expect(errors).toEqual([]);
+});

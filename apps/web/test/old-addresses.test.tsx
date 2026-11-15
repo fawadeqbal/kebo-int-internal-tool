@@ -145,6 +145,9 @@ describe("/orders?view=board", () => {
     expect(ordersBoardTarget({})).toBeNull();
     expect(ordersBoardTarget({ view: "mine" })).toBeNull();
     expect(ordersBoardTarget({ status: "late" })).toBeNull();
+    // The list's own tabs (In production, Shipped…) filter the list: they never jump to the board.
+    for (const stage of ["confirmed", "in_production", "shipped", "done"]) expect(ordersBoardTarget({ stage })).toBeNull();
+    expect(ordersBoardTarget({ stage: "in_production", mine: "1" })).toBeNull();
   });
 });
 
