@@ -1,3 +1,4 @@
+import Form from "next/form";
 import Link from "next/link";
 import { can } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr } from "@kebo/ui";
@@ -162,7 +163,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         search={{ placeholder: "What, who or why", value: sp.q, clearHref: href({ q: undefined }) }}
         keep={{ type: sp.type, person: sp.person }}
         filters={
-          <form className="flex items-center gap-1.5">
+          <Form action="" scroll={false} className="flex items-center gap-1.5">
             <AutoSelect name="type" defaultValue={sp.type ?? ""} aria-label="Kind of record" className="w-32">
               <option value="">+ Kind</option>
               {Object.entries(ENTITY_LABEL).map(([k, l]) => (
@@ -179,7 +180,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 </option>
               ))}
             </AutoSelect>
-          </form>
+          </Form>
         }
         end={<ExportLink what="audit" query={{ type: sp.type, person: sp.person }} />}
       />

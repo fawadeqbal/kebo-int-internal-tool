@@ -1,3 +1,4 @@
+import Form from "next/form";
 import Link from "next/link";
 import { History } from "lucide-react";
 import { buildHref, ButtonLink, Card, EmptyState, FilterBar, FilterChip, Pagination, SearchField, toPage } from "@kebo/ui";
@@ -35,7 +36,7 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
         <FilterChip href={buildHref("/access/sign-ins", keep, { failed: "1", page: undefined })} active={failed}>
           Failed only
         </FilterChip>
-        <form className="flex flex-1 flex-wrap items-center gap-2">
+        <Form action="" scroll={false} className="flex flex-1 flex-wrap items-center gap-2">
           {failed && <input type="hidden" name="failed" value="1" />}
           <AutoSelect name="person" defaultValue={sp.person ?? ""} aria-label="Person" className="w-full sm:w-48">
             <option value="">Anyone</option>
@@ -51,7 +52,7 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
               Clear filters
             </Link>
           )}
-        </form>
+        </Form>
       </FilterBar>
       {data.rows.length === 0 ? (
         <EmptyState

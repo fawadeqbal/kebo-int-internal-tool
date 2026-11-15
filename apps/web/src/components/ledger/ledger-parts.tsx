@@ -1,3 +1,4 @@
+import Form from "next/form";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CURRENCIES, LEDGER_ENTRY_TYPE_LABEL, LEDGER_ENTRY_TYPES, type LedgerEntryType, type LedgerPartyKind } from "@kebo/shared";
@@ -114,7 +115,7 @@ export function LedgerFilters({
   const removed = removedChip && sp.removed !== "0";
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2">
-      <form
+      <Form action="" scroll={false}
         className="flex flex-wrap items-center gap-1.5 [&_select]:h-8 [&_select]:rounded-full [&_select]:border-line-strong [&_select]:text-xs [&_select]:font-medium"
         aria-label="Filter the ledger"
       >
@@ -153,7 +154,7 @@ export function LedgerFilters({
             Apply
           </button>
         </noscript>
-      </form>
+      </Form>
       {removedChip && (
         <FilterChip
           href={buildHref(path, sp, { removed: removed ? "0" : undefined, page: undefined, panel: undefined, id: undefined })}

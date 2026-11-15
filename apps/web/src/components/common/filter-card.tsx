@@ -1,3 +1,4 @@
+import Form from "next/form";
 import { Filter } from "lucide-react";
 import { Button, SearchField, Select } from "@kebo/ui";
 
@@ -30,7 +31,7 @@ export function FilterCard({
   clearHref?: string;
 }) {
   return (
-    <form
+    <Form action="" scroll={false}
       role="search"
       aria-label="Filter the list"
       className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3"
@@ -64,6 +65,6 @@ export function FilterCard({
         <Filter aria-hidden />
         Filter
       </Button>
-    </form>
+    </Form>
   );
 }

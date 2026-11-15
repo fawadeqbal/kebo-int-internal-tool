@@ -1,5 +1,6 @@
 "use client";
 
+import Form from "next/form";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
@@ -782,7 +783,7 @@ export function AppShell({
             <button type="button" className={cn(buttonClass("ghost", "icon"), "hidden xl:inline-flex")} onClick={onFoldButton} aria-label={folded ? "Open the menu" : "Fold the menu"} aria-pressed={folded}>
               {folded ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
             </button>
-            <form action="/inquiries" role="search" aria-label="Search inquiries" className="relative hidden max-w-[380px] flex-1 md:block">
+            <Form action="/inquiries" role="search" aria-label="Search inquiries" className="relative hidden max-w-[380px] flex-1 md:block">
               <label htmlFor="global-search" className="sr-only">
                 Search inquiries
               </label>
@@ -798,7 +799,7 @@ export function AppShell({
               <span className="pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 lg:inline-flex">
                 <Kbd>/</Kbd>
               </span>
-            </form>
+            </Form>
             <div className="ml-auto flex items-center gap-1.5">
               <Link href="/inquiries" className={cn(buttonClass("ghost", "icon"), "md:hidden")} aria-label="Search inquiries">
                 <Search aria-hidden />
