@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { lockScroll } from "@/lib/scroll-lock";
 import { Button, ButtonLink, cn } from "@kebo/ui";
 import { useChanges, watchChanges } from "./changes";
-import { ConfirmDialog, focusables, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
+import { focusables, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
 import { PanelCloseProvider, PanelFooter, useClosePanel } from "./panel";
 
 /** Inside a RouteWindow: called by a form once it saved, to close the window (back to the page under it). */
@@ -61,6 +61,8 @@ export function RouteWindow({
     if (changes.changed()) setAsking(true);
     else leave();
   };
+  // The phone's Back closes it by itself (it is a page in the address); with something typed it asks first.
+  useBackGuard(request, () => changes.changed());
 
   if (!mounted || closed) return null;
   return (
@@ -89,19 +91,14 @@ export function RouteWindow({
         </div>
       </div>
       {asking && (
-        <ConfirmDialog
-          title="Discard changes?"
-          confirmLabel="Discard"
-          cancelLabel="Keep editing"
-          danger
-          onCancel={() => setAsking(false)}
-          onConfirm={() => {
+        <ThrowAwayConfirm
+          what={title}
+          onKeep={() => setAsking(false)}
+          onThrow={() => {
             setAsking(false);
             leave();
           }}
-        >
-          What you changed in &ldquo;{title}&rdquo; is not saved yet.
-        </ConfirmDialog>
+        />
       )}
     </div>
   );

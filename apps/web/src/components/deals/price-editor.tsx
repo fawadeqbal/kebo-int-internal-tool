@@ -62,7 +62,7 @@ export function PriceEditor({
   const [paste, setPaste] = useState<string | null>(null);
   const [chargesOpen, setChargesOpen] = useState(false);
   const dirty = JSON.stringify(s) !== saved;
-  // The window asks "Discard changes?" only when a price really changed.
+  // The window asks "Throw away your changes?" only when a price really changed.
   useEffect(() => {
     reportDirty(dirty);
     return () => reportDirty(null);

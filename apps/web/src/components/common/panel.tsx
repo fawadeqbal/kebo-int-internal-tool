@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buttonClass, cn, type ButtonSize, type ButtonVariant } from "@kebo/ui";
 import { useChanges, watchChanges } from "./changes";
-import { ConfirmDialog, focusables, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
+import { focusables, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
 
 /* ---------------------------------------------------------------- closing */
 
@@ -16,7 +16,7 @@ const PanelClose = createContext<(arg?: CloseArg) => void>(() => {});
 
 /**
  * Inside a side panel: closes it. Pass it as a form's `onDone` (a saved form
- * closes it straight away) or as Cancel's onClick (it asks "Discard
+ * closes it straight away) or as Cancel's onClick (it asks "Throw away your
  * changes?" first, only when something was really changed).
  */
 export const useClosePanel = () => useContext(PanelClose);
@@ -43,9 +43,10 @@ const saved = (arg: CloseArg) => !!arg && typeof arg === "object" && "ok" in arg
  *
  * For everyone: role=dialog, aria-modal, named by its title; focus starts on
  * the first field, stays inside while it is open and goes back to the button
- * that opened it. Escape, ✕, Cancel or a click beside it closes it at once
- * when nothing was changed, and after "Discard changes?" when something was
- * (typed and put back as it was is not a change); Ctrl+Enter (⌘+Enter) saves.
+ * that opened it. Escape, ✕ (← on a phone), Cancel, Back or a click beside it
+ * closes it at once when nothing was changed, and after "Throw away your
+ * changes?" when something was (typed and put back as it was is not a
+ * change); Ctrl+Enter (⌘+Enter) saves.
  *
  * Open it with state (`onClose`) or from the URL with useSidePanel, so a link
  * opens it and Back closes it.
@@ -84,6 +85,11 @@ export function SidePanel({
   );
 
   useEffect(() => lockScroll(), []);
+  // The phone's Back closes a form kept in the address by itself; with something typed it asks first.
+  useBackGuard(
+    () => request(),
+    () => !!(dirtyProp ?? reported ?? changes.changed()),
+  );
 
   // Focus starts on the first field (or the title when there is none).
   useEffect(() => {
@@ -127,19 +133,14 @@ export function SidePanel({
         </PanelClose.Provider>
       </div>
       {asking && (
-        <ConfirmDialog
-          title="Discard changes?"
-          confirmLabel="Discard"
-          cancelLabel="Keep editing"
-          danger
-          onCancel={() => setAsking(false)}
-          onConfirm={() => {
+        <ThrowAwayConfirm
+          what={title}
+          onKeep={() => setAsking(false)}
+          onThrow={() => {
             setAsking(false);
             onClose();
           }}
-        >
-          What you changed in &ldquo;{title}&rdquo; is not saved yet.
-        </ConfirmDialog>
+        />
       )}
     </div>,
     document.body,
@@ -185,13 +186,15 @@ export function PanelSection({
  * The panel's Save / Cancel, in a footer that stays at the bottom of the panel
  * while the form scrolls (pinned to the very bottom: -bottom-5 makes up for the
  * body's padding, so nothing shows under it); `end`: a quiet action on the
- * right (Remove this offer).
+ * right (Remove this offer). On a phone the buttons share its width, big.
  */
 export function PanelActions({ children, end, className }: { children: ReactNode; end?: ReactNode; className?: string }) {
   return (
     <div
       className={cn(
         "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6",
+        // A phone: the buttons share the width, big, under the thumb.
+        "max-md:[&>a]:min-h-12 max-md:[&>a]:flex-1 max-md:[&>button]:min-h-12 max-md:[&>button]:flex-1",
         className,
       )}
     >
