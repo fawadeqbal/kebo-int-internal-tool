@@ -182,7 +182,7 @@ function CardForm({
       showSuccess={false}
       className={PANEL_FORM}
       onDone={(s) => {
-        toast(s.message ?? `Saved · ${card.title}`);
+        toast({ message: s.message && !/^saved\.?$/i.test(s.message) ? s.message : `${card.title} saved`, detail: s.detail });
         onSaved();
       }}
     >

@@ -33,7 +33,7 @@ export function RolePanel({
         <RoleForm
           {...form}
           onSaved={(message) => {
-            toast(message ?? "Saved");
+            toast(message && !/^saved\.?$/i.test(message) ? message : "Role saved");
             panel.close();
           }}
         />

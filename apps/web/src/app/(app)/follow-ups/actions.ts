@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { attempt, formValues, type ActionState } from "@/lib/actions";
 import type { RecordKey } from "@/lib/types-notes";
 import { companyZone } from "@/lib/session";
+import { dayMonth } from "@/lib/format";
 
 /** "2026-11-04T09:02" typed in the company's time zone → the moment, as the API takes it. Empty: now. */
 async function happenedAt(local: string | undefined): Promise<string | undefined> {
@@ -24,10 +25,12 @@ export async function addNoteAction(on: RecordKey, _prev: ActionState, form: For
   const r = await attempt(
     form,
     () => api.post(`/${NOTES_PATH[on.key]}/${on.id}/notes`, { body: v.body, kind: v.kind || undefined, contactId: v.contactId || null, at }),
-    "Note saved.",
+    "Note added.",
   );
-  if (r.ok) revalidatePath("/", "layout");
-  return r;
+  if (!r.ok) return r;
+  revalidatePath("/", "layout");
+  const label = (r.data as { target?: { label?: string } } | undefined)?.target?.label;
+  return { ...r, message: label ? `Note added to ${label}` : "Note added" };
 }
 
 /** Its author, or a manager. */
@@ -84,8 +87,15 @@ export async function followUpDoneAction(id: string, _prev: ActionState, form: F
   // The last open follow-up of an open inquiry is finished together with the next one (its day is asked for).
   const next = v.nextDueOn ? { dueOn: v.nextDueOn, dueAt: v.nextDueAt || null, title: v.nextTitle?.trim() || undefined } : undefined;
   const r = await attempt(form, () => api.post(`/follow-ups/${id}/done`, { note: v.note || null, ...(next ? { next } : {}) }), next ? "Done. The next follow-up is set." : "Done.");
-  if (r.ok) revalidatePath("/", "layout");
-  return r;
+  if (!r.ok) return r;
+  revalidatePath("/", "layout");
+  // Named: what was done, and what is next (the system may set the one after a quotation by itself).
+  const d = r.data as { title?: string; next?: { title?: string; dueOn?: string } | null } | undefined;
+  return {
+    ...r,
+    message: d?.title ? `Follow-up done: ${d.title}` : "Follow-up done",
+    detail: d?.next?.title ? `Next: ${d.next.title}${d.next.dueOn ? `, on ${dayMonth(d.next.dueOn)}` : ""}` : undefined,
+  };
 }
 
 export async function followUpReopenAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {

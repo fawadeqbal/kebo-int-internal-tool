@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, LayoutGrid, Trash2, UserRound } from "lucide-react";
 import { PARTY_TYPE_LABEL, PARTY_TYPES, customerLetters, UNKNOWN_COUNTRY, type PartyType } from "@kebo/shared";
-import { Alert, Banner, Button, buttonClass, Card, CardBody, CardFooter, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Alert, Button, buttonClass, Card, CardBody, CardFooter, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
@@ -131,35 +131,12 @@ export function CustomerForm({
   const save = customer ? "Save changes" : "Add the customer";
 
   const form = (s: ActionState) => {
-    const problems = Object.entries(s.errors ?? {})
-      .filter(([, v]) => v?.length)
-      .map(([k, v]) => ({ key: k, to: fieldId(k, contacts), text: v![0]! }));
     /** Its error, wired to the box for screen readers. */
     const invalid = (id: string, error: unknown) => (error ? { "aria-invalid": true, "aria-describedby": `${id}-error` } : {});
     return (
       <>
         <input type="hidden" name="payload" value={payload} />
         {inPanel && <input type="hidden" name="inPanel" value="1" />}
-        {/* Errors next to each field, and all of them here at the top after a save. */}
-        {problems.length > 1 && (
-          <Banner meaning="bad">
-            <p className="font-medium">Check {problems.length} things before saving:</p>
-            <ul className="mt-1 list-disc pl-4">
-              {problems.map((p) => (
-                <li key={p.key}>
-                  {p.to ? (
-                    <a href={`#${p.to}`} className="underline underline-offset-2">
-                      {p.text}
-                    </a>
-                  ) : (
-                    p.text
-                  )}
-                </li>
-              ))}
-            </ul>
-          </Banner>
-        )}
-
         {/* Board "New customer window": Company / Individual, then the fields in three columns. */}
         <div role="radiogroup" aria-label="Type" className="flex gap-2">
           {PARTY_TYPES.map((t) => (
@@ -378,7 +355,7 @@ export function CustomerForm({
 
   if (inPanel)
     return (
-      <ActionForm action={action} onDone={onSaved} showSuccess={false} keepFields className="flex min-h-0 flex-1 flex-col">
+      <ActionForm action={action} onDone={onSaved} showSuccess={false} keepFields fieldId={(k) => fieldId(k, contacts)} className="flex min-h-0 flex-1 flex-col">
         {(s) => (
           <PanelBody className={PANEL_FORM}>
             {form(s)}
@@ -395,7 +372,7 @@ export function CustomerForm({
       </ActionForm>
     );
   return (
-    <ActionForm action={action} keepFields>
+    <ActionForm action={action} keepFields fieldId={(k) => fieldId(k, contacts)}>
       {(s) => (
         <Card>
           <CardBody className="flex flex-col gap-5">{form(s)}</CardBody>

@@ -53,6 +53,10 @@ test("a new inquiry: New › Inquiry, the customer, what they need, saved", asyn
 
   await expect(page).toHaveURL(/\/inquiries\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(title);
+  // The note names it: its number, what it is and for whom.
+  const note = page.locator("[data-note=done]");
+  await expect(note).toContainText(/Inquiry RFQ-\d{4}-\d{4} added/);
+  await expect(note).toContainText(`${title} · Al-Shifa Pharma Ltd`);
   expect(errors).toEqual([]);
 });
 
@@ -71,7 +75,11 @@ test("a payment received: New › Payment received, the order, the amount, recor
   await page.locator("#r-account").selectOption({ index: 1 });
   await page.locator("#r-reference").fill(reference);
   await page.getByRole("button", { name: "Record the payment" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Payment recorded." })).toBeVisible();
+  // The note names the payment, says how much and what is still to come, with its receipt.
+  const note = page.locator("[data-note=done]");
+  await expect(note).toContainText("Payment recorded");
+  await expect(note).toContainText(/still to come|nothing more is due/);
+  await expect(note.getByRole("link", { name: "Receipt" })).toBeVisible();
 
   // On the order, as the API keeps it.
   const res = await page.request.get(`/api/orders/${orderId}/payments`);
@@ -173,5 +181,38 @@ test("a form on a phone: ← at the top left; the phone's Back asks before throw
   await page.getByRole("button", { name: "Throw away" }).click();
   await expect(form).toBeHidden();
   await expect(page).toHaveURL((u) => u.pathname === "/customers" && !u.searchParams.has("panel"));
+  expect(errors).toEqual([]);
+});
+
+test("a form's mistake: what to fix at the top, each a way to its field, the cursor on the first; nothing typed lost", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/customers");
+  await page.getByRole("link", { name: "Add customer" }).click();
+  const form = page.getByRole("dialog", { name: "New customer" });
+  await form.getByRole("textbox", { name: "Tax no." }).fill("TX-7781");
+  await form.getByRole("button", { name: /Save customer/ }).click();
+  const fix = form.getByRole("alert").filter({ hasText: "to fix before saving" });
+  await expect(fix).toBeVisible();
+  const name = form.getByRole("textbox", { name: "Name", exact: true });
+  await expect(name).toBeFocused();
+  await expect(name).toHaveAttribute("aria-invalid", "true");
+  await expect(form.getByRole("textbox", { name: "Tax no." })).toHaveValue("TX-7781");
+  await expect(form).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("no connection: the save says so with Try again, the form stays with what was typed", async ({ page, context }) => {
+  const errors = watchErrors(page, { allow: [/Failed to fetch|ERR_INTERNET_DISCONNECTED|net::ERR/] });
+  await page.goto("/customers");
+  await page.getByRole("link", { name: "Add customer" }).click();
+  const form = page.getByRole("dialog", { name: "New customer" });
+  await form.getByRole("textbox", { name: "Name", exact: true }).fill("Kabul Medical Supplies");
+  await context.setOffline(true);
+  await form.getByRole("button", { name: /Save customer/ }).click();
+  const note = page.locator("[data-note=fail]");
+  await expect(note).toContainText("Not saved: no connection");
+  await expect(note.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(form.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Kabul Medical Supplies");
+  await context.setOffline(false);
   expect(errors).toEqual([]);
 });

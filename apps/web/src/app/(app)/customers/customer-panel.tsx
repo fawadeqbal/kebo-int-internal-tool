@@ -37,7 +37,7 @@ export function CustomerPanel({
     const d = s.data as { id: string; name: string } | undefined;
     if (!d) return panel.close();
     toast({
-      message: customer ? `Saved · ${d.name}` : `Customer added · ${d.name}`,
+      message: customer ? `${d.name} saved` : `Customer ${d.name} added`,
       undo:
         !customer && undo
           ? async () => {
@@ -45,8 +45,11 @@ export function CustomerPanel({
               router.refresh();
             }
           : undefined,
-      // The list is by name: a new customer may be on another page.
-      action: onRecord ? undefined : { label: "Open", href: `/customers/${d.id}` },
+      // The list is by name: a new customer may be on another page. A new one's likely next step: an inquiry for them.
+      actions: [
+        ...(customer ? [] : [{ label: "New inquiry for them", href: `/inquiries?panel=new-inquiry&for=${d.id}` }]),
+        ...(onRecord ? [] : [{ label: "Open", href: `/customers/${d.id}` }]),
+      ],
     });
     panel.close({ saved: d.id });
   };

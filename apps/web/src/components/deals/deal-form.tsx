@@ -101,7 +101,7 @@ export function DealForm({
   /** Edit: it has an item list, so "What they need" may be empty. */
   hasItems?: boolean;
   /** Saved (and the files are up). */
-  onSaved: (r: { id: string; refNo?: string }) => void;
+  onSaved: (r: { id: string; refNo?: string; title?: string; customer?: string; files?: number }) => void;
 }) {
   const router = useRouter();
   const close = useClosePanel();
@@ -154,7 +154,7 @@ export function DealForm({
         return { ok: true };
       }
     }
-    onSaved({ id, refNo });
+    onSaved({ id, refNo, title: v.title.trim() || undefined, customer: v.customer?.name, files: list.length });
     return { ok: true };
   };
 

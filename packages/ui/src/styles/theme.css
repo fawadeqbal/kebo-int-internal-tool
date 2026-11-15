@@ -211,6 +211,13 @@
   }
 }
 
+/* A note's time running out (with Undo): the line under it empties. */
+@keyframes note-time {
+  to {
+    transform: scaleX(0);
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

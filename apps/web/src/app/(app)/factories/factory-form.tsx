@@ -120,7 +120,7 @@ export function FactoryPanel({
     const d = s.data as { id: string; name: string } | undefined;
     if (!d) return panel.close();
     toast({
-      message: factory ? `Saved · ${d.name}` : `Supplier added · ${d.name}`,
+      message: factory ? `${d.name} saved` : `Supplier ${d.name} added`,
       action: onRecord ? undefined : { label: "Open", href: `/factories/${d.id}` },
     });
     panel.close({ saved: d.id });

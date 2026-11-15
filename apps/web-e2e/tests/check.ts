@@ -5,11 +5,12 @@ import { expect, type Page } from "@playwright/test";
 export const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 /** Errors in the browser while a page is open: thrown and not caught, or written to the console as errors. */
-export function watchErrors(page: Page) {
+export function watchErrors(page: Page, { allow = [] }: { allow?: RegExp[] } = {}) {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(`thrown: ${e.message.slice(0, 300)}`));
   page.on("console", (m) => {
-    if (m.type() === "error") errors.push(`console: ${m.text().slice(0, 300)}`);
+    // `allow`: what a check brings about on purpose (the browser's own line when the connection is cut).
+    if (m.type() === "error" && !allow.some((a) => a.test(m.text()))) errors.push(`console: ${m.text().slice(0, 300)}`);
   });
   return errors;
 }
