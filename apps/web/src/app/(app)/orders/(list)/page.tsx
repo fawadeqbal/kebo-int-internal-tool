@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { ordersBoardTarget } from "@/lib/old-addresses";
-import { List, type Params } from "./views";
+import { List, type Params } from "../views";
 
 export const metadata = { title: "Orders" };
 

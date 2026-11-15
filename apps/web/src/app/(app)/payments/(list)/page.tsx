@@ -2,29 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, Download, List, Plus, TriangleAlert } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow, type PaymentSum } from "@kebo/shared";
-import {
-  Badge,
-  buildHref,
-  ButtonLink,
-  Card,
-  cn,
-  DataRow,
-  EmptyState,
-  LinkTabs,
-  PageHeader,
-  Pager,
-  PhoneList,
-  PhoneRow,
-  RefCode,
-  StatRow,
-  StatTile,
-  StatusBadge,
-  Table,
-  Td,
-  Th,
-  THead,
-  toPage,
-} from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage } from "@kebo/ui";
 import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, money, TZ, whole } from "@/lib/format";
@@ -34,11 +12,10 @@ import { UUID } from "@/lib/ids";
 import { FilterCard } from "@/components/common/filter-card";
 import { periodOf } from "@/components/common/period";
 import { DUE, paymentsTabTarget } from "@/lib/old-addresses";
-import { opensPayments, paymentHref } from "./shared";
+import { opensPayments, paymentHref } from "../shared";
 
 export const metadata = { title: "Payments" };
 
-const PAGE_SIZE = 50;
 type Search = { tab?: string; mine?: string; p?: string; dir?: string; status?: string; kind?: string; q?: string; order?: string; party?: string; account?: string; method?: string; page?: string };
 const STATUS_MEANING = { to_verify: "warn", sent_back: "bad", recorded: "ok", void: "neutral" } as const;
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -255,8 +232,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
             </div>
           </>
         )}
-        <Pager base="/payments" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} />
       </Card>
+      <Pager base="/payments" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} bare />
     </div>
   );
 }

@@ -1,19 +1,6 @@
 import { X } from "lucide-react";
 import { ORDER_WORD_TONE } from "@kebo/shared";
-import {
-  ButtonLink,
-  Card,
-  DataRow,
-  EmptyState,
-  PhoneList,
-  PhoneRow,
-  RefCode,
-  StatusBadge,
-  Td,
-  Th,
-  THead,
-  type StatusMeaning,
-} from "@kebo/ui";
+import { ButtonLink, Card, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead, toPage, type StatusMeaning } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -51,7 +38,7 @@ export default async function CustomerOrders({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ q?: string; status?: string; year?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; year?: string; page?: string }>;
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   await requireUser();
@@ -86,6 +73,9 @@ export default async function CustomerOrders({
       (!sp.status || (sp.status === "late" ? o.status === "open" && late(o, today) : o.status === sp.status)),
   );
   const filtered = !!(q || sp.year || sp.status);
+  // A page at a time, like every list; the totals under it are of all the orders the filter keeps.
+  const page = toPage(sp.page);
+  const shown = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   // Totals per currency (most customers have one).
   const sums = [...new Set(rows.map((o) => o.currency))].map((cur) => {
     const of = rows.filter((o) => o.currency === cur && o.status !== "cancelled");
@@ -121,7 +111,7 @@ export default async function CustomerOrders({
         ) : (
           <>
             <PhoneList label="Orders">
-              {rows.map((o) => {
+              {shown.map((o) => {
                 const s = statusOf(o, today);
                 return (
                   <PhoneRow
@@ -149,7 +139,7 @@ export default async function CustomerOrders({
                   </tr>
                 </THead>
                 <tbody>
-                  {rows.map((o) => {
+                  {shown.map((o) => {
                     const d = byOrder.get(o.id);
                     const s = statusOf(o, today);
                     return (
@@ -188,6 +178,7 @@ export default async function CustomerOrders({
           </>
         )}
       </Card>
+      <Pager base={base} params={{ q: sp.q, status: sp.status, year: sp.year }} page={page} total={rows.length} bare />
     </>
   );
 }

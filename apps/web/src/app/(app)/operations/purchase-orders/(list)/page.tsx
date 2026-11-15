@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, Ban, Boxes, Download, Factory, List, Mail, Package, Ship, ShoppingCart } from "lucide-react";
-import { buildHref, ButtonLink, Card, EmptyState, LinkTabs, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { crumbsFor } from "@/lib/nav";
@@ -22,7 +22,7 @@ const CHIPS = [
   { key: "cancelled", label: "Cancelled", icon: Ban },
 ] as const;
 
-const PAGE = 20;
+const PAGE = PAGE_SIZE;
 
 /**
  * Purchasing › Purchase orders (board PList): one per supplier on each sales order, with its number, what it

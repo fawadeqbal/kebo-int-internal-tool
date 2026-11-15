@@ -10,8 +10,8 @@ import { timeAgo } from "@/lib/format";
 import type { RoleRow, UserRow } from "@/lib/types-people";
 import { RoleBadge } from "@/components/people/role-badge";
 import { TwoStepRemind } from "@/components/people/two-step-remind";
-import { createUserAction, remindTwoStepAction, setActiveAction } from "./actions";
-import { NewUserPanel } from "./forms";
+import { createUserAction, remindTwoStepAction, setActiveAction } from "../actions";
+import { NewUserPanel } from "../forms";
 import { crumbsFor } from "@/lib/nav";
 
 export const metadata = { title: "People" };
@@ -209,8 +209,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             </DataTable>
           </>
         )}
-        <Pager base="/users" params={keep} page={page} total={rows.length} />
       </Card>
+      <Pager base="/users" params={keep} page={page} total={rows.length} bare />
 
       {roles && <NewUserPanel action={createUserAction} roles={roles} />}
     </div>

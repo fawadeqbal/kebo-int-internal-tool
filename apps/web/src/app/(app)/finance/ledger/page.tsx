@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Alert, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, Pager, Segmented, Table, Td, Th, THead, Tr, toPage } from "@kebo/ui";
+import { Alert, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Segmented, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { ArrowRight, Factory, Landmark, List, User, Users } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { todayIn } from "@kebo/utils";
@@ -157,7 +157,7 @@ async function Entries({
     orderId: order,
     lead: "true",
     page: String(page),
-    pageSize: "50",
+    pageSize: String(PAGE_SIZE),
   });
   const keep = { view: view === "all" ? undefined : view, order, account: sp.account };
   const open = (groupId: string) => buildHref(PATH, all, { panel: "entry", id: groupId });
@@ -222,7 +222,7 @@ async function Entries({
         <b className="font-semibold tabular">Debits {money(data.totals.debit, main)}</b>
         <b className="font-semibold tabular">Credits {money(data.totals.credit, main)}</b>
       </div>
-      <Pager base={PATH} params={{ ...all, panel: undefined, id: undefined }} page={page} total={data.total} pageSize={data.pageSize} />
+      <Pager base={PATH} params={{ ...all, panel: undefined, id: undefined }} page={page} total={data.total} pageSize={data.pageSize} bare />
     </>
   );
 }

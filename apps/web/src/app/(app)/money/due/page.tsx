@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Fragment, Suspense } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, expenseShort, FACTORY_DUE_RULE_LABEL } from "@kebo/shared";
-import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { addDays, daysBetween, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, money, TZ, whole } from "@/lib/format";
@@ -23,7 +23,7 @@ import { paymentAction, submitPaymentAction } from "../../orders/actions";
 export const metadata = { title: "To receive and to pay" };
 
 const HERE = "/money/due";
-const PAGE = 20;
+const PAGE = PAGE_SIZE;
 type Search = { side?: string; show?: string; q?: string; who?: string; page?: string; open?: string; do?: string; pay?: string };
 
 const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -224,8 +224,8 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
             </Table>
           </div>
         )}
-        <Pager base={HERE} params={{ ...keep, page: undefined }} page={page} pageSize={PAGE} total={rows.length} />
       </Card>
+      <Pager base={HERE} params={{ ...keep, page: undefined }} page={page} pageSize={PAGE} total={rows.length} bare />
     </>
   );
 }
@@ -434,8 +434,8 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
             </Table>
           </div>
         )}
-        <Pager base={HERE} params={{ ...keep, page: undefined }} page={page} pageSize={PAGE} total={rows.length} />
       </Card>
+      <Pager base={HERE} params={{ ...keep, page: undefined }} page={page} pageSize={PAGE} total={rows.length} bare />
     </>
   );
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@kebo/shared";
-import { buildHref, buttonClass, Card, EmptyState, LinkTabs, PageHeader, Pagination, StatRow, StatTile, toPage } from "@kebo/ui";
+import { buildHref, buttonClass, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, StatRow, StatTile, toPage } from "@kebo/ui";
 import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { money, TZ, whole } from "@/lib/format";
@@ -49,7 +49,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.kind ?? "") ? (sp.kind as ExpenseCategory) : undefined;
   const q = { kind: "company" };
   const [list, before, year, repeating, people, choices, settings] = await Promise.all([
-    api.get<ExpenseList>("/expenses", { ...q, ...span(month), category, page: String(toPage(sp.page)), pageSize: "50" }),
+    api.get<ExpenseList>("/expenses", { ...q, ...span(month), category, page: String(toPage(sp.page)), pageSize: String(PAGE_SIZE) }),
     api.get<ExpenseList>("/expenses", { ...q, ...span(prev), pageSize: "1" }),
     api.get<ExpenseList>("/expenses", { ...q, from: `${month.slice(0, 4)}-01-01`, to: `${month.slice(0, 4)}-12-31`, pageSize: "1" }),
     api.get<RepeatingCosts>("/expenses/repeating"),
@@ -139,8 +139,8 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
             </p>
           </>
         )}
-        {list.listed > list.pageSize && <Pagination base={HERE} params={keep} page={list.page} pageSize={list.pageSize} total={list.listed} />}
       </Card>
+      <Pager base={HERE} params={keep} page={list.page} pageSize={list.pageSize} total={list.listed} bare />
     </div>
   );
 }
