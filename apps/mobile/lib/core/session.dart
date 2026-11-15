@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'company_time.dart';
 import 'doc_files.dart';
 import 'json.dart';
 import 'push.dart';
@@ -83,7 +84,7 @@ class SessionController extends Notifier<Session> {
 
   Future<void> refreshMe() async {
     final me = await _repo.me();
-    state = Session(SessionStatus.signedIn, user: me);
+    _signedIn(me);
   }
 
   /// Step 1: email + password. Throws [ApiException] with the server's message.
@@ -113,8 +114,14 @@ class SessionController extends Notifier<Session> {
     if (user.isEmpty) {
       await refreshMe();
     } else {
-      state = Session(SessionStatus.signedIn, user: user);
+      _signedIn(user);
     }
+  }
+
+  /// Signed in: every date and time on the phone in the company's time and way, from now on.
+  void _signedIn(Json user) {
+    CompanyTime.set(zone: user.s('timeZone'), date: user.s('dateFormat', 'd_mmm_yyyy'), time: user.s('timeFormat', '24h'));
+    state = Session(SessionStatus.signedIn, user: user);
   }
 
   void backToSignIn() {
@@ -140,6 +147,7 @@ class SessionController extends Notifier<Session> {
     try {
       await _storage.delete(key: _tokenKey);
     } catch (_) {}
+    CompanyTime.reset();
     state = Session(SessionStatus.signedOut, message: message);
   }
 

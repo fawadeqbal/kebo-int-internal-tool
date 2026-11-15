@@ -1,11 +1,14 @@
 import 'package:intl/intl.dart';
 
+import 'company_time.dart';
+
 /// Same formats as the web (packages/money, packages/utils).
 final _money = NumberFormat('#,##0.00', 'en_US');
 final _qty = NumberFormat('#,##0.##', 'en_US');
-final _date = DateFormat('dd MMM yyyy', 'en_US');
-final _dateTime = DateFormat('dd MMM yyyy, HH:mm', 'en_US');
-final _short = DateFormat('dd MMM', 'en_US');
+// Dates and times the company's way (Company settings › Time and dates), in its time zone.
+DateFormat get _date => DateFormat(CompanyTime.dayPattern, 'en_US');
+DateFormat get _dateTime => DateFormat('${CompanyTime.dayPattern}, ${CompanyTime.timePattern}', 'en_US');
+DateFormat get _short => DateFormat(CompanyTime.dayMonthPattern, 'en_US');
 
 int toCents(Object? v) {
   if (v == null) return 0;
@@ -21,7 +24,8 @@ String qty(Object? value) => _qty.format(num.tryParse(value.toString()) ?? 0);
 DateTime? parseDate(String? v) {
   if (v == null || v.isEmpty) return null;
   if (v.length == 10) return DateTime.tryParse('${v}T00:00:00');
-  return DateTime.tryParse(v)?.toLocal();
+  final d = DateTime.tryParse(v);
+  return d == null ? null : CompanyTime.of(d);
 }
 
 String date(String? v) {
@@ -40,7 +44,8 @@ String shortDate(String? v) {
 }
 
 String isoDate(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
-String today() => isoDate(DateTime.now());
+/// Today on the company's clock ("2026-11-15").
+String today() => isoDate(CompanyTime.today());
 
 /// "3h 20m", "2d 4h" like the web.
 String duration(num? ms) {

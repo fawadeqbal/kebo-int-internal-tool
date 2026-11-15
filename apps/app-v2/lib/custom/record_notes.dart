@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide Badge;
 import 'package:intl/intl.dart';
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/json.dart';
 import '../core/outbox.dart';
 import '../core/scope.dart';
@@ -64,7 +65,8 @@ Future<bool> openNote(BuildContext context, Object record, {Json? note}) async {
   final r = RecordRef.of(record);
   final contacts = await _contacts(context.api, r.customerId);
   if (!context.mounted) return false;
-  final at = DateTime.tryParse(note?.strOrNull('at') ?? '')?.toLocal() ?? DateTime.now();
+  final saved = DateTime.tryParse(note?.strOrNull('at') ?? '');
+  final at = saved == null ? CompanyTime.now() : CompanyTime.of(saved);
   Sent? sent;
   final ok = await FormSheet.open(
     context,
@@ -91,7 +93,7 @@ Future<bool> openNote(BuildContext context, Object record, {Json? note}) async {
     send: (api, b) async {
       final day = DateTime.parse('${b['on']}');
       final hm = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch('${b['time'] ?? ''}'.trim());
-      final when = DateTime(day.year, day.month, day.day, hm == null ? 12 : int.parse(hm[1]!), hm == null ? 0 : int.parse(hm[2]!));
+      final when = CompanyTime.moment(day.year, day.month, day.day, hm == null ? 12 : int.parse(hm[1]!), hm == null ? 0 : int.parse(hm[2]!));
       final body = {
         'kind': b['kind'],
         'body': '${b['body']}'.trim(),
@@ -229,8 +231,8 @@ class _RecordNotesState extends State<RecordNotes> {
 String dueText(Json f) {
   final d = DateTime.tryParse(f.str('dueOn'));
   if (d == null) return '';
-  final now = DateTime.now();
-  final days = DateTime(d.year, d.month, d.day).difference(DateTime(now.year, now.month, now.day)).inDays;
-  final day = days == 0 ? 'today' : days == 1 ? 'tomorrow' : days == -1 ? 'yesterday' : DateFormat(days.abs() < 7 ? 'EEE' : 'd MMM').format(d);
-  return joinWords([day, f.strOrNull('dueAt')]) ?? day;
+  final now = CompanyTime.today();
+  final days = DateTime(d.year, d.month, d.day).difference(now).inDays;
+  final day = days == 0 ? 'today' : days == 1 ? 'tomorrow' : days == -1 ? 'yesterday' : days.abs() < 7 ? DateFormat('EEE').format(d) : fmtDayMonth(d)!;
+  return joinWords([day, clockText(f.strOrNull('dueAt'))]) ?? day;
 }

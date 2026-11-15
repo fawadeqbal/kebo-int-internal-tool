@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/company_time.dart';
 import '../../core/format.dart' as f;
 import '../../core/json.dart';
 import '../../core/labels.dart';
@@ -26,7 +27,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     final data = ref.watch(dashboardProvider);
-    final hour = DateTime.now().hour;
+    final hour = CompanyTime.now().hour;
     final greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     final first = session.user.s('name').split(' ').first;
 

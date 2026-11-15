@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Badge;
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/json.dart';
 import '../core/outbox.dart';
 import '../core/scope.dart';
@@ -59,7 +60,7 @@ Future<bool> openFollowUp(BuildContext context, {RecordRef? on, Json? edit}) asy
     initial: {
       'title': edit?.strOrNull('title') ?? '',
       'kind': edit?.strOrNull('kind') ?? 'call',
-      'dueOn': edit?.strOrNull('dueOn') ?? isoDay(DateTime.now()),
+      'dueOn': edit?.strOrNull('dueOn') ?? isoDay(CompanyTime.today()),
       'dueAt': edit?.strOrNull('dueAt') ?? '',
       'place': edit?.strOrNull('place') ?? '',
       'assigneeId': edit?.at('assignee.id') ?? me?.id ?? '',

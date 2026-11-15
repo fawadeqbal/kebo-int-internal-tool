@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:intl/intl.dart';
-
+import '../core/company_time.dart';
 import '../core/json.dart';
 import '../core/scope.dart';
 import '../generated/countries.g.dart';
+import 'format.dart';
 import 'theme.dart';
 
 enum FieldKind { text, multiline, email, phone, country, integer, decimal, toggle, date, choice, pick }
@@ -284,11 +284,11 @@ extension on _FieldEditorState {
     final v = widget.value is String ? DateTime.tryParse(widget.value as String) : null;
     return _box(
       context,
-      shown: v == null ? null : DateFormat('d MMM yyyy').format(v),
+      shown: fmtDate(v),
       hint: 'Choose a date',
       icon: Icons.calendar_today_outlined,
       onTap: () async {
-        final now = DateTime.now();
+        final now = CompanyTime.today();
         final picked = await showDatePicker(
           context: context,
           initialDate: v ?? now,

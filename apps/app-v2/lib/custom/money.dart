@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart' hide Badge;
-import 'package:intl/intl.dart';
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/files.dart';
 import '../core/json.dart';
 import '../core/outbox.dart';
@@ -20,7 +20,7 @@ const permSubmit = 'money.submit';
 bool canAddMoney(BuildContext c) => c.can(permRecord) || c.can(permSubmit);
 bool canAddExpense(BuildContext c) => c.can(permExpenses) || c.can(permSubmit);
 
-String _today() => isoDay(DateTime.now())!;
+String _today() => isoDay(CompanyTime.today())!;
 num _n(Object? v) => num.tryParse('${v ?? ''}'.replaceAll(',', '').trim()) ?? 0;
 String _fixed(num v) => v.toStringAsFixed(2);
 
@@ -1001,7 +1001,7 @@ class _OrderMoneySectionState extends State<OrderMoneySection> {
 /// "28 Oct" for a date or a time from the server.
 String? fmtShortDay(String? iso) {
   final d = iso == null ? null : DateTime.tryParse(iso);
-  return d == null ? null : DateFormat('d MMM').format(d.toLocal());
+  return fmtDayMonth(d);
 }
 
 // ---------------------------------------------------------------- approvals

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/json.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart' hide Badge;
@@ -56,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String get _hello {
-    final h = DateTime.now().hour;
+    final h = CompanyTime.now().hour;
     return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   }
 
@@ -70,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final unread = alerts?.integer('unread') ?? 0;
     final sub = joinParts([
       me?.company,
-      DateFormat('EEE d MMM').format(DateTime.now()),
+      '${DateFormat('EEE').format(CompanyTime.now())} ${fmtDayMonth(CompanyTime.now())}',
       if (needs != null) count == 0 ? 'nothing needs you' : count == 1 ? '1 thing needs you' : '$count things need you',
     ]);
     return Scaffold(

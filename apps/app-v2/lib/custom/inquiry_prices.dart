@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Badge;
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/files.dart';
 import '../core/json.dart';
 import '../core/scope.dart';
@@ -194,7 +195,7 @@ Future<bool> openOfferSheet(BuildContext context, Inquiry inquiry) async {
     save: 'Next: their prices ›',
     initial: {
       ...FactoryQuoteFields.blank(),
-      'receivedOn': DateTime.now().toIso8601String().substring(0, 10),
+      'receivedOn': isoDay(CompanyTime.today()),
       'taxIncluded': settings['factoryTaxIncluded'] == true,
       'taxRate': '${settings['factoryTaxRate'] ?? 0}',
     },

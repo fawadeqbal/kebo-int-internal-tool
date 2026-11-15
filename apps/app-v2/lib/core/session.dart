@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'api.dart';
+import 'company_time.dart';
 import 'files.dart';
 import 'json.dart';
 import 'keep.dart';
@@ -11,7 +12,7 @@ enum SessionStatus { starting, signedOut, needsCode, signedIn }
 
 /// The person signed in: `{ id, name, email, role, permissions }` from /api/auth/me.
 class Me {
-  const Me({required this.id, required this.name, required this.email, required this.permissions, this.role, this.company});
+  const Me({required this.id, required this.name, required this.email, required this.permissions, this.role, this.company, this.timeZone, this.dateFormat, this.timeFormat});
 
   factory Me.fromJson(Json j) => Me(
         id: j.str('id'),
@@ -20,11 +21,17 @@ class Me {
         role: j.strOrNull('roleName') ?? j.strOrNull('role'),
         company: j.obj('company', (c) => c.str('name')),
         permissions: {...?(j['permissions'] as List<dynamic>?)?.whereType<String>()},
+        timeZone: j.strOrNull('timeZone'),
+        dateFormat: j.strOrNull('dateFormat'),
+        timeFormat: j.strOrNull('timeFormat'),
       );
 
   final String id, name, email;
   final String? role, company;
   final Set<String> permissions;
+
+  /// The company's time zone and how it writes dates and times (Company settings › Time and dates).
+  final String? timeZone, dateFormat, timeFormat;
 }
 
 /// Sign-in state for the whole app. Screens read it through `context.session`.
@@ -126,6 +133,8 @@ class Session extends ChangeNotifier {
 
   void _signedIn() {
     outbox.owner = me!.id;
+    // Every date and time on the phone in the company's time and way.
+    CompanyTime.set(zone: me!.timeZone, date: me!.dateFormat, time: me!.timeFormat);
     _set(SessionStatus.signedIn);
     // What waits from last time goes now; the day's work is kept for when there is no signal.
     outbox.flush().ignore();
@@ -155,7 +164,14 @@ class Session extends ChangeNotifier {
     }
 
     try {
-      for (final p in ['/api/auth/me', '/api/reminders', '/api/me/todo', '/api/me/today', '/api/settings', '/api/users/people', '/api/customers/names']) {
+      // The company's time again: a change in Settings reaches the phone within ten minutes.
+      try {
+        final fresh = Me.fromJson(await api.get('/api/auth/me'));
+        CompanyTime.set(zone: fresh.timeZone, date: fresh.dateFormat, time: fresh.timeFormat);
+      } on ApiException {
+        // kept as it was
+      }
+      for (final p in ['/api/reminders', '/api/me/todo', '/api/me/today', '/api/settings', '/api/users/people', '/api/customers/names']) {
         await read(p);
       }
       if (can('payments.record')) await read('/api/money/accounts');
@@ -183,6 +199,7 @@ class Session extends ChangeNotifier {
     _precached = null;
     api.token = null;
     me = null;
+    CompanyTime.reset();
     await _storage.delete(key: _tokenKey).catchError((_) {});
     _set(SessionStatus.signedOut);
   }
