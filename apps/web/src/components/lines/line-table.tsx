@@ -940,11 +940,13 @@ export function LineTable({
       )}
 
       <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        {/* Read-only lines have nothing to tab to inside, so the table itself takes the keyboard (arrow keys scroll
+            it sideways); editable lines are reached through their cells. */}
         <div
           ref={gridRef}
-          tabIndex={-1}
+          tabIndex={readOnly ? 0 : -1}
           onKeyDown={gridKeyDown}
-          className="relative overflow-x-auto outline-none"
+          className={cn("relative overflow-x-auto", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
           aria-label={`${noun[0]!.toUpperCase()}${noun.slice(1)}s`}
           role="region"
         >

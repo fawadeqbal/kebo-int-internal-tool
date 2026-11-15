@@ -10,5 +10,15 @@ export default defineConfig({
     environment: "jsdom",
     include: ["test/**/*.test.tsx"],
     setupFiles: ["test/setup.ts"],
+    // COVERAGE=1 (CI's check job): how much of src/ the component tests run (the pages themselves are checked in
+    // a browser by apps/web-e2e), with a floor it may not drop under.
+    coverage: {
+      enabled: !!process.env.COVERAGE,
+      provider: "v8",
+      include: ["src/**"],
+      reporter: ["text-summary", "json-summary"],
+      reportOnFailure: true,
+      thresholds: { lines: 10, functions: 5, branches: 5, statements: 10 },
+    },
   },
 });

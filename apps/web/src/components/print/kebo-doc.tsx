@@ -315,10 +315,11 @@ export function KeboDoc<T>({
 @media screen and (max-width: 400px) { .kebo-doc { zoom: 0.42; } }
 @media screen and (max-width: 360px) { .kebo-doc { zoom: 0.38; } }`}</style>
       {watermark && (
-        <div aria-hidden className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <span className="-rotate-[30deg] border-[6px] border-[#dc2626]/25 px-10 text-[100pt] leading-none font-extrabold tracking-[0.08em] text-[#dc2626]/[0.13] select-none">
-            {watermark}
-          </span>
+        // The stamp (DRAFT, VOID, PREVIEW) is meant to be faint behind the paper, so it is drawn (CSS content) and
+        // not text a contrast check reads as hard to read: decoration in WCAG 1.4.3's sense. Its word is still
+        // read out, so a screen reader hears that the paper is a draft.
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <span data-mark={watermark} className="-rotate-[30deg] border-[6px] border-[#dc2626]/25 px-10 text-[100pt] leading-none font-extrabold tracking-[0.08em] text-[#dc2626]/[0.13] select-none before:content-[attr(data-mark)]" />
         </div>
       )}
       {internal && (

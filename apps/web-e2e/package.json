@@ -1,0 +1,19 @@
+{
+  "name": "@kebo/web-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The app in a real browser, as people use it: sign in, a new inquiry, a payment received; and every page checked for accessibility, width and errors. Runs against a running API and web app (CI starts them).",
+  "scripts": {
+    "e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint tests playwright.config.ts"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@kebo/config": "workspace:*",
+    "@playwright/test": "1.64.1",
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3",
+    "eslint": "^10.13.0"
+  }
+}

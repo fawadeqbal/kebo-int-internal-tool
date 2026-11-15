@@ -6,8 +6,16 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.mjs", "require": "./dist/index.js" } },
-  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
@@ -16,10 +24,15 @@
     "lint": "eslint src",
     "test": "vitest run"
   },
-  "dependencies": { "@kebo/money": "workspace:*", "@kebo/utils": "workspace:*", "zod": "4.6.7" },
+  "dependencies": {
+    "@kebo/money": "workspace:*",
+    "@kebo/utils": "workspace:*",
+    "zod": "4.6.7"
+  },
   "devDependencies": {
     "@kebo/config": "workspace:*",
     "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "5.0.5",
     "eslint": "^10.13.0",
     "tsup": "^8.5.0",
     "typescript": "~6.0.3",

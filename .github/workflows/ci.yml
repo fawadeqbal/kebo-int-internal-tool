@@ -41,7 +41,60 @@ jobs:
           node apps/api/dist/cli/ledger.js rebuild --all
           node apps/api/dist/cli/ledger.js rebuild --all
           node apps/api/dist/cli/ledger.js check --all
+      # COVERAGE=1: each package's tests also measure how much of its src/ they run, and fail under its floor.
       - run: pnpm turbo run typecheck lint test
+        env:
+          COVERAGE: "1"
+      - name: Test coverage, on the summary page
+        if: always()
+        run: node .github/scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+
+  # The app in a real browser (apps/web-e2e), on the demo data: sign in, a new inquiry and a payment received the
+  # way a person does them, then every page at laptop and phone width checked for errors, sideways scrolling and
+  # WCAG 2.2 AA (axe). Playwright starts the API, the web app and a stand-in for Caddy; Chrome is on the runner.
+  browser:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: kebo
+          POSTGRES_USER: kebo
+          POSTGRES_PASSWORD: kebo
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U kebo" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://kebo:kebo@localhost:5432/kebo
+      AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret-1234
+      E2E_CHANNEL: chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@kebo/api... --filter=@kebo/web...
+      - name: The demo data
+        run: |
+          pnpm db:deploy && pnpm db:seed --demo
+          node apps/api/dist/cli/ledger.js rebuild --all
+      - name: The checks in a browser
+        run: pnpm --filter @kebo/web-e2e e2e
+      - name: What the browser found, on the summary page
+        if: always()
+        run: node apps/web-e2e/summary.mjs >> "$GITHUB_STEP_SUMMARY"
+      - name: The report, with a trace of each failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-report
+          path: |
+            apps/web-e2e/playwright-report
+            apps/web-e2e/test-results
+          retention-days: 14
 
   # The migrations on a database with data in it, as in production: the base (main, or the
   # previous commit on a push) is migrated and seeded with its own code, then this change's

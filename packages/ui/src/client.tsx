@@ -67,6 +67,10 @@ export function toast(input: ToastInput | string) {
   toastNow = { ...(typeof input === "string" ? { message: input } : input), id: ++toastSeq };
   emitToast();
 }
+/** How many toasts have been asked for so far: tells whether something already said its own note. */
+export function toastsShown() {
+  return toastSeq;
+}
 function dismissToast(id: number) {
   if (toastNow?.id !== id) return;
   toastNow = null;

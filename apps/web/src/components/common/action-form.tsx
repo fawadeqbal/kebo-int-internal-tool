@@ -3,12 +3,16 @@
 import { Fragment, useActionState, useEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@kebo/ui";
+import { toast, toastsShown } from "@kebo/ui/client";
 import type { ActionState } from "@/lib/actions";
 import { ONCE_FIELD, newOnceKey } from "@/lib/once";
 import { ReasonPrompt } from "./reason-prompt";
 import { useWindowDone } from "./route-window";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
+
+/** A form that closes this soon after its save closed because of it (its window shut): its message goes to a toast. */
+const CLOSES_WITHIN_MS = 3000;
 
 /**
  * Every form in the app: runs a server action, shows its message, keeps typed
@@ -54,17 +58,35 @@ export function ActionForm({
   const seen = useRef<ActionState | null>(null);
   // The save's one-time key (lib/once.ts): the same one until it goes through, so sending it twice saves once.
   const onceKey = useRef<string | null>(null);
+  // A save's message ("Payment recorded.") while the form may still close (a window shuts on save): if it does,
+  // the message goes to a toast, so every save says it was saved. Nothing is added when the owner of the form
+  // already showed its own note, or when the form stays open and shows the message itself.
+  const unseen = useRef<{ message: string; toasts: number } | null>(null);
   useEffect(() => {
     if (state === seen.current || state.ok === undefined) return;
     seen.current = state;
     if (state.ok) {
       onceKey.current = null;
+      if (state.message && !banner) {
+        const note = { message: state.message, toasts: toastsShown() };
+        unseen.current = note;
+        setTimeout(() => {
+          if (unseen.current === note) unseen.current = null;
+        }, CLOSES_WITHIN_MS);
+      }
       if (resetOnSuccess) formRef.current?.reset();
       router.refresh();
       onDone?.(state);
       windowDone?.();
     }
-  }, [state, router, onDone, resetOnSuccess, windowDone]);
+  }, [state, router, onDone, resetOnSuccess, windowDone, banner]);
+  useEffect(
+    () => () => {
+      const note = unseen.current;
+      if (note && toastsShown() === note.toasts) toast(note.message);
+    },
+    [],
+  );
   return (
     <form
       ref={formRef}
