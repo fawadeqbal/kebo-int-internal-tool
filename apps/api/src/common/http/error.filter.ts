@@ -33,6 +33,9 @@ export class ErrorFilter implements ExceptionFilter {
     if (isDbError(error, DB_ERROR.uniqueViolation)) return send(409, { error: "That already exists (someone may have just saved it). Reload and try again." });
     // Another company's row (row-level security refused it): as if it did not exist.
     if (error instanceof Error && /row-level security/i.test(error.message)) return send(404, { error: "This record no longer exists. Reload and try again." });
+    // Money dated in a closed month (the month close): expected, said plainly, not counted as an error.
+    const closed = booksClosed(error);
+    if (closed) return send(409, { error: closed, code: "books_closed" });
     // A database rule kept history as it was written (the ledger, the audit trail, stage moves, final papers).
     // The app never asks for that, so it is logged and counted like any surprise; the person reads why.
     const kept = keptAsWritten(error);
@@ -64,8 +67,16 @@ const KEPT = [
   "A final version stays as it was printed: make it again for a new version",
 ];
 
+/** The month close's rule (migration month_close): its sentence, with the day the books are closed through. */
+const BOOKS_CLOSED = /The books are closed through [^:]+: money dated then stays as it was reported\. Date it later, or reopen the month in Settings › Closed months/;
+
 function keptAsWritten(error: unknown): string | null {
   const message = error instanceof Error ? error.message : "";
   const said = KEPT.find((k) => message.includes(k));
+  return said ? `${said}.` : null;
+}
+
+function booksClosed(error: unknown): string | null {
+  const said = BOOKS_CLOSED.exec(error instanceof Error ? error.message : "")?.[0];
   return said ? `${said}.` : null;
 }
