@@ -386,19 +386,25 @@ export class NotificationsService implements OnModuleInit {
   /* ---------------------------------------------------------------- reading */
 
   /** Mine, newest first, `take` at a time (page 1 by default); `total`: how many there are with the same filter. */
-  async mine(user: SessionUser, opts: { unreadOnly?: boolean; take?: number; page?: number; group?: NotificationGroup }) {
+  async mine(user: SessionUser, opts: { unreadOnly?: boolean; take?: number; page?: number; group?: NotificationGroup; counts?: boolean }) {
     const where = {
       userId: user.id,
       ...(opts.unreadOnly ? { readAt: null } : {}),
       ...(opts.group ? { OR: GROUP_TYPES[opts.group].map((t) => ({ type: { startsWith: t } })) } : {}),
     };
     const take = Math.min(opts.take ?? 50, 200);
-    const [items, unread, total] = await Promise.all([
+    // Each tab's count only for the Alerts page (counts=true); the bell asks on every page and needs only unread.
+    const groups = opts.counts ? (Object.keys(GROUP_TYPES) as NotificationGroup[]) : [];
+    const [items, unread, total, all, ...byGroup] = await Promise.all([
       this.prisma.db.notification.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: ((opts.page ?? 1) - 1) * take, take }),
       this.prisma.db.notification.count({ where: { userId: user.id, readAt: null } }),
       this.prisma.db.notification.count({ where }),
+      opts.counts ? this.prisma.db.notification.count({ where: { userId: user.id } }) : 0,
+      ...groups.map((g) => this.prisma.db.notification.count({ where: { userId: user.id, OR: GROUP_TYPES[g].map((t) => ({ type: { startsWith: t } })) } })),
     ]);
-    return { unread, total, items };
+    /** Each tab's count: exactly what it lists. */
+    const counts = { all, unread, ...Object.fromEntries(groups.map((g, k) => [g, byGroup[k] ?? 0])) } as Record<"all" | "unread" | NotificationGroup, number>;
+    return { unread, total, items, ...(opts.counts ? { counts } : {}) };
   }
 
   async markRead(user: SessionUser, ids: string[] | "all") {

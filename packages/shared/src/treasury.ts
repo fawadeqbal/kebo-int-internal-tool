@@ -89,7 +89,8 @@ export interface PaymentList {
   page: number;
   pageSize: number;
   /** In the period and filters, before the direction and status chips. */
-  counts: { all: number; in: number; out: number; move: number; to_verify: number; expense: number };
+  /** Each tab's count: exactly what that tab lists (removed ones only in `void`). */
+  counts: { all: number; in: number; out: number; move: number; to_verify: number; expense: number; void: number };
   /** The period's money in, out (to suppliers and refunds), to verify and spent on expenses, per currency, largest first; with their counts. */
   totals: { in: PaymentSum[]; inCount: number; out: PaymentSum[]; outCount: number; toVerify: PaymentSum[]; expenses: PaymentSum[] };
   /** The accounts and methods in the rows, for the filters. */

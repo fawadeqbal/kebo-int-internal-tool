@@ -172,13 +172,13 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         label="Which payments"
         className="mb-4"
         tabs={[
-          { href: chip({}), label: <><List aria-hidden /> All</>, active: !dir && !status && !kind },
-          { href: chip({ dir: "in" }), label: <><ArrowDownToLine aria-hidden /> Money in</>, active: dir === "in" && !status },
-          { href: chip({ dir: "out" }), label: <><ArrowUpFromLine aria-hidden /> Money out</>, active: dir === "out" && !status && !kind },
-          { href: chip({ kind: "expense" }), label: <><Banknote aria-hidden /> Expenses</>, active: kind === "expense" },
-          { href: chip({ dir: "move" }), label: <><ArrowLeftRight aria-hidden /> Transfers</>, active: dir === "move" },
-          ...(list.counts.to_verify ? [{ href: chip({ status: "to_verify" }), label: <><TriangleAlert aria-hidden /> To verify</>, count: list.counts.to_verify, active: status === "to_verify" }] : []),
-          { href: chip({ status: "void" }), label: "Removed", active: status === "void" },
+          { href: chip({}), label: <><List aria-hidden /> All</>, count: list.counts.all, active: !dir && !status && !kind },
+          { href: chip({ dir: "in" }), label: <><ArrowDownToLine aria-hidden /> Money in</>, count: list.counts.in, active: dir === "in" && !status },
+          { href: chip({ dir: "out" }), label: <><ArrowUpFromLine aria-hidden /> Money out</>, count: list.counts.out, active: dir === "out" && !status && !kind },
+          { href: chip({ kind: "expense" }), label: <><Banknote aria-hidden /> Expenses</>, count: list.counts.expense, active: kind === "expense" },
+          { href: chip({ dir: "move" }), label: <><ArrowLeftRight aria-hidden /> Transfers</>, count: list.counts.move, active: dir === "move" },
+          ...(list.counts.to_verify ? [{ href: chip({ status: "to_verify" }), label: <><TriangleAlert aria-hidden /> To verify</>, count: list.counts.to_verify, alert: true, active: status === "to_verify" }] : []),
+          { href: chip({ status: "void" }), label: "Removed", count: list.counts.void, active: status === "void" },
         ]}
       />
       <FilterCard

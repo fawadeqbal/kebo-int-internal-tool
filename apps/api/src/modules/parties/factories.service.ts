@@ -50,12 +50,13 @@ export class FactoriesService {
 
   async list(user: SessionUser, q: ListQuery & { mine?: boolean; owner?: string; city?: string; status?: "offers" | "none" }) {
     const term = q.q?.trim();
-    const where: Prisma.PartyWhereInput = {
+    // The same search for every tab; a tab only changes offers or mine (so its count is what it lists).
+    const whereFor = (t: { mine?: boolean; status?: "offers" | "none" }): Prisma.PartyWhereInput => ({
       ...isSupplier,
       deletedAt: null,
-      ...(q.mine ? { ownerId: user.id } : q.owner === "none" ? { ownerId: null } : q.owner ? { ownerId: q.owner } : {}),
+      ...(t.mine ? { ownerId: user.id } : q.owner === "none" ? { ownerId: null } : q.owner ? { ownerId: q.owner } : {}),
       ...(q.city ? { address: { contains: q.city, mode: "insensitive" } } : {}),
-      ...(q.status === "offers" ? { quotes: { some: { deletedAt: null } } } : q.status === "none" ? { quotes: { none: { deletedAt: null } } } : {}),
+      ...(t.status === "offers" ? { quotes: { some: { deletedAt: null } } } : t.status === "none" ? { quotes: { none: { deletedAt: null } } } : {}),
       ...(term
         ? {
             OR: [
@@ -72,8 +73,9 @@ export class FactoriesService {
             ],
           }
         : {}),
-    };
-    const [rows, total, places, waiting] = await Promise.all([
+    });
+    const where = whereFor({ mine: q.mine, status: q.status });
+    const [rows, total, places, waiting, all, offers, none, mine] = await Promise.all([
       this.prisma.db.party.findMany({
         where,
         omit: customerOnly,
@@ -87,9 +89,13 @@ export class FactoriesService {
       this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null, address: { not: null } }, select: { address: true } }),
       // Asked for a price and not answered yet (the "Offers waiting" figure).
       this.prisma.db.factoryRequest.count({ where: { status: "sent", factory: { deletedAt: null } } }),
+      this.prisma.db.party.count({ where: whereFor({}) }),
+      this.prisma.db.party.count({ where: whereFor({ status: "offers" }) }),
+      this.prisma.db.party.count({ where: whereFor({ status: "none" }) }),
+      this.prisma.db.party.count({ where: whereFor({ mine: true }) }),
     ]);
     const cities = [...new Set(places.map((p) => cityOf(p.address)).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b));
-    return { total, page: q.page, pageSize: q.pageSize, cities, waiting, rows: rows.map((r) => ({ ...withContact(r), city: cityOf(r.address) })) };
+    return { total, page: q.page, pageSize: q.pageSize, cities, waiting, counts: { all, offers, none, mine }, rows: rows.map((r) => ({ ...withContact(r), city: cityOf(r.address) })) };
   }
 
   async get(id: string, user?: SessionUser) {

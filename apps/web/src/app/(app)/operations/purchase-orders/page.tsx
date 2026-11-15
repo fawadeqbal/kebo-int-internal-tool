@@ -43,11 +43,12 @@ export default async function PurchaseOrdersPage({
   const chip = CHIPS.some((c) => c.key === sp.status) ? (sp.status as (typeof CHIPS)[number]["key"]) : "all";
   const inChip = (r: PurchaseOrderRow, c: string) => c === "all" || r.status === c || (c === "in_production" && r.status === "late");
   const q = sp.q?.trim().toLowerCase() ?? "";
-  const rows = all
-    .filter((r) => inChip(r, chip))
+  // The search and filters, the same for every tab: a tab's count is exactly what it lists.
+  const searched = all
     .filter((r) => !q || [r.po?.number, r.supplier.name, r.order.refNo, r.customer.name, r.supplierRef].filter(Boolean).join(" ").toLowerCase().includes(q))
     .filter((r) => !sp.supplier || r.supplier.id === sp.supplier)
     .filter((r) => !sp.ready || (sp.ready === "month" ? r.readyOn?.startsWith(month) : sp.ready === "late" ? r.status === "late" : sp.ready === "none" ? !r.readyOn : true));
+  const rows = searched.filter((r) => inChip(r, chip));
   const page = toPage(sp.page);
   const shown = rows.slice((page - 1) * PAGE, page * PAGE);
   const open = all.filter((r) => r.status !== "cancelled" && r.status !== "shipped");
@@ -98,7 +99,7 @@ export default async function PurchaseOrdersPage({
         label="Which purchase orders"
         className="mb-4"
         tabs={CHIPS.map((c) => {
-          const n = c.key === "all" ? 0 : all.filter((r) => inChip(r, c.key)).length;
+          const n = searched.filter((r) => inChip(r, c.key)).length;
           const Icon = c.icon;
           return {
             href: href({ status: c.key === "all" ? undefined : c.key }),
@@ -106,9 +107,9 @@ export default async function PurchaseOrdersPage({
               <>
                 <Icon aria-hidden />
                 {c.label}
-                {n && (c.key === "not_sent" || c.key === "in_production") ? ` ${n}` : ""}
               </>
             ),
+            count: n,
             active: chip === c.key,
           };
         })}

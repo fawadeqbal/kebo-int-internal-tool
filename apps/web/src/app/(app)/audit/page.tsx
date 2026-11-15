@@ -118,13 +118,13 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   if (!(await hasFeature("audit_log"))) return <PlanOff title="Activity log" what="The activity log" crumbs={crumbsFor("/audit")} />;
   const sp = await searchParams;
   const [data, people] = await Promise.all([
-    api.get<Paged<AuditRow> & { counts: Record<string, number> }>("/audit", { entityType: sp.type, userId: sp.person, page: toPage(sp.page), pageSize: PAGE_SIZE }),
+    api.get<Paged<AuditRow> & { counts: Record<string, number> }>("/audit", { entityType: sp.type, userId: sp.person, q: sp.q?.trim() || undefined, page: toPage(sp.page), pageSize: PAGE_SIZE }),
     getPeople(),
   ]);
-  const keep = { type: sp.type, person: sp.person };
+  const keep = { type: sp.type, person: sp.person, q: sp.q };
   const href = (patch: Record<string, string | undefined>) => buildHref("/audit", keep, { page: undefined, ...patch });
   const canUsers = can(me, "users.manage");
-  const filtered = !!(sp.type || sp.person);
+  const filtered = !!(sp.type || sp.person || sp.q);
   const label = (type: string) => ENTITY_LABEL[type] ?? type;
   const everything = Object.values(data.counts).reduce((a, b) => a + b, 0);
   // The four kinds with the most entries, and the one picked.
@@ -159,6 +159,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       <ListToolbar
         chips={chips}
         label="Filter the audit log"
+        search={{ placeholder: "What, who or why", value: sp.q, clearHref: href({ q: undefined }) }}
+        keep={{ type: sp.type, person: sp.person }}
         filters={
           <form className="flex items-center gap-1.5">
             <AutoSelect name="type" defaultValue={sp.type ?? ""} aria-label="Kind of record" className="w-32">

@@ -74,12 +74,17 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   const month = new Date().toISOString().slice(0, 7);
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
   const query = { stage: chip, q: sp.q?.trim() || undefined, assignee, customerId: sp.customer, priority, channel, category: sp.category || undefined };
-  const [data, settings, people, yearFunnel, monthFunnel] = await Promise.all([
+  const [data, settings, people, yearFunnel, monthFunnel, mineCount] = await Promise.all([
     api.get<Paged<DealRow> & { counts: Record<string, number> }>("/inquiries", { ...query, page: toPage(sp.page) }),
     getSettings(),
     getPeople().catch(() => []),
     insights ? api.get<Funnel>("/insights/facts/funnel", { from: `${year}-01-01`, to: `${year}-12-31` }).catch(() => null) : null,
     insights ? api.get<Funnel>("/insights/facts/funnel", { from: `${month}-01`, to: `${month}-31` }).catch(() => null) : null,
+    // The Mine tab's count: my open inquiries, for the same search.
+    api
+      .get<Paged<DealRow>>("/inquiries", { ...query, stage: "open", assignee: "me", page: 1, pageSize: 1 })
+      .then((r) => r.total)
+      .catch(() => null),
   ]);
   const c = data.counts;
   const count = (s: Chip) => (s === "open" ? (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0) : (c[s] ?? 0));
@@ -90,7 +95,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   const currency = settings.sales.currency;
 
   const chipLabel = (s: Chip) =>
-    ({ open: "All", new: "New", sourcing: "Sourcing", quoted: "Quoted", on_hold: "On hold", won: "Won", lost: "Lost", overdue: "Past needed-by" })[s];
+    ({ open: "Open", new: "New", sourcing: "Sourcing", quoted: "Quoted", on_hold: "On hold", won: "Won", lost: "Lost", overdue: "Past needed-by" })[s];
   const chipIcon = { open: List, new: Plus, sourcing: Factory, quoted: FileText, on_hold: Clock, won: Check, lost: X, overdue: Clock } as const;
 
   return (
@@ -142,16 +147,16 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
         tabs={[
           ...CHIPS.filter((s) => s !== "overdue" || count(s) > 0 || chip === s).map((s) => {
             const Icon = chipIcon[s];
-            const n = s === "won" || s === "lost" ? null : count(s);
             return {
               href: href({ stage: s === "open" ? undefined : s, mine: undefined }),
               label: (
                 <>
                   <Icon aria-hidden />
                   {chipLabel(s)}
-                  {n ? ` ${n}` : ""}
                 </>
               ),
+              count: count(s),
+              alert: s === "overdue" && count(s) > 0,
               active: chip === s && !mine,
             };
           }),
@@ -163,6 +168,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                 Mine
               </>
             ),
+            count: mineCount ?? undefined,
             active: mine,
           },
         ]}

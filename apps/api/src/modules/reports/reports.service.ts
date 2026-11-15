@@ -256,12 +256,23 @@ export class ReportsService {
 
   /* ---------------------------------------------------------------- audit */
 
-  async audit(user: SessionUser, q: { entityType?: string; entityId?: string; userId?: string; page: number; pageSize: number }) {
+  async audit(user: SessionUser, q: { entityType?: string; entityId?: string; userId?: string; q?: string; page: number; pageSize: number }) {
     if (!can(user, "audit.view")) throw new ForbiddenError();
+    const term = q.q?.trim();
     const where: Prisma.AuditLogWhereInput = {
       ...(q.entityType ? { entityType: q.entityType } : {}),
       ...(q.entityId ? { entityId: q.entityId } : {}),
       ...(q.userId ? { userId: q.userId } : {}),
+      ...(term
+        ? {
+            OR: [
+              { summary: { contains: term, mode: "insensitive" } },
+              { action: { contains: term, mode: "insensitive" } },
+              { reason: { contains: term, mode: "insensitive" } },
+              { user: { name: { contains: term, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
     };
     const [rows, total, byType] = await Promise.all([
       this.prisma.db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
