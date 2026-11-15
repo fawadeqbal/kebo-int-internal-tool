@@ -438,6 +438,7 @@ model DeviceToken {
   @@unique([companyId, token])
   @@index([userId])
   @@index([companyId])
+  @@index([sessionId])
   @@map("device_tokens")
 }
 
@@ -487,6 +488,7 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@index([companyId])
+  @@index([userId])
   @@map("audit_logs")
 }
 
@@ -512,6 +514,7 @@ model RequestKey {
 
   @@id([companyId, userId, key])
   @@index([createdAt])
+  @@index([userId])
   @@map("request_keys")
 }
 
@@ -615,6 +618,7 @@ model Party {
   @@index([country])
   @@index([ownerId])
   @@index([companyId])
+  @@index([createdById])
   @@map("parties")
 }
 
@@ -721,6 +725,8 @@ model Inquiry {
   @@index([assigneeId])
   @@index([customerId])
   @@index([createdAt])
+  @@index([contactId])
+  @@index([createdById])
   @@map("inquiries")
 }
 
@@ -771,6 +777,7 @@ model InquiryStageChange {
 
   @@index([inquiryId])
   @@index([companyId])
+  @@index([changedById])
   @@map("inquiry_stage_changes")
 }
 
@@ -789,6 +796,8 @@ model InquiryAssignment {
 
   @@index([inquiryId])
   @@index([companyId])
+  @@index([assignedById])
+  @@index([assigneeId])
   @@map("inquiry_assignments")
 }
 
@@ -849,6 +858,7 @@ model Attachment {
   @@index([expenseId])
   @@index([submissionId])
   @@index([companyId])
+  @@index([uploadedById])
   @@map("attachments")
 }
 
@@ -903,6 +913,7 @@ model FactoryQuote {
   @@index([inquiryId])
   @@index([factoryId])
   @@index([companyId])
+  @@index([createdById])
   @@map("factory_quotes")
 }
 
@@ -943,6 +954,7 @@ model FactoryQuoteLine {
   @@index([alternativeOfId])
   @@index([productKey])
   @@index([companyId])
+  @@index([requestedItemId])
   @@map("factory_quote_lines")
 }
 
@@ -1011,6 +1023,7 @@ model QuotationRevision {
   @@unique([quotationId, number])
   @@index([status])
   @@index([companyId])
+  @@index([createdById])
   @@map("quotation_revisions")
 }
 
@@ -1099,6 +1112,8 @@ model QuoteLine {
   @@index([revisionId])
   @@index([optionId])
   @@index([companyId])
+  @@index([factoryQuoteLineId])
+  @@index([requestedItemId])
   @@map("quote_lines")
 }
 
@@ -1220,6 +1235,7 @@ model Order {
   @@index([status])
   @@index([stage])
   @@index([customerId])
+  @@index([createdById])
   @@map("orders")
 }
 
@@ -1273,6 +1289,7 @@ model OrderLine {
   @@index([orderId])
   @@index([factoryId])
   @@index([companyId])
+  @@index([quoteLineId])
   @@map("order_lines")
 }
 
@@ -1318,6 +1335,7 @@ model OrderStageChange {
 
   @@index([orderId, at])
   @@index([companyId])
+  @@index([byId])
   @@map("order_stage_changes")
 }
 
@@ -1354,6 +1372,8 @@ model FactoryRequest {
   @@unique([inquiryId, factoryId])
   @@index([factoryId])
   @@index([companyId])
+  @@index([createdById])
+  @@index([factoryQuoteId])
   @@map("factory_requests")
 }
 
@@ -1409,6 +1429,7 @@ model OrderDelivery {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([companyId])
+  @@index([satEngineerId])
   @@map("order_deliveries")
 }
 
@@ -1551,6 +1572,9 @@ model OrderDocument {
 
   @@index([orderId])
   @@index([companyId])
+  @@index([attachmentId])
+  @@index([paperId])
+  @@index([shipmentId])
   @@map("order_documents")
 }
 
@@ -1586,6 +1610,7 @@ model OrderPaper {
 
   @@unique([orderId, kind, ref, version])
   @@index([companyId])
+  @@index([madeById])
   @@map("order_papers")
 }
 
@@ -1609,6 +1634,7 @@ model OrderBankStep {
 
   @@unique([orderId, step])
   @@index([companyId])
+  @@index([allocationId])
   @@map("order_bank_steps")
 }
 
@@ -1789,6 +1815,8 @@ model Expense {
   @@index([source])
   @@index([repeatKey])
   @@index([companyId])
+  @@index([paidById])
+  @@index([recordedById])
   @@map("expenses")
 }
 
@@ -1846,6 +1874,7 @@ model Allocation {
   @@index([purchaseOrderId])
   @@index([on])
   @@index([companyId])
+  @@index([recordedById])
   @@map("allocations")
 }
 
@@ -1949,6 +1978,8 @@ model MoneyMovement {
   @@index([toAccountId])
   @@index([valueDate])
   @@index([companyId])
+  @@index([paidById])
+  @@index([recordedById])
   @@map("money_movements")
 }
 
@@ -1992,6 +2023,7 @@ model OrderFactory {
   @@unique([orderId, factoryId])
   @@index([factoryId])
   @@index([companyId])
+  @@index([fatAttendedById])
   @@map("order_factories")
 }
 
@@ -2015,6 +2047,7 @@ model SalesTarget {
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@id([companyId, month])
+  @@index([updatedById])
   @@map("sales_targets")
 }
 
@@ -2038,6 +2071,7 @@ model PersonTarget {
 
   @@id([companyId, month, userId])
   @@index([userId])
+  @@index([updatedById])
   @@map("person_targets")
 }
 
@@ -2214,6 +2248,7 @@ model Company {
   purchaseOrders PurchaseOrder[]
   requestKeys    RequestKey[]
 
+  @@index([planId])
   @@map("companies")
 }
 
@@ -2289,6 +2324,7 @@ model Lead {
   @@index([status])
   @@index([createdAt])
   @@index([channel])
+  @@index([companyId])
   @@map("leads")
 }
 
@@ -2626,6 +2662,7 @@ model MoneySubmission {
   @@index([companyId, status])
   @@index([orderId])
   @@index([submittedById])
+  @@index([decidedById])
   @@map("money_submissions")
 }
 
@@ -2662,6 +2699,8 @@ model Note {
   @@index([customerId, at])
   @@index([factoryId, at])
   @@index([companyId])
+  @@index([authorId])
+  @@index([contactId])
   @@map("notes")
 }
 
@@ -2712,6 +2751,8 @@ model FollowUp {
   @@index([customerId])
   @@index([factoryId])
   @@index([createdById])
+  @@index([assigneeId])
+  @@index([doneById])
   @@map("follow_ups")
 }
 
@@ -2835,6 +2876,7 @@ model PurchaseOrder {
   @@unique([companyId, number])
   @@index([supplierId])
   @@index([companyId])
+  @@index([sentById])
   @@map("purchase_orders")
 }
 
