@@ -8,6 +8,7 @@ import type { NotificationItem } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { FilterCard } from "@/components/common/filter-card";
 import { markAllReadAction } from "./actions";
+import { readableDates } from "@/components/insights/readable-dates";
 
 export const metadata = { title: "Alerts" };
 
@@ -112,8 +113,8 @@ export default async function NotificationsPage({ searchParams }: { searchParams
                   <span className="min-w-0 flex-1">
                     <Badge tone={kind.tone}>{kind.label}</Badge>
                     <span className="mt-1.5 block text-sm text-text">
-                      {n.title}
-                      {n.body && <span className="text-text-2"> · {n.body}</span>}
+                      {readableDates(n.title)}
+                      {n.body && <span className="text-text-2"> · {readableDates(n.body)}</span>}
                     </span>
                     <time dateTime={n.createdAt} title={dateTime(n.createdAt)} className="text-xs text-muted">
                       {timeAgo(n.createdAt)}

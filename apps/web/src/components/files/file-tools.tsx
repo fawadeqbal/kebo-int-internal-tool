@@ -1,6 +1,7 @@
 "use client";
 
 import { lockScroll } from "@/lib/scroll-lock";
+import { useTime } from "@/lib/time-client";
 import {
   createContext,
   useCallback,
@@ -35,16 +36,6 @@ const useMounted = () =>
     () => false,
   );
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-/** "12 Jan" (this year) or "12 Jan 2026", in the browser and on the server alike (UTC). */
-export function shortDay(iso: string, withYear = false) {
-  const d = new Date(iso);
-  return `${String(d.getUTCDate()).padStart(2, "0")} ${MONTHS[d.getUTCMonth()]}${withYear ? ` ${d.getUTCFullYear()}` : ""}`;
-}
-const stamp = (iso: string) => {
-  const d = new Date(iso);
-  return `${shortDay(iso, true)}, ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
-};
 const typeLabel = (f: OrderFile) => (f.name.split(".").pop() ?? "").toUpperCase() || f.type;
 
 export function FileIcon({ file, className }: { file: Pick<OrderFile, "type">; className?: string }) {
@@ -201,6 +192,7 @@ export function FileMenu({
   onClose: () => void;
   set?: OrderFile[];
 }) {
+  const t = useTime();
   const tools = useFileTools();
   if (!tools) return null;
   const run = (fn: () => void) => () => {
@@ -217,7 +209,7 @@ export function FileMenu({
         <div className="px-2.5 pt-1 pb-2">
           <p className="truncate text-sm font-semibold">{file.name}</p>
           <p className="text-xs text-muted">
-            {[file.attachedTo.label, file.by?.name, shortDay(file.at), fileSize(file.size)].filter(Boolean).join(" · ")}
+            {[file.attachedTo.label, file.by?.name, t.dayMonth(file.at), fileSize(file.size)].filter(Boolean).join(" · ")}
           </p>
         </div>
       }
@@ -376,6 +368,7 @@ export function FileRow({
   onSelect?: (on: boolean) => void;
   showStep?: boolean;
 }) {
+  const t = useTime();
   const tools = useFileTools();
   const phone = useIsPhone();
   const ref = useRef<HTMLButtonElement>(null);
@@ -416,7 +409,7 @@ export function FileRow({
         <span className="text-xs text-muted"> · {fileSize(file.size)}</span>
         {file.version > 1 && <span className="text-xs text-muted"> · v{file.version}</span>}
         <span className="block truncate text-xs text-muted md:hidden">
-          {[file.attachedTo.label, showStep ? file.stepLabel : null, file.by?.name, shortDay(file.at)].filter(Boolean).join(" · ")}
+          {[file.attachedTo.label, showStep ? file.stepLabel : null, file.by?.name, t.dayMonth(file.at)].filter(Boolean).join(" · ")}
         </span>
       </button>
       <span className="hidden min-w-0 md:block">
@@ -429,7 +422,7 @@ export function FileRow({
       </span>
       {showStep && <span className="hidden truncate text-xs text-text-2 md:block">{file.stepLabel}</span>}
       <span className="hidden truncate text-xs text-muted md:block">
-        {file.by?.name ?? "System"} · {shortDay(file.at)}
+        {file.by?.name ?? "System"} · {t.dayMonth(file.at)}
       </span>
       <span className="flex items-center justify-end gap-0.5">
         {file.viewHref && (
@@ -477,6 +470,7 @@ function FileViewer({
   onClose: () => void;
   open: (d: Dialog) => void;
 }) {
+  const t = useTime();
   const id = useId();
   const mounted = useMounted();
   const at = set.findIndex((f) => f.id === file.id);
@@ -523,7 +517,7 @@ function FileViewer({
         {file.attachedTo.label}
       </Link>,
     ],
-    ["Added", `${file.by?.name ?? "System"} · ${stamp(file.at)}`],
+    ["Added", `${file.by?.name ?? "System"} · ${t.dateTime(file.at)}`],
     ["Size", `${fileSize(file.size)} · ${typeLabel(file)}`],
   ];
   return createPortal(
@@ -628,7 +622,7 @@ function FileViewer({
                       v{v.version} · {v.name}
                     </span>
                     <a href={v.href} download className="shrink-0 text-xs text-primary hover:underline">
-                      {shortDay(v.at, true)} · Download
+                      {t.date(v.at)} · Download
                     </a>
                   </li>
                 ))}

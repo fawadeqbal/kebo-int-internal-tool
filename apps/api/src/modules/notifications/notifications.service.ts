@@ -5,6 +5,7 @@ import { PrismaService, type Tx } from "../../database/prisma.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { ENV, type Env } from "../../config/env";
 import { renderMessageEmail } from "../../common/notify/message-email";
+import { formatDateTime } from "@kebo/utils";
 import { Clock } from "../../common/time/clock.service";
 import { CompanyMail } from "../../common/notify/company-mail";
 import { sendPush } from "../../common/notify/fcm";
@@ -154,7 +155,7 @@ export class NotificationsService implements OnModuleInit {
   private async emailContext() {
     const company = CompanyContext.current();
     const origin = company ? companyOrigin(company.slug, this.env.BASE_DOMAIN, this.env.APP_URL, company.domain) : this.env.APP_URL;
-    const at = new Intl.DateTimeFormat("en-GB", { timeZone: this.clock.timeZone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(this.clock.now());
+    const at = formatDateTime(this.clock.now(), this.clock.style);
     return { company: (await this.settings.get()).company.name || company?.name || "Kebo ERP", origin, at };
   }
 

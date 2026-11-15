@@ -21,6 +21,8 @@ import type { Receivables } from "./types-insights";
 import type { LedgerListRow, LedgerParty } from "./types-ledger";
 import { insightsSheets } from "./insights-data";
 import { UUID } from "@/lib/ids";
+import { dateIn, formatTime } from "@kebo/utils";
+import { companyToday, currentZone } from "@/lib/format";
 
 /**
  * The lists as Excel files: every row the person may see with the filters on
@@ -35,8 +37,10 @@ type Cell = string | number | null;
 
 const num = (v: string | number | null | undefined): number | null =>
   v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
-const day = (v: string | null | undefined) => (v ? v.slice(0, 10) : null);
-const when = (v: string) => v.replace("T", " ").slice(0, 16);
+/** A day in the file: "2026-11-14" (sorts and filters in Excel), a moment's day in the company's time. */
+const day = (v: string | null | undefined) => (v ? (v.length === 10 ? v : dateIn(new Date(v), currentZone())) : null);
+/** A moment in the file: "2026-11-14 15:30", company time. */
+const when = (v: string) => `${dateIn(new Date(v), currentZone())} ${formatTime(v, { zone: currentZone(), date: "yyyy_mm_dd", time: "24h" })}`;
 const text = (h: string, width = 16): SheetCol => ({ header: h, width });
 const money = (h: string): SheetCol => ({ header: h, kind: "number", width: 14 });
 const count = (h: string): SheetCol => ({ header: h, kind: "number", width: 10 });
@@ -52,7 +56,7 @@ async function allPages<T>(path: string, query: Q): Promise<T[]> {
   return rows;
 }
 
-const stamp = () => new Date().toISOString().slice(0, 10);
+const stamp = () => companyToday();
 
 async function deals(q: Q): Promise<SheetSpec> {
   const stage = q.stage ?? "open";
@@ -497,7 +501,7 @@ async function audit(q: Q): Promise<SheetSpec> {
   return {
     name: `Activity log ${stamp()}`,
     title: "Activity log",
-    columns: [text("When (UTC)", 17), text("Who", 18), text("Action", 12), text("What", 14), text("Summary", 70)],
+    columns: [text("When", 17), text("Who", 18), text("Action", 12), text("What", 14), text("Summary", 70)],
     rows: rows.map((r): Cell[] => [when(r.createdAt), r.userName, r.action, r.entityType, r.summary]),
   };
 }

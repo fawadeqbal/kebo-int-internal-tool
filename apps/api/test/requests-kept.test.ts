@@ -2,6 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
 import { Clock } from "../src/common/time/clock.service";
+import { formatDate } from "@kebo/utils";
 
 /**
  * Core plan, phase 1: payment requests and receipts kept as sent.
@@ -196,7 +197,7 @@ describe("payment requests and receipts kept as sent", () => {
     expect(first.doc.total?.amount).toBe(deposit!.amount);
     const row = (await papers(o.id)).find((p) => p.kind === "payment-request" && p.ref === deposit!.id)!;
     expect(row).toMatchObject({ state: "ready", stateLabel: "Sent", version: 1 });
-    expect(row.sub).toContain(`sent ${today}`);
+    expect(row.sub).toContain(`sent ${formatDate(today)}`);
 
     // The plan changes: the deposit asks for 100 more, the balance for 100 less.
     const up = (Number(deposit!.amount) + 100).toFixed(2);

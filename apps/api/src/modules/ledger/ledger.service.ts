@@ -17,7 +17,7 @@ import {
 import { addDays, DomainError, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { LimitsService } from "../../common/company/limits.service";
-import { Clock } from "../../common/time/clock.service";
+import { Clock, companyDay } from "../../common/time/clock.service";
 import { CompanyContext } from "../../common/company/company-context";
 import { toInfo } from "../../common/company/companies.service";
 import { SettingsService } from "../settings/settings.service";
@@ -725,7 +725,7 @@ export class LedgerService {
     const bullets: (string | { label: string; value: string })[] = ageing
       .slice(0, 8)
       .map((i) => ({
-        label: `${i.refNo ? `${i.refNo} · ` : ""}${i.label}${i.dueOn ? `, due ${i.dueOn}` : ""}:`,
+        label: `${i.refNo ? `${i.refNo} · ` : ""}${i.label}${i.dueOn ? `, due ${companyDay(i.dueOn)}` : ""}:`,
         value: `${currency} ${Number(i.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
       }));
     if (!bullets.length) bullets.push(kind === "customer" ? "Nothing is open." : "Nothing to pay.");

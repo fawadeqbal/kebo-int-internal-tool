@@ -55,7 +55,7 @@ import {
 import { dateIn, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
-import { Clock } from "../../common/time/clock.service";
+import { Clock, companyDay } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
@@ -481,7 +481,7 @@ export class PapersService implements OnModuleInit {
       const rows = o.papers.filter((p) => p.kind === kind).sort((a, b) => a.version - b.version);
       const latest = rows.at(-1) ?? null;
       const rebuiltOn = (latest?.snapshot as { rebuiltOn?: string | null } | null)?.rebuiltOn ?? null;
-      return { latest, draft: latest?.status === "draft", rebuilt: rebuiltOn ? ` · rebuilt from the data on ${rebuiltOn}` : "" };
+      return { latest, draft: latest?.status === "draft", rebuilt: rebuiltOn ? ` · rebuilt from the data on ${companyDay(rebuiltOn)}` : "" };
     };
     const pi = own("proforma");
     if (used("proforma") || o.proformaNo)
@@ -501,7 +501,7 @@ export class PapersService implements OnModuleInit {
           ? "order lines, buyer, payment terms, bank details"
           : pi.draft
             ? `version ${pi.latest!.version} · draft: issue it to make it final`
-            : `issued ${fromDbDateOrNull(o.proformaIssuedOn) ?? ""}${(pi.latest?.version ?? 1) > 1 ? ` · version ${pi.latest!.version}` : ""}${pi.rebuilt}`.trim(),
+            : `issued ${o.proformaIssuedOn ? companyDay(fromDbDateOrNull(o.proformaIssuedOn)!) : ""}${(pi.latest?.version ?? 1) > 1 ? ` · version ${pi.latest!.version}` : ""}${pi.rebuilt}`.trim(),
         ref: null,
         printable: true,
         makeable: false,
@@ -575,7 +575,7 @@ export class PapersService implements OnModuleInit {
         /** The copy kept when the request was last sent (R1, R2…), with the day. */
         const sentOf = (ref: string) => {
           const copy = this.rowsOf(o, kind, ref).filter((x) => x.status === "final").at(-1) ?? null;
-          return copy ? { copy, on: dateIn(copy.finalAt ?? copy.madeAt, this.clock.timeZone) } : null;
+          return copy ? { copy, on: companyDay(dateIn(copy.finalAt ?? copy.madeAt, this.clock.timeZone)) } : null;
         };
         livePlanOfPaper(o).forEach((p, i) => {
           const sent = sentOf(p.id);
@@ -590,7 +590,7 @@ export class PapersService implements OnModuleInit {
               number: paperNumber(o.refNo, kind, p.requestNo ?? i + 1),
               version: sent?.copy.version ?? null,
               paperId: sent?.copy.id ?? null,
-              sub: `${o.currency} ${fromMinor(p.amountMinor)}${p.dueOn ? ` · due ${p.dueOn}` : ""}${sent ? ` · sent ${sent.on}${sent.copy.version > 1 ? ` (R${sent.copy.version})` : ""}` : ""}`,
+              sub: `${o.currency} ${fromMinor(p.amountMinor)}${p.dueOn ? ` · due ${companyDay(p.dueOn)}` : ""}${sent ? ` · sent ${sent.on}${sent.copy.version > 1 ? ` (R${sent.copy.version})` : ""}` : ""}`,
               ref: p.id,
               makeable: false,
               inSet: false,

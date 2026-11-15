@@ -71,7 +71,7 @@ describe("the menu", () => {
 
 describe("the period", () => {
   it("defaults to since the first of last month, with its words", () => {
-    expect(periodOf({}, "2026-11-04")).toEqual({ key: "recent", from: "2026-10-01", to: "2026-11-04", label: "1 Oct – 4 Nov 2026" });
+    expect(periodOf({}, "2026-11-04")).toEqual({ key: "recent", from: "2026-10-01", to: "2026-11-04", label: "01 Oct – 04 Nov 2026" });
     expect(periodOf({ period: "last-month" }, "2026-11-04")).toMatchObject({ from: "2026-10-01", to: "2026-10-31" });
     expect(periodOf({ period: "year" }, "2026-01-15")).toMatchObject({ from: "2026-01-01", to: "2026-01-15" });
     expect(periodOf({ period: "last-year" }, "2026-03-01")).toMatchObject({ from: "2025-01-01", to: "2025-12-31" });
@@ -83,7 +83,7 @@ describe("the period", () => {
       to: "2026-02-28",
     });
     expect(periodOf({ from: "nonsense" }, "2026-11-04").key).toBe("recent");
-    expect(span("2025-12-01", "2026-01-31")).toBe("1 Dec 2025 – 31 Jan 2026");
+    expect(span("2025-12-01", "2026-01-31")).toBe("01 Dec 2025 – 31 Jan 2026");
   });
 });
 

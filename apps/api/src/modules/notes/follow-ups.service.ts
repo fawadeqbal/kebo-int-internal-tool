@@ -1,10 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { fromDbDate, toDbDate, type Prisma } from "@kebo/database";
 import { can, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, QUOTE_FOLLOW_UP_DAYS, REMINDER_HOUR, rowsOf, type FollowUpDoneInput, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
-import { addDays, daysBetween, DomainError, ForbiddenError, GateError, NotFoundError, startOfDayIn, type ISODate } from "@kebo/utils";
+import { addDays, daysBetween, DomainError, ForbiddenError, formatClock, GateError, NotFoundError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
-import { Clock } from "../../common/time/clock.service";
+import { Clock, companyDayMonth, companyFormats } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { NotificationsService } from "../notifications/notifications.service";
 import { followUpMissed, followUpsMissed, followUpToday } from "../notifications/messages";
@@ -48,10 +48,11 @@ export function momentIn(date: ISODate, time: string, timeZone: string): Date {
   return new Date(startOfDayIn(date, timeZone).getTime() + (h * 60 + m) * 60_000);
 }
 
-/** "Thu 5 Nov" / "Thu 5 Nov 11:00" */
+/** "Thu 05 Nov" / "Thu 05 Nov 11:00": the day and time the company's way (Time and dates). */
 export function dueWords(dueOn: ISODate, dueAt: string | null) {
-  const day = new Date(`${dueOn}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-  return dueAt ? `${day} ${dueAt}` : day;
+  const weekday = new Date(`${dueOn}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" });
+  const day = `${weekday} ${companyDayMonth(dueOn)}`;
+  return dueAt ? `${day} ${formatClock(dueAt, { zone: "UTC", ...companyFormats() })}` : day;
 }
 
 /**

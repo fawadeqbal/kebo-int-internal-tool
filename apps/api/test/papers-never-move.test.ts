@@ -7,6 +7,7 @@ import { Clock } from "../src/common/time/clock.service";
 import { CompaniesService } from "../src/common/company/companies.service";
 import { CompanyContext } from "../src/common/company/company-context";
 import { DocumentsService } from "../src/modules/orders/documents.service";
+import { formatDate } from "@kebo/utils";
 
 /**
  * Single source of truth, PR 2: papers that never move.
@@ -295,7 +296,7 @@ describe("papers that never move", () => {
     expect(rebuilt).toMatchObject({ final: true, paper: { version: 1, rebuiltOn: app.get(Clock).today() } });
     const strip = (d: Record<string, unknown>) => ({ ...d, paper: null, versions: null, rebuiltOn: null });
     expect(strip(rebuilt)).toEqual(strip(printed));
-    expect((await papers(o.id)).find((p) => p.kind === "proforma")!.sub).toContain(`rebuilt from the data on ${today}`);
+    expect((await papers(o.id)).find((p) => p.kind === "proforma")!.sub).toContain(`rebuilt from the data on ${formatDate(today)}`);
     // Run again: nothing more to do for it.
     await app.get(DocumentsService).rebuildAll();
     expect((await proforma(o.id)).versions).toHaveLength(1);

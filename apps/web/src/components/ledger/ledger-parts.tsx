@@ -76,13 +76,9 @@ export function periodOf(sp: { period?: string; from?: string; to?: string }, to
   return { key, ...range, label: key === "all" ? "All time" : span(range.from, range.to) };
 }
 
-const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-const LONG = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-/** "1 Oct – 4 Nov 2026". */
+/** "01 Oct – 04 Nov 2026", the company's way. */
 export function span(from: string, to: string) {
-  const f = new Date(`${from}T00:00:00Z`);
-  const t = new Date(`${to}T00:00:00Z`);
-  return `${from.slice(0, 4) === to.slice(0, 4) ? SHORT.format(f) : LONG.format(f)} – ${LONG.format(t)}`;
+  return `${from.slice(0, 4) === to.slice(0, 4) ? dayMonth(from) : date(from)} – ${date(to)}`;
 }
 
 /** "04 Nov" for this year's days, "04 Nov 2025" for another's. */

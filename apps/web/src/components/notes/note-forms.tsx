@@ -11,6 +11,8 @@ import { Modal } from "@/components/common/dialog";
 import { PANEL_FORM, PanelActions, PanelBody, PanelSection, useClosePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { NOTE_ICON } from "./kinds";
+import { useTime } from "@/lib/time-client";
+import { addDays } from "@kebo/utils";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -197,10 +199,8 @@ export function FollowUpDoneNext({ action, title, what, inquiryHref, as = "butto
   const [open, setOpen] = useState(false);
   const id = useId();
   // Three days on, to start with: the person sets the day they mean.
-  const [start] = useState(() => {
-    const d = new Date(Date.now() + 3 * 86_400_000);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  });
+  const time = useTime();
+  const [start] = useState(() => addDays(time.today(), 3));
   return (
     <>
       {as === "check" ? (

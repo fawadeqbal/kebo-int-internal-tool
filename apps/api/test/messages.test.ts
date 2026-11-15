@@ -170,8 +170,8 @@ describe("messages", () => {
     } as unknown as OrderFacts;
     const lateMoney = paymentDue(o, { label: "Balance", openMinor: 8365000, dueOn: "2026-12-05" }, 4);
     expect(lateMoney).toMatchObject({ tag: "Payment late", urgent: true, subject: "Late: Lagos Water has not paid USD 83,650 (balance, SO-2026-0412)", link: "/orders/o1/payment" });
-    expect(lateMoney.sentence).toBe("The balance of SO-2026-0412 was due on 5 Dec 2026. It is 4 days late.");
-    expect(paymentDue(o, { label: "Balance", openMinor: 8365000, dueOn: "2026-12-05" }, null).subject).toBe("Lagos Water owes USD 83,650 (balance, SO-2026-0412) by 5 Dec 2026");
+    expect(lateMoney.sentence).toBe("The balance of SO-2026-0412 was due on 05 Dec 2026. It is 4 days late.");
+    expect(paymentDue(o, { label: "Balance", openMinor: 8365000, dueOn: "2026-12-05" }, null).subject).toBe("Lagos Water owes USD 83,650 (balance, SO-2026-0412) by 05 Dec 2026");
     const pay = factoryPayment(o, { factory: "Jiangsu Filling", contact: "Mr Wang · WeChat wang88", currency: "CNY", owed: "760000.00", paid: "0.00" }, { label: "Advance", open: "304000.00", due: "2026-11-14", lateBy: null });
     expect(pay).toMatchObject({ tag: "Pay the factory", subject: "Pay Jiangsu Filling: CNY 304,000 advance (SO-2026-0412) — due 14 Nov 2026", button: "Pay the factory", link: "/orders/o1/factory" });
     expect(pay.money).toContainEqual({ label: "Paid to the factory", value: "CNY 0 of CNY 760,000" });

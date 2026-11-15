@@ -10,6 +10,7 @@ import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel
 import { SwitchList } from "@/components/common/switch-list";
 import type { ActionState } from "@/lib/actions";
 import { BrandPreview, Control, CurrenciesControl, rateText } from "./forms";
+import { useTime } from "@/lib/time-client";
 import { SETTING_GROUPS, toFormText, type SettingCard, type SettingField, type SettingGroup } from "./groups";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -173,6 +174,7 @@ function CardForm({
   currencyLocked: string | null;
   onSaved: () => void;
 }) {
+  const time = useTime();
   const close = useClosePanel();
   return (
     <ActionForm
@@ -208,7 +210,7 @@ function CardForm({
                   errors={[...(s.errors?.currency ?? []), ...(s.errors?.exchangeRates ?? [])]}
                   locked={currencyLocked}
                   dates={(values.rateDates ?? {}) as Record<string, string>}
-                  today={new Date().toISOString().slice(0, 10)}
+                  today={time.today()}
                 />
               ) : (
                 <Control
