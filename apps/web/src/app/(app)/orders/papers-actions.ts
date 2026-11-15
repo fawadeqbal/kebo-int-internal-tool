@@ -51,9 +51,14 @@ export async function paperAction(
     }
   };
   const r = await attempt(form, call, DONE[op]);
-  if (r.ok) {
-    revalidatePath(`/orders/${orderId}`, "layout");
-    revalidatePath("/orders");
-  }
-  return r;
+  if (!r.ok) return r;
+  revalidatePath(`/orders/${orderId}`, "layout");
+  revalidatePath("/orders");
+  // Named: the paper and its number; once final, its PDF.
+  const p = r.data as { label?: string; number?: string } | undefined;
+  const name = p?.label ? `${p.label}${p.number ? ` ${p.number}` : ""}` : null;
+  if (!name || (op !== "draft" && op !== "final" && op !== "again")) return r;
+  const pdf = `/pdf/${kind}/${orderId}${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`;
+  if (op === "final") return { ...r, message: `${name} made final`, detail: "It is kept exactly as it is now", next: [{ label: "Download PDF", href: pdf }] };
+  return { ...r, message: op === "draft" ? `${name} saved as a draft` : `${name}: a new version started as a draft` };
 }

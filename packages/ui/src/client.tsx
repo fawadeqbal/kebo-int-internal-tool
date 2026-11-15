@@ -129,6 +129,8 @@ export function Toaster() {
     try {
       await t.undo();
       toast({ message: "Undone", detail: t.message });
+    } catch (e) {
+      toast({ kind: "fail", message: "Not undone", detail: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
     }

@@ -62,8 +62,17 @@ export async function saveFactoryQuoteAction(
       quoteId ? "Factory prices saved." : "Factory prices added.",
     ),
   );
-  if (r.ok) refresh(dealId);
-  return r;
+  if (!r.ok) return r;
+  refresh(dealId);
+  // Named by the factory, and what came with it.
+  const factory = String(form.get("factoryLabel") ?? "").trim();
+  const lines = Array.isArray((body as { lines?: unknown[] }).lines) ? (body as { lines: unknown[] }).lines.length : 0;
+  const currency = (body as { currency?: string }).currency;
+  return {
+    ...r,
+    message: factory ? `Offer from ${factory} ${quoteId ? "saved" : "added"}` : r.message,
+    detail: [lines ? `${lines} ${lines === 1 ? "line" : "lines"}` : null, currency].filter(Boolean).join(" · ") || undefined,
+  };
 }
 
 export async function removeFactoryQuoteAction(dealId: string, quoteId: string, _prev: ActionState, form: FormData): Promise<ActionState> {

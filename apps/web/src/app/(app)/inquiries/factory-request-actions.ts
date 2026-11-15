@@ -17,8 +17,16 @@ export async function askFactoriesAction(dealId: string, _prev: ActionState, for
     () => api.post(`/inquiries/${dealId}/factory-requests`, { factoryIds, channel: v.channel || null, sentOn: v.sentOn || null, replyBy: v.replyBy || null, note: v.note || null }),
     factoryIds.length === 1 ? "Marked as asked." : `${factoryIds.length} factories marked as asked.`,
   );
-  if (r.ok) refresh(dealId);
-  return r;
+  if (!r.ok) return r;
+  refresh(dealId);
+  // Named: who was asked, and where their prices will be.
+  const items = (r.data as { items?: { factory?: { id?: string; name?: string } }[] } | undefined)?.items ?? [];
+  const names = items.filter((i) => i.factory?.id && factoryIds.includes(i.factory.id)).map((i) => i.factory!.name!);
+  return {
+    ...r,
+    message: names.length === 1 ? `Asked ${names[0]} for a price` : `Asked ${factoryIds.length} factories for prices`,
+    detail: names.length > 1 ? `${names.slice(0, 3).join(", ")}${names.length > 3 ? ` and ${names.length - 3} more` : ""} · their prices go on Factory offers` : "Their price goes on Factory offers",
+  };
 }
 
 /** status (declined | no_reply | sent) */

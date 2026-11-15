@@ -8,4 +8,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/customers",
 }));
 
+// Server actions ("use server" files) are plain modules in a component test: their server-only guard stays quiet.
+vi.mock("server-only", () => ({}));
+
 afterEach(() => cleanup());

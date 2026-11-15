@@ -85,6 +85,14 @@ export class InquiriesController {
     return this.inquiries.update(user, id, body);
   }
 
+  /** The note's Undo after "Mark as lost": whoever marked it, within two minutes, nothing moved since. */
+  @SignedIn("checked inside: whoever marked it lost, on an inquiry they may work on")
+  @Post(":id/undo-lost")
+  @HttpCode(200)
+  undoLost(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.inquiries.undoLost(user, id);
+  }
+
   /** { to, lostReason?, note? } — mark lost, start working, or reopen. */
   @SignedIn("checked inside: inquiries.assign, inquiries.create, inquiries.reopen, quotations.manage, sourcing.manage")
   @Post(":id/stage")

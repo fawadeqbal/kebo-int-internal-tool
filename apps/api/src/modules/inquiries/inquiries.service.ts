@@ -472,6 +472,23 @@ export class InquiriesService {
 
   /* ---------------------------------------------------------------- stage, hold, assignment, notes */
 
+  /** The note's Undo after "Mark as lost": back to the stage it had (see StagesService.undoLost). */
+  async undoLost(user: SessionUser, id: string) {
+    const event = await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from inquiries where id = ${id}::uuid for update`;
+      const i = await this.findWorkable(user, id, tx);
+      const { event, since } = await this.stages.undoLost(tx, i, user.id, this.clock.now());
+      // The system's own follow-ups that "Mark as lost" ended are open again, as they were.
+      await tx.followUp.updateMany({
+        where: { inquiryId: id, auto: { not: null }, doneNote: "Inquiry lost", doneAt: { gte: since } },
+        data: { doneAt: null, doneById: null, doneNote: null },
+      });
+      return event;
+    });
+    await this.events.publish(event);
+    return this.get(user, id);
+  }
+
   async move(user: SessionUser, id: string, input: StageMoveInput) {
     const event = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from inquiries where id = ${id}::uuid for update`;
