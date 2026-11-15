@@ -5,10 +5,9 @@ import { useState } from "react";
 import type { PaymentRoute } from "@kebo/shared";
 import { Alert } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
-import type { OrderMoney } from "@/lib/types-money";
 import type { BankContract } from "@/lib/types-flow";
 import { BankContractForm, RouteForm, type RouteTermsValue } from "@/components/orders/flow-forms";
-import { EditCustomerPayment, PaymentPlan, VoidForm } from "@/components/money/forms";
+import { EditCustomerPayment, VoidForm } from "@/components/money/forms";
 import { AttachedFile } from "@/components/money/attachment";
 import { ReceivedFields } from "@/components/money/money-v2";
 import { FormWindow } from "./form-window";
@@ -42,14 +41,6 @@ export function ContractWindow({ sub, action, contract, lc, currency, orderId, c
 }
 
 /** "Payment plan": the parts the customer pays, which must add up to the order's total. */
-export function PlanWindow({ sub, action, plan, currency, total, terms }: { sub: string; action: Action; plan: OrderMoney["plan"]; currency: string; total: string; terms: string }) {
-  return (
-    <FormWindow button={{ label: "Edit plan", kind: "plain" }} title="Payment plan" sub={sub} size="lg">
-      {(close) => <PaymentPlan plan={plan} currency={currency} total={total} terms={terms} action={action} buttonOnly startOpen onDone={close} />}
-    </FormWindow>
-  );
-}
-
 /** "Record a payment": money received from the customer on this order, with its bank slip. */
 export function RecordPaymentWindow({
   main,

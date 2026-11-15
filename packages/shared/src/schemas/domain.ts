@@ -633,6 +633,8 @@ export const factoryPlanInput = z.object({
         amount: amount(),
         dueRule: z.enum(FACTORY_DUE_RULES),
         dueOn: optionalDate,
+        /** on_ship_plus_days: how many days after the goods leave. */
+        dueDays: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number().int().min(0).max(3650).optional()),
         /** The supplier's own invoice number for this part, if they sent one. */
         supplierRef: optionalText(60),
       }),

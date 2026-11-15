@@ -75,7 +75,10 @@ export function ActionForm({
   id,
   banner,
   fieldId,
+  beforeSend,
 }: {
+  /** Checked as the form is sent (a button or Ctrl+Enter): false keeps it here unsent; the form shows why itself. */
+  beforeSend?: () => boolean;
   /** Where a field the server names is, when its name is not its field's (a contact's name in a list): its id. */
   fieldId?: (key: string) => string | null | undefined;
   /** Draws the form's own message instead of the usual one (return null to show nothing). */
@@ -241,6 +244,10 @@ export function ActionForm({
       noValidate
       onReset={keepFields ? (e) => e.preventDefault() : undefined}
       onSubmit={(e) => {
+        if (beforeSend && !beforeSend()) {
+          e.preventDefault();
+          return;
+        }
         const field = e.currentTarget.elements.namedItem(ONCE_FIELD);
         if (field instanceof HTMLInputElement) field.value = onceKey.current ??= newOnceKey();
       }}

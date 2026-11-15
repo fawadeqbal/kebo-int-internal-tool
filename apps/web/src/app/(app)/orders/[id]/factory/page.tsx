@@ -14,7 +14,7 @@ import { ChangeFactoryPaymentWindow, FactoryOrderWindow, PayFactoryWindow } from
 import { SendForm, type PurchaseOrderView } from "@/components/orders/purchase-order-card";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { PanelButton } from "@/components/orders/step-view";
-import { FactoryPlanForm } from "@/components/money/money-v2";
+import { SupplierPlanWindow } from "@/components/money/plan-editor";
 import { CustomerMoneyLine, howWePay, SupplierPlanTable, supplierPlanWords } from "@/components/order-sections/supplier-plan";
 import { PaymentsList } from "@/components/order-sections/payments-list";
 import { ROW_LINK } from "@/components/order-sections/section-window";
@@ -101,14 +101,12 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   const editPlan = (plan: (typeof plans)[number], label: string) =>
     m.factories?.canPlan &&
     d.open && (
-      <PanelButton
-        size="sm"
-        className={SMALL}
+      <SupplierPlanWindow
         label={label}
-        title={`What we pay ${plan.factory.name}`}
-        description={`${o.refNo} · agreed once per factory on the order`}
-        panelClassName="md:w-[640px]"
-        body={<FactoryPlanForm plan={plan} action={factoryPlanAction.bind(null, o.id)} />}
+        sub={`${o.refNo} · ${plan.factory.name} · ${money(plan.owed, plan.currency)}`}
+        action={factoryPlanAction.bind(null, o.id)}
+        plan={plan}
+        orderedOn={orderedOn}
       />
     );
   const customerLine = m.factories && (

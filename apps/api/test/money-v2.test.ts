@@ -355,6 +355,15 @@ describe("money v2", () => {
     expect(m.factories.plans[0].rows[1]).toMatchObject({ label: "Balance 50%", due: day(10), dueRule: "fixed" });
     expect(m.factories.plans[0].rows[0]).toMatchObject({ status: "due", paid: "30000.00", open: "20000.00" });
     expect(m.factories.plans[0].rows[0].payments).toEqual([{ id: advance, amount: "30000.00" }]);
+    // Three parts, the last some days after the goods leave: no date until they have.
+    const three = [
+      { label: "Advance 30%", percent: 30, amount: 30000, dueRule: "on_order" },
+      { label: "Before shipping 40%", percent: 40, amount: 40000, dueRule: "on_ready" },
+      { label: "After arrival 30%", percent: 30, amount: 30000, dueRule: "on_ship_plus_days", dueDays: 45, supplierRef: "INV-77" },
+    ];
+    m = (await api(app, sana).put(`/orders/${id}/factory-plan`, { factoryId, items: three }).expect(200)).body;
+    expect(m.factories.plans[0].rows[2]).toMatchObject({ dueRule: "on_ship_plus_days", dueDays: 45, due: null, status: "later", supplierRef: "INV-77" });
+    expect(m.factories.plans[0].rows[0]).toMatchObject({ status: "paid", dueDays: null });
   });
 
   it("cancels with money in: credit, refund or a fee; the factory's money a refund or a loss", async () => {

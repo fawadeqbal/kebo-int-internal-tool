@@ -5,7 +5,8 @@ import { date, money } from "@/lib/format";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
-import { ChangePaymentWindow, ContractWindow, PlanWindow, RecordPaymentWindow, RouteWindow } from "@/components/order-sections/payment-windows";
+import { ChangePaymentWindow, ContractWindow, RecordPaymentWindow, RouteWindow } from "@/components/order-sections/payment-windows";
+import { CustomerPlanWindow } from "@/components/money/plan-editor";
 import { PaymentPlanTable } from "@/components/order-sections/payment-plan";
 import { PaymentsList } from "@/components/order-sections/payments-list";
 import { ROW_LINK } from "@/components/order-sections/section-window";
@@ -136,7 +137,10 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
         title="Payment plan"
         state={paid ? "Paid in full" : `${money(p.due, c)} to come`}
         tone={paid ? "ok" : "warn"}
-        actions={m.plan.canEdit && d.open && <PlanWindow sub={sub} action={savePlanAction.bind(null, o.id)} plan={m.plan} currency={c} total={m.total} terms={m.terms} />}
+        actions={
+          m.plan.canEdit &&
+          d.open && <CustomerPlanWindow sub={sub} action={savePlanAction.bind(null, o.id)} plan={m.plan} currency={c} total={m.total} customer={o.customer.name} today={now} />
+        }
       >
         <div className="flex flex-col gap-3 pb-3.5">
           {!m.plan.matchesTotal && (

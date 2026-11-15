@@ -640,6 +640,8 @@ export interface FactoryPlanView {
     amount: string;
     dueRule: FactoryDueRule;
     dueOn: string | null;
+    /** on_ship_plus_days: how many days after the goods leave. */
+    dueDays: number | null;
     due: string | null;
     paid: string;
     open: string;
