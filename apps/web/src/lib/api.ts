@@ -92,7 +92,9 @@ export const api = {
   /** `once`: the form's one-time key (lib/once.ts); the API does a money save once per key. */
   post: async <T>(path: string, body?: unknown, opts?: { once?: string }) =>
     parse<T>(await apiFetch(path, { method: "POST", body: JSON.stringify(body ?? {}), headers: opts?.once ? { [ONCE_HEADER]: opts.once } : undefined })),
-  put: async <T>(path: string, body?: unknown) => parse<T>(await apiFetch(path, { method: "PUT", body: JSON.stringify(body ?? {}) })),
+  /** `version`: the record's updatedAt when the form was opened; a save over someone else's change is refused (409 "stale"). */
+  put: async <T>(path: string, body?: unknown, opts?: { version?: string | null }) =>
+    parse<T>(await apiFetch(path, { method: "PUT", body: JSON.stringify(body ?? {}), headers: opts?.version ? { "If-Match": opts.version } : undefined })),
   patch: async <T>(path: string, body?: unknown) => parse<T>(await apiFetch(path, { method: "PATCH", body: JSON.stringify(body ?? {}) })),
   delete: async <T>(path: string) => parse<T>(await apiFetch(path, { method: "DELETE" })),
   /** Multipart upload (files). */

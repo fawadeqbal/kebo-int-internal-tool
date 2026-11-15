@@ -344,7 +344,7 @@ export default async function CustomerOverview({
         </aside>
       </div>
       {editing && settings && (
-        <CustomerPanel action={saveCustomerAction.bind(null, c.id)} customer={c} currencies={currenciesFrom(settings)} onRecord />
+        <CustomerPanel action={saveCustomerAction.bind(null, c.id, c.updatedAt)} customer={c} currencies={currenciesFrom(settings)} onRecord />
       )}
     </div>
   );

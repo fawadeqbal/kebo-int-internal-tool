@@ -256,7 +256,7 @@ export default async function FactoryOverview({
           </Card>
         </aside>
       </div>
-      {editing && <FactoryPanel action={saveFactoryAction.bind(null, f.id)} factory={f} people={people} meId={me.id} onRecord />}
+      {editing && <FactoryPanel action={saveFactoryAction.bind(null, f.id, f.updatedAt)} factory={f} people={people} meId={me.id} onRecord />}
     </div>
   );
 }

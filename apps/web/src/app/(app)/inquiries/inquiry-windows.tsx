@@ -55,7 +55,7 @@ export async function EditRequestWindow({ d }: { d: DealDetail }) {
       mode="edit"
       refNo={d.refNo}
       customerName={d.customer.name}
-      action={saveRequestAction.bind(null, d.id)}
+      action={saveRequestAction.bind(null, d.id, d.updatedAt)}
       initial={{
         customer: { id: d.customer.id, name: d.customer.name, country: d.customer.country, primaryContact: primary && { id: primary.id, name: primary.name } },
         contactId: d.contactId ?? "",

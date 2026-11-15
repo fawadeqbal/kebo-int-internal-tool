@@ -7,10 +7,11 @@ import type { ImportResult, FactoryInput } from "@kebo/shared";
 import { attempt, formValues, type ActionState } from "@/lib/actions";
 
 /** Create or edit a factory (in the side panel): answers with its id and name, and the page updates in place. */
-export async function saveFactoryAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+/** `version`: the supplier's updatedAt when the form opened (a save over someone else's change is refused). */
+export async function saveFactoryAction(id: string | null, version: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = formValues(form);
   const r = await attempt(form, () =>
-    id ? api.put<{ id: string }>(`/factories/${id}`, body) : api.post<{ id: string }>("/factories", body),
+    id ? api.put<{ id: string }>(`/factories/${id}`, body, { version }) : api.post<{ id: string }>("/factories", body),
   );
   if (!r.ok) return r;
   const savedId = id ?? (r.data as { id: string }).id;

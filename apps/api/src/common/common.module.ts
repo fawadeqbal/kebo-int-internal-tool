@@ -5,10 +5,11 @@ import { Clock } from "./time/clock.service";
 import { ReadCache } from "./cache/read-cache";
 import { CompanyMail } from "./notify/company-mail";
 import { OnceInterceptor } from "./http/once";
+import { VersionInterceptor } from "./http/version";
 
 @Global()
 @Module({
-  providers: [AuditService, Clock, ReadCache, CompanyMail, { provide: APP_INTERCEPTOR, useClass: OnceInterceptor }],
+  providers: [AuditService, Clock, ReadCache, CompanyMail, { provide: APP_INTERCEPTOR, useClass: OnceInterceptor }, { provide: APP_INTERCEPTOR, useClass: VersionInterceptor }],
   exports: [AuditService, Clock, ReadCache, CompanyMail],
 })
 export class CommonModule {}

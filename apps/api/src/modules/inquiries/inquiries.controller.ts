@@ -47,6 +47,7 @@ import { CompaniesService } from "../../common/company/companies.service";
 import { InquiriesService } from "./inquiries.service";
 import { normalizeFields, websiteInquiry, WebsiteService } from "./website.service";
 import { NotesService } from "../notes/notes.service";
+import { Versioned } from "../../common/http/version";
 
 const MAX_UPLOAD = 200 * 1024 * 1024; // hard ceiling; the configured limit is checked in the service
 
@@ -78,6 +79,7 @@ export class InquiriesController {
   }
 
   @SignedIn("checked inside: the record and who they are")
+  @Versioned("inquiries")
   @Put(":id")
   update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(inquiryInput)) body: InquiryInput) {
     return this.inquiries.update(user, id, body);

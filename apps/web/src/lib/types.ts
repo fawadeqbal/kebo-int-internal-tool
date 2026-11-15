@@ -86,6 +86,8 @@ export interface Paged<T> {
 export interface DealDetail {
   id: string;
   refNo: string;
+  /** When it last changed: sent back with a save, so one over someone else's change is refused. */
+  updatedAt: string;
   title: string;
   category: string;
   channel: InquiryChannel;

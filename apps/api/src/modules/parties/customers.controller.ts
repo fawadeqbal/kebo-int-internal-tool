@@ -6,6 +6,7 @@ import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions, RequireFeature, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { CustomersService } from "./customers.service";
+import { Versioned } from "../../common/http/version";
 
 const blank = (v: unknown) => (v === "" ? undefined : v);
 const customerList = listQuery.extend({
@@ -69,6 +70,7 @@ export class CustomersController {
     return this.customers.importMany(user, body);
   }
 
+  @Versioned("parties")
   @Put(":id")
   @RequirePermissions("customers.manage")
   update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(customerInput)) body: CustomerInput) {
