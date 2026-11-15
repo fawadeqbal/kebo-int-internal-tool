@@ -19,6 +19,7 @@ import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/dec
 import type { SessionUser } from "../../common/auth/session-user";
 import { CustomerPaymentsService } from "./customer-payments.service";
 import { Once } from "../../common/http/once";
+import { Versioned } from "../../common/http/version";
 
 /** Money in from a customer on an order (the routes stay under /orders/:id). */
 @ApiTags("treasury")
@@ -69,6 +70,7 @@ class CustomerPaymentsController {
   /** The payment's fields plus { reason } (always asked): a recorded payment changed. */
   @SignedIn("checked inside: payments.record")
   @Patch(":id")
+  @Versioned("payments")
   edit(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(editPaymentInput)) body: EditPaymentInput) {
     return this.payments.edit(user, id, body);
   }

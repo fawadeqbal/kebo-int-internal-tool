@@ -145,6 +145,8 @@ export interface FactoryPaymentView {
   recordedAt: string;
   /** Set when it was changed after it was recorded. */
   changedAt: string | null;
+  /** When it last changed: its Change sends it back, so a change never overwrites someone else's. */
+  updatedAt: string;
   /** Paid to that factory so far and still to pay, once it counted (null when removed). */
   after: { paid: string; toPay: string } | null;
   kind: PaymentKind;
@@ -198,6 +200,8 @@ export interface ExpenseView {
   repeats: boolean;
   repeatKey: string | null;
   repaid: { on: string; account: { id: string; name: string } | null } | null;
+  /** When it last changed: Change sends it back, so a change never overwrites someone else's. */
+  updatedAt: string;
   voided: { at: string; reason: string | null } | null;
 }
 
@@ -228,6 +232,7 @@ export interface CostExpense {
   receipt: AttachedFileInfo | null;
   recordedBy: Person | null;
   recordedAt: string;
+  updatedAt: string;
   voided: { at: string; reason: string | null } | null;
 }
 

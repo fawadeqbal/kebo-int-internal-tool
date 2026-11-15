@@ -104,6 +104,8 @@ function partView(a: PartRow) {
     note: a.later ? (a.note ?? "Paid from the customer's credit") : m.note,
     account: a.later ? null : m.account,
     file: a.later ? null : fileView(fileOf(m.files)),
+    /** When its entry last changed: a change sends it back (If-Match), so it never overwrites someone else's. */
+    updatedAt: m.updatedAt,
   };
 }
 

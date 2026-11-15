@@ -12,9 +12,12 @@ import { PrismaService } from "../../database/prisma.service";
  * changed it and when, instead of quietly overwriting their work. Without the header, a save works as before.
  */
 export const VERSIONED = "kebo:versioned";
-const TABLES = ["parties", "inquiries", "orders", "expenses", "money_movements"] as const;
+const TABLES = ["parties", "inquiries", "orders", "expenses", "money_movements", "payments"] as const;
 type Table = (typeof TABLES)[number];
-/** The record is the row of `table` whose id is the route's `:id`. */
+/**
+ * The record is the row of `table` whose id is the route's `:id`. "payments": a payment on an order, by its part
+ * (allocations) or its entry (money_movements): the version is its entry's, where its money facts are kept.
+ */
 export const Versioned = (table: Table) => SetMetadata(VERSIONED, table);
 
 @Injectable()
@@ -34,7 +37,13 @@ export class VersionInterceptor implements NestInterceptor {
 
   private async check(table: Table, id: string, seen: string) {
     if (!/^[0-9a-f-]{36}$/i.test(id)) return;
-    const [row] = await this.prisma.db.$queryRaw<{ updated_at: Date }[]>`select updated_at from ${Prisma.raw(`"${table}"`)} where id = ${id}::uuid`;
+    const [row] =
+      table === "payments"
+        ? await this.prisma.db.$queryRaw<{ updated_at: Date }[]>`
+            select m.updated_at from money_movements m
+            where m.id = ${id}::uuid or m.id = (select a.movement_id from allocations a where a.id = ${id}::uuid)
+            limit 1`
+        : await this.prisma.db.$queryRaw<{ updated_at: Date }[]>`select updated_at from ${Prisma.raw(`"${table}"`)} where id = ${id}::uuid`;
     if (!row || Math.abs(row.updated_at.getTime() - Date.parse(seen)) < 1) return;
     const [who] = await this.prisma.db.$queryRaw<{ name: string | null }[]>`
       select u.name from audit_logs a left join users u on u.id = a.user_id where a.entity_id = ${id}::uuid order by a.created_at desc limit 1`;

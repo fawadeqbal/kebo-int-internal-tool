@@ -225,7 +225,7 @@ async function recordTools(me: Me, p: PaymentView): Promise<{ change: ReactNode;
       change:
         records && !x.receiptId ? (
           <EditCustomerPayment
-            action={editPaymentAction.bind(null, p.orderId, x.id, o.currency)}
+            action={editPaymentAction.bind(null, p.orderId, x.id, o.currency, x.updatedAt)}
             payment={x}
             currency={o.currency}
             today={today}
@@ -251,7 +251,7 @@ async function recordTools(me: Me, p: PaymentView): Promise<{ change: ReactNode;
     return {
       change: f.canRecord ? (
         <EditFactoryPayment
-          action={factoryPaymentAction.bind(null, m.orderId, x.id)}
+          action={factoryPaymentAction.bind(null, m.orderId, x.id, x.updatedAt)}
           factories={f.rows}
           people={people}
           orderCurrency={m.currency}

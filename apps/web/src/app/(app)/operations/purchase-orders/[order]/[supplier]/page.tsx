@@ -72,7 +72,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         label={label}
         main={main}
         sub={`${po.number} · ${po.supplier.name}`}
-        action={factoryPaymentAction.bind(null, o.id, null)}
+        action={factoryPaymentAction.bind(null, o.id, null, null)}
         factories={owing}
         people={people ?? []}
         orderCurrency={o.currency}

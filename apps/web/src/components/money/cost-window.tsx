@@ -82,7 +82,7 @@ export interface CostSetup {
 /** A cost being changed, or copied ("Add again"): the order's view and the general one both carry these. */
 export type CostToChange = Pick<
   ExpenseView,
-  "id" | "category" | "description" | "amount" | "currency" | "rate" | "spentOn" | "paidBy" | "reference" | "note" | "receipt" | "borneBy" | "ownMoney" | "payLater" | "payee" | "repaid" | "factory" | "account"
+  "id" | "category" | "description" | "amount" | "currency" | "rate" | "spentOn" | "paidBy" | "reference" | "note" | "receipt" | "borneBy" | "ownMoney" | "payLater" | "payee" | "repaid" | "factory" | "account" | "updatedAt"
 > & { repeats?: boolean };
 
 /** A month of a cost that comes every month, to confirm with what was paid. */
@@ -315,7 +315,7 @@ export function CostForm({
   })();
   const asksFactory = !send && (bearer === "factory" || VISITS.includes(category) || !!from?.factory) && (factories.length > 0 || bearer === "factory");
 
-  const base = send ? submitCostAction : expenseAction.bind(null, null, expense?.id ?? null);
+  const base = send ? submitCostAction : expenseAction.bind(null, null, expense?.id ?? null, expense?.updatedAt ?? null);
   const save = useSaveThenSend(
     base,
     file,

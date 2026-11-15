@@ -334,6 +334,8 @@ export class MoneyService {
               recordedAt: p.createdAt,
               /** Set when it was changed after it was recorded. */
               changedAt: p.updatedAt.getTime() - p.createdAt.getTime() > 2000 ? p.updatedAt : null,
+              /** When its entry last changed: a change sends it back (If-Match), so it never overwrites someone else's. */
+              updatedAt: p.updatedAt,
               /** Paid to this factory so far and still to pay (in this currency) once this payment counted. */
               after: factoryAfter.get(p.id) ?? null,
               kind: p.kind,
@@ -445,6 +447,8 @@ export class MoneyService {
       /** When what was owed (own money, or a bill) was paid, and from which account. */
       repaid: e.repaidOn ? { on: fromDbDate(e.repaidOn), account: e.repaidAccount ?? null } : null,
       recordedAt: e.createdAt,
+      /** When it last changed: a change sends it back (If-Match), so it never overwrites someone else's. */
+      updatedAt: e.updatedAt,
       voided: e.voidedAt ? { at: e.voidedAt, reason: e.voidReason } : null,
     };
   }
