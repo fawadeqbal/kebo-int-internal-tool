@@ -118,6 +118,24 @@ export function rootOf(up: string, path: string): string | undefined {
   return next ? `${upPath}/${next}` : undefined;
 }
 
+/**
+ * Where a record was opened from, to remember as its way back: the page before it, when that page is outside the
+ * record. Not when the record was come back to (Back or Forward: its way back stays as it was), and not when it
+ * would make a loop: the page before was itself opened, directly or further back, from this record (an order
+ * opened from its inquiry, and the inquiry opened again from the order, would each go back to the other forever).
+ */
+export function openedFrom(m: NavMemory, root: string | undefined, before: Place | undefined, cameBack: boolean): Place | null {
+  if (!root || !before || cameBack) return null;
+  const was = pathOf(before.url);
+  if (was === root || was.startsWith(`${root}/`)) return null;
+  const seen = new Set<string>();
+  for (let r = before.root; r && !seen.has(r); r = m.from[r]?.root) {
+    if (r === root) return null;
+    seen.add(r);
+  }
+  return before;
+}
+
 /** Where Back goes from a page: where its record was opened from, else up to its list as it was left. */
 export function backTarget(m: NavMemory | null, up: string, label: string, root?: string): { href: string; label: string } {
   const from = root ? m?.from[root] : undefined;
@@ -307,10 +325,10 @@ export function NavMemoryKeeper() {
       writeNav((m) => {
         if (m.now?.url !== url) return;
         m.now = { url, label: here?.label ?? document.title, root: here?.root };
-        // A record opened from outside itself remembers where from (a tab of the same record does not).
-        const before = m.before;
-        const root = here?.root;
-        if (root && before && pathOf(before.url) !== root && !pathOf(before.url).startsWith(`${root}/`)) m.from[root] = before;
+        // A record opened from outside itself remembers where from (a tab of the same record does not; coming
+        // back to it keeps what it had, and a loop is never made).
+        const from = openedFrom(m, here?.root, m.before, !!restore);
+        if (from && here?.root) m.from[here.root] = from;
       });
       let jumped = false;
       if (restore) {

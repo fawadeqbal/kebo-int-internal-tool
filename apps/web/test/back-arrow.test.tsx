@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
 
 const { PageHeader } = await import("@kebo/ui");
 const { placeOf, readNav, writeNav } = await import("@kebo/ui/client");
-const { backTarget, rootOf } = await import("../../../packages/ui/src/back");
+const { backTarget, openedFrom, rootOf } = await import("../../../packages/ui/src/back");
 
 beforeEach(() => {
   window.sessionStorage.clear();
@@ -44,6 +44,37 @@ describe("where Back goes", () => {
     // A tab of the same record is not where it came from.
     const fromTab = { ...kept, from: { "/orders/abc": { url: "/orders/abc/payment", label: "SO-1" } } };
     expect(backTarget(fromTab, "/orders", "Orders", "/orders/abc").href).toBe("/orders?q=valve&stage=open");
+  });
+});
+
+describe("never a loop", () => {
+  const list = { url: "/orders?stage=open", label: "Orders" };
+  const order = { url: "/orders/o1", label: "SO-1", root: "/orders/o1" };
+  const inquiry = { url: "/inquiries/i1", label: "RFQ-1", root: "/inquiries/i1" };
+
+  it("remembers where a record was opened from, but not a tab of itself", () => {
+    const m = { lists: {}, scroll: {}, opened: {}, from: {} };
+    expect(openedFrom(m, "/orders/o1", list, false)).toEqual(list);
+    expect(openedFrom(m, "/orders/o1", { url: "/orders/o1/payment", label: "SO-1", root: "/orders/o1" }, false)).toBeNull();
+  });
+
+  it("keeps a record's way back when it is come back to", () => {
+    // The order was opened from its list; its inquiry from the order. Back from the inquiry to the order: the
+    // order still goes back to its list, not to the inquiry (they would go back to each other forever).
+    const m = { lists: {}, scroll: {}, opened: {}, from: { "/orders/o1": list, "/inquiries/i1": order } };
+    expect(openedFrom(m, "/orders/o1", inquiry, true)).toBeNull();
+  });
+
+  it("does not make a loop going forward either: the inquiry opened again from its order", () => {
+    // List → inquiry → its order → the inquiry again by the link on the order: the inquiry keeps its own way back.
+    const m = { lists: {}, scroll: {}, opened: {}, from: { "/inquiries/i1": { url: "/inquiries?stage=won", label: "Inquiries" }, "/orders/o1": inquiry } };
+    expect(openedFrom(m, "/inquiries/i1", order, false)).toBeNull();
+    // A longer ring: a customer → its inquiry → its order → the customer again.
+    const customer = { url: "/customers/c1", label: "Kabul", root: "/customers/c1" };
+    const ring = { lists: {}, scroll: {}, opened: {}, from: { "/inquiries/i1": customer, "/orders/o1": inquiry } };
+    expect(openedFrom(ring, "/customers/c1", order, false)).toBeNull();
+    // Opened from somewhere new: remembered.
+    expect(openedFrom(ring, "/customers/c1", { url: "/dashboard", label: "Home" }, false)).toEqual({ url: "/dashboard", label: "Home" });
   });
 });
 
