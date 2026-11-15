@@ -110,3 +110,47 @@ test("a list's search: typing on while it looks loses no letter, and it looks on
   await expect(box).toBeFocused();
   expect(errors).toEqual([]);
 });
+
+test("Back: ← beside a record's title returns to its list as it was left, the row lit; tabs do not pile up", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/inquiries?stage=all");
+  const row = page.locator("tr[data-href]").nth(5);
+  const href = (await row.getAttribute("data-href"))!;
+  await row.locator("a").first().click();
+  await expect(page).toHaveURL((u) => u.pathname === href);
+  // ← says where it goes, with the list's filter kept.
+  const back = page.getByRole("link", { name: "Back to Inquiries" });
+  await expect(back).toBeVisible();
+  await expect(back).toHaveAttribute("href", "/inquiries?stage=all");
+  // Looking at tabs is not a step back: from History, ← and the browser's Back both go to the list.
+  await page.getByRole("navigation", { name: "Inquiry" }).getByRole("link", { name: "History" }).click();
+  await expect(page).toHaveURL((u) => u.pathname === `${href}/history`);
+  await back.click();
+  await expect(page).toHaveURL((u) => u.pathname === "/inquiries" && u.search === "?stage=all");
+  await expect(page.locator(`tr[data-href="${href}"]`)).toHaveClass(/animate-flash/);
+  await page.locator(`tr[data-href="${href}"] a`).first().click();
+  await page.getByRole("navigation", { name: "Inquiry" }).getByRole("link", { name: "Quotations" }).click();
+  await expect(page).toHaveURL((u) => u.pathname === `${href}/quotation`);
+  await page.goBack();
+  await expect(page).toHaveURL((u) => u.pathname === "/inquiries" && u.search === "?stage=all");
+  expect(errors).toEqual([]);
+});
+
+test("Back on a phone: a record's top bar is ← and its number; the bottom bar stays", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/inquiries");
+  const row = page.locator("main ul > li > a[href^='/inquiries/']").first();
+  const href = (await row.getAttribute("href"))!;
+  await row.click();
+  await expect(page).toHaveURL((u) => u.pathname === href);
+  const bar = page.locator("[data-record-bar]");
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText(/RFQ-\d{4}-\d{4}/);
+  await expect(page.locator("[data-shell-top]")).toBeHidden();
+  await expect(page.getByRole("navigation", { name: "Quick" })).toBeVisible();
+  await bar.getByRole("link", { name: "Back to Inquiries" }).click();
+  await expect(page).toHaveURL((u) => u.pathname === "/inquiries");
+  await expect(page.locator("[data-shell-top]")).toBeVisible();
+  expect(errors).toEqual([]);
+});

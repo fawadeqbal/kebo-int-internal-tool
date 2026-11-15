@@ -8,7 +8,8 @@ import { cn, Pending } from "@kebo/ui";
 /**
  * A record's tabs, one look on every record (orders, inquiries, customers, suppliers): one row of names under
  * the record's header, the open one underlined in green, a short fact beside a name ("3", "R1 draft",
- * "sailed"). Each tab is its own address. On a phone the row scrolls sideways.
+ * "sailed"). Each tab is its own address (a link opens the same tab), but looking at tabs is not a step back:
+ * a tab replaces the one before in the browser's history. On a phone the row scrolls sideways.
  * (Chips are for narrowing a list; underlined tabs are for the pages of one record.)
  */
 export interface TabRowItem {
@@ -31,6 +32,8 @@ export function TabRow({ label, items, end, className = "mt-4" }: { label: strin
         <Link
           key={t.href}
           href={t.href}
+          // Tabs swap in place: Back from any tab goes to where the record was opened from, not to the tab before.
+          replace
           aria-current={t.active ? "page" : undefined}
           className="-mb-px flex h-[42px] shrink-0 items-center gap-[7px] border-b-2 border-transparent text-[13.5px] font-medium whitespace-nowrap text-text-2 hover:text-text aria-[current]:border-primary-solid aria-[current]:font-bold aria-[current]:text-text"
         >

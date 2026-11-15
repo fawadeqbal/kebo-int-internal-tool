@@ -3,9 +3,10 @@
 import Form from "next/form";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
 import { Avatar, buttonClass, cn, Kbd } from "@kebo/ui";
+import { NavMemoryKeeper } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
 import { PRODUCT_NAME } from "@/lib/product";
@@ -742,7 +743,11 @@ export function AppShell({
 
   return (
     // data-menu: lists read it to know how much width the page has (DataTable).
-    <div className="group/shell min-h-dvh md:flex" data-menu={folded ? "folded" : "open"}>
+    <div className="group/shell min-h-dvh md:flex" data-shell="" data-menu={folded ? "folded" : "open"}>
+      {/* Where you have been in this tab: Back returns to a list as you left it. */}
+      <Suspense fallback={null}>
+        <NavMemoryKeeper />
+      </Suspense>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-pop"
@@ -773,7 +778,8 @@ export function AppShell({
       )}
 
       <div className="min-w-0 flex-1">
-        <header className="no-print sticky top-0 z-30 border-b border-line bg-surface">
+        {/* On a phone a record's own top bar (← and its name) takes this one's place (globals.css). */}
+        <header data-shell-top="" className="no-print sticky top-0 z-30 border-b border-line bg-surface">
           <div className="flex h-14 items-center gap-2 px-4 sm:px-6 md:pl-3">
             <button type="button" className={cn(buttonClass("ghost", "icon"), "-ml-2 md:hidden")} onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer}>
               <MenuIcon aria-hidden />

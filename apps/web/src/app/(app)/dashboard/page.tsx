@@ -51,7 +51,8 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* Who, when, how much waits; the three things people start from here. */}
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      {/* data-page-label: Back from a page opened here says "Back to Home". */}
+      <header data-page-label="Home" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="text-[22px] leading-7 font-bold text-text">
             {hello}, {me.name.split(" ")[0]}
