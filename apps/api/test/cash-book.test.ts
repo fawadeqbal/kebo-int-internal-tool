@@ -14,19 +14,25 @@ describe("cash book", () => {
   const book = async (q: string) => (await api(app, manager).get(`/money/cash-book?from=${today}&to=${today}&${q}`).expect(200)).body;
   const balance = async (id: string) => ((await api(app, manager).get("/money/accounts").expect(200)).body as { id: string; balance: string }[]).find((a) => a.id === id)!.balance;
 
+  // A PKR account asks for PKR's rate and keeps it in Settings: put back as they were afterwards.
+  let admin = "";
+  let sales: Record<string, unknown> = {};
   beforeAll(async () => {
     app = await startApp();
     manager = await signIn(app, "manager@example.com", "Manager@12345");
     sana = await signIn(app, "sana@example.com");
+    admin = await signIn(app, "admin@example.com", "Admin@12345");
+    sales = (await api(app, admin).get("/settings").expect(200)).body.sales;
   });
 
   afterAll(async () => {
+    await api(app, admin).put("/settings/sales", { ...sales, reason: "Test: rates as they were" });
     await app?.close();
   });
 
   it("keeps accounts with an opening balance; staff cannot see the cash book", async () => {
     bank = (await api(app, manager).post("/money/accounts", { name: `Meezan USD ${tag}`, kind: "bank", currency: "USD", openingBalance: 1000, openingOn: "2026-01-01" }).expect(201)).body.id;
-    cash = (await api(app, manager).post("/money/accounts", { name: `Office cash ${tag}`, kind: "cash", currency: "PKR", openingBalance: 50000, openingOn: "2026-01-01" }).expect(201)).body.id;
+    cash = (await api(app, manager).post("/money/accounts", { name: `Office cash ${tag}`, kind: "cash", currency: "PKR", openingBalance: 50000, openingOn: "2026-01-01", rate: 280 }).expect(201)).body.id;
     await api(app, manager).post("/money/accounts", { name: `meezan usd ${tag}`, currency: "USD", openingOn: "2026-01-01" }).expect(400);
     expect(await balance(bank)).toBe("1000.00");
     await api(app, sana).get(`/money/cash-book?from=${today}&to=${today}`).expect(403);
