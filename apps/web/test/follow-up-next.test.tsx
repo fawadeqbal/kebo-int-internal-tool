@@ -3,12 +3,21 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 
 // Finishing the last open follow-up of an open inquiry: the next one is set in the same window.
 vi.mock("server-only", () => ({}));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/", useSearchParams: () => new URLSearchParams() }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 const { FollowUpDoneNext } = await import("@/components/notes/note-forms");
 
+const { addDays, todayIn } = await import("@kebo/utils");
+const { timeStyle } = await import("@/lib/format");
+
 const field = (name: string) => document.querySelector(`[name="${name}"]`) as HTMLInputElement | null;
-const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** Three days from the company's today, as the form counts it (not the test machine's day: they differ after
+ * 16:00 UTC for a company in China). */
+const threeDaysOn = () => addDays(todayIn(timeStyle().zone), 3);
 
 describe("done, and the next follow-up", () => {
   it("opens a window instead of finishing at once, with the next day and the same words filled in", () => {
@@ -19,7 +28,7 @@ describe("done, and the next follow-up", () => {
     expect(screen.getByText("Done, and the next follow-up")).toBeTruthy();
     expect(action).not.toHaveBeenCalled();
     // Three days on to start with; the day is required.
-    expect(field("nextDueOn")!.value).toBe(iso(new Date(Date.now() + 3 * 86_400_000)));
+    expect(field("nextDueOn")!.value).toBe(threeDaysOn());
     expect(field("nextDueOn")!.required).toBe(true);
     expect(field("nextTitle")!.value).toBe("Reply to the customer");
     expect(field("note")!.value).toBe("");
@@ -35,7 +44,15 @@ describe("done, and the next follow-up", () => {
       sent = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)]));
       return { ok: true };
     });
-    render(<FollowUpDoneNext action={action} title="Reply to the customer" what="Reply to the customer" inquiryHref="/inquiries/abc" as="check" />);
+    render(
+      <FollowUpDoneNext
+        action={action}
+        title="Reply to the customer"
+        what="Reply to the customer"
+        inquiryHref="/inquiries/abc"
+        as="check"
+      />,
+    );
     fireEvent.click(screen.getByRole("checkbox", { name: "Mark done: Reply to the customer" }));
     fireEvent.change(field("note")!, { target: { value: "Called, no answer" } });
     fireEvent.change(field("nextDueOn")!, { target: { value: "2030-01-15" } });
