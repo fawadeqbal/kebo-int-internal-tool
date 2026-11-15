@@ -4,9 +4,9 @@ import { Card, CardBody, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, money, TZ } from "@/lib/format";
-import type { ExpenseList, ExpenseTargets } from "@/lib/types-money";
+import type { ExpenseList } from "@/lib/types-money";
 import { ExpenseRecord } from "./expense-record";
-import { DealCostForm } from "./deal-cost-form";
+import { AddCost, type CostSetup } from "./cost-window";
 import { getSettings, getPeople } from "@/lib/loaders";
 
 /**
@@ -17,29 +17,21 @@ import { getSettings, getPeople } from "@/lib/loaders";
  */
 export async function DealExpensesCard({
   deal,
-  me,
   open,
 }: {
   deal: { id: string; refNo: string; title: string; stage: InquiryStage; customer: { id: string; name: string }; order: { id: string; refNo: string } | null };
-  me: string | null;
   open?: string;
 }) {
   const today = todayIn(TZ);
-  const [list, targets, people, settings] = await Promise.all([
-    api.get<ExpenseList>("/expenses", { inquiryId: deal.id, pageSize: 200 }),
-    api.get<ExpenseTargets>("/expenses/targets"),
-    getPeople(),
-    getSettings(),
-  ]);
+  const [list, people, settings] = await Promise.all([api.get<ExpenseList>("/expenses", { inquiryId: deal.id, pageSize: 200 }), getPeople(), getSettings()]);
   const main = list.currency;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  const choices = {
-    ...targets,
-    customers: [deal.customer],
-    deals: [{ id: deal.id, refNo: deal.refNo, title: deal.title, stage: deal.stage, customerId: deal.customer.id, customer: deal.customer.name }],
-    orders: targets.orders.filter((o) => o.dealId === deal.id),
-    customerId: deal.customer.id,
-    dealId: deal.id,
+  const setup: CostSetup = {
+    mainCurrency: settings.sales.currency,
+    fx,
+    today,
+    people,
+    for: { place: "deal", id: deal.id, customerId: deal.customer.id, label: `Inquiry ${deal.refNo}${deal.stage === "lost" ? " (lost)" : ""} · ${deal.customer.name}` },
   };
   // An order's own costs show on the order; here the ones before it.
   const rows = list.rows.filter((e) => !e.order);
@@ -48,10 +40,10 @@ export async function DealExpensesCard({
   const total = one ? live.reduce((t, e) => t + Number(e.amount), 0) : live.reduce((t, e) => t + Number(e.inMain), 0);
   const chosen = open ? rows.find((e) => e.id === open) : undefined;
   return (
-    <div className="flex flex-wrap items-start gap-4">
-      <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-4">
+    <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         <Card>
-          <CardHeader title="Spent on this inquiry" />
+          <CardHeader title="Spent on this inquiry" actions={<AddCost setup={setup} />} />
           {rows.length > 0 ? (
             <Table className="min-w-[720px]">
               <THead>
@@ -106,20 +98,12 @@ export async function DealExpensesCard({
             />
             <CardBody>
               <ul className="rounded-lg border border-line">
-                <ExpenseRecord e={chosen} mainCurrency={main} people={people} fx={fx} today={today} choices={choices} showFor={false} />
+                <ExpenseRecord e={chosen} mainCurrency={main} people={people} fx={fx} today={today} showFor={false} />
               </ul>
             </CardBody>
           </Card>
         )}
       </div>
-      <aside className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
-        <Card>
-          <CardHeader title="Add a cost" />
-          <CardBody>
-            <DealCostForm dealId={deal.id} customerId={deal.customer.id} mainCurrency={main} fx={fx} today={today} people={people} me={me} />
-          </CardBody>
-        </Card>
-      </aside>
     </div>
   );
 }

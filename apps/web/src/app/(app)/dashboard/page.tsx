@@ -12,7 +12,7 @@ import { requireUser, hasFeature } from "@/lib/session";
 import { money, TZ } from "@/lib/format";
 import type { HomeFigures, Receivables, Reminders } from "@/lib/types-insights";
 import { getSettings } from "@/lib/loaders";
-import { SendCostWindow } from "@/components/money/send-cost";
+import { SendCost as SendCostButton } from "@/components/money/cost-window";
 import { WaitingToVerify } from "@/components/money/waiting-money";
 import { CustomersOwe, InquiriesNow, MonthFigures, NeedsYou, NextWeeks, OrdersNow, SoldByMonth, StandsOut, ThinProfit } from "@/components/home/board";
 
@@ -71,12 +71,12 @@ export default async function DashboardPage() {
           )}
           {can(me, "expenses.manage") && (
             <ButtonLink href="/payments/new?kind=expense" variant="secondary">
-              Add cost
+              Add a cost
             </ButtonLink>
           )}
           {sendsCosts && (
             <Suspense>
-              <SendCost meId={me.id} today={today} />
+              <SendCost today={today} />
             </Suspense>
           )}
           {can(me, "inquiries.create") && (
@@ -98,9 +98,15 @@ export default async function DashboardPage() {
 }
 
 /** Staff's "Add a cost": their open orders to choose from, and the company's currency. */
-async function SendCost({ meId, today }: { meId: string; today: string }) {
+async function SendCost({ today }: { today: string }) {
   const [orders, settings] = await Promise.all([api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1, pageSize: 100 }).catch(() => null), getSettings()]);
-  return <SendCostWindow meId={meId} today={today} mainCurrency={settings.sales.currency} orders={(orders?.rows ?? []).map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name }))} />;
+  const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
+  return (
+    <SendCostButton
+      setup={{ mainCurrency: fx.main, fx, today, people: [], for: null }}
+      orders={(orders?.rows ?? []).map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name }))}
+    />
+  );
 }
 
 /** A card on its way, the height it will have, drawn like every skeleton (board "Loading"). */

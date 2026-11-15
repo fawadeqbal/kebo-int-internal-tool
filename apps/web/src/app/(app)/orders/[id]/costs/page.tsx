@@ -9,7 +9,7 @@ import { SectionFiles } from "@/components/order-sections/section-files";
 import { ROW_LINK } from "@/components/order-sections/section-window";
 import { PayCostWindow, RepayWindow } from "@/components/order-sections/costs-windows";
 import { orderCostsSetup } from "@/components/orders/costs-data";
-import { AddOrderExpense, EditOrderExpense } from "@/components/orders/expense-form";
+import { AddCost, ChangeCost } from "@/components/money/cost-window";
 import { CostsExcel } from "@/components/orders/costs-tables";
 import { COST_FROM, costState } from "@/components/orders/cost-words";
 import { stageData } from "../stage-data";
@@ -47,7 +47,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
         <EmptySection title="Costs" text="Only managers with expenses switched on for the company see an order’s costs and profit." />
       </OrderPage>
     );
-  const { costs, setup, money: m } = data;
+  const { costs, setup, canEdit, money: m } = data;
   const c = costs.currency;
   const sheet = costs.sheet;
   const byId = new Map(costs.expenses.map((e) => [e.id, e]));
@@ -71,14 +71,14 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
           <Link href={`${base}/factory`} className={ROW_LINK}>
             {ORDER_TAB_LABEL.factory} →
           </Link>
-        ) : r.state === "to_pay" && e && setup.canEdit ? (
+        ) : r.state === "to_pay" && e && canEdit ? (
           <PayCostWindow orderId={o.id} id={e.id} currency={r.currency} sub={[r.owedTo, r.label, money(r.amount, r.currency)].filter(Boolean).join(" · ")} today={now} from={e.spentOn} canFiles={d.canFiles} />
-        ) : r.state === "to_repay" && e && setup.canEdit ? (
+        ) : r.state === "to_repay" && e && canEdit ? (
           <RepayWindow orderId={o.id} ids={[e.id]} currency={r.currency} name={e.paidBy?.name ?? "them"} amount={money(r.amount, r.currency)} today={now} canFiles={d.canFiles} />
         ) : (
           <Badge tone={r.state === "paid" ? "ok" : r.state === "estimate" ? "neutral" : "warn"}>{costState(r)}</Badge>
         )}
-        {e && !follows && <EditOrderExpense setup={setup} expense={e} />}
+        {e && !follows && canEdit && !e.voided && <ChangeCost setup={setup} expense={e} iconOnly removeOrderId={o.id} />}
       </span>
     );
   };
@@ -108,7 +108,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
         actions={
           <>
             <CostsExcel costs={costs} />
-            <AddOrderExpense setup={setup} step={null} label="Add a cost" />
+            {canEdit && <AddCost setup={setup} />}
           </>
         }
         files={<SectionFiles orderId={o.id} section="expenses" canAdd={d.canFiles} />}

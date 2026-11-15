@@ -8,10 +8,11 @@ import { date, money } from "@/lib/format";
 import type { Fx } from "@/lib/fx";
 import type { Person } from "@/lib/types";
 import type { ExpenseView } from "@/lib/types-money";
-import { expenseAction, removeReceiptAction, voidExpenseAction } from "@/app/(app)/money/actions";
+import { removeReceiptAction, voidExpenseAction } from "@/app/(app)/money/actions";
 import { PaymentRecord } from "./payment-record";
 import { AttachedFile } from "./attachment";
-import { EditExpense, NewExpense, VoidForm, type ExpenseChoices } from "./forms";
+import { VoidForm } from "./forms";
+import { AddCost, ChangeCost, costForOf, type CostSetup, type ExpenseChoices } from "./cost-window";
 import { StopRepeating } from "./company-costs";
 
 
@@ -31,8 +32,8 @@ function Receipt({ e, canChange }: { e: ExpenseView; canChange: boolean }) {
 /**
  * One expense in a list: a line with the amount, what for and who for, that
  * opens into the full record with its receipt, and Change / Add again / Remove.
- * With `choices` (Money page, a customer's page) its customer or order can be
- * changed; on an order's page it stays on that order.
+ * Change opens the one cost window; `choices` limits what it can be moved to
+ * (a customer's page: only theirs).
  */
 export function ExpenseRecord({
   e,
@@ -55,7 +56,7 @@ export function ExpenseRecord({
   canChange?: boolean;
 }) {
   const removed = Boolean(e.voided);
-  const orderId = choices ? null : e.orderId;
+  const setup: CostSetup = { mainCurrency, fx, today, people, for: costForOf(e), choices };
   return (
     <PaymentRecord
       removed={removed}
@@ -148,17 +149,8 @@ export function ExpenseRecord({
       actions={
         canChange && !removed ? (
           <>
-            <EditExpense action={expenseAction.bind(null, orderId, e.id)} people={people} mainCurrency={mainCurrency} fx={fx} today={today} expense={e} choices={choices} />
-            <NewExpense
-              action={expenseAction.bind(null, orderId, null)}
-              people={people}
-              mainCurrency={mainCurrency}
-              fx={fx}
-              today={today}
-              template={e}
-              choices={choices}
-              label="Add again"
-            />
+            <ChangeCost setup={setup} expense={e} removeOrderId={e.orderId} />
+            <AddCost setup={setup} template={{ ...e, for: setup.for ?? undefined }} label="Add again" variant="ghost" size="xs" icon="copy" />
             {e.repeats && e.repeatKey && <StopRepeating repeatKey={e.repeatKey} />}
             <VoidForm action={voidExpenseAction.bind(null, e.orderId, e.id)} label="the expense" />
           </>

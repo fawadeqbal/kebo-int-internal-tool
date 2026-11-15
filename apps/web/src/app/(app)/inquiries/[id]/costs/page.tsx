@@ -12,7 +12,7 @@ export const metadata = { title: "Inquiry costs" };
 export default async function DealCosts({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cost?: string }> }) {
   const { id } = await params;
   const { cost } = await searchParams;
-  const me = await requirePermission("expenses.manage");
+  await requirePermission("expenses.manage");
   if (!(await hasFeature("expenses"))) return <PlanOff title="Costs" what="Expenses" />;
   const d = await api.get<DealDetail>(`/inquiries/${id}`);
   const order = d.orders.find((o) => o.status !== "cancelled") ?? null;
@@ -21,7 +21,6 @@ export default async function DealCosts({ params, searchParams }: { params: Prom
       <CustomerHistoryNote customerId={d.customer.id} dealId={d.id} />
       <DealExpensesCard
         deal={{ id: d.id, refNo: d.refNo, title: d.title, stage: d.stage, customer: { id: d.customer.id, name: d.customer.name }, order: order && { id: order.id, refNo: order.refNo } }}
-        me={me.id}
         open={cost}
       />
     </WithSide>

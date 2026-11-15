@@ -94,7 +94,7 @@ export default async function AppLayout({ children, window: win }: { children: R
           </p>
         )}
         <FeaturesProvider features={company?.features ?? null}>
-          <AccountsProvider accounts={accounts} me={me.name} canAdd={has("expenses.manage") && feature("cash_book")}>
+          <AccountsProvider accounts={accounts} me={me.name} meId={me.id} canAdd={has("expenses.manage") && feature("cash_book")}>
             {children}
             {win}
           </AccountsProvider>

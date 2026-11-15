@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { todayIn } from "@kebo/utils";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import { TZ } from "@/lib/format";
+import type { ExpenseTargets } from "@/lib/types-money";
 
 /** Money changes show on the order, the customer and the Money page. */
 const refresh = (orderId?: string | null, customerId?: string | null) => {
@@ -163,6 +164,15 @@ export async function expenseAction(
     if (saved?.deal) revalidatePath(`/inquiries/${saved.deal.id}`, "layout");
   }
   return r;
+}
+
+/** What a cost can be for (customers, inquiries, orders) and the factories one visits: the cost window loads it when it opens. Null when this person may not see them. */
+export async function costChoicesAction(): Promise<ExpenseTargets | null> {
+  try {
+    return await api.get<ExpenseTargets>("/expenses/targets");
+  } catch {
+    return null;
+  }
 }
 
 /** Removes the proof kept with a payment: `in` from a customer, `out` to a factory. */

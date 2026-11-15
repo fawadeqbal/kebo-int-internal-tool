@@ -17,10 +17,11 @@ import { getPeople, getSettings } from "@/lib/loaders";
 import type { OrderRow } from "@/lib/types-orders";
 import { ReceiptForm, ReceivedForm } from "@/components/money/money-v2";
 import type { CustomerPayments } from "@/lib/types-money";
-import { NewExpense, NewFactoryPayment, type ExpenseChoices } from "@/components/money/forms";
+import { NewFactoryPayment } from "@/components/money/forms";
+import { CostForm, type ExpenseChoices } from "@/components/money/cost-window";
 import { MoveMoney, type AccountRow } from "@/components/money/cash-forms";
 import { customerReceiptAction, paymentAction } from "../../orders/actions";
-import { expenseAction, factoryPaymentAction } from "../../money/actions";
+import { factoryPaymentAction } from "../../money/actions";
 import { opensPayments } from "../shared";
 
 
@@ -319,15 +320,7 @@ async function Expense({ today }: { today: string }) {
   const [people, choices, settings] = await Promise.all([getPeople(), api.get<ExpenseChoices>("/expenses/targets"), getSettings()]);
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   return (
-    <NewExpense
-      startOpen
-      action={expenseAction.bind(null, null, null)}
-      people={people}
-      mainCurrency={fx.main}
-      fx={fx}
-      today={today}
-      choices={choices}
-    />
+    <CostForm setup={{ mainCurrency: fx.main, fx, today, people, choices, for: null }} mode={{ kind: "new" }} />
   );
 }
 
