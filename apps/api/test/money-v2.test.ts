@@ -18,6 +18,7 @@ describe("money v2", () => {
   let bilal: string;
   let manager: string;
   let admin: string;
+  let sales0: Record<string, unknown> = {};
   let office: string;
   let me: string;
   let customerId: string;
@@ -56,7 +57,7 @@ describe("money v2", () => {
   const credit = async (who = manager) => (await api(app, who).get(`/customers/${customerId}/credit`).expect(200)).body;
   const creditIn = async (currency = "USD") => (await credit()).balances.find((b: { currency: string }) => b.currency === currency)?.amount ?? "0.00";
   const account = async (name: string, currency: string) =>
-    (await api(app, manager).post("/money/accounts", { name: `${name} ${tag}`, kind: "bank", currency, openingOn: day(-30) }).expect(201)).body.id as string;
+    (await api(app, manager).post("/money/accounts", { name: `${name} ${tag}`, kind: "bank", currency, openingOn: day(-30), ...(currency === "PKR" ? { rate: 280 } : {}) }).expect(201)).body.id as string;
 
   beforeAll(async () => {
     app = await startApp();
@@ -66,6 +67,7 @@ describe("money v2", () => {
     bilal = await signIn(app, "bilal@example.com");
     manager = await signIn(app, "manager@example.com", "Manager@12345");
     admin = await signIn(app, "admin@example.com", "Admin@12345");
+    sales0 = (await api(app, admin).get("/settings").expect(200)).body.sales;
     me = (await api(app, sana).get("/auth/me")).body.id;
     customerId = (
       await api(app, sana)
@@ -82,6 +84,7 @@ describe("money v2", () => {
   });
 
   afterAll(async () => {
+    await api(app, admin).put("/settings/sales", { ...sales0, reason: "Test: rates as they were" });
     await app?.close();
   });
 
