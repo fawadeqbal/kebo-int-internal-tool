@@ -6,7 +6,7 @@ import { addDays, todayIn } from "@kebo/utils";
 import { lastMonths, monthEnd, monthStart, periodOf, SECTIONS, type Period, type Section } from "./insights-period";
 import type { SheetSpec } from "./sheet-spec";
 import type { Receivables } from "./types-insights";
-import type { OpenBills, ToPayList } from "./types-money";
+import type { LeaksReport, OpenBills, SpendingReport, ToPayList } from "./types-money";
 import type {
   CashFacts,
   CashReport,
@@ -607,6 +607,34 @@ export async function loadPeople(p: Period, today: string) {
 }
 
 /* ------------------------------------------------------------------------------------------- Funnel */
+
+/** The spending figures other Reports tabs show beside their own (People: spent and owed back; Customers: spent on them; Profit: running the company). Null without expenses. */
+export const spendingOf = (p: Period) => api.get<SpendingReport>("/reports/spending", { from: p.from, to: p.to }).catch(() => null);
+
+/**
+ * Reports › Spending (design "spending"): what was spent to sell and by whom (GET /reports/spending), against what
+ * was sold (the Insights tables: by person, and month by month), and the customers who cost more than they bring
+ * (GET /reports/leaks, when the company has it).
+ */
+export async function loadSpending(p: Period) {
+  const span = { from: p.from, to: p.to };
+  const [s, byPerson, byMonth, leaks] = await Promise.all([
+    api.get<SpendingReport>("/reports/spending", { ...span, prevFrom: p.prevFrom, prevTo: p.prevTo }),
+    facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "person" }).catch(() => null),
+    facts<OrderGroups>("orders/groups", { ...span, period: "month" }).catch(() => null),
+    api.get<LeaksReport>("/reports/leaks", span).catch(() => null),
+  ]);
+  const soldBy = new Map((byPerson?.rows ?? []).map((r) => [r.key, n(r.sales)]));
+  const soldIn = new Map((byMonth?.rows ?? []).map((r) => [r.period.slice(0, 7), n(r.sales)]));
+  const sold = [...soldIn.values()].reduce((t, v) => t + v, 0);
+  return {
+    ...s,
+    sold,
+    people: s.people.map((x) => ({ ...x, sold: soldBy.get(x.person.id) ?? 0 })),
+    months: s.months.map((m) => ({ ...m, sold: soldIn.get(m.month) ?? 0 })),
+    costing: leaks?.customers.costing ?? null,
+  };
+}
 
 export async function loadFunnel(p: Period) {
   const span = { from: p.from, to: p.to };

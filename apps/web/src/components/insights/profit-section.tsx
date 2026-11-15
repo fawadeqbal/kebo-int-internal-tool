@@ -33,6 +33,7 @@ export function ProfitSection({
   base,
   params,
   href,
+  running = null,
 }: {
   d: Data;
   p: Period;
@@ -41,6 +42,8 @@ export function ProfitSection({
   base: string;
   params: Record<string, string | undefined>;
   href: (patch: Record<string, string | undefined>) => string;
+  /** Of the company costs, the company's own (on no customer or inquiry): the rest was spent on customers and inquiries. */
+  running?: number | null;
 }) {
   const c = d.currency;
   const t = d.total;
@@ -51,7 +54,16 @@ export function ProfitSection({
       <StatRow>
         <StatTile label="Sold" value={bigMoney(t.sold, c)} delta={<Delta value={change(t.sold, d.totalBefore.sold)} vs={p.vsLabel} />} sub={plural(t.orders, "order")} />
         <StatTile label="Costs of the orders" value={bigMoney(t.costs, c)} sub="goods, freight and the rest" />
-        <StatTile label="Company costs" value={bigMoney(t.company, c)} sub="rent, salaries, office" href="/money/company-costs" />
+        <StatTile
+          label="Company costs"
+          value={bigMoney(t.company, c)}
+          sub={
+            running === null
+              ? "rent, salaries, office"
+              : `${bigMoney(running, c)} running the company · ${bigMoney(Math.max(0, t.company - running), c)} on customers and inquiries`
+          }
+          href={running === null ? "/money/company-costs" : "/reports/spending"}
+        />
         <StatTile
           label="Profit"
           value={bigMoney(t.profit, c)}

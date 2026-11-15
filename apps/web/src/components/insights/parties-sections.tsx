@@ -28,12 +28,15 @@ export function CustomersSection({
   page,
   params,
   base,
+  spent = null,
 }: {
   d: Awaited<ReturnType<typeof loadCustomers>>;
   p: Period;
   href: Href;
   chip: CustomerChip;
   page: number;
+  /** What was spent on each customer in the period (managers with expenses). */
+  spent?: Map<string, number> | null;
   /** The page's other parameters, kept by the pager. */
   params: Record<string, string | undefined>;
   /** The page's address, for the pager. */
@@ -116,6 +119,7 @@ export function CustomersSection({
                 <Th className="text-right">Paid on time</Th>
                 <Th className="text-right">Still owed</Th>
                 <Th className="text-right">Overdue</Th>
+                {spent && <Th className="text-right">Spent on them</Th>}
                 <Th>6 months</Th>
               </tr>
             </THead>
@@ -143,6 +147,7 @@ export function CustomersSection({
                       "—"
                     )}
                   </Td>
+                  {spent && <Td className="text-right tabular">{spent.get(r.id) ? amountCell(spent.get(r.id)!) : "—"}</Td>}
                   <Td>
                     <Spark values={r.spark} label={`Sales over 6 months: ${r.spark.map((v) => compactMoney(v, c)).join(", ")}`} />
                   </Td>
@@ -242,11 +247,14 @@ export function PeopleSection({
   p,
   canSet,
   href,
+  spend = null,
 }: {
   d: Awaited<ReturnType<typeof loadPeople>>;
   p: Period;
   canSet: boolean;
   href: Href;
+  /** What each person spent in the period and what is owed back to them (managers with expenses). */
+  spend?: Map<string, { spent: number; owed: number }> | null;
 }) {
   const c = d.currency;
   return (
@@ -289,6 +297,8 @@ export function PeopleSection({
                 <Th className="text-right">Sales {c}</Th>
                 <Th className="min-w-40">Target this month</Th>
                 <Th className="text-right">Profit {c}</Th>
+                {spend && <Th className="text-right">Spent</Th>}
+                {spend && <Th className="text-right">Owed back</Th>}
               </tr>
             </THead>
             <tbody>
@@ -330,6 +340,12 @@ export function PeopleSection({
                     )}
                   </Td>
                   <Td className="text-right tabular">{amountCell(r.profit)}</Td>
+                  {spend && <Td className="text-right tabular">{spend.get(r.id)?.spent ? amountCell(spend.get(r.id)!.spent) : "—"}</Td>}
+                  {spend && (
+                    <Td className={cn("text-right tabular", (spend.get(r.id)?.owed ?? 0) > 0 && "font-semibold text-warn")}>
+                      {spend.get(r.id)?.owed ? amountCell(spend.get(r.id)!.owed) : "—"}
+                    </Td>
+                  )}
                 </Tr>
               ))}
             </tbody>

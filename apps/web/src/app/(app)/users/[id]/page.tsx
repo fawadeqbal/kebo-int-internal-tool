@@ -4,7 +4,7 @@ import { can } from "@kebo/shared";
 import { PageHeader, StageBadge, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
-import { date, dateTime, timeAgo } from "@/lib/format";
+import { date, dateTime, timeAgo, TZ } from "@/lib/format";
 import type { DealRow, HistoryEntry, Paged } from "@/lib/types";
 import type { AuditRow, RoleRow, UserRow } from "@/lib/types-people";
 import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -15,6 +15,8 @@ import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts
 import { changeRows, compactChanges } from "@/components/common/change-lines";
 import { RoleBadge } from "@/components/people/role-badge";
 import { PerformanceCard } from "@/components/insights/performance";
+import { PersonOwedCard, PersonSpendingCard } from "@/components/people/person-spending";
+import type { PersonSpending } from "@/lib/types-money";
 import { resetTwoStepAction, setActiveAction, setPasswordAction, updateUserAction } from "../actions";
 import { EditUserPanel, PasswordPanel } from "../forms";
 
@@ -48,11 +50,15 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   const sp = await searchParams;
   const me = await requirePermission("users.manage");
   const seeAudit = can(me, "audit.view") && (await hasFeature("audit_log"));
-  const [users, all, inquiries, audit] = await Promise.all([
+  // What they spent and what is owed back to them: managers with expenses.
+  const seeSpending = can(me, "expenses.manage") && (await hasFeature("expenses"));
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
+  const [users, all, inquiries, audit, spending] = await Promise.all([
     api.get<UserRow[]>("/users"),
     api.get<RoleRow[]>("/roles"),
     api.get<Paged<DealRow>>("/inquiries", { assignee: id, stage: "open", pageSize: ROWS }).catch(() => null),
     seeAudit ? api.get<Paged<AuditRow>>("/audit", { entityType: "user", entityId: id, pageSize: 50 }).catch(() => null) : null,
+    seeSpending ? api.get<PersonSpending>(`/people/${id}/spending`).catch(() => null) : null,
   ]);
   const u = users.find((x) => x.id === id);
   if (!u) notFound();
@@ -152,6 +158,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
             label="Person sections"
             items={[
               { id: "overview", label: "Overview" },
+              ...(spending ? [{ id: "spending", label: "Spending", count: spending.count }] : []),
               ...(inquiries ? [{ id: "inquiries", label: "Inquiries", count: inquiries.total }] : []),
               ...(changes ? [{ id: "changes", label: "Changes", count: changes.length }] : []),
             ]}
@@ -175,6 +182,13 @@ export default async function UserPage({ params, searchParams }: { params: Promi
                 ]}
               />
             </RecordSection>
+
+            {spending && (
+              <RecordSection id="spending" className="flex flex-col gap-5">
+                <PersonSpendingCard s={spending} year={today.slice(0, 4)} />
+                <PersonOwedCard s={spending} today={today} canPay />
+              </RecordSection>
+            )}
 
             {inquiries && (
               <RecordSection id="inquiries">

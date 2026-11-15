@@ -4,6 +4,7 @@ import { date, TZ, plural } from "@/lib/format";
 import { bigMoney, percent } from "@/lib/insights-period";
 import { hasFeature } from "@/lib/session";
 import type { Aging, FactoryGroups, FactOrders, InquiryGroups, OrderGroups } from "@/lib/types-facts";
+import type { PersonSpending } from "@/lib/types-money";
 import { PerformanceView, type PerfFigure } from "./performance-view";
 
 const facts = <T,>(path: string, q: Record<string, string | number | undefined>) => api.get<T>(`/insights/facts/${path}`, q);
@@ -34,8 +35,10 @@ export async function PerformanceCard({
   if (!can(me, "reports.view") || !(await hasFeature("insights"))) return null;
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
   const yearFrom = `${today.slice(0, 4)}-01-01`;
+  // A person's spending, for managers with expenses: Spent, Profit after all costs, Owed back.
+  const spend = kind === "user" && can(me, "expenses.manage") && (await hasFeature("expenses"));
   // Insights unreachable: the page works without it.
-  const both = await Promise.all([figures(kind, id, { from: yearFrom, to: today }, today), figures(kind, id, {}, today)]).catch(() => null);
+  const both = await Promise.all([figures(kind, id, { from: yearFrom, to: today }, today, spend), figures(kind, id, {}, today, spend)]).catch(() => null);
   if (!both) return null;
   const [year, all] = balances ? both : both.map((f) => f.filter((t) => !t.now));
   const description =
@@ -55,7 +58,7 @@ export async function PerformanceCard({
   );
 }
 
-async function figures(kind: Kind, id: string, span: { from?: string; to?: string }, today: string): Promise<PerfFigure[]> {
+async function figures(kind: Kind, id: string, span: { from?: string; to?: string }, today: string, spend = false): Promise<PerfFigure[]> {
   if (kind === "customer") {
     const [o, i, owed, last] = await Promise.all([
       facts<OrderGroups>("orders/groups", { ...span, period: "all", customerId: id }),
@@ -157,12 +160,13 @@ async function figures(kind: Kind, id: string, span: { from?: string; to?: strin
     return out;
   }
   const year = today.slice(0, 4);
-  const [i, o, t] = await Promise.all([
+  const [i, o, t, s] = await Promise.all([
     facts<InquiryGroups>("inquiries/groups", { ...span, period: "all", personId: id }),
     facts<OrderGroups>("orders/groups", { ...span, period: "all", personId: id }),
     span.from
       ? api.get<{ targets: { month: string; userId: string; amount: string }[] }>("/insights/targets/people", { year }).catch(() => null)
       : Promise.resolve(null),
+    spend ? api.get<PersonSpending>(`/people/${id}/spending`, { from: span.from ?? "2000-01-01", to: span.to ?? today }).catch(() => null) : Promise.resolve(null),
   ]);
   const q = i.rows[0];
   const r = o.rows[0];
@@ -186,5 +190,24 @@ async function figures(kind: Kind, id: string, span: { from?: string; to?: strin
       sub: target ? `${Math.round((n(r?.sales) / target) * 100)}% of ${bigMoney(target, c)} to date` : plural(r?.orders ?? 0, "order"),
     },
     { label: "Profit", value: bigMoney(n(r?.profitQuote), c), sub: `gross · margin ${percent(r?.marginQuote)}` },
+    ...(s ? spendFigures(s, n(r?.sales), n(r?.profitQuote)) : []),
+  ];
+}
+
+/** Spent, Profit after all costs (their orders' profit less what they spent outside orders) and Owed back, from their spending. */
+function spendFigures(s: PersonSpending, sales: number, profit: number): PerfFigure[] {
+  const c = s.currency;
+  const spent = n(s.spent);
+  const after = profit - n(s.outside);
+  const owed = s.owed.rows.reduce((t, e) => t + n(e.inMain), 0);
+  return [
+    { label: "Spent", value: bigMoney(spent, c), sub: `${plural(s.count, "cost")}${sales > 0 ? ` · ${((spent / sales) * 100).toFixed(1)}% of sales` : ""}` },
+    {
+      label: "Profit after all costs",
+      value: bigMoney(after, c),
+      sub: `${sales > 0 ? `${((after / sales) * 100).toFixed(1)}% · ` : ""}less ${bigMoney(n(s.outside), c)} outside orders`,
+      meaning: after < 0 ? "bad" : undefined,
+    },
+    { label: "Owed back", value: bigMoney(owed, c), sub: owed > 0 ? `their own money · ${plural(s.owed.rows.length, "cost")}` : "nothing owed", now: true },
   ];
 }

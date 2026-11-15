@@ -3,7 +3,10 @@ import { can, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
 import { ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { requireUser } from "@/lib/session";
+import { hasFeature, requireUser } from "@/lib/session";
+import { getPeople, getSettings } from "@/lib/loaders";
+import type { CustomerAccount, ExpenseList } from "@/lib/types-money";
+import { CustomerSpending, WhereMoneyWent } from "@/components/money/customer-spending";
 import { customerOf, customerPaymentsOf } from "@/lib/party-data";
 import { date, TZ, whole } from "@/lib/format";
 import type { LedgerParty } from "@/lib/types-ledger";
@@ -38,10 +41,16 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
   const me = await requireUser();
   const ledgerOn = can(me, "ledger.view");
   const today = todayIn(TZ);
-  const [c, pay, ledger] = await Promise.all([
+  // Where their money went and what was spent on them: managers with expenses.
+  const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
+  const [c, pay, ledger, account, spent, people, settings] = await Promise.all([
     customerOf(id),
     customerPaymentsOf(id),
     ledgerOn ? api.get<LedgerParty>(`/ledger/parties/customer/${id}`, { from: "2000-01-01", to: today }).catch(() => null) : null,
+    seesCosts ? api.get<CustomerAccount>(`/customers/${id}/account`).catch(() => null) : null,
+    seesCosts ? api.get<ExpenseList>("/expenses", { customerId: id, pageSize: 200 }).catch(() => null) : null,
+    seesCosts ? getPeople() : null,
+    seesCosts ? getSettings() : null,
   ]);
   const totals = pay?.totals ?? [];
   const main = totals[0]?.currency ?? c.defaultCurrency;
@@ -117,6 +126,8 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
         />
         <StatTile label="Credit" value={whole(credit, main)} />
       </StatRow>
+
+      {account && <WhereMoneyWent a={account} />}
 
       <Card className="overflow-clip">
         <CardHeader
@@ -195,6 +206,20 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
           </DataTable>
         )}
       </Card>
+
+      {spent && people && settings && (
+        <CustomerSpending
+          list={spent}
+          customerId={c.id}
+          setup={{
+            mainCurrency: settings.sales.currency,
+            fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates },
+            today,
+            people,
+            for: { place: "customer", id: c.id, customerId: c.id, label: c.name },
+          }}
+        />
+      )}
     </div>
   );
 }
