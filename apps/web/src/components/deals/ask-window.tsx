@@ -60,7 +60,7 @@ export function AskWindow({
     <ActionForm action={ask} onDone={close} keepFields className="flex min-h-0 flex-1 flex-col">
       {(s) => (
         <>
-          <div data-panel-body className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 sm:px-6">
+          <div data-panel-body className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 *:shrink-0 sm:px-6">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[13px] font-semibold">
                 Factories<span className="text-bad"> *</span> <span className="font-normal text-muted">· {picked.length} chosen</span>

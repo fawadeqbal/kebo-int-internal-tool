@@ -152,7 +152,7 @@ export function SidePanel({
  */
 export function PanelBody({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div data-panel-body className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto p-5 sm:px-6", className)}>
+    <div data-panel-body className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto p-5 *:shrink-0 sm:px-6", className)}>
       {children}
     </div>
   );
