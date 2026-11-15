@@ -300,7 +300,7 @@ async function OnOrder({
         <NewFactoryPayment
           startOpen
           prefill={prefill}
-          action={factoryPaymentAction.bind(null, m.orderId, null)}
+          action={factoryPaymentAction.bind(null, m.orderId, null, null)}
           factories={owing}
           people={people}
           orderCurrency={o.currency}

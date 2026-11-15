@@ -361,6 +361,7 @@ export class CostsService {
         receipt: e.files[0] ? { id: e.files[0].id, name: e.files[0].fileName, type: e.files[0].mimeType, size: e.files[0].size } : null,
         recordedBy: e.recordedBy,
         recordedAt: e.createdAt,
+        updatedAt: e.updatedAt,
         voided: e.voidedAt ? { at: e.voidedAt, reason: e.voidReason } : null,
       })),
       profit:

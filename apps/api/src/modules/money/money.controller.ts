@@ -42,6 +42,7 @@ import { CostsService } from "./costs.service";
 import { AccountsService } from "./accounts.service";
 import { LeaksService } from "./leaks.service";
 import { Once } from "../../common/http/once";
+import { Versioned } from "../../common/http/version";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const expenseQuery = z.object({
@@ -170,6 +171,7 @@ export class MoneyController {
   /** Same body as recording, plus reason (always asked). */
   @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Patch("factory-payments/:id")
+  @Versioned("payments")
   async editFactoryPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput) {
     const { orderId } = await this.supplierPayments.editFactoryPayment(user, id, body);
     return this.money.forOrder(user, orderId);
@@ -219,6 +221,7 @@ export class MoneyController {
   @RequireFeature("expenses")
   @SignedIn("checked inside: expenses.manage")
   @Patch("expenses/:id")
+  @Versioned("expenses")
   editExpense(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(expenseInput)) body: ExpenseInput) {
     return this.money.editExpense(user, id, body);
   }

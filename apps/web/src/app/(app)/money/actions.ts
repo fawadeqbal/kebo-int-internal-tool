@@ -39,6 +39,8 @@ export async function editPaymentAction(
   orderId: string,
   paymentId: string,
   currency: string,
+  /** The payment's updatedAt when the form was opened: someone else's change since is not overwritten. */
+  version: string | null,
   _prev: ActionState,
   form: FormData,
 ): Promise<ActionState> {
@@ -59,7 +61,7 @@ export async function editPaymentAction(
     accountId: v.accountId || null,
     reason: reasonOf(form),
   };
-  const r = await attempt(form, () => api.patch(`/payments/${paymentId}`, body), "Payment changed.");
+  const r = await attempt(form, () => api.patch(`/payments/${paymentId}`, body, { version }), "Payment changed.");
   if (r.ok) refresh(orderId);
   return r;
 }
@@ -86,13 +88,18 @@ const factoryBody = (form: FormData) => {
 export async function factoryPaymentAction(
   orderId: string,
   paymentId: string | null,
+  /** A change: the payment's updatedAt when the form was opened (someone else's change since is not overwritten). */
+  version: string | null,
   _prev: ActionState,
   form: FormData,
 ): Promise<ActionState> {
   const body = factoryBody(form);
   const r = await attempt(
     form,
-    () => (paymentId ? api.patch(`/factory-payments/${paymentId}`, body) : api.post(`/orders/${orderId}/factory-payments`, body, { once: onceOf(form) })),
+    () =>
+      paymentId
+        ? api.patch(`/factory-payments/${paymentId}`, body, { version })
+        : api.post(`/orders/${orderId}/factory-payments`, body, { once: onceOf(form) }),
     paymentId ? "Payment changed." : "Payment to the factory recorded.",
   );
   if (r.ok) refresh(orderId);
@@ -121,6 +128,8 @@ export async function voidFactoryPaymentAction(
 export async function expenseAction(
   orderId: string | null,
   expenseId: string | null,
+  /** A change: the cost's updatedAt when the form was opened (someone else's change since is not overwritten). */
+  version: string | null,
   _prev: ActionState,
   form: FormData,
 ): Promise<ActionState> {
@@ -155,7 +164,7 @@ export async function expenseAction(
   };
   const r = await attempt(
     form,
-    () => (expenseId ? api.patch(`/expenses/${expenseId}`, body) : api.post("/expenses", body, { once: onceOf(form) })),
+    () => (expenseId ? api.patch(`/expenses/${expenseId}`, body, { version }) : api.post("/expenses", body, { once: onceOf(form) })),
     expenseId ? "Expense changed." : "Expense added.",
   );
   if (r.ok) {

@@ -218,6 +218,8 @@ export interface PaymentsView {
     counts: string;
     recordedBy: { id: string; name: string } | null;
     recordedAt: string;
+    /** When its entry last changed: Change sends it back, so a change never overwrites someone else's. */
+    updatedAt: string;
     /** Received so far and still due once it counted (null when removed). */
     after: { received: string; due: string } | null;
     /** A photo or PDF proving it (bank slip, transfer screenshot). */

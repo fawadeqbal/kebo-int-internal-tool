@@ -444,7 +444,7 @@ async function PayPart({ part, today }: { part: ToPayList["rows"][number]; today
     <PayFactoryInList
       label="Pay"
       sub={`${part.order.refNo} · ${part.supplier.name}`}
-      action={factoryPaymentAction.bind(null, part.order.id, null)}
+      action={factoryPaymentAction.bind(null, part.order.id, null, null)}
       factories={owing}
       people={people ?? []}
       orderCurrency={m.currency}

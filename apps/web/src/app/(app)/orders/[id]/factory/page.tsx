@@ -60,7 +60,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         label={label}
         main={main}
         sub={sub}
-        action={factoryPaymentAction.bind(null, o.id, null)}
+        action={factoryPaymentAction.bind(null, o.id, null, null)}
         factories={owing}
         people={people ?? []}
         orderCurrency={o.currency}
@@ -226,7 +226,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                           <ChangeFactoryPaymentWindow
                             sub={`${o.refNo} · ${x.factory.name} · ${date(x.paidOn)} · ${money(x.amount, x.currency)}`}
                             payment={x}
-                            save={factoryPaymentAction.bind(null, o.id, x.id)}
+                            save={factoryPaymentAction.bind(null, o.id, x.id, x.updatedAt)}
                             remove={voidFactoryPaymentAction.bind(null, o.id, x.id)}
                             removeFile={removePaymentFileAction.bind(null, "out", x.id, o.id)}
                             factories={m.factories!.rows}

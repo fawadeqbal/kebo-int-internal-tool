@@ -230,7 +230,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
                             payment={x}
                             currency={c}
                             today={now}
-                            save={canPay ? editPaymentAction.bind(null, o.id, x.id, c) : null}
+                            save={canPay ? editPaymentAction.bind(null, o.id, x.id, c, x.updatedAt) : null}
                             remove={canRemove ? voidPaymentAction.bind(null, `/payments/${x.id}/void`) : null}
                             removeFile={removePaymentFileAction.bind(null, "in", x.id, o.id)}
                             customerId={o.customer.id}

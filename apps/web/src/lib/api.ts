@@ -95,7 +95,9 @@ export const api = {
   /** `version`: the record's updatedAt when the form was opened; a save over someone else's change is refused (409 "stale"). */
   put: async <T>(path: string, body?: unknown, opts?: { version?: string | null }) =>
     parse<T>(await apiFetch(path, { method: "PUT", body: JSON.stringify(body ?? {}), headers: opts?.version ? { "If-Match": opts.version } : undefined })),
-  patch: async <T>(path: string, body?: unknown) => parse<T>(await apiFetch(path, { method: "PATCH", body: JSON.stringify(body ?? {}) })),
+  /** `version`: as for put. */
+  patch: async <T>(path: string, body?: unknown, opts?: { version?: string | null }) =>
+    parse<T>(await apiFetch(path, { method: "PATCH", body: JSON.stringify(body ?? {}), headers: opts?.version ? { "If-Match": opts.version } : undefined })),
   delete: async <T>(path: string) => parse<T>(await apiFetch(path, { method: "DELETE" })),
   /** Multipart upload (files). */
   upload: async <T>(path: string, form: FormData) => parse<T>(await apiFetch(path, { method: "POST", body: form })),
