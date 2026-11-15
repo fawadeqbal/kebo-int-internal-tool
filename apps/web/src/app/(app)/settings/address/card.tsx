@@ -1,5 +1,6 @@
 import { Alert, Card, CardBody, CardHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
+import { date } from "@/lib/format";
 import { AddressEdit } from "./form";
 import type { AddressView } from "./types";
 
@@ -8,7 +9,7 @@ export async function AddressCard({ sendsTo }: { /** The company's own domain, w
   const view = await api.get<AddressView>("/company/address");
   const host = view.url.replace(/^https:\/\//, "");
   const wait = view.nextChangeOn
-    ? new Date(view.nextChangeOn).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    ? date(view.nextChangeOn)
     : null;
   return (
     <Card>

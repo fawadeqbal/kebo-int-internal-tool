@@ -115,7 +115,7 @@ export class RemindersService {
       const d = fromDbDate(x.requiredBy!);
       const passed = d < today;
       await send(neededBy(i, passed), passed ? [handler(i.assigneeId), managersToo] : [handler(i.assigneeId)], `${passed ? "late" : "soon"}:${i.id}:${today}`);
-      book.add(passed ? [i.assigneeId, ...managers] : [i.assigneeId], "Inquiries waiting", { ref: i.refNo, party: i.customerName, what: `Needed by ${d}: ${i.title}`, when: passed ? `passed ${dayShort(d)}` : `by ${dayShort(d)}`, late: passed });
+      book.add(passed ? [i.assigneeId, ...managers] : [i.assigneeId], "Inquiries waiting", { ref: i.refNo, party: i.customerName, what: `Needed by ${dayShort(d)}: ${i.title}`, when: passed ? `passed ${dayShort(d)}` : `by ${dayShort(d)}`, late: passed });
     }
 
     // 4. Sent quotations: follow up before they end; mark them ended after (only the live revision is ever "sent").

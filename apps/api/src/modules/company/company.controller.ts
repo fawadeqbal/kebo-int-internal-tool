@@ -5,7 +5,7 @@ import { z } from "zod";
 import { fromDbDateOrNull } from "@kebo/database";
 import { brandMarkOf, companyOrigin, LIFECYCLE, slugField } from "@kebo/shared";
 import { addDays, ConflictError, DomainError, ForbiddenError, formatDateTime } from "@kebo/utils";
-import { Clock } from "../../common/time/clock.service";
+import { Clock, companyDay } from "../../common/time/clock.service";
 import { ENV, type Env } from "../../config/env";
 import { PrismaService } from "../../database/prisma.service";
 import { AllowDuringTwoStepSetup, CurrentUser, RequirePermissions } from "../../common/auth/decorators";
@@ -241,7 +241,7 @@ export class CompanyController {
     } else if (c.kind === "client" && renewsOn && today > renewsOn) {
       notices.push({
         tone: "warn",
-        text: `Payment is overdue (paid until ${renewsOn}). ${c.name} becomes read-only on ${addDays(renewsOn, LIFECYCLE.overdueGraceDays + 1)}.`,
+        text: `Payment is overdue (paid until ${companyDay(renewsOn)}). ${c.name} becomes read-only on ${companyDay(addDays(renewsOn, LIFECYCLE.overdueGraceDays + 1))}.`,
       });
     }
     for (const w of summary.warnings) notices.push({ tone: "warn", text: w });

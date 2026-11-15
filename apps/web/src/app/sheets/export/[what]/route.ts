@@ -1,6 +1,8 @@
 import { ApiError } from "@/lib/api";
 import { ExportNotFound, EXPORTS, type ExportKind } from "@/lib/exports";
 import { writeSheet } from "@/lib/sheets";
+import { withCompanyTime } from "@/lib/route-time";
+import type { SheetSpec } from "@/lib/sheet-spec";
 import { excelRefusal } from "../../guard";
 
 /**
@@ -16,7 +18,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ what: st
   for (const [k, v] of new URL(req.url).searchParams) if (v && (v.length <= 200 || k === "ids") && k !== "format") query[k] = v;
   const csv = new URL(req.url).searchParams.get("format") === "csv";
   try {
-    const specs = await EXPORTS[what as ExportKind](query);
+    // Days and times in the file: the company's, as on its pages.
+    const specs = await withCompanyTime<SheetSpec | SheetSpec[]>(() => EXPORTS[what as ExportKind](query));
     const first = Array.isArray(specs) ? specs[0]! : specs;
     // "Export CSV": the first sheet as comma-separated text (with a BOM, so Excel reads the letters right).
     if (csv) {

@@ -2,6 +2,7 @@ import { MessageSquareQuote } from "lucide-react";
 import { cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import type { HistoryEntry } from "@/lib/types";
 import { dateTime } from "@/lib/format";
+import { readableDates } from "@/components/insights/readable-dates";
 
 /** Field names as people say them. */
 const FIELD: Record<string, string> = {
@@ -38,7 +39,7 @@ const FIELD: Record<string, string> = {
 const HIDDEN = /^(ask|id|.+Id)$/;
 const fieldLabel = (f: string) => FIELD[f] ?? f.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 const shown = (v: string | null) =>
-  v === null ? "—" : v === "true" ? "yes" : v === "false" ? "no" : v.length > 80 ? `${v.slice(0, 80)}…` : v;
+  v === null ? "—" : v === "true" ? "yes" : v === "false" ? "no" : readableDates(v.length > 80 ? `${v.slice(0, 80)}…` : v);
 
 const AREA: Record<string, string> = {
   factory_quote: "Factory prices",
@@ -71,7 +72,7 @@ export function HistoryList({
             {showArea && AREA[e.entityType] && (
               <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-text-2">{AREA[e.entityType]}</span>
             )}
-            {e.summary ?? e.action.replace(/_/g, " ")}
+            {e.summary ? readableDates(e.summary) : e.action.replace(/_/g, " ")}
           </p>
           {e.reason && (
             <p className="flex items-start gap-1.5 text-sm text-text-2">
@@ -140,7 +141,7 @@ export function HistoryTable({
             <Td className="align-top">{e.by?.name ?? "System"}</Td>
             <Td className="[overflow-wrap:anywhere]">
               {showArea && AREA[e.entityType] && <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-text-2">{AREA[e.entityType]}</span>}
-              {e.summary ?? e.action.replace(/_/g, " ")}
+              {e.summary ? readableDates(e.summary) : e.action.replace(/_/g, " ")}
               {e.changes
                 .filter((c) => !HIDDEN.test(c.field))
                 .slice(0, 8)

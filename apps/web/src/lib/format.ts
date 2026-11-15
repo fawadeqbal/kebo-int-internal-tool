@@ -46,8 +46,16 @@ export function setCompanyTime(style: TimeStyle) {
   if (typeof window === "undefined") requestTime().style = style;
   else browserStyle = style;
 }
+/**
+ * Route handlers (Excel and CSV files) run outside a React render, where React's cache keeps nothing: they set
+ * the company's time with withCompanyTime (lib/route-time), which answers here.
+ */
+let routeStyle: () => TimeStyle | undefined = () => undefined;
+export const setRouteTimeSource = (source: () => TimeStyle | undefined) => {
+  routeStyle = source;
+};
 /** The company's zone and formats on this request. */
-export const timeStyle = (): TimeStyle => (typeof window !== "undefined" ? (browserStyle ?? SERVER_STYLE) : requestTime().style);
+export const timeStyle = (): TimeStyle => (typeof window !== "undefined" ? (browserStyle ?? SERVER_STYLE) : (routeStyle() ?? requestTime().style));
 /** The company's time zone. */
 export const currentZone = () => timeStyle().zone;
 /** Today, company time ("2026-11-15"). */

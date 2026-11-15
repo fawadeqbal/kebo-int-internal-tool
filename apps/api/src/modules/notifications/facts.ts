@@ -3,6 +3,7 @@ import { toMinor } from "@kebo/money";
 import { contactLine, planStatus } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService } from "../../database/prisma.service";
+import { companyDay, companyDayMonth } from "../../common/time/clock.service";
 import { fxOf, livePlanOf, positionOf } from "../billing/api";
 import { positionRelations } from "../billing/position";
 import type { Settings } from "@kebo/shared";
@@ -29,13 +30,11 @@ export function money(minor: number, currency: string) {
   return `${currency} ${(minor / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
 }
 
-/** "14 Dec 2026" */
-export const day = (iso: ISODate | null | undefined) =>
-  iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : null;
+/** "14 Dec 2026", written the company's way (Time and dates). */
+export const day = (iso: ISODate | null | undefined) => (iso ? companyDay(iso) : null);
 
-/** "14 Dec" */
-export const dayShort = (iso: ISODate | null | undefined) =>
-  iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : null;
+/** "14 Dec", written the company's way. */
+export const dayShort = (iso: ISODate | null | undefined) => (iso ? companyDayMonth(iso) : null);
 
 /** "Lagos Water Ltd · Nigeria" */
 export const customerLine = (c: { name: string; country: string | null }) => [c.name, countryName(c.country)].filter(Boolean).join(" · ");
