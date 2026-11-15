@@ -258,7 +258,7 @@ export function Modal({
         className={`${WINDOW_BOX} ${MODAL_WIDTH[size]}`}
       >
         <WindowHead id={id} title={title} description={sub} onClose={close} disabled={busy} />
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 sm:px-6">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 *:shrink-0 sm:px-6">{children}</div>
         {footer && <div className={WINDOW_FOOTER}>{footer}</div>}
       </div>
       {asking && (
