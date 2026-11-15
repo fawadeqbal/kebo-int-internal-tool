@@ -7,7 +7,7 @@ import { PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { money } from "@/lib/format";
-import { ExportLink } from "@/components/sheets/export-link";
+import { ExportCsv } from "@/components/sheets/export-link";
 import { DataTable } from "@/components/common/data-table";
 import { EntryPanel } from "@/components/ledger/entry-panel";
 import { EntryBody } from "@/components/ledger/entry-body";
@@ -78,9 +78,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
         actions={
           <>
             {view === "all" && (
-              <ExportLink
+              <ExportCsv
                 what="ledger"
-                className={cn("border-transparent bg-transparent shadow-none")}
                 query={{
                   from: period.from,
                   to: period.to,

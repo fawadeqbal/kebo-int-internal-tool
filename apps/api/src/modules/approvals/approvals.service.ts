@@ -276,12 +276,25 @@ export class ApprovalsService {
    * ?status=pending|approved|sent_back|withdrawn|all (default pending), ?mine=true (what I added; else what
    * I approve: the kinds I record, on orders I see). Pending oldest first; the rest newest first.
    */
-  async list(user: SessionUser, q: { status: SubmissionStatus | "all"; mine: boolean; orderId?: string; page: number; pageSize: number }) {
+  async list(user: SessionUser, q: { status: SubmissionStatus | "all"; mine: boolean; orderId?: string; page: number; pageSize: number; q?: string }) {
     const kinds = await this.kindsFor(user);
     if (!q.mine && !kinds.length) throw new ForbiddenError("Only someone who records payments or expenses approves them.");
+    // The search: the order's number or customer, who sent it, or what it is for. Every tab counts for the same search.
+    const text = q.q?.trim();
+    const found: Prisma.MoneySubmissionWhereInput = text
+      ? {
+          OR: [
+            { order: { is: { refNo: { contains: text, mode: "insensitive" } } } },
+            { order: { is: { customer: { name: { contains: text, mode: "insensitive" } } } } },
+            { submittedBy: { name: { contains: text, mode: "insensitive" } } },
+            { body: { path: ["description"], string_contains: text } },
+            { body: { path: ["reference"], string_contains: text } },
+          ],
+        }
+      : {};
     const scope: Prisma.MoneySubmissionWhereInput = q.mine
-      ? { submittedById: user.id }
-      : { kind: { in: kinds }, OR: [{ orderId: null }, { order: { is: orderAccess(user) } }] };
+      ? { submittedById: user.id, ...(text ? { AND: [found] } : {}) }
+      : { kind: { in: kinds }, AND: [{ OR: [{ orderId: null }, { order: { is: orderAccess(user) } }] }, found] };
     const where: Prisma.MoneySubmissionWhereInput = { ...scope, ...(q.orderId ? { orderId: q.orderId } : {}), ...(q.status === "all" ? {} : { status: q.status }) };
     const [rows, total, grouped] = await Promise.all([
       this.prisma.db.moneySubmission.findMany({

@@ -36,6 +36,8 @@ const listQuery = z.object({
     .transform((v) => v === "true"),
   /** Only what was sent on this order (the order's Payment tab). */
   orderId: z.uuid().optional(),
+  /** Order number, customer, who sent it, or what it is for. */
+  q: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });

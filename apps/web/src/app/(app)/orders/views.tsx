@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { AlertTriangle, Check, Download, Factory, FileText, LayoutGrid, List as ListIcon, Lock, MessageSquare, Package, PieChart, Ship, X } from "lucide-react";
+import { AlertTriangle, Check, Factory, FileText, LayoutGrid, List as ListIcon, Lock, MessageSquare, Package, PieChart, Ship, X } from "lucide-react";
 import { ORDER_STAGE_LABEL, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
 import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, Segmented, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage } from "@kebo/ui";
+import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -127,9 +128,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         actions={
           <>
             <ViewSwitch view="list" mine={mine} />
-            <ButtonLink href={buildHref("/sheets/export/orders", { status, mine: keep.mine, q: sp.q, format: "csv" }, {})}>
-              <Download aria-hidden /> Export CSV
-            </ButtonLink>
+            <ExportCsv what="orders" query={{ status, mine: keep.mine, q: sp.q }} />
           </>
         }
       />

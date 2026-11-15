@@ -63,7 +63,7 @@ export default async function PlatformLogPage({ searchParams }: { searchParams: 
             href: href({ kind: log.kind === k ? undefined : k }),
             active: log.kind === k,
           })),
-        ].filter((c) => c.key === "all" || c.active || c.count > 0)}
+        ]}
         end={
           <a href={buildHref("/platform/log/excel", {}, keep)} download className={buttonClass("secondary", "sm")} title="Export to Excel">
             <FileSpreadsheet aria-hidden /> Excel

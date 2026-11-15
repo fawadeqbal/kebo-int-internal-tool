@@ -1,4 +1,4 @@
-import { Eye, Pencil, MessageSquare, Package, Plus, Users, Wallet } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
 import { ButtonLink, PageHeader, RefCode } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
@@ -67,16 +67,15 @@ export default async function CustomerLayout({ children, params }: { children: R
       />
 
       <RecordTabs
-        className="mt-0"
         base={base}
         label="The customer"
         tabs={[
-          { path: "", label: "Overview", icon: <Eye aria-hidden /> },
-          { path: "orders", label: "Orders", count: c.orders.length, alert: lateOrders > 0, icon: <Package aria-hidden /> },
-          { path: "inquiries", label: "Inquiries", count: c.inquiries.length, icon: <MessageSquare aria-hidden /> },
-          { path: "money", label: "Money", icon: <Wallet aria-hidden /> },
-          { path: "contacts", label: "Contacts", count: c.contacts.length, icon: <Users aria-hidden /> },
-          { path: "notes", label: "Notes", icon: <Pencil aria-hidden /> },
+          { path: "", label: "Overview" },
+          { path: "orders", label: "Orders", count: c.orders.length, alert: lateOrders > 0 },
+          { path: "inquiries", label: "Inquiries", count: c.inquiries.length },
+          { path: "money", label: "Money" },
+          { path: "contacts", label: "Contacts", count: c.contacts.length },
+          { path: "notes", label: "Notes" },
         ]}
       />
       <div className="mt-5">{children}</div>

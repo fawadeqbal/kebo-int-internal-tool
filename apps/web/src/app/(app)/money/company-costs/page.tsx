@@ -11,19 +11,20 @@ import { getPeople, getSettings } from "@/lib/loaders";
 import { requirePermission } from "@/lib/session";
 import type { ExpenseList, RepeatingCosts } from "@/lib/types-money";
 import { PlanOff } from "@/components/common/plan-off";
-import { ExportLink } from "@/components/sheets/export-link";
+import { ExportCsv } from "@/components/sheets/export-link";
 import { Section } from "@/components/order-sections/section";
 import { ExpenseRecord } from "@/components/money/expense-record";
 import type { ExpenseChoices } from "@/components/money/forms";
 import { AddCompanyCost, RepeatingRow } from "@/components/money/company-costs";
 import { companyKind } from "@/components/money/company-kinds";
 import { moneyAccess } from "../../finance/sections";
+import { FilterCard } from "@/components/common/filter-card";
 
 export const metadata = { title: "Company costs" };
 
 const HERE = "/money/company-costs";
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-type Search = { p?: string; kind?: string; page?: string };
+type Search = { p?: string; kind?: string; page?: string; q?: string };
 
 /** The first and the last day of a month ("2026-11"). */
 const span = (month: string) => ({ from: `${month}-01`, to: addDays(`${addDays(`${month}-28`, 4).slice(0, 7)}-01`, -1) });
@@ -48,8 +49,11 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const next = addDays(`${month}-28`, 4).slice(0, 7);
   const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.kind ?? "") ? (sp.kind as ExpenseCategory) : undefined;
   const q = { kind: "company" };
-  const [list, before, year, repeating, people, choices, settings] = await Promise.all([
-    api.get<ExpenseList>("/expenses", { ...q, ...span(month), category, page: String(toPage(sp.page)), pageSize: String(PAGE_SIZE) }),
+  const text = sp.q?.trim() || undefined;
+  const [list, unsearched, before, year, repeating, people, choices, settings] = await Promise.all([
+    api.get<ExpenseList>("/expenses", { ...q, ...span(month), category, q: text, page: String(toPage(sp.page)), pageSize: String(PAGE_SIZE) }),
+    // The figures over the list are the month's, whatever is searched.
+    text ? api.get<ExpenseList>("/expenses", { ...q, ...span(month), pageSize: "1" }) : null,
     api.get<ExpenseList>("/expenses", { ...q, ...span(prev), pageSize: "1" }),
     api.get<ExpenseList>("/expenses", { ...q, from: `${month.slice(0, 4)}-01-01`, to: `${month.slice(0, 4)}-12-31`, pageSize: "1" }),
     api.get<RepeatingCosts>("/expenses/repeating"),
@@ -59,14 +63,17 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   ]);
   const c = list.currency;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  const keep = { p: month === thisMonth ? undefined : month, kind: category };
+  const keep = { p: month === thisMonth ? undefined : month, kind: category, q: sp.q };
   const href = (change: Record<string, string | undefined>) => buildHref(HERE, keep, { page: undefined, ...change });
   const monthName = MONTH_YEAR.format(new Date(`${month}-01T00:00:00Z`));
-  // The month's total over every kind (the list may be narrowed to one).
-  const monthTotal = list.byCategory.reduce((t, k) => t + Number(k.total), 0);
-  const monthCount = list.byCategory.reduce((t, k) => t + k.count, 0);
+  // The month's total over every kind (the list may be narrowed to one, or searched).
+  const month0 = unsearched ?? list;
+  const monthTotal = month0.byCategory.reduce((t, k) => t + Number(k.total), 0);
+  const monthCount = month0.byCategory.reduce((t, k) => t + k.count, 0);
+  // The kinds' tabs count what the search finds, so each number is what its tab lists.
+  const foundCount = list.byCategory.reduce((t, k) => t + k.count, 0);
   const change = Number(before.total) > 0 ? Math.round(((monthTotal - Number(before.total)) / Number(before.total)) * 100) : null;
-  const biggest = list.byCategory[0];
+  const biggest = month0.byCategory[0];
 
   return (
     <div>
@@ -74,7 +81,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         crumbs={crumbs}
         title="Company costs"
         summary="Rent, salaries and the office: what the company spends that is not for one order"
-        actions={list.count > 0 ? <ExportLink what="expenses" query={{ ...span(month), category }} /> : undefined}
+        actions={list.count > 0 ? <ExportCsv what="expenses" query={{ ...span(month), category, q: text }} /> : undefined}
         primary={<AddCompanyCost mainCurrency={c} today={today} />}
       />
       <StatRow className="mb-4">
@@ -100,7 +107,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         <LinkTabs
           label="Which kind"
           tabs={[
-            { href: href({ kind: undefined }), label: "All", active: !category },
+            { href: href({ kind: undefined }), label: "All", count: foundCount, active: !category },
             ...list.byCategory.map((k) => ({ href: href({ kind: k.category }), label: companyKind(k.category), count: k.count, active: category === k.category })),
           ]}
         />
@@ -121,9 +128,15 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         </span>
       </div>
 
+      <FilterCard search="Search what it was for, a note or who was paid…" value={sp.q} keep={{ p: keep.p, kind: category }} clearHref={href({ q: undefined })} />
+
       <Card className="overflow-hidden p-0">
         {list.rows.length === 0 ? (
-          <EmptyState framed title={`No company costs in ${monthName}`} description="Add the rent, the salaries and the office's bills here. A cost of one order is added on that order." />
+          text ? (
+            <EmptyState framed title="No cost matches" description={`Nothing in ${monthName} matches “${text}”. Try other words, or clear the search.`} />
+          ) : (
+            <EmptyState framed title={`No company costs in ${monthName}`} description="Add the rent, the salaries and the office's bills here. A cost of one order is added on that order." />
+          )
         ) : (
           <>
             <ul className="flex flex-col divide-y divide-line" aria-label="Company costs">

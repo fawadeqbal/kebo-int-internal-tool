@@ -1,12 +1,11 @@
-import Form from "next/form";
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr } from "@kebo/ui";
-import { AutoSelect } from "@kebo/ui/client";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
+import { FilterCard } from "@/components/common/filter-card";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { api } from "@/lib/api";
-import { ExportLink } from "@/components/sheets/export-link";
+import { ExportCsv } from "@/components/sheets/export-link";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
 import { dateTime, timeAgo } from "@/lib/format";
@@ -156,33 +155,18 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
             {who && ` by ${who}`}
             <span className="max-sm:hidden"> · every change anyone made, newest first; entries cannot be edited or removed</span>
           </>
-        } />
-      <ListToolbar
-        chips={chips}
-        label="Filter the audit log"
-        search={{ placeholder: "What, who or why", value: sp.q, clearHref: href({ q: undefined }) }}
-        keep={{ type: sp.type, person: sp.person }}
-        filters={
-          <Form action="" scroll={false} className="flex items-center gap-1.5">
-            <AutoSelect name="type" defaultValue={sp.type ?? ""} aria-label="Kind of record" className="w-32">
-              <option value="">+ Kind</option>
-              {Object.entries(ENTITY_LABEL).map(([k, l]) => (
-                <option key={k} value={k}>
-                  {l}
-                </option>
-              ))}
-            </AutoSelect>
-            <AutoSelect name="person" defaultValue={sp.person ?? ""} aria-label="Person" className="w-32">
-              <option value="">Anyone</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </AutoSelect>
-          </Form>
         }
-        end={<ExportLink what="audit" query={{ type: sp.type, person: sp.person }} />}
+        actions={<ExportCsv what="audit" query={{ type: sp.type, person: sp.person, q: sp.q }} />}
+      />
+      <LinkTabs label="Which records" className="mb-4" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
+      <FilterCard
+        search="Search what, who or why…"
+        value={sp.q}
+        clearHref={href({ q: undefined })}
+        selects={[
+          { name: "type", label: "Kind", value: sp.type, options: Object.entries(ENTITY_LABEL).map(([value, l]) => ({ value, label: l })) },
+          { name: "person", label: "Person", all: "Anyone", value: sp.person, options: people.map((p) => ({ value: p.id, label: p.name })) },
+        ]}
       />
       <Card className="overflow-clip p-0">
         {data.rows.length === 0 ? (

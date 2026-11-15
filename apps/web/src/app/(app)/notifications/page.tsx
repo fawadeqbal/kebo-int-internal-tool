@@ -1,16 +1,16 @@
 import { Bell, Check } from "lucide-react";
-import { Badge, buildHref, ButtonLink, Card, cn, EmptyState, LinkTabs, PageHeader, Pager, toPage } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { dateTime, timeAgo } from "@/lib/format";
 import { ALERT_GROUPS, alertKind, type AlertGroup } from "@/lib/alerts";
 import type { NotificationItem } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
+import { FilterCard } from "@/components/common/filter-card";
 import { markAllReadAction } from "./actions";
 
 export const metadata = { title: "Alerts" };
 
-const PAGE_SIZE = 25;
 
 /** Where a row goes: through /notifications/open (marks it read) when new, else straight to its link. */
 const openHref = (n: NotificationItem) =>
@@ -21,7 +21,7 @@ const openHref = (n: NotificationItem) =>
  * Payments / Inquiries / Orders / Follow-ups; each alert a row with a dot when
  * new, its kind as a label, what happened, when, and Open. 25 a page.
  */
-export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ show?: string; page?: string }> }) {
+export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ show?: string; page?: string; q?: string }> }) {
   await requireUser();
   const sp = await searchParams;
   const onlyUnread = sp.show === "unread";
@@ -32,10 +32,13 @@ export default async function NotificationsPage({ searchParams }: { searchParams
     unread: onlyUnread ? "true" : undefined,
     group,
     counts: "true",
+    q: sp.q?.trim() || undefined,
     take: PAGE_SIZE,
     page,
   });
-  const keep = { show: sp.show };
+  const keep = { show: sp.show, q: sp.q };
+  // A tab keeps the search: its count is for the same search.
+  const tab = (show: string | undefined) => buildHref("/notifications", { q: sp.q }, { show });
   const show = onlyUnread ? "unread" : (group ?? "all");
 
   return (
@@ -52,6 +55,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
               label="Mark all read"
               pendingText="Marking…"
               variant="secondary"
+              size="md"
               showSuccess={false}
               icon={<Check aria-hidden />}
             />
@@ -62,23 +66,26 @@ export default async function NotificationsPage({ searchParams }: { searchParams
         label="Which alerts"
         className="mb-4"
         tabs={[
-          { href: "/notifications", label: "All", count: counts?.all, active: show === "all" },
-          { href: "/notifications?show=unread", label: "Unread", count: unread, alert: unread > 0, active: show === "unread" },
-          ...ALERT_GROUPS.map((g) => ({ href: `/notifications?show=${g.key}`, label: g.label, count: counts?.[g.key], active: show === g.key })),
+          { href: tab(undefined), label: "All", count: counts?.all, active: show === "all" },
+          { href: tab("unread"), label: "Unread", count: counts?.unread ?? unread, alert: (counts?.unread ?? unread) > 0, active: show === "unread" },
+          ...ALERT_GROUPS.map((g) => ({ href: tab(g.key), label: g.label, count: counts?.[g.key], active: show === g.key })),
         ]}
       />
+      <FilterCard search="Search alerts…" value={sp.q} keep={{ show: sp.show }} clearHref={tab(sp.show)} />
       <Card className="overflow-clip p-0">
         {items.length === 0 ? (
           <EmptyState
             framed
-            title={show === "all" ? "No alerts yet" : "Nothing here"}
+            title={sp.q ? "No alert matches" : show === "all" ? "No alerts yet" : "Nothing here"}
             description={
-              show === "all"
-                ? "You are told here when an inquiry is given to you, a quotation is answered, a payment arrives or an order needs something."
-                : "No alerts of this kind right now."
+              sp.q
+                ? "Try other words, or clear the search."
+                : show === "all"
+                  ? "You are told here when an inquiry is given to you, a quotation is answered, a payment arrives or an order needs something."
+                  : "No alerts of this kind right now."
             }
             action={
-              show !== "all" ? (
+              sp.q || show !== "all" ? (
                 <ButtonLink href="/notifications" size="sm">
                   All alerts
                 </ButtonLink>

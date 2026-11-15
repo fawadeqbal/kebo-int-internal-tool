@@ -617,7 +617,7 @@ export function HistorySection({ c, history, page }: { c: CompanyDetail; history
       description="everything done to this company from the platform, newest first"
     >
       <ListToolbar
-        className="mb-0 border-b border-line px-4 py-2.5"
+        inCard
         label="Kinds of history"
         chips={[
           { key: "all", label: "All", count: history.counts.all ?? 0, href: buildHref(base, { section: "history" }, {}), active: !kind },

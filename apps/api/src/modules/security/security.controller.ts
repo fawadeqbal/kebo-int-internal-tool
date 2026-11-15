@@ -61,8 +61,21 @@ export class SecurityController {
   }
 
   @Get("sessions")
-  sessions(@CurrentUser() actor: SessionUser, @Query(Validate(z.object({ userId: z.uuid().optional() }))) q: { userId?: string }) {
-    return this.security.sessions(actor, q.userId);
+  sessions(
+    @CurrentUser() actor: SessionUser,
+    @Query(
+      Validate(
+        z.object({
+          userId: z.uuid().optional(),
+          q: z.string().trim().max(100).optional(),
+          page: z.coerce.number().int().min(1).default(1),
+          pageSize: z.coerce.number().int().min(1).max(100).default(25),
+        }),
+      ),
+    )
+    q: { userId?: string; q?: string; page: number; pageSize: number },
+  ) {
+    return this.security.sessions(actor, q);
   }
 
   @Delete("sessions/:id")

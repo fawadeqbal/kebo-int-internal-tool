@@ -468,6 +468,8 @@ export class MoneyService {
       category?: string;
       /** company: everything that is not a cost of one order (the company's own, and what is spent on customers and deals). */
       kind?: "order" | "customer" | "general" | "company";
+      /** What it was for, the note or who was paid (the totals are then of what the search finds). */
+      q?: string;
       /** The list comes a page at a time; the totals are always for the whole period. */
       page?: number;
       pageSize?: number;
@@ -495,6 +497,19 @@ export class MoneyService {
                   ? { orderId: null }
                   : {}),
         ...(q.from || q.to ? { spentOn: { ...(q.from ? { gte: toDbDate(q.from) } : {}), ...(q.to ? { lte: toDbDate(q.to) } : {}) } } : {}),
+        ...(q.q?.trim()
+          ? {
+              AND: [
+                {
+                  OR: [
+                    { description: { contains: q.q.trim(), mode: "insensitive" as const } },
+                    { note: { contains: q.q.trim(), mode: "insensitive" as const } },
+                    { payee: { contains: q.q.trim(), mode: "insensitive" as const } },
+                  ],
+                },
+              ],
+            }
+          : {}),
       },
       select: {
         id: true,

@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { Pending } from "@kebo/ui";
 import { usePathname } from "next/navigation";
 import { ORDER_TAB_LABEL, type OrderTab } from "@kebo/shared";
+import { TabRow } from "@/components/common/record-tabs";
 
 /** Pages that belong to a tab without being it (their own address, the tab's place in the line). */
 const INSIDE: Record<string, OrderTab> = { goods: "production", packing: "shipping", items: "overview", money: "payment", papers: "documents" };
@@ -25,19 +24,9 @@ function useTab(base: string): OrderTab {
 export function OrderTabs({ base, tabs }: { base: string; tabs: { key: OrderTab; word?: string }[] }) {
   const at = useTab(base);
   return (
-    <nav aria-label="Order" className="no-print mt-4 flex gap-x-[22px] overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {tabs.map((t) => (
-        <Link
-          key={t.key}
-          href={t.key === "overview" ? base : `${base}/${t.key}`}
-          aria-current={at === t.key ? "page" : undefined}
-          className="-mb-px flex h-[42px] shrink-0 items-center gap-[7px] border-b-2 border-transparent text-[13.5px] font-medium text-text-2 hover:text-text aria-[current]:border-primary-solid aria-[current]:font-bold aria-[current]:text-text"
-        >
-          {ORDER_TAB_LABEL[t.key]}
-          {t.word && <span className="text-xs font-semibold text-text-2">{t.word}</span>}
-          <Pending />
-        </Link>
-      ))}
-    </nav>
+    <TabRow
+      label="Order"
+      items={tabs.map((t) => ({ href: t.key === "overview" ? base : `${base}/${t.key}`, label: ORDER_TAB_LABEL[t.key], tag: t.word, active: at === t.key }))}
+    />
   );
 }

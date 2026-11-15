@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock, Download, Factory, FileText, List, Plus, ShoppingCart, TrendingUp, UserRound, X } from "lucide-react";
+import { Clock, Factory, FileText, List, Plus, ShoppingCart, TrendingUp, UserRound, X } from "lucide-react";
 import { can } from "@kebo/shared";
 import {
   RefCode,
@@ -21,6 +21,7 @@ import {
   THead,
   toPage,
 } from "@kebo/ui";
+import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { PartyExcel } from "@/components/sheets/party-excel";
 import { DataTable } from "@/components/common/data-table";
@@ -123,9 +124,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         papers={
           <>
             <PartyExcel kind="factories" importAction={importFactoriesAction} />
-            <ButtonLink href={buildHref("/sheets/export/factories", {}, { ...query, format: "csv" })} prefetch={false}>
-              <Download aria-hidden /> Export CSV
-            </ButtonLink>
+            <ExportCsv what="factories" query={query} />
           </>
         }
         primary={
