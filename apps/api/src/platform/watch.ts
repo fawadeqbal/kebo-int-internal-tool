@@ -18,6 +18,8 @@ export const REQUEST_STEPS_MS = [25, 50, 100, 200, 400, 800, 1600, 3200, 6400];
 export const KEEP_DAYS = 30;
 /** The outside watcher's check (GitHub Actions, .github/workflows/watch.yml): counted under this name. */
 export const OUTSIDE_ROUTE = "outside check";
+/** How fast pages showed in the browser (largest contentful paint, sent by the web app): counted as "PAGE /orders/[id]". */
+export const PAGE_PREFIX = "PAGE ";
 
 /** "GET /api/orders/:id": the route that answered, never the ids in the address. */
 export function routeOf(req: Request): string {

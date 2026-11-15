@@ -1,6 +1,9 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
+/** Features no page may use (the API sends the same). */
+const PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+
 const config: NextConfig = {
   output: "standalone",
   // In the monorepo the standalone server must trace files from the repo root.
@@ -27,6 +30,8 @@ const config: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "same-origin" },
           { key: "X-Frame-Options", value: "DENY" },
+          // Nothing in the app uses the camera, the microphone, the location, payments in the browser or USB.
+          { key: "Permissions-Policy", value: PERMISSIONS_POLICY },
         ],
       },
       // A file of an order may show inside the app itself (Documents v3: View opens here), never elsewhere.

@@ -1,7 +1,8 @@
 # The outside watcher (Dev tools › Big picture): every 5 minutes, from GitHub's servers, the site must
-# answer. When it does not answer three times in a row, this run fails, and GitHub emails the owner
-# of the repository (Settings › Notifications › Actions: "failed workflows only"). The server cannot
-# warn about itself when it is down; this can.
+# answer, and its background worker must still be running its jobs (the API says so in its answer).
+# After three bad answers in a row this run fails, and GitHub emails the owner of the repository
+# (Settings › Notifications › Actions: "failed workflows only"). The server cannot warn about itself
+# when it is down; this can.
 # The address: the repository variable WATCH_URL (Settings › Secrets and variables › Actions ›
 # Variables), else the live site.
 name: Watch the site
@@ -27,12 +28,15 @@ jobs:
           URL: ${{ vars.WATCH_URL || 'https://rfq.fawadiqbal.dev' }}
         run: |
           for try in 1 2 3; do
-            if curl -fsS --max-time 20 -o /dev/null "$URL/api/health?from=outside"; then
+            code=$(curl -sS --max-time 20 -o answer.json -w '%{http_code}' "$URL/api/health?from=outside" || true)
+            if [ "$code" = "200" ]; then
               echo "$URL answers"
               exit 0
             fi
-            echo "no answer (try $try)"
+            # Why, when the API says (e.g. the background worker has stopped).
+            said=$(head -c 400 answer.json 2>/dev/null || true)
+            echo "no good answer (try $try): HTTP ${code:-none} ${said}"
             sleep 30
           done
-          echo "::error::$URL did not answer three times in a row"
+          echo "::error::$URL: three bad answers in a row. HTTP ${code:-none} ${said}"
           exit 1

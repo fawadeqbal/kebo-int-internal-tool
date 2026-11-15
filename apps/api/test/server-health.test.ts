@@ -6,7 +6,14 @@ import { createPrismaClient } from "@kebo/database";
 import type { Env } from "../src/config/env";
 import type { PrismaService } from "../src/database/prisma.service";
 import type { PlatformMail } from "../src/platform/platform-mail";
-import { serverWarnings, ServerHealthService, warningsToSend, type BackupStatus, type Read } from "../src/platform/server-health";
+import {
+  serverWarnings,
+  ServerHealthService,
+  warningsToSend,
+  workerSilence,
+  type BackupStatus,
+  type Read,
+} from "../src/platform/server-health";
 
 const now = new Date("2026-11-20T08:00:00Z");
 const hoursAgo = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString();
@@ -14,7 +21,8 @@ const ok = <T>(value: T): Read<T> => ({ state: "ok", value });
 const missing = { state: "missing" } as const;
 const keys = (input: Partial<Parameters<typeof serverWarnings>[0]>) =>
   serverWarnings({ now, watchingSince: new Date(hoursAgo(1)), backup: missing, disk: missing, ...input }).map((w) => w.key);
-const backup = (b: Partial<BackupStatus>) => ok<BackupStatus>({ at: hoursAgo(5), ok: true, lastGoodAt: hoursAgo(5), offsite: "off", ...b });
+const backup = (b: Partial<BackupStatus>) =>
+  ok<BackupStatus>({ at: hoursAgo(5), ok: true, lastGoodAt: hoursAgo(5), offsite: "ok", offsiteAt: hoursAgo(5), ...b });
 
 describe("server check: what is a problem", () => {
   it("a good backup from last night is fine", () => {
@@ -46,6 +54,64 @@ describe("server check: what is a problem", () => {
     });
     expect(w.map((x) => x.key)).toEqual(["offsite_failed"]);
     expect(w[0].detail).toContain("db-x.sql.gz");
+  });
+
+  it("no off-site copy set up: the backups are on the server only", () => {
+    const w = serverWarnings({ now, watchingSince: now, disk: missing, backup: backup({ offsite: "off", offsiteAt: null }) });
+    expect(w.map((x) => x.key)).toEqual(["offsite_off"]);
+    expect(w[0]!.detail).toContain("deploy/server/enable-offsite.sh");
+  });
+
+  it("the off-site copy more than a day old; a failed one says when it last worked", () => {
+    // Set up, but the last runs did not get to it (they failed before).
+    expect(keys({ backup: backup({ offsite: "pending", offsiteAt: hoursAgo(30) }) })).toEqual(["offsite_old"]);
+    expect(keys({ backup: backup({ offsite: "pending", offsiteAt: hoursAgo(20) }) })).toEqual([]);
+    // A status from before offsiteAt was written: the run that made it "ok" is when.
+    expect(keys({ backup: backup({ offsite: "ok", offsiteAt: undefined, at: hoursAgo(3) }) })).toEqual([]);
+    const failed = serverWarnings({
+      now,
+      watchingSince: now,
+      disk: missing,
+      backup: backup({ ok: false, offsite: "failed", offsiteAt: hoursAgo(60) }),
+    });
+    expect(failed.map((x) => x.key)).toEqual(["offsite_failed"]);
+    expect(failed[0]!.detail).toContain("Last good off-site copy: 2 days ago");
+  });
+
+  it("a background job slower than its beat (its last run, in the last day)", () => {
+    const run = (job: string, tookMs: number, beatMs: number, startedHoursAgo = 1) => ({
+      job,
+      label: job,
+      startedAt: hoursAgo(startedHoursAgo),
+      tookMs,
+      beatMs,
+    });
+    expect(keys({ backup: backup({}), jobs: [run("Follow-up reminders", 40_000, 300_000)] })).toEqual([]);
+    const w = serverWarnings({
+      now,
+      watchingSince: now,
+      disk: missing,
+      backup: backup({}),
+      jobs: [run("Follow-up reminders", 420_000, 300_000)],
+    });
+    expect(w.map((x) => x.key)).toEqual(["job_slow"]);
+    expect(w[0]!.title).toBe("A background job is slower than its beat: Follow-up reminders");
+    expect(w[0]!.detail).toContain("Follow-up reminders took 7 min (it runs every 5 min)");
+    expect(keys({ backup: backup({}), jobs: [run("Reminders", 4 * 3_600_000, 3_600_000, 30)] })).toEqual([]);
+  });
+
+  it("the quarterly rebuild from the off-site copy failed (within the week)", () => {
+    const restore = (worked: boolean, at: string) =>
+      ok<{ at: string; ok: boolean; message: string }>({ at, ok: worked, message: "Could not fetch db-x.sql.gz from the off-site store." });
+    expect(keys({ backup: backup({}), offsiteRestore: restore(false, hoursAgo(10)) })).toEqual(["offsite_restore_failed"]);
+    expect(keys({ backup: backup({}), offsiteRestore: restore(false, hoursAgo(24 * 8)) })).toEqual([]);
+    expect(keys({ backup: backup({}), offsiteRestore: restore(true, hoursAgo(10)) })).toEqual([]);
+  });
+
+  it("the outside watcher: a worker that finished no job for an hour is stopped", () => {
+    expect(workerSilence(null, now)).toBeNull();
+    expect(workerSilence(new Date(now.getTime() - 59 * 60_000), now)).toBeNull();
+    expect(workerSilence(new Date(now.getTime() - 75 * 60_000), now)).toMatch(/^The background worker has finished no job for 75 minutes/);
   });
 
   it("no status file: only once a backup should have run since the worker started", () => {

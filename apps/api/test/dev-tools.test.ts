@@ -236,9 +236,16 @@ describe("dev tools: the pages' data", () => {
     await errors.record("api", "GET /api/payments", boom, { company: "Codecrood", user: "Sana", path: "/api/payments" });
     await errors.record("api", "GET /api/payments", boom, { company: "Codecrood", user: "Sana", path: "/api/payments" });
 
+    // Pages, as the browser measured them: counted apart from the API's answers.
+    const page = `/test-${tag}/[id]`;
+    for (const ms of [900, 1500, 3000, 3000]) stats.add(`PAGE ${page}`, ms, false);
+    await stats.flush();
+
     const v = (await get("/speed").expect(200)).body;
     expect(v.outside.lastAt).toBeTruthy();
     expect(v.slowest.find((r: { route: string }) => r.route === route)).toMatchObject({ count: 6, slowMs: 3120 });
+    expect(v.slowest.some((r: { route: string }) => r.route.startsWith("PAGE "))).toBe(false);
+    expect(v.pages.find((p: { page: string }) => p.page === page)).toMatchObject({ count: 4 });
     const prisma = app.get(PrismaService);
     const routes = await prisma.platform.requestMinute.findMany({ where: { route: { startsWith: "GET /api/platform/dev-tools" } }, select: { route: true } });
     expect(routes.map((r) => r.route)).toContain("GET /api/platform/dev-tools/overview");

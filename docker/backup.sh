@@ -14,6 +14,8 @@
 #   sh /backup.sh once       one backup now; the exit code says whether it worked
 #   sh /backup.sh restore-test   put the newest database backup into a spare database and check it (also once
 #                            a month by itself, after the nightly backup): backups/status/restore-status.json
+#   sh /backup.sh offsite-restore-test   the same with the newest backup on the off-site store (also once a
+#                            quarter by itself, when it is set up): backups/status/offsite-restore-status.json
 #   sh /backup.sh rclone …   rclone with the remotes "minio" (the app's files) and "offsite" ready (restores)
 set -eu
 # The image's sh (busybox ash) has pipefail: a failed pg_dump fails the run even though gzip succeeded.
@@ -42,9 +44,11 @@ json_str() {
 # backups/status/last-status.json, for the worker (backups/status is mounted into it, read-only).
 write_status() { # ok message
   good=$(cat "$STATUS/last-good" 2>/dev/null || true)
+  # When the off-site copy last worked (offsite: off = not set up; pending = set up, this run did not get to it).
+  offsite_good=$(cat "$STATUS/last-offsite" 2>/dev/null || true)
   tmp="$STATUS/.last-status.json.tmp"
-  printf '{"at":"%s","ok":%s,"message":%s,"lastGoodAt":%s,"dump":%s,"offsite":"%s"}\n' \
-    "$(now_utc)" "$1" "$(json_str "$2")" "$(json_str "$good")" "$(json_str "${dump:-}")" "${offsite:-off}" >"$tmp"
+  printf '{"at":"%s","ok":%s,"message":%s,"lastGoodAt":%s,"dump":%s,"offsite":"%s","offsiteAt":%s}\n' \
+    "$(now_utc)" "$1" "$(json_str "$2")" "$(json_str "$good")" "$(json_str "${dump:-}")" "${offsite:-off}" "$(json_str "$offsite_good")" >"$tmp"
   chmod 644 "$tmp"
   mv "$tmp" "$STATUS/last-status.json"
 }
@@ -145,7 +149,7 @@ finished() {
 once() {
   stamp=$(date +%Y-%m-%d_%H%M)
   dump=""
-  offsite=off
+  if [ -n "${OFFSITE_S3_ENDPOINT:-}" ]; then offsite=pending; else offsite=off; fi
   step="start"
   trap 'finished $?' EXIT
   log "starting $stamp"
@@ -187,6 +191,8 @@ once() {
     offsite=failed
     offsite_copy
     offsite=ok
+    now_utc >"$STATUS/last-offsite"
+    chmod 644 "$STATUS/last-offsite"
   fi
   step="finish"
 }
@@ -195,22 +201,57 @@ once() {
 # tables, the companies and the orders. Proves the backups can be restored, before they are needed.
 # The spare database is dropped again. Result: backups/status/restore-status.json (Dev tools shows it; the
 # worker emails the platform admins when it failed).
+# "offsite": the newest backup on the off-site store instead, fetched first: the business can be rebuilt from
+# the off-site copy alone (once a quarter). Result: backups/status/offsite-restore-status.json.
 restore_test() {
   scratch=kebo_restore_test
-  latest=$(ls -1t "$DIR"/db-*.sql.gz 2>/dev/null | head -n 1 || true)
+  from="${1:-local}"
+  out="restore-status.json"
+  [ "$from" = "offsite" ] && out="offsite-restore-status.json"
   start=$(date +%s)
+  name=""
   write_restore() { # ok message tables companies orders
-    tmp="$STATUS/.restore-status.json.tmp"
+    tmp="$STATUS/.$out.tmp"
     printf '{"at":"%s","ok":%s,"message":%s,"dump":%s,"tookSec":%s,"tables":%s,"companies":%s,"orders":%s}\n' \
-      "$(now_utc)" "$1" "$(json_str "$2")" "$(json_str "$(basename "${latest:-}")")" "$(($(date +%s) - start))" "${3:-null}" "${4:-null}" "${5:-null}" >"$tmp"
+      "$(now_utc)" "$1" "$(json_str "$2")" "$(json_str "$name")" "$(($(date +%s) - start))" "${3:-null}" "${4:-null}" "${5:-null}" >"$tmp"
     chmod 644 "$tmp"
-    mv "$tmp" "$STATUS/restore-status.json"
+    mv "$tmp" "$STATUS/$out"
   }
+  if [ "$from" = "offsite" ]; then
+    if [ -z "${OFFSITE_S3_ENDPOINT:-}" ] || ! setup_rclone; then
+      write_restore false "The off-site copy is not set up."
+      return 1
+    fi
+    newest=$(rclone lsf --files-only offsite:db 2>/dev/null | grep -E '^db-.*\.sql\.gz$' | sort | tail -n 1 || true)
+    if [ -z "$newest" ]; then
+      write_restore false "There is no database backup on the off-site store."
+      return 1
+    fi
+    name="offsite:db/$newest"
+    latest="$DIR/.offsite-test.sql.gz.partial"
+    log "restore test from off-site: fetching $newest"
+    if ! rclone copyto "offsite:db/$newest" "$latest" --stats-one-line --stats-log-level NOTICE; then
+      rm -f "$latest"
+      write_restore false "Could not fetch $newest from the off-site store."
+      return 1
+    fi
+    rc=0
+    restore_into_scratch || rc=$?
+    rm -f "$latest"
+    return "$rc"
+  fi
+  latest=$(ls -1t "$DIR"/db-*.sql.gz 2>/dev/null | head -n 1 || true)
   if [ -z "$latest" ]; then
     write_restore false "There is no database backup to try."
     return 1
   fi
-  log "restore test: $latest into $scratch"
+  name=$(basename "$latest")
+  restore_into_scratch
+}
+
+# $latest into the spare database, checked, dropped again; the result through write_restore.
+restore_into_scratch() {
+  log "restore test: $name into $scratch"
   if ! psql -q -d postgres -v ON_ERROR_STOP=1 -c "drop database if exists $scratch" -c "create database $scratch" -c "alter database $scratch set timezone to 'UTC'" >/dev/null; then
     write_restore false "Could not make the spare database."
     return 1
@@ -240,6 +281,12 @@ restore_test_due() {
   [ ! -f "$STATUS/restore-status.json" ] || [ -n "$(find "$STATUS/restore-status.json" -mtime +29 2>/dev/null)" ]
 }
 
+# Once a quarter, when the off-site copy is set up: the last rebuild from it is 90 days old, or there is none.
+offsite_restore_due() {
+  [ -n "${OFFSITE_S3_ENDPOINT:-}" ] || return 1
+  [ ! -f "$STATUS/offsite-restore-status.json" ] || [ -n "$(find "$STATUS/offsite-restore-status.json" -mtime +89 2>/dev/null)" ]
+}
+
 prepare() {
   mkdir -p "$DIR" "$STATUS"
   chgrp "$BACKUP_GID" "$DIR" && chmod 750 "$DIR"
@@ -258,6 +305,11 @@ case "${1:-}" in
     restore_test
     exit $?
     ;;
+  offsite-restore-test)
+    prepare
+    restore_test offsite
+    exit $?
+    ;;
   rclone)
     shift
     setup_rclone
@@ -265,7 +317,7 @@ case "${1:-}" in
     ;;
   "") ;;
   *)
-    echo "usage: sh /backup.sh [once | restore-test | rclone …]" >&2
+    echo "usage: sh /backup.sh [once | restore-test | offsite-restore-test | rclone …]" >&2
     exit 2
     ;;
 esac
@@ -275,6 +327,7 @@ while true; do
   # A failed run is in the log, in backups/status/last-status.json and, through the worker, in an email.
   sh "$0" once || log "the backup failed (see above); next try at the next BACKUP_HOUR" >&2
   if restore_test_due; then sh "$0" restore-test || log "the restore test failed (see backups/status/restore-status.json)" >&2; fi
+  if offsite_restore_due; then sh "$0" offsite-restore-test || log "the rebuild from the off-site copy failed (see backups/status/offsite-restore-status.json)" >&2; fi
   # Sleep until the next BACKUP_HOUR:00.
   now=$(date +%s)
   hour=$(printf "%02d" "${BACKUP_HOUR:-2}")

@@ -6,7 +6,8 @@ __DOMAIN__ {
 		max_size 30MB
 	}
 	header {
-		Strict-Transport-Security "max-age=31536000"
+		# Every address under it is HTTPS too (the companies' addresses: certificates on demand).
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		-Server
 	}
 	handle /api/* {

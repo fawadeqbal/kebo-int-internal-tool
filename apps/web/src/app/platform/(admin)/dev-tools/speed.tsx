@@ -71,36 +71,65 @@ export function SpeedTab({ v, errors }: { v: DevSpeedView; errors: "open" | "fix
       </Card>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Slowest pages and calls" description={`by the slowest 5%, last ${period} (5 requests or more)`} />
-          {v.slowest.length ? (
-            <Table>
-              <THead>
-                <Tr>
-                  <Th>Call</Th>
-                  <Th className="text-right">Times</Th>
-                  <Th className="text-right">Typical</Th>
-                  <Th className="text-right">Slowest 5%</Th>
-                </Tr>
-              </THead>
-              <tbody>
-                {v.slowest.map((r) => (
-                  <Tr key={r.route}>
-                    <Td className="font-mono text-xs break-all">
-                      {r.route}
-                      {r.errors > 0 && <span className="ml-2 font-sans text-bad">{r.errors} errors</span>}
-                    </Td>
-                    <Td className="text-right tabular">{r.count.toLocaleString("en-US")}</Td>
-                    <Td className="text-right tabular">{msText(r.typicalMs)}</Td>
-                    <Td className={`text-right tabular ${r.slowMs !== null && r.slowMs >= 2000 ? "font-semibold text-warn" : ""}`}>{msText(r.slowMs)}</Td>
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader title="Slowest calls" description={`the API's answers, by the slowest 5%, last ${period} (5 requests or more)`} />
+            {v.slowest.length ? (
+              <Table>
+                <THead>
+                  <Tr>
+                    <Th>Call</Th>
+                    <Th className="text-right">Times</Th>
+                    <Th className="text-right">Typical</Th>
+                    <Th className="text-right">Slowest 5%</Th>
                   </Tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : (
-            <EmptyState title="Not enough requests yet" />
-          )}
-        </Card>
+                </THead>
+                <tbody>
+                  {v.slowest.map((r) => (
+                    <Tr key={r.route}>
+                      <Td className="font-mono text-xs break-all">
+                        {r.route}
+                        {r.errors > 0 && <span className="ml-2 font-sans text-bad">{r.errors} errors</span>}
+                      </Td>
+                      <Td className="text-right tabular">{r.count.toLocaleString("en-US")}</Td>
+                      <Td className="text-right tabular">{msText(r.typicalMs)}</Td>
+                      <Td className={`text-right tabular ${r.slowMs !== null && r.slowMs >= 2000 ? "font-semibold text-warn" : ""}`}>{msText(r.slowMs)}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <EmptyState title="Not enough requests yet" />
+            )}
+          </Card>
+          <Card>
+            <CardHeader title="How fast pages show" description={`in people's browsers, until the main part is on screen · last ${period} (3 visits or more)`} />
+            {v.pages.length ? (
+              <Table>
+                <THead>
+                  <Tr>
+                    <Th>Page</Th>
+                    <Th className="text-right">Visits</Th>
+                    <Th className="text-right">Typical</Th>
+                    <Th className="text-right">3 in 4 within</Th>
+                  </Tr>
+                </THead>
+                <tbody>
+                  {v.pages.map((p) => (
+                    <Tr key={p.page}>
+                      <Td className="font-mono text-xs break-all">{p.page}</Td>
+                      <Td className="text-right tabular">{p.count.toLocaleString("en-US")}</Td>
+                      <Td className="text-right tabular">{msText(p.typicalMs)}</Td>
+                      <Td className={`text-right tabular ${p.slowMs !== null && p.slowMs >= 2500 ? "font-semibold text-warn" : ""}`}>{msText(p.slowMs)}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <EmptyState title="No page visits measured yet" />
+            )}
+          </Card>
+        </div>
 
         <div className="flex flex-col gap-4">
           <Card>
@@ -126,7 +155,7 @@ export function SpeedTab({ v, errors }: { v: DevSpeedView; errors: "open" | "fix
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-medium break-words">{e.message}</span>
                           <span className="block text-xs text-text-2">
-                            {[e.where, `${e.count} ${e.count === 1 ? "time" : "times"}`, `last ${agoText(e.lastAt)}`, e.companyName].filter(Boolean).join(" · ")}
+                            {[e.source === "web" ? `in the browser: ${e.where}` : e.where, `${e.count} ${e.count === 1 ? "time" : "times"}`, `last ${agoText(e.lastAt)}`, e.companyName].filter(Boolean).join(" · ")}
                           </span>
                         </span>
                         <Badge tone={e.status === "open" ? "bad" : "ok"}>{e.status === "open" ? "Open" : "Fixed"}</Badge>

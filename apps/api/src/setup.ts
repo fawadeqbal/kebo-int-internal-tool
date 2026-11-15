@@ -17,6 +17,11 @@ export function configureApp(app: INestApplication, env: Env) {
   // req.ip honours X-Forwarded-For only for the configured number of proxy hops.
   (app.getHttpAdapter().getInstance() as { set(key: string, value: unknown): void }).set("trust proxy", env.TRUST_PROXY);
   app.use(helmet());
+  // Files open from here in the browser: they may not use the camera, the microphone, the location, payments or USB.
+  app.use((_req: unknown, res: { setHeader(name: string, value: string): void }, next: () => void) => {
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+    next();
+  });
   // Dev tools: how fast each route answers, and its server errors (RequestStats).
   app.use(app.get(RequestStats).middleware());
   // Room for the company stamp image in the settings (a data URL of up to ~400 KB).

@@ -19,8 +19,8 @@ import type {
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
 import { PlatformRoute } from "./platform-auth";
-import { BACKUP_MAX_AGE_HOURS, readStatus, type BackupStatus, type RestoreStatus } from "./server-health";
-import { OUTSIDE_ROUTE, quantileMs, REQUEST_STEPS_MS } from "./watch";
+import { BACKUP_MAX_AGE_HOURS, offsiteGoodAt, readStatus, type BackupStatus, type RestoreStatus } from "./server-health";
+import { OUTSIDE_ROUTE, PAGE_PREFIX, quantileMs, REQUEST_STEPS_MS } from "./watch";
 import { DevToolsMoreService, OPEN_PORTS } from "./dev-tools-more";
 
 export { OPEN_PORTS };
@@ -426,6 +426,7 @@ export function buildChecks(i: CheckInput): DevCheck[] {
     fix: !b || goodAge > BACKUP_MAX_AGE_HOURS || !b.ok ? "See the Backup's live log in Services, and docs/restore.md." : undefined,
   });
   const off = b?.offsite ?? null;
+  const offAt = b ? offsiteGoodAt(b) : null;
   out.push({
     key: "offsite",
     lane: "data",
@@ -435,10 +436,12 @@ export function buildChecks(i: CheckInput): DevCheck[] {
         ? "made with the last backup"
         : off === "failed"
           ? "failed"
-          : off === "off"
-            ? "off: backups are on this server only"
-            : "not known yet",
-    level: off === "ok" ? "ok" : off === "failed" ? "bad" : off === "off" ? "warn" : "off",
+          : off === "pending"
+            ? `not made by the last backup run${offAt ? ` · last made ${agoShort(offAt, i.now)}` : ""}`
+            : off === "off"
+              ? "off: backups are on this server only"
+              : "not known yet",
+    level: off === "ok" ? "ok" : off === "failed" ? "bad" : off === "off" || off === "pending" ? "warn" : "off",
     tab: "data",
     fix:
       off === "off"
@@ -682,15 +685,17 @@ export class DevToolsService {
       b[Number(r.i) - 1] = Number(r.n);
       buckets.set(r.route, b);
     }
-    const routes = counts
-      .filter((r) => r.route !== OUTSIDE_ROUTE)
-      .map((r) => ({ route: r.route, count: Number(r.count), errors: Number(r.errors), buckets: buckets.get(r.route) ?? [] }));
+    const counted = counts.map((r) => ({ route: r.route, count: Number(r.count), errors: Number(r.errors), buckets: buckets.get(r.route) ?? [] }));
+    // The API's answers; pages (how fast they showed in the browser) are counted apart.
+    const routes = counted.filter((r) => r.route !== OUTSIDE_ROUTE && !r.route.startsWith(PAGE_PREFIX));
+    const pages = counted.filter((r) => r.route.startsWith(PAGE_PREFIX)).map((r) => ({ ...r, route: r.route.slice(PAGE_PREFIX.length) }));
     const all = routes.reduce(
       (acc, r) => acc.map((v, k) => v + (r.buckets[k] ?? 0)),
       new Array(REQUEST_STEPS_MS.length + 1).fill(0) as number[],
     );
     return {
       routes,
+      pages,
       requests: routes.reduce((a, r) => a + r.count, 0),
       errors: routes.reduce((a, r) => a + r.errors, 0),
       typicalMs: quantileMs(all, 0.5),
@@ -918,7 +923,7 @@ export class DevToolsService {
           ? "off"
           : goodAge > BACKUP_MAX_AGE_HOURS || backup.offsite === "failed"
             ? "bad"
-            : !backup.ok || backup.offsite === "off"
+            : !backup.ok || backup.offsite === "off" || backup.offsite === "pending"
               ? "warn"
               : "ok",
         lastGoodAt: backup?.lastGoodAt ?? null,
@@ -927,6 +932,7 @@ export class DevToolsService {
         message: backup?.message ?? null,
         dump: backup?.dump ?? null,
         offsite: backup?.offsite ?? null,
+        offsiteAt: backup ? offsiteGoodAt(backup) : null,
       },
       database,
     };
@@ -941,7 +947,7 @@ export class DevToolsService {
       this.prisma.platform.$queryRaw<{ t: Date; i: bigint; n: bigint; c: bigint }[]>`
         select date_bin(${`${stepMs / 1000} seconds`}::interval, minute, timestamptz '2000-01-01') as t, u.i, sum(u.b)::bigint as n, 0::bigint as c
         from request_minutes, unnest(buckets) with ordinality as u(b, i)
-        where minute >= ${since} and route <> ${OUTSIDE_ROUTE} group by 1, u.i order by 1`,
+        where minute >= ${since} and route <> ${OUTSIDE_ROUTE} and route not like ${`${PAGE_PREFIX}%`} group by 1, u.i order by 1`,
       this.prisma.platform.appError.findMany({ where: { status }, orderBy: { lastAt: "desc" }, take: 50 }),
       this.prisma.platform.appError.count({ where: { status: "fixed" } }),
       this.outside(),
@@ -984,6 +990,12 @@ export class DevToolsService {
           typicalMs: quantileMs(r.buckets, 0.5),
           slowMs: quantileMs(r.buckets, 0.95),
         }))
+        .sort((a, b) => (b.slowMs ?? 0) - (a.slowMs ?? 0))
+        .slice(0, 10),
+      // How fast pages showed their main part in the browser: typical, and 3 in 4 within (the usual measure).
+      pages: stats.pages
+        .filter((p) => p.count >= 3)
+        .map((p) => ({ page: p.route, count: p.count, typicalMs: quantileMs(p.buckets, 0.5), slowMs: quantileMs(p.buckets, 0.75) }))
         .sort((a, b) => (b.slowMs ?? 0) - (a.slowMs ?? 0))
         .slice(0, 10),
       errorsList: errors.map((e): DevError => ({

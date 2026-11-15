@@ -50,6 +50,8 @@ OFFSITE_ENCRYPTION_PASSWORD=<from setup.sh; also in your password manager>
 
 After editing it by hand: `docker compose up -d backup` (it backs up at once) and check: `cat backups/status/last-status.json` says `"ok":true,"offsite":"ok"`, and `docker compose exec backup sh /backup.sh rclone lsf -R offsite:db` lists the dump.
 
+**Checked by itself.** Once a month the newest local backup is put back into a spare database and checked (`backups/status/restore-status.json`); once a quarter, the same with the newest backup on the off-site store, fetched first (`backups/status/offsite-restore-status.json`): proof that the business can be rebuilt from the off-site copy alone. Either failing is emailed to the platform admins and shown in Dev tools › Jobs and emails, as are no off-site copy at all and an off-site copy more than a day old. By hand: `docker compose exec backup sh /backup.sh restore-test` or `… offsite-restore-test`.
+
 ## Before a restore
 
 - **`kebo_app` first.** The database's company tables are granted to the role `kebo_app`. It belongs to the database server, not to the database, so a dump does not make it. On a new database server create it before restoring: `create role kebo_app nologin`, and give it to `kebo` (`grant kebo_app to kebo`). Without it the restore prints errors for every grant and the app cannot read company data.
