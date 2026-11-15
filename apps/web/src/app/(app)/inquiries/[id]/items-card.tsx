@@ -1,5 +1,5 @@
 import { can } from "@kebo/shared";
-import { Badge, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, ScrollFade, Td, Th, THead, Tr } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { qty } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
@@ -29,7 +29,7 @@ export async function ItemsCard({ id }: { id: string }) {
   const fromOffer = (sourcing?.quotes.length ?? 0) > 0 && d.items.length > 0;
 
   const table = (
-    <div className="overflow-x-auto">
+    <ScrollFade scrollLabel="Items they asked for" className="overflow-x-auto">
       <table className="w-full min-w-[680px] text-[13px]">
         <THead>
           <tr>
@@ -65,7 +65,7 @@ export async function ItemsCard({ id }: { id: string }) {
           })}
         </tbody>
       </table>
-    </div>
+    </ScrollFade>
   );
 
   return (

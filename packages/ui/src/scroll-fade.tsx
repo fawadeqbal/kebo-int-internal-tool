@@ -13,8 +13,19 @@ export function ScrollFade({
   as: Tag = "div",
   className,
   children,
+  scrollLabel,
   ...props
-}: { as?: "div" | "nav"; className?: string; children: ReactNode } & Omit<ComponentProps<"div">, "ref" | "children">) {
+}: {
+  as?: "div" | "nav";
+  className?: string;
+  children: ReactNode;
+  /**
+   * What is in the box ("Items they asked for"). Given, the box takes the keyboard while it is wider than the
+   * screen (focusable; arrow keys scroll it; a region with this name), so a table with no link in it can still be
+   * read to its last column (WCAG 2.1.1). When it fits, it is no stop on the way through the page.
+   */
+  scrollLabel?: string;
+} & Omit<ComponentProps<"div">, "ref" | "children">) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -23,6 +34,17 @@ export function ScrollFade({
       const more = el.scrollWidth - el.clientWidth > 2;
       el.toggleAttribute("data-fade-l", more && el.scrollLeft > 2);
       el.toggleAttribute("data-fade-r", more && el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+      if (scrollLabel) {
+        if (more) {
+          el.tabIndex = 0;
+          el.setAttribute("role", "region");
+          el.setAttribute("aria-label", scrollLabel);
+        } else {
+          el.removeAttribute("tabindex");
+          el.removeAttribute("role");
+          el.removeAttribute("aria-label");
+        }
+      }
     };
     const current = el.querySelector<HTMLElement>('[aria-current="page"], [aria-selected="true"]');
     if (current && el.scrollWidth > el.clientWidth) el.scrollLeft = current.offsetLeft - (el.clientWidth - current.offsetWidth) / 2;
@@ -34,9 +56,9 @@ export function ScrollFade({
       el.removeEventListener("scroll", update);
       ro.disconnect();
     };
-  }, []);
+  }, [scrollLabel]);
   return (
-    <Tag ref={ref as never} className={cn("scroll-fade", className)} {...props}>
+    <Tag ref={ref as never} className={cn("scroll-fade", scrollLabel && "focus-visible:-outline-offset-2", className)} {...props}>
       {children}
     </Tag>
   );
