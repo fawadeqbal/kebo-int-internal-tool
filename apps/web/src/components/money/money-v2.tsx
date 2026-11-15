@@ -3,16 +3,15 @@
 import { useMemo, useState } from "react";
 import { CheckCircle2, Circle, Info, Lock, Plus, Square } from "lucide-react";
 import { divideMinor, formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
-import { allocateOldestFirst, CREDIT_KIND_LABEL, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type FactoryDueRule, type LcCheck, type PaymentMethod } from "@kebo/shared";
+import { allocateOldestFirst, CREDIT_KIND_LABEL, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type LcCheck, type PaymentMethod } from "@kebo/shared";
 import { Alert, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { MoneyInput } from "@/components/common/money-input";
 import { rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
-import type { CustomerCreditView, FactoryPlanView } from "@/lib/types-money";
+import type { CustomerCreditView } from "@/lib/types-money";
 import { AccountSelect, RecordedBy } from "./accounts";
 import { FilePicker, useSaveThenSend } from "./attachment";
 import { useTime } from "@/lib/time-client";
@@ -786,89 +785,3 @@ export function LcChecks({ checks }: { checks: LcCheck[] }) {
 
 /* ---------------------------------------------------------------- the factory payment plan */
 
-/**
- * The supplier's plan, changed in the Edit panel of its card (Order › Factory order): the advance when we
- * order and the balance when they say ready (its date follows the ready date) or on a fixed day, with their
- * own invoice numbers once they send them. What is paid and what is due stay on the card.
- */
-export function FactoryPlanForm({ plan, action }: { plan: FactoryPlanView; action: Action }) {
-  const close = useClosePanel();
-  const advanceRow = plan.rows.find((r) => r.dueRule === "on_order");
-  const balanceRow = plan.rows.find((r) => r.dueRule !== "on_order");
-  const [advance, setAdvance] = useState(String(advanceRow?.percent ?? 0));
-  const [rule, setRule] = useState<FactoryDueRule>((balanceRow?.dueRule as FactoryDueRule) ?? "on_ready");
-  const [fixedOn, setFixedOn] = useState(balanceRow?.dueOn ?? "");
-  // The supplier's own invoice number for each part, once they send one (Billing: we do not number their bills).
-  const [advanceRef, setAdvanceRef] = useState(advanceRow?.supplierRef ?? "");
-  const [balanceRef, setBalanceRef] = useState(balanceRow?.supplierRef ?? "");
-  const owedMinor = toMinor(plan.owed);
-  const p = Math.min(Math.max(num(advance), 0), 100);
-  const rest = Math.round((100 - p) * 100) / 100;
-  const advanceMinor = Math.round((owedMinor * p) / 100);
-  const items = [
-    ...(advanceMinor > 0 ? [{ label: `Advance ${p}%`, percent: p, amount: fromMinor(advanceMinor), dueRule: "on_order", dueOn: null, supplierRef: advanceRef.trim() || null }] : []),
-    ...(owedMinor - advanceMinor > 0
-      ? [{ label: advanceMinor > 0 ? `Balance ${rest}%` : "Payment", percent: 100 - p, amount: fromMinor(owedMinor - advanceMinor), dueRule: rule, dueOn: rule === "fixed" ? fixedOn || null : null, supplierRef: balanceRef.trim() || null }]
-      : []),
-  ];
-  const id = plan.factory.id;
-  return (
-    <ActionForm action={action} keepFields showSuccess={false} onDone={close} className="flex min-h-0 flex-1 flex-col">
-      {(s) => (
-        <>
-          <PanelBody className="flex flex-col gap-5">
-            <input type="hidden" name="payload" value={JSON.stringify({ factoryId: id, items })} />
-            <p className="text-sm text-text-2">
-              We owe {plan.factory.name} <span className="font-semibold text-text tabular">{fmt(owedMinor, plan.currency)}</span> for this order.
-              {Number(plan.paid) > 0 && <> {fmt(toMinor(plan.paid), plan.currency)} is paid; payments already made stay.</>}
-            </p>
-            <Field label="Advance" htmlFor={`fa-${id}`} error={s.errors?.items} hint={advanceMinor > 0 ? `${fmt(advanceMinor, plan.currency)}, due the day we order` : "No advance"}>
-              <div className="flex items-center gap-2 text-sm text-text-2">
-                <Input id={`fa-${id}`} inputMode="decimal" className="w-20 tabular" value={advance} onChange={(e) => setAdvance(e.target.value)} />% when we order
-              </div>
-            </Field>
-            <Field label="Balance" htmlFor={`fb-${id}`} hint={owedMinor - advanceMinor > 0 ? fmt(owedMinor - advanceMinor, plan.currency) : undefined}>
-              <div className="flex flex-wrap items-center gap-2">
-                <Select id={`fb-${id}`} className="min-w-0 flex-1 basis-56" value={rule} onChange={(e) => setRule(e.target.value as FactoryDueRule)}>
-                  <option value="on_ready">{rest}% when they say ready (before shipping)</option>
-                  <option value="fixed">{rest}% on a fixed date</option>
-                  <option value="on_order">{rest}% when we order too</option>
-                </Select>
-                {rule === "fixed" && <Input aria-label="Balance due on" type="date" className="w-40" value={fixedOn} onChange={(e) => setFixedOn(e.target.value)} />}
-              </div>
-            </Field>
-            {/* The supplier's own invoice numbers, once they send them (we do not number their bills). */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              {advanceMinor > 0 && (
-                <Field label="Their invoice no. (advance)" htmlFor={`fra-${id}`}>
-                  <Input id={`fra-${id}`} maxLength={60} value={advanceRef} onChange={(e) => setAdvanceRef(e.target.value)} placeholder="If they sent one" />
-                </Field>
-              )}
-              {owedMinor - advanceMinor > 0 && (
-                <Field label={advanceMinor > 0 ? "Their invoice no. (balance)" : "Their invoice no."} htmlFor={`frb-${id}`}>
-                  <Input id={`frb-${id}`} maxLength={60} value={balanceRef} onChange={(e) => setBalanceRef(e.target.value)} placeholder="If they sent one" />
-                </Field>
-              )}
-            </div>
-            <p className="text-xs text-muted">
-              {rule === "on_ready"
-                ? "The balance takes its date from this supplier’s ready date: when that moves, so does the due day."
-                : rule === "fixed"
-                  ? "The balance is due on the day you set, whatever the ready date."
-                  : "Everything is due the day we order."}
-              {!plan.saved && " This is the company’s usual plan; saving keeps it for this order."}
-            </p>
-          </PanelBody>
-          <PanelActions className="static mx-0 mb-0 justify-end">
-            <Button variant="ghost" onClick={close}>
-              Cancel
-            </Button>
-            <SubmitButton pendingText="Saving…" disabled={rule === "fixed" && !fixedOn}>
-              Save the plan
-            </SubmitButton>
-          </PanelActions>
-        </>
-      )}
-    </ActionForm>
-  );
-}

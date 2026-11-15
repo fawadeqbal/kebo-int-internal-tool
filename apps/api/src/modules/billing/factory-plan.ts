@@ -1,6 +1,6 @@
 import { decimalToMinor, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
-import { defaultFactoryPlan, factoryPlanStatus, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
+import { defaultFactoryPlan, factoryPlanStatus, shippedOnOf, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
 import { factoryReadyOf, readySelect } from "@kebo/database";
@@ -75,6 +75,8 @@ export async function factoryPlansFor(db: Db, orderIds: string[], advancePercent
 const planSelect = {
   factoryOrderedOn: true,
   ...readySelect,
+  // "Days after shipping" parts count from the day the goods left (the earliest shipment).
+  shipments: { select: { departedOn: true } },
   lines: planLines,
   supplierPaid: supplierPaidRelation,
   expenses: factoryBorneExpenses,
@@ -97,6 +99,7 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
     }
   }
   const orderedOn = fromDbDateOrNull(o.factoryOrderedOn);
+  const shippedOn = shippedOnOf(o.shipments.map((x) => ({ departedOn: fromDbDateOrNull(x.departedOn) })));
   return [...owed.entries()].map(([key, f]) => {
     const stored = o.payables.filter((r) => `${r.supplierId}:${r.currency}` === key);
     const rows: (FactoryPlanRow & { id: string | null; supplierRef: string | null })[] = stored.length
@@ -108,13 +111,14 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
           amountMinor: decimalToMinor(r.amount),
           dueRule: r.dueRule as FactoryDueRule,
           dueOn: fromDbDateOrNull(r.dueOn),
+          dueDays: r.dueDays,
         }))
       : defaultFactoryPlan(f.owedMinor, advanceOf(o.lines, f.factory.id, advancePercent)).map((r) => ({ ...r, id: null, supplierRef: null }));
     const paidMinor = f.settledMinor;
     const planMinor = rows.reduce((t, r) => t + r.amountMinor, 0);
     // This factory's own ready date (one per factory; the order's is the latest).
     const readyOn = factoryReadyOf(o, f.factory.id);
-    const status = factoryPlanStatus(rows, paidMinor, orderedOn, readyOn, today, soonDays);
+    const status = factoryPlanStatus(rows, paidMinor, orderedOn, readyOn, today, soonDays, shippedOn);
     const paidBy = paymentsOnParts(
       rows,
       o.supplierPaid.filter((p) => !p.voidedAt && `${p.movement.partyId}:${p.movement.currency}` === key).map((p) => ({ id: p.id, minor: decimalToMinor(p.share) })),
@@ -145,6 +149,8 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
         dueRule: r.dueRule,
         /** The fixed date as saved (on_order / on_ready rows take theirs from the order). */
         dueOn: r.dueOn,
+        /** on_ship_plus_days: how many days after the goods leave. */
+        dueDays: r.dueDays ?? null,
         due: r.due,
         paid: fromMinor(r.paidMinor),
         open: fromMinor(r.openMinor),

@@ -497,11 +497,20 @@ function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMi
         amountMinor: decimalToMinor(r.amount),
         dueRule: r.dueRule as FactoryDueRule,
         dueOn: fromDbDateOrNull(r.dueOn),
+        dueDays: r.dueDays,
       }))
     : defaultFactoryPlan(owedMinor, advanceOf(c.o.lines, factoryId, c.settings.sales.factoryAdvancePercent));
   if (!rows.length || owedMinor <= 0) return null;
   const when = (r: (typeof rows)[number]) =>
-    r.dueRule === "on_order" ? "when we order" : r.dueRule === "on_ready" ? "on the ready date" : r.dueOn ? `by ${paperDateText(r.dueOn)}` : FACTORY_DUE_RULE_LABEL[r.dueRule];
+    r.dueRule === "on_order"
+      ? "when we order"
+      : r.dueRule === "on_ready"
+        ? "on the ready date"
+        : r.dueRule === "on_ship_plus_days"
+          ? `${r.dueDays ?? 0} days after shipping`
+          : r.dueOn
+            ? `by ${paperDateText(r.dueOn)}`
+            : FACTORY_DUE_RULE_LABEL[r.dueRule];
   const named = (r: (typeof rows)[number]) =>
     r.percent !== null && !/%/.test(r.label) ? `${r.label} ${Math.round(r.percent * 100) / 100}%` : r.label;
   return `Payment: ${rows.map((r) => `${named(r)}, ${formatMinor(r.amountMinor, currency)}, ${when(r)}`).join("; ")}.`;

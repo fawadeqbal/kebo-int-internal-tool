@@ -260,6 +260,15 @@ describe("money v2: the factory payment plan", () => {
     // Part paid on the advance, due today.
     expect(factoryPlanStatus(rows, 100_000, "2026-11-02", null, "2026-11-02", 3)[0]).toMatchObject({ status: "due", paidMinor: 100_000, openMinor: 200_000 });
   });
+
+  it("dates a part some days after the goods leave, once they have", () => {
+    const after = { label: "Balance 70%", percent: 70, amountMinor: 700_000, dueRule: "on_ship_plus_days" as const, dueOn: null, dueDays: 30 };
+    expect(factoryDueOn(after, "2026-11-08", "2027-01-07")).toBeNull();
+    expect(factoryDueOn(after, "2026-11-08", "2027-01-07", "2027-01-10")).toBe("2027-02-09");
+    const rows = [{ label: "Advance 30%", percent: 30, amountMinor: 300_000, dueRule: "on_order" as const, dueOn: null }, after];
+    expect(factoryPlanStatus(rows, 300_000, "2026-11-08", "2027-01-07", "2027-02-10", 3, "2027-01-10")[1]).toMatchObject({ due: "2027-02-09", status: "late" });
+    expect(factoryPlanStatus(rows, 300_000, "2026-11-08", "2027-01-07", "2027-02-10", 3)[1]).toMatchObject({ due: null, status: "later" });
+  });
 });
 
 describe("customerMoney: what the person paying the factory sees of the customer's side", () => {

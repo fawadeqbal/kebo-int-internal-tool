@@ -202,12 +202,15 @@ export class BillingService {
           currency: owed.currency,
           dueRule: i.dueRule,
           dueOn: i.dueRule === "fixed" ? toDbDateOrNull(i.dueOn) : null,
+          dueDays: i.dueRule === "on_ship_plus_days" ? (i.dueDays ?? 0) : null,
           supplierRef: i.supplierRef ?? null,
           sortOrder: n,
         })),
       });
-      const describe = (rows: { label: string; amount: string; dueRule: string | null; supplierRef: string | null }[]) =>
-        rows.map((r) => `${r.label} ${r.amount} (${r.dueRule})${r.supplierRef ? ` inv. ${r.supplierRef}` : ""}`).join("; ");
+      const describe = (rows: { label: string; amount: string; dueRule: string | null; dueDays?: number | null; supplierRef: string | null }[]) =>
+        rows
+          .map((r) => `${r.label} ${r.amount} (${r.dueRule}${r.dueRule === "on_ship_plus_days" ? ` ${r.dueDays ?? 0}d` : ""})${r.supplierRef ? ` inv. ${r.supplierRef}` : ""}`)
+          .join("; ");
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_out_plan",
@@ -216,7 +219,7 @@ export class BillingService {
         summary: `${o.refNo}: plan for paying ${f.name} set`,
         oldValues: {
           plan: describe(
-            before.map((b) => ({ label: b.label, amount: b.amount.toFixed(2), dueRule: b.dueRule, supplierRef: b.supplierRef })),
+            before.map((b) => ({ label: b.label, amount: b.amount.toFixed(2), dueRule: b.dueRule, dueDays: b.dueDays, supplierRef: b.supplierRef })),
           ),
         },
         newValues: {
@@ -225,6 +228,7 @@ export class BillingService {
               label: i.label,
               amount: fromMinor(toMinor(i.amount)),
               dueRule: i.dueRule,
+              dueDays: i.dueDays ?? null,
               supplierRef: i.supplierRef ?? null,
             })),
           ),

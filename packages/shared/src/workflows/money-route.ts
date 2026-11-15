@@ -542,12 +542,14 @@ export const CANCEL_FACTORY_MONEY_LABEL: Record<CancelFactoryMoney, string> = {
 
 /* ---------------------------------------------------------------- factory payment plan */
 
-export const FACTORY_DUE_RULES = ["on_order", "on_ready", "fixed"] as const;
+/** When a part of a supplier's plan falls due: when we order, their ready date, a fixed date, or days after the goods leave. */
+export const FACTORY_DUE_RULES = ["on_order", "on_ready", "fixed", "on_ship_plus_days"] as const;
 export type FactoryDueRule = (typeof FACTORY_DUE_RULES)[number];
 export const FACTORY_DUE_RULE_LABEL: Record<FactoryDueRule, string> = {
   on_order: "when ordered",
   on_ready: "ready date",
   fixed: "fixed date",
+  on_ship_plus_days: "days after shipping",
 };
 
 export interface FactoryPlanRow {
@@ -556,6 +558,8 @@ export interface FactoryPlanRow {
   amountMinor: Minor;
   dueRule: FactoryDueRule;
   dueOn: ISODate | null;
+  /** on_ship_plus_days: how many days after the goods leave. */
+  dueDays?: number | null;
 }
 
 /**
@@ -597,10 +601,19 @@ export function defaultFactoryPlan(owedMinor: Minor, advancePercent: number): Fa
 export type FactoryPlanStatus = "paid" | "part" | "due" | "late" | "later";
 export const FACTORY_PLAN_STATUS_LABEL: Record<FactoryPlanStatus, string> = { paid: "Paid", part: "Part paid", due: "Due", late: "Late", later: "Not due yet" };
 
-/** A row's date: when ordered (the factory order date), the order's ready date (moves with it), or the fixed date. */
-export function factoryDueOn(row: { dueRule: string; dueOn: ISODate | null }, orderedOn: ISODate | null, readyOn: ISODate | null): ISODate | null {
+/**
+ * A row's date: when ordered (the factory order date), the factory's ready date (moves with it), days after
+ * the goods left (moves with the shipment), or the fixed date.
+ */
+export function factoryDueOn(
+  row: { dueRule: string; dueOn: ISODate | null; dueDays?: number | null },
+  orderedOn: ISODate | null,
+  readyOn: ISODate | null,
+  shippedOn: ISODate | null = null,
+): ISODate | null {
   if (row.dueRule === "on_order") return orderedOn;
   if (row.dueRule === "on_ready") return readyOn;
+  if (row.dueRule === "on_ship_plus_days") return shippedOn ? addDays(shippedOn, Math.max(row.dueDays ?? 0, 0)) : null;
   return row.dueOn;
 }
 
@@ -616,9 +629,11 @@ export function factoryPlanStatus<T extends FactoryPlanRow>(
   readyOn: ISODate | null,
   today: ISODate,
   soonDays: number,
+  /** The day the goods left (the earliest shipment): "days after shipping" parts count from it. */
+  shippedOn: ISODate | null = null,
 ) {
   return payInstalments(rows, paidMinor).map(({ item, paidMinor: paid, openMinor }) => {
-    const due = factoryDueOn(item, orderedOn, readyOn);
+    const due = factoryDueOn(item, orderedOn, readyOn, shippedOn);
     const status: FactoryPlanStatus =
       openMinor <= 0 ? "paid" : due && due < today ? "late" : due && due <= addDays(today, soonDays) ? "due" : paid > 0 ? "part" : "later";
     return { ...item, due, paidMinor: paid, openMinor: Math.max(openMinor, 0), status, inDays: due ? daysBetween(today, due) : null };

@@ -10,12 +10,13 @@ type Row = FactoryPlanView["rows"][number];
 
 const grouped = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** When a part of a supplier's plan falls due, in the words the customer's plan uses (a fixed date: its date). */
-export const SUPPLIER_RULE: Record<FactoryDueRule, string | null> = {
-  on_order: "when we order",
-  on_ready: "when they say ready",
-  fixed: null,
-};
+/** When a part of a supplier's plan falls due, in the words the customer's plan uses (a fixed date: none, its date says it). */
+export function supplierRule(r: { dueRule: FactoryDueRule; dueDays?: number | null }): string | null {
+  if (r.dueRule === "on_order") return "when we order";
+  if (r.dueRule === "on_ready") return "when they say ready";
+  if (r.dueRule === "on_ship_plus_days") return `${r.dueDays ?? 0} days after shipping`;
+  return null;
+}
 
 /** "Advance" of "Advance 30%": the part's name without its share. */
 export const partName = (r: Pick<Row, "label">) => r.label.replace(/\s+\d+(?:\.\d+)?%$/, "") || r.label;
@@ -23,13 +24,13 @@ export const partName = (r: Pick<Row, "label">) => r.label.replace(/\s+\d+(?:\.\
 /** "30% when we order · CNY 19,170.00", "50% on 12/12/2026 · CNY 31,950.00". */
 export function partWords(r: Row, currency: string) {
   const share = r.percent !== null ? `${Number(r.percent.toFixed(2))}% ` : "";
-  const when = SUPPLIER_RULE[r.dueRule] ?? (r.dueOn ? `on ${date(r.dueOn)}` : "on a date not set yet");
+  const when = supplierRule(r) ?? (r.dueOn ? `on ${date(r.dueOn)}` : "on a date not set yet");
   return `${share}${when} · ${money(r.amount, currency)}`;
 }
 
 /** The plan in a few words: "Advance 30% when we order · Balance 70% when they say ready". */
 export const supplierPlanWords = (plan: FactoryPlanView) =>
-  plan.rows.map((r) => `${r.label} ${SUPPLIER_RULE[r.dueRule] ?? (r.due ? `on ${date(r.due)}` : "on a date")}`).join(" · ");
+  plan.rows.map((r) => `${r.label} ${supplierRule(r) ?? (r.due ? `on ${date(r.due)}` : "on a date")}`).join(" · ");
 
 /**
  * "How we pay them" (Order › Factory order), as "How they pay" is for the customer: each factory, each
@@ -126,7 +127,7 @@ export function SupplierPlanTable({
       </span>
     );
   };
-  const due = (r: Row) => dueText({ dueOn: r.due, rule: SUPPLIER_RULE[r.dueRule] });
+  const due = (r: Row) => dueText({ dueOn: r.due, rule: supplierRule(r) });
   const lastPaid = (r: Row) => paidBy(r).at(-1)?.paidOn ?? null;
   /** What can be done on a part, in the row: its receipts, and Pay on the next one. */
   const actions = (r: Row) => {
