@@ -96,7 +96,11 @@ export default async function NotificationsPage({ searchParams }: { searchParams
                   className={cn("flex gap-3 px-4 py-3.5 sm:px-5", i > 0 && "border-t border-surface-2", fresh && "bg-primary-soft/40")}
                 >
                   <span className="w-2.5 flex-none pt-2">
-                    {fresh && <span className="block size-2 rounded-full bg-primary-solid" aria-label="New" />}
+                    {fresh && (
+                      <span className="block size-2 rounded-full bg-primary-solid">
+                        <span className="sr-only">New</span>
+                      </span>
+                    )}
                   </span>
                   <span className="min-w-0 flex-1">
                     <Badge tone={kind.tone}>{kind.label}</Badge>

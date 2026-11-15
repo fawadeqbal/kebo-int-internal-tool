@@ -257,8 +257,8 @@ export default async function FollowUpsPage({
           Filter
         </Button>
       </Form>
-      <div className="flex flex-col gap-4">
-        <Card className="overflow-clip p-0">
+      <div className="flex min-w-0 flex-col gap-4">
+        <Card className="min-w-0 overflow-clip p-0">
           {list.rows.length === 0 ? (
             <EmptyState
               framed

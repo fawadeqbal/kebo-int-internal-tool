@@ -154,8 +154,9 @@ export function Card({ className, ...props }: ComponentProps<"section">) {
 
 export function CardHeader({ title, description, actions, className }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; className?: string }) {
   return (
-    // With a description and actions, a phone puts the actions under the text instead of squeezing it.
-    <div className={cn("flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
+    // With a description and actions, a phone puts the actions under the text instead of squeezing it; actions
+    // that do not fit beside the title (a narrow screen) go under it rather than past the edge.
+    <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
       <div className="min-w-0">
         <h2 className="text-base font-bold text-text">{title}</h2>
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
