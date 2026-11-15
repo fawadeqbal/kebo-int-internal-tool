@@ -1,9 +1,10 @@
 import { cache, Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { can, ORDER_WORD_TONE, type InquiryStage, type Priority } from "@kebo/shared";
-import { ButtonLink, Card, CardBody, CardHeader, cn, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ButtonLink, Card, CardBody, CardHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { ArrowRight, Plus } from "lucide-react";
+import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import type { OrderRow } from "@/lib/types-orders";
 import type { Paged, Person } from "@/lib/types";
 import { api } from "@/lib/api";
@@ -102,7 +103,9 @@ async function SendCost({ meId, today }: { meId: string; today: string }) {
   return <SendCostWindow meId={meId} today={today} mainCurrency={settings.sales.currency} orders={(orders?.rows ?? []).map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name }))} />;
 }
 
-const block = (h: string) => <div className={cn("animate-pulse rounded-2xl bg-surface-2", h)} aria-hidden />;
+/** A card on its way, the height it will have, drawn like every skeleton (board "Loading"). */
+const block = (h: string) =>
+  h === "h-[92px]" ? <TilesSkeleton count={4} /> : <CardSkeleton lines={h === "h-[340px]" ? 6 : 4} className={h} />;
 
 // One request each per page view, however many cards use them.
 const getFigures = cache(() => api.get<HomeFigures>("/insights/home").catch(() => null));

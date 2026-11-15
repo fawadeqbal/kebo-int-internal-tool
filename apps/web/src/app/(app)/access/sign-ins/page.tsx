@@ -1,7 +1,7 @@
 import Form from "next/form";
 import Link from "next/link";
 import { History } from "lucide-react";
-import { buildHref, ButtonLink, Card, EmptyState, FilterBar, FilterChip, Pagination, SearchField, toPage } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, EmptyState, FilterBar, FilterChip, PAGE_SIZE, Pager, SearchField, toPage } from "@kebo/ui";
 import { PageHeader } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { AutoSelect } from "@kebo/ui/client";
@@ -13,7 +13,6 @@ import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Sign-ins" };
 
-const PAGE_SIZE = 50;
 
 /** Every sign-in attempt for a year, right and wrong: by person, failed only, or by email or address. */
 export default async function SignInsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -64,8 +63,8 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
       ) : (
         <SignInList rows={data.rows} showPerson />
       )}
-      <Pagination base="/access/sign-ins" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} />
     </Card>
+    <Pager base="/access/sign-ins" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
     </div>
   );
 }

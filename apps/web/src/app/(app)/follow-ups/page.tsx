@@ -2,22 +2,7 @@ import Form from "next/form";
 import Link from "next/link";
 import { crumbsFor } from "@/lib/nav";
 import { Check, Clock, Filter, Pencil, Plus, TriangleAlert, User, Users } from "lucide-react";
-import {
-  Badge,
-  Button,
-  Card,
-  cn,
-  EmptyState,
-  LinkTabs,
-  PageHeader,
-  Pager,
-  SearchField,
-  Select,
-  Td,
-  Th,
-  THead,
-  toPage,
-} from "@kebo/ui";
+import { Badge, Button, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, SearchField, Select, Td, Th, THead, toPage } from "@kebo/ui";
 import { can, type Tone } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -35,7 +20,7 @@ import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Follow-ups" };
 
-const PAGE_SIZE = 50;
+
 
 const ON_LABEL = { inquiry: "Inquiry", order: "Order", customer: "Customer", factory: "Supplier" } as const;
 const ABOUT = [
@@ -353,8 +338,8 @@ export default async function FollowUpsPage({
                 </tbody>
             </DataTable>
           )}
-          <Pager base="/follow-ups" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} />
         </Card>
+        <Pager base="/follow-ups" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} bare />
       </div>
     </>
   );

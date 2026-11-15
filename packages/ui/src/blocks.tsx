@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Pending } from "./pending";
 import type { ReactNode } from "react";
 import { AlertTriangle, Check, CheckCircle2, Plus, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
@@ -502,6 +503,7 @@ export function SectionNav({
                 {l.tag && (
                   <span className={cn("rounded-lg px-[7px] py-px text-[11px] font-medium", l.alert ? "bg-bad-soft text-bad" : l.active ? "bg-surface text-primary" : "bg-bg text-muted")}>{l.tag}</span>
                 )}
+                <Pending />
               </Link>
             </li>
           ))}

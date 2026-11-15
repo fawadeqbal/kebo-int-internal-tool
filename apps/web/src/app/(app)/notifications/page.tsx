@@ -126,8 +126,8 @@ export default async function NotificationsPage({ searchParams }: { searchParams
             })}
           </ul>
         )}
-        <Pager base="/notifications" params={keep} page={page} pageSize={PAGE_SIZE} total={total} />
       </Card>
+      <Pager base="/notifications" params={keep} page={page} pageSize={PAGE_SIZE} total={total} bare />
     </>
   );
 }

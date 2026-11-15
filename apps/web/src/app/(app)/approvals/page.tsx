@@ -188,8 +188,8 @@ export default async function ApprovalsPage({
             </div>
           </>
         )}
-        <Pager base="/approvals" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} />
       </Card>
+      <Pager base="/approvals" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} bare />
     </div>
   );
 }

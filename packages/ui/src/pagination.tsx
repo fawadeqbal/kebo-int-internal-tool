@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "./cn";
+import { Pending } from "./pending";
 
 export function buildHref(base: string, params: Record<string, string | undefined>, patch: Record<string, string | undefined>) {
   const next = new URLSearchParams();
@@ -72,9 +73,12 @@ export function Pagination({
       aria-label={aria}
       aria-disabled={disabled}
       tabIndex={disabled ? -1 : undefined}
-      className={cn(box, "border-line bg-surface text-text hover:bg-surface-2", disabled && "pointer-events-none opacity-50")}
+      className={cn(box, "relative border-line bg-surface text-text hover:bg-surface-2", disabled && "pointer-events-none opacity-50")}
     >
       {label}
+      <span className="pointer-events-none absolute -top-1 -right-1 empty:hidden">
+        <Pending />
+      </span>
     </Link>
   );
   return (

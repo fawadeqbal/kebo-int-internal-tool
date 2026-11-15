@@ -1,5 +1,6 @@
 import Form from "next/form";
 import Link from "next/link";
+import { Pending } from "./pending";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
 import { House, Package, Settings, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
@@ -588,6 +589,7 @@ export function LinkTabs({
           {t.count !== undefined && (
             <span className={cn("tabular", t.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{t.count}</span>
           )}
+          <Pending />
         </Link>
       ))}
     </ScrollFade>

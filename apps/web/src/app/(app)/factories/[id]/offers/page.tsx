@@ -1,6 +1,6 @@
 import { Search, X } from "lucide-react";
 import { LOST_REASON_LABEL } from "@kebo/shared";
-import { ButtonLink, Card, DataRow, EmptyState, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead } from "@kebo/ui";
+import { ButtonLink, Card, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { factoryOf } from "@/lib/party-data";
 import { date, whole } from "@/lib/format";
@@ -42,7 +42,7 @@ export default async function FactoryOffers({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ q?: string; inquiry?: string; result?: string }>;
+  searchParams: Promise<{ q?: string; inquiry?: string; result?: string; page?: string }>;
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   await requirePermission("sourcing.manage");
@@ -57,6 +57,9 @@ export default async function FactoryOffers({
   );
   const filtered = !!(q || sp.inquiry || sp.result);
   const base = `/factories/${f.id}/offers`;
+  // A page at a time, like every list.
+  const page = toPage(sp.page);
+  const shown = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const basis = (x: Offer) => [x.basis, x.basisPlace].filter(Boolean).join(" ") || "—";
 
   return (
@@ -94,7 +97,7 @@ export default async function FactoryOffers({
         ) : (
           <>
             <PhoneList label="Offers">
-              {rows.map((x) => {
+              {shown.map((x) => {
                 const r = result(x);
                 return (
                   <PhoneRow
@@ -123,7 +126,7 @@ export default async function FactoryOffers({
                   </tr>
                 </THead>
                 <tbody>
-                  {rows.map((x) => {
+                  {shown.map((x) => {
                     const r = result(x);
                     return (
                       <DataRow key={x.id} href={`/inquiries/${x.inquiry.id}/sourcing`}>
@@ -148,6 +151,7 @@ export default async function FactoryOffers({
           </>
         )}
       </Card>
+      <Pager base={base} params={{ q: sp.q, inquiry: sp.inquiry, result: sp.result }} page={page} total={rows.length} bare />
     </>
   );
 }

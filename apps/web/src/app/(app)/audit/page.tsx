@@ -268,8 +268,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
             </DataTable>
           </>
         )}
-        <Pager base="/audit" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} />
       </Card>
+      <Pager base="/audit" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
     </div>
   );
 }

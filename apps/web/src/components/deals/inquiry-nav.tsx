@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { buttonClass, cn } from "@kebo/ui";
+import { buttonClass, cn, Pending } from "@kebo/ui";
 
 export interface InquiryTab {
   href: string;
@@ -35,6 +35,7 @@ export function InquiryTabs({ base, tabs, order }: { base: string; tabs: Inquiry
         >
           {t.label}
           {t.tag && <span className="text-xs font-semibold text-text-2 tabular">{t.tag}</span>}
+          <Pending />
         </Link>
       ))}
       {order ? (

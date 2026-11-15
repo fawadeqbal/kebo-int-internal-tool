@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Pending } from "@kebo/ui";
 import { usePathname } from "next/navigation";
 import { ORDER_TAB_LABEL, type OrderTab } from "@kebo/shared";
 
@@ -34,6 +35,7 @@ export function OrderTabs({ base, tabs }: { base: string; tabs: { key: OrderTab;
         >
           {ORDER_TAB_LABEL[t.key]}
           {t.word && <span className="text-xs font-semibold text-text-2">{t.word}</span>}
+          <Pending />
         </Link>
       ))}
     </nav>

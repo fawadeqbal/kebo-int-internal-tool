@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { OpenPanelButton } from "@/components/common/panel";
-import { NewInquiryWindow } from "./inquiry-windows";
+import { NewInquiryWindow } from "../inquiry-windows";
 import { Check, Clock, Download, Factory, FileText, LayoutGrid, List, MessageSquareText, Plus, Target, TrendingUp, UserRound, X } from "lucide-react";
 import {
   can,
