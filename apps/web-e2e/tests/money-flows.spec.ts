@@ -100,9 +100,12 @@ test("Edit plan, a supplier's: a paid part stays, the bar adds up, Save checks i
   expect(errors).toEqual([]);
 });
 
-test("Edit plan, the customer's: the same editor, a part's days changed and saved", async ({ page }) => {
+test("Edit plan, the customer's: the same editor, a part's days changed and saved, saying why once money is in", async ({ page }) => {
   const errors = watchErrors(page);
-  await orderWith(page, "payment", (p) => p.getByRole("region", { name: "Payment plan" }).getByRole("button", { name: "Edit plan", exact: true }));
+  // A plan with a part paid (its Receipt): changing it asks why.
+  await orderWith(page, "payment", (p) =>
+    p.getByRole("region", { name: "Payment plan" }).filter({ has: p.getByRole("link", { name: /^Receipt/ }) }).getByRole("button", { name: "Edit plan", exact: true }),
+  );
   await page.getByRole("region", { name: "Payment plan" }).getByRole("button", { name: "Edit plan", exact: true }).click();
   const form = page.getByRole("dialog", { name: "Payment plan" });
   await expect(form.getByRole("group", { name: "Start from a usual plan" })).toBeVisible();
@@ -116,6 +119,10 @@ test("Edit plan, the customer's: the same editor, a part's days changed and save
   await last.getByRole("combobox", { name: "When" }).selectOption("on_ship_plus_days");
   await last.getByRole("spinbutton", { name: "Days after" }).fill("21");
   await form.getByRole("button", { name: "Save the plan" }).click();
+  // The customer has paid: the plan says why it changes, kept in the history.
+  await expect(form.getByRole("alert").filter({ hasText: "Why?" })).toBeVisible();
+  await form.getByRole("textbox", { name: "Reason" }).fill("Customer asked for more time");
+  await form.getByRole("button", { name: "Save with this reason" }).click();
   await expect(form).toBeHidden();
   await expect(page.getByRole("region", { name: "Payment plan" })).toContainText("21 days after shipping");
   expect(errors).toEqual([]);

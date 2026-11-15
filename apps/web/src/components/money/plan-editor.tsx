@@ -205,7 +205,14 @@ export function PlanEditor({
   const tones = ok ? ["bg-ok", "bg-ok/55"] : ["bg-bad", "bg-bad/55"];
 
   return (
-    <ActionForm action={action} keepFields beforeSend={check} onDone={onDone} className="flex min-h-0 flex-1 flex-col">
+    // "Why?" (a plan changed after money came in) is drawn above the parts: it keeps the form's margins.
+    <ActionForm
+      action={action}
+      keepFields
+      beforeSend={check}
+      onDone={onDone}
+      className="flex min-h-0 flex-1 flex-col [&>[role=alert]]:mx-5 [&>[role=alert]]:mt-4 [&>[role=alert]]:mb-0 [&>[role=alert]]:w-auto sm:[&>[role=alert]]:mx-6"
+    >
       <PanelBody className="flex flex-col gap-4">
         <input type="hidden" name="payload" value={JSON.stringify(toPayload(parts))} />
         <p className="text-sm text-text-2">{intro}</p>
