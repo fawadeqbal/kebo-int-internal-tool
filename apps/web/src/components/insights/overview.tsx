@@ -6,6 +6,7 @@ import type { loadOverview } from "@/lib/insights-data";
 import { ChartCard } from "./chart-card";
 import { SalesProfitChart } from "./facts-charts";
 import { Delta } from "./frame";
+import { how, reportSpan } from "@/lib/figures";
 
 type Data = Awaited<ReturnType<typeof loadOverview>>;
 
@@ -24,6 +25,8 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
   const totals = (xs: { currency: string; amount: number }[]) => (xs.length ? xs.map((x) => whole(x.amount, x.currency)).join(" + ") : null);
   /** A loss with a real minus sign in front of the currency, so it is not read as a dash. */
   const signed = (v: number) => (v < 0 ? `− ${whole(-v, c)}` : whole(v, c));
+  // What each figure counts, behind its ⓘ (lib/figures.ts).
+  const span = reportSpan(p);
 
   return (
     <div className="flex flex-col gap-4">
@@ -33,6 +36,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
           value={bigMoney(d.sold.now, c)}
           delta={<Delta value={change(d.sold.now, d.sold.before)} vs={vs} />}
           sub={plural(d.sold.orders, "order")}
+          how={how.sold(span, c)}
         />
         <StatTile
           label="Collected"
@@ -40,6 +44,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
           delta={<Delta value={change(d.collected.now, d.collected.before)} vs={vs} />}
           sub="from customers"
           href={d.paidOut ? href({ section: "cash" }) : undefined}
+          how={d.paidOut ? how.collected(span, c) : how.collectedOnOrders(span, c)}
         />
         {d.paidOut ? (
           <StatTile
@@ -48,6 +53,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             delta={<Delta value={change(d.paidOut.now, d.paidOut.before)} goodWhenUp={false} vs={vs} />}
             sub="suppliers, bills and company costs"
             href={href({ section: "cash" })}
+            how={how.paidOut(span, c)}
           />
         ) : (
           <StatTile
@@ -56,6 +62,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             delta={<Delta value={d.winRate.now !== null && d.winRate.before !== null ? Math.round((d.winRate.now - d.winRate.before) * 10) / 10 : null} points vs={vs} />}
             sub={`won ${d.winRate.won} · lost ${d.winRate.lost}`}
             href={href({ section: "funnel" })}
+            how={how.winRate(span)}
           />
         )}
         <StatTile
@@ -65,6 +72,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
           delta={<Delta value={change(d.profit.now, d.profit.before)} vs={vs} />}
           sub={d.seeProfit ? `${percent(d.profit.margin)} · after company costs` : `${percent(d.profit.margin)} of what was sold`}
           href={d.seeProfit ? href({ section: "money" }) : undefined}
+          how={d.seeProfit ? how.profit(span, c) : how.grossProfit(span, c)}
         />
       </StatRow>
 
@@ -72,6 +80,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
         <ChartCard
           title={`Sold and ${profitName.toLowerCase()}, by month`}
           description={`${c} · a month opens its orders`}
+          how={how.byMonth(c, d.seeProfit, `The ${d.months.length} months up to the end of the period.`)}
           table={{
             columns: ["Month", "Orders", `Sold ${c}`, `${profitName} ${c}`],
             rows: d.months.map((m) => [monthYearOf(m.month), m.orders, amountCell(m.sales), amountCell(m.profit)]),
@@ -87,6 +96,8 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
                   Cash now <span className="font-normal text-text-2">· ≈ {whole(d.cash.total, c)}</span>
                 </>
               }
+              how={how.cashNow(c)}
+              howTitle="Cash now"
               actions={
                 <Link href="/finance/cash-book" className={MORE}>
                   Cash &amp; bank →
@@ -163,6 +174,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
         {d.owe && (
           <ShortList
             title="Customers owe us"
+            how={how.customersOwe}
             total={totals(d.owe.totals.map((x) => ({ currency: x.currency, amount: Number(x.due) })))}
             all={{ href: "/money/due", label: `All ${d.owe.count}` }}
             empty="No customer owes anything."
@@ -179,6 +191,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
         {d.pay && (
           <ShortList
             title="To pay in the next 7 days"
+            how={how.toPaySoon}
             total={totals(d.pay.totals.map(([currency, amount]) => ({ currency, amount })))}
             all={{ href: "/money/due?side=suppliers", label: `All ${d.pay.count}` }}
             empty="Nothing to pay this week."
@@ -195,6 +208,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
         {d.thin && (
           <ShortList
             title="Thin or no profit"
+            how={how.thinOfPeriod(span)}
             total="under 10%"
             all={{ href: href({ section: "money" }), label: "Profit by order" }}
             empty={`Every running order of ${p.name} makes 10% or more.`}
@@ -220,18 +234,22 @@ function ShortList({
   all,
   rows,
   empty,
+  how: rule,
 }: {
   title: string;
   total: string | null;
   all: { href: string; label: string };
   rows: { key: string; href: string; name: string; sub: string; value: string; tone?: "bad" | "warn" }[];
   empty: string;
+  /** How the list is made (lib/figures.ts), behind an ⓘ beside the title. */
+  how: string;
 }) {
   return (
     <Card>
       <CardHeader
         title={title}
         description={total}
+        how={rule}
         actions={
           <Link href={all.href} className={cn(MORE, "whitespace-nowrap")}>
             {all.label} →

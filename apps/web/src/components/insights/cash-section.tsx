@@ -3,6 +3,7 @@ import { Alert, Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, T
 import { date, plural } from "@/lib/format";
 import { bigMoney, monthYearOf, type Period } from "@/lib/insights-period";
 import type { CashReport } from "@/lib/types-facts";
+import { how, reportSpan } from "@/lib/figures";
 
 const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const signed = (v: string | number) => (Number(v) < 0 ? `− ${n2(-Number(v))}` : n2(v));
@@ -15,13 +16,27 @@ export function CashSection({ r, p }: { r: CashReport; p: Period }) {
   const c = r.currency;
   const ended = r.to < r.today;
   const net = Number(r.total.net);
+  // What each figure counts, behind its ⓘ (lib/figures.ts): the days the report covers (to today at most).
+  const span = reportSpan({ ...p, from: r.from, to: r.to });
   return (
     <div className="flex flex-col gap-4">
       <StatRow>
-        <StatTile label="Came in" value={bigMoney(Number(r.in.amount), c)} tone={Number(r.in.amount) > 0 ? "ok" : undefined} sub={plural(r.in.entries, "payment")} />
-        <StatTile label="Went out" value={bigMoney(Number(r.out.amount), c)} sub={plural(r.out.entries, "payment")} />
-        <StatTile label="Net" value={net < 0 ? `− ${bigMoney(-net, c)}` : bigMoney(net, c)} tone={net < 0 ? "bad" : undefined} sub={p.name} />
-        <StatTile label="Cash now" value={bigMoney(Number(r.cashNow), c)} sub={`${plural(r.accounts.filter((a) => !a.archived).length, "account")}${r.byCurrency.length > 1 ? `, counted in ${c}` : ""}`} href="/finance/cash-book" />
+        <StatTile
+          label="Came in"
+          value={bigMoney(Number(r.in.amount), c)}
+          tone={Number(r.in.amount) > 0 ? "ok" : undefined}
+          sub={plural(r.in.entries, "payment")}
+          how={how.cameIn(span, c)}
+        />
+        <StatTile label="Went out" value={bigMoney(Number(r.out.amount), c)} sub={plural(r.out.entries, "payment")} how={how.wentOut(span, c)} />
+        <StatTile label="Net" value={net < 0 ? `− ${bigMoney(-net, c)}` : bigMoney(net, c)} tone={net < 0 ? "bad" : undefined} sub={p.name} how={how.net(span)} />
+        <StatTile
+          label="Cash now"
+          value={bigMoney(Number(r.cashNow), c)}
+          sub={`${plural(r.accounts.filter((a) => !a.archived).length, "account")}${r.byCurrency.length > 1 ? `, counted in ${c}` : ""}`}
+          href="/finance/cash-book"
+          how={how.cashNow(c)}
+        />
       </StatRow>
       {r.offAccount > 0 && (
         <Alert tone="warning">

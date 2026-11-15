@@ -5,6 +5,7 @@ import { plural } from "@/lib/format";
 import { bigMoney, change, monthYearOf, type Period } from "@/lib/insights-period";
 import { PROFIT_SORT_LABEL, PROFIT_SORTS, type loadProfit, type ProfitSort } from "@/lib/insights-data";
 import { Delta } from "./frame";
+import { how, reportSpan } from "@/lib/figures";
 
 type Data = Awaited<ReturnType<typeof loadProfit>>;
 
@@ -49,11 +50,19 @@ export function ProfitSection({
   const t = d.total;
   const shown = d.orders.slice((page - 1) * PAGE, page * PAGE);
   const tone = (v: number) => (v < 0 ? ("bad" as const) : v > 0 ? ("ok" as const) : undefined);
+  // What each figure counts, behind its ⓘ (lib/figures.ts).
+  const span = reportSpan(p);
   return (
     <div className="flex flex-col gap-4">
       <StatRow>
-        <StatTile label="Sold" value={bigMoney(t.sold, c)} delta={<Delta value={change(t.sold, d.totalBefore.sold)} vs={p.vsLabel} />} sub={plural(t.orders, "order")} />
-        <StatTile label="Costs of the orders" value={bigMoney(t.costs, c)} sub="goods, freight and the rest" />
+        <StatTile
+          label="Sold"
+          value={bigMoney(t.sold, c)}
+          delta={<Delta value={change(t.sold, d.totalBefore.sold)} vs={p.vsLabel} />}
+          sub={plural(t.orders, "order")}
+          how={how.sold(span, c)}
+        />
+        <StatTile label="Costs of the orders" value={bigMoney(t.costs, c)} sub="goods, freight and the rest" how={how.costsOfOrders(span, c)} />
         <StatTile
           label="Company costs"
           value={bigMoney(t.company, c)}
@@ -63,6 +72,7 @@ export function ProfitSection({
               : `${bigMoney(running, c)} running the company · ${bigMoney(Math.max(0, t.company - running), c)} on customers and inquiries`
           }
           href={running === null ? "/money/company-costs" : "/reports/spending"}
+          how={how.companyCosts(span)}
         />
         <StatTile
           label="Profit"
@@ -70,6 +80,7 @@ export function ProfitSection({
           tone={tone(t.profit)}
           delta={<Delta value={change(t.profit, d.totalBefore.profit)} vs={p.vsLabel} />}
           sub={t.margin === null ? "nothing sold yet" : `${percent(t.margin)} of what was sold`}
+          how={how.profitOfReport(span, c)}
         />
       </StatRow>
       {t.uncosted > 0.005 && (

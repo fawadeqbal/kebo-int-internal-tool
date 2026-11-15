@@ -3,7 +3,8 @@ import { CHANNEL_LABEL, type InquiryChannel } from "@kebo/shared";
 import { Card, CardHeader, DataRow, FilterChip, Meter, Pager, Table, Td, Th, THead, Tr, cn, StatTile } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { countryName } from "@/lib/countries";
-import { money, plural, daysText } from "@/lib/format";
+import { companyToday, money, plural, daysText } from "@/lib/format";
+import { how, reportSpan, sixMonthsBack } from "@/lib/figures";
 import { amountCell, bigMoney, change, compactMoney, percent, type Period } from "@/lib/insights-period";
 import {
   CUSTOMER_CHIP_LABEL,
@@ -44,6 +45,8 @@ export function CustomersSection({
 }) {
   const c = d.currency;
   const vs = p.vsLabel;
+  // What each figure counts, behind its ⓘ (lib/figures.ts).
+  const span = reportSpan(p);
   const rows = d.rows.filter((r) => r.kinds.has(chip));
   const size = 25;
   const shown = rows.slice((page - 1) * size, page * size);
@@ -55,6 +58,7 @@ export function CustomersSection({
           value={String(d.ordered.now)}
           delta={<Delta value={change(d.ordered.now, d.ordered.before)} vs={vs} />}
           sub={`of ${d.total} · ${d.ordered.new} new`}
+          how={how.customersWhoOrdered(span)}
         />
         <StatTile
           label="Repeat share"
@@ -67,6 +71,7 @@ export function CustomersSection({
             />
           }
           sub="of orders from returning customers"
+          how={how.repeatShare(span)}
         />
         <StatTile
           label="Average order"
@@ -75,12 +80,14 @@ export function CustomersSection({
             <Delta value={d.average.now !== null && d.average.before !== null ? change(d.average.now, d.average.before) : null} vs={vs} />
           }
           sub={plural(d.average.orders, "order")}
+          how={how.averageOrder(span, c)}
         />
         <StatTile
           label="Sleeping"
           value={String(d.sleeping.count)}
           sub={`no order in 6 months · ${compactMoney(d.sleeping.sales, c)} before`}
           href={href({ chip: "sleeping", page: undefined })}
+          how={how.sleeping(sixMonthsBack(companyToday()), c)}
         />
       </Tiles>
 

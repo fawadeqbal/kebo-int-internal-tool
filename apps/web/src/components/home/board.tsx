@@ -8,6 +8,7 @@ import type { HomeFigures, HomeStage, Receivables, Reminders } from "@/lib/types
 import { Delta } from "@/components/insights/frame";
 import { SalesProfitChart } from "@/components/insights/facts-charts";
 import { readableDates } from "@/components/insights/readable-dates";
+import { homeSpan, how } from "@/lib/figures";
 
 /*
  * Home (design "money, simple", board Home). Every card answers one question and opens the page behind it.
@@ -39,6 +40,8 @@ export function MonthFigures({ h }: { h: HomeFigures }) {
   const m = h.month;
   const vs = `the same days of ${m.before}`;
   const profit = Number(m.profit.now);
+  // What each figure counts, behind its ⓘ (lib/figures.ts): this month so far, against the same days of last month.
+  const span = homeSpan(h.today, m.name, m.before);
   return (
     <StatRow>
       <StatTile
@@ -47,6 +50,7 @@ export function MonthFigures({ h }: { h: HomeFigures }) {
         delta={<Delta value={change(Number(m.sold.now), Number(m.sold.before))} vs={vs} />}
         sub={`${plural(m.sold.orders, "order")} · against ${m.before} by this day`}
         href="/reports/profit?period=month"
+        how={how.sold(span, c)}
       />
       {m.collected && (
         <StatTile
@@ -55,6 +59,7 @@ export function MonthFigures({ h }: { h: HomeFigures }) {
           delta={<Delta value={change(Number(m.collected.now), Number(m.collected.before))} vs={vs} />}
           sub={plural(m.collected.payments, "payment")}
           href="/reports/cash?period=month"
+          how={how.collected(span, c)}
         />
       )}
       <StatTile
@@ -63,6 +68,7 @@ export function MonthFigures({ h }: { h: HomeFigures }) {
         tone={profit < 0 ? "bad" : profit > 0 ? "ok" : undefined}
         sub={`${percent(m.profit.margin)}${m.profit.marginBefore !== null ? ` · ${m.before} ${percent(m.profit.marginBefore)}` : ""}`}
         href={h.seeProfit ? "/reports/profit?period=month" : undefined}
+        how={m.profit.afterCompanyCosts ? how.profit(span, c, m.before) : how.grossProfit(span, c, m.before)}
       />
       {m.cash && (
         <StatTile
@@ -70,6 +76,7 @@ export function MonthFigures({ h }: { h: HomeFigures }) {
           value={bigMoney(Number(m.cash.total), c)}
           sub={m.cash.byCurrency.length ? m.cash.byCurrency.map((x) => bigMoney(Number(x.amount), x.currency)).join(" · ") : "no account yet"}
           href="/finance/cash-book"
+          how={how.cashNow(c)}
         />
       )}
     </StatRow>
@@ -117,7 +124,7 @@ export function NeedsYou({ r }: { r: Reminders }) {
 export function StandsOut({ h }: { h: HomeFigures }) {
   return (
     <Card>
-      <CardHeader title="What stands out" description="worked out from the numbers, not typed" />
+      <CardHeader title="What stands out" description="worked out from the numbers, not typed" how={how.standsOut} />
       {h.standout.length === 0 ? (
         <p className="p-4 text-sm text-muted sm:px-5">Nothing unusual: sales are level, nobody is late, no cost is growing, no supplier keeps slipping.</p>
       ) : (
@@ -145,7 +152,7 @@ export function NextWeeks({ h }: { h: HomeFigures }) {
   const at = h.weeks.indexOf(lowest);
   return (
     <Card className="overflow-hidden">
-      <CardHeader title="Cash in the next four weeks" description={`${c} · what is due to come in and to go out`} />
+      <CardHeader title="Cash in the next four weeks" description={`${c} · what is due to come in and to go out`} how={how.nextWeeks(c)} />
       <Table data-fit>
         <THead>
           <tr>
@@ -178,7 +185,12 @@ export function SoldByMonth({ h }: { h: HomeFigures }) {
   const name = h.seeProfit ? "Profit" : "Gross profit";
   return (
     <Card>
-      <CardHeader title={`Sold and ${name.toLowerCase()}, by month`} description={h.currency} actions={<More href="/reports">Reports</More>} />
+      <CardHeader
+        title={`Sold and ${name.toLowerCase()}, by month`}
+        description={h.currency}
+        actions={<More href="/reports">Reports</More>}
+        how={how.byMonth(h.currency, h.seeProfit)}
+      />
       <div className="p-4 sm:p-5">
         <SalesProfitChart rows={h.months.map((m) => ({ month: m.month, sales: Number(m.sold), profit: Number(m.profit), orders: m.orders }))} currency={h.currency} names={["Sold", name]} />
       </div>
@@ -213,7 +225,12 @@ function Stages({ rows, currency, href }: { rows: HomeStage[]; currency: string;
 export function OrdersNow({ h }: { h: HomeFigures }) {
   return (
     <Card>
-      <CardHeader title="Orders now" description={`${h.orders.open} open · ${whole(h.orders.value, h.currency)}`} actions={<More href="/orders/board">Order board</More>} />
+      <CardHeader
+        title="Orders now"
+        description={`${h.orders.open} open · ${whole(h.orders.value, h.currency)}`}
+        actions={<More href="/orders/board">Order board</More>}
+        how={how.ordersNow(h.currency)}
+      />
       <Stages rows={h.orders.stages} currency={h.currency} href={() => "/orders/board"} />
     </Card>
   );
@@ -223,7 +240,7 @@ export function InquiriesNow({ h }: { h: HomeFigures }) {
   const w = h.inquiries.won;
   return (
     <Card>
-      <CardHeader title="Inquiries now" description={`${h.inquiries.open} open`} actions={<More href="/inquiries">Inquiries</More>} />
+      <CardHeader title="Inquiries now" description={`${h.inquiries.open} open`} actions={<More href="/inquiries">Inquiries</More>} how={how.inquiriesNow} />
       <Stages rows={h.inquiries.stages} currency={h.currency} href={(k) => `/inquiries?stage=${k}`} />
       <p className="border-t border-line px-4 py-3 text-xs text-text-2 sm:px-5">
         {w.answered === 0 ? (
@@ -267,7 +284,12 @@ export function CustomersOwe({ r }: { r: Receivables }) {
   const totals = r.totals.filter((t) => Number(t.due) > 0).map((t) => whole(t.due, t.currency));
   return (
     <Card>
-      <CardHeader title="Customers owe us" description={totals.join(" + ") || undefined} actions={rows.length > 0 ? <More href="/money/due">All {rows.length}</More> : undefined} />
+      <CardHeader
+        title="Customers owe us"
+        description={totals.join(" + ") || undefined}
+        actions={rows.length > 0 ? <More href="/money/due">All {rows.length}</More> : undefined}
+        how={how.customersOwe}
+      />
       <Lines
         empty="No customer owes anything."
         rows={rows.slice(0, 4).map((x) => ({
@@ -290,7 +312,7 @@ export function ThinProfit({ h }: { h: HomeFigures }) {
   const c = h.currency;
   return (
     <Card>
-      <CardHeader title="Thin or no profit" description="open orders under 10%" actions={<More href="/reports/profit">Profit by order</More>} />
+      <CardHeader title="Thin or no profit" description="open orders under 10%" actions={<More href="/reports/profit">Profit by order</More>} how={how.thinProfit} />
       <Lines
         empty="Every open order makes 10% or more."
         rows={t.rows.map((x) => ({

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Pending } from "./pending";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
-import { Filter, House, Package, Settings, ShieldCheck, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
+import { Filter, House, Info, Package, Settings, ShieldCheck, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 
 /* ---------------------------------------------------------------- Button */
@@ -152,17 +152,94 @@ export function Field({
 }
 
 /* ---------------------------------------------------------------- Card */
+/* ---------------------------------------------------------------- HowMade */
+
+/** An id from the figure's name and rule: the same on the server and in the browser, different for each figure. */
+function howId(title: string, rule: string) {
+  let h = 5381;
+  for (const ch of `${title}|${rule}`) h = (Math.imul(h, 33) ^ ch.charCodeAt(0)) >>> 0;
+  return `how-${h.toString(36)}`;
+}
+
+/**
+ * A figure's ⓘ: what it counts, from where and at which rate, in plain words, so a number can be trusted and
+ * checked. Opens a short note over the page with the browser's own popover (a click outside, Esc or Close shuts
+ * it; no script). `rule`: the caller's words, a new paragraph on each new line.
+ */
+export function HowMade({ title, rule, className }: { title: string; rule: string; className?: string }) {
+  const id = howId(title, rule);
+  return (
+    <>
+      <button
+        type="button"
+        popoverTarget={id}
+        aria-label={`How ${title} is worked out`}
+        className={cn("tap no-print inline-grid size-6 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-text", className)}
+      >
+        <Info className="size-3.5" aria-hidden />
+      </button>
+      {/* Centred over the page (m-auto: Tailwind's reset takes away the browser's own margin for popovers). */}
+      <div
+        id={id}
+        popover="auto"
+        role="dialog"
+        aria-labelledby={`${id}-title`}
+        className="m-auto w-[min(calc(100vw-2rem),27rem)] rounded-2xl border border-line bg-surface p-4 text-left text-sm leading-relaxed font-normal text-text-2 shadow-pop backdrop:bg-black/25 sm:p-5"
+      >
+        <p id={`${id}-title`} className="text-base font-bold text-text">
+          {title}
+        </p>
+        <p className="mt-0.5 text-xs text-muted">How it is worked out</p>
+        <div className="mt-3 flex flex-col gap-2">
+          {rule.split("\n").map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button type="button" popoverTarget={id} popoverTargetAction="hide" className={buttonClass("secondary", "sm")}>
+            Close
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function Card({ className, ...props }: ComponentProps<"section">) {
   return <section className={cn("rounded-2xl border border-line bg-surface", className)} {...props} />;
 }
 
-export function CardHeader({ title, description, actions, className }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; className?: string }) {
+export function CardHeader({
+  title,
+  description,
+  actions,
+  className,
+  how,
+  howTitle,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+  /** How the card's figures are worked out, behind an ⓘ beside the title (HowMade). */
+  how?: string;
+  /** The ⓘ note's heading when the title is not plain text. */
+  howTitle?: string;
+}) {
+  const heading = <h2 className="text-base font-bold text-text">{title}</h2>;
   return (
     // With a description and actions, a phone puts the actions under the text instead of squeezing it; actions
     // that do not fit beside the title (a narrow screen) go under it rather than past the edge.
     <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
       <div className="min-w-0">
-        <h2 className="text-base font-bold text-text">{title}</h2>
+        {how ? (
+          <div className="flex items-center gap-1">
+            {heading}
+            <HowMade title={howTitle ?? (typeof title === "string" ? title : "These figures")} rule={how} />
+          </div>
+        ) : (
+          heading
+        )}
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
       </div>
       {/* Never wider than the card: on a small screen the buttons wrap among themselves. */}

@@ -3,6 +3,7 @@ import { Pending } from "./pending";
 import type { ReactNode } from "react";
 import { AlertTriangle, Check, CheckCircle2, Plus, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
+import { HowMade } from "./primitives";
 
 /*
  * Building blocks from the RFQ Desk design system
@@ -229,6 +230,8 @@ export function StatTile({
   icon: Icon,
   iconColor = 1,
   className,
+  how,
+  howTitle,
 }: {
   label: ReactNode;
   value: ReactNode;
@@ -250,10 +253,14 @@ export function StatTile({
   /** The tile's colour: one of the chart colours (1 green, 2 orange, 3 blue, 4 violet, 5 teal). */
   iconColor?: 1 | 2 | 3 | 4 | 5;
   className?: string;
+  /** How the figure is worked out, behind an ⓘ in the tile's corner (HowMade): every figure of Home and Reports has one. */
+  how?: string;
+  /** The ⓘ note's heading when the label is not plain text. */
+  howTitle?: string;
 }) {
   const figure = (
     <>
-      <span className="flex items-start justify-between gap-2">
+      <span className={cn("flex items-start justify-between gap-2", how && "pr-6")}>
         <span className="text-xs text-muted">{label}</span>
         {delta}
       </span>
@@ -292,12 +299,24 @@ export function StatTile({
     size === "sm" ? "gap-0.5 px-4 py-3" : "gap-0.5 px-4 py-3.5",
     className,
   );
-  return href ? (
+  const tile = href ? (
     <Link href={href} className={cn(cls, "transition-colors hover:border-line-strong")}>
       {body}
     </Link>
   ) : (
     <div className={cls}>{body}</div>
+  );
+  if (!how) return tile;
+  // The ⓘ sits on the tile, beside it in the page (a button may not be inside the tile's link).
+  return (
+    <div className="relative h-full min-w-0">
+      {tile}
+      <HowMade
+        title={howTitle ?? (typeof label === "string" ? label : "This figure")}
+        rule={how}
+        className={cn("absolute right-2.5", size === "sm" ? "top-2" : "top-2.5")}
+      />
+    </div>
   );
 }
 
