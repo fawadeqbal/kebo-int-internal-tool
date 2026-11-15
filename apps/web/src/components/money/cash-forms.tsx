@@ -58,6 +58,12 @@ export function AccountForm({ account, today, onClose }: { account?: AccountRow;
             <Field label="On" htmlFor="ac-on" error={s.errors?.openingOn} hint="Money recorded from this day on is added">
               <Input id="ac-on" name="openingOn" type="date" max={today} defaultValue={s.values?.openingOn ?? account?.openingOn ?? today} />
             </Field>
+            {s.code === "rate_needed" && (
+              // Settings has no rate for this currency yet: asked here, kept in Settings for every total.
+              <Field label={`Exchange rate: ${currency} per 1 of the main currency`} htmlFor="ac-rate" error={s.errors?.rate} className="sm:col-span-3">
+                <Input id="ac-rate" name="rate" inputMode="decimal" required autoFocus defaultValue={s.values?.rate ?? ""} placeholder="e.g. 3.6725" className="max-w-56" />
+              </Field>
+            )}
             <Field label="Note" htmlFor="ac-note" optional className="sm:col-span-3">
               <Textarea id="ac-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? account?.note ?? ""} placeholder="e.g. account number ending 4471" />
             </Field>

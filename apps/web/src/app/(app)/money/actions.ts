@@ -236,6 +236,8 @@ export async function saveAccountAction(id: string | null, _prev: ActionState, f
     openingOn: v.openingOn,
     note: v.note?.trim() || null,
     archived: v.archived === "on",
+    // Asked when Settings has no rate for the currency (code "rate_needed"): kept there.
+    rate: v.rate?.trim() || null,
   };
   const r = await attempt(form, () => (id ? api.patch(`/money/accounts/${id}`, body) : api.post("/money/accounts", body)), id ? "Account saved." : "Account added.");
   if (r.ok) revalidatePath("/", "layout");
