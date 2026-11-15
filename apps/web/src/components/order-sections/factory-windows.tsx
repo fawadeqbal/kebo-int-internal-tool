@@ -63,7 +63,7 @@ export function PayFactoryWindow({
   orderCurrency: string;
   fx: Fx;
   today: string;
-  prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" };
+  prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null };
   /** Open at once (a list's row asked for it), and what to do once it closes. */
   startOpen?: boolean;
   onClosed?: () => void;

@@ -10,6 +10,7 @@ import type { Tone } from "@kebo/shared";
  */
 export function Section({
   title,
+  titleMore,
   state,
   tone = "neutral",
   actions,
@@ -21,6 +22,8 @@ export function Section({
   id,
 }: {
   title: string;
+  /** Said after the title where there is room (not on a phone): "· Jinan Pharma Machinery". */
+  titleMore?: string;
   /** Where it stands, in a word: "Booked 28 Nov". */
   state?: string | null;
   tone?: Tone;
@@ -38,14 +41,17 @@ export function Section({
   return (
     <section id={id} aria-label={title} className={cn("flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-card", wide && "lg:col-span-full")}>
       <div className="flex min-h-[54px] flex-wrap items-center gap-x-2.5 gap-y-1.5 px-[18px] pt-3 pb-2.5">
-        <h2 className="min-w-0 flex-1 text-[15px] font-bold">{title}</h2>
+        <h2 className="min-w-0 flex-1 text-[15px] font-bold">
+          {title}
+          {titleMore && <span className="max-sm:hidden"> · {titleMore}</span>}
+        </h2>
         {state && <Badge tone={tone}>{state}</Badge>}
         {actions}
       </div>
       {rows && rows.length > 0 && (
         <dl className={cn("grid grid-cols-2 gap-x-[18px] gap-y-3 px-[18px] pt-1 pb-3.5", cols === 3 && "sm:grid-cols-3", cols === 4 && "sm:grid-cols-4")}>
-          {rows.map((r) => (
-            <div key={r.label} className="flex min-w-0 flex-col gap-0.5">
+          {rows.map((r, i) => (
+            <div key={`${i}:${r.label}`} className="flex min-w-0 flex-col gap-0.5">
               <dt className="text-xs text-text-2">{r.label}</dt>
               <dd className="text-[13px] font-semibold [overflow-wrap:anywhere]">{r.value === null || r.value === undefined || r.value === "" ? <span className="font-normal text-muted">—</span> : r.value}</dd>
             </div>

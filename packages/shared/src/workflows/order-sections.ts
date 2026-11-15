@@ -73,7 +73,7 @@ export const ORDER_SECTION_LABEL: Record<OrderSection, string> = {
   bank_contract: "The bank contract",
   lc: "The letter of credit",
   purchase_order: "Purchase order",
-  factory_payments: "Payments to the factory",
+  factory_payments: "Payments made",
   ready_date: "Ready date",
   fat: "Factory test (FAT)",
   goods: "Goods from the factory",

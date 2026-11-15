@@ -92,7 +92,8 @@ export const moneyFacts = (p: OrderPosition) => ({
 export const supplierPaidRelation = {
   where: livePurchase,
   orderBy: [{ on: "asc" }, { createdAt: "asc" }],
-  select: { share: true, voidedAt: true, movement: { select: { partyId: true, currency: true, rate: true } } },
+  // id: which payment paid which part of a factory's plan (factory-plan.ts).
+  select: { id: true, share: true, voidedAt: true, movement: { select: { partyId: true, currency: true, rate: true } } },
 } satisfies Prisma.Order$supplierPaidArgs;
 
 /** The expenses the factories bear, to load with an order. */

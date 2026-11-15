@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Mail, Printer } from "lucide-react";
 import { can, PAYMENT_METHOD_LABEL } from "@kebo/shared";
-import { Badge, ButtonLink, RefCode, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ButtonLink, RefCode } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
-import { date, dateTime, money } from "@/lib/format";
+import { date, money } from "@/lib/format";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
@@ -15,7 +15,9 @@ import { SendForm, type PurchaseOrderView } from "@/components/orders/purchase-o
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { PanelButton } from "@/components/orders/step-view";
 import { FactoryPlanForm } from "@/components/money/money-v2";
-import { SupplierParts, supplierPlanWords } from "@/components/money/supplier-plan";
+import { CustomerMoneyLine, howWePay, SupplierPlanTable, supplierPlanWords } from "@/components/order-sections/supplier-plan";
+import { PaymentsList } from "@/components/order-sections/payments-list";
+import { ROW_LINK } from "@/components/order-sections/section-window";
 import { factoryPaymentAction, factoryPlanAction, removePaymentFileAction, voidFactoryPaymentAction } from "../../../money/actions";
 import { sendPurchaseOrderAction } from "../../flow-actions";
 import { fieldsAction } from "../../light-actions";
@@ -53,8 +55,30 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   const priced = goodsLines.some((l) => l.factoryPrice) ? goodsLines : [];
   const payments = m.factories?.payments ?? [];
   const live = payments.filter((x) => !x.voided);
+  const plans = m.factories?.plans ?? [];
+  const byId = new Map(payments.map((x) => [x.id, x]));
+  // What each payment paid: the parts of the plans it went to ("Advance 30%"), as a customer's payment says.
+  const paidFor = new Map<string, string[]>();
+  for (const plan of plans) for (const r of plan.rows) for (const x of r.payments) paidFor.set(x.id, [...(paidFor.get(x.id) ?? []), r.label]);
+  const manyFactories = new Set(payments.map((x) => x.factory.id)).size > 1 || plans.length > 1;
+  const madeFor = (x: (typeof payments)[number]) => {
+    const parts = paidFor.get(x.id)?.join(", ") ?? null;
+    if (!manyFactories) return parts;
+    return (
+      <>
+        {parts ?? <span className="font-normal text-muted">—</span>}
+        <span className="block text-xs font-normal text-muted">{x.factory.name}</span>
+      </>
+    );
+  };
+  /** The payments added up per currency: "CNY 19,170.00" (two currencies: both). */
+  const totalOf = (xs: typeof payments) => {
+    const by = new Map<string, number>();
+    for (const x of xs) by.set(x.currency, (by.get(x.currency) ?? 0) + Number(x.amount));
+    return by.size ? [...by].map(([cur, v]) => money(v.toFixed(2), cur)).join(" + ") : money(0, plans[0]?.currency ?? o.currency);
+  };
   const sub = `${o.refNo} · ${(flow?.factory.factories ?? []).map((f) => f.name).join(", ") || "the factory"}`;
-  const pay = (label: string, main: boolean, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" }) =>
+  const pay = (label: string, main: boolean, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null }) =>
     canPay ? (
       <PayFactoryWindow
         label={label}
@@ -69,6 +93,36 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         prefill={prefill}
       />
     ) : null;
+  // Pay is on each plan's next part, as Record payment is on the customer's; Payments made offers "Pay the
+  // factory" only for a factory owed money with no part left to pay it on (prices changed since the plan).
+  const onAPart = (f: { factory: { id: string }; currency: string }) =>
+    plans.some((p) => p.factory.id === f.factory.id && p.currency === f.currency && p.rows.some((r) => r.status !== "paid" && Number(r.open) > 0));
+  const payAny = owing.some((f) => !onAPart(f)) ? pay("Pay the factory", true) : null;
+  const editPlan = (plan: (typeof plans)[number], label: string) =>
+    m.factories?.canPlan &&
+    d.open && (
+      <PanelButton
+        size="sm"
+        className={SMALL}
+        label={label}
+        title={`What we pay ${plan.factory.name}`}
+        description={`${o.refNo} · agreed once per factory on the order`}
+        panelClassName="md:w-[640px]"
+        body={<FactoryPlanForm plan={plan} action={factoryPlanAction.bind(null, o.id)} />}
+      />
+    );
+  const customerLine = m.factories && (
+    <CustomerMoneyLine
+      orderId={o.id}
+      state={m.factories.customer.state}
+      warn={m.factories.customer.warn}
+      route={m.route.route}
+      deposit={o.money.depositPercent > 0}
+      received={m.received}
+      owed={(Number(m.received) + Number(m.due)).toFixed(2)}
+      currency={o.currency}
+    />
+  );
   const depositText = pos
     ? Number(pos.deposit.paid) > 0
       ? `${money(pos.deposit.paid, o.currency)} of the deposit ${money(pos.deposit.asked, o.currency)} is recorded; the rest is not in yet.`
@@ -126,6 +180,101 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       ))}
       {pos && pos.items.length === 0 && <EmptySection title="Purchase order" text="No line of this order was quoted from a factory, so there is no purchase order." />}
 
+      {plans.length > 0 && (
+        <Section
+          title="How we pay them"
+          cols={4}
+          rows={howWePay(plans)}
+          actions={plans.length === 1 && editPlan(plans[0]!, "Change")}
+        />
+      )}
+
+      {plans.map((plan, n) => {
+        const owed = m.factories!.rows.find((r) => r.factory.id === plan.factory.id && r.currency === plan.currency);
+        const toPay = Number(owed?.toPay ?? 0);
+        const paidInOrder = live.filter((x) => x.factory.id === plan.factory.id && x.currency === plan.currency).reduce((t, x) => t + Number(x.inOrderCurrency), 0);
+        const done = !!owed && toPay <= 0 && Number(owed.paid) > 0;
+        return (
+          <Section
+            key={`${plan.factory.id}:${plan.currency}`}
+            title={plans.length > 1 ? `Payment plan · ${plan.factory.name}` : "Payment plan"}
+            titleMore={plans.length > 1 ? undefined : plan.factory.name}
+            state={owed ? (done ? "Paid in full" : `${money(owed.toPay, plan.currency)} to pay`) : supplierPlanWords(plan)}
+            tone={done ? "ok" : toPay > 0 ? "warn" : "neutral"}
+            actions={editPlan(plan, "Edit plan")}
+          >
+            <div className="flex flex-col gap-3 pb-3.5">
+              {plan.differs && (
+                <p className="mx-[18px] rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
+                  The parts do not add up to what we owe ({money(plan.differs, plan.currency)} {Number(plan.differs) > 0 ? "missing" : "too much"}): prices changed since. Open Edit plan and save it again.
+                </p>
+              )}
+              <SupplierPlanTable
+                plan={plan}
+                payments={byId}
+                pay={(r) => pay("Pay", true, { factoryId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance", reference: r.supplierRef })}
+                orderCurrency={o.currency}
+                paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
+                overpaid={owed?.overpaid ?? null}
+                after={n === 0 && customerLine}
+              />
+            </div>
+          </Section>
+        );
+      })}
+
+      {m.factories &&
+        (payments.length === 0 ? (
+          <EmptySection title="Payments made" text="No payment yet." action={payAny} />
+        ) : (
+          <Section
+            title="Payments made"
+            state={`${live.length} payment${live.length === 1 ? "" : "s"}`}
+            actions={payAny}
+            files={<SectionFiles orderId={o.id} section="factory_payments" canAdd={false} />}
+          >
+            <PaymentsList
+              name="Payments made"
+              account="From"
+              total={{ label: "Paid", amount: totalOf(live) }}
+              rows={payments.map((x) => ({
+                id: x.id,
+                paidOn: x.paidOn,
+                for: madeFor(x),
+                how: PAYMENT_METHOD_LABEL[x.method],
+                account: x.account?.name ?? null,
+                reference: x.reference,
+                recordedBy: x.recordedBy?.name ?? null,
+                recordedAt: x.recordedAt,
+                amount: x.amount,
+                currency: x.currency,
+                voided: x.voided ? { reason: x.voided.reason } : null,
+                actions: (
+                  <>
+                    <Link href={`/payments/supplier/${x.id}`} className={ROW_LINK}>
+                      Receipt
+                    </Link>
+                    {m.factories!.canRecord && o.status !== "cancelled" && (
+                      <ChangeFactoryPaymentWindow
+                        sub={`${o.refNo} · ${x.factory.name} · ${date(x.paidOn)} · ${money(x.amount, x.currency)}`}
+                        payment={x}
+                        save={factoryPaymentAction.bind(null, o.id, x.id, x.updatedAt)}
+                        remove={voidFactoryPaymentAction.bind(null, o.id, x.id)}
+                        removeFile={removePaymentFileAction.bind(null, "out", x.id, o.id)}
+                        factories={m.factories!.rows}
+                        people={people ?? []}
+                        orderCurrency={o.currency}
+                        fx={fx}
+                        today={now}
+                      />
+                    )}
+                  </>
+                ),
+              }))}
+            />
+          </Section>
+        ))}
+
       {priced.length > 0 && (
         <Section title="Lines to the factory" state={`${priced.length} line${priced.length === 1 ? "" : "s"}`}>
           <div className="px-[18px] pb-3.5">
@@ -138,112 +287,6 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           </div>
         </Section>
       )}
-
-      {m.factories?.plans.map((plan) => {
-        const paidInOrder = live.filter((x) => x.factory.id === plan.factory.id && x.currency === plan.currency).reduce((t, x) => t + Number(x.inOrderCurrency), 0);
-        const owed = m.factories!.rows.find((r) => r.factory.id === plan.factory.id && r.currency === plan.currency);
-        const toPay = Number(owed?.toPay ?? 0);
-        return (
-          <Section
-            key={`${plan.factory.id}:${plan.currency}`}
-            title={m.factories!.plans.length > 1 ? `Paying ${plan.factory.name}` : "Paying the factory"}
-            state={owed ? (toPay <= 0 && Number(owed.paid) > 0 ? "Paid in full" : `${money(owed.toPay, plan.currency)} to pay`) : supplierPlanWords(plan)}
-            tone={owed && toPay <= 0 && Number(owed.paid) > 0 ? "ok" : Number(owed?.paid ?? 0) > 0 ? "warn" : "neutral"}
-            actions={
-              m.factories?.canPlan &&
-              d.open && (
-                <PanelButton
-                  size="sm"
-                  className={SMALL}
-                  label="Edit plan"
-                  title={`What we pay ${plan.factory.name}`}
-                  description={`${o.refNo} · agreed once per factory on the order`}
-                  panelClassName="md:w-[640px]"
-                  body={<FactoryPlanForm plan={plan} action={factoryPlanAction.bind(null, o.id)} />}
-                />
-              )
-            }
-          >
-            <div className="px-[18px] pb-3.5">
-              <SupplierParts
-                orderId={o.id}
-                plan={plan}
-                pay={(r) => (Number(r.open) > 0 ? pay("Pay", false, { factoryId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance" }) : null)}
-                paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
-                orderCurrency={o.currency}
-                overpaid={owed?.overpaid ?? null}
-                customer={{ route: m.route.route, ...m.factories!.customer, received: m.received, owed: (Number(m.received) + Number(m.due)).toFixed(2) }}
-              />
-            </div>
-          </Section>
-        );
-      })}
-
-      {m.factories &&
-        (payments.length === 0 ? (
-          <EmptySection title="Payments to the factory" text="No payment yet." action={pay("Pay the factory", true)} />
-        ) : (
-          <Section
-            title="Payments to the factory"
-            state={`${live.length} payment${live.length === 1 ? "" : "s"}`}
-            actions={pay("Pay the factory", true)}
-            files={<SectionFiles orderId={o.id} section="factory_payments" canAdd={false} />}
-          >
-            <Table>
-              <THead>
-                <tr>
-                  <Th>Date</Th>
-                  <Th>Factory</Th>
-                  <Th>How</Th>
-                  <Th>From</Th>
-                  <Th>Reference</Th>
-                  <Th>Recorded by</Th>
-                  <Th className="text-right">Amount</Th>
-                  <Th>
-                    <span className="sr-only">Change</span>
-                  </Th>
-                </tr>
-              </THead>
-              <tbody>
-                {payments.map((x) => (
-                  <Tr key={x.id} className={x.voided ? "text-muted line-through" : undefined}>
-                    <Td className="whitespace-nowrap tabular">{date(x.paidOn)}</Td>
-                    <Td>{x.factory.name}</Td>
-                    <Td>{PAYMENT_METHOD_LABEL[x.method]}</Td>
-                    <Td>{x.account?.name ?? <span className="text-muted">—</span>}</Td>
-                    <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <span className="text-muted">—</span>}</Td>
-                    <Td className="text-[12.5px] text-text-2">
-                      {x.recordedBy?.name ?? "—"}
-                      <span className="block text-muted">{dateTime(x.recordedAt)}</span>
-                    </Td>
-                    <Td className="text-right whitespace-nowrap tabular">{x.voided ? money(x.amount, x.currency) : <span className="font-semibold">{money(x.amount, x.currency)}</span>}</Td>
-                    <Td className="text-right">
-                      {x.voided ? (
-                        <Badge tone="neutral">Removed</Badge>
-                      ) : (
-                        m.factories!.canRecord &&
-                        o.status !== "cancelled" && (
-                          <ChangeFactoryPaymentWindow
-                            sub={`${o.refNo} · ${x.factory.name} · ${date(x.paidOn)} · ${money(x.amount, x.currency)}`}
-                            payment={x}
-                            save={factoryPaymentAction.bind(null, o.id, x.id, x.updatedAt)}
-                            remove={voidFactoryPaymentAction.bind(null, o.id, x.id)}
-                            removeFile={removePaymentFileAction.bind(null, "out", x.id, o.id)}
-                            factories={m.factories!.rows}
-                            people={people ?? []}
-                            orderCurrency={o.currency}
-                            fx={fx}
-                            today={now}
-                          />
-                        )
-                      )}
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
-          </Section>
-        ))}
     </OrderPage>
   );
 }

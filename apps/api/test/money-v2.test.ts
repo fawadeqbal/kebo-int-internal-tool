@@ -332,6 +332,10 @@ describe("money v2", () => {
     await api(app, manager).post(`/orders/${id}/factory-payments`, { factoryId, kind: "deposit", amount: 30000, currency: "CNY", rate: 7.12, paidOn: today }).expect(201);
     m = await money(id);
     expect(m.factories.plans[0].rows[0]).toMatchObject({ status: "paid", paid: "30000.00" });
+    // Each part says which payment paid it (its Receipt; the payment's "For").
+    const advance = m.factories.payments.find((x: { voided: unknown }) => !x.voided).id;
+    expect(m.factories.plans[0].rows[0].payments).toEqual([{ id: advance, amount: "30000.00" }]);
+    expect(m.factories.plans[0].rows[1].payments).toEqual([]);
     // Money › We owe factories shows the next part and its date.
     const payables = (await api(app, manager).get("/money/payables").expect(200)).body;
     const row = payables.find((r: { factory: { id: string } }) => r.factory.id === factoryId);
@@ -350,6 +354,7 @@ describe("money v2", () => {
     m = (await api(app, sana).put(`/orders/${id}/factory-plan`, { factoryId, items }).expect(200)).body;
     expect(m.factories.plans[0].rows[1]).toMatchObject({ label: "Balance 50%", due: day(10), dueRule: "fixed" });
     expect(m.factories.plans[0].rows[0]).toMatchObject({ status: "due", paid: "30000.00", open: "20000.00" });
+    expect(m.factories.plans[0].rows[0].payments).toEqual([{ id: advance, amount: "30000.00" }]);
   });
 
   it("cancels with money in: credit, refund or a fee; the factory's money a refund or a loss", async () => {

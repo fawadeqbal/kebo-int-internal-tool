@@ -1,13 +1,13 @@
 import { BALANCE_TERMS_LABEL, can, PAYMENT_METHOD_LABEL, ROUTE_NAME, type PaymentRoute } from "@kebo/shared";
-import { Badge, RefCode, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderPaymentsOf } from "@/lib/order-data";
-import { date, dateTime, money } from "@/lib/format";
+import { date, money } from "@/lib/format";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import { ChangePaymentWindow, ContractWindow, PlanWindow, RecordPaymentWindow, RouteWindow } from "@/components/order-sections/payment-windows";
 import { PaymentPlanTable } from "@/components/order-sections/payment-plan";
+import { PaymentsList } from "@/components/order-sections/payments-list";
 import { ROW_LINK } from "@/components/order-sections/section-window";
 import { LcChecks, UseCredit } from "@/components/money/money-v2";
 import { editPaymentAction, removePaymentFileAction, savePlanAction, sendRequestAction } from "../../../money/actions";
@@ -179,79 +179,44 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
           }
           files={<SectionFiles orderId={o.id} section="payments" canAdd={false} />}
         >
-          <Table>
-            <THead>
-              <tr>
-                <Th>Date</Th>
-                <Th>For</Th>
-                <Th>How</Th>
-                <Th>Into</Th>
-                <Th>Reference</Th>
-                <Th>Recorded by</Th>
-                <Th className="text-right">Amount</Th>
-                <Th>
-                  <span className="sr-only">Receipt and change</span>
-                </Th>
-              </tr>
-            </THead>
-            <tbody>
-              {p.payments.map((x) => (
-                <Tr key={x.id} className={x.voided ? "text-muted" : undefined}>
-                  <Td className={`whitespace-nowrap tabular ${x.voided ? "line-through" : ""}`}>{date(x.paidOn)}</Td>
-                  <Td className="font-medium">{x.voided ? <span className="font-normal">{x.voided.reason ?? ""}</span> : (paidFor.get(x.id)?.join(", ") ?? <span className="font-normal text-muted">—</span>)}</Td>
-                  <Td>{PAYMENT_METHOD_LABEL[x.method]}</Td>
-                  <Td>{x.account?.name ?? <span className="text-muted">—</span>}</Td>
-                  <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <span className="text-muted">—</span>}</Td>
-                  <Td className="text-[12.5px] text-text-2">
-                    {x.recordedBy?.name ?? "—"}
-                    <span className="block text-muted">{dateTime(x.recordedAt)}</span>
-                  </Td>
-                  <Td className="text-right whitespace-nowrap tabular">
-                    {x.voided ? (
-                      <span className="line-through">{money(x.receivedAmount, x.receivedCurrency)}</span>
-                    ) : (
-                      <>
-                        <span className="font-semibold">{money(x.receivedAmount, x.receivedCurrency)}</span>
-                        {(x.receivedCurrency !== c || Number(x.bankCharges) > 0) && <span className="block text-xs text-muted">counts for {money(x.counts, c)}</span>}
-                      </>
-                    )}
-                  </Td>
-                  <Td className="text-right">
-                    {x.voided ? (
-                      <Badge tone="neutral">Removed</Badge>
-                    ) : (
-                      <span className="flex items-center justify-end gap-3">
-                        <a href={`/print/orders/${o.id}/payment-receipt?${new URLSearchParams({ ref: x.id, back: here })}`} className={ROW_LINK}>
-                          Receipt
-                        </a>
-                        {(canPay || canRemove) && (
-                          <ChangePaymentWindow
-                            sub={`${o.refNo} · ${date(x.paidOn)} · ${money(x.receivedAmount, x.receivedCurrency)}`}
-                            payment={x}
-                            currency={c}
-                            today={now}
-                            save={canPay ? editPaymentAction.bind(null, o.id, x.id, c, x.updatedAt) : null}
-                            remove={canRemove ? voidPaymentAction.bind(null, `/payments/${x.id}/void`) : null}
-                            removeFile={removePaymentFileAction.bind(null, "in", x.id, o.id)}
-                            customerId={o.customer.id}
-                          />
-                        )}
-                      </span>
-                    )}
-                  </Td>
-                </Tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-line-strong font-bold">
-                <td className="px-3.5 py-3" colSpan={6}>
-                  Received
-                </td>
-                <td className="px-3.5 py-3 text-right tabular">{money(p.received, c)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </Table>
+          <PaymentsList
+            name="Payments received"
+            account="Into"
+            total={{ label: "Received", amount: money(p.received, c) }}
+            rows={p.payments.map((x) => ({
+              id: x.id,
+              paidOn: x.paidOn,
+              for: paidFor.get(x.id)?.join(", ") ?? null,
+              how: PAYMENT_METHOD_LABEL[x.method],
+              account: x.account?.name ?? null,
+              reference: x.reference,
+              recordedBy: x.recordedBy?.name ?? null,
+              recordedAt: x.recordedAt,
+              amount: x.receivedAmount,
+              currency: x.receivedCurrency,
+              note: x.receivedCurrency !== c || Number(x.bankCharges) > 0 ? `counts for ${money(x.counts, c)}` : null,
+              voided: x.voided ? { reason: x.voided.reason ?? null } : null,
+              actions: (
+                <>
+                  <a href={`/print/orders/${o.id}/payment-receipt?${new URLSearchParams({ ref: x.id, back: here })}`} className={ROW_LINK}>
+                    Receipt
+                  </a>
+                  {(canPay || canRemove) && (
+                    <ChangePaymentWindow
+                      sub={`${o.refNo} · ${date(x.paidOn)} · ${money(x.receivedAmount, x.receivedCurrency)}`}
+                      payment={x}
+                      currency={c}
+                      today={now}
+                      save={canPay ? editPaymentAction.bind(null, o.id, x.id, c, x.updatedAt) : null}
+                      remove={canRemove ? voidPaymentAction.bind(null, `/payments/${x.id}/void`) : null}
+                      removeFile={removePaymentFileAction.bind(null, "in", x.id, o.id)}
+                      customerId={o.customer.id}
+                    />
+                  )}
+                </>
+              ),
+            }))}
+          />
         </Section>
       )}
     </OrderPage>
