@@ -100,6 +100,14 @@ describe("server check: what is a problem", () => {
     expect(keys({ backup: backup({}), jobs: [run("Reminders", 4 * 3_600_000, 3_600_000, 30)] })).toEqual([]);
   });
 
+  it("the quarterly rebuild from the off-site copy failed (within the week)", () => {
+    const restore = (worked: boolean, at: string) =>
+      ok<{ at: string; ok: boolean; message: string }>({ at, ok: worked, message: "Could not fetch db-x.sql.gz from the off-site store." });
+    expect(keys({ backup: backup({}), offsiteRestore: restore(false, hoursAgo(10)) })).toEqual(["offsite_restore_failed"]);
+    expect(keys({ backup: backup({}), offsiteRestore: restore(false, hoursAgo(24 * 8)) })).toEqual([]);
+    expect(keys({ backup: backup({}), offsiteRestore: restore(true, hoursAgo(10)) })).toEqual([]);
+  });
+
   it("the outside watcher: a worker that finished no job for an hour is stopped", () => {
     expect(workerSilence(null, now)).toBeNull();
     expect(workerSilence(new Date(now.getTime() - 59 * 60_000), now)).toBeNull();

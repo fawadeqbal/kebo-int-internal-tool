@@ -58,7 +58,7 @@ export class DevToolsMoreService {
   async jobs(now = new Date()): Promise<DevJobsView> {
     const db = this.prisma.platform;
     const since7 = new Date(now.getTime() - 7 * DAY);
-    const [last, fails, server, backup, disk, restore, days, failures, phones, errorsHour] = await Promise.all([
+    const [last, fails, server, backup, disk, restore, offsiteRestore, days, failures, phones, errorsHour] = await Promise.all([
       db.$queryRaw<{ job: string; started_at: Date; took_ms: number; ok: boolean; result: string | null }[]>`
         select distinct on (job) job, started_at, took_ms, ok, result from job_runs order by job, started_at desc`,
       db.jobRun.groupBy({ by: ["job"], where: { ok: false, startedAt: { gte: since7 } }, _count: true }),
@@ -66,6 +66,7 @@ export class DevToolsMoreService {
       this.read<BackupStatus>("last-status.json"),
       this.read<DiskStatus>("disk.json"),
       this.read<RestoreStatus>("restore-status.json"),
+      this.read<RestoreStatus>("offsite-restore-status.json"),
       db.deliveryDay.findMany({ where: { day: { gte: new Date(dayKey(new Date(now.getTime() - 6 * DAY))) } }, orderBy: { day: "asc" } }),
       db.deliveryFailure.findMany({ where: { at: { gte: since7 } }, orderBy: { at: "desc" }, take: 30 }),
       db.deviceToken.count(),
@@ -106,6 +107,18 @@ export class DevToolsMoreService {
           : null,
         tookMs: restore?.tookSec != null ? restore.tookSec * 1000 : null,
       },
+      "offsite-restore": {
+        lastAt: offsiteRestore?.at ?? null,
+        ok: offsiteRestore ? offsiteRestore.ok : null,
+        result: offsiteRestore
+          ? offsiteRestore.ok
+            ? `worked: ${offsiteRestore.tables} tables, ${offsiteRestore.companies} companies, ${offsiteRestore.orders} orders`
+            : (offsiteRestore.message ?? "failed")
+          : backup?.offsite === "off"
+            ? "off: no off-site copy"
+            : null,
+        tookMs: offsiteRestore?.tookSec != null ? offsiteRestore.tookSec * 1000 : null,
+      },
       cleanup: { lastAt: disk?.at ?? null, ok: disk ? true : null, result: disk ? `disk ${disk.percent}% after it` : null, tookMs: null },
       status: { lastAt: server?.at ?? null, ok: server ? true : null, result: server ? "written" : null, tookMs: null },
     };
@@ -117,7 +130,7 @@ export class DevToolsMoreService {
           : fromServer[j.key]!;
       const isLate = late(r.lastAt, j.everyMs, now);
       let level: DevLevel = "ok";
-      if (r.ok === false) level = j.key === "backup" || j.key === "restore-test" ? "bad" : "warn";
+      if (r.ok === false) level = j.key === "backup" || j.key === "restore-test" || j.key === "offsite-restore" ? "bad" : "warn";
       else if (!r.lastAt) level = "off";
       else if (isLate) level = "warn";
       if (j.key === "offsite" && r.result?.startsWith("off")) level = "warn";

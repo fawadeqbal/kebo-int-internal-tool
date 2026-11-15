@@ -50,6 +50,7 @@ export interface ServerWarning {
     | "errors"
     | "certificate"
     | "restore_failed"
+    | "offsite_restore_failed"
     | "job_slow";
   title: string;
   detail: string;
@@ -96,6 +97,7 @@ export const JOBS: { key: string; label: string; by: "worker" | "server"; schedu
   { key: "backup", label: "Database backup", by: "server", schedule: "every night", everyMs: DAY },
   { key: "offsite", label: "Off-site copy of the backup", by: "server", schedule: "after each backup", everyMs: DAY },
   { key: "restore-test", label: "Restore test", by: "server", schedule: "once a month", everyMs: 31 * DAY },
+  { key: "offsite-restore", label: "Rebuild from the off-site copy", by: "server", schedule: "once a quarter", everyMs: 92 * DAY },
   { key: "cleanup", label: "Disk clean-up", by: "server", schedule: "every night, 03:30", everyMs: DAY },
   { key: "status", label: "Server status (this page's figures)", by: "server", schedule: "every minute", everyMs: 60_000 },
 ];
@@ -128,6 +130,8 @@ export function serverWarnings(input: {
   disk: Read<DiskStatus>;
   server?: Read<ServerFacts>;
   restore?: Read<RestoreStatus>;
+  /** The quarterly rebuild from the off-site copy (offsite-restore-status.json). */
+  offsiteRestore?: Read<RestoreStatus>;
   errorsLastHour?: number;
   /** Each worker job's last run in the last day, with its beat: how often it runs (JOBS). */
   jobs?: JobLastRun[];
@@ -232,6 +236,12 @@ export function serverWarnings(input: {
       title: "The monthly restore test failed",
       detail: `${input.restore.value.message ?? "No reason given"}. A backup that cannot be put back is no backup: see docs/restore.md.`,
     });
+  if (input.offsiteRestore?.state === "ok" && !input.offsiteRestore.value.ok && age(now, input.offsiteRestore.value.at) <= 24 * 7)
+    out.push({
+      key: "offsite_restore_failed",
+      title: "The rebuild from the off-site copy failed",
+      detail: `${input.offsiteRestore.value.message ?? "No reason given"}. If the server is lost, this copy is what the business is rebuilt from: see docs/restore.md.`,
+    });
   return out;
 }
 
@@ -324,6 +334,7 @@ export class ServerHealthService {
       disk: await readStatus<DiskStatus>(path.join(dir, "disk.json")),
       server: await readStatus<ServerFacts>(path.join(dir, "server.json")),
       restore: await readStatus<RestoreStatus>(path.join(dir, "restore-status.json")),
+      offsiteRestore: await readStatus<RestoreStatus>(path.join(dir, "offsite-restore-status.json")),
       errorsLastHour: await this.errorsLastHour(now),
       jobs: await this.jobRuns(now),
     });
