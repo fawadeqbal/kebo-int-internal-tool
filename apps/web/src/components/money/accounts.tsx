@@ -19,15 +19,35 @@ interface Desk {
   accounts: AccountOption[];
   /** The person signed in: every money window says who records it. */
   me: string;
+  /** Their id: "Paid by" starts with them. */
+  meId: string;
   /** Whether this person may add an account (managers, with the cash book). */
   canAdd: boolean;
 }
-const DeskContext = createContext<Desk>({ accounts: [], me: "", canAdd: false });
+const DeskContext = createContext<Desk>({ accounts: [], me: "", meId: "", canAdd: false });
 
 /** Our accounts and the person signed in, for every money form on the page (loaded once by the app layout). */
-export function AccountsProvider({ accounts, me = "", canAdd = false, children }: { accounts: AccountOption[]; me?: string; canAdd?: boolean; children: ReactNode }) {
-  return <DeskContext.Provider value={{ accounts, me, canAdd }}>{children}</DeskContext.Provider>;
+export function AccountsProvider({
+  accounts,
+  me = "",
+  meId = "",
+  canAdd = false,
+  children,
+}: {
+  accounts: AccountOption[];
+  me?: string;
+  meId?: string;
+  canAdd?: boolean;
+  children: ReactNode;
+}) {
+  return <DeskContext.Provider value={{ accounts, me, meId, canAdd }}>{children}</DeskContext.Provider>;
 }
+
+/** The person signed in: { id, name }. */
+export const useMe = () => {
+  const { me, meId } = useContext(DeskContext);
+  return { id: meId, name: me };
+};
 
 /** Our accounts (empty when none are set up). */
 export const useAccounts = () => useContext(DeskContext).accounts;
@@ -106,7 +126,7 @@ export function AccountSelect({
           <>
             No {currency} account yet.{" "}
             {canAdd ? (
-              <button type="button" className="font-medium text-primary underline underline-offset-2" onClick={() => setAdding(true)}>
+              <button type="button" className="inline-flex min-h-6 items-center font-medium text-primary underline underline-offset-2" onClick={() => setAdding(true)}>
                 Add one
               </button>
             ) : (
@@ -114,7 +134,7 @@ export function AccountSelect({
             )}
           </>
         ) : canAdd ? (
-          <button type="button" className="text-text-2 underline underline-offset-2 hover:text-text" onClick={() => setAdding(true)}>
+          <button type="button" className="inline-flex min-h-6 items-center text-text-2 underline underline-offset-2 hover:text-text" onClick={() => setAdding(true)}>
             Add another account
           </button>
         ) : undefined

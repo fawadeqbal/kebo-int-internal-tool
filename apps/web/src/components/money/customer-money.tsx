@@ -6,9 +6,8 @@ import { api } from "@/lib/api";
 import { customerPaymentsOf } from "@/lib/party-data";
 import { money, TZ } from "@/lib/format";
 import type { CustomerAccount, CustomerPayments, ExpenseList, ExpenseTargets } from "@/lib/types-money";
-import { expenseAction } from "@/app/(app)/money/actions";
 import { ViewSwitch } from "@/components/common/view-switch";
-import { NewExpense } from "./forms";
+import { AddCost } from "./cost-window";
 import { ExpenseRecord } from "./expense-record";
 import { CustomerPaymentsBody } from "./customer-payments";
 import { RecordPaymentLink, ViewPaymentsLink } from "./pay-links";
@@ -84,16 +83,11 @@ export async function CustomerMoney({
           </div>
         ) : (
           profit && (
-            <div className="has-[form]:basis-full">
-              <NewExpense
-                action={expenseAction.bind(null, null, null)}
-                people={profit.people}
-                mainCurrency={a!.currency}
-                fx={profit.fx}
-                today={profit.today}
-                choices={profit.choices}
-                label="Add an expense for them"
-                quiet
+            <div className="flex flex-wrap items-center gap-2">
+              <AddCost
+                setup={{ mainCurrency: a!.currency, fx: profit.fx, today: profit.today, people: profit.people, choices: profit.choices, for: { place: "customer", id: customerId, customerId, label: customerName } }}
+                label="Add a cost for them"
+                variant="secondary"
               />
             </div>
           )

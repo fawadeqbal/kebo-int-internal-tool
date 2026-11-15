@@ -2,122 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { ExpenseCategory } from "@kebo/shared";
-import { Alert, Button, cn, Field, Input, Select } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
-import { ActionForm } from "@/components/common/action-form";
-import { CurrencySelect } from "@/components/common/currency-select";
-import { MoneyInput } from "@/components/common/money-input";
-import { AccountSelect, RecordedBy } from "@/components/money/accounts";
-import { FilePicker } from "@/components/money/attachment";
-import { uploadReceipt } from "@/components/money/forms";
-import { FormWindow } from "@/components/order-sections/form-window";
-import { expenseAction, repeatingAction } from "@/app/(app)/money/actions";
-import type { ActionState } from "@/lib/actions";
+import { Button } from "@kebo/ui";
+import { repeatingAction } from "@/app/(app)/money/actions";
 import { date, money } from "@/lib/format";
 import type { RepeatingCosts } from "@/lib/types-money";
-import { COMPANY_KINDS, companyKind } from "./company-kinds";
-
-const chip = (on: boolean) =>
-  cn("h-8 rounded-full border px-3 text-sm transition-colors", on ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line bg-surface hover:border-line-strong");
+import { companyKind } from "./company-kinds";
+import { ConfirmCost, type CostSetup } from "./cost-window";
 
 type Waiting = RepeatingCosts["waiting"][number];
 
-/**
- * The fields of a company cost: what kind, what, how much, the day it was paid and the account. New: whether
- * it comes every month. Confirming a proposed month: last month's values filled in, and the chain it belongs to.
- */
-function CostFields({ mainCurrency, today, confirm, onClose }: { mainCurrency: string; today: string; confirm?: Waiting; onClose: () => void }) {
-  const router = useRouter();
-  const [category, setCategory] = useState<ExpenseCategory>(confirm?.category ?? "rent");
-  const [currency, setCurrency] = useState(confirm?.currency ?? mainCurrency);
-  const [file, setFile] = useState<File | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  // A proposed month is paid on its day once that day has come; before it, today.
-  const paidOn = confirm ? (confirm.on <= today ? confirm.on : today) : today;
-  const done = async (st: ActionState) => {
-    const id = (st.data as { id?: string } | undefined)?.id;
-    if (file && id) {
-      const error = await uploadReceipt(id, file);
-      router.refresh();
-      if (error) return setNotice(`The cost is saved, but the file was not: ${error} Open the cost to add it again.`);
-    }
-    onClose();
-  };
-  return (
-    <ActionForm action={expenseAction.bind(null, null, null)} onDone={done} showSuccess={false} keepFields className="flex flex-col gap-4">
-      {(s) => (
-        <>
-          {notice && <Alert tone="warning">{notice}</Alert>}
-          <input type="hidden" name="category" value={category} />
-          {confirm ? (
-            <>
-              <input type="hidden" name="description" value={confirm.description} />
-              <input type="hidden" name="repeats" value="on" />
-              <input type="hidden" name="repeatKey" value={confirm.key} />
-            </>
-          ) : (
-            <>
-              <fieldset>
-                <legend className="mb-2 text-xs font-medium text-text-2">Kind</legend>
-                <div className="flex flex-wrap gap-1.5">
-                  {COMPANY_KINDS.map((c) => (
-                    <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)} className={chip(category === c)}>
-                      {companyKind(c)}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              <Field label="What" htmlFor="cc-description" error={s.errors?.description}>
-                <Input id="cc-description" name="description" maxLength={200} defaultValue={s.values?.description ?? ""} placeholder={category === "rent" ? "e.g. Office rent" : category === "salaries" ? "e.g. Salaries" : "Say what it is for"} />
-              </Field>
-            </>
-          )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Amount" htmlFor="cc-amount" error={s.errors?.amount}>
-              <MoneyInput id="cc-amount" name="amount" currency={currency} defaultValue={s.values?.amount ?? confirm?.amount ?? ""} placeholder="0.00" />
-            </Field>
-            <Field label="Currency" htmlFor="cc-currency" error={s.errors?.currency ?? s.errors?.rate}>
-              <CurrencySelect id="cc-currency" name="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
-            </Field>
-            <Field label="Paid on" htmlFor="cc-spentOn" error={s.errors?.spentOn}>
-              <Input id="cc-spentOn" name="spentOn" type="date" max={today} defaultValue={s.values?.spentOn ?? paidOn} />
-            </Field>
-            <AccountSelect key={currency} id="cc-account" label="From account" currency={currency} defaultValue={s.values?.accountId ?? confirm?.account?.id} error={s.errors?.accountId} />
-          </div>
-          {!confirm && (
-            <Field label="Repeats" htmlFor="cc-repeats">
-              <Select id="cc-repeats" name="repeats" defaultValue={s.values?.repeats ?? "off"}>
-                <option value="off">Does not repeat</option>
-                <option value="on">Every month, on this day</option>
-              </Select>
-            </Field>
-          )}
-          <FilePicker id="cc-file" label={confirm ? "Bank slip" : "Receipt"} hint="Photo or PDF" file={file} onChange={setFile} />
-          <RecordedBy />
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <SubmitButton pendingText="Saving…">{confirm ? "Confirm" : "Add the cost"}</SubmitButton>
-          </div>
-        </>
-      )}
-    </ActionForm>
-  );
-}
-
-/** "Add a company cost": the page's one orange button. */
-export function AddCompanyCost({ mainCurrency, today }: { mainCurrency: string; today: string }) {
-  return (
-    <FormWindow button={{ label: "Add company cost", kind: "main" }} title="New company cost" sub="Not for one order" size="sm">
-      {(close) => <CostFields mainCurrency={mainCurrency} today={today} onClose={close} />}
-    </FormWindow>
-  );
-}
-
 /** One cost that comes every month and is not in this month yet: Skip (this month only), or Confirm with what was paid. */
-export function RepeatingRow({ w, mainCurrency, today }: { w: Waiting; mainCurrency: string; today: string }) {
+export function RepeatingRow({ w, setup }: { w: Waiting; setup: CostSetup }) {
   const [busy, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -148,9 +43,12 @@ export function RepeatingRow({ w, mainCurrency, today }: { w: Waiting; mainCurre
         >
           Skip
         </Button>
-        <FormWindow button={{ label: "Confirm", kind: "plain" }} title="Confirm" sub={`${w.description} · every month on day ${w.day}`} size="sm">
-          {(close) => <CostFields mainCurrency={mainCurrency} today={today} confirm={w} onClose={close} />}
-        </FormWindow>
+        <ConfirmCost
+          setup={setup}
+          sub={`${w.description} · every month on day ${w.day}`}
+          // A proposed month is paid on its day once that day has come; before it, today.
+          month={{ key: w.key, category: w.category, description: w.description, amount: w.amount, currency: w.currency, account: w.account, on: w.on <= setup.today ? w.on : setup.today }}
+        />
       </span>
     </li>
   );

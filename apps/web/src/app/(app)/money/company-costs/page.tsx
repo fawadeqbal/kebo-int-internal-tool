@@ -14,8 +14,8 @@ import { PlanOff } from "@/components/common/plan-off";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { Section } from "@/components/order-sections/section";
 import { ExpenseRecord } from "@/components/money/expense-record";
-import type { ExpenseChoices } from "@/components/money/forms";
-import { AddCompanyCost, RepeatingRow } from "@/components/money/company-costs";
+import { RepeatingRow } from "@/components/money/company-costs";
+import { AddCost, COMPANY, type CostSetup } from "@/components/money/cost-window";
 import { companyKind } from "@/components/money/company-kinds";
 import { moneyAccess } from "../../finance/sections";
 import { FilterCard } from "@/components/common/filter-card";
@@ -50,7 +50,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.kind ?? "") ? (sp.kind as ExpenseCategory) : undefined;
   const q = { kind: "company" };
   const text = sp.q?.trim() || undefined;
-  const [list, unsearched, before, year, repeating, people, choices, settings] = await Promise.all([
+  const [list, unsearched, before, year, repeating, people, settings] = await Promise.all([
     api.get<ExpenseList>("/expenses", { ...q, ...span(month), category, q: text, page: String(toPage(sp.page)), pageSize: String(PAGE_SIZE) }),
     // The figures over the list are the month's, whatever is searched.
     text ? api.get<ExpenseList>("/expenses", { ...q, ...span(month), pageSize: "1" }) : null,
@@ -58,11 +58,11 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
     api.get<ExpenseList>("/expenses", { ...q, from: `${month.slice(0, 4)}-01-01`, to: `${month.slice(0, 4)}-12-31`, pageSize: "1" }),
     api.get<RepeatingCosts>("/expenses/repeating"),
     getPeople(),
-    api.get<ExpenseChoices>("/expenses/targets"),
     getSettings(),
   ]);
   const c = list.currency;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
+  const setup: CostSetup = { mainCurrency: fx.main, fx, today, people, for: COMPANY };
   const keep = { p: month === thisMonth ? undefined : month, kind: category, q: sp.q };
   const href = (change: Record<string, string | undefined>) => buildHref(HERE, keep, { page: undefined, ...change });
   const monthName = MONTH_YEAR.format(new Date(`${month}-01T00:00:00Z`));
@@ -82,7 +82,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         title="Company costs"
         summary="Rent, salaries and the office: what the company spends that is not for one order"
         actions={list.count > 0 ? <ExportCsv what="expenses" query={{ ...span(month), category, q: text }} /> : undefined}
-        primary={<AddCompanyCost mainCurrency={c} today={today} />}
+        primary={<AddCost setup={setup} label="Add company cost" icon={null} />}
       />
       <StatRow className="mb-4">
         <StatTile label={month === thisMonth ? "This month" : monthName} value={whole(monthTotal, c)} sub={`${monthCount} cost${monthCount === 1 ? "" : "s"}`} />
@@ -96,7 +96,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
           <Section title="To confirm this month" state={`${repeating.waiting.length} waiting`} tone="warn">
             <ul className="flex flex-col divide-y divide-line border-t border-line">
               {repeating.waiting.map((w) => (
-                <RepeatingRow key={w.key} w={w} mainCurrency={c} today={today} />
+                <RepeatingRow key={w.key} w={w} setup={setup} />
               ))}
             </ul>
           </Section>
@@ -141,7 +141,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
           <>
             <ul className="flex flex-col divide-y divide-line" aria-label="Company costs">
               {list.rows.map((e) => (
-                <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} choices={choices} />
+                <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} />
               ))}
             </ul>
             <p className="flex items-baseline justify-between gap-3 border-t-2 border-line-strong px-4 py-3 text-sm font-bold">
