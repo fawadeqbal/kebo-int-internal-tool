@@ -19,6 +19,7 @@ import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { ApprovalsService, SUBMISSION_KINDS, SUBMISSION_STATUSES } from "./approvals.service";
+import { Once } from "../../common/http/once";
 
 const MAX_UPLOAD = 200 * 1024 * 1024; // hard ceiling; the configured limit is checked in the service
 const body = z.record(z.string(), z.unknown(), "Send the details (body)");
@@ -59,6 +60,7 @@ export class SubmissionsController {
 
   /** { kind: payment | expense, orderId? (needed for payment), body } — body as POST /orders/:id/payments or POST /expenses takes it. */
   @Post()
+  @Once()
   @RequirePermissions("money.submit")
   submit(@CurrentUser() user: SessionUser, @Body(Validate(submitInput)) input: z.infer<typeof submitInput>) {
     return this.approvals.submit(user, input);

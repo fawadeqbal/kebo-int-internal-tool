@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { todayIn } from "@kebo/utils";
-import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
+import { attempt, formBody, formValues, reasonOf, type ActionState, onceOf } from "@/lib/actions";
 import { companyZone } from "@/lib/session";
 import type { ExpenseTargets } from "@/lib/types-money";
 
@@ -92,7 +92,7 @@ export async function factoryPaymentAction(
   const body = factoryBody(form);
   const r = await attempt(
     form,
-    () => (paymentId ? api.patch(`/factory-payments/${paymentId}`, body) : api.post(`/orders/${orderId}/factory-payments`, body)),
+    () => (paymentId ? api.patch(`/factory-payments/${paymentId}`, body) : api.post(`/orders/${orderId}/factory-payments`, body, { once: onceOf(form) })),
     paymentId ? "Payment changed." : "Payment to the factory recorded.",
   );
   if (r.ok) refresh(orderId);
@@ -155,7 +155,7 @@ export async function expenseAction(
   };
   const r = await attempt(
     form,
-    () => (expenseId ? api.patch(`/expenses/${expenseId}`, body) : api.post("/expenses", body)),
+    () => (expenseId ? api.patch(`/expenses/${expenseId}`, body) : api.post("/expenses", body, { once: onceOf(form) })),
     expenseId ? "Expense changed." : "Expense added.",
   );
   if (r.ok) {
@@ -195,7 +195,7 @@ export async function repayAction(orderId: string | null, expenseIds: string[], 
   const body = { repaidOn: v.repaidOn, accountId: v.accountId || null };
   let r: ActionState = { ok: true };
   for (const id of expenseIds) {
-    r = await attempt(form, () => api.post(`/expenses/${id}/repay`, body), expenseIds.length > 1 ? `${expenseIds.length} expenses repaid.` : "Repaid.");
+    r = await attempt(form, () => api.post(`/expenses/${id}/repay`, body, { once: onceOf(form, id) }), expenseIds.length > 1 ? `${expenseIds.length} expenses repaid.` : "Repaid.");
     if (!r.ok) break;
   }
   refresh(orderId);
@@ -261,7 +261,7 @@ export async function submitCostAction(_prev: ActionState, form: FormData): Prom
     paidById: own ? v.paidById || null : null,
     accountId: own ? null : v.accountId || null,
   };
-  const r = await attempt(form, () => api.post("/submissions", { kind: "expense", orderId, body }), "Sent to a manager to verify.");
+  const r = await attempt(form, () => api.post("/submissions", { kind: "expense", orderId, body }, { once: onceOf(form) }), "Sent to a manager to verify.");
   if (r.ok) revalidatePath("/", "layout");
   return r;
 }
@@ -289,7 +289,7 @@ export async function transferAction(_prev: ActionState, form: FormData): Promis
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
   };
-  const r = await attempt(form, () => api.post("/money/transfers", body), "Money moved.");
+  const r = await attempt(form, () => api.post("/money/transfers", body, { once: onceOf(form) }), "Money moved.");
   if (r.ok) revalidatePath("/finance", "layout");
   return r;
 }

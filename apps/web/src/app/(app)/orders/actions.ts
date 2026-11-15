@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { api, ApiError } from "@/lib/api";
-import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
+import { attempt, formBody, formValues, reasonOf, type ActionState, onceOf } from "@/lib/actions";
 import type { OrderLineView } from "@/lib/types-orders";
 
 /** The other orders a transfer pays, sent as JSON (empty when missing or unreadable). */
@@ -128,7 +128,7 @@ function paymentBody(form: FormData, currency: string) {
 }
 
 export async function paymentAction(orderId: string, currency: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.post(`/orders/${orderId}/payments`, paymentBody(form, currency)), "Payment recorded.");
+  const r = await attempt(form, () => api.post(`/orders/${orderId}/payments`, paymentBody(form, currency), { once: onceOf(form) }), "Payment recorded.");
   if (r.ok) refresh(orderId);
   return r;
 }
@@ -138,7 +138,7 @@ export async function paymentAction(orderId: string, currency: string, _prev: Ac
  * verify, and counts on the order only then. The same form and the same checks as recording it.
  */
 export async function submitPaymentAction(orderId: string, currency: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.post("/submissions", { kind: "payment", orderId, body: paymentBody(form, currency) }), "Sent to a manager to verify.");
+  const r = await attempt(form, () => api.post("/submissions", { kind: "payment", orderId, body: paymentBody(form, currency) }, { once: onceOf(form) }), "Sent to a manager to verify.");
   if (r.ok) revalidatePath("/", "layout");
   return r;
 }
@@ -171,7 +171,7 @@ export async function issueProformaAction(orderId: string, _prev: ActionState, f
 /** Pays (part of) the order from the customer's credit (managers). */
 export async function useCreditAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/orders/${orderId}/use-credit`, { amount: v.amount, on: v.on || null }), "Paid from the customer's credit.");
+  const r = await attempt(form, () => api.post(`/orders/${orderId}/use-credit`, { amount: v.amount, on: v.on || null }, { once: onceOf(form) }), "Paid from the customer's credit.");
   if (r.ok) refresh(orderId);
   return r;
 }
@@ -201,7 +201,7 @@ export async function customerReceiptAction(customerId: string, _prev: ActionSta
     accountId: v.accountId || null,
     parts,
   };
-  const r = await attempt(form, () => api.post(`/customers/${customerId}/receipts`, body), "Payment recorded.");
+  const r = await attempt(form, () => api.post(`/customers/${customerId}/receipts`, body, { once: onceOf(form) }), "Payment recorded.");
   if (r.ok) refreshCustomer(customerId);
   return r;
 }
@@ -210,7 +210,7 @@ export async function customerReceiptAction(customerId: string, _prev: ActionSta
 export async function refundCreditAction(customerId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const body = { amount: v.amount, currency: v.currency, on: v.on, accountId: v.accountId || null, note: v.note?.trim() || null };
-  const r = await attempt(form, () => api.post(`/customers/${customerId}/credit/refund`, body), "Refund recorded.");
+  const r = await attempt(form, () => api.post(`/customers/${customerId}/credit/refund`, body, { once: onceOf(form) }), "Refund recorded.");
   if (r.ok) refreshCustomer(customerId);
   return r;
 }

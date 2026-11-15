@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { ONCE_HEADER } from "./once";
 
 /**
  * The only way the web app talks to the API: on the server, with the person's
@@ -88,7 +89,9 @@ async function parse<T>(res: Response, platform = false): Promise<T> {
 
 export const api = {
   get: async <T>(path: string, query?: Query) => parse<T>(await apiFetch(path, { query })),
-  post: async <T>(path: string, body?: unknown) => parse<T>(await apiFetch(path, { method: "POST", body: JSON.stringify(body ?? {}) })),
+  /** `once`: the form's one-time key (lib/once.ts); the API does a money save once per key. */
+  post: async <T>(path: string, body?: unknown, opts?: { once?: string }) =>
+    parse<T>(await apiFetch(path, { method: "POST", body: JSON.stringify(body ?? {}), headers: opts?.once ? { [ONCE_HEADER]: opts.once } : undefined })),
   put: async <T>(path: string, body?: unknown) => parse<T>(await apiFetch(path, { method: "PUT", body: JSON.stringify(body ?? {}) })),
   patch: async <T>(path: string, body?: unknown) => parse<T>(await apiFetch(path, { method: "PATCH", body: JSON.stringify(body ?? {}) })),
   delete: async <T>(path: string) => parse<T>(await apiFetch(path, { method: "DELETE" })),

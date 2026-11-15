@@ -149,6 +149,12 @@ class Api {
   }
 
   Future<Json> post(String path, [Object? body]) => _map(() => _dio.post<Object?>(path, data: body ?? const <String, Object?>{}));
+
+  /// A money save that must happen once: the server keeps the answer for [once] (its Idempotency-Key), so sending
+  /// it again (the answer was lost, the waiting saves go again) does nothing twice and gets the first answer.
+  Future<Json> postOnce(String path, Object? body, String once) => _map(
+        () => _dio.post<Object?>(path, data: body ?? const <String, Object?>{}, options: Options(headers: {'Idempotency-Key': once})),
+      );
   Future<Json> put(String path, Object body) => _map(() => _dio.put<Object?>(path, data: body));
   Future<Json> patch(String path, Object body) => _map(() => _dio.patch<Object?>(path, data: body));
   Future<void> delete(String path) => _send(() => _dio.delete<Object?>(path));

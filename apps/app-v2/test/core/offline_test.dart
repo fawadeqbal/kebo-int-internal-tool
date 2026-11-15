@@ -56,6 +56,27 @@ void main() {
     api.net.stop();
   });
 
+  test('a save carries its step id as a one-time key: sent again, the same key (the server does it once)', () async {
+    final answers = <String, Object?>{'/api/c': {'ok': true}};
+    final (api, box, server, _) = _setup(answers);
+    server.offline = true;
+    await (box.chain('Payment')
+          ..post('/api/missing', {'x': 1})
+          ..patch('/api/c', {'y': 2}))
+        .send();
+    server.offline = false;
+    await api.net.check();
+    await box.flush();
+    answers['/api/missing'] = {'ok': true};
+    await box.retry(box.groups.single);
+    final keys = [for (final c in server.calls) '${c.method} ${c.headers['Idempotency-Key']}'];
+    expect(keys, hasLength(3));
+    expect(keys[0], startsWith('POST out-'));
+    expect(keys[1], keys[0], reason: 'Try again sends the same save with the same key');
+    expect(keys[2], 'PATCH null', reason: 'only a POST makes something new');
+    api.net.stop();
+  });
+
   test('a call the server refuses waits for the person; other things still go; Try again sends it', () async {
     final answers = <String, Object?>{'/api/a': {'id': 'a1'}, '/api/b': {'ok': true}, '/api/c': {'ok': true}};
     final (api, box, server, _) = _setup(answers);
