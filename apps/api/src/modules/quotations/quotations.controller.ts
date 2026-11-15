@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { currency, revisionEmailInput, revisionInput, revisionMoveInput, type RevisionInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { QuotationsService } from "./quotations.service";
 
@@ -13,6 +13,7 @@ export class QuotationsController {
   constructor(private readonly quotations: QuotationsService) {}
 
   /** The deal's quotation with every revision (costs only for people who may see them). */
+  @SignedIn("checked inside: sourcing.manage")
   @Get("inquiries/:id/quotation")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.quotations.get(user, id);
@@ -42,6 +43,7 @@ export class QuotationsController {
     return this.quotations.createRevision(user, id, body);
   }
 
+  @SignedIn("checked inside: sourcing.manage")
   @Get("revisions/:id")
   revision(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.quotations.revision(user, id);

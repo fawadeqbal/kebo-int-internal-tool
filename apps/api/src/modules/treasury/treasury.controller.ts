@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { PAYMENT_DIRECTIONS, PAYMENT_RECORD_KINDS, type PaymentRecordKind } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { TreasuryService } from "./treasury.service";
 
@@ -34,17 +34,20 @@ class TreasuryController {
   constructor(private readonly payments: TreasuryService) {}
 
   /** ?from&to&dir&status&q&order&party&page&pageSize → { rows, total, page, pageSize, counts, canRecord } */
+  @SignedIn("checked inside: expenses.manage, ledger.view, money.submit, payments.record, sourcing.manage")
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(paymentsQuery)) q: z.infer<typeof paymentsQuery>) {
     return this.payments.list(user, q);
   }
 
   /** Whether this person opens Treasury › Payments (the sidebar asks). */
+  @SignedIn("checked inside: expenses.manage, ledger.view, money.submit, payments.record, sourcing.manage")
   @Get("access")
   async access(@CurrentUser() user: SessionUser) {
     return { opens: await this.payments.opens(user) };
   }
 
+  @SignedIn("checked inside: expenses.manage, ledger.view, money.submit, orders.manage, payments.record, sourcing.manage")
   @Get(":kind/:id")
   one(@CurrentUser() user: SessionUser, @Param("kind", kindPipe) kind: PaymentRecordKind, @Param("id", ParseUUIDPipe) id: string) {
     return this.payments.one(user, kind, id);

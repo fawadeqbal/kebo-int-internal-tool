@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
+import { CurrentUser, RequireFeature, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { InsightsService } from "./insights.service";
 import { RemindersListService } from "./reminders-list.service";
@@ -22,6 +22,7 @@ export class InsightsController {
 
   /** People who see the reports: Home's figures, what stands out, the next four weeks, orders and inquiries now. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("insights/home")
   home(@CurrentUser() user: SessionUser) {
     return this.homeFigures.home(user);
@@ -29,12 +30,14 @@ export class InsightsController {
 
   /** Managers: this month's company target and how far along it is (Home), from Insights' sales. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("insights/target")
   monthTarget(@CurrentUser() user: SessionUser) {
     return this.insights.monthTarget(user);
   }
 
   @RequireFeature("insights")
+  @SignedIn("checked inside: reports.view")
   @Get("insights/targets")
   targets(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ year: z.coerce.number().int().min(2000).max(2100) }))) q: { year: number }) {
     return this.insights.targets(user, q.year);
@@ -42,6 +45,7 @@ export class InsightsController {
 
   /** { amount } in the main currency; 0 or null removes the month's target. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage")
   @Put("insights/targets/:month")
   setTarget(@CurrentUser() user: SessionUser, @Param("month") m: string, @Body(Validate(z.object({ amount: z.coerce.number().min(0).max(1e12).nullable() }))) body: { amount: number | null }) {
     return this.insights.setTarget(user, month.parse(m), body.amount);
@@ -49,6 +53,7 @@ export class InsightsController {
 
   /** Targets per person for a year, with the people to set them for. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: reports.view")
   @Get("insights/targets/people")
   personTargets(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ year: z.coerce.number().int().min(2000).max(2100) }))) q: { year: number }) {
     return this.insights.personTargets(user, q.year);
@@ -56,6 +61,7 @@ export class InsightsController {
 
   /** { amount } in the main currency for one person and month; 0 or null removes it. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage")
   @Put("insights/targets/:month/people/:userId")
   setPersonTarget(
     @CurrentUser() user: SessionUser,
@@ -68,35 +74,41 @@ export class InsightsController {
 
   /** My own target this month and how far I am. */
   @RequireFeature("insights")
+  @SignedIn("their own work")
   @Get("me/target")
   myTarget(@CurrentUser() user: SessionUser) {
     return this.insights.myTarget(user);
   }
 
   /** What customers still owe, order by order (Money → To receive). */
+  @SignedIn("checked inside: expenses.manage, payments.record")
   @Get("money/receivables")
   receivables(@CurrentUser() user: SessionUser) {
     return this.insights.receivables(user);
   }
 
   /** What needs me now ("Needs attention" on Home). */
+  @SignedIn("checked inside: expenses.manage, settings.manage, sourcing.manage")
   @Get("reminders")
   list(@CurrentUser() user: SessionUser) {
     return this.reminders.list(user);
   }
 
+  @SignedIn("their own reminders")
   @Post("reminders/snooze")
   @HttpCode(200)
   snooze(@CurrentUser() user: SessionUser, @Body(Validate(key.extend({ days: z.coerce.number().int().min(1).max(90) }))) body: { key: string; days: number }) {
     return this.reminders.snooze(user, body.key, body.days);
   }
 
+  @SignedIn("their own reminders")
   @Post("reminders/done")
   @HttpCode(200)
   done(@CurrentUser() user: SessionUser, @Body(Validate(key)) body: { key: string }) {
     return this.reminders.done(user, body.key);
   }
 
+  @SignedIn("their own reminders")
   @Post("reminders/restore")
   @HttpCode(200)
   restore(@CurrentUser() user: SessionUser, @Body(Validate(key)) body: { key: string }) {

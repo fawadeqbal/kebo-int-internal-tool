@@ -38,7 +38,7 @@ import {
   type StageMoveInput,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, Public, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, Public, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { CompanyContext } from "../../common/company/company-context";
 import { companyRefusal } from "../../common/auth/auth.guard";
@@ -59,11 +59,13 @@ export class InquiriesController {
   ) {}
 
   /** ?stage=open|overdue|on_hold|new|sourcing|quoted|won|lost&assignee=me|unassigned|<id>&q&customerId&priority&channel&sort&page */
+  @SignedIn("anyone signed in to the company")
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(inquiryListQuery)) q: InquiryListQuery) {
     return this.inquiries.list(user, q);
   }
 
+  @SignedIn("checked inside: inquiries.assign, inquiries.create, inquiries.reopen, quotations.manage, sourcing.manage")
   @Get(":id")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.inquiries.get(user, id);
@@ -75,18 +77,21 @@ export class InquiriesController {
     return this.inquiries.create(user, body);
   }
 
+  @SignedIn("checked inside: the record and who they are")
   @Put(":id")
   update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(inquiryInput)) body: InquiryInput) {
     return this.inquiries.update(user, id, body);
   }
 
   /** { to, lostReason?, note? } — mark lost, start working, or reopen. */
+  @SignedIn("checked inside: inquiries.assign, inquiries.create, inquiries.reopen, quotations.manage, sourcing.manage")
   @Post(":id/stage")
   @HttpCode(200)
   move(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(stageMoveInput)) body: StageMoveInput) {
     return this.inquiries.move(user, id, body);
   }
 
+  @SignedIn("checked inside: inquiries.assign, inquiries.create, inquiries.reopen, quotations.manage, sourcing.manage")
   @Post(":id/hold")
   @HttpCode(200)
   hold(
@@ -97,6 +102,7 @@ export class InquiriesController {
     return this.inquiries.hold(user, id, body);
   }
 
+  @SignedIn("checked inside: inquiries.assign, inquiries.create, inquiries.reopen, quotations.manage, sourcing.manage")
   @Post(":id/assign")
   @HttpCode(200)
   assign(
@@ -108,6 +114,7 @@ export class InquiriesController {
   }
 
   /** { parts: [{ description, model?, quantity, unit }], reason? } — the item is quoted in parts (numbered under it). */
+  @SignedIn("checked inside: inquiries.assign, inquiries.create, inquiries.reopen, quotations.manage, sourcing.manage")
   @Post(":id/items/:itemId/parts")
   @HttpCode(200)
   split(
@@ -124,6 +131,7 @@ export class InquiriesController {
    * ({ id, inquiryId, body, kind, contactId, at, authorId, createdAt, editedAt, … }), as it always answered.
    * GET /inquiries/:id/notes, PATCH and DELETE /notes/:id: see the notes module.
    */
+  @SignedIn("checked inside: the record and who they are")
   @Post(":id/notes")
   async note(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(noteInput)) body: NoteInput) {
     const { row } = await this.notes.create(user, "inquiry", id, body);
@@ -140,6 +148,7 @@ export class InquiriesController {
   }
 
   /** multipart/form-data with one `file`, and optionally `kind` (urs | drawing | photo | specification | other) and `note`. */
+  @SignedIn("checked inside: sourcing.manage")
   @Post(":id/files")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   upload(
@@ -153,6 +162,7 @@ export class InquiriesController {
   }
 
   /** Every file on the deal in one zip. */
+  @SignedIn("anyone signed in to the company")
   @Get(":id/files.zip")
   async zip(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
     const z = await this.inquiries.zipFiles(user, id);

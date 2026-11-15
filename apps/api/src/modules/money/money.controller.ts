@@ -32,7 +32,7 @@ import {
 } from "@kebo/shared";
 import { isISODate } from "@kebo/utils";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequireFeature, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequireFeature, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { MoneyService } from "./money.service";
@@ -76,6 +76,7 @@ export class MoneyController {
 
   /** Managers: where we lose money in a period (?from&to, default this year), with warnings. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("reports/leaks")
   leaksReport(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ from: date, to: date }))) q: { from?: string; to?: string }) {
     return this.leaks.report(user, q);
@@ -83,6 +84,7 @@ export class MoneyController {
 
   /** Managers only: the bills known and not paid yet, and the people to pay back, across the company. */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Get("money/bills")
   openBills(@CurrentUser() user: SessionUser) {
     return this.money.openBills(user);
@@ -90,6 +92,7 @@ export class MoneyController {
 
   /** Managers only: the company's costs that come every month and are not in this month yet. */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Get("expenses/repeating")
   repeating(@CurrentUser() user: SessionUser) {
     return this.money.repeatingCosts(user);
@@ -97,6 +100,7 @@ export class MoneyController {
 
   /** { what: skip | stop }: skip this month's, or stop the cost from repeating. */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Post("expenses/repeating/:key")
   @HttpCode(200)
   repeatingChange(@CurrentUser() user: SessionUser, @Param("key", ParseUUIDPipe) key: string, @Body(Validate(z.object({ what: z.enum(["skip", "stop"]) }))) body: { what: "skip" | "stop" }) {
@@ -105,6 +109,7 @@ export class MoneyController {
 
   /** Managers only: what an expense can be for (customers, deals, orders, factories). */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Get("expenses/targets")
   expenseTargets(@CurrentUser() user: SessionUser) {
     return this.accounts.expenseTargets(user);
@@ -112,6 +117,7 @@ export class MoneyController {
 
   /** Managers only: Reports › Spending for a period (?from&to, and the period before ?prevFrom&prevTo to compare). */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Get("reports/spending")
   spendingReport(
     @CurrentUser() user: SessionUser,
@@ -122,6 +128,7 @@ export class MoneyController {
 
   /** Managers only: what one person spent (paid, or recorded with nobody named), by kind and by what for, and what is owed back to them. */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Get("people/:id/spending")
   personSpending(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Query(Validate(z.object({ from: date, to: date }))) q: { from?: string; to?: string }) {
     return this.accounts.personSpending(user, id, q);
@@ -129,12 +136,14 @@ export class MoneyController {
 
   /** Managers only: a customer's deals, what they earned us, everything spent on them, and a timeline. */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Get("customers/:id/account")
   customerAccount(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.accounts.customerAccount(user, id);
   }
 
   /** An order's money: payment plan, what we owe and paid factories, expenses and profit (each for the people who may see it). */
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Get("orders/:id/money")
   forOrder(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.money.forOrder(user, id);
@@ -150,6 +159,7 @@ export class MoneyController {
 
   /* The order's payments to its suppliers: Treasury records them; the answer is the order's money view. */
 
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Post("orders/:id/factory-payments")
   @Once()
   async payFactory(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput) {
@@ -158,12 +168,14 @@ export class MoneyController {
   }
 
   /** Same body as recording, plus reason (always asked). */
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Patch("factory-payments/:id")
   async editFactoryPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput) {
     const { orderId } = await this.supplierPayments.editFactoryPayment(user, id, body);
     return this.money.forOrder(user, orderId);
   }
 
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Post("factory-payments/:id/void")
   @HttpCode(200)
   async voidFactoryPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidInput)) body: z.infer<typeof voidInput>) {
@@ -172,6 +184,7 @@ export class MoneyController {
   }
 
   /** { items: [{ id?, label, amount, dueOn? }], reason? } — they must add up to the order total. */
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Put("orders/:id/payment-plan")
   async plan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(paymentPlanInput)) body: PaymentPlanInput) {
     await this.billing.setPlan(user, id, body);
@@ -188,12 +201,14 @@ export class MoneyController {
 
   /** Managers only. ?from&to (dates), ?orderId, ?customerId, ?category, ?kind=order|customer|general; with totals by kind and by customer. */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Get("expenses")
   expenses(@CurrentUser() user: SessionUser, @Query(Validate(expenseQuery)) q: z.infer<typeof expenseQuery>) {
     return this.money.listExpenses(user, q);
   }
 
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Post("expenses")
   @Once()
   createExpense(@CurrentUser() user: SessionUser, @Body(Validate(expenseInput)) body: ExpenseInput) {
@@ -202,12 +217,14 @@ export class MoneyController {
 
   /** Same body as adding, plus reason (always asked). */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Patch("expenses/:id")
   editExpense(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(expenseInput)) body: ExpenseInput) {
     return this.money.editExpense(user, id, body);
   }
 
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Post("expenses/:id/void")
   @HttpCode(200)
   voidExpense(
@@ -230,6 +247,7 @@ export class MoneyController {
 
   /** multipart/form-data with one `file`: a photo or PDF of the receipt (replaces the one there). */
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Post("expenses/:id/receipt")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   attachReceipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
@@ -238,6 +256,7 @@ export class MoneyController {
   }
 
   @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Delete("expenses/:id/receipt")
   removeReceipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.money.removeReceipt(user, id);
@@ -245,6 +264,7 @@ export class MoneyController {
 
   /** Managers only: the year month by month, earned and cash, in the main currency. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage")
   @Get("money/profit-and-loss")
   pnl(@CurrentUser() user: SessionUser, @Query(Validate(yearQuery)) q: z.infer<typeof yearQuery>) {
     return this.money.profitAndLoss(user, q.year);

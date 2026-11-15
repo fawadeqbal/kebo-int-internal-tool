@@ -2,7 +2,7 @@ import { Controller, Get, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OperationsService, PURCHASE_ORDER_TABS, type PurchaseOrderPageQuery } from "./operations.service";
 
@@ -22,6 +22,7 @@ export class OperationsController {
   constructor(private readonly operations: OperationsService) {}
 
   /** ?all=true: arrived ones too (default: under way). */
+  @SignedIn("anyone signed in to the company")
   @Get("shipments")
   shipments(
     @CurrentUser() user: SessionUser,
@@ -35,6 +36,7 @@ export class OperationsController {
    * filter: ?status=all|not_sent|in_production|ready|shipped|cancelled&q&supplier&ready=month|late|none&page&pageSize.
    * People who see costs.
    */
+  @SignedIn("checked inside: sourcing.manage")
   @Get("purchase-orders/page")
   purchaseOrderPage(@CurrentUser() user: SessionUser, @Query(Validate(pageQuery)) q: PurchaseOrderPageQuery) {
     return this.operations.purchaseOrderPage(user, q);
@@ -44,6 +46,7 @@ export class OperationsController {
    * ?all=true: every purchase order (default: those still to pay or not shipped). ?order=: one sales order's
    * (the purchase order's own page). People who see costs.
    */
+  @SignedIn("checked inside: sourcing.manage")
   @Get("purchase-orders")
   purchaseOrders(
     @CurrentUser() user: SessionUser,

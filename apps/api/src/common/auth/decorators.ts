@@ -18,6 +18,15 @@ export const AllowDuringTwoStepSetup = () => SetMetadata(SETUP_ALLOWED, true);
 /** The signed-in user must have every listed permission. */
 export const RequirePermissions = (...permissions: Permission[]) => SetMetadata(PERMISSIONS, permissions);
 
+export const SIGNED_IN = "auth:signed-in";
+
+/**
+ * Open to anyone signed in to the company; what it lets them do is decided inside, and `rule` says how in words
+ * ("their own account", "checked inside: payments.record, orders.update"). Settings › Roles shows it. Every route
+ * states its rule: @Public, @PlatformRoute, @RequirePermissions or this (a test fails on one with none).
+ */
+export const SignedIn = (rule: string) => SetMetadata(SIGNED_IN, rule);
+
 export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionContext): SessionUser => ctx.switchToHttp().getRequest().user);
 
 export const READ_ONLY_ALLOWED = "company:read-only-allowed";

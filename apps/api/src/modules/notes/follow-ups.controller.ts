@@ -11,7 +11,7 @@ import {
   type FollowUpListQuery,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { FollowUpsService } from "./follow-ups.service";
 /**
@@ -25,35 +25,41 @@ export class FollowUpsController {
   constructor(private readonly followUps: FollowUpsService) {}
 
   /** ?mine=true&on=&from=&to=&open=true|false&inquiryId|orderId|customerId|factoryId&page&pageSize → { rows, total, page, pageSize, counts: { open, done, late }, canViewAll } */
+  @SignedIn("anyone signed in to the company")
   @Get("follow-ups")
   list(@CurrentUser() user: SessionUser, @Query(Validate(followUpListQuery)) q: FollowUpListQuery) {
     return this.followUps.list(user, q);
   }
 
   /** { title, kind?, dueOn, dueAt?, place?, note?, inquiryId | orderId | customerId | factoryId (at most one), assigneeId? (default me) } */
+  @SignedIn("anyone signed in to the company")
   @Post("follow-ups")
   create(@CurrentUser() user: SessionUser, @Body(Validate(followUpInput)) body: FollowUpInput) {
     return this.followUps.create(user, body);
   }
 
+  @SignedIn("anyone signed in to the company")
   @Get("follow-ups/:id")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.followUps.get(user, id);
   }
 
   /** The fields that change (as POST); any of the four record ids sent sets the record (all null: none). */
+  @SignedIn("checked inside: the record and who they are")
   @Patch("follow-ups/:id")
   edit(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(followUpEditInput)) body: FollowUpEditInput) {
     return this.followUps.edit(user, id, body);
   }
 
   /** { note? } — done (again: no change). */
+  @SignedIn("checked inside: the record and who they are")
   @Post("follow-ups/:id/done")
   @HttpCode(200)
   done(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(followUpDoneInput)) body: FollowUpDoneInput) {
     return this.followUps.done(user, id, body.note, body.next);
   }
 
+  @SignedIn("checked inside: the record and who they are")
   @Post("follow-ups/:id/reopen")
   @HttpCode(200)
   reopen(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
@@ -61,6 +67,7 @@ export class FollowUpsController {
   }
 
   /** The person it is for, who made it, or a manager → { ok: true } */
+  @SignedIn("checked inside: the record and who they are")
   @Delete("follow-ups/:id")
   @HttpCode(200)
   remove(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
@@ -68,6 +75,7 @@ export class FollowUpsController {
   }
 
   /** My open follow-ups due today or earlier, by when they are due → { today, now, total, late, rows } */
+  @SignedIn("their own work")
   @Get("me/today")
   today(@CurrentUser() user: SessionUser) {
     return this.followUps.today(user);

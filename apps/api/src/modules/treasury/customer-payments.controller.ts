@@ -15,7 +15,7 @@ import {
   type UseCreditInput,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { CustomerPaymentsService } from "./customer-payments.service";
 import { Once } from "../../common/http/once";
@@ -27,6 +27,7 @@ class OrderPaymentsController {
   constructor(private readonly payments: CustomerPaymentsService) {}
 
   /** Money in from the customer, and the position (received, still due). */
+  @SignedIn("checked inside: payments.record")
   @Get(":id/payments")
   listPayments(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.payments.forOrder(user, id);
@@ -59,18 +60,21 @@ class CustomerPaymentsController {
   constructor(private readonly payments: CustomerPaymentsService) {}
 
   /** ?customerId= — that customer's orders with what was received and is due, totals per currency, and every payment. */
+  @SignedIn("checked inside: payments.record")
   @Get()
   forCustomer(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ customerId: z.uuid() }))) q: { customerId: string }) {
     return this.payments.forCustomer(user, q.customerId);
   }
 
   /** The payment's fields plus { reason } (always asked): a recorded payment changed. */
+  @SignedIn("checked inside: payments.record")
   @Patch(":id")
   edit(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(editPaymentInput)) body: EditPaymentInput) {
     return this.payments.edit(user, id, body);
   }
 
   /** { reason } — managers only; the payment stays visible, crossed out. */
+  @SignedIn("checked inside: orders.manage, payments.record")
   @Post(":id/void")
   @HttpCode(200)
   void(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidPaymentInput)) body: z.infer<typeof voidPaymentInput>) {
@@ -84,6 +88,7 @@ class CreditController {
   constructor(private readonly payments: CustomerPaymentsService) {}
 
   /** The customer's credit: balances per currency and every entry. */
+  @SignedIn("checked inside: payments.record")
   @Get("customers/:id/credit")
   credit(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.payments.creditView(user, id);

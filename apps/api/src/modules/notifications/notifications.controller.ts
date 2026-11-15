@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Post, Query } from "@nestjs/co
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions, AllowWhenReadOnly } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, AllowWhenReadOnly, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { NOTIFICATION_GROUPS, NotificationsService, type NotificationGroup } from "./notifications.service";
 import { RemindersService } from "./reminders.service";
@@ -18,6 +18,7 @@ export class NotificationsController {
     private readonly reminders: RemindersService,
   ) {}
 
+  @SignedIn("their own notifications")
   @Get("notifications")
   mine(
     @CurrentUser() user: SessionUser,
@@ -40,6 +41,7 @@ export class NotificationsController {
 
   /** { ids: [...] | "all" } */
   @AllowWhenReadOnly()
+  @SignedIn("their own notifications")
   @Post("notifications/read")
   @HttpCode(200)
   read(@CurrentUser() user: SessionUser, @Body(Validate(readInput)) body: z.infer<typeof readInput>) {
@@ -47,6 +49,7 @@ export class NotificationsController {
   }
 
   @AllowWhenReadOnly()
+  @SignedIn("their own phones (push notifications)")
   @Post("me/devices")
   @HttpCode(200)
   device(@CurrentUser() user: SessionUser, @Body(Validate(deviceInput)) body: z.infer<typeof deviceInput>) {
@@ -54,6 +57,7 @@ export class NotificationsController {
   }
 
   @AllowWhenReadOnly()
+  @SignedIn("their own phones (push notifications)")
   @Delete("me/devices")
   @HttpCode(200)
   forget(@CurrentUser() user: SessionUser, @Body(Validate(deviceInput.pick({ token: true }))) body: { token: string }) {

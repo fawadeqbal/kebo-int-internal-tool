@@ -9,17 +9,19 @@ import type { RoleRow, SecurityOverview } from "@/lib/types-people";
 import { OpenPanelButton } from "@/components/common/panel";
 import { createRoleAction } from "../actions";
 import { RolePanel } from "../role-form";
+import { AccessMapCard, type AccessRoute } from "./access-map";
 
 export const metadata = { title: "Roles" };
 
 /** How people stand (signed in, two-step sign-in, failed attempts) and the roles: what each allows and whether it needs two-step sign-in. */
 export default async function RolesPage() {
-  const [o, roles, company, me, custom] = await Promise.all([
+  const [o, roles, company, me, custom, access] = await Promise.all([
     api.get<SecurityOverview>("/security/overview"),
     api.get<RoleRow[]>("/roles"),
     getCompany(),
     requireUser(),
     hasFeature("custom_roles"),
+    api.get<AccessRoute[]>("/security/access-map").catch(() => null),
   ]);
   const superAdmin = !!roles.find((x) => x.key === me.role)?.superAdmin;
   // Permissions follow the company's plan: what it leaves out nobody has, and it is not counted.
@@ -133,6 +135,7 @@ export default async function RolesPage() {
           </tbody>
         </Table>
       </Card>
+      {access && <AccessMapCard routes={access} />}
       {custom && (
         <RolePanel
           name="new-role"

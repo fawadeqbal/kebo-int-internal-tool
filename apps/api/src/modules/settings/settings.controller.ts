@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseEnumPipe, Post, Put } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { mailSettingsInput, mailTestInput, SETTINGS, type MailSettingsInput, type MailTestInput, type SettingsKey } from "@kebo/shared";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { Validate } from "../../common/http/zod.pipe";
 import { CompanyMail } from "../../common/notify/company-mail";
@@ -14,12 +14,14 @@ const KEYS = Object.fromEntries(Object.keys(SETTINGS).map((k) => [k, k])) as Rec
 class SettingsController {
   constructor(private readonly settings: SettingsService) {}
 
+  @SignedIn("anyone signed in to the company")
   @Get()
   all() {
     return this.settings.get();
   }
 
   /** Whether the main currency can still change (not once money is recorded against it). */
+  @SignedIn("anyone signed in to the company")
   @Get("main-currency")
   mainCurrency() {
     return this.settings.mainCurrencyLock();
