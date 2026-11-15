@@ -75,7 +75,7 @@ describe("the groups", () => {
     expect(pages(m, "reports")).toEqual(["Reports"]);
     expect(m.filter(isSingle).map((x) => x.key)).toEqual(["reports"]);
     // Settings is two groups: the company's own (managers too), and the admin's.
-    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails", "Website form"]);
+    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails", "Website form"]);
     expect(pages(m, "admin")).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Email sending", "Activity log"]);
   });
 
@@ -106,6 +106,7 @@ describe("the groups", () => {
         "/settings/company",
         "/settings/address",
         "/settings/sales",
+        "/settings/books",
         "/settings/papers",
         "/settings/reminders",
         "/settings/emails",
@@ -152,9 +153,9 @@ describe("the groups", () => {
     expect(titles(m)).toEqual(["Sales", "Purchasing", "Money", "Reports", "Company settings", "Admin settings"]);
     expect(pages(m, "reports")).toEqual(["Reports"]);
     // The company's web address and its website form are the admin's too: a manager does not see them.
-    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails"]);
+    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails"]);
     const withAddresses = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 0, approves: true, companyAddresses: true });
-    expect(pages(withAddresses, "company")).toEqual(["Company", "Sales & quotations", "Document templates", "Reminders", "Emails"]);
+    expect(pages(withAddresses, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails"]);
     // No people, roles, sign-ins, sessions or email sending: those are the admin's.
     expect(pages(m, "admin")).toEqual(["Activity log"]);
     // Someone who only manages people sees Admin settings alone.

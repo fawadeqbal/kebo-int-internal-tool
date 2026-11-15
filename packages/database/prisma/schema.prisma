@@ -367,6 +367,7 @@ model User {
 
   purchaseOrdersSent PurchaseOrder[] @relation("PurchaseOrderSentBy")
   requestKeys        RequestKey[]
+  booksClosed        BooksClose[]    @relation("BooksClosedBy")
 
   @@unique([companyId, email])
   @@map("users")
@@ -490,6 +491,22 @@ model AuditLog {
   @@index([companyId])
   @@index([userId])
   @@map("audit_logs")
+}
+
+/// The month close: money dated on or before `closedThrough` is kept as reported (a database rule refuses a
+/// payment, cost, transfer or allocation dated then, and a change to one). Moved back only with a reason.
+model BooksClose {
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId     String   @id @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company       Company  @relation(fields: [companyId], references: [id])
+  closedThrough DateTime @map("closed_through") @db.Date
+  closedById    String?  @map("closed_by") @db.Uuid
+  closedBy      User?    @relation("BooksClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  closedAt      DateTime @default(now()) @map("closed_at") @db.Timestamptz
+  reason        String?
+
+  @@index([closedById])
+  @@map("books_close")
 }
 
 /// One-time keys for money saves (the Idempotency-Key header): a save sent twice (a double tap, a retry after the
@@ -2247,6 +2264,7 @@ model Company {
 
   purchaseOrders PurchaseOrder[]
   requestKeys    RequestKey[]
+  booksClose     BooksClose?
 
   @@index([planId])
   @@map("companies")
