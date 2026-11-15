@@ -348,14 +348,15 @@ export function FollowUpFields({
               </Select>
             </Field>
           )}
-          <div className="col-span-2 flex items-center gap-2 sm:col-span-3">
+          {/* In its window: Cancel and save at the bottom right, like every window. */}
+          <div className="col-span-2 flex flex-wrap items-center justify-end gap-3 border-t border-line pt-4 sm:col-span-3">
+            <Button type="button" variant="ghost" onClick={() => closePanel()}>
+              Cancel
+            </Button>
             <SubmitButton pendingText="Saving…">
               <Check aria-hidden />
               {submit}
             </SubmitButton>
-            <Button type={initial ? "button" : "reset"} variant="ghost" onClick={initial ? () => done?.() : undefined}>
-              Cancel
-            </Button>
           </div>
         </>
       )}

@@ -53,8 +53,8 @@ export default async function PlansPage() {
         title="Plans"
         summary="What companies can buy · click a plan to change it"
         primary={
-          <OpenPanelButton panel="new-plan" variant="primary" label="New plan">
-            <Plus aria-hidden /> New plan
+          <OpenPanelButton panel="new-plan" variant="primary" label="Add plan">
+            <Plus aria-hidden /> Add plan
           </OpenPanelButton>
         }
       />
@@ -63,7 +63,7 @@ export default async function PlansPage() {
           <EmptyState
             framed
             title="No plans yet"
-            description="A plan sets a price, limits on people and files, and the modules a company gets. Use New plan above."
+            description="A plan sets a price, limits on people and files, and the modules a company gets. Use Add plan above."
           />
         ) : (
           <>

@@ -60,7 +60,7 @@ export default async function CustomerLayout({ children, params }: { children: R
         primary={
           canAsk && (
             <ButtonLink href={`/inquiries?panel=new-inquiry&for=${c.id}`} variant="primary">
-              <Plus aria-hidden /> New inquiry
+              <Plus aria-hidden /> Add inquiry
             </ButtonLink>
           )
         }

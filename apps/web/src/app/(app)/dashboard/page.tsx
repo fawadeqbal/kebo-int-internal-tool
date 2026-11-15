@@ -70,7 +70,7 @@ export default async function DashboardPage() {
           )}
           {can(me, "expenses.manage") && (
             <ButtonLink href="/payments/new?kind=expense" variant="secondary">
-              Add a cost
+              Add cost
             </ButtonLink>
           )}
           {sendsCosts && (
@@ -80,7 +80,7 @@ export default async function DashboardPage() {
           )}
           {can(me, "inquiries.create") && (
             <ButtonLink href="/inquiries?panel=new-inquiry" variant="primary">
-              <Plus aria-hidden /> New inquiry
+              <Plus aria-hidden /> Add inquiry
             </ButtonLink>
           )}
         </div>

@@ -55,7 +55,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         }
         primary={
           <ButtonLink href="/platform/leads/new" variant="primary">
-            <Plus aria-hidden /> Add by hand
+            <Plus aria-hidden /> Add client inquiry
           </ButtonLink>
         }
       />
@@ -69,7 +69,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
               description="Requests from the public “Request a demo” page and self sign-ups land here."
               action={
                 <ButtonLink href="/platform/leads/new" size="sm">
-                  <Plus aria-hidden /> Add one by hand
+                  <Plus aria-hidden /> Add client inquiry
                 </ButtonLink>
               }
             />

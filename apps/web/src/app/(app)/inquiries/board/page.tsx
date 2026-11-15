@@ -143,7 +143,7 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
         primary={
           can(me, "inquiries.create") && (
             <OpenPanelButton panel="new-inquiry" variant="primary">
-              <Plus aria-hidden /> New inquiry
+              <Plus aria-hidden /> Add inquiry
             </OpenPanelButton>
           )
         }

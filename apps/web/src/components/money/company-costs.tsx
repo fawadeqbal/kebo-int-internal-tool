@@ -110,7 +110,7 @@ function CostFields({ mainCurrency, today, confirm, onClose }: { mainCurrency: s
 /** "Add a company cost": the page's one orange button. */
 export function AddCompanyCost({ mainCurrency, today }: { mainCurrency: string; today: string }) {
   return (
-    <FormWindow button={{ label: "Add a company cost", kind: "main" }} title="Add a company cost" sub="Not for one order" size="sm">
+    <FormWindow button={{ label: "Add company cost", kind: "main" }} title="New company cost" sub="Not for one order" size="sm">
       {(close) => <CostFields mainCurrency={mainCurrency} today={today} onClose={close} />}
     </FormWindow>
   );

@@ -43,14 +43,14 @@ export default async function PlatformOverviewPage() {
         summary={`${n(companies, "company", "companies")} · ${n(d.newLeads, "new client inquiry", "new client inquiries")}`}
         primary={
           <ButtonLink href="/platform/companies/new" variant="primary">
-            <Plus aria-hidden /> New company
+            <Plus aria-hidden /> Add company or demo
           </ButtonLink>
         }
         more={
           <MoreMenu
             label="More on the platform"
             items={[
-              { label: "New client inquiry", href: "/platform/leads/new" },
+              { label: "Add client inquiry", href: "/platform/leads/new" },
               { label: "Give a demo", href: "/platform/companies/new?kind=demo" },
               { label: "Platform log", href: "/platform/log" },
               { label: "Visitors and leads", href: "/platform/settings?section=website" },

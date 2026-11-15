@@ -89,7 +89,7 @@ export function NewAccount({ today }: { today: string }) {
     </div>
   ) : (
     <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-      <Plus aria-hidden /> Add an account
+      <Plus aria-hidden /> Add account
     </Button>
   );
 }

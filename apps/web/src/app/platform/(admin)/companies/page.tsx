@@ -67,8 +67,8 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
         }
         primary={
           <ButtonLink href="/platform/companies/new" variant="primary">
-            <Plus aria-hidden /> <span className="sm:hidden">New</span>
-            <span className="max-sm:hidden">New company or demo</span>
+            <Plus aria-hidden /> <span className="sm:hidden">Add</span>
+            <span className="max-sm:hidden">Add company or demo</span>
           </ButtonLink>
         }
       />
