@@ -236,7 +236,7 @@ describe("security: roles, two-step per role, sessions, sign-ins", () => {
     // Found by name, a page at a time.
     const found = (await api(app, admin).get(`/security/sessions?q=ali&pageSize=1`).expect(200)).body;
     expect(found.rows.length).toBeLessThanOrEqual(1);
-    expect(found.rows.every((r: { user: { name: string } }) => /ali/i.test(r.user.name) || /ali/i.test(r.user.email))).toBe(true);
+    expect(found.rows.every((r: { user: { name: string; email: string } }) => /ali/i.test(r.user.name) || /ali/i.test(r.user.email))).toBe(true);
     await api(app, admin).post(`/security/users/${ali.id}/sign-out`).expect(200);
     await api(app, laptop).get("/auth/me").expect(401);
   });
