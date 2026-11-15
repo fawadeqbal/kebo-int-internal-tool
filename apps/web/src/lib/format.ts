@@ -19,6 +19,8 @@ const SERVER_STYLE: TimeStyle = { zone: SERVER_TZ, date: "d_mmm_yyyy", time: "24
 
 /** "1 order", "3 orders"; a third word for irregular plurals ("1 inquiry", "2 inquiries"). */
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** How many a list shows, for its filter line: "1,204 inquiries". */
+export const countOf = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
 export const money = (amount: string | number | null | undefined, currency: string) => (amount === null || amount === undefined ? "—" : formatMinor(toMinor(amount), currency));
 /** A headline amount in whole units (KPI cards): "USD 58,140". Exact amounts stay in the tables. */

@@ -5,7 +5,7 @@ import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { crumbsFor } from "@/lib/nav";
-import { date, money, short } from "@/lib/format";
+import { date, money, short, countOf } from "@/lib/format";
 import { FilterCard } from "@/components/common/filter-card";
 import { getSettings } from "@/lib/loaders";
 import { PURCHASE_ORDER_STATUS, purchaseOrderHref, type PurchaseOrderPage } from "@/lib/purchase-orders";
@@ -103,6 +103,7 @@ export default async function PurchaseOrdersPage({
       />
 
       <FilterCard
+        count={countOf(data.total, "purchase order")}
         search="Search PO, supplier, SO…"
         value={sp.q}
         keep={{ status: keep.status }}

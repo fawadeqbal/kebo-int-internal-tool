@@ -1,12 +1,12 @@
-import Form from "next/form";
 import Link from "next/link";
 import { crumbsFor } from "@/lib/nav";
-import { Check, Clock, Filter, Pencil, Plus, TriangleAlert, User, Users } from "lucide-react";
-import { Badge, Button, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, SearchField, Select, Td, Th, THead, toPage } from "@kebo/ui";
+import { Check, Clock, Pencil, Plus, TriangleAlert, User, Users } from "lucide-react";
+import { Badge, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Td, Th, THead, toPage } from "@kebo/ui";
 import { can, type Tone } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { date } from "@/lib/format";
+import { countOf, date } from "@/lib/format";
+import { FilterCard } from "@/components/common/filter-card";
 import type { DealRow, Paged, Person } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
 import type { FollowUp, FollowUpList } from "@/lib/types-notes";
@@ -186,62 +186,17 @@ export default async function FollowUpsPage({
           },
         ]}
       />
-      <Form action="" scroll={false}
-        role="search"
-        aria-label="Find follow-ups"
-        className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3"
-      >
-        {keep.view && <input type="hidden" name="view" value={keep.view} />}
-        {keep.status && <input type="hidden" name="status" value={keep.status} />}
-        <SearchField
-          defaultValue={q}
-          placeholder="Search follow-ups…"
-          label="Search follow-ups"
-          clearHref={href({ q: undefined, page: undefined })}
-          className="min-w-0 flex-[1_1_260px] sm:w-auto"
-        />
-        <label className="sr-only" htmlFor="fu-due">
-          Due
-        </label>
-        <Select id="fu-due" name="due" defaultValue={due ?? ""} className="w-auto text-[13px]">
-          <option value="">Due: Any day</option>
-          {DUE.map((d) => (
-            <option key={d.value} value={d.value}>
-              Due: {d.label}
-            </option>
-          ))}
-        </Select>
-        {viewAll && (
-          <>
-            <label className="sr-only" htmlFor="fu-who">
-              Person
-            </label>
-            <Select id="fu-who" name="who" defaultValue={who ?? ""} className="w-auto text-[13px]">
-              <option value="">Person: All</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  Person: {p.name}
-                </option>
-              ))}
-            </Select>
-          </>
-        )}
-        <label className="sr-only" htmlFor="fu-about">
-          About
-        </label>
-        <Select id="fu-about" name="about" defaultValue={about ?? ""} className="w-auto text-[13px]">
-          <option value="">About: All</option>
-          {ABOUT.map((a) => (
-            <option key={a.value} value={a.value}>
-              About: {a.label}
-            </option>
-          ))}
-        </Select>
-        <Button type="submit">
-          <Filter aria-hidden />
-          Filter
-        </Button>
-      </Form>
+      <FilterCard
+        search="Search follow-ups…"
+        value={q}
+        keep={{ view: keep.view, status: keep.status }}
+        selects={[
+          { name: "due", label: "Due", value: due, options: DUE.map((d) => ({ value: d.value, label: d.label })), all: "Any day" },
+          ...(viewAll ? [{ name: "who", label: "Person", value: who, options: people.map((p) => ({ value: p.id, label: p.name })), all: "Everyone" }] : []),
+          { name: "about", label: "About", value: about, options: ABOUT.map((a) => ({ value: a.value, label: a.label })) },
+        ]}
+        count={countOf(list.total, "follow-up")}
+      />
       <div className="flex min-w-0 flex-col gap-4">
         <Card className="min-w-0 overflow-clip p-0">
           {list.rows.length === 0 ? (

@@ -9,7 +9,7 @@ import { readableDates } from "@/components/insights/readable-dates";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
-import { dateTime, timeAgo } from "@/lib/format";
+import { dateTime, timeAgo, countOf } from "@/lib/format";
 import type { Paged } from "@/lib/types";
 import type { AuditRow } from "@/lib/types-people";
 import { crumbsFor } from "@/lib/nav";
@@ -161,6 +161,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       />
       <LinkTabs label="Which records" className="mb-4" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
       <FilterCard
+        count={countOf(data.total, "entry", "entries")}
         search="Search what, who or why…"
         value={sp.q}
         clearHref={href({ q: undefined })}
