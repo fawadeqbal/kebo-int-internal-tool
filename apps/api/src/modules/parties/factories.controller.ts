@@ -6,6 +6,7 @@ import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions, RequireFeature } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { FactoriesService } from "./factories.service";
+import { Versioned } from "../../common/http/version";
 
 /** ?mine=true: the factories I look after. */
 const blank = (v: unknown) => (v === "" ? undefined : v);
@@ -51,6 +52,7 @@ export class FactoriesController {
     return this.factories.importMany(user, body);
   }
 
+  @Versioned("parties")
   @Put(":id")
   @RequirePermissions("sourcing.manage")
   update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryInput)) body: FactoryInput) {

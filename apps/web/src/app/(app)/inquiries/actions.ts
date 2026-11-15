@@ -136,7 +136,8 @@ export async function quickCustomerAction(v: QuickCustomer): Promise<QuickCustom
  * need, priority, needed by) and who handles it. The items are left as they are: they have their own editor.
  * Answers { id, refNo } so the window can send its new files, as a new inquiry does.
  */
-export async function saveRequestAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+/** `version`: the inquiry's updatedAt when the window opened (a save over someone else's change is refused). */
+export async function saveRequestAction(id: string, version: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(
     form,
     async () => {
@@ -152,7 +153,7 @@ export async function saveRequestAction(id: string, _prev: ActionState, form: Fo
         unit: it.unit,
         targetPrice: it.targetPrice,
       }));
-      await api.put(`/inquiries/${id}`, { ...fields, items, reason });
+      await api.put(`/inquiries/${id}`, { ...fields, items, reason }, { version });
       if ((assigneeId ?? null) !== (d.assignee?.id ?? null)) await api.post(`/inquiries/${id}/assign`, { assigneeId: assigneeId ?? null, reason });
       return { id, refNo: d.refNo };
     },

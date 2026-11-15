@@ -31,11 +31,12 @@ function locateContactErrors(body: Record<string, unknown>, r: ActionState): Act
  * From the side panel (`inPanel`) it answers with the customer's id and name and the list updates in
  * place; from the old edit page it goes to the customer.
  */
-export async function saveCustomerAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+/** `version`: the customer's updatedAt when the form opened (a save over someone else's change is refused). */
+export async function saveCustomerAction(id: string | null, version: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = { ...formBody(form), allowDuplicate: form.get("allowDuplicate") === "true" };
   const r = locateContactErrors(
     body,
-    await attempt(form, () => (id ? api.put<{ id: string }>(`/customers/${id}`, body) : api.post<{ id: string }>("/customers", body))),
+    await attempt(form, () => (id ? api.put<{ id: string }>(`/customers/${id}`, body, { version }) : api.post<{ id: string }>("/customers", body))),
   );
   if (!r.ok) return r;
   const savedId = id ?? (r.data as { id: string }).id;

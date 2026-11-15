@@ -454,7 +454,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       {settings && (panel === "new-customer" || editing) && (
         <CustomerPanel
           key={editing?.id ?? "new"}
-          action={saveCustomerAction.bind(null, editing?.id ?? null)}
+          action={saveCustomerAction.bind(null, editing?.id ?? null, editing?.updatedAt ?? null)}
           undo={editing ? undefined : undoNewCustomerAction}
           customer={editing}
           currencies={currenciesFrom(settings)}

@@ -289,7 +289,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
       {panel && (panel === "new-factory" || editing) && (
         <FactoryPanel
           key={editing?.id ?? "new"}
-          action={saveFactoryAction.bind(null, editing?.id ?? null)}
+          action={saveFactoryAction.bind(null, editing?.id ?? null, editing?.updatedAt ?? null)}
           factory={editing}
           people={people}
           meId={me.id}

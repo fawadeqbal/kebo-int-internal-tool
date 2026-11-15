@@ -81,6 +81,8 @@ export interface FactoryRow extends Factory {
 }
 
 export interface FactoryDetail extends Factory {
+  /** When it last changed: sent back with a save, so one over someone else's change is refused. */
+  updatedAt: string;
   quotes: {
     id: string;
     receivedOn: string;
