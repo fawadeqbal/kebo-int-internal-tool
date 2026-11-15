@@ -10,7 +10,7 @@ const _out = 'lib/design/tokens.g.dart';
 
 void main(List<String> args) {
   final json = jsonDecode(File(_src).readAsStringSync()) as Map<String, dynamic>;
-  final code = generate(json);
+  final code = formatted(generate(json));
   final out = File(_out);
   if (args.contains('--check')) {
     if (!out.existsSync() || out.readAsStringSync() != code) {
@@ -22,6 +22,21 @@ void main(List<String> args) {
   }
   out.writeAsStringSync(code);
   stdout.writeln('Wrote $_out');
+}
+
+/// Runs `dart format` on [code] (page width from analysis_options.yaml), so the file is
+/// the same whether or not someone formats the project afterwards.
+String formatted(String code) {
+  // Format inside the project (.dart_tool) so dart format reads this project's analysis_options.yaml.
+  final dir = Directory('.dart_tool/gen_tokens')..createSync(recursive: true);
+  final f = File('${dir.path}/tokens.g.dart')..writeAsStringSync(code);
+  try {
+    final r = Process.runSync(Platform.resolvedExecutable, ['format', f.path]);
+    if (r.exitCode != 0) throw StateError('dart format failed: ${r.stderr}');
+    return f.readAsStringSync();
+  } finally {
+    f.deleteSync();
+  }
 }
 
 String camel(String name) {
