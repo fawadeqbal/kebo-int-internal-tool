@@ -88,6 +88,8 @@ services:
       # Dev tools (platform admin): the server's status and the live logs, written by deploy/server.
       SERVER_STATUS_DIR: /server-status
       LIVE_LOGS_DIR: /server-logs
+      # Every upload checked for viruses by the optional clamav service (see below); empty: no check.
+      CLAMAV_HOST: ${CLAMAV_HOST:-}
     depends_on:
       db: { condition: service_healthy }
       minio: { condition: service_started }
@@ -172,6 +174,17 @@ services:
     mem_limit: 256m
     logging: *logging
 
+  # Optional: a virus check of every upload. Switched on with COMPOSE_PROFILES=scan and CLAMAV_HOST=clamav:3310
+  # in .env (then `docker compose up -d`). It needs about 1.2 GB of memory for its virus list, updated by itself.
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ["scan"]
+    restart: unless-stopped
+    mem_limit: ${CLAMAV_MEMORY:-1400m}
+    volumes: [clamav:/var/lib/clamav]
+    logging: *logging
+
 volumes:
   pgdata:
   files:
+  clamav:

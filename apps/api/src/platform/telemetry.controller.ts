@@ -51,6 +51,37 @@ export class TelemetryController {
     private readonly stats: RequestStats,
   ) {}
 
+  /**
+   * What the Content-Security-Policy (report-only for now) would have blocked on a page: one kind of thing per
+   * place in Dev tools' errors, so a real problem is seen before the policy is switched on. Both report formats.
+   */
+  @Public()
+  @Post("csp")
+  @HttpCode(204)
+  async csp(@Req() req: Request, @Body() body: unknown) {
+    if (!this.hits.allow(`t:${req.ip || req.socket.remoteAddress || "local"}`, REPORTS_PER_MINUTE, 60_000)) return;
+    const reports = (Array.isArray(body) ? body : [body]).slice(0, 10);
+    for (const raw of reports) {
+      const r = (raw as { "csp-report"?: Record<string, unknown>; body?: Record<string, unknown> })?.["csp-report"] ?? (raw as { body?: Record<string, unknown> })?.body;
+      if (!r || typeof r !== "object") continue;
+      const text = (k: string, k2: string) => String(r[k] ?? r[k2] ?? "").slice(0, 300);
+      const directive = text("effective-directive", "effectiveDirective") || text("violated-directive", "violatedDirective");
+      const blocked = text("blocked-uri", "blockedURL") || "inline";
+      const page = text("document-uri", "documentURL");
+      if (!directive) continue;
+      const error = new Error(`Would block ${blocked} (${directive})`);
+      error.name = "CSP";
+      error.stack = `${error.name}: ${error.message}\n    at ${text("source-file", "sourceFile") || page}:${text("line-number", "lineNumber") || "?"}`;
+      let path = "/";
+      try {
+        path = new URL(page).pathname;
+      } catch {
+        // not a full address: the page's path stays "/"
+      }
+      await this.errors.record("web", `CSP ${directive}`, error, { path: path.slice(0, 300) });
+    }
+  }
+
   @Public()
   @Post()
   @HttpCode(204)
