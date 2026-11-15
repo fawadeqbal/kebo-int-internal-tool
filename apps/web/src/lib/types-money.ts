@@ -3,6 +3,7 @@ import type {
   BasisStep,
   CostRowStatus,
   CreditKind,
+  CustomerMoneyState,
   ExpenseBearer,
   ExpenseCategory,
   FactoryDueRule,
@@ -83,7 +84,7 @@ export interface OrderMoney {
   factories: {
     rows: FactoryOwed[];
     /** Where the customer's money for this order stands, for the person paying its suppliers. */
-    customer: { state: string; words: string; warn: boolean };
+    customer: { state: CustomerMoneyState; words: string; warn: boolean };
     payments: FactoryPaymentView[];
     canRecord: boolean;
     /** Each factory's payment plan with what is paid on each part. */
@@ -644,6 +645,8 @@ export interface FactoryPlanView {
     open: string;
     status: FactoryPlanStatus;
     inDays: number | null;
+    /** The payments that paid this part (a payment can pay more than one part), oldest first. */
+    payments: { id: string; amount: string }[];
   }[];
   next: { label: string; due: string | null; open: string; status: FactoryPlanStatus } | null;
 }

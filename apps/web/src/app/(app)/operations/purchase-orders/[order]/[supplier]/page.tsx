@@ -2,13 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, Printer, ShoppingCart } from "lucide-react";
 import { PAYMENT_METHOD_LABEL } from "@kebo/shared";
-import { Badge, ButtonLink, PageHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ButtonLink, PageHeader, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderFilesOf, orderMoneyOf } from "@/lib/order-data";
 import { requirePermission } from "@/lib/session";
 import { optional } from "@/components/print/data";
-import { date, dateTime, money, whole } from "@/lib/format";
+import { date, money, whole } from "@/lib/format";
 import { PURCHASE_ORDER_STATUS, PURCHASE_ORDERS, type PurchaseOrderRow } from "@/lib/purchase-orders";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
@@ -16,7 +16,9 @@ import { PayFactoryWindow } from "@/components/order-sections/factory-windows";
 import type { PurchaseOrderView } from "@/components/orders/purchase-order-card";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
-import { SupplierParts, supplierPlanWords } from "@/components/money/supplier-plan";
+import { CustomerMoneyLine, SupplierPlanTable, supplierPlanWords } from "@/components/order-sections/supplier-plan";
+import { PaymentsList } from "@/components/order-sections/payments-list";
+import { ROW_LINK } from "@/components/order-sections/section-window";
 import { FileToolsProvider } from "@/components/files/file-tools";
 import { factoryPaymentAction } from "../../../../money/actions";
 import { stageData } from "../../../../orders/[id]/stage-data";
@@ -65,8 +67,17 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   const basis = defaults.priceBasis ? `${defaults.priceBasis.basis}${defaults.priceBasis.place ? ` ${defaults.priceBasis.place}` : ""}` : null;
   const taxes = [...new Set(lines.map((l) => `${l.factoryPrice!.taxIncluded ? "Tax included" : "Without tax"} · ${Number(l.factoryPrice!.taxRate)}%`))];
   const orderHref = `/orders/${o.id}/factory`;
+  const byId = new Map(payments.map((x) => [x.id, x]));
+  // What each payment paid: the parts of the plan it went to, as on the order's Factory order tab.
+  const paidFor = new Map<string, string[]>();
+  for (const plan of plans) for (const r of plan.rows) for (const x of r.payments) paidFor.set(x.id, [...(paidFor.get(x.id) ?? []), r.label]);
+  const totalOf = (xs: typeof payments) => {
+    const by = new Map<string, number>();
+    for (const x of xs) by.set(x.currency, (by.get(x.currency) ?? 0) + Number(x.amount));
+    return by.size ? [...by].map(([cur, v]) => money(v.toFixed(2), cur)).join(" + ") : money(0, plans[0]?.currency ?? po.currency ?? o.currency);
+  };
   // The same window as on the order's Factory order tab, for this factory only.
-  const pay = (label: string, main: boolean, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" }) =>
+  const pay = (label: string, main: boolean, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null }) =>
     canPay ? (
       <PayFactoryWindow
         label={label}
@@ -81,6 +92,8 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         prefill={prefill}
       />
     ) : null;
+  // Pay is on the plan's next part; "Pay the factory" only when money is owed with no part left to pay it on.
+  const payAny = owing.some((f) => !plans.some((p) => p.currency === f.currency && p.rows.some((r) => r.status !== "paid" && Number(r.open) > 0))) ? pay("Pay the factory", true) : null;
   const sent = po.sentOn ? (po.sentEarlyReason ? `Sent ${date(po.sentOn)} · before the deposit` : `Sent ${date(po.sentOn)}`) : "Not sent";
   const meta = [
     <span key="o">
@@ -188,22 +201,41 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             const of = owed.find((r) => r.currency === plan.currency);
             const toPay = Number(of?.toPay ?? 0);
             const paidInOrder = live.filter((x) => x.currency === plan.currency).reduce((t, x) => t + Number(x.inOrderCurrency), 0);
+            const done = !!of && toPay <= 0 && Number(of.paid) > 0;
             return (
               <Section
                 key={plan.currency}
                 title="Payment plan"
-                state={of ? (toPay <= 0 && Number(of.paid) > 0 ? "Paid in full" : `${money(of.toPay, plan.currency)} to pay`) : supplierPlanWords(plan)}
-                tone={of && toPay <= 0 && Number(of.paid) > 0 ? "ok" : Number(of?.paid ?? 0) > 0 ? "warn" : "neutral"}
+                state={of ? (done ? "Paid in full" : `${money(of.toPay, plan.currency)} to pay`) : supplierPlanWords(plan)}
+                tone={done ? "ok" : toPay > 0 ? "warn" : "neutral"}
               >
-                <div className="px-[18px] pb-3.5">
-                  <SupplierParts
-                    orderId={o.id}
+                <div className="flex flex-col gap-3 pb-3.5">
+                  {plan.differs && (
+                    <p className="mx-[18px] rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
+                      The parts do not add up to what we owe ({money(plan.differs, plan.currency)} {Number(plan.differs) > 0 ? "missing" : "too much"}): prices changed since. Open the order&apos;s Factory order and save the plan again.
+                    </p>
+                  )}
+                  <SupplierPlanTable
                     plan={plan}
-                    pay={(r) => (Number(r.open) > 0 ? pay("Pay", false, { factoryId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance" }) : null)}
-                    paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
+                    payments={byId}
+                    pay={(r) => pay("Pay", true, { factoryId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance", reference: r.supplierRef })}
                     orderCurrency={o.currency}
+                    paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
                     overpaid={of?.overpaid ?? null}
-                    customer={{ route: m.route.route, ...m.factories!.customer, received: m.received, owed: (Number(m.received) + Number(m.due)).toFixed(2) }}
+                    after={
+                      m.factories && (
+                        <CustomerMoneyLine
+                          orderId={o.id}
+                          state={m.factories.customer.state}
+                          warn={m.factories.customer.warn}
+                          route={m.route.route}
+                          deposit={o.money.depositPercent > 0}
+                          received={m.received}
+                          owed={(Number(m.received) + Number(m.due)).toFixed(2)}
+                          currency={o.currency}
+                        />
+                      )
+                    }
                   />
                 </div>
               </Section>
@@ -211,44 +243,32 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           })}
 
           {payments.length === 0 ? (
-            <EmptySection title="Payments to the factory" text="No payment yet." action={pay("Pay the factory", true)} />
+            <EmptySection title="Payments made" text="No payment yet." action={payAny} />
           ) : (
-            <Section title="Payments to the factory" state={`${live.length} payment${live.length === 1 ? "" : "s"}`} actions={pay("Pay the factory", true)}>
-              <Table>
-                <THead>
-                  <tr>
-                    <Th>Date</Th>
-                    <Th>How</Th>
-                    <Th>From</Th>
-                    <Th className="hidden md:table-cell">Reference</Th>
-                    <Th className="hidden sm:table-cell">Recorded by</Th>
-                    <Th className="text-right">Amount</Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {payments.map((x) => (
-                    <Tr key={x.id} className={x.voided ? "text-muted line-through" : undefined}>
-                      <Td className="whitespace-nowrap tabular">{date(x.paidOn)}</Td>
-                      <Td>{PAYMENT_METHOD_LABEL[x.method]}</Td>
-                      <Td>{x.account?.name ?? <span className="text-muted">—</span>}</Td>
-                      <Td className="hidden md:table-cell">{x.reference ? <RefCode>{x.reference}</RefCode> : <span className="text-muted">—</span>}</Td>
-                      <Td className="hidden text-[12.5px] text-text-2 sm:table-cell">
-                        {x.recordedBy?.name ?? "—"}
-                        <span className="block text-muted">{dateTime(x.recordedAt)}</span>
-                      </Td>
-                      <Td className="text-right whitespace-nowrap tabular">
-                        {x.voided ? (
-                          <>
-                            {money(x.amount, x.currency)} <Badge tone="neutral">Removed</Badge>
-                          </>
-                        ) : (
-                          <span className="font-semibold">{money(x.amount, x.currency)}</span>
-                        )}
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
+            <Section title="Payments made" state={`${live.length} payment${live.length === 1 ? "" : "s"}`} actions={payAny}>
+              <PaymentsList
+                name="Payments made"
+                account="From"
+                total={{ label: "Paid", amount: totalOf(live) }}
+                rows={payments.map((x) => ({
+                  id: x.id,
+                  paidOn: x.paidOn,
+                  for: paidFor.get(x.id)?.join(", ") ?? null,
+                  how: PAYMENT_METHOD_LABEL[x.method],
+                  account: x.account?.name ?? null,
+                  reference: x.reference,
+                  recordedBy: x.recordedBy?.name ?? null,
+                  recordedAt: x.recordedAt,
+                  amount: x.amount,
+                  currency: x.currency,
+                  voided: x.voided ? { reason: x.voided.reason } : null,
+                  actions: (
+                    <Link href={`/payments/supplier/${x.id}`} className={ROW_LINK}>
+                      Receipt
+                    </Link>
+                  ),
+                }))}
+              />
             </Section>
           )}
 

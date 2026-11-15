@@ -566,8 +566,8 @@ export function FactoryPaymentForm({
   onClose: () => void;
   /** The payment was recorded but its file was not. */
   onFileError?: (message: string) => void;
-  /** A part of the factory's payment plan to pay (its amount and what for). */
-  prefill?: { factoryId: string; amount: string; kind: PaymentKind };
+  /** A part of the factory's payment plan to pay (its amount, what for, and their invoice for it). */
+  prefill?: { factoryId: string; amount: string; kind: PaymentKind; reference?: string | null };
 }) {
   const first = (prefill && factories.find((f) => f.factory.id === prefill.factoryId)) ?? factories.find((f) => Number(f.toPay) > 0) ?? factories[0];
   const [factoryKey, setFactoryKey] = useState(
@@ -723,7 +723,7 @@ export function FactoryPaymentForm({
               />
             </Field>
             <Field label="Bank reference" htmlFor="fp-reference" optional>
-              <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? ""} />
+              <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? prefill?.reference ?? ""} />
             </Field>
             <AccountSelect id="fp-account" label="From account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
           </div>

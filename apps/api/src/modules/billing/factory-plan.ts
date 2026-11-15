@@ -115,6 +115,10 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
     // This factory's own ready date (one per factory; the order's is the latest).
     const readyOn = factoryReadyOf(o, f.factory.id);
     const status = factoryPlanStatus(rows, paidMinor, orderedOn, readyOn, today, soonDays);
+    const paidBy = paymentsOnParts(
+      rows,
+      o.supplierPaid.filter((p) => !p.voidedAt && `${p.movement.partyId}:${p.movement.currency}` === key).map((p) => ({ id: p.id, minor: decimalToMinor(p.share) })),
+    );
     const next = status.find((r) => r.status !== "paid") ?? null;
     return {
       factory: f.factory,
@@ -130,7 +134,7 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
       paid: fromMinor(paidMinor),
       takenOff: fromMinor(f.takenOffMinor),
       toPay: fromMinor(Math.max(f.owedMinor - paidMinor, 0)),
-      rows: status.map((r) => ({
+      rows: status.map((r, i) => ({
         /** The invoice (null: the company's default, not saved yet). */
         id: r.id,
         /** The supplier's own invoice number, if they sent one. */
@@ -146,6 +150,8 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
         open: fromMinor(r.openMinor),
         status: r.status,
         inDays: r.inDays,
+        /** The payments that paid this part (a payment can pay more than one part), oldest first. */
+        payments: (paidBy[i] ?? []).map((x) => ({ id: x.id, amount: fromMinor(x.minor) })),
       })),
       next: next && { label: next.label, due: next.due, open: fromMinor(next.openMinor), status: next.status },
     };
@@ -153,6 +159,33 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
 }
 
 export type FactoryPlanView = Awaited<ReturnType<typeof factoryPlansOf>>[number];
+
+/**
+ * Which payments paid each part of a plan: payments pay the parts in order (the oldest first, as
+ * factoryPlanStatus counts them), so each part lists the payments, or the shares of them, that went to
+ * it. What is paid beyond the plan's parts goes to none. A part paid by what the factory bears (an
+ * expense taken off what we owe it) has no payment of its own.
+ */
+export function paymentsOnParts(parts: { amountMinor: number }[], payments: { id: string; minor: number }[]): { id: string; minor: number }[][] {
+  const out = parts.map(() => [] as { id: string; minor: number }[]);
+  let i = 0;
+  let room = parts[0]?.amountMinor ?? 0;
+  for (const p of payments) {
+    let left = p.minor;
+    while (left > 0 && i < parts.length) {
+      if (room <= 0) {
+        i += 1;
+        room = parts[i]?.amountMinor ?? 0;
+        continue;
+      }
+      const take = Math.min(left, room);
+      out[i]!.push({ id: p.id, minor: take });
+      left -= take;
+      room -= take;
+    }
+  }
+  return out;
+}
 
 /** Ordered from the factory: each factory owed on the order gets the default plan (its offer's advance), unless it has one. */
 export async function seedFactoryPlans(tx: Tx, orderId: string, advancePercent: number) {
