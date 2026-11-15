@@ -109,6 +109,23 @@ export class MoneyController {
     return this.accounts.expenseTargets(user);
   }
 
+  /** Managers only: Reports › Spending for a period (?from&to, and the period before ?prevFrom&prevTo to compare). */
+  @RequireFeature("expenses")
+  @Get("reports/spending")
+  spendingReport(
+    @CurrentUser() user: SessionUser,
+    @Query(Validate(z.object({ from: date, to: date, prevFrom: date, prevTo: date }))) q: { from?: string; to?: string; prevFrom?: string; prevTo?: string },
+  ) {
+    return this.accounts.spendingReport(user, q);
+  }
+
+  /** Managers only: what one person spent (paid, or recorded with nobody named), by kind and by what for, and what is owed back to them. */
+  @RequireFeature("expenses")
+  @Get("people/:id/spending")
+  personSpending(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Query(Validate(z.object({ from: date, to: date }))) q: { from?: string; to?: string }) {
+    return this.accounts.personSpending(user, id, q);
+  }
+
   /** Managers only: a customer's deals, what they earned us, everything spent on them, and a timeline. */
   @RequireFeature("expenses")
   @Get("customers/:id/account")

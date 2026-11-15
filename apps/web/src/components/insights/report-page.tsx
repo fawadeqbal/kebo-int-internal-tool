@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Banknote, Factory, LayoutGrid, Target, TrendingUp, User, Users, type LucideIcon } from "lucide-react";
+import { Banknote, Factory, LayoutGrid, Receipt, Target, TrendingUp, User, Users, type LucideIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
 import { Alert, buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage } from "@kebo/ui";
@@ -11,7 +11,8 @@ import { SECTION_PATH, viewPath } from "@/lib/old-addresses";
 import { PlanOff } from "@/components/common/plan-off";
 import { FileActions } from "@/components/common/file-actions";
 import { PERIOD_KINDS, PERIOD_LABEL, periodOf, type Period, type Section } from "@/lib/insights-period";
-import { CUSTOMER_CHIPS, loadCash, loadCustomers, loadFactories, loadFunnel, loadOverview, loadPeople, loadProfit, PROFIT_SORTS, type CustomerChip, type ProfitSort } from "@/lib/insights-data";
+import { CUSTOMER_CHIPS, loadCash, loadCustomers, loadFactories, loadFunnel, loadOverview, loadPeople, loadProfit, loadSpending, PROFIT_SORTS, spendingOf, type CustomerChip, type ProfitSort } from "@/lib/insights-data";
+import { SpendingSection } from "./spending-section";
 import { Overview } from "./overview";
 import { ProfitSection } from "./profit-section";
 import { CashSection } from "./cash-section";
@@ -32,7 +33,7 @@ export type ReportSearch = {
 };
 
 /** The tabs of Reports (each has its own address, so a link or a bookmark opens the tab it means). */
-export type ReportKind = "overview" | "profit" | "customers" | "factories" | "cash" | "people" | "targets" | "funnel";
+export type ReportKind = "overview" | "profit" | "customers" | "factories" | "cash" | "people" | "targets" | "funnel" | "spending";
 
 const SECTION_OF: Record<ReportKind, Section> = {
   overview: "overview",
@@ -43,6 +44,7 @@ const SECTION_OF: Record<ReportKind, Section> = {
   people: "people",
   targets: "people",
   funnel: "funnel",
+  spending: "money",
 };
 const PATH_OF: Record<ReportKind, string> = {
   overview: "/reports",
@@ -53,6 +55,7 @@ const PATH_OF: Record<ReportKind, string> = {
   people: "/reports/people",
   targets: "/reports/people/targets",
   funnel: "/reports/funnel",
+  spending: "/reports/spending",
 };
 /** One page, its reports as tabs under the title: the same period goes with you. Profit and Cash are for people who see money. */
 const REPORT_TABS: { key: ReportKind; href: string; label: string; icon: LucideIcon; money?: boolean }[] = [
@@ -63,6 +66,7 @@ const REPORT_TABS: { key: ReportKind; href: string; label: string; icon: LucideI
   { key: "cash", href: "/reports/cash", label: "Cash", icon: Banknote, money: true },
   { key: "people", href: "/reports/people", label: "People", icon: User },
   { key: "funnel", href: "/reports/funnel", label: "Funnel", icon: Target },
+  { key: "spending", href: "/reports/spending", label: "Spending", icon: Receipt, money: true },
 ];
 /** Targets is a view of People (it opens from there), so People stays the tab. */
 const TAB_OF = (kind: ReportKind): ReportKind => (kind === "targets" ? "people" : kind);
@@ -94,6 +98,7 @@ const DESCRIPTION: Record<ReportKind, string> = {
   people: "Who sells, how fast, and against their targets",
   targets: "Monthly sales targets for the company and each person",
   funnel: "Where inquiries go, and why we lose them",
+  spending: "Who spends, on what, and what winning and losing cost us",
 };
 
 /**
@@ -109,7 +114,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
   if (!(await hasFeature("insights"))) return <PlanOff title={title} what="Insights (sales, profit and team reports)" crumbs={crumbs} />;
   const seeMoney = can(me, "expenses.manage");
   // Profit, cash and setting targets: for people who may see money.
-  if ((kind === "profit" || kind === "cash" || kind === "targets") && !seeMoney) redirect(kind === "targets" ? "/reports/people" : "/forbidden");
+  if ((kind === "profit" || kind === "cash" || kind === "targets" || kind === "spending") && !seeMoney) redirect(kind === "targets" ? "/reports/people" : "/forbidden");
   const sp = await searchParams;
   const section = SECTION_OF[kind];
   const path = PATH_OF[kind];
@@ -131,7 +136,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
   };
   // The printable report (unchanged), for the period up to today.
   const reportTo = p.to < today ? p.to : today;
-  const excel = kind === "targets" ? undefined : buildHref("/sheets/export/insights", {}, { section, period: p.kind, from: p.from, to: p.to });
+  const excel = kind === "targets" || kind === "spending" ? undefined : buildHref("/sheets/export/insights", {}, { section, period: p.kind, from: p.from, to: p.to });
 
   const periodPicker = (
     <Segmented
@@ -238,12 +243,12 @@ async function Body({
     }
     case "profit": {
       const sort: ProfitSort = (PROFIT_SORTS as readonly string[]).includes(sp.sort ?? "") ? (sp.sort as ProfitSort) : "low";
-      const d = await loadProfit(p, sort);
+      const [d, s] = await Promise.all([loadProfit(p, sort), spendingOf(p)]);
       const params = { ...keep, sort: sort === "low" ? undefined : sort };
       return (
         <>
           <Missing rates={d.missingRates} />
-          <ProfitSection d={d} p={p} sort={sort} page={toPage(sp.page)} base={path} params={params} href={(patch) => buildHref(path, params, patch)} />
+          <ProfitSection d={d} p={p} sort={sort} page={toPage(sp.page)} base={path} params={params} href={(patch) => buildHref(path, params, patch)} running={s ? Number(s.company) : null} />
         </>
       );
     }
@@ -259,19 +264,27 @@ async function Body({
     }
     case "customers": {
       const chip: CustomerChip = (CUSTOMER_CHIPS as readonly string[]).includes(sp.chip ?? "") ? (sp.chip as CustomerChip) : "all";
-      const d = await loadCustomers(p, today);
-      return <CustomersSection d={d} p={p} href={href} chip={chip} page={page} base={path} params={{ ...keep, chip: chip === "all" ? undefined : chip }} />;
+      const [d, s] = await Promise.all([loadCustomers(p, today), seeMoney ? spendingOf(p) : null]);
+      const spent = s ? new Map(s.customers.map((x) => [x.customer.id, Number(x.spent)])) : null;
+      return <CustomersSection d={d} p={p} href={href} chip={chip} page={page} base={path} params={{ ...keep, chip: chip === "all" ? undefined : chip }} spent={spent} />;
     }
     case "factories":
       return <FactoriesSection d={await loadFactories(p)} p={p} page={page} base={path} params={keep} />;
-    case "people":
-      return <PeopleSection d={await loadPeople(p, today)} p={p} canSet={seeMoney} href={href} />;
+    case "people": {
+      const [d, s] = await Promise.all([loadPeople(p, today), seeMoney ? spendingOf(p) : null]);
+      const spend = s ? new Map(s.people.map((x) => [x.person.id, { spent: Number(x.spent), owed: Number(x.owed) }])) : null;
+      return <PeopleSection d={d} p={p} canSet={seeMoney} href={href} spend={spend} />;
+    }
     case "targets": {
       const year = /^\d{4}$/.test(sp.year ?? "") ? Number(sp.year) : Number(today.slice(0, 4));
       return <TargetsView year={year} today={today} back="/reports/people" />;
     }
     case "funnel":
       return <FunnelSection d={await loadFunnel(p)} p={p} />;
+    case "spending": {
+      if (!(await hasFeature("expenses"))) return <Alert tone="info">Expenses are not switched on for the company, so there is no spending to report on.</Alert>;
+      return <SpendingSection d={await loadSpending(p)} p={p} />;
+    }
   }
 }
 

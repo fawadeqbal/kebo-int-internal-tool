@@ -916,3 +916,64 @@ export interface ToPayList {
   totals: { currency: string; open: string; late: string; count: number }[];
   canPay: boolean;
 }
+
+/** One cost on a person's page (GET /people/:id/spending). */
+export interface PersonCost {
+  id: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: string;
+  currency: string;
+  inMain: string;
+  spentOn: string;
+  for: PersonSpendFor;
+  order: { id: string; refNo: string } | null;
+  inquiry: { id: string; refNo: string; stage: InquiryStage } | null;
+  customer: { id: string; name: string } | null;
+  /** Their own money (owed back until it is), a bill not paid yet, or an account. */
+  paid: "own" | "own_repaid" | "not_yet" | "account";
+  account: string | null;
+  /** Recorded by them with nobody named as paying it. */
+  recordedOnly: boolean;
+}
+
+/** What a cost of a person was for: on orders, before an order (inquiry won), lost or open inquiries, customers, the company. */
+export type PersonSpendFor = "orders" | "before" | "lost" | "open" | "customers" | "company";
+
+/** GET /people/:id/spending?from&to (managers): what one person spent, in the main currency. */
+export interface PersonSpending {
+  person: { id: string; name: string };
+  currency: string;
+  from: string;
+  to: string;
+  spent: string;
+  count: number;
+  byKind: { category: ExpenseCategory; amount: string }[];
+  byFor: Record<PersonSpendFor, string>;
+  /** Before orders, lost and open inquiries, customers: what profit after all costs takes off their orders' profit. */
+  outside: string;
+  latest: PersonCost[];
+  owed: { total: { currency: string; amount: string; ids: string[] }[]; rows: PersonCost[] };
+}
+
+/** GET /reports/spending?from&to&prevFrom&prevTo (managers): Reports › Spending, in the main currency. */
+export interface SpendingReport {
+  currency: string;
+  from: string;
+  to: string;
+  /** Trips, hotels, meals, gifts, samples, courier and checks on a customer, an inquiry or an order. */
+  toSell: string;
+  toSellBefore: string | null;
+  /** Spent to sell on orders, or before them on inquiries we won. */
+  onWon: string;
+  lost: { spent: string; deals: number };
+  /** The company's own costs: Money › Company costs. */
+  company: string;
+  owed: string;
+  people: { person: { id: string; name: string }; spent: string; toSell: string; lost: string; owed: string }[];
+  kinds: { category: ExpenseCategory; amount: string }[];
+  lostReasons: { reason: LostReason | "not_said"; deals: number; spent: string }[];
+  factories: { factory: { id: string; name: string }; visits: number; spent: string }[];
+  customers: { customer: { id: string; name: string }; spent: string }[];
+  months: { month: string; toSell: string }[];
+}

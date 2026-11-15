@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
 import {
@@ -29,6 +30,7 @@ import { late } from "./shared";
 import { hasFeature, requireUser } from "@/lib/session";
 import { api } from "@/lib/api";
 import type { OrderGroups } from "@/lib/types-facts";
+import type { CustomerAccount } from "@/lib/types-money";
 import { customerOf } from "@/lib/party-data";
 import { countryName } from "@/lib/countries";
 import { OpenPanelButton } from "@/components/common/panel";
@@ -51,7 +53,7 @@ const TAB_OF: Record<string, string> = {
   orders: "orders",
   money: "money",
   payments: "money",
-  account: "money?view=profit",
+  account: "money#where",
   history: "notes",
   contacts: "contacts",
 };
@@ -75,7 +77,8 @@ export default async function CustomerOverview({
   const canEdit = can(me, "customers.manage");
   const editing = canEdit && sp.panel === "edit-customer";
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  const [c, settings, pay, notes, groups] = await Promise.all([
+  const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
+  const [c, settings, pay, notes, groups, account] = await Promise.all([
     customerOf(id),
     editing ? getSettings() : null,
     customerPaymentsOf(id),
@@ -83,6 +86,8 @@ export default async function CustomerOverview({
     insights
       ? api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", customerId: id }).catch(() => null)
       : null,
+    // What was spent on them and their profit after all costs: managers with expenses.
+    seesCosts ? api.get<CustomerAccount>(`/customers/${id}/account`).catch(() => null) : null,
   ]);
   const facts = groups?.rows[0];
   const latest = [...(pay?.orders ?? [])].sort((a, b) => b.orderedOn.localeCompare(a.orderedOn)).slice(0, 5);
@@ -242,6 +247,26 @@ export default async function CustomerOverview({
                 })
               ) : (
                 <p className="text-muted">No orders yet.</p>
+              )}
+              {account && (Number(account.totals.spent) > 0 || Number(account.totals.sales) > 0) && (
+                <div className="flex flex-col gap-2.5 border-t border-line pt-2.5">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-text-2">Spent on them</span>
+                    <strong className="tabular">{whole(account.totals.spent, account.currency)}</strong>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-text-2">Profit after all costs</span>
+                    <strong className={cn("tabular", Number(account.totals.net) < 0 && "text-bad")}>
+                      {whole(account.totals.net, account.currency)}
+                      {Number(account.totals.sales) > 0 && (
+                        <span className="font-normal text-text-2"> · {((Number(account.totals.net) / Number(account.totals.sales)) * 100).toFixed(1)}%</span>
+                      )}
+                    </strong>
+                  </div>
+                  <Link href={`/customers/${c.id}/money#where`} className="w-fit font-medium text-primary hover:underline">
+                    Where their money went →
+                  </Link>
+                </div>
               )}
             </CardBody>
           </Card>

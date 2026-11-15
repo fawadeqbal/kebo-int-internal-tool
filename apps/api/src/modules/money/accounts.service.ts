@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
-import { livePurchase, livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { livePurchase, livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, orderMoney, roundHalfAway } from "@kebo/money";
-import { can, shippedOnOf, type LostReason } from "@kebo/shared";
-import { addDays, dateIn, ForbiddenError, NotFoundError } from "@kebo/utils";
+import { can, shippedOnOf, type ExpenseCategory, type LostReason } from "@kebo/shared";
+import { addDays, dateIn, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -10,6 +10,11 @@ import { SettingsService } from "../settings/settings.service";
 import { convert, costingsOf, MainMoney, paysBasis } from "./order-money";
 
 const person = { select: { id: true, name: true } } as const;
+
+/** Kinds spent to sell (on a customer, an inquiry or an order): trips, hotels, meals, gifts, samples, courier, checks. */
+const SELLING = new Set<string>(["travel", "hotel", "meals", "gifts", "samples", "courier", "inspection"]);
+/** Kinds that are a visit to a factory when one is named. */
+const VISITS = new Set<string>(["travel", "hotel", "meals", "inspection"]);
 
 type Event = {
   on: string;
@@ -368,6 +373,223 @@ export class AccountsService {
       rows,
       timeline: events.slice(0, 80),
       missingRates: fx.missingRates,
+    };
+  }
+
+  /**
+   * What one person spent (design "spending", the person's page): the costs they paid, and the ones they
+   * recorded where nobody else is named, in a period (default this year), in the main currency at each cost's
+   * own rate. By kind and by what it was for: on orders (already in those orders' profit), before an order on
+   * an inquiry we won, on inquiries lost or still open, on customers, and for the company. "Outside orders" is
+   * what their profit after all costs takes off: before orders, lost and open inquiries, customers. Owed back:
+   * every cost they paid from their own money and were not paid back, whenever it was.
+   */
+  async personSpending(user: SessionUser, personId: string, q: { from?: ISODate; to?: ISODate }) {
+    this.assertManager(user);
+    const who = await this.prisma.db.user.findFirst({ where: { id: personId }, select: { id: true, name: true } });
+    if (!who) throw new NotFoundError("Person");
+    const today = this.clock.today();
+    const to = q.to ?? today;
+    const from = q.from ?? `${to.slice(0, 4)}-01-01`;
+    const { sales } = await this.settings.get();
+    const select = {
+      id: true,
+      category: true,
+      description: true,
+      amount: true,
+      currency: true,
+      rate: true,
+      spentOn: true,
+      ownMoney: true,
+      payLater: true,
+      repaidOn: true,
+      paidById: true,
+      account: { select: { name: true } },
+      order: { select: { id: true, refNo: true } },
+      inquiry: { select: { id: true, refNo: true, stage: true, orders: { where: { status: { not: "cancelled" } }, select: { id: true }, take: 1 } } },
+      customer: { select: { id: true, name: true } },
+    } as const;
+    const [rows, owedRows] = await Promise.all([
+      this.prisma.db.expense.findMany({
+        where: { voidedAt: null, spentOn: { gte: toDbDate(from), lte: toDbDate(to) }, OR: [{ paidById: personId }, { paidById: null, recordedById: personId }] },
+        orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }],
+        select,
+      }),
+      this.prisma.db.expense.findMany({
+        where: { voidedAt: null, ownMoney: true, repaidOn: null, paidById: personId, OR: [{ orderId: null }, { order: { status: { not: "cancelled" } } }] },
+        orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }],
+        select,
+      }),
+    ]);
+    const inMain = (e: { amount: Prisma.Decimal; rate: Prisma.Decimal }) => convert(decimalToMinor(e.amount), Number(e.rate));
+    type For = "orders" | "before" | "lost" | "open" | "customers" | "company";
+    const forOf = (e: (typeof rows)[number]): For =>
+      e.order ? "orders" : e.inquiry ? (e.inquiry.orders.length ? "before" : e.inquiry.stage === "lost" ? "lost" : "open") : e.customer ? "customers" : "company";
+    const byKind = new Map<string, number>();
+    const byFor: Record<For, number> = { orders: 0, before: 0, lost: 0, open: 0, customers: 0, company: 0 };
+    let spent = 0;
+    for (const e of rows) {
+      const v = inMain(e);
+      spent += v;
+      byKind.set(e.category, (byKind.get(e.category) ?? 0) + v);
+      byFor[forOf(e)] += v;
+    }
+    const view = (e: (typeof rows)[number]) => ({
+      id: e.id,
+      category: e.category as ExpenseCategory,
+      description: e.description,
+      amount: e.amount.toFixed(2),
+      currency: e.currency,
+      inMain: fromMinor(inMain(e)),
+      spentOn: fromDbDate(e.spentOn),
+      for: forOf(e),
+      order: e.order,
+      inquiry: e.inquiry && { id: e.inquiry.id, refNo: e.inquiry.refNo, stage: e.inquiry.stage },
+      customer: e.customer,
+      /** How it was paid: their own money (owed back until it is), a bill not paid yet, or an account. */
+      paid: e.ownMoney ? (e.repaidOn ? ("own_repaid" as const) : ("own" as const)) : e.payLater && !e.repaidOn ? ("not_yet" as const) : ("account" as const),
+      account: e.account?.name ?? null,
+      /** Recorded by them with nobody named as paying it. */
+      recordedOnly: e.paidById !== personId,
+    });
+    const owed = new Map<string, { currency: string; minor: number; ids: string[] }>();
+    for (const e of owedRows) {
+      const o = owed.get(e.currency) ?? { currency: e.currency, minor: 0, ids: [] };
+      o.minor += decimalToMinor(e.amount);
+      o.ids.push(e.id);
+      owed.set(e.currency, o);
+    }
+    return {
+      person: who,
+      currency: sales.currency,
+      from,
+      to,
+      spent: fromMinor(spent),
+      count: rows.length,
+      byKind: [...byKind].map(([category, v]) => ({ category: category as ExpenseCategory, amount: fromMinor(v) })).sort((a, b) => Number(b.amount) - Number(a.amount)),
+      byFor: Object.fromEntries(Object.entries(byFor).map(([k, v]) => [k, fromMinor(v)])) as Record<For, string>,
+      /** Before orders, lost and open inquiries, customers: what profit after all costs takes off their orders' profit. */
+      outside: fromMinor(byFor.before + byFor.lost + byFor.open + byFor.customers),
+      latest: rows.slice(0, 5).map(view),
+      owed: {
+        total: [...owed.values()].map((o) => ({ currency: o.currency, amount: fromMinor(o.minor), ids: o.ids })),
+        rows: owedRows.map(view),
+      },
+    };
+  }
+
+  /**
+   * Reports › Spending (design "spending"): who spends, on what, and what winning and losing cost us, in a period.
+   * Every cost in the main currency at its own rate. "Spent to sell": trips, hotels, meals, gifts, samples,
+   * courier and checks on a customer, an inquiry or an order (the company's own costs stay on Company costs).
+   * A person's spending is the costs they paid, or recorded with nobody named, as on their page. "On lost deals":
+   * spent in the period on inquiries that are lost, by why they were lost. Owed back: what staff paid from their
+   * own money and were not paid back, whenever it was spent.
+   */
+  async spendingReport(user: SessionUser, q: { from?: ISODate; to?: ISODate; prevFrom?: ISODate; prevTo?: ISODate }) {
+    this.assertManager(user);
+    const today = this.clock.today();
+    const to = q.to ?? today;
+    const from = q.from ?? `${to.slice(0, 4)}-01-01`;
+    const { sales } = await this.settings.get();
+    const select = {
+      category: true,
+      amount: true,
+      rate: true,
+      spentOn: true,
+      paidById: true,
+      recordedById: true,
+      orderId: true,
+      customerId: true,
+      factory: { select: { id: true, name: true } },
+      customer: { select: { id: true, name: true } },
+      inquiry: { select: { id: true, stage: true, lostReason: true, orders: { where: { status: { not: "cancelled" } }, select: { id: true }, take: 1 } } },
+    } as const;
+    const [rows, before, owedRows, people] = await Promise.all([
+      this.prisma.db.expense.findMany({ where: { voidedAt: null, spentOn: { gte: toDbDate(from), lte: toDbDate(to) } }, select }),
+      q.prevFrom && q.prevTo
+        ? this.prisma.db.expense.findMany({ where: { voidedAt: null, spentOn: { gte: toDbDate(q.prevFrom), lte: toDbDate(q.prevTo) } }, select })
+        : Promise.resolve([]),
+      this.prisma.db.expense.findMany({
+        where: { voidedAt: null, ownMoney: true, repaidOn: null, paidById: { not: null }, OR: [{ orderId: null }, { order: { status: { not: "cancelled" } } }] },
+        select: { amount: true, rate: true, paidById: true },
+      }),
+      this.prisma.db.user.findMany({ where: { isSystem: false }, select: { id: true, name: true } }),
+    ]);
+    const inMain = (e: { amount: Prisma.Decimal; rate: Prisma.Decimal }) => convert(decimalToMinor(e.amount), Number(e.rate));
+    const toSell = (e: (typeof rows)[number]) => SELLING.has(e.category) && !!(e.orderId || e.inquiry || e.customerId);
+    const whoOf = (e: { paidById: string | null; recordedById: string }) => e.paidById ?? e.recordedById;
+    const nameOf = (id: string) => people.find((p) => p.id === id)?.name ?? "Someone";
+    const sum = (list: typeof rows, keep: (e: (typeof rows)[number]) => boolean) => list.filter(keep).reduce((t, e) => t + inMain(e), 0);
+
+    const byPerson = new Map<string, { spent: number; toSell: number; lost: number; owed: number }>();
+    const personOf = (id: string) => byPerson.get(id) ?? byPerson.set(id, { spent: 0, toSell: 0, lost: 0, owed: 0 }).get(id)!;
+    const kinds = new Map<string, number>();
+    const reasons = new Map<string, { deals: Set<string>; spent: number }>();
+    const months = new Map<string, number>();
+    const factories = new Map<string, { factory: { id: string; name: string }; visits: number; spent: number }>();
+    const customers = new Map<string, { customer: { id: string; name: string }; spent: number }>();
+    let company = 0;
+    let onWon = 0;
+    for (const e of rows) {
+      const v = inMain(e);
+      const p = personOf(whoOf(e));
+      p.spent += v;
+      if (!e.orderId && !e.inquiry && !e.customerId) company += v;
+      if (e.customer) {
+        const c = customers.get(e.customer.id) ?? { customer: e.customer, spent: 0 };
+        c.spent += v;
+        customers.set(e.customer.id, c);
+      }
+      const lost = !e.orderId && e.inquiry?.stage === "lost" && e.inquiry.orders.length === 0;
+      if (lost) {
+        p.lost += v;
+        const key = e.inquiry!.lostReason ?? "not_said";
+        const r = reasons.get(key) ?? { deals: new Set<string>(), spent: 0 };
+        r.deals.add(e.inquiry!.id);
+        r.spent += v;
+        reasons.set(key, r);
+      }
+      if (e.factory && VISITS.has(e.category)) {
+        const f = factories.get(e.factory.id) ?? { factory: e.factory, visits: 0, spent: 0 };
+        f.visits += 1;
+        f.spent += v;
+        factories.set(e.factory.id, f);
+      }
+      if (!toSell(e)) continue;
+      p.toSell += v;
+      kinds.set(e.category, (kinds.get(e.category) ?? 0) + v);
+      const m = fromDbDate(e.spentOn).slice(0, 7);
+      months.set(m, (months.get(m) ?? 0) + v);
+      if (e.orderId || (e.inquiry && e.inquiry.orders.length > 0)) onWon += v;
+    }
+    for (const e of owedRows) personOf(e.paidById!).owed += inMain(e);
+    const total = (k: "spent" | "toSell" | "lost" | "owed") => [...byPerson.values()].reduce((t, p) => t + p[k], 0);
+    const monthList: string[] = [];
+    for (let m = from.slice(0, 7); m <= to.slice(0, 7); m = addDays(`${m}-28`, 4).slice(0, 7)) monthList.push(m);
+    return {
+      currency: sales.currency,
+      from,
+      to,
+      toSell: fromMinor(total("toSell")),
+      toSellBefore: q.prevFrom && q.prevTo ? fromMinor(sum(before, toSell)) : null,
+      /** Spent to sell on orders, or before them on inquiries we won. */
+      onWon: fromMinor(onWon),
+      lost: { spent: fromMinor(total("lost")), deals: new Set([...reasons.values()].flatMap((r) => [...r.deals])).size },
+      /** The company's own costs (on no customer, inquiry or order): Money › Company costs. */
+      company: fromMinor(company),
+      owed: fromMinor(total("owed")),
+      people: [...byPerson]
+        .map(([id, p]) => ({ person: { id, name: nameOf(id) }, spent: fromMinor(p.spent), toSell: fromMinor(p.toSell), lost: fromMinor(p.lost), owed: fromMinor(p.owed) }))
+        .sort((a, b) => Number(b.spent) - Number(a.spent) || Number(b.owed) - Number(a.owed)),
+      kinds: [...kinds].map(([category, v]) => ({ category: category as ExpenseCategory, amount: fromMinor(v) })).sort((a, b) => Number(b.amount) - Number(a.amount)),
+      lostReasons: [...reasons]
+        .map(([reason, r]) => ({ reason: reason as LostReason | "not_said", deals: r.deals.size, spent: fromMinor(r.spent) }))
+        .sort((a, b) => Number(b.spent) - Number(a.spent)),
+      factories: [...factories.values()].map((f) => ({ factory: f.factory, visits: f.visits, spent: fromMinor(f.spent) })).sort((a, b) => Number(b.spent) - Number(a.spent)),
+      /** Everything spent on each customer in the period (on them, their inquiries and their orders). */
+      customers: [...customers.values()].map((c) => ({ customer: c.customer, spent: fromMinor(c.spent) })).sort((a, b) => Number(b.spent) - Number(a.spent)),
+      months: monthList.map((m) => ({ month: m, toSell: fromMinor(months.get(m) ?? 0) })),
     };
   }
 }
