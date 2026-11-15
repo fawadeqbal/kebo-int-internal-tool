@@ -75,6 +75,7 @@ export function ExpenseRecord({
         <>
           {EXPENSE_CATEGORY_LABEL[e.category]} · {date(e.spentOn)}
           {showFor && ` · ${forWhom(e)}`}
+          {e.paidBy && ` · paid by ${e.paidBy.name}${e.ownMoney ? (e.repaid ? " (own money, paid back)" : " (own money, owed back)") : ""}`}
           {e.currency !== mainCurrency && ` · ≈ ${money(e.inMain, mainCurrency)}`}
         </>
       }
