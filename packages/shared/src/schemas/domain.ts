@@ -780,6 +780,8 @@ export const moneyAccountInput = z.object({
   openingOn: isoDate(),
   note: optionalText(500),
   archived: bool.optional(),
+  /** Units of the currency per 1 of the main one, when Settings has no rate for it yet: kept in Settings. */
+  rate: optionalRate.optional().transform((v) => v ?? null),
 });
 export type MoneyAccountInput = z.infer<typeof moneyAccountInput>;
 

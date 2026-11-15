@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
 import { fromMinor, toMinor, type Minor } from "@kebo/money";
 import { can, EXPENSE_CATEGORY_LABEL, PAYMENT_KIND_LABEL, type ExpenseCategory, type MoneyAccountInput, type TransferInput } from "@kebo/shared";
-import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
+import { DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -10,6 +10,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { checkAccount } from "./account-check";
 import { LimitsService } from "../../common/company/limits.service";
 import { LedgerPosting } from "../ledger/posting.service";
+import { SettingsService } from "../settings/settings.service";
 
 type Kind = "in" | "factory" | "expense" | "transfer_out" | "transfer_in" | "refund";
 
@@ -44,6 +45,7 @@ export class CashService {
     private readonly clock: Clock,
     private readonly limits: LimitsService,
     private readonly ledger: LedgerPosting,
+    private readonly settings: SettingsService,
   ) {}
 
   private assertManager(user: SessionUser) {
@@ -113,6 +115,21 @@ export class CashService {
     if (input.openingOn > this.clock.today()) throw new DomainError("The opening day cannot be in the future.");
     const clash = await this.prisma.db.moneyAccount.findFirst({ where: { name: { equals: input.name, mode: "insensitive" }, ...(id ? { NOT: { id } } : {}) } });
     if (clash) throw new DomainError(`There is already an account called ${clash.name}.`);
+    // A currency with no exchange rate would leave the account's money out of every total: the rate is asked
+    // here, with the account, and kept in Settings (the same rates every figure uses).
+    const { sales } = await this.settings.get();
+    if (input.currency !== sales.currency && !sales.exchangeRates[input.currency]) {
+      if (!input.rate)
+        throw new GateError(
+          `There is no exchange rate for ${input.currency} in Settings. Enter it (${input.currency} per 1 ${sales.currency}): it is kept there, so this account counts in every total.`,
+          "rate_needed",
+        );
+      await this.settings.update(user, "sales", {
+        ...sales,
+        exchangeRates: { ...sales.exchangeRates, [input.currency]: input.rate },
+        reason: `Added with the money account ${input.name}`,
+      });
+    }
     return this.prisma.tx(async (tx) => {
       if (id) {
         const a = await tx.moneyAccount.findUnique({ where: { id } });
