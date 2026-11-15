@@ -66,7 +66,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 name={me.name}
                 email={me.email}
                 phone={profile?.phone}
-                language={profile?.language}
               />
             </div>
           </Card>

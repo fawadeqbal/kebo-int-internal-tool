@@ -11,8 +11,9 @@ import { HistoryTable, historyText } from "@/components/common/history-list";
 import { FilterCard } from "@/components/common/filter-card";
 import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
 import { OrderPage } from "@/components/order-sections/order-side";
+import { orderTitle } from "@/lib/titles";
 
-export const metadata = { title: "Order · history" };
+export const generateMetadata = orderTitle("History");
 
 /**
  * History (design "the order, final"): every change on the order with who made it, when, why and the

@@ -40,8 +40,9 @@ import { removeCustomerAction, saveCustomerAction } from "../actions";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { CustomerPanel } from "../customer-panel";
 import { currenciesFrom } from "../currencies";
+import { customerTitle } from "@/lib/titles";
 
-export const metadata = { title: "Customer" };
+export const generateMetadata = customerTitle();
 
 const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 

@@ -20,8 +20,16 @@ import { SupplierParts, supplierPlanWords } from "@/components/money/supplier-pl
 import { FileToolsProvider } from "@/components/files/file-tools";
 import { factoryPaymentAction } from "../../../../money/actions";
 import { stageData } from "../../../../orders/[id]/stage-data";
+import { cache } from "react";
 
-export const metadata = { title: "Purchase order" };
+/** The order's purchase orders, read once per request (the page and its tab title). */
+const purchaseOrdersOf = cache((order: string) => optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${order}/purchase-orders`)));
+
+export async function generateMetadata({ params }: { params: Promise<{ order: string; supplier: string }> }) {
+  const { order, supplier } = await params;
+  const po = (await purchaseOrdersOf(order))?.items.find((p) => p.supplier.id === supplier);
+  return { title: po ? `${po.number} · ${po.supplier.name}` : "Purchase order" };
+}
 
 /**
  * A purchase order's own page (board PDetail): what it says, shown. Its terms, the lines at the factory's
@@ -36,7 +44,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   const { o, flow, now, defaults } = d;
   const [m, pos, rows, people, settings, files] = await Promise.all([
     orderMoneyOf(order),
-    optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${order}/purchase-orders`)),
+    purchaseOrdersOf(order),
     optional(() => api.get<PurchaseOrderRow[]>("/operations/purchase-orders", { all: "true", order })),
     optional(() => getPeople()),
     getSettings(),

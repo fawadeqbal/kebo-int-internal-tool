@@ -7,8 +7,9 @@ import { date, whole } from "@/lib/format";
 import type { FactoryDetail } from "@/lib/types-people";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
+import { supplierTitle } from "@/lib/titles";
 
-export const metadata = { title: "Supplier offers" };
+export const generateMetadata = supplierTitle("Offers");
 
 type Offer = FactoryDetail["quotes"][number];
 

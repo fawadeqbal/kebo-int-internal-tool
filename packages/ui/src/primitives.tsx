@@ -165,7 +165,8 @@ export function CardHeader({ title, description, actions, className }: { title: 
         <h2 className="text-base font-bold text-text">{title}</h2>
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {/* Never wider than the card: on a small screen the buttons wrap among themselves. */}
+      {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -310,7 +311,7 @@ export function Breadcrumb({ items, className }: { items: { label: string; href?
                 </span>
               )}
               {c.href && !last ? (
-                <Link href={c.href} className="text-primary hover:text-primary-hover hover:underline">
+                <Link href={c.href} className="tap text-primary hover:text-primary-hover hover:underline">
                   {c.label}
                 </Link>
               ) : (

@@ -10,8 +10,9 @@ import type { ExpenseList } from "@/lib/types-money";
 import type { FactoryOrders } from "@/lib/types-facts";
 import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
+import { supplierTitle } from "@/lib/titles";
 
-export const metadata = { title: "Supplier costs" };
+export const generateMetadata = supplierTitle("Costs");
 
 interface Line {
   key: string;

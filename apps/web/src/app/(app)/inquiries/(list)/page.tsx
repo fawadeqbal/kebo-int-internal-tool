@@ -21,7 +21,7 @@ import { api } from "@/lib/api";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { hasFeature, requireUser } from "@/lib/session";
-import { date, short, countOf } from "@/lib/format";
+import { date, short, countOf, daysText } from "@/lib/format";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { DealRow, Paged } from "@/lib/types";
 import type { Funnel } from "@/lib/types-facts";
@@ -59,7 +59,7 @@ function Stage({ d }: { d: DealRow }) {
 
 /**
  * Inquiries (board "Inquiries — list"): Board, Export CSV and New inquiry; Open, Quoted value, Won this month,
- * Win rate and Avg. days to quote; chips by stage with counts and Mine; search with Category, Came by,
+ * Win rate and Time to quote; chips by stage with counts and Mine; search with Category, Came by,
  * Handles and Priority; each inquiry with what, who, how it came, when, who handles it, priority, where it is
  * and its stage.
  */
@@ -133,9 +133,9 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           <StatTile
             icon={Clock}
             iconColor={5}
-            label="Avg. days to quote"
-            value={yearFunnel.medianDaysToFirstQuote === null ? "—" : yearFunnel.medianDaysToFirstQuote.toLocaleString("en-US", { maximumFractionDigits: 1 })}
-            sub="new → R1 sent"
+            label="Time to quote"
+            value={daysText(yearFunnel.medianDaysToFirstQuote)}
+            sub="typical, new → R1 sent"
           />
         )}
       </StatRow>

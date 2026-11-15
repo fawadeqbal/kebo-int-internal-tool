@@ -17,8 +17,18 @@ import type { Me } from "@/lib/session";
 import { editPaymentAction, factoryPaymentAction, removePaymentFileAction } from "../../../money/actions";
 import { voidPaymentAction } from "../../actions";
 import { opensPayments } from "../../shared";
+import { cache } from "react";
 
-export const metadata = { title: "Payment" };
+/** One payment, read once per request (the page and its tab title). */
+const paymentOf = cache((kind: PaymentRecordKind, id: string) => api.get<PaymentView>(`/treasury/payments/${kind}/${id}`).catch(() => null));
+const NOUN: Partial<Record<PaymentRecordKind, string>> = { customer: "Receipt", supplier: "Supplier payment", expense: "Expense", transfer: "Transfer", refund: "Refund", credit: "From credit" };
+const titleOf = (p: PaymentView) => (p.number && NOUN[p.kind] ? `${NOUN[p.kind]} ${p.number}` : p.title);
+
+export async function generateMetadata({ params }: { params: Promise<{ kind: string; id: string }> }) {
+  const { kind, id } = await params;
+  const p = (PAYMENT_RECORD_KINDS as readonly string[]).includes(kind) && UUID.test(id) ? await paymentOf(kind as PaymentRecordKind, id) : null;
+  return { title: p ? titleOf(p) : "Payment" };
+}
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -30,13 +40,12 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
   if (!opensPayments(me)) redirect("/forbidden");
   const { kind, id } = await params;
   if (!(PAYMENT_RECORD_KINDS as readonly string[]).includes(kind) || !UUID.test(id)) notFound();
-  const p = await api.get<PaymentView>(`/treasury/payments/${kind as PaymentRecordKind}/${id}`).catch(() => null);
+  const p = await paymentOf(kind as PaymentRecordKind, id);
   if (!p) notFound();
   const order = p.for.find((f) => f.href?.startsWith("/orders/"));
   const { change, proof } = await recordTools(me, p);
 
-  const NOUN: Partial<Record<PaymentRecordKind, string>> = { customer: "Receipt", supplier: "Supplier payment", expense: "Expense", transfer: "Transfer", refund: "Refund", credit: "From credit" };
-  const title = p.number && NOUN[p.kind] ? `${NOUN[p.kind]} ${p.number}` : p.title;
+  const title = titleOf(p);
   const fieldItems = [
     ...(p.number ? [{ label: NOUN[p.kind] ?? "Number", value: <RefCode>{p.number}</RefCode> }] : []),
     ...(p.party

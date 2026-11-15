@@ -15,8 +15,9 @@ import { offerFactsOf } from "./facts";
 import { ItemsCard } from "./items-card";
 import { WithSide } from "./side";
 import { revisionsOf } from "./steps";
+import { inquiryTitle } from "@/lib/titles";
 
-export const metadata = { title: "Inquiry" };
+export const generateMetadata = inquiryTitle();
 
 /**
  * The inquiry's Overview: where it stands in three lines (the factory offers, the quotation, the sales

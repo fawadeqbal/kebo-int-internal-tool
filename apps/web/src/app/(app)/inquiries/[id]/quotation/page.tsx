@@ -18,8 +18,9 @@ import { WithSide } from "../side";
 import { PriceEditor } from "@/components/deals/price-editor";
 import { createRevisionAction, deleteRevisionAction, emailRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
 import { DeleteDraftButton, SendWindow } from "@/components/deals/send-quote";
+import { inquiryTitle } from "@/lib/titles";
 
-export const metadata = { title: "Quotation" };
+export const generateMetadata = inquiryTitle("Quotation");
 
 const printHref = (r: { id: string }) => `/print/revisions/${r.id}`;
 const pdfHref = (r: { id: string }) => `/pdf/revisions/${r.id}`;

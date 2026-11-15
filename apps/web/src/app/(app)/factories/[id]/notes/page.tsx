@@ -2,8 +2,9 @@ import { requirePermission } from "@/lib/session";
 import { factoryOf, partyNotesOf } from "@/lib/party-data";
 import { NotesTab } from "@/components/notes/notes-tab";
 import { addNoteAction } from "../../../follow-ups/actions";
+import { supplierTitle } from "@/lib/titles";
 
-export const metadata = { title: "Supplier notes" };
+export const generateMetadata = supplierTitle("Notes");
 
 /** The supplier's Notes tab (as the customer's, board "Customer — Notes tab"): notes and calls, and Add a note. */
 export default async function FactoryNotes({ params }: { params: Promise<{ id: string }> }) {

@@ -8,8 +8,9 @@ import type { FollowUpList } from "@/lib/types-notes";
 import { FilterCard } from "@/components/common/filter-card";
 import { HistoryTable, historyText } from "@/components/common/history-list";
 import { FollowUpsCard } from "@/components/notes/cards";
+import { inquiryTitle } from "@/lib/titles";
 
-export const metadata = { title: "Inquiry history" };
+export const generateMetadata = inquiryTitle("History");
 
 /** Every change on the deal and its prices, quotation, files and order: who, when, old → new, and why; searchable, by person. Then its follow-ups. */
 export default async function DealHistory({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string; who?: string }> }) {

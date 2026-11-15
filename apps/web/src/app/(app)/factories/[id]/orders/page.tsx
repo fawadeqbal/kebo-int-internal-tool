@@ -3,8 +3,9 @@ import { requirePermission } from "@/lib/session";
 import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
 import { date, whole } from "@/lib/format";
 import { DataTable } from "@/components/common/data-table";
+import { supplierTitle } from "@/lib/titles";
 
-export const metadata = { title: "Supplier orders" };
+export const generateMetadata = supplierTitle("Orders");
 
 /**
  * The supplier's Orders tab (in the board's table style): what it is making for us, with the day it should be

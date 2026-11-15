@@ -8,8 +8,9 @@ import { date, whole } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
+import { customerTitle } from "@/lib/titles";
 
-export const metadata = { title: "Customer inquiries" };
+export const generateMetadata = customerTitle("Inquiries");
 
 const STAGES: InquiryStage[] = ["new", "sourcing", "quoted", "won", "lost"];
 

@@ -19,8 +19,16 @@ import { PersonOwedCard, PersonSpendingCard } from "@/components/people/person-s
 import type { PersonSpending } from "@/lib/types-money";
 import { resetTwoStepAction, setActiveAction, setPasswordAction, updateUserAction } from "../actions";
 import { EditUserPanel, PasswordPanel } from "../forms";
+import { cache } from "react";
 
-export const metadata = { title: "Person" };
+/** The company's people, read once per request (the page and its tab title). */
+const usersOf = cache(() => api.get<UserRow[]>("/users"));
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const u = (await usersOf().catch(() => [] as UserRow[])).find((x) => x.id === id);
+  return { title: u?.name ?? "Person" };
+}
 
 /** Inquiries the card shows before "All n". */
 const ROWS = 6;
@@ -54,7 +62,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   const seeSpending = can(me, "expenses.manage") && (await hasFeature("expenses"));
   const today = companyToday();
   const [users, all, inquiries, audit, spending] = await Promise.all([
-    api.get<UserRow[]>("/users"),
+    usersOf(),
     api.get<RoleRow[]>("/roles"),
     api.get<Paged<DealRow>>("/inquiries", { assignee: id, stage: "open", pageSize: ROWS }).catch(() => null),
     seeAudit ? api.get<Paged<AuditRow>>("/audit", { entityType: "user", entityId: id, pageSize: 50 }).catch(() => null) : null,

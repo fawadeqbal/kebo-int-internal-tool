@@ -47,7 +47,7 @@ export function SectionFiles({ orderId, section, canAdd }: { orderId: string; se
       {canAdd && (
         <>
           <input ref={input} type="file" multiple hidden onChange={(e) => (send(e.target.files), (e.target.value = ""))} />
-          <button type="button" disabled={busy} className="text-[12.5px] font-medium text-text-2 hover:text-primary hover:underline disabled:opacity-60" onClick={() => input.current?.click()}>
+          <button type="button" disabled={busy} className="tap text-[12.5px] font-medium text-text-2 hover:text-primary hover:underline disabled:opacity-60" onClick={() => input.current?.click()}>
             {busy ? "Sending…" : "+ Add a file"}
           </button>
         </>

@@ -8,6 +8,7 @@ import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as Me
 import { Avatar, buttonClass, cn, Kbd } from "@kebo/ui";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
+import { PRODUCT_NAME } from "@/lib/product";
 
 export type { NavModule, NavPage } from "@/lib/nav";
 
@@ -386,9 +387,12 @@ function MenuContent({
   return (
     <>
       <div className="flex h-14 shrink-0 items-center px-4">
-        <Link href={HOME_HREF} className={cn("flex min-w-0 items-center gap-2.5 rounded-lg", big && "pr-10")} aria-label={`Kebo ERP, ${companyName}, home`}>
+        <Link href={HOME_HREF} className={cn("flex min-w-0 items-center gap-2.5 rounded-lg", big && "pr-10")} aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
           <Logo companyName={companyName} logo={logo} size={32} />
-          <span className="truncate text-[15.5px] font-bold tracking-tight text-text">Kebo ERP</span>
+          <span className="flex min-w-0 flex-col leading-tight">
+            <span className="truncate text-[15.5px] font-bold tracking-tight text-text">{PRODUCT_NAME}</span>
+            <span className="truncate text-xs text-muted">{companyName}</span>
+          </span>
         </Link>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 pt-1 pb-4" aria-label="Main">
@@ -590,7 +594,7 @@ function Strip({ modules, companyName, logo }: { modules: NavModule[]; companyNa
   return (
     <>
       <div className="grid h-14 shrink-0 place-items-center">
-        <Link href={HOME_HREF} className="rounded-lg" aria-label={`Kebo ERP, ${companyName}, home`}>
+        <Link href={HOME_HREF} className="rounded-lg" aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
           <Logo companyName={companyName} logo={logo} size={32} />
         </Link>
       </div>
@@ -773,9 +777,9 @@ export function AppShell({
             <button type="button" className={cn(buttonClass("ghost", "icon"), "-ml-2 md:hidden")} onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer}>
               <MenuIcon aria-hidden />
             </button>
-            <Link href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg md:hidden" aria-label={`Kebo ERP, ${companyName}, home`}>
+            <Link href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg md:hidden" aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
               <Logo companyName={companyName} logo={logo} size={32} />
-              <span className="text-[15.5px] font-bold tracking-tight text-text max-[380px]:hidden">Kebo ERP</span>
+              <span className="text-[15.5px] font-bold tracking-tight text-text max-[380px]:hidden">{PRODUCT_NAME}</span>
             </Link>
             {/* Under 1280 px the menu is the strip: the button opens the whole menu over the page. */}
             <button type="button" className={cn(buttonClass("ghost", "icon"), "hidden md:inline-flex xl:hidden")} onClick={() => setDrawer(true)} aria-label="Open the menu" aria-expanded={drawer}>
@@ -827,7 +831,7 @@ export function AppShell({
         <main id="main" className="mx-auto w-full max-w-[1440px] px-4 pt-[18px] pb-28 sm:px-6 md:pb-10">
           {children}
           <p className="no-print mt-6 text-xs text-muted">
-            © {new Date().getFullYear()} Kebo ERP · {companyName}
+            © {new Date().getFullYear()} {PRODUCT_NAME} · {companyName}
           </p>
         </main>
       </div>

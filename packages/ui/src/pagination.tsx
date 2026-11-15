@@ -66,14 +66,14 @@ export function Pagination({
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
   const box = "inline-grid h-9 min-w-9 place-items-center rounded-[10px] border px-2 text-[13px] font-medium tabular transition-colors";
-  const link = (p: number, label: string, aria: string, disabled: boolean) => (
+  const link = (p: number, label: string, aria: string, disabled: boolean, extra?: string) => (
     <Link
       key={aria}
       href={buildHref(base, params, { page: p > 1 ? String(p) : undefined })}
       aria-label={aria}
       aria-disabled={disabled}
       tabIndex={disabled ? -1 : undefined}
-      className={cn(box, "relative border-line bg-surface text-text hover:bg-surface-2", disabled && "pointer-events-none opacity-50")}
+      className={cn(box, "relative border-line bg-surface text-text hover:bg-surface-2", disabled && "pointer-events-none opacity-50", extra)}
     >
       {label}
       <span className="pointer-events-none absolute -top-1 -right-1 empty:hidden">
@@ -93,7 +93,7 @@ export function Pagination({
         {link(page - 1, "‹", "Previous page", page <= 1)}
         {pageList(page, pages).map((p, i) =>
           p === null ? (
-            <span key={`gap-${i}`} className="inline-grid h-9 place-items-center px-1" aria-hidden>
+            <span key={`gap-${i}`} className="inline-grid h-9 place-items-center px-1 max-sm:hidden" aria-hidden>
               …
             </span>
           ) : p === page ? (
@@ -101,7 +101,8 @@ export function Pagination({
               {p}
             </span>
           ) : (
-            link(p, String(p), `Page ${p}`, false)
+            // On a phone only ‹ this page ›: every number would not fit on a small screen.
+            link(p, String(p), `Page ${p}`, false, "max-sm:hidden")
           ),
         )}
         {link(page + 1, "›", "Next page", page >= pages)}

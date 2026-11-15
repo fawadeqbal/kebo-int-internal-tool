@@ -7,8 +7,9 @@ import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { optional } from "@/components/print/data";
 import { AddFilesCard, FilesTable } from "@/components/deals/inquiry-files";
 import { describeFileAction, removeFileAction } from "../../actions";
+import { inquiryTitle } from "@/lib/titles";
 
-export const metadata = { title: "Inquiry · files" };
+export const generateMetadata = inquiryTitle("Files");
 
 const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
 

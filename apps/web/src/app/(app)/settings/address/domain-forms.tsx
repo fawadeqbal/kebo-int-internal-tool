@@ -55,7 +55,7 @@ function ConnectForm({ ours, onSaved }: { ours: string; onSaved: () => void }) {
             lines={[
               "You add one record where your domain is managed",
               <>
-                When we find it, <strong>{shown}</strong> opens your Kebo ERP
+                When we find it, <strong>{shown}</strong> opens your RFQ Desk
               </>,
               <>
                 <strong>{ours}</strong> keeps working and sends people on

@@ -88,7 +88,7 @@ export function DetailsCard({
           {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
         {editHref && (
-          <Link href={editHref} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline">
+          <Link href={editHref} className="tap inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline">
             <Pencil className="size-4" aria-hidden /> Edit
           </Link>
         )}
@@ -98,7 +98,7 @@ export function DetailsCard({
             id={edit.id}
             variant="link"
             size="sm"
-            className="h-auto text-[13px] font-semibold [&_svg]:size-4"
+            className="tap h-auto text-[13px] font-semibold [&_svg]:size-4"
             label={edit.label}
           >
             <Pencil aria-hidden /> Edit

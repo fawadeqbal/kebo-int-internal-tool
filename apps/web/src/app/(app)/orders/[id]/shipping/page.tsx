@@ -18,8 +18,9 @@ import { PackingCard } from "../goods";
 import { RemoveButton } from "@/components/orders/flow-forms";
 import { removeShipmentAction } from "../../flow-actions";
 import { stageData } from "../stage-data";
+import { orderTitle } from "@/lib/titles";
 
-export const metadata = { title: "Order · shipping" };
+export const generateMetadata = orderTitle("Shipping");
 
 /** What saving the freight and the insurance does to the order's costs. */
 const COST_WHATS = ["Freight we pay (not “collect”) and the premium become costs of this order by themselves."];

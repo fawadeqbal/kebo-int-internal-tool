@@ -13,8 +13,14 @@ import { deleteLeadAction, giveDemoAction, leadNoteAction, updateLeadAction } fr
 import { PanelButton } from "../../companies/[id]/cards";
 import { NoteForm } from "./forms";
 import { LeadPanels, ProgressSteps } from "./panels";
+import { cache } from "react";
 
-export const metadata = { title: "Client inquiry" };
+/** The client inquiry, read once per request (the page and its tab title). */
+const leadOf = cache((id: string) => loadPlatform(() => platformApi.get<LeadDetail>(`/leads/${id}`)));
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return { title: `${(await leadOf((await params).id)).companyName} · Client inquiry` };
+}
 
 const MEANING: Record<LeadStatus, "info" | "neutral" | "ok" | "bad"> = {
   new: "info",
@@ -36,7 +42,7 @@ const MEANING: Record<LeadStatus, "info" | "neutral" | "ok" | "bad"> = {
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [l, plans] = await Promise.all([
-    loadPlatform(() => platformApi.get<LeadDetail>(`/leads/${id}`)),
+    leadOf(id),
     platformApi.get<Plan[]>("/plans"),
   ]);
   const company = l.company && l.company.status !== "deleted" ? l.company : null;

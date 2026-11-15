@@ -32,6 +32,26 @@
   }
 }
 
+/*
+ * A small link or button on a touch screen: its hit area grows to at least 44 × 44 px, centred on it, without
+ * moving anything (the breadcrumbs, "+ Add a file", Edit in a card's header). Opt in with the class "tap"; not
+ * on an element that already draws something with ::after.
+ */
+@utility tap {
+  @media (pointer: coarse) {
+    position: relative;
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
 
 /*
  * A read-only table of lines that can be edited (EditableRows): a hovered row
