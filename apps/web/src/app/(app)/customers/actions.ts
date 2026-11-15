@@ -43,7 +43,7 @@ export async function saveCustomerAction(id: string | null, _prev: ActionState, 
   revalidatePath(`/customers/${savedId}`, "layout");
   const name = (body as { name?: unknown }).name;
   if (form.get("inPanel") === "1")
-    return { ok: true, data: { id: savedId, name: typeof name === "string" ? name.trim() : "", another: form.get("another") === "1" } };
+    return { ok: true, data: { id: savedId, name: typeof name === "string" ? name.trim() : "" } };
   redirect(`/customers/${savedId}?toast=${encodeURIComponent(id ? "Customer saved." : "Customer added.")}`);
 }
 

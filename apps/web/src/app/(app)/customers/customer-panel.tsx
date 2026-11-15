@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@kebo/ui/client";
 import { SidePanel, useSidePanel } from "@/components/common/panel";
@@ -33,17 +32,10 @@ export function CustomerPanel({
   onRecord?: boolean;
 }) {
   const router = useRouter();
-  // "Save & add another": the window stays open with an empty form.
-  const [round, setRound] = useState(0);
   const panel = useSidePanel(customer ? "edit-customer" : "new-customer");
   const saved = (s: ActionState) => {
-    const d = s.data as { id: string; name: string; another?: boolean } | undefined;
+    const d = s.data as { id: string; name: string } | undefined;
     if (!d) return panel.close();
-    if (d.another) {
-      toast({ message: `Customer added · ${d.name}`, action: { label: "Open", href: `/customers/${d.id}` } });
-      router.refresh();
-      return setRound((r) => r + 1);
-    }
     toast({
       message: customer ? `Saved · ${d.name}` : `Customer added · ${d.name}`,
       undo:
@@ -67,7 +59,7 @@ export function CustomerPanel({
       onClose={() => panel.close()}
       className="md:w-[960px]"
     >
-      <CustomerForm key={round} action={action} customer={customer} currencies={currencies} inPanel onSaved={saved} />
+      <CustomerForm action={action} customer={customer} currencies={currencies} inPanel onSaved={saved} />
     </SidePanel>
   );
 }

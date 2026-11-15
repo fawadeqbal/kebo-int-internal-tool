@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Copy, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
@@ -194,7 +194,7 @@ type Mode =
 
 /**
  * The fields of a cost and its buttons. In a window of its own (AddCost, ChangeCost) or inside Record payment.
- * `onSaved(again)`: saved; `again` keeps it open, empty, for the next one.
+ * `onSaved`: saved (the window closes).
  */
 export function CostForm({
   setup,
@@ -208,7 +208,7 @@ export function CostForm({
   mode: Mode;
   /** In a window of its own: Cancel closes it. */
   inPanel?: boolean;
-  onSaved?: (again: boolean) => void;
+  onSaved?: () => void;
   onFileError?: (message: string) => void;
   /** Change: "Remove this cost…" in the footer. */
   onRemove?: () => void;
@@ -278,7 +278,6 @@ export function CostForm({
   const [factoryId, setFactoryId] = useState(from?.factory?.id ?? "");
   const [repeats, setRepeats] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const again = useRef(false);
 
   const kinds = (() => {
     if (allKinds) return EXPENSE_CATEGORIES;
@@ -361,19 +360,14 @@ export function CostForm({
           Cancel
         </Button>
       )}
-      {mode.kind === "new" && inPanel && (
-        <SubmitButton variant="secondary" className="max-sm:hidden" pendingText="Saving…" onClick={() => (again.current = true)}>
-          Add and add another
-        </SubmitButton>
-      )}
-      <SubmitButton pendingText={file ? "Saving, sending the file…" : "Saving…"} onClick={() => (again.current = false)}>
+      <SubmitButton pendingText={file ? "Saving, sending the file…" : "Saving…"}>
         {saveLabel}
       </SubmitButton>
     </>
   );
 
   return (
-    <ActionForm action={save} onDone={() => onSaved?.(again.current)} keepFields showSuccess={!inPanel} className={PANEL_FORM}>
+    <ActionForm action={save} onDone={() => onSaved?.()} keepFields showSuccess={!inPanel} className={PANEL_FORM}>
       {(st) => (
         <>
           {/* What it is for: the API takes the order, else the inquiry, else the customer. */}
@@ -749,32 +743,21 @@ function CostPanel({
   setup,
   mode,
   onClose,
-  onAgain,
   onFileError,
   onRemove,
-  round = 0,
-  added,
 }: {
   title: string;
   sub: ReactNode;
   setup: CostSetup;
   mode: Mode;
   onClose: () => void;
-  onAgain?: () => void;
   onFileError: (m: string) => void;
   onRemove?: () => void;
-  round?: number;
-  added?: string | null;
 }) {
   return (
     <SidePanel title={title} description={sub} onClose={onClose} className="md:w-[640px]">
       <PanelBody className="gap-4">
-        {added && (
-          <Alert tone="success" className="mb-1">
-            {added}
-          </Alert>
-        )}
-        <CostForm key={round} setup={setup} mode={mode} inPanel onSaved={(again) => (again && onAgain ? onAgain() : onClose())} onFileError={onFileError} onRemove={onRemove} />
+        <CostForm setup={setup} mode={mode} inPanel onSaved={onClose} onFileError={onFileError} onRemove={onRemove} />
       </PanelBody>
     </SidePanel>
   );
@@ -801,13 +784,8 @@ export function AddCost({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [round, setRound] = useState(0);
-  const [added, setAdded] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const close = () => {
-    setOpen(false);
-    setAdded(null);
-  };
+  const close = () => setOpen(false);
   return (
     <>
       <Button type="button" size={size} variant={variant} className={className} onClick={() => setOpen(true)}>
@@ -824,13 +802,7 @@ export function AddCost({
           sub={subOf(template?.for ?? setup.for)}
           setup={setup}
           mode={{ kind: "new", template }}
-          round={round}
-          added={added}
           onClose={close}
-          onAgain={() => {
-            setRound((r) => r + 1);
-            setAdded("Cost added. Add the next one, or close.");
-          }}
           onFileError={setNotice}
         />
       )}

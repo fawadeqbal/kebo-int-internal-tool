@@ -100,8 +100,8 @@ export function DealForm({
   files?: RequestFile[];
   /** Edit: it has an item list, so "What they need" may be empty. */
   hasItems?: boolean;
-  /** Saved (and the files are up): `another` when "Save & add another" was pressed. */
-  onSaved: (r: { id: string; refNo?: string; another: boolean }) => void;
+  /** Saved (and the files are up). */
+  onSaved: (r: { id: string; refNo?: string }) => void;
 }) {
   const router = useRouter();
   const close = useClosePanel();
@@ -154,7 +154,7 @@ export function DealForm({
         return { ok: true };
       }
     }
-    onSaved({ id, refNo, another: !!form.get("another") });
+    onSaved({ id, refNo });
     return { ok: true };
   };
 
@@ -395,11 +395,6 @@ export function DealForm({
               <Button type="button" variant="ghost" onClick={() => close()}>
                 Cancel
               </Button>
-              {create && (
-                <SubmitButton variant="secondary" name="another" value="1" pendingText="Saving…">
-                  <Plus aria-hidden /> Save &amp; add another
-                </SubmitButton>
-              )}
               <SubmitButton pendingText={uploading ? "Uploading files…" : "Saving…"}>
                 <Check aria-hidden /> {create ? "Save inquiry" : "Save changes"}
               </SubmitButton>

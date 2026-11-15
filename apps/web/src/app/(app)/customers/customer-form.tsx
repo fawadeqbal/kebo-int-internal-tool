@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, LayoutGrid, Plus, Trash2, UserRound } from "lucide-react";
+import { Check, LayoutGrid, Trash2, UserRound } from "lucide-react";
 import { PARTY_TYPE_LABEL, PARTY_TYPES, customerLetters, UNKNOWN_COUNTRY, type PartyType } from "@kebo/shared";
 import { Alert, Banner, Button, buttonClass, Card, CardBody, CardFooter, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
@@ -386,11 +386,6 @@ export function CustomerForm({
               <Button variant="ghost" onClick={close} className="max-md:hidden">
                 Cancel
               </Button>
-              {!customer && (
-                <SubmitButton variant="secondary" name="another" value="1" pendingText="Saving…">
-                  <Plus aria-hidden /> Save &amp; add another
-                </SubmitButton>
-              )}
               <SubmitButton pendingText="Saving…">
                 <Check aria-hidden /> {customer ? "Save changes" : "Save customer"}
               </SubmitButton>
