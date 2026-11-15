@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { DEFAULT_DATE_FORMAT, DEFAULT_TIME_FORMAT, formatDate, formatDayMonth, hourIn, todayIn, type ISODate, type TimeStyle } from "@kebo/utils";
+import { dateIn, DEFAULT_DATE_FORMAT, DEFAULT_TIME_FORMAT, formatClock, formatDate, formatDayMonth, hourIn, todayIn, type ISODate, type TimeStyle } from "@kebo/utils";
 import { ENV, type Env } from "../../config/env";
 import { CompanyContext } from "../company/company-context";
 
@@ -9,6 +9,18 @@ import { CompanyContext } from "../company/company-context";
  * company (the platform's own work) and for a company that has not chosen one: the server's (APP_TIME_ZONE).
  * The one place the API reads a time zone; injected so tests can fix the date.
  */
+/** The server's zone (APP_TIME_ZONE), kept when the Clock is made: for the plain helpers below. */
+let serverZone = "Asia/Shanghai";
+
+/** The company's time zone, for plain helpers outside the Clock (messages): the server's until it chooses one. */
+export const companyZone = () => CompanyContext.current()?.timeZone ?? serverZone;
+
+/** A moment's day in the company's zone, as the company writes it. */
+export const companyDayOf = (moment: Date) => companyDay(dateIn(moment, companyZone()));
+
+/** A typed time of day ("15:30"), as the company writes it: "15:30" or "3:30 PM". */
+export const companyClock = (hhmm: string) => formatClock(hhmm, { zone: "UTC", ...companyFormats() });
+
 /** How the company writes dates and times (its Time and dates settings); the usual way outside a company. */
 export function companyFormats(): Omit<TimeStyle, "zone"> {
   const c = CompanyContext.current();
@@ -23,7 +35,9 @@ export const companyDayMonth = (iso: ISODate) => formatDayMonth(iso, { zone: "UT
 
 @Injectable()
 export class Clock {
-  constructor(@Inject(ENV) private readonly env: Env) {}
+  constructor(@Inject(ENV) private readonly env: Env) {
+    serverZone = env.APP_TIME_ZONE;
+  }
 
   now(): Date {
     return new Date();

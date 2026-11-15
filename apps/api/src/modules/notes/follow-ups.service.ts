@@ -4,7 +4,7 @@ import { can, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, QUOTE_
 import { addDays, daysBetween, DomainError, ForbiddenError, formatClock, GateError, NotFoundError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
-import { Clock, companyDayMonth, companyFormats } from "../../common/time/clock.service";
+import { Clock, companyClock, companyDayMonth, companyFormats } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { NotificationsService } from "../notifications/notifications.service";
 import { followUpMissed, followUpsMissed, followUpToday } from "../notifications/messages";
@@ -547,7 +547,7 @@ export class FollowUpsService {
         missedFor.set(r.assigneeId, [...(missedFor.get(r.assigneeId) ?? []), { row: r, days: daysBetween(dueOn, today), ref }]);
         continue;
       }
-      if (dueOn === today) book?.add([r.assigneeId], "Follow-ups today", { ...splitLabel(ref?.label), what: r.title, when: r.dueAt ?? "today" });
+      if (dueOn === today) book?.add([r.assigneeId], "Follow-ups today", { ...splitLabel(ref?.label), what: r.title, when: r.dueAt ? companyClock(r.dueAt) : "today" });
       const at = r.dueAt ? momentIn(dueOn, r.dueAt, tz) : null;
       const soon = at ? moment.getTime() >= at.getTime() - 30 * 60_000 : false;
       const to = [{ ids: [r.assigneeId], as: "the person it is for" }];

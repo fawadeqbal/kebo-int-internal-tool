@@ -1,5 +1,6 @@
 import { CHANNEL_LABEL, LOST_REASON_LABEL, rowsOf, SENT_VIA_LABEL, type Message, type MessageListRow } from "@kebo/shared";
 import { day, money, type InquiryFacts, type OrderFacts, type RevisionFacts } from "./facts";
+import { companyClock, companyDayOf } from "../../common/time/clock.service";
 
 /**
  * Every message the system sends about inquiries, quotations, orders and money, written in trade words from
@@ -308,7 +309,7 @@ export function quotationEnding(i: InquiryFacts, r: RevisionFacts, ended: boolea
     sentence: ended
       ? `Quotation ${r.ref} to ${i.customerName} ended on ${day(r.validUntil)}. The customer never answered.`
       : `Quotation ${r.ref} to ${i.customerName} is valid until ${day(r.validUntil)}, and the customer has not answered.`,
-    where: { ref: i.refNo, title: [i.title, r.sentOn ? `sent ${day(r.sentOn.toISOString().slice(0, 10))}` : null].filter(Boolean).join(" · ") },
+    where: { ref: i.refNo, title: [i.title, r.sentOn ? `sent ${companyDayOf(r.sentOn)}` : null].filter(Boolean).join(" · ") },
     people: rowsOf([
       ["Customer", i.customer],
       ["Contact", i.contact],
@@ -504,7 +505,7 @@ const refWhere = (ref: RefLike, title: string) => {
   const [n, ...rest] = ref.label.split(" · ");
   return { ref: n!, title: rest.join(" · ") || title };
 };
-const when = (f: FollowUpLike) => `${day(f.dueOn)}${f.dueAt ? ` ${f.dueAt}` : ""}`;
+const when = (f: FollowUpLike) => `${day(f.dueOn)}${f.dueAt ? ` ${companyClock(f.dueAt)}` : ""}`;
 
 /** On the day (in the morning), or 30 minutes before its time. */
 export function followUpToday(f: FollowUpLike, ref: RefLike, inMinutes: number | null): Message {
@@ -513,8 +514,8 @@ export function followUpToday(f: FollowUpLike, ref: RefLike, inMinutes: number |
     kind: "followUp.due",
     group: "followups",
     tag: soon ? (inMinutes ? `In ${inMinutes} minutes` : "Now") : "Follow-up today",
-    subject: soon ? `At ${f.dueAt}: ${f.title}` : `Today${f.dueAt ? ` at ${f.dueAt}` : ""}: ${f.title}`,
-    sentence: soon ? `Your follow-up is ${inMinutes ? `in ${inMinutes} minutes` : "now"}${f.place ? `, at ${f.place}` : ""}.` : `Your follow-up is today${f.dueAt ? ` at ${f.dueAt}` : ""}${f.place ? `, at ${f.place}` : ""}.${f.note ? `\n${f.note}` : ""}`,
+    subject: soon ? `At ${companyClock(f.dueAt ?? "")}: ${f.title}` : `Today${f.dueAt ? ` at ${companyClock(f.dueAt)}` : ""}: ${f.title}`,
+    sentence: soon ? `Your follow-up is ${inMinutes ? `in ${inMinutes} minutes` : "now"}${f.place ? `, at ${f.place}` : ""}.` : `Your follow-up is today${f.dueAt ? ` at ${companyClock(f.dueAt)}` : ""}${f.place ? `, at ${f.place}` : ""}.${f.note ? `\n${f.note}` : ""}`,
     where: refWhere(ref, f.title),
     people: rowsOf([["About", ref?.label]]),
     next: `${f.title}. When done, say what happened and set the next one.`,
