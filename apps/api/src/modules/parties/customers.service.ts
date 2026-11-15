@@ -38,14 +38,15 @@ export class CustomersService {
   ) {
     const term = q.q?.trim();
     const open = ["new", "sourcing", "quoted"] as const;
-    const where: Prisma.PartyWhereInput = {
+    // The same search for every tab; a tab only changes the type or archived (so its count is what it lists).
+    const whereFor = (t: { type?: "company" | "individual"; archived?: boolean; ids?: string[] }): Prisma.PartyWhereInput => ({
       ...isCustomer,
-      deletedAt: q.archived ? { not: null } : null,
+      deletedAt: t.archived ? { not: null } : null,
       ...customerAccess(user),
       ...(q.country ? { country: q.country } : {}),
-      ...(q.type ? { type: q.type } : {}),
+      ...(t.type ? { type: t.type } : {}),
       ...(q.currency ? { defaultCurrency: q.currency } : {}),
-      ...(q.ids ? { id: { in: q.ids } } : {}),
+      ...(t.ids ? { id: { in: t.ids } } : {}),
       ...(q.status === "order"
         ? { orders: { some: { status: "open" } } }
         : q.status === "inquiry"
@@ -67,8 +68,9 @@ export class CustomersService {
             ],
           }
         : {}),
-    };
-    const [rows, total, newThisYear] = await Promise.all([
+    });
+    const where = whereFor({ type: q.type, archived: q.archived, ids: q.ids });
+    const [rows, total, newThisYear, all, company, individual, archived] = await Promise.all([
       this.prisma.db.party.findMany({
         where,
         omit: supplierOnly,
@@ -84,9 +86,15 @@ export class CustomersService {
       this.prisma.db.party.count({ where }),
       // Added since the first of January (the Customers figure's line).
       this.prisma.db.party.count({ where: { ...isCustomer, deletedAt: null, ...customerAccess(user), createdAt: { gte: new Date(`${new Date().getUTCFullYear()}-01-01T00:00:00Z`) } } }),
+      this.prisma.db.party.count({ where: whereFor({}) }),
+      this.prisma.db.party.count({ where: whereFor({ type: "company" }) }),
+      this.prisma.db.party.count({ where: whereFor({ type: "individual" }) }),
+      this.prisma.db.party.count({ where: whereFor({ archived: true }) }),
     ]);
     return {
       newThisYear,
+      /** Each tab's count, for the same search (Owe money is counted by the page, from what each owes). */
+      counts: { all, company, individual, archived },
       total,
       page: q.page,
       pageSize: q.pageSize,

@@ -100,21 +100,21 @@ export default async function FollowUpsPage({
   const due = DUE.find((d) => d.value === sp.due)?.value;
   const about = ABOUT.find((a) => a.value === sp.about)?.value;
   const q = sp.q?.trim() || undefined;
-  const [list, people, orders, inquiries] = await Promise.all([
+  const filters = { ...dueRange(due, today), q, who: viewAll ? sp.who || undefined : undefined, about };
+  const [list, people, orders, inquiries, other] = await Promise.all([
     api.get<FollowUpList>("/follow-ups", {
       mine: viewAll && !everyone ? "true" : undefined,
       open: status === "done" ? "false" : "true",
       late: status === "late" ? "true" : undefined,
-      ...dueRange(due, today),
-      q,
-      who: viewAll ? sp.who || undefined : undefined,
-      about,
+      ...filters,
       page,
       pageSize: PAGE_SIZE,
     }),
     getPeople().catch(() => [] as Person[]),
     api.get<OrderRow[]>("/orders", { status: "open" }).catch(() => [] as OrderRow[]),
     api.get<Paged<DealRow>>("/inquiries", { stage: "open", pageSize: 100 }).catch(() => null),
+    // The other of Mine / Everyone, for its tab's count (the same search).
+    viewAll ? api.get<FollowUpList>("/follow-ups", { mine: everyone ? "true" : undefined, open: "true", ...filters, page: 1, pageSize: 1 }).catch(() => null) : null,
   ]);
   const who = viewAll ? people.find((p) => p.id === sp.who)?.id : undefined;
   const keep = { view: everyone ? "everyone" : undefined, status: status === "open" ? undefined : status, q, due, who, about };
@@ -157,6 +157,7 @@ export default async function FollowUpsPage({
                 Mine
               </>
             ),
+            count: everyone ? other?.counts.open : list.counts.open,
             active: status === "open" && !everyone,
           },
           ...(viewAll
@@ -169,6 +170,7 @@ export default async function FollowUpsPage({
                       Everyone
                     </>
                   ),
+                  count: everyone ? list.counts.open : other?.counts.open,
                   active: status === "open" && everyone,
                 },
               ]
@@ -178,9 +180,11 @@ export default async function FollowUpsPage({
             label: (
               <>
                 <TriangleAlert aria-hidden />
-                {list.counts.late ? `Late ${list.counts.late}` : "Late"}
+                Late
               </>
             ),
+            count: list.counts.late,
+            alert: list.counts.late > 0,
             active: status === "late",
           },
           {
@@ -191,6 +195,7 @@ export default async function FollowUpsPage({
                 Done
               </>
             ),
+            count: list.counts.done,
             active: status === "done",
           },
         ]}

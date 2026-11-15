@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Clock, Download, Factory, Plus, ShoppingCart, TrendingUp, X } from "lucide-react";
+import { Clock, Download, Factory, FileText, List, Plus, ShoppingCart, TrendingUp, UserRound, X } from "lucide-react";
 import { can } from "@kebo/shared";
 import {
   RefCode,
   buildHref,
   ButtonLink,
   Card,
+  LinkTabs,
   DataRow,
   EmptyState,
   PageHeader,
@@ -38,7 +39,7 @@ import { getPeople } from "@/lib/loaders";
 export const metadata = { title: "Suppliers" };
 
 type Params = Record<string, string | undefined>;
-type List = Paged<FactoryRow & { city: string | null }> & { cities: string[]; waiting: number };
+type List = Paged<FactoryRow & { city: string | null }> & { cities: string[]; waiting: number; counts?: { all: number; offers: number; none: number; mine: number } };
 
 /** How to reach them, in a few words: "Mr. Zhang · WeChat zhang_jpm". */
 const reach = (f: FactoryRow) => [f.contactPerson, f.wechat ? `WeChat ${f.wechat}` : (f.email ?? f.phone)].filter(Boolean).join(" · ");
@@ -57,8 +58,9 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   const me = await requirePermission("sourcing.manage");
   const sp = await searchParams;
   const status = STATUSES.find((x) => x.value === sp.status)?.value;
-  const keep = { q: sp.q, city: sp.city || undefined, owner: sp.owner || undefined, status };
-  const query = { q: sp.q?.trim() || undefined, city: keep.city, owner: keep.owner === "me" ? me.id : keep.owner, status };
+  const mineTab = sp.show === "mine";
+  const keep = { q: sp.q, city: sp.city || undefined, owner: sp.owner || undefined, status, show: mineTab ? "mine" : undefined };
+  const query = { q: sp.q?.trim() || undefined, city: keep.city, owner: keep.owner === "me" ? me.id : keep.owner, status, mine: mineTab ? "true" : undefined };
   const panel = sp.panel === "new-factory" || (sp.panel === "edit-factory" && sp.id) ? sp.panel : undefined;
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
   const year = new Date().getFullYear();
@@ -99,7 +101,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   const spend = (g: FactoryGroups | null) => (g?.rows ?? []).reduce((t, r) => t + Number(r.spend ?? 0), 0);
   const boughtYear = spend(thisYear);
   const boughtLast = spend(lastYear);
-  const filtered = !!(sp.q || keep.city || keep.owner || status);
+  const filtered = !!(sp.q || keep.city || keep.owner || status || mineTab);
   const people_ = people.map((p) => ({ value: p.id, label: p.id === me.id ? "Me" : p.name }));
 
   /** Where things stand with the factory, in a word. */
@@ -141,7 +143,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
           label="Suppliers"
           value={all.total}
           sub={mine.total ? `${mine.total} looked after by you` : "nobody's yet"}
-          href={mine.total ? "/factories?owner=me" : undefined}
+          href={mine.total ? "/factories?show=mine" : undefined}
         />
         {owed && (
           <StatTile
@@ -174,14 +176,25 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         <StatTile icon={Clock} iconColor={4} label="Offers waiting" value={data.waiting} sub="asked for prices, no answer yet" />
       </StatRow>
 
+      <LinkTabs
+        label="Which suppliers"
+        className="mb-4"
+        tabs={[
+          { href: buildHref("/factories", keep, { status: undefined, show: undefined, page: undefined }), label: <><List aria-hidden /> All</>, count: data.counts?.all, active: !status && !mineTab },
+          { href: buildHref("/factories", keep, { status: "offers", show: undefined, page: undefined }), label: <><FileText aria-hidden /> Offers in</>, count: data.counts?.offers, active: status === "offers" && !mineTab },
+          { href: buildHref("/factories", keep, { status: "none", show: undefined, page: undefined }), label: <><Clock aria-hidden /> No offers yet</>, count: data.counts?.none, active: status === "none" && !mineTab },
+          { href: buildHref("/factories", keep, { status: undefined, show: "mine", page: undefined }), label: <><UserRound aria-hidden /> Mine</>, count: data.counts?.mine, active: mineTab },
+        ]}
+      />
+
       <FilterCard
         search="Search factory, person, WeChat…"
         value={sp.q}
+        keep={{ status, show: keep.show }}
         clearHref={buildHref("/factories", keep, { q: undefined })}
         selects={[
           { name: "city", label: "City", value: keep.city, options: data.cities.map((c) => ({ value: c, label: c })) },
           { name: "owner", label: "Owner", value: keep.owner, options: [{ value: "none", label: "Nobody yet" }, ...people_] },
-          { name: "status", label: "Status", value: status, options: STATUSES },
         ]}
       />
 

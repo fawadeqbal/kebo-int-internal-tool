@@ -101,10 +101,10 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
     { key: "confirmed", label: "Confirmed", icon: Check, n: c.confirmed, href: href({ status: undefined, stage: "confirmed" }), active: stage === "confirmed" },
     { key: "in_production", label: "In production", icon: Factory, n: c.in_production, href: href({ status: undefined, stage: "in_production" }), active: stage === "in_production" },
     { key: "shipped", label: "Shipped", icon: Ship, n: c.shipped, href: href({ status: undefined, stage: "shipped" }), active: stage === "shipped" },
-    { key: "done", label: "Done", icon: Package, n: 0, href: href({ status: undefined, stage: "done" }), active: stage === "done" },
+    { key: "done", label: "Done", icon: Package, n: c.done ?? 0, href: href({ status: undefined, stage: "done" }), active: stage === "done" },
     { key: "late", label: "Late", icon: AlertTriangle, n: c.late, href: href({ status: "late", stage: undefined }), active: status === "late" },
-    { key: "closed", label: "Closed", icon: Lock, n: 0, href: href({ status: "closed", stage: undefined }), active: status === "closed" },
-    { key: "cancelled", label: "Cancelled", icon: X, n: 0, href: href({ status: "cancelled", stage: undefined }), active: status === "cancelled" },
+    { key: "closed", label: "Closed", icon: Lock, n: c.closed ?? 0, href: href({ status: "closed", stage: undefined }), active: status === "closed" },
+    { key: "cancelled", label: "Cancelled", icon: X, n: c.cancelled ?? 0, href: href({ status: "cancelled", stage: undefined }), active: status === "cancelled" },
   ].filter((x) => x.key !== "late" || c.late > 0 || status === "late");
 
   const rowMenu = (o: OrderRow): MenuEntry[] => [
@@ -174,11 +174,12 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
           return {
             href: x.href,
             active: x.active,
+            count: x.n ?? 0,
+            alert: x.key === "late" && x.n > 0,
             label: (
               <>
                 <Icon aria-hidden />
                 {x.label}
-                {x.n ? ` ${x.n}` : ""}
               </>
             ),
           };

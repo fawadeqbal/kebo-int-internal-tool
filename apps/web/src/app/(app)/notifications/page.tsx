@@ -27,10 +27,11 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   const onlyUnread = sp.show === "unread";
   const group = ALERT_GROUPS.find((g) => g.key === sp.show)?.key as AlertGroup | undefined;
   const page = toPage(sp.page);
-  type Mine = { unread: number; total: number; items: NotificationItem[] };
-  const { unread, total, items } = await api.get<Mine>("/notifications", {
+  type Mine = { unread: number; total: number; items: NotificationItem[]; counts?: Record<string, number> };
+  const { unread, total, items, counts } = await api.get<Mine>("/notifications", {
     unread: onlyUnread ? "true" : undefined,
     group,
+    counts: "true",
     take: PAGE_SIZE,
     page,
   });
@@ -61,9 +62,9 @@ export default async function NotificationsPage({ searchParams }: { searchParams
         label="Which alerts"
         className="mb-4"
         tabs={[
-          { href: "/notifications", label: "All", active: show === "all" },
-          { href: "/notifications?show=unread", label: unread ? `Unread ${unread}` : "Unread", active: show === "unread" },
-          ...ALERT_GROUPS.map((g) => ({ href: `/notifications?show=${g.key}`, label: g.label, active: show === g.key })),
+          { href: "/notifications", label: "All", count: counts?.all, active: show === "all" },
+          { href: "/notifications?show=unread", label: "Unread", count: unread, alert: unread > 0, active: show === "unread" },
+          ...ALERT_GROUPS.map((g) => ({ href: `/notifications?show=${g.key}`, label: g.label, count: counts?.[g.key], active: show === g.key })),
         ]}
       />
       <Card className="overflow-clip p-0">

@@ -142,13 +142,17 @@ export class TreasuryService {
           ),
         )
       : rows;
+    // Each tab's count is exactly what that tab lists: the same search, account and method; removed ones only under Removed.
+    const narrowed = found.filter((r) => !q.account || r.accountId === q.account).filter((r) => !q.method || r.method === q.method);
+    const kept = narrowed.filter((r) => r.status !== "void");
     const counts = {
-      all: found.length,
-      in: found.filter((r) => r.direction === "in").length,
-      out: found.filter((r) => r.direction === "out").length,
-      move: found.filter((r) => r.direction === "move").length,
-      to_verify: found.filter((r) => r.status === "to_verify").length,
-      expense: found.filter((r) => r.kind === "expense" && r.status !== "void").length,
+      all: kept.length,
+      in: kept.filter((r) => r.direction === "in").length,
+      out: kept.filter((r) => r.direction === "out").length,
+      move: kept.filter((r) => r.direction === "move").length,
+      to_verify: narrowed.filter((r) => r.status === "to_verify").length,
+      expense: kept.filter((r) => r.kind === "expense").length,
+      void: narrowed.filter((r) => r.status === "void").length,
     };
     const live = found.filter((r) => r.status === "recorded" && !r.fromCredit);
     const moneyIn = live.filter((r) => r.direction === "in");

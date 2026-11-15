@@ -117,10 +117,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     status: status === "order" || status === "inquiry" || status === "none" ? status : undefined,
     ids: ids?.length ? ids.join(",") : undefined,
   };
-  const empty: Paged<CustomerRow> = { rows: [], total: 0, page: 1, pageSize: 25 };
-  const [data, all, openInquiries, askingCustomers, editing, sold, soldYear, soldLastYear] = await Promise.all([
-    none ? empty : api.get<Paged<CustomerRow>>("/customers", { ...query, page: toPage(sp.page) }),
-    api.get<Paged<CustomerRow> & { newThisYear?: number }>("/customers", { pageSize: 1 }),
+  type CustomerPage = Paged<CustomerRow> & { counts?: { all: number; company: number; individual: number; archived: number } };
+  const empty: CustomerPage = { rows: [], total: 0, page: 1, pageSize: 25 };
+  const owingIds = [...owes.keys()];
+  const [data, all, openInquiries, askingCustomers, editing, sold, soldYear, soldLastYear, owingCount] = await Promise.all([
+    none ? empty : api.get<CustomerPage>("/customers", { ...query, page: toPage(sp.page) }),
+    api.get<CustomerPage & { newThisYear?: number }>("/customers", { pageSize: 1 }),
     api.get<Paged<unknown>>("/inquiries", { stage: "open", pageSize: 1 }).catch(() => null),
     api.get<Paged<CustomerRow>>("/customers", { status: "inquiry", pageSize: 1 }),
     panel === "edit-customer" && sp.id ? api.get<CustomerDetail>(`/customers/${sp.id}`).catch(() => null) : null,
@@ -141,7 +143,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           })
           .catch(() => null)
       : null,
+    // The Owe money tab's count, for the same search.
+    owingIds.length
+      ? api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country, currency, status: query.status, ids: owingIds.join(","), pageSize: 1 }).then((r) => r.total).catch(() => null)
+      : 0,
   ]);
+  // Each tab's count, for the same search (with no customer owing, the list itself is not asked for).
+  const tabCounts = data.counts ?? all.counts;
   const soldBy = new Map((sold?.rows ?? []).map((r) => [r.key, r]));
   const salesYear = (soldYear?.rows ?? []).reduce((t, r) => t + Number(r.sales), 0);
   const salesLast = (soldLastYear?.rows ?? []).reduce((t, r) => t + Number(r.sales), 0);
@@ -230,6 +238,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 All
               </>
             ),
+            count: tabCounts?.all,
             active: show === "all",
           },
           {
@@ -240,6 +249,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 Companies
               </>
             ),
+            count: tabCounts?.company,
             active: show === "company",
           },
           {
@@ -250,6 +260,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 People
               </>
             ),
+            count: tabCounts?.individual,
             active: show === "individual",
           },
           ...(owed
@@ -262,6 +273,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       Owe money
                     </>
                   ),
+                  count: owingCount ?? undefined,
+                  alert: (owingCount ?? 0) > 0,
                   active: show === "owing",
                 },
               ]
@@ -276,6 +289,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       Archived
                     </>
                   ),
+                  count: tabCounts?.archived,
                   active: show === "archived",
                 },
               ]
