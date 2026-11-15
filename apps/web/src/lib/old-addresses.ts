@@ -153,8 +153,13 @@ export function settingsTarget(q: Query): string {
 /* ------------------------------------------------------------------ /orders?view=board */
 
 /** The orders board was a view of /orders (?view=board, or a step from the dashboard, ?stage=…): its own page now. */
+/** The list's own stage filters (its tabs "Confirmed", "In production"…): these stay on the list. */
+const LIST_STAGES = ["confirmed", "in_production", "shipped", "done"];
+
 export function ordersBoardTarget(q: Query): string | null {
-  const board = q.view === "board" || (!!q.stage && !q.status);
+  // An old dashboard link named a step of the board (?stage=payment); the list's tabs name an order stage.
+  const step = !!q.stage && !q.status && !LIST_STAGES.includes(String(q.stage));
+  const board = q.view === "board" || step;
   if (!board) return null;
   const { view: _view, ...rest } = q;
   return buildHref("/orders/board", {}, rest);
