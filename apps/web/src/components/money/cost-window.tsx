@@ -9,7 +9,6 @@ import {
   EXPENSE_BEARERS,
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_LABEL,
-  expenseShort,
   INQUIRY_STAGE_LABEL,
   ORDER_EXPENSE_CHIPS,
   type ExpenseBearer,
@@ -32,6 +31,7 @@ import type { Person } from "@/lib/types";
 import type { ExpenseView } from "@/lib/types-money";
 import { AccountSelect, RecordedBy, useMe } from "./accounts";
 import { useSaveThenSend } from "./attachment";
+import { COMPANY, costKind } from "./cost-kinds";
 
 /*
  * The one cost window (design "spending", board CostWindow): every place that adds or changes a cost opens it,
@@ -53,8 +53,6 @@ export interface CostFor {
   /** In words: "Order SO-2026-0035 · Kabul Medical Supplies". */
   label: string;
 }
-
-export const COMPANY: CostFor = { place: "company", id: null, label: "The company" };
 
 /** What "For" can choose (GET /expenses/targets); on a customer's page only theirs. */
 export interface ExpenseChoices {
@@ -98,15 +96,6 @@ export interface CostToConfirm {
   on: string;
 }
 
-/** Who an expense was for, as the window shows it. */
-export function costForOf(e: Pick<ExpenseView, "order" | "deal" | "customer">): CostFor {
-  const who = e.customer ? ` · ${e.customer.name}` : "";
-  if (e.order) return { place: "order", id: e.order.id, customerId: e.customer?.id ?? null, label: `Order ${e.order.refNo}${who}` };
-  if (e.deal) return { place: "deal", id: e.deal.id, customerId: e.customer?.id ?? null, label: `Inquiry ${e.deal.refNo}${e.deal.stage === "lost" ? " (lost)" : ""}${who}` };
-  if (e.customer) return { place: "customer", id: e.customer.id, customerId: e.customer.id, label: e.customer.name };
-  return COMPANY;
-}
-
 /* ---------------------------------------------------------------- words */
 
 /** The kinds each place offers as chips; "More kinds" shows all of them. */
@@ -120,8 +109,6 @@ const DEFAULT_KIND: Record<CostPlace, ExpenseCategory> = { company: "rent", cust
 /** Kinds that are a visit: the window asks which factory. */
 const VISITS: readonly ExpenseCategory[] = ["travel", "hotel", "meals", "inspection"];
 
-/** A kind's short name, the same on every chip and table ("To the port", "Internet and bills"). */
-export const costKind = (c: ExpenseCategory) => (c === "utilities" ? "Internet and bills" : expenseShort(c));
 
 const PLACEHOLDER: Partial<Record<ExpenseCategory, string>> = {
   freight: "e.g. Sea freight Ningbo → Karachi",

@@ -441,7 +441,7 @@ async function cashBook(q: Q): Promise<SheetSpec> {
 }
 
 async function expenses(q: Q): Promise<SheetSpec> {
-  const query = { from: q.from, to: q.to, kind: q.kind, customerId: q.customer, category: q.category };
+  const query = { from: q.from, to: q.to, kind: q.kind, customerId: q.customer, inquiryId: q.inquiry, category: q.category };
   const rows: ExpenseList["rows"] = [];
   let first: ExpenseList | null = null;
   for (let page = 1; page <= 100; page++) {

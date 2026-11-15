@@ -9,9 +9,8 @@ import { WithSide } from "../side";
 export const metadata = { title: "Inquiry costs" };
 
 /** Managers: what was spent on this deal (trips, samples, factory visits), and the customer's history. */
-export default async function DealCosts({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cost?: string }> }) {
+export default async function DealCosts({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { cost } = await searchParams;
   await requirePermission("expenses.manage");
   if (!(await hasFeature("expenses"))) return <PlanOff title="Costs" what="Expenses" />;
   const d = await api.get<DealDetail>(`/inquiries/${id}`);
@@ -20,8 +19,16 @@ export default async function DealCosts({ params, searchParams }: { params: Prom
     <WithSide id={id}>
       <CustomerHistoryNote customerId={d.customer.id} dealId={d.id} />
       <DealExpensesCard
-        deal={{ id: d.id, refNo: d.refNo, title: d.title, stage: d.stage, customer: { id: d.customer.id, name: d.customer.name }, order: order && { id: order.id, refNo: order.refNo } }}
-        open={cost}
+        deal={{
+          id: d.id,
+          refNo: d.refNo,
+          stage: d.stage,
+          customer: { id: d.customer.id, name: d.customer.name },
+          order: order && { id: order.id, refNo: order.refNo },
+          closedAt: d.closedAt,
+          lostReason: d.lostReason,
+          assignee: d.assignee,
+        }}
       />
     </WithSide>
   );

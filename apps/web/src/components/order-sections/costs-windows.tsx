@@ -66,9 +66,12 @@ export function RepayWindow({
   amount,
   today,
   canFiles,
+  label = "Repay",
 }: {
   /** Null: an expense of the company, on no order. */
   orderId: string | null;
+  /** The button's words ("Pay back Sana · USD 640.00"). */
+  label?: string;
   /** The expenses repaid together. */
   ids: string[];
   currency: string;
@@ -80,7 +83,7 @@ export function RepayWindow({
 }) {
   return (
     <SectionWindow
-      button={{ label: "Repay", kind: "plain" }}
+      button={{ label, kind: "plain" }}
       title="Repay"
       sub={`${name} paid ${amount} from their own money`}
       action={repayAction.bind(null, orderId, ids)}
