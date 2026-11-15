@@ -1,3 +1,4 @@
+import Form from "next/form";
 import Link from "next/link";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
@@ -663,11 +664,11 @@ export function ListToolbar({
   return (
     <div data-slot="list-toolbar" className={cn("mb-4 flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3", className)}>
       {search && (
-        <form role="search" aria-label={search.label ?? "Search this list"} className="w-full sm:w-auto">
+        <Form action="" scroll={false} role="search" aria-label={search.label ?? "Search this list"} className="w-full sm:w-auto">
           {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
           <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="h-10 sm:w-80 [&_input]:h-10" />
           <button className="sr-only">Search</button>
-        </form>
+        </Form>
       )}
       {(chips.length > 0 || filters || end) && (
         <div className="flex min-w-0 flex-1 items-center gap-2">

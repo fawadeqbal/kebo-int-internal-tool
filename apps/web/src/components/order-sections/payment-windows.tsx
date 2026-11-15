@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { PaymentRoute } from "@kebo/shared";
 import { Alert } from "@kebo/ui";
@@ -128,9 +129,9 @@ export function ChangePaymentWindow({
           {transfer ? (
             <p className="text-sm text-text-2">
               This payment is part of one transfer over several orders. To change it, remove the transfer on{" "}
-              <a href={`/customers/${customerId}/money`} className="font-medium text-primary hover:underline">
+              <Link href={`/customers/${customerId}/money`} className="font-medium text-primary hover:underline">
                 the customer&apos;s money
-              </a>{" "}
+              </Link>{" "}
               and record it again.
             </p>
           ) : fromCredit ? (

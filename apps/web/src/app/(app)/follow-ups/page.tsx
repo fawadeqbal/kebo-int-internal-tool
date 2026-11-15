@@ -1,3 +1,4 @@
+import Form from "next/form";
 import Link from "next/link";
 import { crumbsFor } from "@/lib/nav";
 import { Check, Clock, Filter, Pencil, Plus, TriangleAlert, User, Users } from "lucide-react";
@@ -200,7 +201,7 @@ export default async function FollowUpsPage({
           },
         ]}
       />
-      <form
+      <Form action="" scroll={false}
         role="search"
         aria-label="Find follow-ups"
         className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3"
@@ -255,7 +256,7 @@ export default async function FollowUpsPage({
           <Filter aria-hidden />
           Filter
         </Button>
-      </form>
+      </Form>
       <div className="flex flex-col gap-4">
         <Card className="overflow-clip p-0">
           {list.rows.length === 0 ? (
