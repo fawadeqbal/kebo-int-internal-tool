@@ -161,7 +161,7 @@ function AccountMenu({ user, companyName }: { user: { name: string; email: strin
         <span className="flex items-center gap-2.5 rounded-xl lg:py-1 lg:pr-2 lg:pl-1 lg:hover:bg-surface-2">
           <Avatar name={user.name} size={34} className="font-bold" />
           <span className="hidden text-left leading-tight lg:block">
-            <span className="block max-w-36 truncate text-[13px] font-semibold text-text">{user.name}</span>
+            <span className="block max-w-36 truncate text-[13px] font-semibold text-text">{user.name}</span>{" "}
             <span className="block max-w-36 truncate text-xs text-muted">{user.role}</span>
           </span>
         </span>
