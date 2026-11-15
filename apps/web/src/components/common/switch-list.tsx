@@ -81,10 +81,10 @@ export function SwitchList({
       const r = await save(item.key, on);
       if (r.ok === false) {
         setState((s) => ({ ...s, [item.key]: !on }));
-        toast(r.message ?? "Could not save that. Try again.");
+        toast({ kind: "fail", message: r.message ?? "Could not save that. Try again." });
         return;
       }
-      toast(`Saved · ${item.label} ${on ? "on" : "off"}`);
+      toast(`${item.label} switched ${on ? "on" : "off"}`);
       router.refresh();
     });
   };

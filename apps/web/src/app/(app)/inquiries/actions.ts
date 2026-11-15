@@ -1,12 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { LOST_REASON_LABEL } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail, Paged } from "@/lib/types";
 import type { ContactOption, CustomerOption } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
+
+/** The inquiry's number from what the API answers (its detail), to name it in the note. */
+const numberOf = (r: ActionState) => (r.data as { refNo?: string } | undefined)?.refNo;
+/** "RFQ-2026-0583 marked lost", "Lost: price too high". */
+const STAGE_SAID: Record<string, string> = { lost: "marked lost", won: "marked won", sourcing: "is being worked on", new: "is open again", quoted: "moved to Quoted" };
 
 export async function moveStageAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
@@ -15,8 +21,11 @@ export async function moveStageAction(id: string, _prev: ActionState, form: Form
     () => api.post(`/inquiries/${id}/stage`, { to: v.to, lostReason: v.lostReason || null, note: v.note || null, reason: reasonOf(form) }),
     "Stage updated.",
   );
-  if (r.ok) refresh(id);
-  return r;
+  if (!r.ok) return r;
+  refresh(id);
+  const n = numberOf(r);
+  const lost = v.to === "lost" && v.lostReason ? LOST_REASON_LABEL[v.lostReason as keyof typeof LOST_REASON_LABEL] : undefined;
+  return { ...r, message: n ? `${n} ${STAGE_SAID[v.to ?? ""] ?? `moved to ${v.to}`}` : r.message, detail: lost ? `Why: ${lost}` : undefined };
 }
 
 export async function holdAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
@@ -26,8 +35,10 @@ export async function holdAction(id: string, _prev: ActionState, form: FormData)
     () => api.post(`/inquiries/${id}/hold`, { onHold: v.onHold === "true", note: v.note || null, reason: reasonOf(form) }),
     v.onHold === "true" ? "On hold." : "Resumed.",
   );
-  if (r.ok) refresh(id);
-  return r;
+  if (!r.ok) return r;
+  refresh(id);
+  const n = numberOf(r);
+  return n ? { ...r, message: v.onHold === "true" ? `${n} put on hold` : `${n} taken off hold`, detail: v.onHold === "true" ? "Reminders are paused until it is taken off hold" : undefined } : r;
 }
 
 export async function assignAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
@@ -37,8 +48,10 @@ export async function assignAction(id: string, _prev: ActionState, form: FormDat
     () => api.post(`/inquiries/${id}/assign`, { assigneeId: v.assigneeId || null, reason: reasonOf(form) }),
     "Assignment saved.",
   );
-  if (r.ok) refresh(id);
-  return r;
+  if (!r.ok) return r;
+  refresh(id);
+  const d = r.data as { refNo?: string; assignee?: { name?: string } | null } | undefined;
+  return d?.refNo ? { ...r, message: d.assignee?.name ? `${d.assignee.name} handles ${d.refNo}` : `Nobody handles ${d.refNo} now` } : r;
 }
 
 export async function noteAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {

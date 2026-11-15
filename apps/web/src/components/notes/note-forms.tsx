@@ -4,7 +4,9 @@ import { useId, useState } from "react";
 import { Check, RotateCcw } from "lucide-react";
 import { FOLLOW_UP_KIND_LABEL, FOLLOW_UP_KINDS, NOTE_KIND_LABEL, NOTE_KINDS } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
+import { SubmitButton, toast } from "@kebo/ui/client";
+import { useRouter } from "next/navigation";
+import { followUpReopenAction, removeFollowUpAction, removeNoteAction } from "@/app/(app)/follow-ups/actions";
 import Link from "next/link";
 import { ActionForm } from "@/components/common/action-form";
 import { Modal } from "@/components/common/dialog";
@@ -22,8 +24,22 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
  */
 export function NoteAddForm({ action, contacts }: { action: Action; contacts?: { id: string; name: string }[] }) {
   const id = useId();
+  const router = useRouter();
+  // Said in a note, with Undo (the note is taken away again).
+  const added = (s: ActionState) => {
+    const noteId = (s.data as { id?: string } | undefined)?.id;
+    toast({
+      message: s.message ?? "Note added",
+      undo: noteId
+        ? async () => {
+            await removeNoteAction(noteId, {}, new FormData());
+            router.refresh();
+          }
+        : undefined,
+    });
+  };
   return (
-    <ActionForm action={action} resetOnSuccess showSuccess={false} className="flex flex-col gap-3">
+    <ActionForm action={action} resetOnSuccess showSuccess={false} onDone={added} className="flex flex-col gap-3">
       {(s) => (
         <>
           <fieldset>
@@ -173,10 +189,30 @@ export function FollowUpForm({
   );
 }
 
+/**
+ * The note after a follow-up is done: what was done and what is next, with Undo (it is open again, and the next
+ * one set with it is taken away).
+ */
+function saidDone(s: ActionState, refresh: () => void) {
+  const d = s.data as { id?: string; next?: { id?: string } | null } | undefined;
+  toast({
+    message: s.message ?? "Follow-up done",
+    detail: s.detail,
+    undo: d?.id
+      ? async () => {
+          await followUpReopenAction(d.id!, {}, new FormData());
+          if (d.next?.id) await removeFollowUpAction(d.next.id, {}, new FormData());
+          refresh();
+        }
+      : undefined,
+  });
+}
+
 /** "Done" or "Reopen" on a follow-up's row; `what` names it for screen readers. */
 export function FollowUpToggle({ action, done, what }: { action: Action; done: boolean; what: string }) {
+  const router = useRouter();
   return (
-    <ActionForm action={action} showSuccess={false}>
+    <ActionForm action={action} showSuccess={false} onDone={(s) => (done ? toast({ message: `Reopened: ${what}` }) : saidDone(s, router.refresh))}>
       <SubmitButton
         size="sm"
         variant={done ? "ghost" : "secondary"}
@@ -196,6 +232,7 @@ export function FollowUpToggle({ action, done, what }: { action: Action; done: b
  * inquiry (won or lost), on its page. Drawn as the row's "Done" button or the list's tick box.
  */
 export function FollowUpDoneNext({ action, title, what, inquiryHref, as = "button" }: { action: Action; title: string; what: string; inquiryHref: string; as?: "button" | "check" }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const id = useId();
   // Three days on, to start with: the person sets the day they mean.
@@ -215,7 +252,15 @@ export function FollowUpDoneNext({ action, title, what, inquiryHref, as = "butto
       )}
       {open && (
         <Modal title="Done, and the next follow-up" sub={title} onClose={() => setOpen(false)}>
-          <ActionForm action={action} onDone={() => setOpen(false)} showSuccess={false} className="flex flex-col gap-4 px-5 py-4 sm:px-6">
+          <ActionForm
+            action={action}
+            onDone={(s) => {
+              saidDone(s, router.refresh);
+              setOpen(false);
+            }}
+            showSuccess={false}
+            className="flex flex-col gap-4 px-5 py-4 sm:px-6"
+          >
             {(s) => (
               <>
                 <Field label="What happened" htmlFor={`${id}-note`} optional error={s.errors?.note}>

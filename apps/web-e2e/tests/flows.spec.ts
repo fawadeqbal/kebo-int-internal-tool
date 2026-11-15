@@ -53,6 +53,10 @@ test("a new inquiry: New › Inquiry, the customer, what they need, saved", asyn
 
   await expect(page).toHaveURL(/\/inquiries\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(title);
+  // The note names it: its number, what it is and for whom.
+  const note = page.locator("[data-note=done]");
+  await expect(note).toContainText(/Inquiry RFQ-\d{4}-\d{4} added/);
+  await expect(note).toContainText(`${title} · Al-Shifa Pharma Ltd`);
   expect(errors).toEqual([]);
 });
 
@@ -71,7 +75,11 @@ test("a payment received: New › Payment received, the order, the amount, recor
   await page.locator("#r-account").selectOption({ index: 1 });
   await page.locator("#r-reference").fill(reference);
   await page.getByRole("button", { name: "Record the payment" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Payment recorded." })).toBeVisible();
+  // The note names the payment, says how much and what is still to come, with its receipt.
+  const note = page.locator("[data-note=done]");
+  await expect(note).toContainText("Payment recorded");
+  await expect(note).toContainText(/still to come|nothing more is due/);
+  await expect(note.getByRole("link", { name: "Receipt" })).toBeVisible();
 
   // On the order, as the API keeps it.
   const res = await page.request.get(`/api/orders/${orderId}/payments`);

@@ -28,10 +28,17 @@ export function InquiryPanel({ refNo, customerName, numberHint, ...form }: FormP
         {...form}
         onSaved={(r) => {
           if (edit) {
-            toast(`Saved · ${refNo ?? "the request"}`);
+            toast({ message: `Request saved · ${refNo ?? "the inquiry"}` });
             router.refresh();
             return panel.close();
           }
+          // The new inquiry opens; the note says its number, what it is and for whom.
+          const number = r.refNo ?? "The inquiry";
+          toast({
+            message: r.refNo ? `Inquiry ${r.refNo} added` : "Inquiry added",
+            detail: [r.title, r.customer, r.files ? `${r.files} ${r.files === 1 ? "file" : "files"} attached` : null].filter(Boolean).join(" · ") || undefined,
+            actions: r.refNo ? [{ label: "Copy number", run: () => void navigator.clipboard?.writeText(number) }] : undefined,
+          });
           router.push(`/inquiries/${r.id}`);
         }}
       />

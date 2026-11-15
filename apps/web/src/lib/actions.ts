@@ -14,6 +14,12 @@ export type ActionState = {
   /** The values typed, so a form keeps them after an error. */
   values?: Record<string, string>;
   data?: unknown;
+  /** The note's quieter line, the facts: "USD 2,000 from Gulf Foods Trading · 4,724.20 still to come". */
+  detail?: string;
+  /** What kind of thing happened, for the note: done (default), waiting for someone (sent to verify), partly. */
+  kind?: "done" | "wait" | "part";
+  /** The note's next steps, as links ("Receipt", "Open"). */
+  next?: { label: string; href: string }[];
 };
 
 /** FormData → plain strings (the API's schemas accept form strings). Fields named `payload` hold JSON for complex forms. */

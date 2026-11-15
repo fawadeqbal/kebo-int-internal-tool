@@ -3,7 +3,7 @@
 import { Fragment, useActionState, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@kebo/ui";
-import { toast, toastsShown } from "@kebo/ui/client";
+import { toast, toastsShown, type ToastInput } from "@kebo/ui/client";
 import type { ActionState } from "@/lib/actions";
 import { ONCE_FIELD, newOnceKey } from "@/lib/once";
 import { FormNotice } from "./form-notice";
@@ -118,7 +118,7 @@ export function ActionForm({
   // A save's message ("Payment recorded.") while the form may still close (a window shuts on save): if it does,
   // the message goes to a toast, so every save says it was saved. Nothing is added when the owner of the form
   // already showed its own note, or when the form stays open and shows the message itself.
-  const unseen = useRef<{ message: string; toasts: number } | null>(null);
+  const unseen = useRef<{ note: ToastInput; toasts: number } | null>(null);
   const problems = problemsOf(state);
   useEffect(() => {
     if (state === seen.current || state.ok === undefined) return;
@@ -149,7 +149,7 @@ export function ActionForm({
     if (state.ok) {
       onceKey.current = null;
       if (state.message && !banner) {
-        const note = { message: state.message, toasts: toastsShown() };
+        const note = { note: { message: state.message, detail: state.detail, kind: state.kind, actions: state.next }, toasts: toastsShown() };
         unseen.current = note;
         setTimeout(() => {
           if (unseen.current === note) unseen.current = null;
@@ -164,7 +164,11 @@ export function ActionForm({
   useEffect(
     () => () => {
       const note = unseen.current;
-      if (note && toastsShown() === note.toasts) toast(note.message);
+      if (!note || toastsShown() !== note.toasts) return;
+      // Never only "Saved.": a plain word says what was saved, the page's record ("Saved · RFQ-2026-0583").
+      const where = document.querySelector("#main [data-page-label]")?.getAttribute("data-page-label");
+      const plain = /^(saved|done)\.?$/i.test(note.note.message);
+      toast(plain && where ? { ...note.note, message: `${note.note.message.replace(/\.$/, "")} · ${where}` } : note.note);
     },
     [],
   );
@@ -195,6 +199,7 @@ export function ActionForm({
         !(state.code && quietCodes?.includes(state.code)) && (
           <Alert tone={state.ok ? "success" : "error"} className="mb-3">
             {state.message}
+            {state.detail && <span className="block text-[12.5px] opacity-80">{state.detail}</span>}
           </Alert>
         )}
     </>

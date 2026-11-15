@@ -4,6 +4,29 @@ import { revalidatePath } from "next/cache";
 import { api, ApiError } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState, onceOf } from "@/lib/actions";
 import type { OrderLineView } from "@/lib/types-orders";
+import { money } from "@/lib/format";
+
+/** What recording a payment answers (the order's payments after it, and the new one's id). */
+type PaymentsAnswer = {
+  currency: string;
+  due: string;
+  createdId?: string;
+  payments: { id: string; receivedAmount: string; receivedCurrency: string; paidByName: string | null }[];
+};
+
+/** The note after money in: how much from whom, what is still to come, and its receipt. */
+function paymentNote(orderId: string, r: ActionState): ActionState {
+  const d = r.data as PaymentsAnswer | undefined;
+  const p = d?.payments.find((x) => x.id === d.createdId);
+  if (!d || !p) return r;
+  const from = p.paidByName ? ` from ${p.paidByName}` : "";
+  return {
+    ...r,
+    message: "Payment recorded",
+    detail: `${money(p.receivedAmount, p.receivedCurrency)}${from} · ${Number(d.due) > 0 ? `${money(d.due, d.currency)} still to come` : "nothing more is due"}`,
+    next: [{ label: "Receipt", href: `/print/orders/${orderId}/payment-receipt?ref=${p.id}` }],
+  };
+}
 
 /** The other orders a transfer pays, sent as JSON (empty when missing or unreadable). */
 const partsOf = (json: string | undefined): unknown[] => {
@@ -129,8 +152,9 @@ function paymentBody(form: FormData, currency: string) {
 
 export async function paymentAction(orderId: string, currency: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.post(`/orders/${orderId}/payments`, paymentBody(form, currency), { once: onceOf(form) }), "Payment recorded.");
-  if (r.ok) refresh(orderId);
-  return r;
+  if (!r.ok) return r;
+  refresh(orderId);
+  return paymentNote(orderId, r);
 }
 
 /**
@@ -138,9 +162,12 @@ export async function paymentAction(orderId: string, currency: string, _prev: Ac
  * verify, and counts on the order only then. The same form and the same checks as recording it.
  */
 export async function submitPaymentAction(orderId: string, currency: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.post("/submissions", { kind: "payment", orderId, body: paymentBody(form, currency) }, { once: onceOf(form) }), "Sent to a manager to verify.");
-  if (r.ok) revalidatePath("/", "layout");
-  return r;
+  const body = paymentBody(form, currency);
+  const r = await attempt(form, () => api.post("/submissions", { kind: "payment", orderId, body }, { once: onceOf(form) }), "Sent to a manager to verify.");
+  if (!r.ok) return r;
+  revalidatePath("/", "layout");
+  // Waiting for someone: blue, and what it will count for once verified.
+  return { ...r, kind: "wait", detail: `${money(body.receivedAmount, body.receivedCurrency)} · it counts on the order once a manager verifies it` };
 }
 
 export async function cancelOrderAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
