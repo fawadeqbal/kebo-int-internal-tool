@@ -51,6 +51,22 @@ describe("browser reports", () => {
     expect(rows.reduce((a, r) => a + r.count, 0)).toBe(1);
   });
 
+  it("what the Content-Security-Policy would block goes to the errors, once per kind", async () => {
+    const report = {
+      "csp-report": {
+        "document-uri": "https://rfq.test/orders/6f1e2d3c-1111-4222-8333-944455556666",
+        "violated-directive": "script-src-elem",
+        "effective-directive": "script-src-elem",
+        "blocked-uri": `https://evil.test/${tag}.js`,
+      },
+    };
+    for (let k = 0; k < 2; k++)
+      await request(app.getHttpServer()).post("/api/telemetry/csp").set("content-type", "application/csp-report").send(JSON.stringify(report)).expect(204);
+    const rows = await prisma.platform.appError.findMany({ where: { message: { contains: `evil.test/${tag}` } } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ source: "web", where: "CSP script-src-elem", name: "CSP", count: 2, message: `Would block https://evil.test/${tag}.js (script-src-elem)` });
+  });
+
   it("refuses what is not a report", async () => {
     await send({ kind: "speed", page: "/x", ms: -5 }).expect(422);
     await send({ kind: "other", page: "/x" }).expect(422);

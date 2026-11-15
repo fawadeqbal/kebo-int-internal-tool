@@ -25,7 +25,8 @@ export function configureApp(app: INestApplication, env: Env) {
   // Dev tools: how fast each route answers, and its server errors (RequestStats).
   app.use(app.get(RequestStats).middleware());
   // Room for the company stamp image in the settings (a data URL of up to ~400 KB).
-  (app as NestExpressApplication).useBodyParser("json", { limit: "1mb" });
+  // The browser's Content-Security-Policy reports come as JSON of their own types (POST /api/telemetry/csp).
+  (app as NestExpressApplication).useBodyParser("json", { limit: "1mb", type: ["application/json", "application/csp-report", "application/reports+json"] });
   app.enableCors({ origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : false, credentials: true });
   app.useGlobalFilters(new ErrorFilter());
   // Which company the request works in; everything after runs inside it (see CompanyResolver).

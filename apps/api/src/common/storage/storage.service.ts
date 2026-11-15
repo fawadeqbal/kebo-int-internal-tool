@@ -1,4 +1,4 @@
-import { Global, Injectable, Module } from "@nestjs/common";
+import { Global, Injectable, Logger, Module } from "@nestjs/common";
 import { createReadStream } from "node:fs";
 import { copyFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -15,6 +15,8 @@ import { z } from "zod";
 import { loadEnv, envField } from "@kebo/config";
 import { CompanyContext } from "../company/company-context";
 import { LimitsService } from "../company/limits.service";
+import { DomainError } from "@kebo/utils";
+import { scanWithClamd, type ScanResult } from "./virus-scan";
 
 /**
  * Where uploaded files live: any S3-compatible store (MinIO on our server, AWS
@@ -31,6 +33,8 @@ const storageEnv = z.object({
   S3_FORCE_PATH_STYLE: envField.bool(true),
   UPLOAD_DIR: z.string().default("./storage/uploads"),
   MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(200).default(25),
+  /** clamd's address (the optional clamav service, e.g. clamav:3310): every file is checked for viruses before it is kept. */
+  CLAMAV_HOST: z.string().optional(),
 });
 
 interface Driver {
@@ -160,6 +164,8 @@ export const safeFileName = (name: string) => name.replace(/[^\w.\- ()]+/g, "_")
 @Injectable()
 export class StorageService {
   private readonly driver: Driver;
+  private readonly clamd: string | null;
+  private readonly log = new Logger("Storage");
   readonly maxBytes: number;
 
   constructor(private readonly limits: LimitsService) {
@@ -179,6 +185,7 @@ export class StorageService {
       this.driver = new LocalDisk(env.UPLOAD_DIR);
     }
     this.maxBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
+    this.clamd = env.CLAMAV_HOST || null;
   }
 
   isAllowed(fileName: string) {
@@ -190,10 +197,24 @@ export class StorageService {
     return `companies/${CompanyContext.require().id}/${path}`;
   }
 
-  /** Keeps a file, if the company's plan has room for it. */
+  /** Keeps a file, if the company's plan has room for it and (with CLAMAV_HOST) it holds no virus. */
   async put(key: string, data: Buffer, contentType: string) {
     await this.limits.checkStorage(data.length);
+    await this.checkForViruses(data);
     return this.driver.put(key, data, contentType);
+  }
+
+  /** With CLAMAV_HOST: a file with a virus is refused, and so is any file while the check cannot answer. */
+  private async checkForViruses(data: Buffer) {
+    if (!this.clamd) return;
+    let result: ScanResult;
+    try {
+      result = await scanWithClamd(this.clamd, data);
+    } catch (e) {
+      this.log.error(`virus check failed: ${(e as Error).message}`);
+      throw new DomainError("The virus check is not answering, so the file was not kept. Try again in a minute.");
+    }
+    if (!result.clean) throw new DomainError(`This file holds a virus (${result.virus}): it was not kept.`);
   }
   /** The platform's own files (company archives): no company, no plan limit. */
   putPlatformFile(key: string, file: string, contentType: string) {
