@@ -50,11 +50,12 @@ export function ScrollFade({
     if (current && el.scrollWidth > el.clientWidth) el.scrollLeft = current.offsetLeft - (el.clientWidth - current.offsetWidth) / 2;
     update();
     el.addEventListener("scroll", update, { passive: true });
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
+    // Without ResizeObserver (an old browser, a test's DOM) the box is judged once, when it is drawn.
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    ro?.observe(el);
     return () => {
       el.removeEventListener("scroll", update);
-      ro.disconnect();
+      ro?.disconnect();
     };
   }, [scrollLabel]);
   return (
