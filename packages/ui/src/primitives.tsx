@@ -1,5 +1,6 @@
 import Form from "next/form";
 import Link from "next/link";
+import { BackArrow, ListLink } from "./back";
 import { Pending } from "./pending";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
@@ -295,11 +296,17 @@ export function PageHeader({
   actions,
   backHref,
   backLabel,
+  back,
   crumbs,
   phoneStack,
   children,
 }: {
   title: ReactNode;
+  /**
+   * Where ← beside the title goes (a deeper page: a record, a page under one). By default the last link in the
+   * path ("Inquiries" for an inquiry); false: none. A list and Home have none: they are the top.
+   */
+  back?: { href: string; label: string; root?: string } | false;
   /** The icon in the green tile before the title (default: the module's, from the crumbs; none without crumbs). */
   icon?: LucideIcon | null;
   /** Where the page is in the menu, above the title: "Money / Cash & bank" (the last is this page). */
@@ -329,47 +336,68 @@ export function PageHeader({
   const Icon = icon === null ? null : (icon ?? (crumbs?.[0] ? MODULE_ICONS[crumbs[0].label] : undefined));
   // The path is the menu's two levels (and the record, on a record's page): "Sales / Inquiries / RFQ-2026-0001".
   const trail = crumbs && crumbs.length > 0 ? crumbs : null;
+  // A deeper page goes up to the last link in its path (or where it says), with ← beside its title.
+  const parent = trail?.slice(0, -1).reverse().find((c) => c.href);
+  const up = back === false ? null : (back ?? (backHref ? { href: backHref, label: backLabel ?? "Back" } : parent?.href ? { href: parent.href, label: parent.label } : null));
+  // The page's name, as Back says it from the pages opened from here ("Back to Kabul Medical Supplies").
+  const name = trail?.at(-1)?.label ?? (typeof title === "string" ? title : undefined);
   return (
-    <header className="mb-4">
-      {trail && <Breadcrumb items={trail} />}
-      {backHref && (
-        <Link href={backHref} className="mb-1 inline-flex min-h-7 items-center gap-1 text-xs font-medium text-primary hover:text-primary-hover">
-          ← {backLabel ?? "Back"}
-        </Link>
-      )}
-      <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap", phoneStack && "max-sm:flex-col")}>
-        <div className={cn("flex min-w-0 items-start gap-3", framed ? "flex-1 sm:flex-[1_1_18rem]" : "flex-[1_1_18rem]")}>
-          {Icon && (
-            <span data-slot="page-icon" className="mt-0.5 hidden size-11 shrink-0 place-items-center rounded-xl bg-primary-solid text-white sm:grid" aria-hidden>
-              <Icon className="size-[22px]" strokeWidth={2} />
-            </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <h1 className={cn("font-bold text-text", framed ? "text-[22px] leading-7 sm:text-[26px] sm:leading-8" : "text-2xl leading-8 sm:text-[26px] sm:leading-8")}>{title}</h1>
-              {badge}
+    <>
+      {up && (
+        // Phone: the top bar becomes the way back, with the record's name and what it is under; ⋯ beside it.
+        <>
+          <div aria-hidden className="h-14 md:hidden" />
+          <div data-record-bar="" className="no-print fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-1 border-b border-line bg-surface pr-1.5 pl-1 md:hidden">
+            <BackArrow up={up.href} label={up.label} root={up.root} bar />
+            <div className="min-w-0 flex-1 pl-0.5">
+              <p className="truncate text-[16.5px] leading-5 font-bold text-text">{name ?? title}</p>
+              <p className="truncate text-[11.5px] leading-4 font-medium text-muted">{up.label}</p>
             </div>
-            {summary && <div className="mt-0.5 text-[13px] text-muted">{summary}</div>}
-            {description && <div className="mt-0.5 max-w-2xl text-[13px] text-muted">{description}</div>}
+            {/* ⋯ as a plain icon here, the size of ← (it is a bordered button in the header). */}
+            {more && <div className="shrink-0 [&>button]:size-11 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
           </div>
-        </div>
-        {/* Papers first, then the one primary, then ⋯: always top right. */}
-        {right && (
-          <div className={cn("flex items-center gap-2", framed ? "shrink-0 sm:flex-wrap sm:justify-end" : "flex-wrap sm:justify-end")}>
-            {actions}
-            {papers && (
-              <div data-slot="papers" className="flex items-center gap-2 max-sm:hidden">
-                {papers}
-              </div>
+        </>
+      )}
+      <header className="mb-4" data-page-label={name}>
+        {trail && <Breadcrumb items={trail} className={up ? "max-md:hidden" : undefined} />}
+        <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap", phoneStack && "max-sm:flex-col")}>
+          <div className={cn("flex min-w-0 items-start gap-3", framed ? "flex-1 sm:flex-[1_1_18rem]" : "flex-[1_1_18rem]")}>
+            {up ? (
+              <BackArrow up={up.href} label={up.label} root={up.root} className="max-md:hidden" />
+            ) : (
+              Icon && (
+                <span data-slot="page-icon" className="mt-0.5 hidden size-11 shrink-0 place-items-center rounded-xl bg-primary-solid text-white sm:grid" aria-hidden>
+                  <Icon className="size-[22px]" strokeWidth={2} />
+                </span>
+              )
             )}
-            {views}
-            {primary && <div data-slot="primary" className="contents">{primary}</div>}
-            {more}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <h1 className={cn("font-bold text-text", framed ? "text-[22px] leading-7 sm:text-[26px] sm:leading-8" : "text-2xl leading-8 sm:text-[26px] sm:leading-8")}>{title}</h1>
+                {badge}
+              </div>
+              {summary && <div className="mt-0.5 text-[13px] text-muted">{summary}</div>}
+              {description && <div className="mt-0.5 max-w-2xl text-[13px] text-muted">{description}</div>}
+            </div>
           </div>
-        )}
-      </div>
-      {children}
-    </header>
+          {/* Papers first, then the one primary, then ⋯: always top right. */}
+          {right && (
+            <div className={cn("flex items-center gap-2", framed ? "shrink-0 sm:flex-wrap sm:justify-end" : "flex-wrap sm:justify-end")}>
+              {actions}
+              {papers && (
+                <div data-slot="papers" className="flex items-center gap-2 max-sm:hidden">
+                  {papers}
+                </div>
+              )}
+              {views}
+              {primary && <div data-slot="primary" className="contents">{primary}</div>}
+              {more && up ? <div className="contents max-md:hidden">{more}</div> : more}
+            </div>
+          )}
+        </div>
+        {children}
+      </header>
+    </>
   );
 }
 
@@ -388,9 +416,10 @@ export function Breadcrumb({ items, className }: { items: { label: string; href?
                 </span>
               )}
               {c.href && !last ? (
-                <Link href={c.href} className="tap text-primary hover:text-primary-hover hover:underline">
+                // A list opens as it was left: its search, filters and page.
+                <ListLink href={c.href} className="tap text-primary hover:text-primary-hover hover:underline">
                   {c.label}
-                </Link>
+                </ListLink>
               ) : (
                 <span className={cn(last ? "text-muted" : "text-primary")} aria-current={last ? "page" : undefined}>
                   {c.label}

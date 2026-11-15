@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Activity, Building2, ClipboardList, Gauge, Inbox, LogOut, Package, ScrollText, Settings } from "lucide-react";
 import { Avatar, cn } from "@kebo/ui";
+import { NavMemoryKeeper } from "@kebo/ui/client";
 import { platformLogoutAction } from "@/app/platform/actions";
 
 type Counts = { companies?: number; newLeads?: number; plans?: number };
@@ -39,7 +40,11 @@ export function PlatformShell({
   const active = (href: string, exact?: boolean) => (exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
   const count = (key?: keyof Counts) => (key ? counts[key] : undefined);
   return (
-    <div className="min-h-dvh lg:pl-56">
+    <div className="min-h-dvh lg:pl-56" data-shell="">
+      {/* Where you have been in this tab: Back returns to a list as you left it. */}
+      <Suspense fallback={null}>
+        <NavMemoryKeeper />
+      </Suspense>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-pop"
@@ -118,7 +123,8 @@ export function PlatformShell({
       </aside>
 
       {/* Phone and tablet: a bar on top, the menu as chips. */}
-      <header className="no-print sticky top-0 z-20 border-b border-line bg-bg/85 backdrop-blur-md lg:hidden">
+      {/* On a phone a record's own top bar (← and its name) takes this one's place (globals.css). */}
+      <header data-shell-top="" className="no-print sticky top-0 z-20 border-b border-line bg-bg/85 backdrop-blur-md lg:hidden">
         <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
           <Link href="/platform" className="flex shrink-0 items-center gap-2">
             <span className="grid size-8 place-items-center rounded-lg bg-primary-solid text-primary-fg">
