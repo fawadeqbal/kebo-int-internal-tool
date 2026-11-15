@@ -7,7 +7,7 @@ import { isSupplier } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { orderAccess } from "../../common/auth/order-access";
@@ -136,12 +136,14 @@ export class EditsController {
   constructor(private readonly edits: EditsService) {}
 
   /** ?type=&id= — each card's edits: count, who, when, why and what. */
+  @SignedIn("checked inside: sourcing.manage")
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(editQuery)) q: z.infer<typeof editQuery>) {
     return this.edits.of(user, q.type, q.id);
   }
 
   /** One Save changes on a card: its first save, or an edit with the reason. */
+  @SignedIn("checked inside: sourcing.manage")
   @Post()
   @HttpCode(201)
   record(@CurrentUser() user: SessionUser, @Body(Validate(editInput)) body: EditInput) {

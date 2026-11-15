@@ -26,7 +26,7 @@ import {
 } from "@kebo/shared";
 import { isISODate } from "@kebo/utils";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
+import { CurrentUser, RequireFeature, SignedIn } from "../../common/auth/decorators";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { CashService } from "./cash.service";
@@ -69,6 +69,7 @@ class CashController {
    * Our accounts (cash, banks, wallets): to choose from when recording money; managers also get balances.
    * ?choose=true: only the list to choose from (no balances), as every money window needs it.
    */
+  @SignedIn("checked inside: expenses.manage, money.submit, payments.record")
   @Get("money/accounts")
   async moneyAccounts(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ choose: z.enum(["true", "false"]).optional() }))) q: { choose?: string }) {
     // The cash book is a plan feature: without it there are no accounts to choose.
@@ -76,12 +77,14 @@ class CashController {
   }
 
   @RequireFeature("cash_book")
+  @SignedIn("checked inside: expenses.manage")
   @Post("money/accounts")
   addAccount(@CurrentUser() user: SessionUser, @Body(Validate(moneyAccountInput)) body: MoneyAccountInput) {
     return this.cash.saveAccount(user, null, body);
   }
 
   @RequireFeature("cash_book")
+  @SignedIn("checked inside: expenses.manage")
   @Patch("money/accounts/:id")
   changeAccount(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(moneyAccountInput)) body: MoneyAccountInput) {
     return this.cash.saveAccount(user, id, body);
@@ -89,6 +92,7 @@ class CashController {
 
   /** Money moved between two of our accounts. */
   @RequireFeature("cash_book")
+  @SignedIn("checked inside: expenses.manage")
   @Post("money/transfers")
   @Once()
   transfer(@CurrentUser() user: SessionUser, @Body(Validate(transferInput)) body: TransferInput) {
@@ -96,6 +100,7 @@ class CashController {
   }
 
   @RequireFeature("cash_book")
+  @SignedIn("checked inside: expenses.manage")
   @Post("money/transfers/:id/void")
   @HttpCode(200)
   voidTransfer(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidInput)) body: z.infer<typeof voidInput>) {
@@ -104,6 +109,7 @@ class CashController {
 
   /** Managers: every amount in and out between two dates; ?account=<id>|none, ?currency=, ?removed=true. */
   @RequireFeature("cash_book")
+  @SignedIn("checked inside: expenses.manage")
   @Get("money/cash-book")
   cashBook(@CurrentUser() user: SessionUser, @Query(Validate(cashBookQuery)) q: z.infer<typeof cashBookQuery>) {
     return this.cash.cashBook(user, q);
@@ -111,6 +117,7 @@ class CashController {
 
   /** Managers: Reports › Cash. What came in and went out by month, and each account at the start and the end. */
   @RequireFeature("cash_book")
+  @SignedIn("checked inside: expenses.manage")
   @Get("money/cash-report")
   cashReport(@CurrentUser() user: SessionUser, @Query(Validate(cashReportQuery)) q: z.infer<typeof cashReportQuery>) {
     return this.report.report(user, q);
@@ -118,6 +125,7 @@ class CashController {
 
   /** Put a payment, a factory payment or an expense on an account afterwards: { accountId | null }. */
   @RequireFeature("cash_book")
+  @SignedIn("checked inside: expenses.manage")
   @Put("money/entries/:kind/:id/account")
   setAccount(
     @CurrentUser() user: SessionUser,
@@ -134,23 +142,27 @@ class CashController {
    * slip, transfer screenshot). `payments` is money in from a customer,
    * `factory-payments` money out to a factory. A new one replaces the one there.
    */
+  @SignedIn("checked inside: ledger.view, payments.record, sourcing.manage")
   @Post("payments/:id/file")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   attachPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
     return this.attachFile(user, "in", id, file);
   }
 
+  @SignedIn("checked inside: ledger.view, payments.record, sourcing.manage")
   @Post("factory-payments/:id/file")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   attachFactoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
     return this.attachFile(user, "out", id, file);
   }
 
+  @SignedIn("checked inside: ledger.view, payments.record, sourcing.manage")
   @Delete("payments/:id/file")
   removePaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.paymentFiles.remove(user, "in", id);
   }
 
+  @SignedIn("checked inside: ledger.view, payments.record, sourcing.manage")
   @Delete("factory-payments/:id/file")
   removeFactoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.paymentFiles.remove(user, "out", id);

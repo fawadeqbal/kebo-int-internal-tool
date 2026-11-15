@@ -19,7 +19,7 @@ import {
   type ReceiptInput,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersService } from "./orders.service";
 import { DocumentsService, ORDER_DOCUMENTS, type OrderDocumentKind } from "./documents.service";
@@ -60,24 +60,28 @@ export class OrdersController {
   ) {}
 
   /** Orders with their stage, money due and what each needs now. ?status=open|closed|cancelled&stage=&mine=true&late=true */
+  @SignedIn("anyone signed in to the company")
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(listQuery)) q: z.infer<typeof listQuery>) {
     return this.orders.list(user, { mine: q.mine, status: q.status, stage: q.stage, lateOnly: q.late, recent: q.recent, limit: q.limit, q: q.q, customerId: q.customer });
   }
 
   /** The orders list, a page at a time, with each status's count: ?status=open|late|closed|cancelled|all&mine=true&q&page&pageSize */
+  @SignedIn("anyone signed in to the company")
   @Get("page")
   page(@CurrentUser() user: SessionUser, @Query(Validate(pageQuery)) q: z.infer<typeof pageQuery>) {
     return this.orders.page(user, q);
   }
 
   /** How many orders: ?status=open|closed|cancelled&mine=true → { count }. */
+  @SignedIn("anyone signed in to the company")
   @Get("count")
   count(@CurrentUser() user: SessionUser, @Query(Validate(listQuery)) q: z.infer<typeof listQuery>) {
     return this.orders.count(user, { mine: q.mine, status: q.status });
   }
 
   /** The order: stage, the next button, money, what it needs, history, documents. */
+  @SignedIn("checked inside: sourcing.manage")
   @Get(":id")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.orders.get(user, id);
@@ -87,6 +91,7 @@ export class OrdersController {
    * { to, confirm?, note?, readyOn?, shippedOn?, blNo? } — one stage forward or back.
    * A move with warnings answers 409 { code: "confirm", error: the warnings }; send it again with confirm: true.
    */
+  @SignedIn("checked inside: orders.manage, orders.update, sourcing.manage")
   @Post(":id/stage")
   @HttpCode(200)
   move(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(moveStageInput)) body: MoveStageInput) {
@@ -94,18 +99,21 @@ export class OrdersController {
   }
 
   /** { shipBy, readyOn, shippedOn, blNo } */
+  @SignedIn("checked inside: orders.update, sourcing.manage")
   @Patch(":id/details")
   details(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(orderDetailsInput)) body: OrderDetailsInput) {
     return this.orders.setDetails(user, id, body);
   }
 
   /** { on?, lines: [{ lineId, receivedQty }] } — how many of each goods line came in from the factory so far. */
+  @SignedIn("checked inside: orders.update, sourcing.manage")
   @Put(":id/receipt")
   receipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(receiptInput)) body: ReceiptInput) {
     return this.orders.recordReceipt(user, id, body);
   }
 
   /** { containerNo?, shippingMarks?, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] } — the packing list. */
+  @SignedIn("checked inside: orders.update, sourcing.manage")
   @Put(":id/packing")
   packing(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(packingInput)) body: PackingInput) {
     return this.orders.savePacking(user, id, body);
@@ -116,6 +124,7 @@ export class OrdersController {
    * now (the number never changes). Issued already with a next version open (Make again): that version is
    * made final.
    */
+  @SignedIn("checked inside: orders.update, sourcing.manage")
   @Post(":id/proforma")
   @HttpCode(200)
   issueProforma(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
@@ -123,6 +132,7 @@ export class OrdersController {
   }
 
   /** { reason } — the buyer on the order's papers taken again from the customer (papers made from now on; final ones keep theirs). */
+  @SignedIn("checked inside: documents.manage, orders.update")
   @Post(":id/buyer")
   @HttpCode(200)
   refreshBuyer(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(buyerRefreshInput)) body: BuyerRefreshInput) {
@@ -130,6 +140,7 @@ export class OrdersController {
   }
 
   /** { print } — the quotation's own payment text on the papers although the route now differs (default: not printed). */
+  @SignedIn("checked inside: documents.manage, orders.update")
   @Post(":id/quoted-terms")
   @HttpCode(200)
   quotedTerms(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(quotedTermsInput)) body: QuotedTermsInput) {
@@ -137,6 +148,7 @@ export class OrdersController {
   }
 
   /** proforma | packing-list — the data to print (the web turns it into a page and a PDF): a final version as it was made (?v=), else from the order now. */
+  @SignedIn("checked inside: sourcing.manage")
   @Get(":id/documents/:kind")
   document(
     @CurrentUser() user: SessionUser,
@@ -148,6 +160,7 @@ export class OrdersController {
   }
 
   /** Make again: the next version as a draft (same number); the final one stays as it was printed. */
+  @SignedIn("checked inside: orders.update, sourcing.manage")
   @Post(":id/documents/:kind/again")
   @HttpCode(200)
   documentAgain(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind) {
@@ -155,6 +168,7 @@ export class OrdersController {
   }
 
   /** The open version made final, as it prints now. */
+  @SignedIn("checked inside: orders.update, sourcing.manage")
   @Post(":id/documents/:kind/final")
   @HttpCode(200)
   documentFinal(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind) {
@@ -162,6 +176,7 @@ export class OrdersController {
   }
 
   /** The next version's draft deleted. */
+  @SignedIn("checked inside: orders.update, sourcing.manage")
   @Delete(":id/documents/:kind/draft")
   documentDraftDelete(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind) {
     return this.documents.removeDraft(user, id, kind);
@@ -183,6 +198,7 @@ export class OrderLinesController {
    * { set: "delivered", deliveredQty?, condition?, note? } (delivery.manage, Delivery & SAT on).
    * Only the fields sent change. Answers { line, goods }.
    */
+  @SignedIn("checked inside: delivery.manage, orders.update, sourcing.manage")
   @Patch(":id")
   edit(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(orderLineInput)) body: OrderLineInput) {
     return this.orders.editLine(user, id, body);
@@ -195,6 +211,7 @@ export class MeController {
   constructor(private readonly orders: OrdersService) {}
 
   /** My to-do: what each open order I handle needs now, late ones first. */
+  @SignedIn("their own work")
   @Get("todo")
   todo(@CurrentUser() user: SessionUser) {
     return this.orders.todo(user);

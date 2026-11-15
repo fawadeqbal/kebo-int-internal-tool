@@ -17,7 +17,7 @@ import {
   type SendRequestInput,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { PapersService } from "./papers.service";
 
@@ -37,12 +37,14 @@ export class PapersController {
   constructor(private readonly papers: PapersService) {}
 
   /** Every paper of the order with where it stands (Ready, Draft, Can be made, Waiting for data, Uploaded, Missing, Kept elsewhere). */
+  @SignedIn("checked inside: documents.manage, sourcing.manage")
   @Get("orders/:id/papers")
   list(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
     return this.papers.list(user, id);
   }
 
   /** ?ref= — the Make page: what the paper takes from the order (and what is missing), its options and versions. */
+  @SignedIn("checked inside: documents.manage, orders.update, sourcing.manage")
   @Get("orders/:id/papers/:kind/checks")
   checks(
     @CurrentUser() user: SessionUser,
@@ -54,6 +56,7 @@ export class PapersController {
   }
 
   /** ?v=&opts=&ref= — the paper to print: a final version's snapshot, else made from the order now. */
+  @SignedIn("checked inside: sourcing.manage")
   @Get("orders/:id/papers/:kind/doc")
   doc(
     @CurrentUser() user: SessionUser,
@@ -65,6 +68,7 @@ export class PapersController {
   }
 
   /** { ref, reason? } — send the payment request of a plan row: kept exactly as it prints now. Sent again: R2, with why. */
+  @SignedIn("checked inside: documents.manage, orders.update, sourcing.manage")
   @Post("orders/:id/requests/send")
   @HttpCode(200)
   sendRequest(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(sendRequestInput)) body: SendRequestInput) {
@@ -96,6 +100,7 @@ export class PapersController {
   }
 
   /** { field, value, lineId? } (?ref=) — missing data typed on the Make page, saved where it belongs. */
+  @SignedIn("checked inside: documents.manage, orders.update, sourcing.manage")
   @Post("orders/:id/papers/:kind/fix")
   @HttpCode(200)
   fix(

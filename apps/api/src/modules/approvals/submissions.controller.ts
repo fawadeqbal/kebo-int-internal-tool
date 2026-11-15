@@ -16,7 +16,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { ApprovalsService, SUBMISSION_KINDS, SUBMISSION_STATUSES } from "./approvals.service";
 import { Once } from "../../common/http/once";
@@ -53,6 +53,7 @@ export class SubmissionsController {
   constructor(private readonly approvals: ApprovalsService) {}
 
   /** ?status=pending|approved|sent_back|withdrawn|all&mine=true&orderId&page&pageSize → { rows, total, page, pageSize, counts, approves, canSubmit } */
+  @SignedIn("checked inside: expenses.manage, money.submit, payments.record")
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(listQuery)) q: z.infer<typeof listQuery>) {
     return this.approvals.list(user, q);
@@ -66,12 +67,14 @@ export class SubmissionsController {
     return this.approvals.submit(user, input);
   }
 
+  @SignedIn("checked inside: expenses.manage, payments.record")
   @Get(":id")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.approvals.get(user, id);
   }
 
   /** { orderId?, body } — the submitter changes one waiting or sent back; it waits again. */
+  @SignedIn("checked inside: expenses.manage, payments.record")
   @Patch(":id")
   edit(
     @CurrentUser() user: SessionUser,
@@ -82,6 +85,7 @@ export class SubmissionsController {
   }
 
   /** { body? } (a corrected body, checked the same way) — records it as the approver → { submission, createdId }. */
+  @SignedIn("checked inside: expenses.manage, payments.record")
   @Post(":id/approve")
   @HttpCode(200)
   approve(
@@ -93,6 +97,7 @@ export class SubmissionsController {
   }
 
   /** { reason } */
+  @SignedIn("checked inside: expenses.manage, payments.record")
   @Post(":id/send-back")
   @HttpCode(200)
   sendBack(
@@ -103,6 +108,7 @@ export class SubmissionsController {
     return this.approvals.sendBack(user, id, input.reason);
   }
 
+  @SignedIn("checked inside: expenses.manage, payments.record")
   @Post(":id/withdraw")
   @HttpCode(200)
   withdraw(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
@@ -110,6 +116,7 @@ export class SubmissionsController {
   }
 
   /** multipart/form-data with one `file`: the bank slip or receipt, a photo or PDF (replaces the one there). */
+  @SignedIn("checked inside: expenses.manage, payments.record")
   @Post(":id/file")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   attach(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
@@ -120,6 +127,7 @@ export class SubmissionsController {
     return this.approvals.attach(user, id, file);
   }
 
+  @SignedIn("checked inside: expenses.manage, payments.record")
   @Delete(":id/file")
   removeFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.approvals.removeFile(user, id);

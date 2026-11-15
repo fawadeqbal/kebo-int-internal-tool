@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { customerImport, customerInput, listQuery, type CustomerImport, type CustomerInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions, RequireFeature } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, RequireFeature, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { CustomersService } from "./customers.service";
 
@@ -34,17 +34,20 @@ const customerList = listQuery.extend({
 export class CustomersController {
   constructor(private readonly customers: CustomersService) {}
 
+  @SignedIn("anyone signed in to the company")
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(customerList)) q: z.infer<typeof customerList>) {
     return this.customers.list(user, q);
   }
 
   /** Every customer the person may see, by name: [{ id, name }] for pickers. */
+  @SignedIn("anyone signed in to the company")
   @Get("names")
   names(@CurrentUser() user: SessionUser) {
     return this.customers.names(user);
   }
 
+  @SignedIn("anyone signed in to the company")
   @Get(":id")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.customers.get(user, id);

@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { attachmentInput, type AttachmentInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { InquiriesService } from "../inquiries/inquiries.service";
 import { FilesService } from "./files.service";
@@ -21,6 +21,7 @@ export class FilesController {
     private readonly inquiries: InquiriesService,
   ) {}
 
+  @SignedIn("checked inside: expenses.manage, ledger.view, payments.record, sourcing.manage")
   @Get(":id")
   async download(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
     const f = await this.files.open(user, id);
@@ -35,6 +36,7 @@ export class FilesController {
   }
 
   /** { kind, note } — what a deal's file is (URS, drawing…) and a note. */
+  @SignedIn("checked inside: sourcing.manage")
   @Patch(":id")
   describe(
     @CurrentUser() user: SessionUser,
@@ -44,6 +46,7 @@ export class FilesController {
     return this.inquiries.describeFile(user, id, body);
   }
 
+  @SignedIn("checked inside: sourcing.manage")
   @Delete(":id")
   @HttpCode(200)
   async remove(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {

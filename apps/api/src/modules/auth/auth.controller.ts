@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { AllowDuringTwoStepSetup, AllowWhenReadOnly, CurrentUser, Public } from "../../common/auth/decorators";
+import { AllowDuringTwoStepSetup, AllowWhenReadOnly, CurrentUser, Public, SignedIn } from "../../common/auth/decorators";
 import { SESSION_COOKIE, sessionCookieOptions, tokenFrom } from "../../common/auth/tokens.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { COMPANY_HEADER } from "../../common/company/company-resolver";
@@ -65,6 +65,7 @@ export class AuthController {
 
   @AllowDuringTwoStepSetup()
   @AllowWhenReadOnly()
+  @SignedIn("their own session")
   @Post("logout")
   @HttpCode(200)
   async logout(@CurrentUser() user: SessionUser, @Res({ passthrough: true }) res: Response) {
@@ -74,6 +75,7 @@ export class AuthController {
   }
 
   @AllowDuringTwoStepSetup()
+  @SignedIn("their own session")
   @Get("me")
   me(@CurrentUser() user: SessionUser) {
     return this.auth.me(user);

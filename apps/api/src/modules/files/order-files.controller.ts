@@ -33,7 +33,7 @@ import {
   type OrderFileUploadInput,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrderFilesService } from "./order-files.service";
 
@@ -53,12 +53,14 @@ const noFile = () => new z.ZodError([{ code: "custom", path: ["file"], message: 
 export class OrderFilesController {
   constructor(private readonly files: OrderFilesService) {}
 
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Get()
   list(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
     return this.files.list(user, id);
   }
 
   /** multipart/form-data: one `file`, and `step` or `section` (a section of the order page: its stage follows), `kind`, `note`, `attachTo` ("paper:<kind or doc:id>"). */
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Post()
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   upload(
@@ -72,6 +74,7 @@ export class OrderFilesController {
   }
 
   /** ?files=attachment:<id>,payment:<id> — those files in one zip; every file of the order without it. */
+  @SignedIn("anyone signed in to the company")
   @Get("zip")
   async zip(
     @CurrentUser() user: SessionUser,
@@ -90,6 +93,7 @@ export class OrderFilesController {
   }
 
   /** { files, papers, via: share | download, message? } — noted in History; the app sends nothing. */
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Post("share")
   @HttpCode(200)
   share(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(orderFilesShareInput)) body: OrderFilesShareInput) {
@@ -97,6 +101,7 @@ export class OrderFilesController {
   }
 
   /** { name?, kind?, note? } */
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Patch(":source/:fileId")
   update(
     @CurrentUser() user: SessionUser,
@@ -109,6 +114,7 @@ export class OrderFilesController {
   }
 
   /** { to: paper | step | section, target } */
+  @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Post(":source/:fileId/attach")
   @HttpCode(200)
   attach(
@@ -122,6 +128,7 @@ export class OrderFilesController {
   }
 
   /** multipart/form-data with one `file`: the newer one (the deal's files keep the old one as an earlier version). */
+  @SignedIn("checked inside: documents.manage, expenses.manage, ledger.view, orders.update, payments.record, sourcing.manage")
   @Post(":source/:fileId/replace")
   @HttpCode(200)
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
@@ -136,6 +143,7 @@ export class OrderFilesController {
     return this.files.replace(user, id, source, fileId, file);
   }
 
+  @SignedIn("checked inside: documents.manage, expenses.manage, ledger.view, orders.update, payments.record, sourcing.manage")
   @Delete(":source/:fileId")
   @HttpCode(200)
   remove(

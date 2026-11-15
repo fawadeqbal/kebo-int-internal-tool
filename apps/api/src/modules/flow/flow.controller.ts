@@ -40,7 +40,7 @@ import {
   type ShipmentUpdateInput,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequireFeature, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequireFeature, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { FlowService } from "./flow.service";
 import { FactoryRequestsService } from "./factory-requests.service";
@@ -58,6 +58,7 @@ export class OrderFlowController {
   constructor(private readonly flow: FlowService) {}
 
   /** The steps (payment → factory → production → shipping → documents & bank → delivery & SAT) and each module's data. */
+  @SignedIn("anyone signed in to the company")
   @Get(":id/flow")
   get(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
     return this.flow.get(user, id);
@@ -67,6 +68,7 @@ export class OrderFlowController {
    * What a step's row fills in from earlier orders and the quote (nothing is saved): the forwarder of the last
    * order on this route, the banks of this customer's last LC, the quote's lead time and the factory's price basis.
    */
+  @SignedIn("checked inside: sourcing.manage")
   @Get(":id/defaults")
   defaults(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
     return this.flow.defaults(user, id);
@@ -94,6 +96,7 @@ export class OrderFlowController {
   }
 
   /** The order's purchase orders: one per supplier on its lines, with its number and whether it was sent. */
+  @SignedIn("checked inside: sourcing.manage")
   @Get(":id/purchase-orders")
   purchaseOrders(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
     return this.flow.purchaseOrders(user, id);
@@ -289,6 +292,7 @@ export class OrderBoardController {
   constructor(private readonly flow: FlowService) {}
 
   /** ?mine=true — each open order's current step, for the board's columns. */
+  @SignedIn("anyone signed in to the company")
   @Get()
   @RequireFeature("orders_board")
   board(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ mine: z.enum(["true", "false"]).optional() }))) q: { mine?: "true" | "false" }) {

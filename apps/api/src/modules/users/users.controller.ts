@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { AllowDuringTwoStepSetup, CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { AllowDuringTwoStepSetup, CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { codeInput, newUserInput, passwordChangeInput, passwordRule, userInput, UsersService } from "./users.service";
 
@@ -12,6 +12,7 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   /** Active people for pickers (assign to…). */
+  @SignedIn("anyone signed in to the company")
   @Get("people")
   people() {
     return this.users.people();
@@ -79,17 +80,20 @@ export class AccountController {
   constructor(private readonly users: UsersService) {}
 
   /** { name, phone, language }: your own profile (the email and role are changed by who manages people; times are the company's). */
+  @SignedIn("their own account")
   @Patch()
   rename(@CurrentUser() actor: SessionUser, @Body(Validate(ownProfileInput)) body: z.infer<typeof ownProfileInput>) {
     return this.users.renameSelf(actor, body.name, { phone: body.phone, language: body.language });
   }
 
   /** Your phone and language (My account). */
+  @SignedIn("their own account")
   @Get("profile")
   profile(@CurrentUser() actor: SessionUser) {
     return this.users.ownProfile(actor);
   }
 
+  @SignedIn("their own account")
   @Post("password")
   @HttpCode(200)
   async password(@CurrentUser() actor: SessionUser, @Body(Validate(passwordChangeInput)) body: z.infer<typeof passwordChangeInput>) {
@@ -98,6 +102,7 @@ export class AccountController {
   }
 
   @AllowDuringTwoStepSetup()
+  @SignedIn("their own two-step sign-in")
   @Get("two-step")
   twoStep(@CurrentUser() actor: SessionUser) {
     return this.users.twoStepStatus(actor);
@@ -105,6 +110,7 @@ export class AccountController {
 
   /** Start setup: returns the secret and the otpauth:// link for the QR code. */
   @AllowDuringTwoStepSetup()
+  @SignedIn("their own two-step sign-in")
   @Post("two-step/setup")
   @HttpCode(200)
   setup(@CurrentUser() actor: SessionUser) {
@@ -112,18 +118,21 @@ export class AccountController {
   }
 
   @AllowDuringTwoStepSetup()
+  @SignedIn("their own two-step sign-in")
   @Post("two-step/confirm")
   @HttpCode(200)
   confirm(@CurrentUser() actor: SessionUser, @Body(Validate(codeInput)) body: { code: string }) {
     return this.users.confirmTwoStep(actor, body.code);
   }
 
+  @SignedIn("their own two-step sign-in")
   @Post("two-step/recovery-codes")
   @HttpCode(200)
   codes(@CurrentUser() actor: SessionUser, @Body(Validate(codeInput)) body: { code: string }) {
     return this.users.newRecoveryCodes(actor, body.code);
   }
 
+  @SignedIn("their own two-step sign-in")
   @Post("two-step/off")
   @HttpCode(200)
   async off(@CurrentUser() actor: SessionUser, @Body(Validate(codeInput)) body: { code: string }) {

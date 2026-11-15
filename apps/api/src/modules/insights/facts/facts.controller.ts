@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { isISODate } from "@kebo/utils";
 import { Validate } from "../../../common/http/zod.pipe";
-import { CurrentUser, RequireFeature } from "../../../common/auth/decorators";
+import { CurrentUser, RequireFeature, SignedIn } from "../../../common/auth/decorators";
 import type { SessionUser } from "../../../common/auth/session-user";
 import { FACTORY_GROUPS, FactsReadService, ORDER_GROUPS, PERIODS } from "./facts-read.service";
 
@@ -42,6 +42,7 @@ export class FactsController {
 
   /** Orders added up per period × group: ?from&to&period=month|quarter|year|all&by=company|customer|person|channel|country|category (+ filters). */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("orders/groups")
   orderGroups(@CurrentUser() user: SessionUser, @Query(Validate(orderQuery)) q: z.infer<typeof orderQuery>) {
     return this.read.orderGroups(user, q);
@@ -49,6 +50,7 @@ export class FactsController {
 
   /** Inquiries per period × group, dated by when they came in (on=received) or were decided (on=closed). */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("inquiries/groups")
   inquiryGroups(@CurrentUser() user: SessionUser, @Query(Validate(inquiryQuery)) q: z.infer<typeof inquiryQuery>) {
     return this.read.inquiryGroups(user, q);
@@ -56,6 +58,7 @@ export class FactsController {
 
   /** From inquiry to order for a span: stages, values, why we lose, medians. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("funnel")
   funnel(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ ...span, ...filters }))) q: z.infer<z.ZodObject<typeof span & typeof filters>>) {
     return this.read.funnel(user, q);
@@ -63,6 +66,7 @@ export class FactsController {
 
   /** Factories per period × group (by=factory|company): spend, to pay, ready on time, offers won of sent, claims. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("factories/groups")
   factoryGroups(@CurrentUser() user: SessionUser, @Query(Validate(factoryQuery)) q: z.infer<typeof factoryQuery>) {
     return this.read.factoryGroups(user, q);
@@ -70,6 +74,7 @@ export class FactsController {
 
   /** Owed to us (side=receivable) or to factories (side=payable) by age today; bucket= lists its orders. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("aging")
   aging(@CurrentUser() user: SessionUser, @Query(Validate(agingQuery)) q: z.infer<typeof agingQuery>) {
     return this.read.aging(user, q);
@@ -77,6 +82,7 @@ export class FactsController {
 
   /** What each customer owes us (side=receivable) or we owe each factory (side=payable) today: total and overdue. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("owed")
   owed(@CurrentUser() user: SessionUser, @Query(Validate(owedQuery)) q: z.infer<typeof owedQuery>) {
     return this.read.owed(user, q);
@@ -84,6 +90,7 @@ export class FactsController {
 
   /** ?factoryId → that factory's orders: owed, paid, to pay, ready date, stage (Suppliers › Overview). */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("factory-orders")
   factoryOrders(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ factoryId: z.string().uuid() }))) q: { factoryId: string }) {
     return this.read.factoryOrders(user, q);
@@ -91,6 +98,7 @@ export class FactsController {
 
   /** Cash in and out by month, straight from payments, factory payments and expenses; expenses by kind. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("cash")
   cash(@CurrentUser() user: SessionUser, @Query(Validate(z.object(span))) q: z.infer<z.ZodObject<typeof span>>) {
     return this.read.cash(user, q);
@@ -98,6 +106,7 @@ export class FactsController {
 
   /** What stands today and needs attention: open quotations, expiring ones, overdue customers, late factories, low margins. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("now")
   now(@CurrentUser() user: SessionUser, @Query(Validate(z.object(span))) q: z.infer<z.ZodObject<typeof span>>) {
     return this.read.now(user, q);
@@ -105,6 +114,7 @@ export class FactsController {
 
   /** The order rows themselves, newest first (drill-down and Excel). */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("orders")
   orders(@CurrentUser() user: SessionUser, @Query(Validate(rowsQuery)) q: z.infer<typeof rowsQuery>) {
     return this.read.orders(user, q);
@@ -112,6 +122,7 @@ export class FactsController {
 
   /** When the tables were last worked out and what is still queued. */
   @RequireFeature("insights")
+  @SignedIn("checked inside: reports.view")
   @Get("status")
   status(@CurrentUser() user: SessionUser) {
     return this.read.status(user);
@@ -119,6 +130,7 @@ export class FactsController {
 
   /** Work everything out again now and say what differed (also done every night by the worker). */
   @RequireFeature("insights")
+  @SignedIn("checked inside: expenses.manage")
   @Post("rebuild")
   @HttpCode(200)
   rebuild(@CurrentUser() user: SessionUser) {

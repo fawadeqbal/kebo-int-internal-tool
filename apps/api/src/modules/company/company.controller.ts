@@ -8,7 +8,7 @@ import { addDays, ConflictError, DomainError, ForbiddenError, formatDateTime } f
 import { Clock, companyDay } from "../../common/time/clock.service";
 import { ENV, type Env } from "../../config/env";
 import { PrismaService } from "../../database/prisma.service";
-import { AllowDuringTwoStepSetup, CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { AllowDuringTwoStepSetup, CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { Validate } from "../../common/http/zod.pipe";
 import { AuditService } from "../../common/audit/audit.service";
@@ -42,6 +42,7 @@ export class CompanyController {
    * its logo (or none), the title ("KEBO", or made from its name), the line under
    * it, and its name and name in Chinese. For everyone signed in (documents are printed by all).
    */
+  @SignedIn("anyone signed in to the company")
   @Get("brand")
   async brand() {
     const c = (await this.settings.get()).company;
@@ -214,6 +215,7 @@ export class CompanyController {
   }
 
   @AllowDuringTwoStepSetup()
+  @SignedIn("anyone signed in to the company")
   @Get()
   async get() {
     const c = CompanyContext.require();
