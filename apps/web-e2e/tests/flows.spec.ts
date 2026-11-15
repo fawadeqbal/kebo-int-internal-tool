@@ -95,3 +95,18 @@ test("a figure says how it is made: its ⓘ opens the rule, Esc closes it", asyn
   await expect(page.getByRole("button", { name: /is worked out$/ })).toHaveCount(4);
   expect(errors).toEqual([]);
 });
+
+test("a list's search: typing on while it looks loses no letter, and it looks once the typing stops", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/inquiries");
+  const box = page.getByRole("searchbox", { name: "Search number, title, customer" });
+  await box.click();
+  await box.pressSequentially("bott", { delay: 100 });
+  // A pause while thinking: the search for "bott" starts as it ends, and typing goes on while the page comes back.
+  await page.waitForTimeout(650);
+  await box.pressSequentially("ling line", { delay: 120 });
+  await expect(page).toHaveURL(/q=bottling\+line$/);
+  await expect(box).toHaveValue("bottling line");
+  await expect(box).toBeFocused();
+  expect(errors).toEqual([]);
+});

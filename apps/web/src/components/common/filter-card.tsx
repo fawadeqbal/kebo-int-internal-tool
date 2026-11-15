@@ -34,6 +34,10 @@ export interface FilterMonth {
   options: { value: string; label: string }[];
 }
 
+/** How long the search waits after the last key before it looks: longer than the gap between a slow typist's
+ * letters (a phone's keyboard too), short enough to feel at once when the typing stops. Enter looks at once. */
+export const SEARCH_PAUSE_MS = 600;
+
 /** A month and the one before or after it ("2026-11" → "2026-10"). */
 const step = (month: string, by: number) => {
   const [y, m] = month.split("-").map(Number) as [number, number];
@@ -236,38 +240,53 @@ export function FilterCard({
   const router = useRouter();
   const path = usePathname();
   const [pending, start] = useTransition();
+  const shown = (value ?? "").trim();
   const [text, setText] = useState(value ?? "");
-  // The box follows the page when the search changes elsewhere (Back, Clear all, a tab).
-  const [was, setWas] = useState(value ?? "");
-  if ((value ?? "") !== was) {
-    setWas(value ?? "");
-    setText(value ?? "");
+  // The searches this box sent that the page has not shown yet, oldest first.
+  const [asked, setAsked] = useState<string[]>([]);
+  // The box follows the page when its search changes elsewhere (Back, a tab, a link). When the page comes back
+  // with a search this box sent, the box keeps what was typed since: typing on while it looks never loses a letter.
+  const [was, setWas] = useState(shown);
+  if (shown !== was) {
+    setWas(shown);
+    const i = asked.lastIndexOf(shown);
+    if (i >= 0) setAsked(asked.slice(i + 1));
+    else {
+      setAsked([]);
+      setText(value ?? "");
+    }
   }
 
   const go = (changes: Record<string, string | undefined>) => {
-    const all: Record<string, string | undefined> = { ...keep, q: value || undefined };
+    // The list is searched for what the box says, even words not looked for yet (a filter chosen while typing).
+    const q = ("q" in changes ? changes.q : text.trim()) || undefined;
+    const all: Record<string, string | undefined> = { ...keep };
     for (const s of selects) all[s.name] = s.value || undefined;
     if (month) all[month.name] = month.current === month.base ? undefined : month.current || undefined;
     const p = new URLSearchParams();
-    for (const [k, v] of Object.entries({ ...all, ...changes })) if (v) p.set(k, v);
+    for (const [k, v] of Object.entries({ ...all, ...changes, q })) if (v) p.set(k, v);
     const qs = p.toString();
     const url = qs ? `${path}?${qs}` : path;
+    // A new search: the page will come back with it (a filter chosen, the same search: nothing to wait for).
+    if ((q ?? "") !== shown) setAsked((a) => [...a, q ?? ""]);
     // Typing more into a search already made replaces it; anything else is a step Back can undo.
-    const typing = "q" in changes && Object.keys(changes).length === 1 && !!value && !!changes.q;
+    const typing = "q" in changes && Object.keys(changes).length === 1 && !!shown && !!q;
     start(() => (typing ? router.replace(url, { scroll: false }) : router.push(url, { scroll: false })));
   };
 
-  // The search finds as you type: a short pause after the last key.
+  // The search finds as you type, once the typing pauses: not between the letters of a word.
   const latest = useRef(go);
   useEffect(() => {
     latest.current = go;
   });
+  const coming = asked.at(-1);
   useEffect(() => {
     const t = text.trim();
-    if (t === (value ?? "").trim()) return;
-    const id = setTimeout(() => latest.current({ q: t || undefined }), 450);
+    // Nothing new to look for: the list shows it, or it is on its way.
+    if (t === shown || t === coming) return;
+    const id = setTimeout(() => latest.current({ q: t || undefined }), SEARCH_PAUSE_MS);
     return () => clearTimeout(id);
-  }, [text, value]);
+  }, [text, shown, coming]);
 
   const pick = (name: string, v: string | undefined) => go({ [name]: v });
   const anyOn = !!value || selects.some((s) => s.value);
@@ -292,7 +311,8 @@ export function FilterCard({
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
             e.preventDefault();
-            if (text.trim() !== (value ?? "").trim()) go({ q: text.trim() || undefined });
+            // Enter looks at once (and again, if a search on its way was lost).
+            if (text.trim() !== shown) go({ q: text.trim() || undefined });
           }}
           placeholder={search}
           className="h-full w-full min-w-0 bg-transparent pr-9 pl-9 text-[13.5px] text-text outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:appearance-none"
@@ -303,7 +323,7 @@ export function FilterCard({
             aria-label="Empty the search"
             onClick={() => {
               setText("");
-              if (value) go({ q: undefined });
+              if (shown || asked.length) go({ q: undefined });
             }}
             className="absolute right-1.5 grid size-7 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-text"
           >
