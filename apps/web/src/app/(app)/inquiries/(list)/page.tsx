@@ -21,7 +21,7 @@ import { api } from "@/lib/api";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { hasFeature, requireUser } from "@/lib/session";
-import { date, short } from "@/lib/format";
+import { date, short, countOf } from "@/lib/format";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { DealRow, Paged } from "@/lib/types";
 import type { Funnel } from "@/lib/types-facts";
@@ -174,6 +174,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
       />
 
       <FilterCard
+        count={countOf(data.total, "inquiry", "inquiries")}
         search="Search number, title, customer…"
         value={sp.q}
         keep={{ stage: keep.stage, mine: keep.mine, customer: sp.customer }}

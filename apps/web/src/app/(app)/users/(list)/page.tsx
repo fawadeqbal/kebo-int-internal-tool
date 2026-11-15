@@ -7,7 +7,7 @@ import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { OpenPanelButton } from "@/components/common/panel";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
-import { timeAgo } from "@/lib/format";
+import { timeAgo, countOf } from "@/lib/format";
 import type { RoleRow, UserRow } from "@/lib/types-people";
 import { RoleBadge } from "@/components/people/role-badge";
 import { TwoStepRemind } from "@/components/people/two-step-remind";
@@ -129,7 +129,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         </Card>
       )}
       <LinkTabs label="Which people" className="mb-4" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
-      <FilterCard search="Search name or email…" value={sp.q} keep={{ show: keep.show }} clearHref={href({ q: undefined })} />
+      <FilterCard count={countOf(rows.length, "person", "people")} search="Search name or email…" value={sp.q} keep={{ show: keep.show }} clearHref={href({ q: undefined })} />
 
       <Card className="overflow-clip p-0">
         {rows.length === 0 ? (

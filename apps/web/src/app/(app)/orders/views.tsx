@@ -8,7 +8,7 @@ import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { optional } from "@/components/print/data";
 import { crumbsFor } from "@/lib/nav";
-import { date, money, short } from "@/lib/format";
+import { date, money, short, countOf } from "@/lib/format";
 import { FilterCard } from "@/components/common/filter-card";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { Paged } from "@/lib/types";
@@ -186,6 +186,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
       />
 
       <FilterCard
+        count={countOf(data.total, "order")}
         search="Search SO, PO, customer, container…"
         value={sp.q}
         keep={{ status: keep.status, stage: keep.stage, mine: keep.mine }}

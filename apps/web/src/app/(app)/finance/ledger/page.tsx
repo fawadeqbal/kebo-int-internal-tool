@@ -306,7 +306,7 @@ async function Balances({ sp }: { sp: Search }) {
           clearHref={buildHref(PATH, { who: who === "all" ? undefined : who, cur: sp.cur, has: sp.has }, {})}
           selects={[
             { name: "cur", label: "Currency", value: sp.cur, options: currencies.map((c) => ({ value: c, label: c })) },
-            { name: "has", label: "Has balance", value: sp.has, options: [{ value: "all", label: "Any" }], all: "Yes" },
+            { name: "has", label: "Has balance", value: sp.has, options: [{ value: "all", label: "Any" }], all: "Yes", showDefault: true },
           ]}
         />
         <Card className="overflow-x-auto p-0">

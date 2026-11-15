@@ -50,7 +50,7 @@ import type { CustomerDetail, CustomerRow, Owed } from "@/lib/types-people";
 import { CustomerPanel } from "../customer-panel";
 import { currenciesFrom } from "../currencies";
 import { crumbsFor } from "@/lib/nav";
-import { plural, short, whole } from "@/lib/format";
+import { plural, short, whole, countOf } from "@/lib/format";
 import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Customers" };
@@ -296,6 +296,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       />
 
       <FilterCard
+        count={countOf(data.total, "customer")}
         search="Search name, contact, phone, tax no…"
         value={sp.q}
         keep={{ show: keep.show }}

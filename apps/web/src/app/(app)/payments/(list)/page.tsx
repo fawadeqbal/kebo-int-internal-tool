@@ -6,7 +6,7 @@ import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, 
 import { addDays } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
-import { date, money, whole, companyToday } from "@/lib/format";
+import { date, money, whole, companyToday, countOf } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { hasFeature, requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
@@ -165,8 +165,17 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         selects={[
           { name: "account", label: "Account", value: account, options: list.accounts.map((a) => ({ value: a.id, label: a.name })) },
           { name: "method", label: "Method", value: method, options: list.methods.map((m) => ({ value: m, label: m })) },
-          { name: "p", label: "Month", value: sp.p && sp.p !== pr.thisMonth ? pr.period : undefined, options: periods.slice(1), all: allDates ? "Every date" : periods[0]!.label },
         ]}
+        month={{
+          name: "p",
+          current: allDates ? "" : pr.period,
+          // Opened for one order or party, no month means every date; else it means this month.
+          base: order || party ? "" : pr.thisMonth,
+          thisMonth: pr.thisMonth,
+          label: allDates ? "Every date" : pr.isYear ? `All of ${pr.period}` : pr.name,
+          options: [...(order || party ? [{ value: "", label: "Every date" }] : []), ...periods],
+        }}
+        count={countOf(list.total, "payment")}
       />
       <Card className="overflow-clip p-0">
         {list.rows.length === 0 ? (

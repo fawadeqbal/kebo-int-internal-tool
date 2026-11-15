@@ -2,7 +2,7 @@ import { Bell, Check } from "lucide-react";
 import { Badge, buildHref, ButtonLink, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { dateTime, timeAgo } from "@/lib/format";
+import { dateTime, timeAgo, countOf } from "@/lib/format";
 import { ALERT_GROUPS, alertKind, type AlertGroup } from "@/lib/alerts";
 import type { NotificationItem } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
@@ -72,7 +72,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
           ...ALERT_GROUPS.map((g) => ({ href: tab(g.key), label: g.label, count: counts?.[g.key], active: show === g.key })),
         ]}
       />
-      <FilterCard search="Search alerts…" value={sp.q} keep={{ show: sp.show }} clearHref={tab(sp.show)} />
+      <FilterCard count={countOf(total, "alert")} search="Search alerts…" value={sp.q} keep={{ show: sp.show }} clearHref={tab(sp.show)} />
       <Card className="overflow-clip p-0">
         {items.length === 0 ? (
           <EmptyState

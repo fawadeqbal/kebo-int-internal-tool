@@ -101,7 +101,9 @@ const emptyNote = (
   </p>
 );
 /** The note hides itself as soon as the menu has an item. */
-const HIDE_EMPTY = "[&:has([role=menuitem])>[data-menu-empty]]:hidden";
+const HIDE_EMPTY = "[&:has([role=menuitem])>[data-menu-empty]]:hidden [&:has([role=menuitemradio])>[data-menu-empty]]:hidden";
+/** The items of a menu: actions, or choices (a filter's). */
+const ITEMS = "[role=menuitem]:not([disabled]),[role=menuitemradio]:not([disabled])";
 
 /**
  * A menu of actions for a button (⋯, "Later"…). Drawn in a layer above the
@@ -119,7 +121,10 @@ export function FloatingMenu({
   width = 240,
   align = "end",
   header,
+  focus,
 }: {
+  /** What takes the focus when it opens: its first item, or ("input") the box to type in at its top. */
+  focus?: "input";
   /** On a phone, shown at the top of the sheet in place of the label (a file's name and details). */
   header?: ReactNode;
   /** The button that opened it. */
@@ -135,15 +140,21 @@ export function FloatingMenu({
   const mounted = useMounted();
   const { panel, pos } = useFloating(anchor, onClose, { width, align, active: mounted && !phone });
 
+  // Once it is in place and seen (a hidden panel cannot take the focus): its first item, or the box to type in.
+  const ready = mounted && (phone || !!pos);
+  const focused = useRef(false);
   useEffect(() => {
-    if (!mounted) return;
-    panel.current?.querySelector<HTMLElement>("[role=menuitem]:not([disabled])")?.focus({ preventScroll: true });
-  }, [mounted, phone, panel]);
+    if (!ready || focused.current) return;
+    focused.current = true;
+    panel.current?.querySelector<HTMLElement>(focus === "input" ? "input" : ITEMS)?.focus({ preventScroll: true });
+  }, [ready, panel, focus]);
 
   // Arrow keys move between the items, as in any menu.
   const keys = (e: React.KeyboardEvent) => {
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
-    const items = [...(panel.current?.querySelectorAll<HTMLElement>("[role=menuitem]:not([disabled])") ?? [])];
+    // In the box to type in, Home and End move in the words.
+    if ((e.target as HTMLElement).tagName === "INPUT" && (e.key === "Home" || e.key === "End")) return;
+    const items = [...(panel.current?.querySelectorAll<HTMLElement>(ITEMS) ?? [])];
     if (!items.length) return;
     e.preventDefault();
     const at = items.indexOf(document.activeElement as HTMLElement);
@@ -169,7 +180,7 @@ export function FloatingMenu({
           aria-label={label}
           onKeyDown={keys}
           className={cn(
-            "relative flex max-h-[80dvh] flex-col overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base",
+            "relative flex max-h-[80dvh] flex-col overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base [&_[role=menuitemradio]]:min-h-12 [&_[role=menuitemradio]]:text-base",
             HIDE_EMPTY,
           )}
         >

@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@kebo/shared";
-import { buildHref, buttonClass, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, StatRow, StatTile, toPage } from "@kebo/ui";
+import { buildHref, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, StatRow, StatTile, toPage } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { money, whole, companyToday } from "@/lib/format";
+import { money, whole, companyToday, countOf } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { requirePermission } from "@/lib/session";
@@ -47,7 +45,6 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const thisMonth = today.slice(0, 7);
   const month = /^\d{4}-\d{2}$/.test(sp.p ?? "") && sp.p! <= thisMonth ? sp.p! : thisMonth;
   const prev = addDays(`${month}-01`, -1).slice(0, 7);
-  const next = addDays(`${month}-28`, 4).slice(0, 7);
   const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.kind ?? "") ? (sp.kind as ExpenseCategory) : undefined;
   const q = { kind: "company" };
   const text = sp.q?.trim() || undefined;
@@ -104,7 +101,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4">
         <LinkTabs
           label="Which kind"
           tabs={[
@@ -112,24 +109,25 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
             ...list.byCategory.map((k) => ({ href: href({ kind: k.category }), label: companyKind(k.category), count: k.count, active: category === k.category })),
           ]}
         />
-        <span className="flex items-center gap-1.5">
-          <Link href={href({ p: prev })} aria-label="The month before" className={buttonClass("secondary", "sm", "px-2")}>
-            <ChevronLeft aria-hidden />
-          </Link>
-          <span className="min-w-36 text-center text-sm font-semibold">{monthName}</span>
-          {next <= thisMonth ? (
-            <Link href={href({ p: next === thisMonth ? undefined : next })} aria-label="The month after" className={buttonClass("secondary", "sm", "px-2")}>
-              <ChevronRight aria-hidden />
-            </Link>
-          ) : (
-            <span className={buttonClass("secondary", "sm", "pointer-events-none px-2 opacity-40")} aria-hidden>
-              <ChevronRight />
-            </span>
-          )}
-        </span>
       </div>
 
-      <FilterCard search="Search what it was for, a note or who was paid…" value={sp.q} keep={{ p: keep.p, kind: category }} clearHref={href({ q: undefined })} />
+      <FilterCard
+        search="Search what it was for, a note or who was paid…"
+        value={sp.q}
+        keep={{ kind: category }}
+        month={{
+          name: "p",
+          current: month,
+          base: thisMonth,
+          thisMonth,
+          label: monthName,
+          // This month and the eleven before it.
+          options: Array.from({ length: 12 }, (_, i) => addDays(`${thisMonth}-15`, -30 * i).slice(0, 7))
+            .filter((m, i, all) => all.indexOf(m) === i)
+            .map((m) => ({ value: m, label: MONTH_YEAR.format(new Date(`${m}-01T00:00:00Z`)) })),
+        }}
+        count={countOf(list.count, "cost")}
+      />
 
       <Card className="overflow-hidden p-0">
         {list.rows.length === 0 ? (

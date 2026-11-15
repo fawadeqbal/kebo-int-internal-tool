@@ -34,7 +34,7 @@ import type { Paged } from "@/lib/types";
 import type { FactoryGroups } from "@/lib/types-facts";
 import type { FactoryDetail, FactoryRow, Owed } from "@/lib/types-people";
 import { crumbsFor, labelFor } from "@/lib/nav";
-import { plural, short, whole } from "@/lib/format";
+import { plural, short, whole, countOf } from "@/lib/format";
 import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Suppliers" };
@@ -187,6 +187,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
       />
 
       <FilterCard
+        count={countOf(data.total, "supplier")}
         search="Search factory, person, WeChat…"
         value={sp.q}
         keep={{ status, show: keep.show }}
