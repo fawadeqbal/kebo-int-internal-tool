@@ -80,3 +80,18 @@ test("a payment received: New › Payment received, the order, the amount, recor
   expect(view.payments.find((p) => p.reference === reference)?.receivedAmount).toBe("10.00");
   expect(errors).toEqual([]);
 });
+
+test("a figure says how it is made: its ⓘ opens the rule, Esc closes it", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "How Sold this month is worked out" }).click();
+  const note = page.getByRole("dialog", { name: "Sold this month" });
+  await expect(note).toBeVisible();
+  await expect(note).toContainText("order date");
+  await page.keyboard.press("Escape");
+  await expect(note).toBeHidden();
+  // Every figure on Reports has one too.
+  await page.goto("/reports/profit");
+  await expect(page.getByRole("button", { name: /is worked out$/ })).toHaveCount(4);
+  expect(errors).toEqual([]);
+});

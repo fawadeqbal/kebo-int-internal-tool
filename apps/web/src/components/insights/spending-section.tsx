@@ -6,6 +6,7 @@ import { money } from "@/lib/format";
 import { bigMoney, change, type Period } from "@/lib/insights-period";
 import type { loadSpending } from "@/lib/insights-data";
 import { BarList, Delta, Tiles } from "./frame";
+import { how, reportSpan } from "@/lib/figures";
 
 const n0 = (v: string | number) => Math.round(Number(v)).toLocaleString("en-US");
 const dash = <span className="text-muted">—</span>;
@@ -28,6 +29,8 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
     { spent: 0, toSell: 0, lost: 0, owed: 0, sold: 0 },
   );
   const lostDeals = d.lostReasons.reduce((t, r) => t + r.deals, 0);
+  // What each figure counts, behind its ⓘ (lib/figures.ts).
+  const span = reportSpan(p);
   // Months before anything was spent or sold are left out (the last three stay).
   const firstBusy = d.months.findIndex((m) => Number(m.toSell) > 0 || m.sold > 0);
   const months = d.months.slice(Math.min(firstBusy < 0 ? d.months.length : firstBusy, Math.max(0, d.months.length - 3)));
@@ -40,14 +43,26 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
           value={bigMoney(toSell, c)}
           delta={d.toSellBefore !== null ? <Delta value={change(toSell, Number(d.toSellBefore))} goodWhenUp={false} vs={p.vsLabel} /> : undefined}
           sub="trips, samples, gifts, meals"
+          how={how.spentToSell(span, c)}
         />
-        <StatTile label="On deals we won" value={bigMoney(Number(d.onWon), c)} sub="on their orders, or before them" />
-        <StatTile label="What lost deals cost" value={bigMoney(Number(d.lost.spent), c)} sub={`${d.lost.deals} lost inquir${d.lost.deals === 1 ? "y" : "ies"}`} />
-        <StatTile label={`Per ${c} 100 sold`} value={per100(toSell, d.sold) === null ? "—" : `${c} ${per100(toSell, d.sold)}`} sub={`on ${bigMoney(d.sold, c)} sold`} />
+        <StatTile label="On deals we won" value={bigMoney(Number(d.onWon), c)} sub="on their orders, or before them" how={how.onDealsWon(span)} />
+        <StatTile
+          label="What lost deals cost"
+          value={bigMoney(Number(d.lost.spent), c)}
+          sub={`${d.lost.deals} lost inquir${d.lost.deals === 1 ? "y" : "ies"}`}
+          how={how.lostDeals(span)}
+        />
+        <StatTile
+          label={`Per ${c} 100 sold`}
+          value={per100(toSell, d.sold) === null ? "—" : `${c} ${per100(toSell, d.sold)}`}
+          sub={`on ${bigMoney(d.sold, c)} sold`}
+          how={how.per100(span, c)}
+        />
         <StatTile
           label="Owed back to staff"
           value={bigMoney(Number(d.owed), c)}
           sub={owing.length ? owing.slice(0, 2).map((x) => `${x.person.name.split(" ")[0]} ${n0(x.owed)}`).join(" · ") : "nothing owed"}
+          how={how.owedBack(c)}
         />
       </Tiles>
 

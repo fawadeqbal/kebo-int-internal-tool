@@ -85,7 +85,8 @@ describe("Home: the month and what stands out", () => {
     render(<MonthFigures h={{ ...h, seeProfit: false, month: { ...h.month, collected: null, cash: null, profit: { ...h.month.profit, afterCompanyCosts: false } } }} />);
     expect(screen.queryByText("Collected this month")).toBeNull();
     expect(screen.queryByText("Cash now")).toBeNull();
-    expect(screen.getByText("Gross profit this month")).toBeTruthy();
+    // The tile's label (its ⓘ note repeats the name as its heading).
+    expect(screen.getByText("Gross profit this month", { selector: "span" })).toBeTruthy();
   });
 
   it("the sentences are shown as given, each with the page behind it; with none, it says so", () => {

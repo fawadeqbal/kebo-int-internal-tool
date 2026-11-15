@@ -21,6 +21,7 @@ export function ChartCard({
   children,
   className,
   actions,
+  how,
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -28,6 +29,8 @@ export function ChartCard({
   children: ReactNode;
   className?: string;
   actions?: ReactNode;
+  /** How the chart's figures are worked out (lib/figures.ts), behind an ⓘ beside the title. */
+  how?: string;
 }) {
   const [asTable, setAsTable] = useState(false);
   return (
@@ -35,6 +38,7 @@ export function ChartCard({
       <CardHeader
         title={title}
         description={description}
+        how={how}
         actions={
           <>
             {actions}
