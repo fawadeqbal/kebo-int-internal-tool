@@ -175,3 +175,36 @@ test("a form on a phone: ← at the top left; the phone's Back asks before throw
   await expect(page).toHaveURL((u) => u.pathname === "/customers" && !u.searchParams.has("panel"));
   expect(errors).toEqual([]);
 });
+
+test("a form's mistake: what to fix at the top, each a way to its field, the cursor on the first; nothing typed lost", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/customers");
+  await page.getByRole("link", { name: "Add customer" }).click();
+  const form = page.getByRole("dialog", { name: "New customer" });
+  await form.getByRole("textbox", { name: "Tax no." }).fill("TX-7781");
+  await form.getByRole("button", { name: /Save customer/ }).click();
+  const fix = form.getByRole("alert").filter({ hasText: "to fix before saving" });
+  await expect(fix).toBeVisible();
+  const name = form.getByRole("textbox", { name: "Name", exact: true });
+  await expect(name).toBeFocused();
+  await expect(name).toHaveAttribute("aria-invalid", "true");
+  await expect(form.getByRole("textbox", { name: "Tax no." })).toHaveValue("TX-7781");
+  await expect(form).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("no connection: the save says so with Try again, the form stays with what was typed", async ({ page, context }) => {
+  const errors = watchErrors(page, { allow: [/Failed to fetch|ERR_INTERNET_DISCONNECTED|net::ERR/] });
+  await page.goto("/customers");
+  await page.getByRole("link", { name: "Add customer" }).click();
+  const form = page.getByRole("dialog", { name: "New customer" });
+  await form.getByRole("textbox", { name: "Name", exact: true }).fill("Kabul Medical Supplies");
+  await context.setOffline(true);
+  await form.getByRole("button", { name: /Save customer/ }).click();
+  const note = page.locator("[data-note=fail]");
+  await expect(note).toContainText("Not saved: no connection");
+  await expect(note.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(form.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Kabul Medical Supplies");
+  await context.setOffline(false);
+  expect(errors).toEqual([]);
+});

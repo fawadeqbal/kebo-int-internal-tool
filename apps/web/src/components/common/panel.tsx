@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buttonClass, cn, type ButtonSize, type ButtonVariant } from "@kebo/ui";
 import { useChanges, watchChanges } from "./changes";
+import { useFormNotice } from "./form-notice";
 import { focusables, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
 
 /* ---------------------------------------------------------------- closing */
@@ -152,8 +153,11 @@ export function SidePanel({
  * its PanelActions stay at the bottom of the panel however short it is.
  */
 export function PanelBody({ children, className }: { children: ReactNode; className?: string }) {
+  // The form's message after a save (what to fix, no connection) at the top, inside the form, in view.
+  const notice = useFormNotice();
   return (
     <div data-panel-body className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto p-5 *:shrink-0 sm:px-6", className)}>
+      {notice}
       {children}
     </div>
   );
