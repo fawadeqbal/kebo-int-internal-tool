@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { checkManualMove, INQUIRY_STAGE_LABEL, stageAfter, type InquiryEvent, type InquiryStage, type LostReason } from "@kebo/shared";
-import { GateError } from "@kebo/utils";
+import { DomainError, GateError } from "@kebo/utils";
 import type { Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import type { DomainEvent } from "../../common/events/event-bus";
@@ -19,6 +19,9 @@ export interface StageSubject {
  * work) and manual ones (lost, start, reopen) both write the stage history and
  * the audit trail, and return the event to publish once the transaction commits.
  */
+/** How long "Mark as lost" can be taken back by whoever did it (the note's Undo is shown for 8 seconds). */
+export const UNDO_LOST_MS = 2 * 60 * 1000;
+
 @Injectable()
 export class StagesService {
   constructor(private readonly audit: AuditService) {}
@@ -67,6 +70,22 @@ export class StagesService {
     const to = stageAfter(subject.stage, event);
     if (!to) return null;
     return this.write(tx, subject, to, event, actorId, event === "order_cancelled" ? { lostReason: "customer_cancelled" } : {});
+  }
+
+  /**
+   * Takes back a "Mark as lost" just made (the note's Undo): only by whoever marked it, within
+   * UNDO_LOST_MS, and only while that is still the last thing that happened to its stage. The inquiry
+   * goes back to the stage it had; the stage history keeps both moves. Later on, reopening is a
+   * manager's decision with a reason (Reopen).
+   */
+  async undoLost(tx: Tx, subject: StageSubject, actorId: string, now: Date) {
+    if (subject.stage !== "lost") throw new DomainError(`${subject.refNo} is not lost now.`);
+    const last = await tx.inquiryStageChange.findFirst({ where: { inquiryId: subject.id }, orderBy: { changedAt: "desc" } });
+    const fresh = !!last && now.getTime() - last.changedAt.getTime() <= UNDO_LOST_MS;
+    if (!last || last.toStage !== "lost" || last.cause !== "manual" || last.changedById !== actorId || !fresh)
+      throw new DomainError(`It can no longer be undone here: a manager can reopen ${subject.refNo}.`);
+    const event = await this.write(tx, subject, last.fromStage as InquiryStage, "undo", actorId, { reason: "Mark as lost undone" });
+    return { event, since: last.changedAt };
   }
 
   /** A person's decision: mark lost (with a reason), start working, or reopen. */

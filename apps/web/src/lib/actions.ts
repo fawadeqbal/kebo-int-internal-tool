@@ -20,7 +20,12 @@ export type ActionState = {
   kind?: "done" | "wait" | "part";
   /** The note's next steps, as links ("Receipt", "Open"). */
   next?: { label: string; href: string }[];
+  /** What the note's Undo takes back (see lib/undo-actions.ts): only where it is safe. */
+  undo?: UndoWhat;
 };
+
+/** Something an Undo can take back, as plain data. */
+export type UndoWhat = { type: "inquiry-lost"; id: string };
 
 /** FormData → plain strings (the API's schemas accept form strings). Fields named `payload` hold JSON for complex forms. */
 export function formValues(form: FormData): Record<string, string> {

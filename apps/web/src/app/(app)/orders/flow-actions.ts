@@ -86,7 +86,10 @@ export async function sendPurchaseOrderAction(orderId: string, poId: string, _pr
     () => api.post(`/orders/${orderId}/purchase-orders/${poId}/send`, { sentOn: v.sentOn, supplierRef: v.supplierRef?.trim() || null, how: v.how || null, reason: v.reason?.trim() || null }),
     "Purchase order sent.",
   );
-  if (r.ok) revalidatePath(`/orders/${orderId}`, "layout");
-  return r;
+  if (!r.ok) return r;
+  revalidatePath(`/orders/${orderId}`, "layout");
+  const d = r.data as { number?: string; supplier?: { name?: string } | null; factory?: { name?: string } | null } | undefined;
+  const to = d?.supplier?.name ?? d?.factory?.name;
+  return { ...r, message: `Purchase order${d?.number ? ` ${d.number}` : ""} sent${to ? ` to ${to}` : ""}`, detail: v.supplierRef?.trim() ? `Their reference: ${v.supplierRef.trim()}` : undefined };
 }
 

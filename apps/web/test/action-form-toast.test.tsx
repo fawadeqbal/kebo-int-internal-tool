@@ -45,7 +45,34 @@ const submit = () =>
     fireEvent.submit(document.querySelector("form")!);
   });
 
+/** A save that takes its own form off the page ("Mark lost…" is gone once the inquiry is lost). */
+function Vanishing() {
+  const [gone, setGone] = useState(false);
+  return (
+    <>
+      <Toaster />
+      {!gone && (
+        <ActionForm
+          action={async () => {
+            setGone(true);
+            return { ok: true, message: "RFQ-2026-0001 marked lost" };
+          }}
+        >
+          <button>Mark lost</button>
+        </ActionForm>
+      )}
+    </>
+  );
+}
+
 describe("the note after a save", () => {
+  it("is said even when the save takes the form off the page", async () => {
+    render(<Vanishing />);
+    await submit();
+    expect(document.querySelector("form")).toBeNull();
+    expect(toastText()).toContain("RFQ-2026-0001 marked lost");
+  });
+
   it("goes to a toast when the form closes on save", async () => {
     render(<Closing message="Payment recorded." />);
     await submit();

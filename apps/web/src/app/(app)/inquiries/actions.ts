@@ -25,7 +25,13 @@ export async function moveStageAction(id: string, _prev: ActionState, form: Form
   refresh(id);
   const n = numberOf(r);
   const lost = v.to === "lost" && v.lostReason ? LOST_REASON_LABEL[v.lostReason as keyof typeof LOST_REASON_LABEL] : undefined;
-  return { ...r, message: n ? `${n} ${STAGE_SAID[v.to ?? ""] ?? `moved to ${v.to}`}` : r.message, detail: lost ? `Why: ${lost}` : undefined };
+  return {
+    ...r,
+    message: n ? `${n} ${STAGE_SAID[v.to ?? ""] ?? `moved to ${v.to}`}` : r.message,
+    detail: lost ? `Why: ${lost}` : undefined,
+    // Marked lost by mistake: Undo, for a little while (the API allows whoever did it, just now).
+    undo: v.to === "lost" ? { type: "inquiry-lost", id } : undefined,
+  };
 }
 
 export async function holdAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {

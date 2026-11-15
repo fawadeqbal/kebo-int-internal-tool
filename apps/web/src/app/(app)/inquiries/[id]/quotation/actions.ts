@@ -11,14 +11,22 @@ import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
+/** What a revision answer says about itself: "QUO-2026-0051 R1", and how many options it has. */
+type RevisionAnswer = { number?: number; quotation?: { refNo?: string }; options?: unknown[] };
+const revisionName = (d: RevisionAnswer | undefined) => (d?.number ? `${d.quotation?.refNo ? `${d.quotation.refNo} ` : ""}R${d.number}` : null);
+
 /** Start the next revision as a draft (JSON in `payload`, from …/quotation/draft and the person's changes). */
 export async function createRevisionAction(dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.post<{ number: number }>(`/inquiries/${dealId}/quotation/revisions`, formBody(form)));
-  if (r.ok) {
-    refresh(dealId);
-    r.message = `R${(r.data as { number: number }).number} saved as a draft. Check it, then mark it as sent.`;
-  }
-  return r;
+  if (!r.ok) return r;
+  refresh(dealId);
+  const d = r.data as RevisionAnswer;
+  const options = d.options?.length ?? 0;
+  return {
+    ...r,
+    message: `Quotation ${revisionName(d) ?? `R${d.number}`} drafted`,
+    detail: `${options > 1 ? `${options} options · ` : ""}Check it, then send it`,
+  };
 }
 
 export async function updateRevisionAction(dealId: string, revisionId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
@@ -53,15 +61,28 @@ export async function moveRevisionAction(dealId: string, revisionId: string, _pr
     return { ...r, message: "The order could not be made, so nothing was changed: the quotation is still waiting for the answer. Try again; if it happens again, tell whoever looks after the system." };
   if (!r.ok) return r;
   refresh(dealId);
+  const name = revisionName(r.data as RevisionAnswer);
   if (v.to === "accepted") {
     const deal = await api.get<DealDetail>(`/inquiries/${dealId}`).catch(() => null);
     const order = deal?.orders.find((o) => o.status !== "cancelled");
     if (order) {
       revalidatePath(`/orders/${order.id}`, "layout");
-      return { ...r, message: `Accepted. Order ${order.refNo} was created.`, data: { orderId: order.id, orderRefNo: order.refNo } };
+      return {
+        ...r,
+        message: `Sales order ${order.refNo} made${name ? ` from ${name}` : ""}`,
+        detail: "The customer accepted: the order starts with its payment",
+        next: [{ label: "Open the order", href: `/orders/${order.id}` }],
+        data: { orderId: order.id, orderRefNo: order.refNo },
+      };
     }
   }
-  return r;
+  if (!name) return r;
+  const said: Record<string, ActionState> = {
+    sent: { message: `${name} marked as sent`, detail: "The inquiry is now Quoted" },
+    rejected: { message: `${name}: the customer said no` },
+    expired: { message: `${name} marked expired` },
+  };
+  return { ...r, ...(said[v.to ?? ""] ?? {}) };
 }
 
 /** The offers with costs in another currency (the editor asks when the quotation currency changes). */
@@ -90,8 +111,10 @@ export async function lostAction(dealId: string, revisionId: string | null, _pre
     },
     "Marked as lost.",
   );
-  if (r.ok) refresh(dealId);
-  return r;
+  if (!r.ok) return r;
+  refresh(dealId);
+  const n = (r.data as { refNo?: string } | undefined)?.refNo;
+  return { ...r, message: n ? `${n} marked lost` : "Marked lost", detail: why };
 }
 
 const TERM_FIELDS = ["validUntil", "incotermPlace", "paymentTerms", "deliveryTerms", "warranty", "notes"] as const;
@@ -133,5 +156,5 @@ export async function emailRevisionAction(dealId: string, revisionId: string, fi
   );
   if (!r.ok) return r;
   refresh(dealId);
-  return { ok: true, message: `Sent to ${to.join(", ")}.` };
+  return { ok: true, message: `${fileName.replace(/\.pdf$/i, "") || "The quotation"} sent to ${to.join(", ")}`, detail: pdf ? "By email, with the PDF" : "By email" };
 }

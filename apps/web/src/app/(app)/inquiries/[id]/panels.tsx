@@ -3,7 +3,7 @@
 import { Clock } from "lucide-react";
 import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from "@kebo/shared";
 import { Button, Field, Select, Textarea } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
+import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelButton } from "@/components/orders/step-view";
 import { PANEL_FORM, PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
@@ -183,7 +183,8 @@ export function AssignForm({
 /** "Handles it" (board): a list that saves as soon as another person is chosen. */
 export function AssignSelect({ action, people, current }: { action: Action; people: { id: string; name: string }[]; current: string | null }) {
   return (
-    <ActionForm action={action} showSuccess={false}>
+    // Saved as soon as it is chosen: the note says who handles it now.
+    <ActionForm action={action} showSuccess={false} onDone={(s) => s.message && toast({ message: s.message })}>
       <Field label="Handles it" htmlFor="handles-it">
         <Select id="handles-it" name="assigneeId" defaultValue={current ?? ""} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
           <option value="">Nobody yet</option>

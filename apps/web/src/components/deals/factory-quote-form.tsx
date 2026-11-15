@@ -575,6 +575,8 @@ export function OfferHeaderForm({
         {(st) => (
           <>
             <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
+            {/* The factory's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
+            <input type="hidden" name="factoryLabel" value={s.factory?.name ?? ""} />
             {filled && s.factory && (
               <p role="status" className="rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
                 Filled from {s.factory.name}’s last offer:{" "}

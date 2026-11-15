@@ -7,6 +7,7 @@ import { toast, toastsShown, type ToastInput } from "@kebo/ui/client";
 import type { ActionState } from "@/lib/actions";
 import { ONCE_FIELD, newOnceKey } from "@/lib/once";
 import { FormNotice } from "./form-notice";
+import { undoAction } from "@/lib/undo-actions";
 import { ReasonPrompt } from "./reason-prompt";
 import { useWindowDone } from "./route-window";
 
@@ -95,30 +96,58 @@ export function ActionForm({
    */
   keepFields?: boolean;
 }) {
+  const router = useRouter();
+  // A save's message ("Payment recorded") while the form may still close (a window shuts on save, or the save
+  // takes the form itself off the page: "Mark lost…" is gone once lost): if it does, the message goes to a
+  // note, so every save says it was saved. Nothing is added when the owner of the form already showed its own
+  // note, or when the form stays open and shows the message itself.
+  const unseen = useRef<{ note: ToastInput; toasts: number } | null>(null);
   // A save that cannot reach the server says so and keeps what was typed (it does not end on an error page).
   const send = useCallback(
     async (prev: ActionState, form: FormData): Promise<ActionState> => {
+      let r: ActionState;
       try {
-        return await action(prev, form);
+        r = await action(prev, form);
       } catch (e) {
         if (!noConnection(e)) throw e;
         return { ok: false, code: "offline", message: "Not saved: no connection. What you typed is still here.", values: typed(form) };
       }
+      // Remembered now, before the page changes: the answer and a fresh page come back together.
+      if (r.ok && r.message && !banner) {
+        const undo = r.undo;
+        const note = {
+          note: {
+            message: r.message,
+            detail: r.detail,
+            kind: r.kind,
+            actions: r.next,
+            // Undo what the action offered: the API checks again; a refusal says why.
+            undo: undo
+              ? async () => {
+                  const u = await undoAction(undo);
+                  if (!u.ok) throw new Error(u.message ?? "It could not be undone.");
+                  router.refresh();
+                }
+              : undefined,
+          },
+          toasts: toastsShown(),
+        };
+        unseen.current = note;
+        setTimeout(() => {
+          if (unseen.current === note) unseen.current = null;
+        }, CLOSES_WITHIN_MS);
+      }
+      return r;
     },
-    [action],
+    [action, banner, router],
   );
   const [state, formAction] = useActionState(send, {});
-  const router = useRouter();
   // In a page shown as a window (Record payment): saving closes it, back to the page under it.
   const windowDone = useWindowDone();
   const formRef = useRef<HTMLFormElement>(null);
   const seen = useRef<ActionState | null>(null);
   // The save's one-time key (lib/once.ts): the same one until it goes through, so sending it twice saves once.
   const onceKey = useRef<string | null>(null);
-  // A save's message ("Payment recorded.") while the form may still close (a window shuts on save): if it does,
-  // the message goes to a toast, so every save says it was saved. Nothing is added when the owner of the form
-  // already showed its own note, or when the form stays open and shows the message itself.
-  const unseen = useRef<{ note: ToastInput; toasts: number } | null>(null);
   const problems = problemsOf(state);
   useEffect(() => {
     if (state === seen.current || state.ok === undefined) return;
@@ -148,13 +177,6 @@ export function ActionForm({
       });
     if (state.ok) {
       onceKey.current = null;
-      if (state.message && !banner) {
-        const note = { note: { message: state.message, detail: state.detail, kind: state.kind, actions: state.next }, toasts: toastsShown() };
-        unseen.current = note;
-        setTimeout(() => {
-          if (unseen.current === note) unseen.current = null;
-        }, CLOSES_WITHIN_MS);
-      }
       if (resetOnSuccess) formRef.current?.reset();
       router.refresh();
       onDone?.(state);

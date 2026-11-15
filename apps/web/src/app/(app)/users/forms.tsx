@@ -67,9 +67,14 @@ const invalid = (error: unknown) => (error ? { "aria-invalid": true } : {});
 export function NewUserPanel({ action, roles }: { action: Action; roles: RoleRow[] }) {
   const panel = useSidePanel("new-user");
   const saved = (s: ActionState) => {
-    const d = s.data as { id: string; name: string } | undefined;
+    const d = s.data as { id: string; name: string; email?: string; role?: { name?: string } | null; roleName?: string } | undefined;
     if (!d) return panel.close();
-    toast({ message: `${d.name} can now sign in`, action: { label: "Open", href: `/users/${d.id}` } });
+    const role = d.role?.name ?? d.roleName;
+    toast({
+      message: `${d.name} can sign in now`,
+      detail: [d.email ? `With ${d.email}` : null, role ? `as ${role}` : null].filter(Boolean).join(" ") || undefined,
+      action: { label: "Open", href: `/users/${d.id}` },
+    });
     panel.close({ saved: d.id });
   };
   const start = roles.some((r) => r.key === "staff" && r.givable) ? "staff" : (roles.find((r) => r.givable)?.key ?? "");

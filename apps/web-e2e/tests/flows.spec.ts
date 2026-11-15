@@ -216,3 +216,23 @@ test("no connection: the save says so with Try again, the form stays with what w
   await context.setOffline(false);
   expect(errors).toEqual([]);
 });
+
+test("Mark as lost has Undo: the note takes it back, the inquiry is as it was", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/inquiries?stage=new");
+  const row = page.locator("tr[data-href]").first();
+  const href = (await row.getAttribute("data-href"))!;
+  await page.goto(href);
+  await page.getByRole("button", { name: "Mark lost…" }).click();
+  const form = page.getByRole("dialog", { name: /as lost$/ });
+  await form.getByRole("radio", { name: "No reply from customer" }).check();
+  await form.getByRole("button", { name: "Mark lost" }).click();
+  const note = page.locator("[data-note=done]");
+  await expect(note).toContainText(/RFQ-\d{4}-\d{4} marked lost/);
+  await expect(note).toContainText("Why: No reply from customer");
+  await note.getByRole("button", { name: "Undo" }).click();
+  await expect(page.locator("[data-note]")).toContainText("Undone");
+  // Back to its stage: open again, with Mark lost offered again.
+  await expect(page.getByRole("button", { name: "Mark lost…" })).toBeVisible();
+  expect(errors).toEqual([]);
+});

@@ -10,7 +10,8 @@ const VOID_PATH = /^\/(payments|customer-receipts|customer-credits|factory-payme
 /** Remove a payment typed by mistake: it stays listed under Removed, crossed out. */
 export async function voidPaymentAction(path: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   if (!VOID_PATH.test(path)) return { ok: false, message: "This cannot be removed here." };
-  const r = await attempt(form, () => api.post(path, { reason: formValues(form).reason }), "Payment removed.");
-  if (r.ok) revalidatePath("/", "layout");
-  return r;
+  const r = await attempt(form, () => api.post(path, { reason: formValues(form).reason }), path.startsWith("/expenses/") ? "Cost removed." : path.startsWith("/money/transfers/") ? "Move removed." : "Payment removed.");
+  if (!r.ok) return r;
+  revalidatePath("/", "layout");
+  return { ...r, detail: "It stays under Removed, with your reason" };
 }
