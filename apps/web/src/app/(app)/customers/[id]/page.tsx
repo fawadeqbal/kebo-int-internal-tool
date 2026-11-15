@@ -22,8 +22,7 @@ import {
 import { ArrowRight, FileText } from "lucide-react";
 import { ORDER_WORD_TONE } from "@kebo/shared";
 import { customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
-import { date, timeAgo, TZ, whole } from "@/lib/format";
-import { todayIn } from "@kebo/utils";
+import { date, timeAgo, whole, companyToday } from "@/lib/format";
 import { QuickNote } from "@/components/notes/note-forms";
 import { addNoteAction } from "../../follow-ups/actions";
 import { late } from "./shared";
@@ -97,7 +96,7 @@ export default async function CustomerOverview({
   const lost = c.inquiries.filter((d) => d.stage === "lost").length;
   const primary = c.contacts.find((p) => p.isPrimary) ?? c.contacts[0] ?? null;
   const countryKnown = c.country !== UNKNOWN_COUNTRY;
-  const today = todayIn(TZ);
+  const today = companyToday();
   const canNote = can(me, "customers.manage");
 
   return (

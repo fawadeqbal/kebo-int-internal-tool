@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { can } from "@kebo/shared";
 import { Toast } from "@kebo/ui/client";
 import { api } from "@/lib/api";
-import { getCompany, requireUser } from "@/lib/session";
+import { getCompany, requireUser, timeStyleOf } from "@/lib/session";
 import { Alert } from "@kebo/ui";
 import { FeaturesProvider } from "@/components/common/features";
 import { leaveCompanyAction } from "@/app/platform/actions";
@@ -12,6 +12,7 @@ import { AppShell, type NewItem } from "@/components/shell/nav";
 import { buildModules, FOLD_COOKIE, MODULE_PAGES, OPEN_COOKIE, type ModuleKey } from "@/lib/nav";
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
 import { AccountsProvider, type AccountOption } from "@/components/money/accounts";
+import { CompanyTime } from "@/lib/time-client";
 import { getSettings } from "@/lib/loaders";
 
 /** The company's own logo (Settings → Company), at a link that changes when the logo does; none: the app's icon. */
@@ -71,7 +72,7 @@ export default async function AppLayout({ children, window: win }: { children: R
   ].filter((x): x is NewItem => !!x);
 
   return (
-    <>
+    <CompanyTime style={timeStyleOf(me)}>
       <AppShell modules={modules} initialOpen={initialOpen} initialFold={initialFold} newItems={newItems} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
         {me.viaPlatform && (
           <form action={leaveCompanyAction} className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary-soft/60 px-3 py-2 text-sm">
@@ -104,6 +105,6 @@ export default async function AppLayout({ children, window: win }: { children: R
         <Toast />
       </Suspense>
       <KeyboardShortcuts canCreate={has("inquiries.create")} />
-    </>
+    </CompanyTime>
   );
 }

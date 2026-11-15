@@ -15,7 +15,7 @@ describe("payment requests in words", () => {
     expect(requestWords({ state: "sent", with: "request", sentOn: "2026-11-12", revision: 1 })).toBe("Sent 12 Nov");
     expect(requestWords({ state: "sent", with: "request", sentOn: "2026-11-12", revision: 2 })).toBe("Sent 12 Nov · R2");
     expect(requestWords({ state: "sent", with: "proforma", sentOn: "2026-11-01", revision: null })).toBe("Sent with the proforma");
-    expect(requestWords({ state: "sent", with: "bank", sentOn: "2026-11-03", revision: null })).toBe("At the bank since 3 Nov");
+    expect(requestWords({ state: "sent", with: "bank", sentOn: "2026-11-03", revision: null })).toBe("At the bank since 03 Nov");
   });
 
   it("a bank route's balance waits for the papers, not for a request", () => {

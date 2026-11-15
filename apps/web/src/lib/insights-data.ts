@@ -2,7 +2,7 @@ import "server-only";
 import { api } from "./api";
 import { countryName } from "./countries";
 import { can, type Permission } from "@kebo/shared";
-import { addDays, todayIn } from "@kebo/utils";
+import { addDays } from "@kebo/utils";
 import { lastMonths, monthEnd, monthStart, periodOf, SECTIONS, type Period, type Section } from "./insights-period";
 import type { SheetSpec } from "./sheet-spec";
 import type { Receivables } from "./types-insights";
@@ -17,7 +17,7 @@ import type {
   OrderGroupRow,
   OrderGroups,
 } from "./types-facts";
-import { TZ } from "@/lib/format";
+import { companyToday } from "@/lib/format";
 
 /*
  * What each Insights section shows, read from the Insights tables (GET /insights/facts/*) — never worked
@@ -53,7 +53,7 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
     facts<FactOrders>("orders", { ...span, limit: 1000 }),
     maybe(() => api.get<Receivables>("/money/receivables")),
     // Only the factories' parts due in the next 7 days (the list below), not every open one.
-    money ? maybe(() => api.get<ToPayList>("/billing/to-pay", { dueBy: addDays(todayIn(TZ), 7) })) : null,
+    money ? maybe(() => api.get<ToPayList>("/billing/to-pay", { dueBy: addDays(companyToday(), 7) })) : null,
     money ? maybe(() => api.get<OpenBills>("/money/bills")) : null,
     money ? maybe(() => api.get<CashReport>("/money/cash-report", span)) : null,
     money ? maybe(() => api.get<CashReport>("/money/cash-report", prev)) : null,
@@ -84,7 +84,7 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
   const oweTotals = (owed?.totals ?? []).filter((x) => n(x.due) > 0);
 
   // To pay in the next 7 days: the factories' parts late or due by then, and the bills that wait.
-  const soon = addDays(todayIn(TZ), 7);
+  const soon = addDays(companyToday(), 7);
   const pay = [
     ...(toPay?.rows ?? [])
       .filter((r) => n(r.open) > 0 && r.dueOn !== null && r.dueOn <= soon)
@@ -232,7 +232,7 @@ export async function loadProfit(p: Period, sort: ProfitSort = "low") {
     return { orders: g?.orders ?? 0, sold, uncosted: sold - costed, costs: costed - fromOrders, fromOrders, company, profit, margin: pct(profit, costed) };
   };
   const companyOf = (x: CashFacts, m?: string) => sum(x.months.filter((y) => !m || y.month === m), (y) => n(y.company));
-  const today = todayIn(TZ);
+  const today = companyToday();
   const lastMonth = (p.to < today ? p.to : today).slice(0, 7);
   const monthKeys: string[] = [];
   for (let d = monthStart(p.from); d.slice(0, 7) <= lastMonth; d = monthStart(d, 1)) monthKeys.push(d.slice(0, 7));
@@ -712,7 +712,7 @@ export async function loadFunnel(p: Period) {
 /** "Excel" on an Insights section: the tables that section shows, for the same period (one tab each). */
 export async function insightsSheets(q: Record<string, string | undefined>): Promise<SheetSpec[]> {
   const me = await api.get<{ permissions: Permission[] }>("/auth/me");
-  const today = todayIn(TZ);
+  const today = companyToday();
   const p = periodOf(q, today);
   const section: Section = (SECTIONS as readonly string[]).includes(q.section ?? "") ? (q.section as Section) : "overview";
   const money = can(me, "expenses.manage");

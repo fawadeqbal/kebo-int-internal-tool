@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
 import { Badge, Button, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
-import { date, dueText, money } from "@/lib/format";
+import { dueText, money } from "@/lib/format";
+import { useTime } from "@/lib/time-client";
 import type { ActionState } from "@/lib/actions";
 import type { OrderMoney } from "@/lib/types-money";
 import { requestPrintHref, requestWords } from "@/lib/requests";
@@ -17,10 +18,10 @@ type Item = OrderMoney["plan"]["items"][number];
 type Sending = Parameters<typeof SendDialog>[0]["what"];
 
 const grouped = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const dayMonth = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
 /** Where a part stands, as a badge: paid (and when), part paid, sent (how), not sent. */
 function Stand({ i }: { i: Item }) {
+  const { dayMonth, style } = useTime();
   const r = i.request;
   const last = r.receipts.at(-1);
   return (
@@ -28,7 +29,7 @@ function Stand({ i }: { i: Item }) {
       {r.state === "paid" ? (
         <Badge tone="ok">Paid{last ? ` ${dayMonth(last.paidOn)}` : ""}</Badge>
       ) : (
-        <Badge tone={r.state === "part_paid" ? "warn" : r.state === "sent" ? "info" : "neutral"}>{requestWords(r)}</Badge>
+        <Badge tone={r.state === "part_paid" ? "warn" : r.state === "sent" ? "info" : "neutral"}>{requestWords(r, style)}</Badge>
       )}
       {r.changed && <span className="text-xs font-medium text-warn">Changed since it was sent</span>}
       {i.late > 0 && r.state !== "paid" && (
@@ -75,6 +76,7 @@ export function PaymentPlanTable({
   /** `verify`: the person sends the payment for a manager to verify (it does not count until then). */
   pay: { action: Action; customer: string; refNo: string; due: string; depositDue: string; fx: Parameters<typeof RecordPaymentWindow>[0]["fx"]; today: string; verify?: boolean } | null;
 }) {
+  const { date, style } = useTime();
   // The dialog lives here, not in the row: once sent, the row's button changes and the dialog still says what to do next.
   const [sending, setSending] = useState<Sending | null>(null);
   const close = useCallback(() => setSending(null), []);
@@ -142,7 +144,7 @@ export function PaymentPlanTable({
             </span>
             {under(i)}
             <span className="text-sm text-text-2">
-              {dueText(i)}
+              {dueText(i, style)}
               {Number(i.paid) > 0 && i.request.state !== "paid" ? ` · ${grouped(i.paid)} received` : ""}
             </span>
             <span className="flex flex-wrap items-center justify-between gap-3">
@@ -182,7 +184,7 @@ export function PaymentPlanTable({
                   <span className="font-semibold">{i.label}</span>
                   {under(i)}
                 </Td>
-                <Td className={cn("min-w-[7.5rem] text-sm", i.late > 0 && i.request.state !== "paid" && "font-medium text-bad")}>{dueText(i)}</Td>
+                <Td className={cn("min-w-[7.5rem] text-sm", i.late > 0 && i.request.state !== "paid" && "font-medium text-bad")}>{dueText(i, style)}</Td>
                 <Td className="text-right whitespace-nowrap tabular">
                   {grouped(i.amount)}
                   {Number(i.paid) > 0 && i.request.state !== "paid" && <span className="block text-xs text-muted">{grouped(i.paid)} received</span>}

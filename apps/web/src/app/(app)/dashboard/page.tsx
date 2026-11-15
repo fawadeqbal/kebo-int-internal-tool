@@ -2,14 +2,13 @@ import { cache, Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { can, ORDER_WORD_TONE, type InquiryStage, type Priority } from "@kebo/shared";
 import { ButtonLink, Card, CardBody, CardHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { ArrowRight, Plus } from "lucide-react";
 import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import type { OrderRow } from "@/lib/types-orders";
 import type { Paged, Person } from "@/lib/types";
 import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
-import { money, TZ } from "@/lib/format";
+import { money, companyToday, hourNow } from "@/lib/format";
 import type { HomeFigures, Receivables, Reminders } from "@/lib/types-insights";
 import { getSettings } from "@/lib/loaders";
 import { SendCost as SendCostButton } from "@/components/money/cost-window";
@@ -40,8 +39,9 @@ interface Dashboard {
 export default async function DashboardPage() {
   const me = await requireUser();
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  const today = todayIn(TZ);
-  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: TZ }).format(new Date()));
+  const today = companyToday();
+  // Company time: "Good morning" is the company's morning.
+  const hour = hourNow();
   const hello = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   // Staff add money and costs that a manager verifies; people who record them verify.
   const verifies = can(me, "payments.record") || can(me, "expenses.manage");

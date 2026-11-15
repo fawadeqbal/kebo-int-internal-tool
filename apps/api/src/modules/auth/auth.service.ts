@@ -8,6 +8,7 @@ import { SESSION_MAX_AGE_DAYS, SESSION_TTL_SECONDS, TokensService } from "../../
 import type { SessionUser } from "../../common/auth/session-user";
 import { UsersService } from "../users/users.service";
 import { CompaniesService } from "../../common/company/companies.service";
+import { Clock } from "../../common/time/clock.service";
 import { CompanyContext } from "../../common/company/company-context";
 import { companyRefusal } from "../../common/auth/auth.guard";
 
@@ -31,6 +32,7 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly companies: CompaniesService,
     private readonly limits: LimitsService,
+    private readonly clock: Clock,
   ) {}
 
   /** Too many sign-ins from this address: true the first time over the limit in a window (to record it once). */
@@ -337,11 +339,10 @@ export class AuthService {
     await this.prisma.db.session.update({ where: { id: user.sessionId }, data: { revokedAt: new Date() } });
   }
 
-  /** What the apps know about the signed-in person: who, their role and what they may do. */
-  /** GET /auth/me: who is signed in, with their own language and time zone. */
+  /** GET /auth/me: who is signed in, with their own language, and the company's time zone and date and time formats. */
   async me(user: SessionUser) {
-    const own = await this.prisma.db.user.findUnique({ where: { id: user.id }, select: { language: true, timeZone: true } });
-    return { ...this.profile(user), language: own?.language ?? "en", timeZone: own?.timeZone ?? null };
+    const own = await this.prisma.db.user.findUnique({ where: { id: user.id }, select: { language: true } });
+    return { ...this.profile(user), language: own?.language ?? "en" };
   }
 
   profile(user: SessionUser) {
@@ -357,6 +358,10 @@ export class AuthService {
       /** A platform admin working in this company. */
       viaPlatform: user.viaPlatform,
       company: c ? { slug: c.slug, name: c.name, kind: c.kind, status: c.status, statusReason: c.statusReason, endsAt: c.endsAt } : null,
+      /** The company's time zone and how it writes dates and times: the web and the phone show every date and time this way. */
+      timeZone: this.clock.timeZone,
+      dateFormat: this.clock.style.date,
+      timeFormat: this.clock.style.time,
     };
   }
 

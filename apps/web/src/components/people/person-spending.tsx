@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card, cn } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
-import { date, money } from "@/lib/format";
+import { date, money, dayMonth } from "@/lib/format";
 import type { PersonCost, PersonSpendFor, PersonSpending } from "@/lib/types-money";
 
 const FOR_LABEL: Record<PersonSpendFor, string> = {
@@ -139,7 +139,7 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
               <tbody>
                 {s.latest.map((e) => (
                   <tr key={e.id} className="border-t border-line">
-                    <td className="px-4 py-2.5 whitespace-nowrap text-text-2">{date(e.spentOn).replace(/ \d{4}$/, "")}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap text-text-2">{dayMonth(e.spentOn)}</td>
                     <td className="px-3 py-2.5">
                       {e.description}
                       <span className="block text-xs text-text-2">{costKind(e.category)}</span>

@@ -254,17 +254,16 @@ export class UsersService {
   /* ---------------------------------------------------------------- my account */
 
   /** Your own name, as everyone sees it; recorded in the audit log. */
-  async renameSelf(actor: SessionUser, name: string, more: { phone?: string | null; language?: string; timeZone?: string | null } = {}) {
+  async renameSelf(actor: SessionUser, name: string, more: { phone?: string | null; language?: string } = {}) {
     const user = await this.prisma.db.user.findUniqueOrThrow({ where: { id: actor.id } });
     const data = {
       name,
       ...(more.phone !== undefined ? { phone: more.phone || null } : {}),
       ...(more.language !== undefined ? { language: more.language } : {}),
-      ...(more.timeZone !== undefined ? { timeZone: more.timeZone || null } : {}),
     };
     return this.prisma.tx(async (tx) => {
       const updated = await tx.user.update({ where: { id: actor.id }, data, select: publicUser });
-      const old = { name: user.name, phone: user.phone, language: user.language, timeZone: user.timeZone };
+      const old = { name: user.name, phone: user.phone, language: user.language };
       const changed = Object.keys(data).filter((k) => old[k as keyof typeof old] !== data[k as keyof typeof data]);
       if (changed.length)
         await this.audit.record(tx, {
@@ -280,9 +279,9 @@ export class UsersService {
     });
   }
 
-  /** My account: the person's phone, language and time zone. */
+  /** My account: the person's phone and language (times are the company's). */
   async ownProfile(actor: SessionUser) {
-    const u = await this.prisma.db.user.findUniqueOrThrow({ where: { id: actor.id }, select: { phone: true, language: true, timeZone: true } });
+    const u = await this.prisma.db.user.findUniqueOrThrow({ where: { id: actor.id }, select: { phone: true, language: true } });
     return u;
   }
 

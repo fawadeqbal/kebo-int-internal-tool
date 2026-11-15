@@ -2,12 +2,13 @@ import type { OwnDomainView } from "@kebo/shared";
 import { Card, CardBody, CardHeader, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { CheckDomain, ConnectDomain, CopyValue, RemoveDomain } from "./domain-forms";
+import { date } from "@/lib/format";
 
 export type DomainView = OwnDomainView & { enabled: boolean };
 /** The company's own domain as the API has it (null: not offered here, or it cannot be read). */
 export const domainView = () => api.get<DomainView>("/company/domain").catch(() => null);
 
-const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const day = (iso: string) => date(iso);
 
 /** "2 minutes ago", "3 hours ago", "just now". */
 function ago(iso: string) {

@@ -4,12 +4,11 @@ import { Banknote, Check, FileText } from "lucide-react";
 import { can, PAYMENT_RECORD_KINDS, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
 import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { date, dateTime, TZ } from "@/lib/format";
+import { date, dateTime, companyToday } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
 import type { ReactNode } from "react";
-import { todayIn } from "@kebo/utils";
 import { EditCustomerPayment, EditFactoryPayment, VoidForm } from "@/components/money/forms";
 import { AttachedFile } from "@/components/money/attachment";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
@@ -206,7 +205,7 @@ function HistoryLine({ who, what, at }: { who: string | null; what: string; at: 
 async function recordTools(me: Me, p: PaymentView): Promise<{ change: ReactNode; proof: ReactNode }> {
   const none = { change: null, proof: null };
   if (!p.orderId || p.voided) return none;
-  const today = todayIn(TZ);
+  const today = companyToday();
   if (p.kind === "customer") {
     const [pays, o] = await Promise.all([orderPaymentsOf(p.orderId), orderOf(p.orderId)]);
     // The payment on the order this entry is (it pays that one order in full).

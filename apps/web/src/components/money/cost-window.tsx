@@ -25,7 +25,8 @@ import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useClosePanel, WhatHapp
 import { useWindowDone } from "@/components/common/route-window";
 import { costChoicesAction, expenseAction, submitCostAction, voidExpenseAction } from "@/app/(app)/money/actions";
 import type { ActionState } from "@/lib/actions";
-import { date, money } from "@/lib/format";
+import { money } from "@/lib/format";
+import { useTime } from "@/lib/time-client";
 import { rateOf, type Fx } from "@/lib/fx";
 import type { Person } from "@/lib/types";
 import type { ExpenseView } from "@/lib/types-money";
@@ -212,6 +213,7 @@ export function CostForm({
   /** Change: "Remove this cost…" in the footer. */
   onRemove?: () => void;
 }) {
+  const { date } = useTime();
   const me = useMe();
   const closePanel = useClosePanel();
   const inWindow = useWindowDone() !== null;
@@ -880,6 +882,7 @@ export function ChangeCost({
   /** The order the cost is on, to refresh it after Remove. */
   removeOrderId?: string | null;
 }) {
+  const { date } = useTime();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);

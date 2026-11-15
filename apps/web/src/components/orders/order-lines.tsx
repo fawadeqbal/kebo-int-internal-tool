@@ -8,7 +8,7 @@ import { BatchLines } from "@/components/edits/batch-lines";
 import type { EditCard, EditRef } from "@/lib/types-edits";
 import { LineTable, type LineColumn, type LineResult, type LineRow, type LineValues } from "@/components/lines/line-table";
 import { orderLineAction } from "@/app/(app)/orders/actions";
-import { date } from "@/lib/format";
+import { formatDate } from "@kebo/utils";
 import type { OrderLineView } from "@/lib/types-orders";
 
 /**
@@ -69,7 +69,8 @@ function valuesOf(l: OrderLineView): LineValues {
     factoryCurrency: l.factoryPrice?.currency ?? "",
     taxRate: l.factoryPrice ? raw(l.factoryPrice.taxRate) : "",
     receivedQty: raw(l.receivedQty),
-    receivedOn: l.receivedOn ? date(l.receivedOn) : "",
+    // Typed back in this table (readDate takes "02 Nov 2026"), so always written that way.
+    receivedOn: l.receivedOn ? formatDate(l.receivedOn) : "",
     packageType: l.packing.packageType ?? "",
     packages: l.packing.packages === null ? "" : String(l.packing.packages),
     grossWeightKg: raw(l.packing.grossWeightKg),

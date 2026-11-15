@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { LOST_REASON_LABEL, type InquiryStage, type LostReason } from "@kebo/shared";
 import { Badge } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { date, money, TZ } from "@/lib/format";
+import { date, money, companyToday } from "@/lib/format";
 import type { CostSheetRow, ExpenseList } from "@/lib/types-money";
 import { getSettings, getPeople } from "@/lib/loaders";
 import { Section } from "@/components/order-sections/section";
@@ -32,7 +31,7 @@ export async function DealExpensesCard({
     assignee: { name: string } | null;
   };
 }) {
-  const today = todayIn(TZ);
+  const today = companyToday();
   const [list, people, settings] = await Promise.all([api.get<ExpenseList>("/expenses", { inquiryId: deal.id, pageSize: 200 }), getPeople(), getSettings()]);
   const main = list.currency;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };

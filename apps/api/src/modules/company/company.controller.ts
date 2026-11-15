@@ -4,7 +4,8 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { fromDbDateOrNull } from "@kebo/database";
 import { brandMarkOf, companyOrigin, LIFECYCLE, slugField } from "@kebo/shared";
-import { addDays, ConflictError, DomainError, ForbiddenError, todayIn } from "@kebo/utils";
+import { addDays, ConflictError, DomainError, ForbiddenError, formatDateTime } from "@kebo/utils";
+import { Clock } from "../../common/time/clock.service";
 import { ENV, type Env } from "../../config/env";
 import { PrismaService } from "../../database/prisma.service";
 import { AllowDuringTwoStepSetup, CurrentUser, RequirePermissions } from "../../common/auth/decorators";
@@ -33,6 +34,7 @@ export class CompanyController {
     private readonly settings: SettingsService,
     private readonly domains: OwnDomainService,
     @Inject(ENV) private readonly env: Env,
+    private readonly clock: Clock,
   ) {}
 
   /**
@@ -219,7 +221,7 @@ export class CompanyController {
       this.prisma.platform.company.findUniqueOrThrow({ where: { id: c.id } }),
       this.limits.summary(c),
     ]);
-    const today = todayIn(this.env.APP_TIME_ZONE);
+    const today = this.clock.today();
     const renewsOn = fromDbDateOrNull(row.renewsOn);
     const notices: { tone: "info" | "warn" | "danger"; text: string }[] = [];
     const what = c.kind === "demo" ? "demo" : "trial";
@@ -231,9 +233,7 @@ export class CompanyController {
         text: `${c.name} is read-only${c.statusReason ? ` (${c.statusReason.toLowerCase()})` : ""}: you can look, but not change anything. Contact us to carry on.`,
       });
     else if (c.kind !== "client" && row.endsAt) {
-      const ends = new Intl.DateTimeFormat("en-GB", { timeZone: this.env.APP_TIME_ZONE, dateStyle: "medium", timeStyle: "short" }).format(
-        row.endsAt,
-      );
+      const ends = formatDateTime(row.endsAt, this.clock.style);
       notices.push({
         tone: row.endsAt.getTime() - Date.now() < 86_400_000 ? "warn" : "info",
         text: `This is a ${what}: it ends on ${ends}. Contact us to keep using RFQ Desk.`,

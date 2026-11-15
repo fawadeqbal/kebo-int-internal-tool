@@ -5,7 +5,7 @@
  * every row is created in that company.
  */
 import { documentTotals, fromMinor, splitDeposit, withTaxMinor, priceForMargin, toMinor } from "@kebo/money";
-import { defaultPlan, PRESET_ROLES, readSettings, SETTINGS, type BalanceTerms, type OrderStage, type SettingsKey } from "@kebo/shared";
+import { COMPANY_TIME_KEYS, defaultPlan, PRESET_ROLES, readSettings, SETTINGS, type BalanceTerms, type OrderStage, type SettingsKey } from "@kebo/shared";
 import { addDays, todayIn } from "@kebo/utils";
 import type { PrismaClient } from "./client";
 import { nextReference } from "./counters";
@@ -78,6 +78,8 @@ async function seedSettings(db: SeedDb, opts: CompanyDefaults) {
     // A new company: its own name, and none of the defaults' contact details, bank or stamp.
     if (key === "company" && opts.profile) value = { ...(value as Record<string, unknown>), ...opts.profile };
     else if (key === "company" && opts.companyName) value = companyProfile(opts.companyName, value as Record<string, unknown>);
+    // Time and dates live on the company row, not here.
+    if (key === "company") value = Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([k]) => !(COMPANY_TIME_KEYS as readonly string[]).includes(k)));
     await db.setting.create({ data: { key, value: value as object } });
   }
 }

@@ -2,10 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { LedgerPartyKind } from "@kebo/shared";
 import { buildHref, Card, cn, DataRow, EmptyState, FilterChip, PageHeader, Segmented, Td, Th, THead } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
-import { money } from "@/lib/format";
+import { money, companyToday } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { DataTable } from "@/components/common/data-table";
@@ -14,7 +13,6 @@ import { EntryBody } from "@/components/ledger/entry-body";
 import { StatementButtons } from "@/components/ledger/statement-buttons";
 import { AgeingTiles, day, LedgerFilters, PARTY_PATH, periodOf, span, TypeBadge } from "@/components/ledger/ledger-parts";
 import type { LedgerEntry, LedgerParty } from "@/lib/types-ledger";
-import { TZ } from "../../../sections";
 import { UUID } from "@/lib/ids";
 
 const KIND: Record<string, LedgerPartyKind> = { customers: "customer", factories: "factory", staff: "staff" };
@@ -44,7 +42,7 @@ export default async function PartyLedgerPage({
   const [{ kind: path, id }, sp] = await Promise.all([params, searchParams]);
   const kind = KIND[path];
   if (!kind || !UUID.test(id)) notFound();
-  const today = todayIn(TZ);
+  const today = companyToday();
   const period = periodOf(sp, today);
   const open = sp.open === "1";
   const p = await load(() =>

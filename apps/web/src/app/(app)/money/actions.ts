@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { todayIn } from "@kebo/utils";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
-import { TZ } from "@/lib/format";
+import { companyZone } from "@/lib/session";
 import type { ExpenseTargets } from "@/lib/types-money";
 
 /** Money changes show on the order, the customer and the Money page. */
@@ -271,7 +271,7 @@ export async function submitCostAction(_prev: ActionState, form: FormData): Prom
  * at once, so the answer carries its id. Its opening balance and note are changed on Cash & bank.
  */
 export async function quickAccountAction(name: string, kind: string, currency: string): Promise<{ ok: boolean; message?: string; id?: string }> {
-  const body = { name: name.trim(), kind, currency, openingBalance: "0", openingOn: todayIn(TZ), note: null };
+  const body = { name: name.trim(), kind, currency, openingBalance: "0", openingOn: todayIn(await companyZone()), note: null };
   const r = await attempt(null, () => api.post<{ id: string }>("/money/accounts", body), "Account added.");
   if (r.ok) revalidatePath("/", "layout");
   return { ok: !!r.ok, message: r.ok ? r.message : (r.errors?.name?.[0] ?? r.message), id: (r.data as { id?: string } | undefined)?.id };

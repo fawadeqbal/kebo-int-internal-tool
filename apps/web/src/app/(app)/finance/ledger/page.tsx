@@ -2,11 +2,10 @@ import Link from "next/link";
 import { Alert, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Segmented, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { ArrowRight, Factory, Landmark, List, User, Users } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
-import { todayIn } from "@kebo/utils";
 import { PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
-import { money } from "@/lib/format";
+import { money, companyToday } from "@/lib/format";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { DataTable } from "@/components/common/data-table";
 import { EntryPanel } from "@/components/ledger/entry-panel";
@@ -14,7 +13,6 @@ import { EntryBody } from "@/components/ledger/entry-body";
 import { AgeingTiles, amount, entryCells, LedgerFilters, partyHref, periodOf } from "@/components/ledger/ledger-parts";
 import type { LedgerAccounts, LedgerAgeing, LedgerEntries, LedgerEntry } from "@/lib/types-ledger";
 import type { OrderRow } from "@/lib/types-orders";
-import { TZ } from "../sections";
 
 export const metadata = { title: "Ledger" };
 
@@ -57,7 +55,7 @@ const PATH = "/finance/ledger";
 export default async function LedgerPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requirePermission("ledger.view");
   const sp = await searchParams;
-  const today = todayIn(TZ);
+  const today = companyToday();
   // Balances first (board General ledger); a link into the entries (an account, an order, a period) opens them.
   const entriesAsked = !!(sp.account || sp.order || sp.type || sp.period || sp.from || sp.cur || sp.removed || sp.page);
   const view: View = VIEWS.some((v) => v.key === sp.view) ? (sp.view as View) : entriesAsked ? "all" : "balances";

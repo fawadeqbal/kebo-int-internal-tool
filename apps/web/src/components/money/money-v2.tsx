@@ -15,6 +15,7 @@ import type { ActionState } from "@/lib/actions";
 import type { CustomerCreditView, FactoryPlanView } from "@/lib/types-money";
 import { AccountSelect, RecordedBy } from "./accounts";
 import { FilePicker, useSaveThenSend } from "./attachment";
+import { useTime } from "@/lib/time-client";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -30,8 +31,6 @@ const framed = "flex flex-col gap-3 rounded-xl border border-line bg-surface p-3
 const box = "flex flex-col gap-2 rounded-lg bg-surface-2 p-3";
 const fmt = (minor: Minor, currency: string) => formatMinor(minor, currency);
 const num = (v: string) => (v.trim() && Number.isFinite(Number(v.replace(/,/g, ""))) ? Number(v.replace(/,/g, "")) : 0);
-const shortDay = (iso: string | null | undefined) =>
-  iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" }) : "";
 const METHODS = PAYMENT_METHODS.filter((m) => m !== "credit");
 /** "110,208.90" */
 const grouped = (v: string | undefined) => (v ? Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "");
@@ -400,6 +399,7 @@ function ReceiptFields({
   today: string;
   onClose: () => void;
 }) {
+  const { dayMonth } = useTime();
   const a = useArrival(fx, currency);
   const [typed, setTyped] = useState<Record<string, string>>({});
   const [method, setMethod] = useState<PaymentMethod>("bank_transfer");
@@ -500,7 +500,7 @@ function ReceiptFields({
                         <td className="py-2 pr-2 font-mono text-xs">{o.refNo}</td>
                         <td className="py-2 pr-2">
                           {o.next?.label ?? "Balance"}
-                          {o.next?.dueOn && <span className="block text-xs text-muted">due {shortDay(o.next.dueOn)}</span>}
+                          {o.next?.dueOn && <span className="block text-xs text-muted">due {dayMonth(o.next.dueOn)}</span>}
                         </td>
                         <td className="py-2 pr-2 text-right tabular">{grouped(o.due)}</td>
                         <td className="py-2 text-right">
@@ -574,6 +574,7 @@ export function CustomerCredit({
   canManage: boolean;
   today: string;
 }) {
+  const { dayMonth } = useTime();
   const [doing, setDoing] = useState<"use" | "refund" | null>(null);
   const [orderId, setOrderId] = useState("");
   const main = credit.balances[0] ?? null;
@@ -602,7 +603,7 @@ export function CustomerCredit({
             <tbody>
               {credit.entries.map((e) => (
                 <tr key={e.id} className={cn("border-t border-line", e.voided && "text-muted line-through")}>
-                  <td className="py-2 pr-2 whitespace-nowrap">{shortDay(e.on)}</td>
+                  <td className="py-2 pr-2 whitespace-nowrap">{dayMonth(e.on)}</td>
                   <td className="py-2 pr-2">
                     {e.kind === "in" && e.receipt ? `Left over from ${e.receipt.received.replace(/[\d.]+$/, (n) => grouped(n))}` : (e.note ?? CREDIT_KIND_LABEL[e.kind])}
                     {e.account && <span className="block text-xs text-muted">from {e.account.name}</span>}

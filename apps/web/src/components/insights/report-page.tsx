@@ -3,7 +3,6 @@ import { Banknote, Factory, LayoutGrid, Receipt, Target, TrendingUp, User, Users
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
 import { Alert, buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { crumbsFor, labelFor } from "@/lib/nav";
@@ -18,7 +17,7 @@ import { ProfitSection } from "./profit-section";
 import { CashSection } from "./cash-section";
 import { CustomersSection, FactoriesSection, FunnelSection, PeopleSection } from "./parties-sections";
 import { TargetsView } from "./targets-view";
-import { TZ } from "@/lib/format";
+import { companyToday } from "@/lib/format";
 
 export type ReportSearch = {
   period?: string;
@@ -118,7 +117,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
   const sp = await searchParams;
   const section = SECTION_OF[kind];
   const path = PATH_OF[kind];
-  const today = todayIn(TZ);
+  const today = companyToday();
   const p = periodOf(sp, today);
   const keep = {
     period: p.kind === "quarter" ? undefined : p.kind,

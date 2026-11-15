@@ -359,17 +359,12 @@ export function ProfileForm({
   email,
   phone,
   language,
-  timeZone,
-  zones,
 }: {
   action: Action;
   name: string;
   email: string;
   phone?: string | null;
   language?: string;
-  timeZone?: string | null;
-  /** The time zones to choose from (IANA names). */
-  zones?: string[];
 }) {
   return (
     <ActionForm action={action} className="grid gap-4 sm:grid-cols-3">
@@ -389,16 +384,6 @@ export function ProfileForm({
               <option value="en">English</option>
               <option value="zh">中文 (Chinese)</option>
               <option value="ur">اردو (Urdu)</option>
-            </Select>
-          </Field>
-          <Field label="Time zone" htmlFor="profile-tz" error={s.errors?.timeZone}>
-            <Select id="profile-tz" name="timeZone" defaultValue={s.values?.timeZone ?? timeZone ?? ""}>
-              <option value="">The company&rsquo;s</option>
-              {(zones ?? []).map((z) => (
-                <option key={z} value={z}>
-                  {z}
-                </option>
-              ))}
             </Select>
           </Field>
           <div className="flex items-center gap-2 border-t border-line pt-4 sm:col-span-3">

@@ -6,10 +6,8 @@ import type { ReactNode } from "react";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote } from "lucide-react";
 import { Alert, buildHref, Card, CardBody, CardHeader, LinkTabs, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { AutoSelect } from "@/components/common/auto-select";
-import { date, money } from "@/lib/format";
-import { todayIn } from "@kebo/utils";
+import { date, money, companyToday } from "@/lib/format";
 import { api } from "@/lib/api";
-import { TZ } from "@/lib/format";
 import { requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
@@ -47,13 +45,13 @@ const BACK = /^\/(orders|customers|factories|inquiries)\/[0-9a-f-]{36}(\/[a-z-]+
 export async function RecordPayment({ sp, inWindow = false }: { sp: Search; inWindow?: boolean }) {
   const me = await requireUser();
   if (!opensPayments(me)) redirect("/forbidden");
-  const { canRecord } = await api.get<PaymentList>("/treasury/payments", { pageSize: 1, from: todayIn(TZ), to: todayIn(TZ) });
+  const { canRecord } = await api.get<PaymentList>("/treasury/payments", { pageSize: 1, from: companyToday(), to: companyToday() });
   const allowed = KINDS.filter((k) => canRecord[k.kind]);
   if (!allowed.length) redirect("/payments");
   const kind: Kind = allowed.find((k) => k.kind === sp.kind)?.kind ?? allowed[0]!.kind;
   const orderId = UUID.test(sp.order ?? "") ? sp.order : undefined;
   const customerId = kind === "in" && !orderId && UUID.test(sp.customer ?? "") ? sp.customer : undefined;
-  const today = todayIn(TZ);
+  const today = companyToday();
   const back = BACK.test(sp.back ?? "") ? sp.back : undefined;
   const href = (k: Kind) => buildHref("/payments/new", {}, { kind: k, order: k === "in" || k === "out" ? orderId : undefined, back });
   const prefill =
@@ -109,7 +107,7 @@ export async function RecordPayment({ sp, inWindow = false }: { sp: Search; inWi
 export function numberHint(kindParam: string | undefined) {
   const kind: Kind = KINDS.find((k) => k.kind === kindParam)?.kind ?? "in";
   const PREFIX: Record<Kind, string> = { in: "RC", out: "FP", expense: "EX", transfer: "TR" };
-  return `Number given on save · ${PREFIX[kind]}-${todayIn(TZ).slice(0, 4)}-…`;
+  return `Number given on save · ${PREFIX[kind]}-${companyToday().slice(0, 4)}-…`;
 }
 
 /** Beside the form (board PaymentIn): the order's payment plan, and what happens after saving. */

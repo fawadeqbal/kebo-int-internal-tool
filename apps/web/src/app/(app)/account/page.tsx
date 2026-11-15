@@ -30,7 +30,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const [status, sessions, profile] = await Promise.all([
     api.get<TwoStepStatus>("/me/two-step"),
     api.get<SessionRow[]>("/me/sessions"),
-    api.get<{ phone: string | null; language: string; timeZone: string | null }>("/me/profile").catch(() => null),
+    api.get<{ phone: string | null; language: string }>("/me/profile").catch(() => null),
   ]);
   const twoStep = (
     <TwoStepPanel
@@ -67,8 +67,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 email={me.email}
                 phone={profile?.phone}
                 language={profile?.language}
-                timeZone={profile?.timeZone}
-                zones={Intl.supportedValuesOf("timeZone")}
               />
             </div>
           </Card>

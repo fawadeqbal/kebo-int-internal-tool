@@ -2,8 +2,7 @@ import { ArrowRight, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { can } from "@kebo/shared";
 import { Banner, ButtonLink, cn, PageHeader, PriorityBadge, RefCode } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
-import { TZ } from "@/lib/format";
+import { companyToday } from "@/lib/format";
 import { requireUser, hasFeature } from "@/lib/session";
 import { dealOf } from "@/lib/deal-data";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -28,7 +27,7 @@ export default async function DealLayout({ children, params }: { children: React
   const order = d.orders.find((o) => o.status !== "cancelled");
   const base = `/inquiries/${d.id}`;
   const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const status = statusWords(d, facts, todayIn(TZ));
+  const status = statusWords(d, facts, companyToday());
   const next = inquiryNext(d, facts);
   const meta = [
     <span key="st" className={cn("font-semibold whitespace-nowrap", TONE[status.tone])}>

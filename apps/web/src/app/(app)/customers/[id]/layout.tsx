@@ -1,16 +1,15 @@
 import { Pencil, Plus } from "lucide-react";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
 import { ButtonLink, PageHeader, RefCode } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
 import { requireUser } from "@/lib/session";
 import { customerOf, customerPaymentsOf } from "@/lib/party-data";
-import { TZ } from "@/lib/format";
+import { companyToday, currentZone } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import { RecordTabs } from "@/components/common/record-tabs";
 import { late } from "./shared";
 
 /** "Mar 2025" */
-const monthOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: TZ });
+const monthOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: currentZone() }); // "since Nov 2026", company time
 
 /**
  * Every page of a customer shares one top (design: Record): ← Customers, the name with a status worked out
@@ -22,7 +21,7 @@ export default async function CustomerLayout({ children, params }: { children: R
   const { id } = await params;
   const me = await requireUser();
   const [c, pay] = await Promise.all([customerOf(id), customerPaymentsOf(id)]);
-  const today = todayIn(TZ);
+  const today = companyToday();
   const canAsk = can(me, "inquiries.create");
   const countryKnown = c.country !== UNKNOWN_COUNTRY;
   const base = `/customers/${c.id}`;

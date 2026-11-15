@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { ExportLink } from "@/components/sheets/export-link";
 import { hasFeature } from "@/lib/session";
 import { PeriodBar, periodOf } from "@/components/common/period";
-import { date, money, TZ, whole } from "@/lib/format";
+import { date, money, whole } from "@/lib/format";
 import type { CashBook, CashRow } from "@/lib/types-money";
 import { VoidForm } from "@/components/money/forms";
 import { EditAccount, MoveMoney, NewAccount, PutOnAccount, type AccountRow } from "@/components/money/cash-forms";
@@ -466,4 +466,3 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
 
 /* ---------------------------------------------------------------- payables */
 
-export { TZ };

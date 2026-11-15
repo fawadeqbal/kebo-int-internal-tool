@@ -7,6 +7,7 @@ import { useClosePanel } from "@/components/common/panel";
 import { recordEditAction } from "@/lib/edit-actions";
 import type { EditCard, EditRef } from "@/lib/types-edits";
 import { ReasonDialog } from "./edits";
+import { useTime } from "@/lib/time-client";
 
 /** `confirm`: the order's checks saw something out of order (the message says what): ask, then save anyway with why. */
 export type SaveResult = { ok: true } | { ok: false; message: string; reasonChoices?: string[]; confirm?: boolean };
@@ -21,6 +22,7 @@ type Asking = { changes: string[]; note?: string; choices?: readonly string[]; a
  * panel closes.
  */
 export function useEditSave({ edit, card, what = "lines" }: { edit?: EditRef; card?: EditCard | null; what?: "lines" | "values" | "steps" }) {
+  const { date } = useTime();
   const router = useRouter();
   const close = useClosePanel();
   const [asking, setAsking] = useState<Asking | null>(null);
@@ -82,9 +84,7 @@ export function useEditSave({ edit, card, what = "lines" }: { edit?: EditRef; ca
       saveLabel={asking.anyway ? "Save anyway" : undefined}
       cancelLabel={asking.anyway ? "Go back and fix" : undefined}
       n={asking.anyway ? undefined : (card?.count ?? 0) + 1}
-      note={asking.note?.replace(/\d{4}-\d{2}-\d{2}/g, (d) =>
-        new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }),
-      )}
+      note={asking.note?.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d))}
       changes={asking.changes}
       choices={asking.choices ?? (what === "lines" ? REASON_CHOICES.edit : REASON_CHOICES.editValues)}
       busy={busy}

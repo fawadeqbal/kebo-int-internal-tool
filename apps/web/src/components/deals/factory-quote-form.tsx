@@ -8,7 +8,7 @@ import { Button, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryOption, FactoryQuoteView, LastOffer } from "@/lib/types-deals";
-import { date } from "@/lib/format";
+import { useTime } from "@/lib/time-client";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
@@ -496,6 +496,7 @@ export function OfferHeaderForm({
   note?: ReactNode;
   footer: ReactNode;
 }) {
+  const { date } = useTime();
   // How the window opens; a field still like this has not been typed in.
   const [start] = useState<QuoteState>(() => ({
     ...initialState(quote, today),

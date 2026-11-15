@@ -1,7 +1,6 @@
 import { NOTE_KIND_LABEL, type NoteKind } from "@kebo/shared";
 import { Avatar, Badge, Card, CardHeader, EmptyState } from "@kebo/ui";
-import { todayIn } from "@kebo/utils";
-import { date, TZ } from "@/lib/format";
+import { date, companyToday } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
 import type { Note } from "@/lib/types-notes";
 import { NoteCardForm } from "./note-forms";
@@ -60,7 +59,7 @@ export function NotesTab({
         <Card>
           <CardHeader title="Add a note" />
           <div className="p-5">
-            <NoteCardForm action={add} contacts={contacts} today={todayIn(TZ)} />
+            <NoteCardForm action={add} contacts={contacts} today={companyToday()} />
           </div>
         </Card>
       )}

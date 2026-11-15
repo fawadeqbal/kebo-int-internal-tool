@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Paperclip } from "lucide-react";
 import { EXPENSE_CATEGORY_LABEL, INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE } from "@kebo/shared";
 import { Badge, cn } from "@kebo/ui";
-import { date, money } from "@/lib/format";
+import { money } from "@/lib/format";
+import { useTime } from "@/lib/time-client";
 import type { Fx } from "@/lib/fx";
 import type { Person } from "@/lib/types";
 import type { ExpenseView } from "@/lib/types-money";
@@ -56,6 +57,7 @@ export function ExpenseRecord({
   showFor?: boolean;
   canChange?: boolean;
 }) {
+  const { date } = useTime();
   const removed = Boolean(e.voided);
   const setup: CostSetup = { mainCurrency, fx, today, people, for: costForOf(e), choices };
   return (
