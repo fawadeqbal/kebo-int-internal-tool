@@ -49,7 +49,7 @@ import { requireReason } from "../../common/audit/reason";
 import { ordersWithMoneyDue } from "../billing/api";
 import { chargedExpenses, fxOf, moneyFacts, positionOf, type MoneyCtx } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
-import { factoryPlansOf } from "../billing/api";
+import { factoryPlansFor } from "../billing/api";
 import { createPlan, termsOf } from "../billing/api";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { setPaymentTerms } from "./payment-terms";
@@ -793,8 +793,11 @@ export class OrdersService {
     // A factory's part (the advance, the balance on the ready date) due soon or late, for people who see factory money.
     if (can(user, "sourcing.manage")) {
       const { sales } = await this.settings.get();
-      for (const i of all.filter((x) => x.status === "open")) {
-        for (const p of await factoryPlansOf(this.prisma.db, i.id, sales.factoryAdvancePercent, today, soon, fxOf(await this.settings.get(), await this.limits.allows("expenses")))) {
+      const open = all.filter((x) => x.status === "open");
+      // Every open order's payment plans in one read, not one read per order.
+      const plans = await factoryPlansFor(this.prisma.db, open.map((i) => i.id), sales.factoryAdvancePercent, today, soon, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
+      for (const i of open) {
+        for (const p of plans.get(i.id) ?? []) {
           const n = p.next;
           if (!n?.due || (n.status !== "due" && n.status !== "late")) continue;
           if (!i.needs || n.due < i.needs.due) i.needs = { title: `Pay ${p.factory.name}: ${n.label} ${p.currency} ${n.open}`, due: n.due, late: n.due < today };

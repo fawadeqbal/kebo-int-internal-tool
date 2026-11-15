@@ -25,7 +25,7 @@ import { factoryPositionsSql, positionsSql } from "../billing/api";
 import { orderRate } from "../money/order-money";
 import { chargedExpenses, fxOf, positionOf, type MoneyCtx } from "../billing/api";
 import { livePlansOf } from "../billing/api";
-import { factoryPlansOf } from "../billing/api";
+import { factoryPlansFor } from "../billing/api";
 import { LedgerPosting } from "./posting.service";
 import { ledgerCheck, type LedgerCheck } from "./check";
 import { companySnapshot } from "../quotations/quotations.service";
@@ -911,10 +911,12 @@ export class LedgerService {
           (o) => [o.id, o],
         ),
       );
+      // Every order's payment plans in one read, not one read per order.
+      const allPlans = await factoryPlansFor(db, [...orders.keys()], s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx);
       for (const orderId of orderIds) {
         const o = orders.get(orderId);
         if (!o) continue;
-        const plans = await factoryPlansOf(db, orderId, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx);
+        const plans = allPlans.get(orderId) ?? [];
         for (const p of plans) {
           if (!owing.some((r) => r.orderId === orderId && r.factoryId === p.factory.id && r.currency === p.currency)) continue;
           const rate = p.currency === fx.main ? 1 : (fx.rates[p.currency] ?? null);

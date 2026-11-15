@@ -53,7 +53,10 @@ export function ButtonLink({
   className,
   ...props
 }: ComponentProps<typeof Link> & { variant?: ButtonVariant; size?: ButtonSize }) {
-  return <Link className={buttonClass(variant, size, className)} {...props} />;
+  // A file (Excel export, PDF, a print or a download) is made only when clicked: never fetched ahead (a prefetch
+  // of an export built the whole file on every visit to the list).
+  const file = typeof props.href === "string" && /^\/(sheets|files|pdf|print|api)\//.test(props.href);
+  return <Link className={buttonClass(variant, size, className)} {...(file && props.prefetch === undefined ? { prefetch: false } : {})} {...props} />;
 }
 
 /* ---------------------------------------------------------------- Form controls */

@@ -133,4 +133,21 @@ describe("tab counts match what each tab lists", () => {
       for (const k of kinds.slice(0, 5)) expect(a.counts[k], `audit ${k}`).toBe((await get("/audit", { ...base, entityType: k, pageSize: "1" })).total);
     }
   });
+  it("purchase orders (one page at a time, counts for the same search)", async () => {
+    const tabs = ["all", "not_sent", "in_production", "ready", "shipped", "cancelled"];
+    for (const base of [{}, { q: "PO" }, { ready: "none" }]) {
+      await check(
+        "/operations/purchase-orders/page",
+        base,
+        tabs.map((t) => [t, { status: t }]),
+        (b) => b.counts as Record<string, number>,
+      );
+    }
+    // Only the page asked for comes back, and the pages add up to the tab.
+    const first = await get("/operations/purchase-orders/page", { pageSize: "5" });
+    expect(first.rows.length).toBeLessThanOrEqual(5);
+    expect(first.total).toBe(first.counts.all);
+    const all = await get("/operations/purchase-orders", { all: "true" });
+    expect(first.total).toBe(all.length);
+  });
 });

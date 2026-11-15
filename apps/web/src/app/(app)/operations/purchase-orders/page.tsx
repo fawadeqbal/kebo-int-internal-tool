@@ -7,7 +7,7 @@ import { crumbsFor } from "@/lib/nav";
 import { date, money, short } from "@/lib/format";
 import { FilterCard } from "@/components/common/filter-card";
 import { getSettings } from "@/lib/loaders";
-import { PURCHASE_ORDER_STATUS, purchaseOrderHref, type PurchaseOrderRow } from "@/lib/purchase-orders";
+import { PURCHASE_ORDER_STATUS, purchaseOrderHref, type PurchaseOrderPage } from "@/lib/purchase-orders";
 
 export const metadata = { title: "Purchase orders" };
 
@@ -36,29 +36,18 @@ export default async function PurchaseOrdersPage({
 }) {
   await requirePermission("sourcing.manage");
   const sp = await searchParams;
-  const [all, settings] = await Promise.all([api.get<PurchaseOrderRow[]>("/operations/purchase-orders", { all: "true" }), getSettings()]);
-  const main = settings.sales.currency;
-  const today = new Date().toISOString().slice(0, 10);
-  const month = today.slice(0, 7);
   const chip = CHIPS.some((c) => c.key === sp.status) ? (sp.status as (typeof CHIPS)[number]["key"]) : "all";
-  const inChip = (r: PurchaseOrderRow, c: string) => c === "all" || r.status === c || (c === "in_production" && r.status === "late");
-  const q = sp.q?.trim().toLowerCase() ?? "";
-  // The search and filters, the same for every tab: a tab's count is exactly what it lists.
-  const searched = all
-    .filter((r) => !q || [r.po?.number, r.supplier.name, r.order.refNo, r.customer.name, r.supplierRef].filter(Boolean).join(" ").toLowerCase().includes(q))
-    .filter((r) => !sp.supplier || r.supplier.id === sp.supplier)
-    .filter((r) => !sp.ready || (sp.ready === "month" ? r.readyOn?.startsWith(month) : sp.ready === "late" ? r.status === "late" : sp.ready === "none" ? !r.readyOn : true));
-  const rows = searched.filter((r) => inChip(r, chip));
+  const ready = sp.ready === "month" || sp.ready === "late" || sp.ready === "none" ? sp.ready : undefined;
   const page = toPage(sp.page);
-  const shown = rows.slice((page - 1) * PAGE, page * PAGE);
-  const open = all.filter((r) => r.status !== "cancelled" && r.status !== "shipped");
-  const late = all.filter((r) => r.status === "late");
-  // What we still owe factories, in each currency (the tile shows the largest, the rest under it).
-  const owe = new Map<string, number>();
-  for (const r of all) if (r.status !== "cancelled" && Number(r.toPay) > 0) owe.set(r.currency, (owe.get(r.currency) ?? 0) + Number(r.toPay));
-  const oweList = [...owe.entries()].sort((a, b) => b[1] - a[1]);
-  const suppliers = [...new Map(all.map((r) => [r.supplier.id, r.supplier.name])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  const keep = { status: chip === "all" ? undefined : chip, q: sp.q, supplier: sp.supplier, ready: sp.ready };
+  // Only the page shown comes from the server, with each tab's count and the tiles worked out there.
+  const [data, settings] = await Promise.all([
+    api.get<PurchaseOrderPage>("/operations/purchase-orders/page", { status: chip, q: sp.q?.trim() || undefined, supplier: sp.supplier, ready, page: String(page), pageSize: String(PAGE) }),
+    getSettings(),
+  ]);
+  const main = settings.sales.currency;
+  const { tiles } = data;
+  const shown = data.rows;
+  const keep = { status: chip === "all" ? undefined : chip, q: sp.q, supplier: sp.supplier, ready };
   const href = (p: Record<string, string | undefined>) => buildHref("/operations/purchase-orders", keep, { ...p, page: undefined });
 
   return (
@@ -75,23 +64,23 @@ export default async function PurchaseOrdersPage({
         }
       />
       <StatRow className="mb-4">
-        <StatTile label="Open POs" value={open.length} />
+        <StatTile label="Open POs" value={tiles.open} />
         <StatTile
           icon={ShoppingCart}
           iconColor={2}
           label="We owe factories"
-          value={oweList.length ? short(oweList[0]![1], oweList[0]![0]) : money(0, main)}
-          sub={oweList.length > 1 ? oweList.slice(1).map(([c, v]) => short(v, c)).join(" · ") : undefined}
+          value={tiles.owe.length ? short(tiles.owe[0]!.amount, tiles.owe[0]!.currency) : money(0, main)}
+          sub={tiles.owe.length > 1 ? tiles.owe.slice(1).map((o) => short(o.amount, o.currency)).join(" · ") : undefined}
         />
-        <StatTile icon={Boxes} iconColor={3} label="Ready this month" value={all.filter((r) => r.readyOn?.startsWith(month) && r.status !== "cancelled").length} />
+        <StatTile icon={Boxes} iconColor={3} label="Ready this month" value={tiles.readyThisMonth} />
         <StatTile
           icon={AlertTriangle}
           iconColor={5}
           label="Late"
-          value={late.length}
-          tone={late.length ? "bad" : undefined}
-          sub={late.length ? late.map((r) => r.po?.number ?? r.order.refNo).slice(0, 2).join(", ") : undefined}
-          href={late.length ? href({ status: "in_production", ready: "late" }) : undefined}
+          value={tiles.late}
+          tone={tiles.late ? "bad" : undefined}
+          sub={tiles.late ? tiles.lateRefs.join(", ") : undefined}
+          href={tiles.late ? href({ status: "in_production", ready: "late" }) : undefined}
         />
       </StatRow>
 
@@ -99,7 +88,6 @@ export default async function PurchaseOrdersPage({
         label="Which purchase orders"
         className="mb-4"
         tabs={CHIPS.map((c) => {
-          const n = searched.filter((r) => inChip(r, c.key)).length;
           const Icon = c.icon;
           return {
             href: href({ status: c.key === "all" ? undefined : c.key }),
@@ -109,7 +97,7 @@ export default async function PurchaseOrdersPage({
                 {c.label}
               </>
             ),
-            count: n,
+            count: data.counts[c.key],
             active: chip === c.key,
           };
         })}
@@ -121,7 +109,7 @@ export default async function PurchaseOrdersPage({
         keep={{ status: keep.status }}
         clearHref={href({ q: undefined })}
         selects={[
-          { name: "supplier", label: "Supplier", value: sp.supplier, options: suppliers.map(([value, label]) => ({ value, label })) },
+          { name: "supplier", label: "Supplier", value: sp.supplier, options: data.suppliers.map((x) => ({ value: x.id, label: x.name })) },
           {
             name: "ready",
             label: "Ready",
@@ -138,8 +126,8 @@ export default async function PurchaseOrdersPage({
       <Card className="overflow-hidden">
         {shown.length === 0 ? (
           <EmptyState
-            title={all.length ? "No purchase order matches" : "No purchase orders yet"}
-            description={all.length ? "Clear the search or choose All." : "Each supplier on a sales order gets one, numbered PO-2026-0001, when the order is made."}
+            title={data.suppliers.length ? "No purchase order matches" : "No purchase orders yet"}
+            description={data.suppliers.length ? "Clear the search or choose All." : "Each supplier on a sales order gets one, numbered PO-2026-0001, when the order is made."}
           />
         ) : (
           <Table className="min-w-[900px]">
@@ -190,7 +178,7 @@ export default async function PurchaseOrdersPage({
           </Table>
         )}
       </Card>
-      <Pager base="/operations/purchase-orders" params={keep} page={page} pageSize={PAGE} total={rows.length} bare />
+      <Pager base="/operations/purchase-orders" params={keep} page={page} pageSize={PAGE} total={data.total} bare />
     </div>
   );
 }

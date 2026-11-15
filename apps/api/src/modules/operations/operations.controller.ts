@@ -4,7 +4,16 @@ import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
-import { OperationsService } from "./operations.service";
+import { OperationsService, PURCHASE_ORDER_TABS, type PurchaseOrderPageQuery } from "./operations.service";
+
+const pageQuery = z.object({
+  status: z.enum(PURCHASE_ORDER_TABS).default("all"),
+  q: z.string().trim().max(100).optional(),
+  supplier: z.string().uuid().optional(),
+  ready: z.enum(["month", "late", "none"]).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
 
 /** Operations & trading lists across orders: shipments and purchase orders. */
 @ApiTags("operations")
@@ -19,6 +28,16 @@ export class OperationsController {
     @Query(Validate(z.object({ all: z.enum(["true", "false"]).optional() }))) q: { all?: string },
   ) {
     return this.operations.shipments(user, q.all === "true");
+  }
+
+  /**
+   * The Purchase orders list, a page at a time, with each tab's count, the tiles and the suppliers for the
+   * filter: ?status=all|not_sent|in_production|ready|shipped|cancelled&q&supplier&ready=month|late|none&page&pageSize.
+   * People who see costs.
+   */
+  @Get("purchase-orders/page")
+  purchaseOrderPage(@CurrentUser() user: SessionUser, @Query(Validate(pageQuery)) q: PurchaseOrderPageQuery) {
+    return this.operations.purchaseOrderPage(user, q);
   }
 
   /**

@@ -64,11 +64,14 @@ class CashController {
     private readonly limits: LimitsService,
   ) {}
 
-  /** Our accounts (cash, banks, wallets): to choose from when recording money; managers also get balances. */
+  /**
+   * Our accounts (cash, banks, wallets): to choose from when recording money; managers also get balances.
+   * ?choose=true: only the list to choose from (no balances), as every money window needs it.
+   */
   @Get("money/accounts")
-  async moneyAccounts(@CurrentUser() user: SessionUser) {
+  async moneyAccounts(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ choose: z.enum(["true", "false"]).optional() }))) q: { choose?: string }) {
     // The cash book is a plan feature: without it there are no accounts to choose.
-    return (await this.limits.allows("cash_book")) ? this.cash.accounts(user) : [];
+    return (await this.limits.allows("cash_book")) ? this.cash.accounts(user, q.choose === "true") : [];
   }
 
   @RequireFeature("cash_book")

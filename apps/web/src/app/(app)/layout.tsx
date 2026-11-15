@@ -24,24 +24,29 @@ function logoUrl(logo: string | undefined) {
 
 export default async function AppLayout({ children, window: win }: { children: React.ReactNode; window: React.ReactNode }) {
   const me = await requireUser();
-  const [{ unread }, settings, company] = await Promise.all([
+  const has = (p: Parameters<typeof can>[1]) => can(me, p);
+  const companyP = getCompany();
+  const featureOf = (c: Awaited<typeof companyP>) => (f: string) => !c || c.features.includes(f);
+  // Money received and expenses sent for approval: approvers see how many wait for them; those who add them, how many were sent back.
+  const approvesIn = (c: Awaited<typeof companyP>) => has("payments.record") || (has("expenses.manage") && featureOf(c)("expenses"));
+  // Everything the frame needs, asked for at the same time rather than one after another.
+  const [{ unread }, settings, company, accounts, approvals] = await Promise.all([
     api.get<{ unread: number }>("/notifications", { take: 1 }),
     getSettings(),
-    getCompany(),
+    companyP,
+    // Our money accounts, for every form that records money (payments, factory payments, expenses): the list to choose from only.
+    has("payments.record") || has("expenses.manage") || has("money.submit") ? api.get<AccountOption[]>("/money/accounts", { choose: "true" }).catch(() => []) : [],
+    companyP.then((c) => {
+      const approves = approvesIn(c);
+      if (!approves && !has("money.submit")) return null;
+      return api
+        .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approves ? undefined : "true", pageSize: 1 })
+        .then((r) => (approves ? r.counts.pending : r.counts.sent_back))
+        .catch(() => 0);
+    }),
   ]);
-  const feature = (f: string) => !company || company.features.includes(f);
-  const has = (p: Parameters<typeof can>[1]) => can(me, p);
-  // Our money accounts, for every form that records money (payments, factory payments, expenses).
-  const accounts = has("payments.record") || has("expenses.manage") || has("money.submit") ? await api.get<AccountOption[]>("/money/accounts").catch(() => []) : [];
-  // Money received and expenses sent for approval: approvers see how many wait for them; those who add them, how many were sent back.
-  const approves = has("payments.record") || (has("expenses.manage") && feature("expenses"));
-  const approvals =
-    approves || has("money.submit")
-      ? await api
-          .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approves ? undefined : "true", pageSize: 1 })
-          .then((r) => (approves ? r.counts.pending : r.counts.sent_back))
-          .catch(() => 0)
-      : null;
+  const feature = featureOf(company);
+  const approves = approvesIn(company);
 
   // The menu's groups: each page only for those who may open it, with the same checks as the page itself.
   const modules = buildModules({

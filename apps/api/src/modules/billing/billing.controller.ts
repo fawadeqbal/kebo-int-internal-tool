@@ -1,7 +1,8 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { invoicesQuery, type InvoicesQuery } from "@kebo/shared";
+import { invoicesQuery, isoDate, type InvoicesQuery } from "@kebo/shared";
+import type { ISODate } from "@kebo/utils";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -13,7 +14,7 @@ import { BillingService } from "./billing.service";
 export class BillingController {
   constructor(private readonly billing: BillingService) {}
 
-  /** What we still owe each factory on orders not cancelled. ?mine=true: the factories I look after. */
+  /** What we still owe each factory on orders not cancelled. ?mine=true: the factories I look after; ?factory=: one supplier. */
   @Get("money/payables")
   payables(
     @CurrentUser() user: SessionUser,
@@ -24,12 +25,14 @@ export class BillingController {
             .enum(["true", "false"])
             .optional()
             .transform((v) => v === "true"),
+          /** Only this supplier's (its own page). */
+          factory: z.string().uuid().optional(),
         }),
       ),
     )
-    q: { mine: boolean },
+    q: { mine: boolean; factory?: string },
   ) {
-    return this.billing.payables(user, q.mine);
+    return this.billing.payables(user, q.mine, q.factory);
   }
 
   /** One payment request of an order (`ref`: its plan row): what it asks for, where it stands, the copies kept when sent, its payments. */
@@ -93,12 +96,14 @@ export class BillingController {
             .enum(["true", "false"])
             .optional()
             .transform((v) => v === "true"),
+          /** Only the parts late or due by this day. */
+          dueBy: isoDate().optional(),
         }),
       ),
     )
-    q: { mine: boolean },
+    q: { mine: boolean; dueBy?: string },
   ) {
-    return this.billing.toPay(user, q.mine);
+    return this.billing.toPay(user, q.mine, q.dueBy as ISODate | undefined);
   }
 
   /** The open invoices of one side, instalment by instalment (late first). ?side=receivable|payable, ?mine=true. */

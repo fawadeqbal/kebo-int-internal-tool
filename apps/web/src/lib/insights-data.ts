@@ -52,7 +52,8 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
     facts<CashFacts>("cash", twelve),
     facts<FactOrders>("orders", { ...span, limit: 1000 }),
     maybe(() => api.get<Receivables>("/money/receivables")),
-    money ? maybe(() => api.get<ToPayList>("/billing/to-pay")) : null,
+    // Only the factories' parts due in the next 7 days (the list below), not every open one.
+    money ? maybe(() => api.get<ToPayList>("/billing/to-pay", { dueBy: addDays(todayIn(TZ), 7) })) : null,
     money ? maybe(() => api.get<OpenBills>("/money/bills")) : null,
     money ? maybe(() => api.get<CashReport>("/money/cash-report", span)) : null,
     money ? maybe(() => api.get<CashReport>("/money/cash-report", prev)) : null,
