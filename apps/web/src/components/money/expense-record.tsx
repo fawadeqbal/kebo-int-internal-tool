@@ -12,7 +12,8 @@ import { removeReceiptAction, voidExpenseAction } from "@/app/(app)/money/action
 import { PaymentRecord } from "./payment-record";
 import { AttachedFile } from "./attachment";
 import { VoidForm } from "./forms";
-import { AddCost, ChangeCost, costForOf, type CostSetup, type ExpenseChoices } from "./cost-window";
+import { AddCost, ChangeCost, type CostSetup, type ExpenseChoices } from "./cost-window";
+import { costForOf } from "./cost-kinds";
 import { StopRepeating } from "./company-costs";
 
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { expenseShort, ORDER_TAB_LABEL } from "@kebo/shared";
-import { Alert, Badge, buttonClass, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
-import { money, whole } from "@/lib/format";
+import { ORDER_TAB_LABEL } from "@kebo/shared";
+import { Alert, Badge, buttonClass, cn } from "@kebo/ui";
+import { date, money, whole } from "@/lib/format";
 import type { CostSheetRow } from "@/lib/types-money";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
@@ -10,14 +10,13 @@ import { ROW_LINK } from "@/components/order-sections/section-window";
 import { PayCostWindow, RepayWindow } from "@/components/order-sections/costs-windows";
 import { orderCostsSetup } from "@/components/orders/costs-data";
 import { AddCost, ChangeCost } from "@/components/money/cost-window";
+import { costForOf, costKind } from "@/components/money/cost-kinds";
+import { CostSheetTable, OwedBack, paidHow } from "@/components/orders/cost-sheet";
 import { CostsExcel } from "@/components/orders/costs-tables";
-import { COST_FROM, costState } from "@/components/orders/cost-words";
+import { costState } from "@/components/orders/cost-words";
 import { stageData } from "../stage-data";
 
 export const metadata = { title: "Order · costs" };
-
-const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const dash = <span className="text-muted">—</span>;
 
 /** One of the four figures at the top. */
 function Figure({ label, value, sub, tone, first }: { label: string; value: string; sub: string; tone?: "ok" | "warn" | "bad"; first?: boolean }) {
@@ -54,6 +53,15 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
   const known = sheet.rows.filter((r) => r.kind !== "estimate").length;
   const toPay = Number(sheet.toPay ?? 0);
   const dealSpent = (m?.dealExpenses ?? []).filter((e) => !e.voided);
+  const beforeTotal = dealSpent.reduce((t, e) => t + Number(e.inMain), 0);
+  // Paid from someone's own money and not paid back yet: per person and currency.
+  const owed = costs.toRepay.map((r) => ({
+    person: r.person,
+    currency: r.currency,
+    amount: r.amount,
+    ids: r.items.map((x) => x.id),
+    since: r.items.reduce((a, x) => (x.spentOn < a ? x.spentOn : a), r.items[0]?.spentOn ?? now),
+  }));
   const fromHref: Partial<Record<CostSheetRow["from"], string>> = { factory: `${base}/factory`, shipment: `${base}/shipping`, payment: `${base}/payment` };
 
   /** What can be done on a row: pay or repay what waits, open where it comes from, or change a cost added here. */
@@ -116,72 +124,18 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
         {sheet.rows.length === 0 ? (
           <p className="border-t border-line px-[18px] py-3.5 text-[13px] text-text-2">No cost known yet.</p>
         ) : (
-          <Table className="min-w-[640px]">
-            <THead>
-              <tr>
-                <Th>What for</Th>
-                <Th>Who we owe</Th>
-                <Th>Comes from</Th>
-                <Th className="text-right">Cost {c}</Th>
-                <Th className="text-right">Paid</Th>
-                <Th className="text-right">Still to pay</Th>
-                <Th>
-                  <span className="sr-only">Pay or change</span>
-                </Th>
-              </tr>
-            </THead>
-            <tbody>
-              {sheet.rows.map((r) => {
-                const ours = r.borneBy === "us";
-                const e = r.expenseId ? byId.get(r.expenseId) : undefined;
-                const kind = r.kind === "goods" ? "Goods from the factory" : r.kind === "estimate" ? "Estimated on the quotation" : r.category && r.kind === "cost" ? expenseShort(r.category) : r.label;
-                const detail = r.kind === "cost" && r.label !== kind ? r.label : r.kind === "estimate" ? r.label : null;
-                return (
-                  <Tr key={r.key} className={r.kind === "estimate" || !ours ? "text-text-2" : undefined}>
-                    <Td>
-                      <span className="font-semibold">{kind}</span>
-                      {detail && <span className="block text-xs text-text-2">{detail}</span>}
-                      {e?.receipt && (
-                        <a href={`/files/${e.receipt.id}?view=1`} target="_blank" rel="noreferrer" className="block text-xs text-primary hover:underline">
-                          Their bill
-                        </a>
-                      )}
-                    </Td>
-                    <Td>{r.owedTo ?? dash}</Td>
-                    <Td className="text-text-2">
-                      {fromHref[r.from] ? (
-                        <Link href={fromHref[r.from]!} className="hover:text-primary hover:underline">
-                          {COST_FROM[r.from]}
-                        </Link>
-                      ) : (
-                        COST_FROM[r.from]
-                      )}
-                    </Td>
-                    <Td className="text-right whitespace-nowrap tabular">
-                      {r.inOrder !== null ? n2(r.inOrder) : dash}
-                      {(r.currency !== c || r.inOrder === null) && <span className="block text-xs text-text-2">{money(r.amount, r.currency)}</span>}
-                    </Td>
-                    <Td className="text-right whitespace-nowrap tabular">{r.paidInOrder !== null && r.kind !== "estimate" ? n2(r.paidInOrder) : dash}</Td>
-                    <Td className={cn("text-right whitespace-nowrap tabular", Number(r.toPayInOrder ?? 0) > 0 && "font-semibold text-warn")}>{r.toPayInOrder !== null && r.kind !== "estimate" ? n2(r.toPayInOrder) : dash}</Td>
-                    <Td className="text-right">{action(r)}</Td>
-                  </Tr>
-                );
-              })}
-            </tbody>
-            {sheet.costs !== null && (
-              <tfoot>
-                <tr className="border-t-2 border-line-strong font-bold">
-                  <td className="px-3.5 py-3" colSpan={3}>
-                    Total
-                  </td>
-                  <td className="px-3.5 py-3 text-right tabular">{n2(sheet.costs)}</td>
-                  <td className="px-3.5 py-3 text-right tabular">{n2(sheet.paid ?? 0)}</td>
-                  <td className={cn("px-3.5 py-3 text-right tabular", toPay > 0 && "text-warn")}>{n2(sheet.toPay ?? 0)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            )}
-          </Table>
+          <CostSheetTable
+            rows={sheet.rows}
+            currency={c}
+            totals={sheet.costs !== null ? { costs: sheet.costs, paid: sheet.paid ?? "0", toPay: sheet.toPay ?? "0" } : null}
+            action={action}
+            receiptOf={(r) => (r.expenseId ? (byId.get(r.expenseId)?.receipt ?? null) : null)}
+            howOf={(r) => {
+              const e = r.expenseId ? byId.get(r.expenseId) : undefined;
+              return e ? paidHow(e) : null;
+            }}
+            fromHref={fromHref}
+          />
         )}
         {Number(sheet.uncosted) > 0 && (
           <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">{money(sheet.uncosted, c)} of the order is on lines without a cost: left out of the profit.</p>
@@ -190,24 +144,38 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
 
       {dealSpent.length > 0 && m && (
         <Section
-          title="Spent before the order"
-          state={`${dealSpent.length} expense${dealSpent.length === 1 ? "" : "s"}`}
+          title="Spent on its inquiry before the order"
+          state={`${dealSpent.length} cost${dealSpent.length === 1 ? "" : "s"} · ${money(beforeTotal, setup.mainCurrency)}`}
           actions={
-            <Link href={`/inquiries/${m.deal.id}`} className={buttonClass("ghost", "xs")}>
+            <Link href={`/inquiries/${m.deal.id}/costs`} className={buttonClass("ghost", "xs")}>
               Open the inquiry
             </Link>
           }
         >
-          <ul className="flex flex-col divide-y divide-line border-t border-line px-[18px]">
-            {dealSpent.map((e) => (
-              <li key={e.id} className="flex justify-between gap-3 py-2.5 text-[13px]">
-                <span>{e.description}</span>
-                <span className="text-text-2 tabular">{money(e.amount, e.currency)}</span>
-              </li>
-            ))}
+          <p className="border-t border-line px-[18px] pt-2.5 text-xs text-text-2">
+            {dealSpent[0]?.deal ? `From ${dealSpent[0].deal.refNo}. ` : ""}Not in Profit now, which stays the number the Orders list and Reports use. It counts on{" "}
+            {o.customer.name} after all costs.
+          </p>
+          <ul className="flex flex-col divide-y divide-line px-[18px]">
+            {dealSpent.map((e) => {
+              const how = [e.paidBy?.name, paidHow(e)].filter(Boolean).join(" · ");
+              return (
+                <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-[13px]">
+                  <span className="w-14 shrink-0 text-text-2 tabular">{date(e.spentOn).replace(/ \d{4}$/, "")}</span>
+                  <span className="min-w-0 flex-1">
+                    {e.description} <Badge tone="neutral">{costKind(e.category)}</Badge>
+                    {how && <span className="block text-xs text-text-2">{how}</span>}
+                  </span>
+                  <span className="text-text-2 tabular">{money(e.amount, e.currency)}</span>
+                  {canEdit && <ChangeCost setup={{ ...setup, for: costForOf(e), order: undefined }} expense={e} iconOnly />}
+                </li>
+              );
+            })}
           </ul>
         </Section>
       )}
+
+      <OwedBack owed={owed} where="on this order" orderId={o.id} today={now} canPay={canEdit} canFiles={d.canFiles} />
     </OrderPage>
   );
 }

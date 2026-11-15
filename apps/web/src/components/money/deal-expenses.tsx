@@ -1,26 +1,36 @@
 import Link from "next/link";
-import { EXPENSE_CATEGORY_LABEL, type InquiryStage } from "@kebo/shared";
-import { Card, CardBody, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { LOST_REASON_LABEL, type InquiryStage, type LostReason } from "@kebo/shared";
+import { Badge } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, money, TZ } from "@/lib/format";
-import type { ExpenseList } from "@/lib/types-money";
-import { ExpenseRecord } from "./expense-record";
-import { AddCost, type CostSetup } from "./cost-window";
+import type { CostSheetRow, ExpenseList } from "@/lib/types-money";
 import { getSettings, getPeople } from "@/lib/loaders";
+import { Section } from "@/components/order-sections/section";
+import { PayCostWindow, RepayWindow } from "@/components/order-sections/costs-windows";
+import { CostSheetTable, OwedBack, owedOf, paidHow, sheetRowOf } from "@/components/orders/cost-sheet";
+import { costState } from "@/components/orders/cost-words";
+import { ExportLink } from "@/components/sheets/export-link";
+import { AddCost, ChangeCost, type CostSetup } from "./cost-window";
 
 /**
- * What was spent on this deal (trips to check products, samples, visits),
- * managers only, beside "Add a cost". Won: it comes off the order's profit.
- * Lost: it is what the lost deal cost us. ?cost=<id> opens one to change,
- * add its receipt or remove it.
+ * An inquiry's Costs tab (design "spending", board InquiryCosts), managers only: what was spent on it (trips to
+ * check products, samples, visits) in the same table as an order's Costs, and who is owed back. Won: the costs
+ * show on the order as spent before it. Lost: a note says what losing it cost. Every row opens the one cost window.
  */
 export async function DealExpensesCard({
   deal,
-  open,
 }: {
-  deal: { id: string; refNo: string; title: string; stage: InquiryStage; customer: { id: string; name: string }; order: { id: string; refNo: string } | null };
-  open?: string;
+  deal: {
+    id: string;
+    refNo: string;
+    stage: InquiryStage;
+    customer: { id: string; name: string };
+    order: { id: string; refNo: string } | null;
+    closedAt: string | null;
+    lostReason: LostReason | null;
+    assignee: { name: string } | null;
+  };
 }) {
   const today = todayIn(TZ);
   const [list, people, settings] = await Promise.all([api.get<ExpenseList>("/expenses", { inquiryId: deal.id, pageSize: 200 }), getPeople(), getSettings()]);
@@ -36,74 +46,102 @@ export async function DealExpensesCard({
   // An order's own costs show on the order; here the ones before it.
   const rows = list.rows.filter((e) => !e.order);
   const live = rows.filter((e) => !e.voided);
-  const one = live.length > 0 && live.every((e) => e.currency === live[0]!.currency) ? live[0]!.currency : null;
-  const total = one ? live.reduce((t, e) => t + Number(e.amount), 0) : live.reduce((t, e) => t + Number(e.inMain), 0);
-  const chosen = open ? rows.find((e) => e.id === open) : undefined;
+  const removed = rows.filter((e) => e.voided);
+  const byId = new Map(live.map((e) => [e.id, e]));
+  const sheet = live.map(sheetRowOf);
+  const sum = (k: "inOrder" | "paidInOrder" | "toPayInOrder") => sheet.reduce((t, r) => t + Number(r[k] ?? 0), 0);
+  const total = sum("inOrder");
+  const toPay = sum("toPayInOrder");
+  const owed = owedOf(live);
+
+  const action = (r: CostSheetRow) => {
+    const e = byId.get(r.expenseId ?? "");
+    if (!e) return null;
+    return (
+      <span className="flex items-center justify-end gap-2">
+        {r.state === "to_pay" ? (
+          <PayCostWindow orderId={null} id={e.id} currency={e.currency} sub={[r.owedTo, e.description, money(e.amount, e.currency)].filter(Boolean).join(" · ")} today={today} from={e.spentOn} canFiles={false} />
+        ) : r.state === "to_repay" ? (
+          <RepayWindow orderId={null} ids={[e.id]} currency={e.currency} name={e.paidBy?.name ?? "them"} amount={money(e.amount, e.currency)} today={today} canFiles={false} />
+        ) : (
+          <Badge tone="ok">{costState(r)}</Badge>
+        )}
+        <ChangeCost setup={setup} expense={e} iconOnly />
+      </span>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex min-w-0 flex-col gap-4">
-        <Card>
-          <CardHeader title="Spent on this inquiry" actions={<AddCost setup={setup} />} />
-          {rows.length > 0 ? (
-            <Table className="min-w-[720px]">
-              <THead>
-                <tr>
-                  <Th>Date</Th>
-                  <Th>Category</Th>
-                  <Th>What</Th>
-                  <Th>Paid by</Th>
-                  <Th>Account</Th>
-                  <Th className="text-right">Amount</Th>
-                </tr>
-              </THead>
-              <tbody>
-                {rows.map((e) => (
-                  <Tr key={e.id} className={cn(e.voided && "text-muted line-through")}>
-                    <Td className="whitespace-nowrap">{date(e.spentOn)}</Td>
-                    <Td>{EXPENSE_CATEGORY_LABEL[e.category]}</Td>
-                    <Td>
-                      <Link href={`?cost=${e.id}#cost`} scroll={false} className="text-text hover:text-primary hover:underline">
-                        {e.description}
-                      </Link>
-                    </Td>
-                    <Td>{e.paidBy?.name ?? "—"}</Td>
-                    <Td>{e.ownMoney ? (e.repaid ? `Own money · repaid ${date(e.repaid.on)}` : "Own money · to repay") : (e.account?.name ?? "—")}</Td>
-                    <Td className="text-right whitespace-nowrap tabular">{money(e.amount, e.currency)}</Td>
-                  </Tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-line font-bold">
-                  <Td colSpan={4} />
-                  <Td>Total</Td>
-                  <Td className="text-right whitespace-nowrap tabular">{money(total, one ?? main)}</Td>
-                </tr>
-              </tfoot>
-            </Table>
+      {deal.stage === "lost" && (
+        <p className="rounded-xl border border-line bg-surface-2 px-[18px] py-3 text-[13px] text-text-2">
+          <strong className="text-text">
+            Lost{deal.closedAt ? ` on ${date(deal.closedAt)}` : ""}
+            {deal.lostReason ? `, ${LOST_REASON_LABEL[deal.lostReason].toLowerCase()}` : ""}.
+          </strong>{" "}
+          {live.length ? (
+            <>
+              What it cost us to try: <strong className="text-text tabular">{money(total, main)}</strong>. It counts for {deal.customer.name}
+              {deal.assignee ? `, for ${deal.assignee.name}` : ""} and under lost deals in Reports.
+            </>
           ) : (
-            <CardBody>
-              <p className="text-sm text-muted">Nothing spent on this inquiry yet.</p>
-            </CardBody>
+            "Nothing was spent on it."
           )}
-        </Card>
-        {chosen && (
-          <Card id="cost">
-            <CardHeader
-              title={chosen.description}
-              actions={
-                <Link href="?" scroll={false} className="text-sm text-primary hover:underline">
-                  Close
-                </Link>
-              }
-            />
-            <CardBody>
-              <ul className="rounded-lg border border-line">
-                <ExpenseRecord e={chosen} mainCurrency={main} people={people} fx={fx} today={today} showFor={false} />
-              </ul>
-            </CardBody>
-          </Card>
+        </p>
+      )}
+
+      <Section
+        title="Spent on this inquiry"
+        state={toPay > 0 ? `${money(toPay, main)} to pay` : live.length ? "All paid" : null}
+        tone={toPay > 0 ? "warn" : "ok"}
+        actions={
+          <>
+            {live.length > 0 && <ExportLink what="expenses" query={{ inquiry: deal.id }} className="h-8 px-2.5 text-[13px]" />}
+            <AddCost setup={setup} />
+          </>
+        }
+      >
+        {live.length ? (
+          <CostSheetTable
+            rows={sheet}
+            currency={main}
+            totals={{ costs: total.toFixed(2), paid: sum("paidInOrder").toFixed(2), toPay: toPay.toFixed(2) }}
+            action={action}
+            receiptOf={(r) => byId.get(r.expenseId ?? "")?.receipt ?? null}
+            howOf={(r) => {
+              const e = byId.get(r.expenseId ?? "");
+              return e ? paidHow(e) : null;
+            }}
+          />
+        ) : (
+          <p className="border-t border-line px-[18px] py-3.5 text-[13px] text-text-2">Nothing spent on this inquiry yet.</p>
         )}
-      </div>
+        {deal.order && live.length > 0 && (
+          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">
+            Won: these show on{" "}
+            <Link href={`/orders/${deal.order.id}/costs`} className="font-medium text-primary hover:underline">
+              order {deal.order.refNo}
+            </Link>{" "}
+            as spent before the order.
+          </p>
+        )}
+        {removed.length > 0 && (
+          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">
+            Removed:{" "}
+            {removed.map((e, i) => (
+              <span key={e.id}>
+                {i > 0 && " · "}
+                <span className="line-through">
+                  {e.description} {money(e.amount, e.currency)}
+                </span>
+                {e.voided?.reason ? ` (${e.voided.reason})` : ""}
+              </span>
+            ))}
+          </p>
+        )}
+      </Section>
+
+      <OwedBack owed={owed} where="on this inquiry" orderId={null} today={today} canPay />
     </div>
   );
 }
