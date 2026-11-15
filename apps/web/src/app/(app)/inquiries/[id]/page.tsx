@@ -80,7 +80,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
           {
             kind: "Factory offers",
             number: (
-              <Link href={`${base}/sourcing`} className="inline-block py-1 font-semibold text-primary hover:underline">
+              <Link href={`${base}/sourcing`} className="inline-block min-w-6 py-1 font-semibold text-primary hover:underline">
                 {facts.asked > facts.offers ? `${facts.answered} of ${facts.asked} in` : facts.offers ? `${facts.offers} in` : "Open"}
               </Link>
             ),
