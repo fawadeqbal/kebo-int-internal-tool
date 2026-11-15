@@ -1,0 +1,27 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    missing_return: error
+    dead_code: warning
+
+linter:
+  rules:
+    always_declare_return_types: true
+    avoid_dynamic_calls: true
+    avoid_print: true
+    prefer_single_quotes: true
+    prefer_final_locals: true
+    prefer_const_constructors: true
+    sort_child_properties_last: true
+    unawaited_futures: false
+    use_super_parameters: true
+    require_trailing_commas: false

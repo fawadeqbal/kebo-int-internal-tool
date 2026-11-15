@@ -1,0 +1,101 @@
+# Releases the RFQ Desk phone app: push the tag phone-v<version> (see apps/phone/README.md).
+#
+# Needs these repository secrets (Settings › Secrets and variables › Actions):
+#   ANDROID_KEYSTORE_BASE64    the release .jks, base64-encoded (base64 -w0 release.jks)
+#   ANDROID_KEYSTORE_PASSWORD  its store password
+#   ANDROID_KEY_ALIAS          the key alias (rfqdesk)
+#   ANDROID_KEY_PASSWORD       the key password
+# Without them the release stops: a debug-signed APK is never published.
+name: Phone release
+
+on:
+  push:
+    tags: ["phone-v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phone-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/phone
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: The tag, pubspec version, build number and changelog agree
+        run: |
+          flutter pub get
+          dart run tool/version.dart check --tag "$GITHUB_REF_NAME"
+          echo "VERSION=${GITHUB_REF_NAME#phone-v}" >> "$GITHUB_ENV"
+
+      - name: The release key is set
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for v in KS KS_PASS ALIAS KEY_PASS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Missing release signing secret ($v). See the top of .github/workflows/phone-release.yml."
+              exit 1
+            fi
+          done
+          echo "$KS" | base64 -d > android/release.jks
+          printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$KS_PASS" "$ALIAS" "$KEY_PASS" > android/key.properties
+
+      - name: Checks
+        run: |
+          dart run tool/gen_tokens.dart --check
+          flutter analyze
+          flutter test
+
+      - name: Build the APK
+        run: flutter build apk --release
+
+      - name: Signed with the release key, not the debug key
+        run: |
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$SIGNER" verify --print-certs "$APK" | tee certs.txt
+          if grep -q "CN=Android Debug" certs.txt; then
+            echo "::error::The APK is debug-signed; refusing to release it."
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$APK" "dist/rfq-desk-$VERSION.apk"
+          (cd dist && sha256sum "rfq-desk-$VERSION.apk" > "rfq-desk-$VERSION.apk.sha256")
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dart run tool/version.dart notes > notes.md
+          {
+            echo
+            echo "---"
+            echo "Install: download rfq-desk-$VERSION.apk on the phone and open it. It updates the installed RFQ Desk."
+            echo "Build $(dart run tool/version.dart | awk '/^build/ {print $2}') · commit ${GITHUB_SHA::7}"
+          } >> notes.md
+          PRE=""
+          case "$VERSION" in *-*) PRE="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* --title "RFQ Desk $VERSION" --notes-file notes.md $PRE
+
+      - name: Remove the key from the runner
+        if: always()
+        run: rm -f android/release.jks android/key.properties
