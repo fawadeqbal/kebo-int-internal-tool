@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' hide Badge;
 
+import '../core/company_time.dart';
 import '../core/json.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart';
@@ -53,7 +54,7 @@ Future<bool> openGoodsReceived(BuildContext context, String orderId, String? ref
       saveLabel: 'Save',
       save: (changes) => inBatches(
         [for (final e in changes.entries) {'lineId': e.key, 'receivedQty': _n(e.value['receivedQty']) ?? 0}],
-        (batch) => api.put('/api/orders/$orderId/receipt', {'on': DateTime.now().toIso8601String().substring(0, 10), 'lines': batch}),
+        (batch) => api.put('/api/orders/$orderId/receipt', {'on': isoDay(CompanyTime.today()), 'lines': batch}),
       ),
     ),
   );

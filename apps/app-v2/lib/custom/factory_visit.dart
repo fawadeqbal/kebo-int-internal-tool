@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Badge;
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/json.dart';
 import '../core/outbox.dart';
 import '../core/scope.dart';
@@ -9,7 +10,7 @@ import '../generated/models.g.dart';
 import 'money.dart' show canAddExpense, openExpense;
 import 'waiting.dart';
 
-String _today() => isoDay(DateTime.now())!;
+String _today() => isoDay(CompanyTime.today())!;
 
 const _fatResults = {'passed': 'Passed', 'passed_with_remarks': 'Passed with remarks', 'failed': 'Failed'};
 

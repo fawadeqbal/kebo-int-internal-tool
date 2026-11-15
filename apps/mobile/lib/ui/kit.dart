@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/format.dart' as f;
 import '../core/json.dart';
 import '../core/labels.dart';
@@ -572,7 +573,7 @@ class DateField extends StatelessWidget {
           InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: () async {
-              final now = DateTime.now();
+              final now = CompanyTime.today();
               final picked = await showDatePicker(
                 context: context,
                 initialDate: f.parseDate(value) ?? now,

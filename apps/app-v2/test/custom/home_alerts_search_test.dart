@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kebo_app/core/company_time.dart';
 import 'package:kebo_app/custom/alerts.dart';
 import 'package:kebo_app/custom/home.dart';
 import 'package:kebo_app/custom/links.dart';
@@ -86,9 +87,27 @@ void main() {
 
   test('times read like people say them', () {
     final now = DateTime(2026, 11, 4, 10);
-    expect(fmtWhen(DateTime(2026, 11, 4, 9, 2), now: now), '9:02');
+    expect(fmtWhen(DateTime(2026, 11, 4, 9, 2), now: now), '09:02');
     expect(fmtWhen(DateTime(2026, 11, 3, 18), now: now), 'yesterday');
     expect(fmtShort('1692475.64', 'USD'), 'USD 1.7M');
     expect(fmtShort('44100', 'USD'), 'USD 44.1k');
+  });
+
+  test("dates and times are the company's: its zone and its way, wherever the phone is", () {
+    addTearDown(CompanyTime.reset);
+    CompanyTime.set(zone: 'Asia/Karachi', date: 'dd_mm_yyyy', time: '12h');
+    // 20:30 UTC is 01:30 the next day in Karachi.
+    final late = DateTime.utc(2026, 11, 14, 20, 30);
+    expect(fmtDate(late), '15/11/2026');
+    expect(fmtTime(late), '1:30 AM');
+    expect(fmtDateTime(late), '15/11/2026, 1:30 AM');
+    // A calendar day from the API stays that day.
+    expect(fmtDate(DateTime.parse('2026-11-14')), '14/11/2026');
+    expect(clockText('15:05'), '3:05 PM');
+    CompanyTime.set(zone: 'America/New_York', date: 'mm_dd_yyyy', time: '24h');
+    expect(fmtDateTime(late), '11/14/2026, 15:30');
+    expect(clockText('9:05'), '09:05');
+    // A time typed in a form is that time on the company's clock.
+    expect(CompanyTime.moment(2026, 11, 14, 9).toUtc(), DateTime.utc(2026, 11, 14, 14));
   });
 }

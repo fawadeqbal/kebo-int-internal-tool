@@ -1,9 +1,18 @@
 import 'package:intl/intl.dart';
 
-final _day = DateFormat('d MMM yyyy');
+import '../core/company_time.dart';
 
-/// "28 Oct 2026", in the phone's time zone.
-String? fmtDate(DateTime? d) => d == null ? null : _day.format(d.toLocal());
+/// "28 Oct 2026" (or 28/10/2026…), the company's way and in its time zone.
+String? fmtDate(DateTime? d) => d == null ? null : DateFormat(CompanyTime.dayPattern).format(CompanyTime.of(d));
+
+/// "28 Oct" (or 28/10…): a day without its year, the company's way.
+String? fmtDayMonth(DateTime? d) => d == null ? null : DateFormat(CompanyTime.dayMonthPattern).format(CompanyTime.of(d));
+
+/// "15:30" or "3:30 PM": a moment's time of day, company time.
+String? fmtTime(DateTime? d) => d == null ? null : DateFormat(CompanyTime.timePattern).format(CompanyTime.of(d));
+
+/// "28 Oct 2026, 15:30": a moment's day and time, company time and way.
+String? fmtDateTime(DateTime? d) => d == null ? null : '${fmtDate(d)}, ${fmtTime(d)}';
 
 /// "USD 12,400.00". [amount] is the API's decimal string.
 String? fmtMoney(String? amount, String? currency) {
@@ -23,30 +32,26 @@ String? fill(String template, String? value) => value == null || value.isEmpty ?
 /// The parts that have a value, joined with " · ".
 String joinParts(Iterable<String?> parts) => parts.whereType<String>().where((s) => s.trim().isNotEmpty).join(' · ');
 
-final _time = DateFormat('H:mm');
-final _weekday = DateFormat('EEE');
-final _dayMonth = DateFormat('d MMM');
-
-/// When something happened, as people say it: "9:02", "yesterday", "Mon", "28 Oct".
+/// When something happened, as people say it: "09:02", "yesterday", "Mon", "28 Oct" (company time and way).
 String fmtWhen(DateTime? d, {DateTime? now}) {
   if (d == null) return '';
-  final t = d.toLocal();
-  final n = now ?? DateTime.now();
+  final t = CompanyTime.of(d);
+  final n = now ?? CompanyTime.now();
   final days = DateTime(n.year, n.month, n.day).difference(DateTime(t.year, t.month, t.day)).inDays;
-  if (days == 0) return _time.format(t);
+  if (days == 0) return DateFormat(CompanyTime.timePattern).format(t);
   if (days == 1) return 'yesterday';
-  if (days < 7) return _weekday.format(t);
-  return _dayMonth.format(t);
+  if (days < 7) return DateFormat('EEE').format(t);
+  return DateFormat(CompanyTime.dayMonthPattern).format(t);
 }
 
-/// The day heading of a list grouped by day: "Today", "Yesterday", "Mon 2 Nov".
+/// The day heading of a list grouped by day: "Today", "Yesterday", "Mon 02 Nov".
 String fmtDayHeading(DateTime d, {DateTime? now}) {
-  final n = now ?? DateTime.now();
-  final t = d.toLocal();
+  final n = now ?? CompanyTime.now();
+  final t = CompanyTime.of(d);
   final days = DateTime(n.year, n.month, n.day).difference(DateTime(t.year, t.month, t.day)).inDays;
   if (days == 0) return 'Today';
   if (days == 1) return 'Yesterday';
-  return DateFormat('EEE d MMM').format(t);
+  return '${DateFormat('EEE').format(t)} ${DateFormat(CompanyTime.dayMonthPattern).format(t)}';
 }
 
 /// "USD 1.2M", "USD 44.1k": big amounts on cards.
@@ -62,4 +67,13 @@ String? fmtShort(String? amount, String? currency) {
 String? joinWords(Iterable<String?> parts) {
   final s = parts.whereType<String>().where((x) => x.trim().isNotEmpty).join(' ');
   return s.isEmpty ? null : s;
+}
+
+/// A typed time of day ("15:30", a follow-up's time), the company's way: "15:30" or "3:30 PM".
+String? clockText(String? hhmm) {
+  final m = hhmm == null ? null : RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(hhmm);
+  if (m == null) return hhmm;
+  final h = int.parse(m[1]!);
+  if (CompanyTime.timeFormat != '12h') return '${m[1]!.padLeft(2, '0')}:${m[2]}';
+  return '${h % 12 == 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}';
 }

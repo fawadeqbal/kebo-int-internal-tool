@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Badge;
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/json.dart';
 import '../core/outbox.dart';
 import '../core/scope.dart';
@@ -12,7 +13,7 @@ import 'waiting.dart';
 
 const permDelivery = 'delivery.manage';
 
-String _today() => isoDay(DateTime.now())!;
+String _today() => isoDay(CompanyTime.today())!;
 num? _n(Object? v) => v == null || '$v'.trim().isEmpty ? null : num.tryParse('$v'.replaceAll(',', ''));
 String _fmt(num? n) => n == null ? '' : (n == n.roundToDouble() ? '${n.round()}' : n.toStringAsFixed(2));
 

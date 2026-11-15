@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter/semantics.dart';
-import 'package:intl/intl.dart' show DateFormat;
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/json.dart';
 import '../core/outbox.dart';
 import '../core/scope.dart';
@@ -100,9 +100,9 @@ class _OfflineBannerState extends State<OfflineBanner> {
   }
 
   static String _asOf(DateTime t) {
-    final l = t.toLocal();
-    final n = DateTime.now();
-    return l.year == n.year && l.month == n.month && l.day == n.day ? DateFormat('H:mm').format(l) : DateFormat('d MMM H:mm').format(l);
+    final l = CompanyTime.of(t);
+    final n = CompanyTime.now();
+    return l.year == n.year && l.month == n.month && l.day == n.day ? fmtTime(t)! : '${fmtDayMonth(t)} ${fmtTime(t)}';
   }
 }
 
@@ -191,7 +191,7 @@ class _GroupRow extends StatelessWidget {
     final box = context.outbox;
     final stuck = g.stuck;
     final other = g.steps.first.owner != box.owner;
-    final when = DateFormat('d MMM H:mm').format(g.at.toLocal());
+    final when = '${fmtDayMonth(g.at)} ${fmtTime(g.at)}';
     final badge = other
         ? const Badge('Another sign-in', Tone.neutral)
         : stuck == null

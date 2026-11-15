@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Badge;
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/files.dart';
 import '../core/json.dart';
 import '../core/scope.dart';
@@ -259,7 +260,7 @@ class _MakeSheetState extends State<_MakeSheet> {
                     onPressed: busy
                         ? null
                         : () async {
-                            final now = DateTime.now();
+                            final now = CompanyTime.today();
                             final d = await showDatePicker(context: context, initialDate: now, firstDate: DateTime(now.year - 2), lastDate: DateTime(now.year + 3));
                             if (d != null) await _fix(field, isoDay(d)!, lineId: lineId);
                           },

@@ -68,7 +68,7 @@ void main() {
     expect(find.text('Changed by someone else'), findsOneWidget);
     await tester.tap(find.text('Choose…'));
     await tester.pumpAndSettle();
-    expect(find.text('1 Dec 2026'), findsOneWidget, reason: 'yours');
+    expect(find.text('01 Dec 2026'), findsOneWidget, reason: 'yours');
     expect(find.text('25 Nov 2026'), findsOneWidget, reason: 'now on the server');
     await tester.tap(find.text('Keep mine'));
     await tester.pumpAndSettle();

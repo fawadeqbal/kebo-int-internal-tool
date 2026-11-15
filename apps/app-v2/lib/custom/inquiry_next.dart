@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Badge;
 
 import '../core/api.dart';
+import '../core/company_time.dart';
 import '../core/json.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart';
@@ -48,7 +49,7 @@ class _InquiryNextState extends State<InquiryNext> {
               : 'This makes the order from the option they chose.')
           : 'The quotation is marked rejected. The inquiry stays open until you mark it lost.',
       initial: {
-        'on': DateTime.now().toIso8601String().substring(0, 10),
+        'on': isoDay(CompanyTime.today()),
         if (options.length == 1) 'optionId': options.first.str('id'),
       },
       groups: [
