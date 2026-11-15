@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, Download, List, Plus, TriangleAlert } from "lucide-react";
+import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, List, Plus, TriangleAlert } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow, type PaymentSum } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage } from "@kebo/ui";
 import { addDays, todayIn } from "@kebo/utils";
+import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { date, money, TZ, whole } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
@@ -117,9 +118,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           )
         }
         actions={
-          <ButtonLink prefetch={false} href={buildHref("/sheets/export/cash-book", {}, { format: "csv", from: allDates ? undefined : pr.from, to: allDates ? undefined : pr.to, account })} variant="secondary">
-            <Download aria-hidden /> Export CSV
-          </ButtonLink>
+          <ExportCsv what="cash-book" query={{ from: allDates ? undefined : pr.from, to: allDates ? undefined : pr.to, account }} />
         }
         primary={
           canRecord ? (

@@ -123,6 +123,16 @@ describe("tab counts match what each tab lists", () => {
     expect(n.counts.all).toBe((await get("/notifications", { take: "1" })).total);
     expect(n.counts.unread).toBe((await get("/notifications", { unread: "true", take: "1" })).total);
     for (const g of groups) expect(n.counts[g], `alerts tab ${g}`).toBe((await get("/notifications", { group: g, take: "1" })).total);
+    // Searched: every tab counts what it lists for the same words; the bell's unread stays everything.
+    const all = await get("/notifications", { counts: "true", take: "1" });
+    const found = await get("/notifications", { counts: "true", take: "1", q: "inquiry" });
+    expect(found.counts.all).toBe(found.total);
+    expect(found.counts.all).toBeLessThanOrEqual(all.counts.all);
+    expect(found.counts.unread).toBe((await get("/notifications", { unread: "true", take: "1", q: "inquiry" })).total);
+    for (const g of groups) expect(found.counts[g], `searched alerts tab ${g}`).toBe((await get("/notifications", { group: g, take: "1", q: "inquiry" })).total);
+    expect(found.unread).toBe(all.unread);
+    const none = await get("/notifications", { counts: "true", take: "1", q: "zz-no-such-words" });
+    expect(none).toMatchObject({ total: 0, counts: { all: 0, unread: 0 } });
     // The bell (every page) asks without counts: they are not worked out for it.
     expect((await get("/notifications", { take: "1" })).counts).toBeUndefined();
 
@@ -149,5 +159,23 @@ describe("tab counts match what each tab lists", () => {
     expect(first.total).toBe(first.counts.all);
     const all = await get("/operations/purchase-orders", { all: "true" });
     expect(first.total).toBe(all.length);
+  });
+  it("to verify and company costs: the search narrows the list and its counts", async () => {
+    for (const status of ["pending", "approved", "all"]) {
+      const s = await get("/submissions", { status, pageSize: "1", q: "SO-" });
+      const tabTotal = status === "all" ? s.counts.all : s.counts[status];
+      expect(s.total, `to verify ${status}`).toBe(tabTotal);
+    }
+    const none = await get("/submissions", { status: "all", pageSize: "1", q: "zz-no-such-words" });
+    expect(none.total).toBe(0);
+    const costs = await get("/expenses", { kind: "company", pageSize: "200" });
+    if (costs.rows.length) {
+      const word = String(costs.rows[0].description).split(" ")[0];
+      const f = await get("/expenses", { kind: "company", pageSize: "200", q: word });
+      expect(f.rows.length).toBeGreaterThan(0);
+      expect(f.listed).toBeLessThanOrEqual(costs.listed);
+      expect(f.rows.every((r: { description: string; note?: string | null; payee?: string | null }) => [r.description, r.note, r.payee].some((v) => v?.toLowerCase().includes(word.toLowerCase())))).toBe(true);
+    }
+    expect((await get("/expenses", { kind: "company", q: "zz-no-such-words" })).count).toBe(0);
   });
 });

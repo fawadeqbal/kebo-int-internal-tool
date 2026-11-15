@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   Archive,
-  Download,
   FileText,
   LayoutGrid,
   List,
@@ -13,6 +12,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { ExportCsv } from "@/components/sheets/export-link";
 import type { OrderGroups } from "@/lib/types-facts";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
 import {
@@ -167,9 +167,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         papers={
           <>
             {canAdd && <PartyExcel kind="customers" importAction={importCustomersAction} />}
-            <ButtonLink href={buildHref("/sheets/export/customers", {}, { ...query, format: "csv" })} prefetch={false}>
-              <Download aria-hidden /> Export CSV
-            </ButtonLink>
+            <ExportCsv what="customers" query={query} />
           </>
         }
         primary={

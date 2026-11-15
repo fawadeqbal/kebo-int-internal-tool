@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Pending } from "./pending";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
-import { House, Package, Settings, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
+import { Filter, House, Package, Settings, ShieldCheck, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 
 /* ---------------------------------------------------------------- Button */
@@ -200,6 +200,8 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
   Money: Wallet,
   Reports: TrendingUp,
   Settings: Settings,
+  "Company settings": Settings,
+  "Admin settings": ShieldCheck,
 };
 
 export function PageHeader({
@@ -641,10 +643,10 @@ export interface ListChip {
 }
 
 /**
- * The row above every list (design system: List frame): search, the filter
- * chips with their counts, and on the right the list's Excel — in one row; on
- * a phone the search takes the width and the chips scroll sideways. The search
- * is a GET form that keeps the other filters (`keep`), so the URL holds them all.
+ * The filters above a list (design system: List frame), drawn the same as every list's: the chips (tabs with
+ * their counts) on their own row, then the white filter strip with the search taking the width, the list's
+ * other filters and Filter, and on the right the list's Excel. The search is a GET form that keeps the other
+ * filters (`keep`), so the URL holds them all. Inside a card (`inCard`) the chips sit in a row with a rule under it.
  */
 export function ListToolbar({
   search,
@@ -654,48 +656,47 @@ export function ListToolbar({
   end,
   label = "Filters",
   className,
+  inCard,
 }: {
   search?: { placeholder: string; value?: string; clearHref?: string; label?: string; name?: string };
   /** The list's other filters, carried by the search form (page is dropped: a new search starts at page 1). */
   keep?: Record<string, string | undefined>;
   chips?: ListChip[];
-  /** After the chips: a filter you add ("+ Country", a select), drawn as a chip. */
+  /** After the search: the list's other filters (selects). */
   filters?: ReactNode;
   /** The list's Excel (export what the filters show). */
   end?: ReactNode;
   label?: string;
   className?: string;
+  /** Inside a card: the chips and the end in one row with a rule under it, no strip. */
+  inCard?: boolean;
 }) {
   const name = search?.name ?? "q";
+  const tabs = chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }));
+  if (inCard) {
+    return (
+      <div data-slot="list-toolbar" className={cn("flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5", className)}>
+        {tabs.length > 0 && <LinkTabs label={label} tabs={tabs} className="min-w-0 flex-1" />}
+        {end && <div className="ml-auto flex shrink-0 items-center gap-2">{end}</div>}
+      </div>
+    );
+  }
   return (
-    <div data-slot="list-toolbar" className={cn("mb-4 flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3", className)}>
-      {search && (
-        <Form action="" scroll={false} role="search" aria-label={search.label ?? "Search this list"} className="w-full sm:w-auto">
-          {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
-          <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="h-10 sm:w-80 [&_input]:h-10" />
-          <button className="sr-only">Search</button>
-        </Form>
-      )}
-      {(chips.length > 0 || filters || end) && (
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          {(chips.length > 0 || filters) && (
-            <ScrollFade
-              as="nav"
-              aria-label={label}
-              className="-mx-3 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0.5 [&::-webkit-scrollbar]:hidden"
-            >
-              {chips.map((c) => (
-                <FilterChip key={c.key} href={c.href} active={c.active} count={c.count} pill>
-                  {c.label}
-                </FilterChip>
-              ))}
-              {filters && (
-                <div className="flex shrink-0 items-center gap-1.5 [&_select]:h-10 [&_select]:rounded-[10px] [&_select]:border-line-strong [&_select]:text-[13px] [&_select]:font-medium [&_select]:shadow-none">
-                  {filters}
-                </div>
-              )}
-            </ScrollFade>
+    <div data-slot="list-toolbar" className={className}>
+      {tabs.length > 0 && <LinkTabs label={label} tabs={tabs} className="mb-4" />}
+      {(search || filters || end) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3">
+          {search && (
+            <Form action="" scroll={false} role="search" aria-label={search.label ?? "Search this list"} className="flex min-w-0 flex-[1_1_260px] items-center gap-2.5">
+              {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
+              <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="min-w-0 flex-1" />
+              <button type="submit" className={buttonClass("secondary", "md", "shrink-0")}>
+                <Filter aria-hidden />
+                Filter
+              </button>
+            </Form>
           )}
+          {filters && <div className="flex flex-wrap items-center gap-2.5">{filters}</div>}
           {end && <div className="ml-auto flex shrink-0 items-center gap-2">{end}</div>}
         </div>
       )}

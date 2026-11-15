@@ -386,24 +386,28 @@ export class NotificationsService implements OnModuleInit {
   /* ---------------------------------------------------------------- reading */
 
   /** Mine, newest first, `take` at a time (page 1 by default); `total`: how many there are with the same filter. */
-  async mine(user: SessionUser, opts: { unreadOnly?: boolean; take?: number; page?: number; group?: NotificationGroup; counts?: boolean }) {
-    const where = {
+  async mine(user: SessionUser, opts: { unreadOnly?: boolean; take?: number; page?: number; group?: NotificationGroup; counts?: boolean; q?: string }) {
+    // The search (its title or its line), the same for every tab, so a tab's count is exactly what it lists.
+    const text = opts.q?.trim();
+    const mineFound = {
       userId: user.id,
-      ...(opts.unreadOnly ? { readAt: null } : {}),
-      ...(opts.group ? { OR: GROUP_TYPES[opts.group].map((t) => ({ type: { startsWith: t } })) } : {}),
+      ...(text ? { AND: [{ OR: [{ title: { contains: text, mode: "insensitive" as const } }, { body: { contains: text, mode: "insensitive" as const } }] }] } : {}),
     };
+    const ofGroup = (g: NotificationGroup) => ({ OR: GROUP_TYPES[g].map((t) => ({ type: { startsWith: t } })) });
+    const where = { ...mineFound, ...(opts.unreadOnly ? { readAt: null } : {}), ...(opts.group ? ofGroup(opts.group) : {}) };
     const take = Math.min(opts.take ?? 50, 200);
     // Each tab's count only for the Alerts page (counts=true); the bell asks on every page and needs only unread.
     const groups = opts.counts ? (Object.keys(GROUP_TYPES) as NotificationGroup[]) : [];
-    const [items, unread, total, all, ...byGroup] = await Promise.all([
+    const [items, unread, total, all, unreadFound, ...byGroup] = await Promise.all([
       this.prisma.db.notification.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: ((opts.page ?? 1) - 1) * take, take }),
       this.prisma.db.notification.count({ where: { userId: user.id, readAt: null } }),
       this.prisma.db.notification.count({ where }),
-      opts.counts ? this.prisma.db.notification.count({ where: { userId: user.id } }) : 0,
-      ...groups.map((g) => this.prisma.db.notification.count({ where: { userId: user.id, OR: GROUP_TYPES[g].map((t) => ({ type: { startsWith: t } })) } })),
+      opts.counts ? this.prisma.db.notification.count({ where: mineFound }) : 0,
+      opts.counts ? this.prisma.db.notification.count({ where: { ...mineFound, readAt: null } }) : 0,
+      ...groups.map((g) => this.prisma.db.notification.count({ where: { ...mineFound, ...ofGroup(g) } })),
     ]);
-    /** Each tab's count: exactly what it lists. */
-    const counts = { all, unread, ...Object.fromEntries(groups.map((g, k) => [g, byGroup[k] ?? 0])) } as Record<"all" | "unread" | NotificationGroup, number>;
+    /** Each tab's count: exactly what it lists (for the same search). `unread` above it is all unread, for the bell. */
+    const counts = { all, unread: unreadFound, ...Object.fromEntries(groups.map((g, k) => [g, byGroup[k] ?? 0])) } as Record<"all" | "unread" | NotificationGroup, number>;
     return { unread, total, items, ...(opts.counts ? { counts } : {}) };
   }
 

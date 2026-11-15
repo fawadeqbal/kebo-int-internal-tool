@@ -8,7 +8,6 @@ import {
   Card,
   EmptyState,
   LinkTabs,
-  ListToolbar,
   PageHeader,
   Pager,
   StatRow,
@@ -22,6 +21,7 @@ import {
   Tr,
   type StatusMeaning,
 } from "@kebo/ui";
+import { FilterCard } from "@/components/common/filter-card";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
 import { date, dateTime, money, timeAgo, whole } from "@/lib/format";
@@ -62,7 +62,7 @@ const nameOf = (s: Submission) => [kindWords(s).toLowerCase(), s.order?.refNo, a
 export default async function ApprovalsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; mine?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; mine?: string; page?: string; q?: string }>;
 }) {
   const me = await requireUser();
   const approver = can(me, "payments.record") || (can(me, "expenses.manage") && (await hasFeature("expenses")));
@@ -72,12 +72,18 @@ export default async function ApprovalsPage({
   const mine = !approver || sp.mine === "true";
   const status: SubmissionStatus = STATUSES.includes(sp.status as SubmissionStatus) ? (sp.status as SubmissionStatus) : "pending";
   const page = toPage(sp.page);
-  const list = await api.get<SubmissionList>("/submissions", { status, mine: mine ? "true" : undefined, page, pageSize: PAGE_SIZE });
+  const text = sp.q?.trim() || undefined;
+  const [list, everything] = await Promise.all([
+    api.get<SubmissionList>("/submissions", { status, mine: mine ? "true" : undefined, q: text, page, pageSize: PAGE_SIZE }),
+    // The figures over the list are for everything waiting, whatever is searched.
+    text ? api.get<SubmissionList>("/submissions", { status, mine: mine ? "true" : undefined, page: 1, pageSize: 1 }) : null,
+  ]);
+  const all = everything ?? list;
   const base = (params: Record<string, string | undefined>) => {
     const q = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => !!e[1]));
     return `/approvals${q.size ? `?${q}` : ""}`;
   };
-  const keep = { mine: mine && approver ? "true" : undefined, status: status === "pending" ? undefined : status };
+  const keep = { mine: mine && approver ? "true" : undefined, status: status === "pending" ? undefined : status, q: sp.q };
   // The waiting ones on this page: their total per currency, and how long the oldest has waited.
   const sums = new Map<string, number>();
   for (const r of list.rows) if (r.status === "pending" && r.amount && r.currency) sums.set(r.currency, (sums.get(r.currency) ?? 0) + Number(r.amount));
@@ -105,12 +111,12 @@ export default async function ApprovalsPage({
             icon={Clock}
             iconColor={2}
             label="Waiting"
-            value={list.counts.pending}
-            sub={status === "pending" && waitingSum ? waitingSum : undefined}
-            tone={list.counts.pending ? "warn" : undefined}
+            value={all.counts.pending}
+            sub={status === "pending" && waitingSum && !text ? waitingSum : undefined}
+            tone={all.counts.pending ? "warn" : undefined}
           />
           <StatTile label="Oldest" value={oldest === null ? "—" : oldest === 0 ? "today" : `${oldest} day${oldest === 1 ? "" : "s"}`} />
-          <StatTile icon={Check} iconColor={1} label="Approved" value={list.counts.approved} sub={list.counts.sent_back ? `${list.counts.sent_back} sent back` : undefined} />
+          <StatTile icon={Check} iconColor={1} label="Approved" value={all.counts.approved} sub={all.counts.sent_back ? `${all.counts.sent_back} sent back` : undefined} />
         </StatRow>
       )}
       {approver && submitter && (
@@ -118,21 +124,22 @@ export default async function ApprovalsPage({
           label="Whose"
           className="mb-4"
           tabs={[
-            { href: "/approvals", label: "To approve", active: !mine },
-            { href: "/approvals?mine=true", label: "Mine", active: mine },
+            { href: base({ q: sp.q }), label: "To approve", active: !mine },
+            { href: base({ mine: "true", q: sp.q }), label: "Mine", active: mine },
           ]}
         />
       )}
-      <ListToolbar
+      <LinkTabs
         label="Which ones"
-        chips={STATUSES.map((s) => ({
-          key: s,
+        className="mb-4"
+        tabs={STATUSES.map((s) => ({
           label: mine || s !== "pending" ? STATUS_LABEL[s] : "To approve",
           count: list.counts[s],
-          href: base({ mine: keep.mine, status: s === "pending" ? undefined : s }),
+          href: base({ mine: keep.mine, status: s === "pending" ? undefined : s, q: sp.q }),
           active: status === s,
         }))}
       />
+      <FilterCard search="Search order, customer, who sent it…" value={sp.q} keep={{ mine: keep.mine, status: keep.status }} clearHref={base({ mine: keep.mine, status: keep.status })} />
       {!mine && status === "pending" && list.counts.pending > 0 && (
         <Alert tone="info" className="mb-3">
           They added it; you approve it. Nothing counts until you do.
@@ -143,10 +150,12 @@ export default async function ApprovalsPage({
           <EmptyState
             framed
             title={
-              status === "pending" ? (mine ? "Nothing waiting" : "Nothing to approve") : `Nothing ${STATUS_LABEL[status].toLowerCase()}`
+              text ? "Nothing matches" : status === "pending" ? (mine ? "Nothing waiting" : "Nothing to approve") : `Nothing ${STATUS_LABEL[status].toLowerCase()}`
             }
             description={
-              mine
+              text
+                ? "Try other words, or clear the search."
+                : mine
                 ? "Add money a customer sent, or an expense, on the phone app and tap “Send for approval”."
                 : "When someone adds money received or an expense for approval, it shows here and you are told."
             }

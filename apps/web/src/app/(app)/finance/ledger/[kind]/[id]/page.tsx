@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
 import { money } from "@/lib/format";
 import { countryName } from "@/lib/countries";
-import { ExportLink } from "@/components/sheets/export-link";
+import { ExportCsv } from "@/components/sheets/export-link";
 import { DataTable } from "@/components/common/data-table";
 import { EntryPanel } from "@/components/ledger/entry-panel";
 import { EntryBody } from "@/components/ledger/entry-body";
@@ -100,11 +100,7 @@ export default async function PartyLedgerPage({
         phoneStack
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <ExportLink
-              what="ledger-party"
-              query={{ kind, id, from: period.from, to: period.to, open: open ? "1" : undefined }}
-              className="border-transparent bg-transparent shadow-none"
-            />
+            <ExportCsv what="ledger-party" query={{ kind, id, from: period.from, to: period.to, open: open ? "1" : undefined }} />
             <StatementButtons kind={kind} id={id} from={period.from} to={period.to} cur={sp.cur ?? single ?? undefined} back={base} />
           </div>
         }

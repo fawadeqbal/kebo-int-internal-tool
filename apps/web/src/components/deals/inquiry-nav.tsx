@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { buttonClass, cn, Pending } from "@kebo/ui";
+import { buttonClass, cn } from "@kebo/ui";
+import { TabRow } from "@/components/common/record-tabs";
 
 export interface InquiryTab {
   href: string;
@@ -25,29 +26,21 @@ export function InquiryTabs({ base, tabs, order }: { base: string; tabs: Inquiry
   const first = at.slice(base.length).split("/")[1] ?? "";
   const here = (href: string) => (href === base ? at === base || UNDER_OVERVIEW.includes(first) : at === href || at.startsWith(`${href}/`));
   return (
-    <nav aria-label="Inquiry" className="no-print mt-4 flex items-stretch gap-6 overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {tabs.map((t) => (
-        <Link
-          key={t.href}
-          href={t.href}
-          aria-current={here(t.href) ? "page" : undefined}
-          className="-mb-px flex h-11 shrink-0 items-center gap-1.5 border-b-2 border-transparent text-[13.5px] font-medium text-text-2 hover:text-text aria-[current]:border-primary-solid aria-[current]:font-bold aria-[current]:text-text"
-        >
-          {t.label}
-          {t.tag && <span className="text-xs font-semibold text-text-2 tabular">{t.tag}</span>}
-          <Pending />
-        </Link>
-      ))}
-      {order ? (
-        <Link href={order.href} className="-mb-px flex h-11 shrink-0 items-center gap-1.5 border-b-2 border-transparent text-[13.5px] font-semibold text-primary hover:underline">
-          Order {order.refNo} <ArrowRight className="size-3.5" aria-hidden />
-        </Link>
-      ) : (
-        <span className="-mb-px flex h-11 shrink-0 items-center gap-1.5 text-[13.5px] font-medium text-muted" title="The sales order is made when the customer accepts an option">
-          Order <span className="text-xs font-normal">when accepted</span>
-        </span>
-      )}
-    </nav>
+    <TabRow
+      label="Inquiry"
+      items={tabs.map((t) => ({ href: t.href, label: t.label, tag: t.tag, active: here(t.href) }))}
+      end={
+        order ? (
+          <Link href={order.href} className="-mb-px flex h-[42px] shrink-0 items-center gap-1.5 border-b-2 border-transparent text-[13.5px] font-semibold whitespace-nowrap text-primary hover:underline">
+            Order {order.refNo} <ArrowRight className="size-3.5" aria-hidden />
+          </Link>
+        ) : (
+          <span className="-mb-px flex h-[42px] shrink-0 items-center gap-1.5 text-[13.5px] font-medium whitespace-nowrap text-muted" title="The sales order is made when the customer accepts an option">
+            Order <span className="text-xs font-normal">when accepted</span>
+          </span>
+        )
+      }
+    />
   );
 }
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { AlertTriangle, Ban, Boxes, Download, Factory, List, Mail, Package, Ship, ShoppingCart } from "lucide-react";
-import { buildHref, ButtonLink, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { AlertTriangle, Ban, Boxes, Factory, List, Mail, Package, Ship, ShoppingCart } from "lucide-react";
+import { buildHref, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { crumbsFor } from "@/lib/nav";
@@ -58,9 +59,7 @@ export default async function PurchaseOrdersPage({
         title="Purchase orders"
         description="One per supplier on each sales order"
         actions={
-          <ButtonLink href="/sheets/export/purchase-orders?format=csv">
-            <Download aria-hidden /> Export CSV
-          </ButtonLink>
+          <ExportCsv what="purchase-orders" />
         }
       />
       <StatRow className="mb-4">

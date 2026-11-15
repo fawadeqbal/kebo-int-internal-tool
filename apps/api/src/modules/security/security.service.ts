@@ -286,14 +286,25 @@ export class SecurityService {
     };
   }
 
-  async sessions(actor: SessionUser, userId?: string) {
-    const rows = await this.prisma.db.session.findMany({
-      where: { ...live(), user: { isActive: true, isSystem: false }, ...(userId ? { userId } : {}) },
-      select: sessionSelect,
-      orderBy: { lastSeenAt: "desc" },
-      take: 500,
-    });
-    return rows.map((s) => this.sessionView(s, actor.sessionId));
+  /** Live sessions, a page at a time: one person's (userId), or found by name, email or address (q). */
+  async sessions(actor: SessionUser, q: { userId?: string; q?: string; page: number; pageSize: number }) {
+    const text = q.q?.trim();
+    const where = {
+      ...live(),
+      user: {
+        isActive: true,
+        isSystem: false,
+        ...(text ? { OR: [{ name: { contains: text, mode: "insensitive" as const } }, { email: { contains: text, mode: "insensitive" as const } }] } : {}),
+      },
+      ...(q.userId ? { userId: q.userId } : {}),
+    };
+    const [rows, total, people] = await Promise.all([
+      this.prisma.db.session.findMany({ where, select: sessionSelect, orderBy: [{ lastSeenAt: "desc" }, { id: "asc" }], skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
+      this.prisma.db.session.count({ where }),
+      this.prisma.db.session.groupBy({ by: ["userId"], where }),
+    ]);
+    /** `people`: how many people the sessions found belong to. */
+    return { rows: rows.map((s) => this.sessionView(s, actor.sessionId)), total, page: q.page, pageSize: q.pageSize, people: people.length };
   }
 
   async mySessions(actor: SessionUser) {

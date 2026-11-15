@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus, ShieldAlert, ShieldCheck } from "lucide-react";
-import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { FilterCard } from "@/components/common/filter-card";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { OpenPanelButton } from "@/components/common/panel";
@@ -53,7 +54,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const page = Math.min(toPage(sp.page), Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
   const keep = { q: sp.q, show: show === "all" ? undefined : show };
   const href = (patch: Params) => buildHref("/users", keep, { page: undefined, ...patch });
-  const chips = SHOWS.filter((s) => s === "all" || s === show || found.some(shows[s])).map((s) => ({
+  // Every tab, with its number even when 0 (the same on every list).
+  const chips = SHOWS.map((s) => ({
     key: s,
     label: SHOW_CHIP[s],
     count: found.filter(shows[s]).length,
@@ -126,7 +128,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           })()}
         </Card>
       )}
-      <ListToolbar search={{ placeholder: "Search name or email…", value: sp.q, clearHref: href({ q: undefined }) }} keep={keep} chips={chips} label="Filter users" />
+      <LinkTabs label="Which people" className="mb-4" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
+      <FilterCard search="Search name or email…" value={sp.q} keep={{ show: keep.show }} clearHref={href({ q: undefined })} />
 
       <Card className="overflow-clip p-0">
         {rows.length === 0 ? (

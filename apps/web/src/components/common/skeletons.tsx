@@ -272,15 +272,12 @@ export function TabSkeleton({ side = true, tiles = 0, table = false }: { side?: 
   );
 }
 
-/**
- * A record on its way: its header (title, status, the line under it, buttons), its tabs and the Overview.
- * `chips`: the tabs as a row of chips (customer and supplier pages) rather than underlined (orders, inquiries).
- */
-export function RecordSkeleton({ tabs = 6, tiles = 0, side = true, chips = false }: { tabs?: number; tiles?: number; side?: boolean; chips?: boolean }) {
+/** A record on its way: its header (title, status, the line under it, buttons), its tabs and the Overview. */
+export function RecordSkeleton({ tabs = 6, tiles = 0, side = true }: { tabs?: number; tiles?: number; side?: boolean }) {
   return (
     <Loading>
       <HeaderSkeleton record buttons={2} />
-      {tabs > 0 && (chips ? <ChipsSkeleton count={tabs} className="mt-4" /> : <RecordTabsSkeleton count={tabs} />)}
+      {tabs > 0 && <RecordTabsSkeleton count={tabs} />}
       <div className={tabs > 0 ? "mt-5" : undefined}>
         <TabSkeleton tiles={tiles} side={side} />
       </div>

@@ -230,8 +230,13 @@ describe("security: roles, two-step per role, sessions, sign-ins", () => {
 
     // And everywhere, by the Super Admin.
     const all = (await api(app, admin).get(`/security/sessions?userId=${ali.id}`).expect(200)).body;
-    expect(all).toHaveLength(1);
-    expect(all[0]).toMatchObject({ user: { id: ali.id, name: "Ali" }, current: false });
+    expect(all.rows).toHaveLength(1);
+    expect(all).toMatchObject({ total: 1, people: 1 });
+    expect(all.rows[0]).toMatchObject({ user: { id: ali.id, name: "Ali" }, current: false });
+    // Found by name, a page at a time.
+    const found = (await api(app, admin).get(`/security/sessions?q=ali&pageSize=1`).expect(200)).body;
+    expect(found.rows.length).toBeLessThanOrEqual(1);
+    expect(found.rows.every((r: { user: { name: string; email: string } }) => /ali/i.test(r.user.name) || /ali/i.test(r.user.email))).toBe(true);
     await api(app, admin).post(`/security/users/${ali.id}/sign-out`).expect(200);
     await api(app, laptop).get("/auth/me").expect(401);
   });

@@ -52,6 +52,8 @@ const expenseQuery = z.object({
   customerId: z.uuid().optional(),
   category: z.enum(EXPENSE_CATEGORIES).optional(),
   kind: z.enum(["order", "customer", "general", "company"]).optional(),
+  /** What it was for, the note or who was paid. */
+  q: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).max(10_000).optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 });

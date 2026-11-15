@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
 import { Alert, buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
+import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { SECTION_PATH, viewPath } from "@/lib/old-addresses";
@@ -286,13 +287,12 @@ function Missing({ rates }: { rates: string[] }) {
 /** While a page's figures are on their way. */
 function SectionSkeleton() {
   return (
-    <div className="flex flex-col gap-3" role="status" aria-busy="true" aria-label="Loading">
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-24 animate-pulse rounded-xl bg-surface-2" />
-        ))}
+    <div className="flex flex-col gap-4" role="status" aria-busy="true" aria-label="Loading">
+      <TilesSkeleton count={4} />
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <CardSkeleton lines={7} className="min-h-72" />
+        <CardSkeleton lines={4} />
       </div>
-      <div className="h-72 animate-pulse rounded-xl bg-surface-2" />
     </div>
   );
 }

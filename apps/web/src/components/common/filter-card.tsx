@@ -42,10 +42,10 @@ export function FilterCard({
         placeholder={search}
         label={search.replace(/…$/, "")}
         clearHref={value ? clearHref : undefined}
-        className="min-w-0 flex-[1_1_260px] sm:w-auto"
+        className="min-w-0 flex-[1_1_260px] max-sm:basis-full sm:w-auto"
       />
       {selects.map((s) => (
-        <span key={s.name} className="max-sm:flex-1">
+        <span key={s.name} className="max-sm:min-w-0 max-sm:flex-[1_1_40%]">
           <label htmlFor={`filter-${s.name}`} className="sr-only">
             {s.label}
           </label>

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { can } from "@kebo/shared";
-import { Avatar, PageHeader, StageBadge, StatusBadge } from "@kebo/ui";
+import { PageHeader, StageBadge, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { date, dateTime, timeAgo } from "@/lib/format";
@@ -119,15 +119,9 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   return (
     <div>
       <PageHeader
-        backHref="/users"
-        backLabel="Users"
+        crumbs={[{ label: "Admin settings" }, { label: "People", href: "/users" }, { label: u.name }]}
         phoneStack
-        title={
-          <span className="flex items-center gap-2.5">
-            <Avatar name={u.name} size={32} />
-            {u.name}
-          </span>
-        }
+        title={u.name}
         badge={
           <>
             {u.isActive ? <StatusBadge meaning="ok">Active</StatusBadge> : <StatusBadge meaning="neutral">Switched off</StatusBadge>}

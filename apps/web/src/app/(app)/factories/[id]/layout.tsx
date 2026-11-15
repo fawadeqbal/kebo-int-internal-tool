@@ -1,4 +1,4 @@
-import { Banknote, Eye, Factory, Package, Pencil, Search, Tag } from "lucide-react";
+import { Banknote, Factory, Pencil, Search } from "lucide-react";
 import { can } from "@kebo/shared";
 import { ButtonLink, PageHeader, RefCode } from "@kebo/ui";
 import { requirePermission, hasFeature } from "@/lib/session";
@@ -55,15 +55,14 @@ export default async function FactoryLayout({ children, params }: { children: Re
       />
 
       <RecordTabs
-        className="mt-0"
         base={base}
         label="The supplier"
         tabs={[
-          { path: "", label: "Overview", icon: <Eye aria-hidden /> },
-          { path: "orders", label: "Orders", count: r.openOrders.length, alert: r.lateSteps > 0, icon: <Package aria-hidden /> },
-          { path: "offers", label: "Offers", count: f.quotes.length, icon: <Tag aria-hidden /> },
-          ...(managers ? [{ path: "costs", label: "Costs", icon: <Banknote aria-hidden /> }] : []),
-          { path: "notes", label: "Notes", icon: <Pencil aria-hidden /> },
+          { path: "", label: "Overview" },
+          { path: "orders", label: "Orders", count: r.openOrders.length, alert: r.lateSteps > 0 },
+          { path: "offers", label: "Offers", count: f.quotes.length },
+          ...(managers ? [{ path: "costs", label: "Costs" }] : []),
+          { path: "notes", label: "Notes" },
         ]}
       />
       <div className="mt-5">{children}</div>

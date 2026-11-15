@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { ExportCsv } from "@/components/sheets/export-link";
 import { OpenPanelButton } from "@/components/common/panel";
 import { NewInquiryWindow } from "../inquiry-windows";
-import { Check, Clock, Download, Factory, FileText, LayoutGrid, List, MessageSquareText, Plus, Target, TrendingUp, UserRound, X } from "lucide-react";
+import { Check, Clock, Factory, FileText, LayoutGrid, List, MessageSquareText, Plus, Target, TrendingUp, UserRound, X } from "lucide-react";
 import {
   can,
   CHANNEL_LABEL,
@@ -110,9 +111,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
             <ButtonLink href="/inquiries/board">
               <LayoutGrid aria-hidden /> Board
             </ButtonLink>
-            <ButtonLink href={buildHref("/sheets/export/inquiries", {}, { ...query, customer: sp.customer, format: "csv" })} prefetch={false}>
-              <Download aria-hidden /> Export CSV
-            </ButtonLink>
+            <ExportCsv what="inquiries" query={{ ...query, customer: sp.customer }} />
           </>
         }
         primary={
