@@ -18,7 +18,7 @@ export {
 } from "./position";
 export { livePlanOf, livePlanOfOrder, livePlansOf, type LiveItem } from "./plan-live";
 export { createPlan, lcBalanceMinor, lcChecksOf, rebuildRoutePlan, termsOf } from "./route-plan";
-export { advanceOf, factoryPlansOf, owedByFactory, seedFactoryPlans, type FactoryPlanView } from "./factory-plan";
+export { advanceOf, factoryPlansFor, factoryPlansOf, owedByFactory, seedFactoryPlans, type FactoryPlanView } from "./factory-plan";
 export { factoryPositionsSql, ordersOwingFactories, ordersWithMoneyDue, owedLineSql, positionsSql } from "./due";
 export { requestsOf, requestsOfOrder, requestViewOf, type KeptCopy, type OrderRequests, type RequestView, type RowReceipt, type SentWith } from "./requests";
 export { reachedOn } from "./reached-on";

@@ -23,6 +23,18 @@ export interface PurchaseOrderRow {
   toPay: string;
 }
 
+/** GET /operations/purchase-orders/page: one tab's page after the search and filters, with each tab's count. */
+export type PurchaseOrderTab = "all" | "not_sent" | "in_production" | "ready" | "shipped" | "cancelled";
+export interface PurchaseOrderPage {
+  rows: PurchaseOrderRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  counts: Record<PurchaseOrderTab, number>;
+  tiles: { open: number; late: number; lateRefs: string[]; readyThisMonth: number; owe: { currency: string; amount: number }[] };
+  suppliers: { id: string; name: string }[];
+}
+
 export const PURCHASE_ORDER_STATUS: Record<PurchaseOrderStatus, { label: string; meaning: "neutral" | "info" | "warn" | "bad" | "ok" }> = {
   not_sent: { label: "Not sent", meaning: "warn" },
   in_production: { label: "In production", meaning: "info" },

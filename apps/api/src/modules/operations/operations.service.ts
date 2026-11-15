@@ -169,4 +169,53 @@ export class OperationsService {
     });
     return open ? rows.filter((r) => r.status !== "cancelled" && (Number(r.toPay) > 0 || r.order.beforeShipping)) : rows;
   }
+
+  /**
+   * The Purchase orders list, a page at a time: the rows of one tab after the search and filters, each tab's
+   * count (the same search and filters, so a tab's count is exactly what it lists), the tiles over the list and
+   * the suppliers for its filter. A purchase order's status is worked out, not stored, so the rows are worked
+   * out here and only the page asked for leaves the server.
+   */
+  async purchaseOrderPage(user: SessionUser, q: PurchaseOrderPageQuery) {
+    const all = await this.purchaseOrders(user, false, true);
+    const month = this.clock.today().slice(0, 7);
+    const text = q.q?.trim().toLowerCase() ?? "";
+    const inTab = (r: (typeof all)[number], tab: PurchaseOrderTab) => tab === "all" || r.status === tab || (tab === "in_production" && r.status === "late");
+    const searched = all
+      .filter((r) => !text || [r.po?.number, r.supplier.name, r.order.refNo, r.customer.name, r.supplierRef].filter(Boolean).join(" ").toLowerCase().includes(text))
+      .filter((r) => !q.supplier || r.supplier.id === q.supplier)
+      .filter((r) => !q.ready || (q.ready === "month" ? !!r.readyOn?.startsWith(month) : q.ready === "late" ? r.status === "late" : !r.readyOn));
+    const counts = Object.fromEntries(PURCHASE_ORDER_TABS.map((t) => [t, searched.filter((r) => inTab(r, t)).length])) as Record<PurchaseOrderTab, number>;
+    const listed = searched.filter((r) => inTab(r, q.status));
+    const late = all.filter((r) => r.status === "late");
+    // What we still owe factories, in each currency, largest first.
+    const owe = new Map<string, number>();
+    for (const r of all) if (r.status !== "cancelled" && Number(r.toPay) > 0) owe.set(r.currency, (owe.get(r.currency) ?? 0) + Number(r.toPay));
+    return {
+      rows: listed.slice((q.page - 1) * q.pageSize, q.page * q.pageSize),
+      total: listed.length,
+      page: q.page,
+      pageSize: q.pageSize,
+      counts,
+      tiles: {
+        open: all.filter((r) => r.status !== "cancelled" && r.status !== "shipped").length,
+        late: late.length,
+        lateRefs: late.slice(0, 2).map((r) => r.po?.number ?? r.order.refNo),
+        readyThisMonth: all.filter((r) => r.status !== "cancelled" && !!r.readyOn?.startsWith(month)).length,
+        owe: [...owe.entries()].sort((a, b) => b[1] - a[1]).map(([currency, amount]) => ({ currency, amount })),
+      },
+      suppliers: [...new Map(all.map((r) => [r.supplier.id, r.supplier.name])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }
+}
+
+export const PURCHASE_ORDER_TABS = ["all", "not_sent", "in_production", "ready", "shipped", "cancelled"] as const;
+export type PurchaseOrderTab = (typeof PURCHASE_ORDER_TABS)[number];
+export interface PurchaseOrderPageQuery {
+  status: PurchaseOrderTab;
+  q?: string;
+  supplier?: string;
+  ready?: "month" | "late" | "none";
+  page: number;
+  pageSize: number;
 }

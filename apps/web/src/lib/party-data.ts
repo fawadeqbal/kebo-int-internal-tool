@@ -17,9 +17,7 @@ export const customerPaymentsOf = cache((id: string) => api.get<CustomerPayments
 
 export const factoryOf = cache((id: string) => load(() => api.get<FactoryDetail>(`/factories/${id}`)));
 /** What we still owe this supplier (Finance › Payables, one row per supplier and currency). */
-export const factoryPayablesOf = cache(async (id: string) =>
-  ((await api.get<Payable[]>("/money/payables").catch(() => [] as Payable[])) ?? []).filter((p) => p.factory.id === id),
-);
+export const factoryPayablesOf = cache(async (id: string) => (await api.get<Payable[]>("/money/payables", { factory: id }).catch(() => [] as Payable[])) ?? []);
 
 export const partyHistoryOf = cache((type: "customer" | "factory", id: string) =>
   api.get<HistoryEntry[]>("/history", { type, id }).catch(() => [] as HistoryEntry[]),

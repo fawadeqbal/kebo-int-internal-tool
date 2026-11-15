@@ -62,17 +62,26 @@ export function advanceOf(lines: AdvanceLine[], factoryId: string, fallback: num
  * factory's own ready date.
  */
 export async function factoryPlansOf(db: Db, orderId: string, advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
-  const o = await db.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: {
-      factoryOrderedOn: true,
-      ...readySelect,
-      lines: planLines,
-      supplierPaid: supplierPaidRelation,
-      expenses: factoryBorneExpenses,
-      payables: { orderBy: { sortOrder: "asc" }, include: { supplier: { select: { id: true, name: true } } } },
-    },
-  });
+  const o = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: planSelect });
+  return plansOf(o, advancePercent, today, soonDays, fx);
+}
+
+/** factoryPlansOf for many orders in one read (lists across orders): each order's plans by its id. */
+export async function factoryPlansFor(db: Db, orderIds: string[], advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
+  const orders = orderIds.length ? await db.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, ...planSelect } }) : [];
+  return new Map(orders.map((o) => [o.id, plansOf(o, advancePercent, today, soonDays, fx)] as const));
+}
+
+const planSelect = {
+  factoryOrderedOn: true,
+  ...readySelect,
+  lines: planLines,
+  supplierPaid: supplierPaidRelation,
+  expenses: factoryBorneExpenses,
+  payables: { orderBy: { sortOrder: "asc" }, include: { supplier: { select: { id: true, name: true } } } },
+} satisfies Prisma.OrderSelect;
+
+function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
   const names = new Map<string, FactoryRef>();
   for (const l of o.lines) if (l.factory) names.set(l.factory.id, l.factory);
   for (const r of o.payables) names.set(r.supplier!.id, r.supplier!);

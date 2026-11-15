@@ -27,7 +27,7 @@ import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { ordersOwingFactories, ordersWithMoneyDue } from "./due";
-import { factoryPlansOf, owedByFactory } from "./factory-plan";
+import { factoryPlansFor, owedByFactory } from "./factory-plan";
 import { chargedExpenses, factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, supplierPaidRelation } from "./position";
 import { livePlanOf, livePlansOf } from "./plan-live";
 import { termsOf } from "./route-plan";
@@ -234,14 +234,15 @@ export class BillingService {
   }
 
   /** What we still owe each factory across all orders that are not cancelled (people who see costs). */
-  async payables(user: SessionUser, mine: boolean) {
+  async payables(user: SessionUser, mine: boolean, factoryId?: string) {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
-    // Only orders where a factory may still be owed (worked out in the database, the same rule), not every order ever.
+    // Only orders where a factory may still be owed (worked out in the database, the same rule), not every order ever;
+    // `factoryId`: only that supplier's (its own page).
     const s = await this.settings.get();
     const fx = fxOf(s, await this.limits.allows("expenses"));
     const owing = await ordersOwingFactories(this.prisma, fx);
     const orders = await this.prisma.db.order.findMany({
-      where: { status: { not: "cancelled" }, id: { in: owing } },
+      where: { status: { not: "cancelled" }, id: { in: owing }, ...(factoryId ? { lines: { some: { factoryId } } } : {}) },
       select: {
         id: true,
         refNo: true,
@@ -274,20 +275,20 @@ export class BillingService {
     >();
     const today = this.clock.today();
     const features = await this.limits.features();
+    // Every order's payment plans in one read, not one read per order.
+    const plans = await factoryPlansFor(this.prisma.db, orders.map((o) => o.id), s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx);
     for (const o of orders) {
       const factoryOf = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
       // What we owe each factory here, less what we paid and what it bears: factoryPosition, as on the order.
       for (const f of factoryPositionOf(o, fx).filter((r) => r.lines > 0)) {
         // Only orders with something still to pay count, so "paid X of Y" is about those.
-        if (f.toPayMinor <= 0) continue;
+        if (f.toPayMinor <= 0 || (factoryId && f.factoryId !== factoryId)) continue;
         const factory = factoryOf.get(f.factoryId)!;
         const row = byFactory.get(f.key) ?? { factory, currency: f.currency, owedMinor: 0, paidMinor: 0, orders: [] };
         row.owedMinor += f.owedMinor;
         row.paidMinor += f.settledMinor;
         // The next part of its payment plan (advance, balance on the ready date…): when it is due.
-        const plan = (await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx)).find(
-          (p) => `${p.factory.id}:${p.currency}` === f.key,
-        );
+        const plan = plans.get(o.id)?.find((p) => `${p.factory.id}:${p.currency}` === f.key);
         row.orders.push({
           id: o.id,
           refNo: o.refNo,
@@ -760,9 +761,10 @@ export class BillingService {
         where: { status: { not: "cancelled" }, id: { in: await ordersOwingFactories(this.prisma, fx) } },
         select: { id: true, refNo: true, lines: { select: { factory: { select: { id: true, owner: person } } } } },
       });
+      const plans = await factoryPlansFor(this.prisma.db, orders.map((o) => o.id), s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx);
       for (const o of orders) {
         const owners = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.owner] as const] : [])));
-        for (const f of await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx)) {
+        for (const f of plans.get(o.id) ?? []) {
           const owner = owners.get(f.factory.id) ?? null;
           if (mine && owner?.id !== user.id) continue;
           for (const r of f.rows) {
@@ -816,7 +818,7 @@ export class BillingService {
    * that order stands: the person paying the factory sees both sides before paying. Nothing is stored for
    * it: the parts are the supplier's plan (factoryPlansOf), the customer's side the order's position.
    */
-  async toPay(user: SessionUser, mine: boolean) {
+  async toPay(user: SessionUser, mine: boolean, dueBy?: ISODate) {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
     const today = this.clock.today();
     const s = await this.settings.get();
@@ -842,12 +844,14 @@ export class BillingService {
       orderBy: { orderedOn: "asc" },
     });
     const rows: ToPayRow[] = [];
+    // Every order's payment plans in one read, not one read per order.
+    const plans = await factoryPlansFor(this.prisma.db, orders.map((o) => o.id), s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx);
     for (const o of orders) {
       const owners = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.owner] as const] : [])));
       const pos = positionOf(o, fx);
       const route = termsOf(o).route;
       const theirs = customerMoney({ totalMinor: pos.owedMinor, receivedMinor: pos.settledMinor, depositMinor: pos.depositMinor, route });
-      for (const f of await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx)) {
+      for (const f of plans.get(o.id) ?? []) {
         const owner = owners.get(f.factory.id) ?? null;
         if (mine && owner?.id !== user.id) continue;
         for (const [n, r] of f.rows.entries()) {
@@ -877,8 +881,10 @@ export class BillingService {
       }
     }
     rows.sort((a, b) => b.late - a.late || (a.dueOn ?? "9999").localeCompare(b.dueOn ?? "9999") || a.order.refNo.localeCompare(b.order.refNo));
+    // `dueBy`: only the parts late or due by that day (Reports' "to pay this week"); the totals are of what is listed.
+    const listed = dueBy ? rows.filter((r) => r.dueOn !== null && r.dueOn <= dueBy) : rows;
     const totals = new Map<string, { open: Minor; late: Minor; count: number }>();
-    for (const r of rows) {
+    for (const r of listed) {
       const t = totals.get(r.currency) ?? { open: 0, late: 0, count: 0 };
       t.open += toMinor(r.open);
       if (r.late > 0) t.late += toMinor(r.open);
@@ -886,7 +892,7 @@ export class BillingService {
       totals.set(r.currency, t);
     }
     return {
-      rows,
+      rows: listed,
       totals: [...totals.entries()].map(([currency, t]) => ({ currency, open: fromMinor(t.open), late: fromMinor(t.late), count: t.count })),
       /** May record a payment to a supplier. */
       canPay: can(user, "payments.record"),
