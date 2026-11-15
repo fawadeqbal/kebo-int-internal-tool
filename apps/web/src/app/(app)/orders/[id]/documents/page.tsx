@@ -17,8 +17,9 @@ import { issueProformaAction } from "../../actions";
 import { bankPaidAction } from "../../section-actions";
 import { docHref } from "../shared";
 import { stageData } from "../stage-data";
+import { orderTitle } from "@/lib/titles";
 
-export const metadata = { title: "Order · documents" };
+export const generateMetadata = orderTitle("Documents");
 
 const TABS: PapersTab[] = ["bank", "all", "missing"];
 

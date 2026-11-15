@@ -3,7 +3,7 @@ import { CHANNEL_LABEL, type InquiryChannel } from "@kebo/shared";
 import { Card, CardHeader, DataRow, FilterChip, Meter, Pager, Table, Td, Th, THead, Tr, cn, StatTile } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { countryName } from "@/lib/countries";
-import { money, plural } from "@/lib/format";
+import { money, plural, daysText } from "@/lib/format";
 import { amountCell, bigMoney, change, compactMoney, percent, type Period } from "@/lib/insights-period";
 import {
   CUSTOMER_CHIP_LABEL,
@@ -292,7 +292,7 @@ export function PeopleSection({
               <tr>
                 <Th>Person</Th>
                 <Th className="text-right">Inquiries</Th>
-                <Th className="text-right">Days to first quote</Th>
+                <Th className="text-right">Time to first quote</Th>
                 <Th className="text-right">Win rate</Th>
                 <Th className="text-right">Sales {c}</Th>
                 <Th className="min-w-40">Target this month</Th>
@@ -314,7 +314,7 @@ export function PeopleSection({
                     )}
                   </Td>
                   <Td className="text-right tabular">{r.inquiries}</Td>
-                  <Td className="text-right tabular">{r.daysToQuote === null ? "—" : r.daysToQuote}</Td>
+                  <Td className="text-right tabular">{daysText(r.daysToQuote)}</Td>
                   <Td className="text-right tabular">{percent(r.winRate)}</Td>
                   <Td className="text-right tabular">{amountCell(r.sales)}</Td>
                   <Td className="relative">

@@ -1,16 +1,17 @@
 import { Suspense, type ReactNode } from "react";
 import { Toast } from "@kebo/ui/client";
 import { Truck, TrendingUp, Wallet } from "lucide-react";
+import { PRODUCT_NAME } from "@/lib/product";
 
 /**
- * The frame of sign-in, the two-step code and the public pages (request a demo, sign up), Kebo ERP
+ * The frame of sign-in, the two-step code and the public pages (request a demo, sign up), RFQ Desk
  * look. Phone first: the brand mark and the form. From a laptop up, a soft green panel on the left
  * says what the app does.
  */
 export function AuthShell({
   children,
   wide = false,
-  title = "Kebo ERP",
+  title = PRODUCT_NAME,
   subtitle = "Sign in to your company",
   footer,
   tag = true,

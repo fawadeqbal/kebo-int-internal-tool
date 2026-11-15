@@ -26,6 +26,9 @@ export const money = (amount: string | number | null | undefined, currency: stri
 /** A headline amount in whole units (KPI cards): "USD 58,140". Exact amounts stay in the tables. */
 export const whole = (amount: string | number | null | undefined, currency: string) =>
   amount === null || amount === undefined ? "—" : `${currency} ${Math.round(Number(amount)).toLocaleString("en-US")}`;
+/** A count of days (worked out from dates): "Same day" for 0, "1 day", "2.5 days"; none: "—". */
+export const daysText = (n: number | null | undefined) =>
+  n === null || n === undefined ? "—" : n === 0 ? "Same day" : `${n.toLocaleString("en-US", { maximumFractionDigits: 1 })} day${n === 1 ? "" : "s"}`;
 /** A figure tile's amount, short: "USD 159.6K", "USD 1.24M"; under 10,000 in whole units. */
 export const short = (amount: string | number | null | undefined, currency: string) => {
   if (amount === null || amount === undefined) return "—";

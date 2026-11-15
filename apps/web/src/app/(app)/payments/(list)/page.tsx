@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, List, Plus, TriangleAlert } from "lucide-react";
-import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow, type PaymentSum } from "@kebo/shared";
+import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
-import { date, money, whole, companyToday, countOf } from "@/lib/format";
+import { date, money, companyToday, countOf } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { hasFeature, requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
@@ -14,6 +14,7 @@ import { FilterCard } from "@/components/common/filter-card";
 import { periodOf } from "@/components/common/period";
 import { DUE, paymentsTabTarget } from "@/lib/old-addresses";
 import { opensPayments, paymentHref } from "../shared";
+import { moneyTile } from "@/lib/money-tile";
 
 export const metadata = { title: "Payments" };
 
@@ -21,11 +22,6 @@ type Search = { tab?: string; mine?: string; p?: string; dir?: string; status?: 
 const STATUS_MEANING = { to_verify: "warn", sent_back: "bad", recorded: "ok", void: "neutral" } as const;
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
-/** The largest of a list's totals ("USD 99,740"), and how many other currencies there are. */
-function top(sums: PaymentSum[]) {
-  const first = sums[0];
-  return first ? `${whole(first.amount, first.currency)}${sums.length > 1 ? ` +${sums.length - 1}` : ""}` : "—";
-}
 
 /** The row's status: money in reads "Received", a supplier payment "Paid", an expense "Expense", a transfer "Transfer". */
 function statusOf(r: PaymentRow) {
@@ -105,6 +101,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       <PageHeader
         crumbs={crumbsFor("/payments")}
         title="Payments"
+        phoneStack
         summary={
           order || party ? (
             <>
@@ -140,9 +137,9 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         </p>
       )}
       <StatRow className="mb-4">
-        <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} value={top(t.in)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />
-        <StatTile icon={ArrowUpFromLine} iconColor={2} label={`Out${when}`} value={top(t.out)} sub={`${t.outCount} payment${t.outCount === 1 ? "" : "s"} out`} />
-        <StatTile icon={Banknote} iconColor={4} label="Expenses" value={top(t.expenses)} sub={`${list.counts.expense} entr${list.counts.expense === 1 ? "y" : "ies"}`} />
+        <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} {...moneyTile(t.in)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />
+        <StatTile icon={ArrowUpFromLine} iconColor={2} label={`Out${when}`} {...moneyTile(t.out)} sub={`${t.outCount} payment${t.outCount === 1 ? "" : "s"} out`} />
+        <StatTile icon={Banknote} iconColor={4} label="Expenses" {...moneyTile(t.expenses)} sub={`${list.counts.expense} entr${list.counts.expense === 1 ? "y" : "ies"}`} />
       </StatRow>
       <LinkTabs
         label="Which payments"

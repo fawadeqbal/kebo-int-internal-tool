@@ -29,8 +29,9 @@ import { DetailsCard } from "@/components/common/record";
 import { RecordLanding } from "@/components/common/record-nav";
 import { removeFactoryAction, saveFactoryAction } from "../actions";
 import { FactoryPanel } from "../factory-form";
+import { supplierTitle } from "@/lib/titles";
 
-export const metadata = { title: "Supplier" };
+export const generateMetadata = supplierTitle();
 
 /** Where an order with the factory is: ready date passed, else the order's stage; closed or cancelled. */
 function poState(o: FactoryOrders["rows"][number], today: string): { label: string; meaning: StatusMeaning } {

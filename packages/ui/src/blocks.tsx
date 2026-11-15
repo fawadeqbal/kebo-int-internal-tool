@@ -218,6 +218,7 @@ export function StatRow({ children, className }: { children: ReactNode; classNam
 export function StatTile({
   label,
   value,
+  also,
   sub,
   delta,
   tone,
@@ -231,6 +232,8 @@ export function StatTile({
 }: {
   label: ReactNode;
   value: ReactNode;
+  /** The value's other parts, named, right under it: the other currencies ("and USD 12,400"), never "+1". */
+  also?: ReactNode;
   /** One line of context under the value. */
   sub?: ReactNode;
   /** The change against the period before (Delta), top right. */
@@ -263,6 +266,7 @@ export function StatTile({
       >
         {value}
       </span>
+      {also && <span className="truncate text-xs font-medium text-text-2">{also}</span>}
       {meter && (
         <span className="block h-1.5 overflow-hidden rounded-full bg-surface-3" role="img" aria-label={meter.label}>
           <span className="block h-full rounded-full bg-chart-3" style={{ width: `${Math.max(0, Math.min(100, meter.percent))}%` }} />

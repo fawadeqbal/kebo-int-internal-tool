@@ -16,8 +16,9 @@ import { SatEdit } from "@/components/orders/view-panels";
 import { addClaimAction, satAction, updateClaimAction } from "../../flow-actions";
 import { fieldsAction, lightAction } from "../../light-actions";
 import { stageData } from "../stage-data";
+import { orderTitle } from "@/lib/titles";
 
-export const metadata = { title: "Order · delivery and SAT" };
+export const generateMetadata = orderTitle("Delivery and SAT");
 
 const SMALL = "h-8 px-2.5 text-[13px]";
 const RESULT_TONE = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" } as const;

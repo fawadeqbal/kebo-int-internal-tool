@@ -156,7 +156,7 @@ export class NotificationsService implements OnModuleInit {
     const company = CompanyContext.current();
     const origin = company ? companyOrigin(company.slug, this.env.BASE_DOMAIN, this.env.APP_URL, company.domain) : this.env.APP_URL;
     const at = formatDateTime(this.clock.now(), this.clock.style);
-    return { company: (await this.settings.get()).company.name || company?.name || "Kebo ERP", origin, at };
+    return { company: (await this.settings.get()).company.name || company?.name || "RFQ Desk", origin, at };
   }
 
   /** The message, emailed to each person at their own address (active people with an email; nothing when email is not set up). */

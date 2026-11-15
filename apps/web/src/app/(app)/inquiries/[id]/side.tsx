@@ -180,7 +180,7 @@ export async function InquirySide({ id }: { id: string }) {
         title="Files"
         count={files.length || undefined}
         action={
-          <Link href={`${base}/files`} className={quiet}>
+          <Link href={`${base}/files`} className={cn("tap", quiet)}>
             {d.canWork ? "Add a file" : "All files"}
           </Link>
         }

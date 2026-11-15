@@ -7,8 +7,9 @@ import { PanelButton } from "@/components/orders/step-view";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { ContactForm } from "@/components/people/contact-form";
 import { makePrimaryContactAction, removeContactAction, saveContactAction } from "../../actions";
+import { customerTitle } from "@/lib/titles";
 
-export const metadata = { title: "Customer contacts" };
+export const generateMetadata = customerTitle("Contacts");
 
 /**
  * The customer's Contacts tab (board "Customer — Contacts tab"): a card per person (the primary first, marked),

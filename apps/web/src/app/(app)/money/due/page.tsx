@@ -6,7 +6,7 @@ import { can, EXPENSE_CATEGORY_LABEL, expenseShort, FACTORY_DUE_RULE_LABEL } fro
 import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { addDays, daysBetween } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { date, money, whole, companyToday } from "@/lib/format";
+import { date, money, companyToday } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
@@ -19,6 +19,7 @@ import { PayCostWindow, RepayWindow } from "@/components/order-sections/costs-wi
 import { PayFactoryInList, PlanInList } from "@/components/money/due-windows";
 import { factoryPaymentAction, sendRequestAction } from "../actions";
 import { paymentAction, submitPaymentAction } from "../../orders/actions";
+import { moneyTile } from "@/lib/money-tile";
 
 export const metadata = { title: "To receive and to pay" };
 
@@ -30,12 +31,6 @@ const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFr
 const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
 const SMALL = "h-8 px-2.5 text-[13px]";
 
-/** Amounts in several currencies as one tile value: the largest, and how many more there are. */
-function top(sums: Map<string, number>) {
-  const list = [...sums].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-  const first = list[0];
-  return first ? `${whole(first[1], first[0])}${list.length > 1 ? ` +${list.length - 1}` : ""}` : "—";
-}
 const add = (m: Map<string, number>, currency: string, v: string | number) => m.set(currency, (m.get(currency) ?? 0) + Number(v));
 
 /**
@@ -111,22 +106,22 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
   return (
     <>
       <StatRow className="mb-4">
-        <StatTile label="Customers owe us" value={top(owed)} sub={`${r.rows.length} order${r.rows.length === 1 ? "" : "s"}`} />
+        <StatTile label="Customers owe us" {...moneyTile(owed)} sub={`${r.rows.length} order${r.rows.length === 1 ? "" : "s"}`} />
         <StatTile
           label="Late"
-          value={top(late)}
+          {...moneyTile(late)}
           sub={lateRows.length ? `${lateRows.length} order${lateRows.length === 1 ? "" : "s"} · oldest ${days(Math.max(...lateRows.map((o) => o.daysLate)))}` : "nothing late"}
           tone={lateRows.length ? "bad" : undefined}
           href={lateRows.length ? href({ show: "late", page: undefined, open: undefined }) : undefined}
         />
         <StatTile
           label="Due in the next 7 days"
-          value={top(dueSoon)}
+          {...moneyTile(dueSoon)}
           sub={`${soonRows.length} order${soonRows.length === 1 ? "" : "s"}`}
           tone={soonRows.length ? "warn" : undefined}
           href={soonRows.length ? href({ show: "week", page: undefined, open: undefined }) : undefined}
         />
-        {held.size > 0 && <StatTile label="Held for customers" value={top(held)} sub="their credit, to use or pay back" />}
+        {held.size > 0 && <StatTile label="Held for customers" {...moneyTile(held)} sub="their credit, to use or pay back" />}
       </StatRow>
       <LinkTabs
         label="Which orders"
@@ -350,9 +345,9 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
   return (
     <>
       <StatRow className="mb-4">
-        <StatTile label="We owe" value={top(owe)} sub={`${all.length} to pay`} />
-        <StatTile label="Late" value={top(late)} sub={lateCount ? `${lateCount} to pay` : "nothing late"} tone={lateCount ? "bad" : undefined} href={lateCount ? href({ show: "late", page: undefined }) : undefined} />
-        <StatTile label="Due in the next 7 days" value={top(dueSoon)} sub={`${soonCount} to pay`} tone={soonCount ? "warn" : undefined} href={soonCount ? href({ show: "week", page: undefined }) : undefined} />
+        <StatTile label="We owe" {...moneyTile(owe)} sub={`${all.length} to pay`} />
+        <StatTile label="Late" {...moneyTile(late)} sub={lateCount ? `${lateCount} to pay` : "nothing late"} tone={lateCount ? "bad" : undefined} href={lateCount ? href({ show: "late", page: undefined }) : undefined} />
+        <StatTile label="Due in the next 7 days" {...moneyTile(dueSoon)} sub={`${soonCount} to pay`} tone={soonCount ? "warn" : undefined} href={soonCount ? href({ show: "week", page: undefined }) : undefined} />
       </StatRow>
       <LinkTabs
         label="Which ones"

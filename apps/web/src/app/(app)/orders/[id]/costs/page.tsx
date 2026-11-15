@@ -15,8 +15,9 @@ import { CostSheetTable, OwedBack, paidHow } from "@/components/orders/cost-shee
 import { CostsExcel } from "@/components/orders/costs-tables";
 import { costState } from "@/components/orders/cost-words";
 import { stageData } from "../stage-data";
+import { orderTitle } from "@/lib/titles";
 
-export const metadata = { title: "Order · costs" };
+export const generateMetadata = orderTitle("Costs");
 
 /** One of the four figures at the top. */
 function Figure({ label, value, sub, tone, first }: { label: string; value: string; sub: string; tone?: "ok" | "warn" | "bad"; first?: boolean }) {

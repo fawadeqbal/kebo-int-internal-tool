@@ -204,7 +204,10 @@ export function FollowUpDoneNext({ action, title, what, inquiryHref, as = "butto
   return (
     <>
       {as === "check" ? (
-        <input type="checkbox" checked={false} readOnly aria-label={`Mark done: ${what}`} onClick={(e) => (e.preventDefault(), setOpen(true))} className="size-[18px] cursor-pointer accent-primary-solid" />
+        // A label around it: a tap anywhere in its larger hit area (class "tap") ticks it.
+        <label className="tap inline-flex cursor-pointer">
+          <input type="checkbox" checked={false} readOnly aria-label={`Mark done: ${what}`} onClick={(e) => (e.preventDefault(), setOpen(true))} className="size-[18px] cursor-pointer accent-primary-solid" />
+        </label>
       ) : (
         <Button size="sm" variant="secondary" aria-label={`Mark done: ${what}`} onClick={() => setOpen(true)}>
           <Check aria-hidden /> Done

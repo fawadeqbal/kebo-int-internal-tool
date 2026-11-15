@@ -165,9 +165,9 @@ export class CompanyMail {
     if (!mailer.enabled) throw new DomainError("Email is not set up yet: choose how to send it and save first.");
     if (s?.provider === "smtp") await this.checkHost(s.host!);
     const via = s ? MAIL_PROVIDER_LABEL[s.provider] : "the server's own email";
-    const { html, text } = renderEmail({ heading: "Email works", body: `This is a test from Kebo ERP, sent through ${via}.`, footer: "Sent from Admin settings › Email sending." });
+    const { html, text } = renderEmail({ heading: "Email works", body: `This is a test from RFQ Desk, sent through ${via}.`, footer: "Sent from Admin settings › Email sending." });
     try {
-      await mailer.send({ to, subject: "Test email from Kebo ERP", html, text });
+      await mailer.send({ to, subject: "Test email from RFQ Desk", html, text });
     } catch (e) {
       throw new DomainError(`The test was not sent: ${String((e as Error).message ?? e).replace(/\s+/g, " ").slice(0, 300)}`);
     }

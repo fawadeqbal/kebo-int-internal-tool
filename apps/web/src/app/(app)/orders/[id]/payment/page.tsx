@@ -16,8 +16,9 @@ import { bankContractAction, routeAction } from "../../flow-actions";
 import { paymentAction, submitPaymentAction, useCreditAction } from "../../actions";
 import { WaitingToVerify } from "@/components/money/waiting-money";
 import { stageData } from "../stage-data";
+import { orderTitle } from "@/lib/titles";
 
-export const metadata = { title: "Order · payment" };
+export const generateMetadata = orderTitle("Payment");
 
 /** The route the quote's balance terms point to, for a route not chosen yet. */
 const SUGGEST: Record<string, PaymentRoute> = {

@@ -11,8 +11,9 @@ import { date, whole, companyToday } from "@/lib/format";
 import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
 import { late } from "../shared";
+import { customerTitle } from "@/lib/titles";
 
-export const metadata = { title: "Customer money" };
+export const generateMetadata = customerTitle("Money");
 
 /** One line of the statement: charged (what they owe more) or paid, and the balance after it. */
 interface Line {

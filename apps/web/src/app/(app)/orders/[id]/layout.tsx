@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Package, XCircle } from "lucide-react";
-import { can, dayMonth, ORDER_TABS, ORDER_WORD_TONE, PAYMENT_ROUTE_SHORT, type FlowStep, type OrderTab } from "@kebo/shared";
+import { can, dayMonth, ORDER_TABS, ORDER_WORD_TONE, PAYMENT_ROUTE_LABEL, type FlowStep, type OrderTab } from "@kebo/shared";
 import { cn, PageHeader, RefCode } from "@kebo/ui";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
@@ -61,7 +61,8 @@ export default async function OrderLayout({ children, params }: { children: Reac
   );
   const ship = flow?.shipping?.shipments[0];
   const base = `/orders/${o.id}`;
-  const route = flow?.payment.route ? PAYMENT_ROUTE_SHORT[flow.payment.route] : null;
+  // The payment route said as one: "Payment: informal (cash, Alipay, WeChat, personal account)", never a bare "Informal".
+  const route = flow?.payment.route ? `Payment: ${PAYMENT_ROUTE_LABEL[flow.payment.route].replace(/^\w/, (c) => c.toLowerCase())}` : null;
   const proforma = o.documents.find((d) => d.kind === "proforma");
   const pdf = proforma ? docHref(o, proforma) : null;
   // On a phone the paper buttons fold into ⋯ (design system: page header).

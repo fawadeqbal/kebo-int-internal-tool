@@ -20,8 +20,9 @@ import { factoryPaymentAction, factoryPlanAction, removePaymentFileAction, voidF
 import { sendPurchaseOrderAction } from "../../flow-actions";
 import { fieldsAction } from "../../light-actions";
 import { stageData } from "../stage-data";
+import { orderTitle } from "@/lib/titles";
 
-export const metadata = { title: "Order · factory order" };
+export const generateMetadata = orderTitle("Factory order");
 
 const SMALL = "h-8 px-2.5 text-[13px]";
 

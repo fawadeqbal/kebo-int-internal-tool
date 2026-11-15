@@ -3,8 +3,9 @@ import { requireUser } from "@/lib/session";
 import { customerOf, partyNotesOf } from "@/lib/party-data";
 import { NotesTab } from "@/components/notes/notes-tab";
 import { addNoteAction } from "../../../follow-ups/actions";
+import { customerTitle } from "@/lib/titles";
 
-export const metadata = { title: "Customer notes" };
+export const generateMetadata = customerTitle("Notes");
 
 /** The customer's Notes tab (board): notes and calls, and Add a note. */
 export default async function CustomerNotes({ params }: { params: Promise<{ id: string }> }) {

@@ -25,8 +25,14 @@ import { CopyLink } from "./forms";
 import { headline, SECTIONS, sectionHref, sectionOf } from "./model";
 import { CompanyPanels, type SavedCard } from "./panels";
 import { BillingSection, DetailsSection, HistorySection, OverviewSection, PeopleSection, PlanSection } from "./sections";
+import { cache } from "react";
 
-export const metadata = { title: "Company" };
+/** The company, read once per request (the page and its tab title). */
+const companyOf = cache((id: string) => loadPlatform(() => platformApi.get<CompanyDetail>(`/companies/${id}`)));
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return { title: (await companyOf((await params).id)).name };
+}
 
 type Search = { section?: string; kind?: string; page?: string; saved?: string };
 
@@ -43,7 +49,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const sp = await searchParams;
   const section = sectionOf(sp.section);
   const [c, plans, flash, history] = await Promise.all([
-    loadPlatform(() => platformApi.get<CompanyDetail>(`/companies/${id}`)),
+    companyOf(id),
     platformApi.get<Plan[]>("/plans"),
     readFlash(id),
     section === "history" ? platformApi.get<CompanyHistory>(`/companies/${id}/history`, sp.kind ? { kind: sp.kind } : undefined) : null,

@@ -3,9 +3,10 @@ import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 import { WebVitals } from "@/components/common/web-vitals";
+import { PRODUCT_NAME } from "@/lib/product";
 
 export const metadata: Metadata = {
-  title: { default: "RFQ Desk", template: "%s · RFQ Desk" },
+  title: { default: PRODUCT_NAME, template: `%s · ${PRODUCT_NAME}` },
   description: "Every RFQ from first message to shipped and paid: inquiries, quotations, orders and money",
   robots: { index: false, follow: false },
 };

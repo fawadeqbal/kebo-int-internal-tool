@@ -5,8 +5,9 @@ import type { DealDetail } from "@/lib/types";
 import { CustomerHistoryNote } from "@/components/money/customer-account";
 import { DealExpensesCard } from "@/components/money/deal-expenses";
 import { WithSide } from "../side";
+import { inquiryTitle } from "@/lib/titles";
 
-export const metadata = { title: "Inquiry costs" };
+export const generateMetadata = inquiryTitle("Costs");
 
 /** Managers: what was spent on this deal (trips, samples, factory visits), and the customer's history. */
 export default async function DealCosts({ params }: { params: Promise<{ id: string }> }) {

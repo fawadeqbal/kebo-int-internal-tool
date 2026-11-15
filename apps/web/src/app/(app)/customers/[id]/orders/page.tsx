@@ -10,8 +10,9 @@ import type { CustomerPayments } from "@/lib/types-money";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { late } from "../shared";
+import { customerTitle } from "@/lib/titles";
 
-export const metadata = { title: "Customer orders" };
+export const generateMetadata = customerTitle("Orders");
 
 type PayOrder = CustomerPayments["orders"][number];
 

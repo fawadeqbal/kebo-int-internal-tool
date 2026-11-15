@@ -13,8 +13,9 @@ import { OrderLines, OrderLinesEditor, PhoneLines } from "@/components/orders/or
 import { PanelButton } from "@/components/orders/step-view";
 import { factoryTestAction, goodsReceivedAction, readyDateAction } from "../../section-actions";
 import { stageData } from "../stage-data";
+import { orderTitle } from "@/lib/titles";
 
-export const metadata = { title: "Order · production" };
+export const generateMetadata = orderTitle("Production");
 
 const SMALL = "h-8 px-2.5 text-[13px]";
 const DAY = 86_400_000;

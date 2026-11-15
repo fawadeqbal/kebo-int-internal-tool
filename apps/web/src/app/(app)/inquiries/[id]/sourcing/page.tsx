@@ -20,8 +20,9 @@ import { factoryRequestStatusAction, removeFactoryRequestAction } from "../../fa
 import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, lastOfferAction, moveOfferLineAction, offerFieldsAction, removeFactoryQuoteAction, removeOfferLineAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
 import { getSettings } from "@/lib/loaders";
 import { editsOf } from "@/lib/edit-data";
+import { inquiryTitle } from "@/lib/titles";
 
-export const metadata = { title: "Factory offers" };
+export const generateMetadata = inquiryTitle("Factory offers");
 
 
 /**
