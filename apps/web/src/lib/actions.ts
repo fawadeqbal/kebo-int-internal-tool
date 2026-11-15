@@ -1,5 +1,6 @@
 import "server-only";
 import { ApiError } from "./api";
+import { ONCE_FIELD, ONCE_KEY } from "./once";
 
 /** What every form action returns, so forms show the same kind of feedback everywhere. */
 export type ActionState = {
@@ -18,8 +19,19 @@ export type ActionState = {
 /** FormData → plain strings (the API's schemas accept form strings). Fields named `payload` hold JSON for complex forms. */
 export function formValues(form: FormData): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [k, v] of form.entries()) if (typeof v === "string" && !k.startsWith("$ACTION")) out[k] = v;
+  for (const [k, v] of form.entries()) if (typeof v === "string" && !k.startsWith("$ACTION") && k !== ONCE_FIELD) out[k] = v;
   return out;
+}
+
+/**
+ * The form's one-time key (every ActionForm sends one): give it to api.post for a money save. One form that
+ * makes several saves gives each its `part` (the record's id), so each is done once.
+ */
+export function onceOf(form: FormData | null, part?: string): string | undefined {
+  const v = form?.get(ONCE_FIELD);
+  if (typeof v !== "string" || !ONCE_KEY.test(v)) return undefined;
+  const key = part ? `${v}-${part}` : v;
+  return ONCE_KEY.test(key) ? key : undefined;
 }
 
 export function formBody(form: FormData): Record<string, unknown> {

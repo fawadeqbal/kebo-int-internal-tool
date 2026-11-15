@@ -33,6 +33,7 @@ import { CashService } from "./cash.service";
 import { CashReportService } from "./cash-report.service";
 import { PaymentFilesService, type PaymentSide } from "./payment-files.service";
 import { SupplierPaymentsService } from "./supplier-payments.service";
+import { Once } from "../../common/http/once";
 
 const MAX_UPLOAD = 200 * 1024 * 1024; // hard ceiling; the configured limit is checked in the service
 const flag = z
@@ -89,6 +90,7 @@ class CashController {
   /** Money moved between two of our accounts. */
   @RequireFeature("cash_book")
   @Post("money/transfers")
+  @Once()
   transfer(@CurrentUser() user: SessionUser, @Body(Validate(transferInput)) body: TransferInput) {
     return this.cash.transfer(user, body);
   }

@@ -18,6 +18,7 @@ import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { CustomerPaymentsService } from "./customer-payments.service";
+import { Once } from "../../common/http/once";
 
 /** Money in from a customer on an order (the routes stay under /orders/:id). */
 @ApiTags("treasury")
@@ -37,6 +38,7 @@ class OrderPaymentsController {
    * bankStep: "bank_paid_us" (Money reached us). What is more than is due becomes the customer's credit.
    */
   @Post(":id/payments")
+  @Once()
   @RequirePermissions("payments.record")
   pay(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(paymentInput)) body: PaymentInput) {
     return this.payments.record(user, id, body);
@@ -44,6 +46,7 @@ class OrderPaymentsController {
 
   /** { amount, on? } — pays (part of) the order from the customer's credit. */
   @Post(":id/use-credit")
+  @Once()
   @RequirePermissions("payments.record")
   useCredit(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(useCreditInput)) body: UseCreditInput) {
     return this.payments.useCredit(user, id, body);
@@ -88,6 +91,7 @@ class CreditController {
 
   /** One transfer over several of the customer's orders: { receivedAmount, receivedCurrency, currency, rate?, parts, … }; the rest is credit. */
   @Post("customers/:id/receipts")
+  @Once()
   @RequirePermissions("payments.record")
   receive(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(customerReceiptInput)) body: CustomerReceiptInput) {
     return this.payments.receive(user, id, body);
@@ -95,6 +99,7 @@ class CreditController {
 
   /** { amount, currency, on, accountId?, note? } — pays the customer's credit back. */
   @Post("customers/:id/credit/refund")
+  @Once()
   @RequirePermissions("payments.record")
   refund(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(creditRefundInput)) body: CreditRefundInput) {
     return this.payments.refundCredit(user, id, body);

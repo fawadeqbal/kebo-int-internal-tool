@@ -165,7 +165,8 @@ class Outbox extends ChangeNotifier {
       reply = await api.upload(path, bytes: bytes, fileName: s.fileName!, fields: {for (final e in s.fields.entries) e.key: _fill(e.value) as String?});
     } else {
       final body = _fill(s.body) ?? const <String, Object?>{};
-      reply = switch (s.method) { 'PUT' => await api.put(path, body), 'PATCH' => await api.patch(path, body), _ => await api.post(path, body) };
+      // A POST carries its step's id as a one-time key: sent again after a lost answer, the server does it once.
+      reply = switch (s.method) { 'PUT' => await api.put(path, body), 'PATCH' => await api.patch(path, body), _ => await api.postOnce(path, body, 'out-${s.id}') };
     }
     if (s.key != null) {
       final id = reply.at(s.idAt);

@@ -41,6 +41,7 @@ import { SupplierPaymentsService } from "../treasury/supplier-payments.service";
 import { CostsService } from "./costs.service";
 import { AccountsService } from "./accounts.service";
 import { LeaksService } from "./leaks.service";
+import { Once } from "../../common/http/once";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const expenseQuery = z.object({
@@ -150,6 +151,7 @@ export class MoneyController {
   /* The order's payments to its suppliers: Treasury records them; the answer is the order's money view. */
 
   @Post("orders/:id/factory-payments")
+  @Once()
   async payFactory(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput) {
     const { createdId } = await this.supplierPayments.recordFactoryPayment(user, id, body);
     return { ...(await this.money.forOrder(user, id)), createdId };
@@ -193,6 +195,7 @@ export class MoneyController {
 
   @RequireFeature("expenses")
   @Post("expenses")
+  @Once()
   createExpense(@CurrentUser() user: SessionUser, @Body(Validate(expenseInput)) body: ExpenseInput) {
     return this.money.createExpense(user, body);
   }
@@ -219,6 +222,7 @@ export class MoneyController {
   @RequireFeature("expenses")
   @RequirePermissions("expenses.manage")
   @Post("expenses/:id/repay")
+  @Once()
   @HttpCode(200)
   repayExpense(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(repayInput)) body: RepayInput) {
     return this.money.repayExpense(user, id, body);

@@ -4,6 +4,7 @@ import { Fragment, useActionState, useEffect, useRef, type ReactNode } from "rea
 import { useRouter } from "next/navigation";
 import { Alert } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
+import { ONCE_FIELD, newOnceKey } from "@/lib/once";
 import { ReasonPrompt } from "./reason-prompt";
 import { useWindowDone } from "./route-window";
 
@@ -51,10 +52,13 @@ export function ActionForm({
   const windowDone = useWindowDone();
   const formRef = useRef<HTMLFormElement>(null);
   const seen = useRef<ActionState | null>(null);
+  // The save's one-time key (lib/once.ts): the same one until it goes through, so sending it twice saves once.
+  const onceKey = useRef<string | null>(null);
   useEffect(() => {
     if (state === seen.current || state.ok === undefined) return;
     seen.current = state;
     if (state.ok) {
+      onceKey.current = null;
       if (resetOnSuccess) formRef.current?.reset();
       router.refresh();
       onDone?.(state);
@@ -69,7 +73,12 @@ export function ActionForm({
       className={className}
       noValidate
       onReset={keepFields ? (e) => e.preventDefault() : undefined}
+      onSubmit={(e) => {
+        const field = e.currentTarget.elements.namedItem(ONCE_FIELD);
+        if (field instanceof HTMLInputElement) field.value = onceKey.current ??= newOnceKey();
+      }}
     >
+      <input type="hidden" name={ONCE_FIELD} />
       {state.code === "reason_needed" && <ReasonPrompt key={state.message} state={state} />}
       {banner && state.code !== "reason_needed" && banner(state)}
       {!banner &&

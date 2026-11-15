@@ -754,6 +754,8 @@ class _OrderMoneySectionState extends State<OrderMoneySection> {
   Future<void> _useCredit(Json credit, String cur) async {
     final p = pays!;
     final most = [_n(credit.str('amount')), _n(p.str('due'))].reduce((a, b) => a < b ? a : b);
+    // One key while the sheet is open: Save pressed again after a lost answer uses the credit once.
+    final once = 'credit-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
     await _after(
       FormSheet.open(
         context,
@@ -770,7 +772,7 @@ class _OrderMoneySectionState extends State<OrderMoneySection> {
             ],
           ),
         ],
-        send: (api, body) => api.post('/api/orders/${o.id}/use-credit', body),
+        send: (api, body) => api.postOnce('/api/orders/${o.id}/use-credit', body, once),
       ),
     );
   }
