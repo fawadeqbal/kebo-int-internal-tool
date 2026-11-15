@@ -386,7 +386,7 @@ describe("the row at the top", () => {
 
   it("the account menu has the name, the role with the company's full name, My account, the look and Sign out", () => {
     shell(everything());
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    fireEvent.click(screen.getByRole("button", { name: /account menu/ }));
     const m = screen.getByRole("menu");
     expect(m.textContent).toContain("Super Admin · Kebo International");
     expect(within(m).getByRole("menuitem", { name: "My account" }).getAttribute("href")).toBe("/account");

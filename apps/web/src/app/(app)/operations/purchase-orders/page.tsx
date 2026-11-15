@@ -163,7 +163,7 @@ export default async function PurchaseOrdersPage({
                     </Link>
                   </Td>
                   <Td>
-                    <Link href={`/factories/${r.supplier.id}`} className="font-semibold hover:text-primary">
+                    <Link href={`/factories/${r.supplier.id}`} className="inline-block py-1 font-semibold hover:text-primary">
                       {r.supplier.name}
                     </Link>
                     <span className="block text-xs text-muted">

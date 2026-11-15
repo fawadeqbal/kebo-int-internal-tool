@@ -154,13 +154,14 @@ function LookChoice() {
 function AccountMenu({ user, companyName }: { user: { name: string; email: string; role: string }; companyName: string }) {
   return (
     <Menu
-      label="Account"
+      // Starts with what the button shows (name and role), so speech and screen readers find it by its words.
+      label={`${user.name} ${user.role}, account menu`}
       className="w-64"
       trigger={
         <span className="flex items-center gap-2.5 rounded-xl lg:py-1 lg:pr-2 lg:pl-1 lg:hover:bg-surface-2">
           <Avatar name={user.name} size={34} className="font-bold" />
           <span className="hidden text-left leading-tight lg:block">
-            <span className="block max-w-36 truncate text-[13px] font-semibold text-text">{user.name}</span>
+            <span className="block max-w-36 truncate text-[13px] font-semibold text-text">{user.name}</span>{" "}
             <span className="block max-w-36 truncate text-xs text-muted">{user.role}</span>
           </span>
         </span>
@@ -809,8 +810,9 @@ export function AppShell({
                   <NewMenu items={newItems} />
                 </span>
               )}
-              <Link href="/notifications" className={cn(buttonClass("ghost", "icon"), "relative")} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
+              <Link href="/notifications" className={cn(buttonClass("ghost", "icon"), "relative")}>
                 <Bell aria-hidden />
+                <span className="sr-only">{unread ? `Notifications, ${unread} unread` : "Notifications"}</span>
                 {!!unread && (
                   <span className="absolute top-0.5 right-0 min-w-[18px] rounded-full bg-action-solid px-1 text-center text-[10px] leading-[18px] font-bold text-white" aria-hidden>
                     {unread > 9 ? "9+" : unread}
