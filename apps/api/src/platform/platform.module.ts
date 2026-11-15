@@ -12,11 +12,12 @@ import { PlatformAuthController, PlatformController, PlatformPublicController } 
 import { PlatformMail } from "./platform-mail";
 import { SiteService } from "./site.service";
 import { WatchModule } from "./watch";
+import { TelemetryController } from "./telemetry.controller";
 
 /** The platform: companies, plans, client inquiries, demos and trials, and the platform admins. */
 @Module({
   imports: [WatchModule],
-  controllers: [PlatformAuthController, PlatformPublicController, PlatformController, DevToolsController],
+  controllers: [PlatformAuthController, PlatformPublicController, PlatformController, DevToolsController, TelemetryController],
   providers: [
     PlatformAuthService,
     PlatformGuard,

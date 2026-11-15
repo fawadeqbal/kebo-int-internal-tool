@@ -42,9 +42,11 @@ json_str() {
 # backups/status/last-status.json, for the worker (backups/status is mounted into it, read-only).
 write_status() { # ok message
   good=$(cat "$STATUS/last-good" 2>/dev/null || true)
+  # When the off-site copy last worked (offsite: off = not set up; pending = set up, this run did not get to it).
+  offsite_good=$(cat "$STATUS/last-offsite" 2>/dev/null || true)
   tmp="$STATUS/.last-status.json.tmp"
-  printf '{"at":"%s","ok":%s,"message":%s,"lastGoodAt":%s,"dump":%s,"offsite":"%s"}\n' \
-    "$(now_utc)" "$1" "$(json_str "$2")" "$(json_str "$good")" "$(json_str "${dump:-}")" "${offsite:-off}" >"$tmp"
+  printf '{"at":"%s","ok":%s,"message":%s,"lastGoodAt":%s,"dump":%s,"offsite":"%s","offsiteAt":%s}\n' \
+    "$(now_utc)" "$1" "$(json_str "$2")" "$(json_str "$good")" "$(json_str "${dump:-}")" "${offsite:-off}" "$(json_str "$offsite_good")" >"$tmp"
   chmod 644 "$tmp"
   mv "$tmp" "$STATUS/last-status.json"
 }
@@ -145,7 +147,7 @@ finished() {
 once() {
   stamp=$(date +%Y-%m-%d_%H%M)
   dump=""
-  offsite=off
+  if [ -n "${OFFSITE_S3_ENDPOINT:-}" ]; then offsite=pending; else offsite=off; fi
   step="start"
   trap 'finished $?' EXIT
   log "starting $stamp"
@@ -187,6 +189,8 @@ once() {
     offsite=failed
     offsite_copy
     offsite=ok
+    now_utc >"$STATUS/last-offsite"
+    chmod 644 "$STATUS/last-offsite"
   fi
   step="finish"
 }

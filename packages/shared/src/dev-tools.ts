@@ -114,7 +114,10 @@ export interface DevDataView {
     ok: boolean | null;
     message: string | null;
     dump: string | null;
-    offsite: "off" | "ok" | "failed" | null;
+    /** off: not set up; pending: set up, but the last run did not get to it. */
+    offsite: "off" | "ok" | "failed" | "pending" | null;
+    /** When the off-site copy last worked. */
+    offsiteAt: string | null;
   };
   database: {
     ok: boolean;
@@ -164,6 +167,8 @@ export interface DevSpeedView {
   /** Every hour (24h) or every 6 hours (7d). */
   chart: { t: string; count: number; typicalMs: number | null; slowMs: number | null }[];
   slowest: DevRoute[];
+  /** How fast pages showed their main part in the browser (largest contentful paint): typical, and 3 in 4 within. */
+  pages: { page: string; count: number; typicalMs: number | null; slowMs: number | null }[];
   errorsList: DevError[];
   fixedCount: number;
   outside: { lastAt: string | null; checks24h: number };

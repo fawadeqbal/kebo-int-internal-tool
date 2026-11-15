@@ -11,7 +11,7 @@ export function CopyForClaude({ error: e }: { error: DevError }) {
   const [done, setDone] = useState(false);
   const text = [
     `Please fix this error in RFQ Desk (${e.source}).`,
-    `Where: ${e.where}${e.path ? ` (${e.path})` : ""}`,
+    `Where: ${e.source === "web" ? "in the browser, page " : ""}${e.where}${e.path ? ` (${e.path})` : ""}`,
     `Seen ${e.count} times, first ${e.firstAt}${e.afterDeploy ? ` (after deploy ${e.afterDeploy})` : ""}, last ${e.lastAt}.`,
     "",
     e.stack ?? `${e.name}: ${e.message}`,

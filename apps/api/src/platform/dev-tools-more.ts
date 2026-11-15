@@ -9,6 +9,8 @@ import {
   CERT_WARN_DAYS,
   DISK_WARN_PERCENT,
   ERRORS_WARN_PER_HOUR,
+  JOBS,
+  offsiteGoodAt,
   readStatus,
   type BackupStatus,
   type DiskStatus,
@@ -20,21 +22,6 @@ export const OPEN_PORTS = [22, 80, 443];
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
-/** The jobs that run by themselves: the worker's (job_runs) and the server's (status files). */
-export const JOBS: { key: string; label: string; by: "worker" | "server"; schedule: string; everyMs: number }[] = [
-  { key: "reminders", label: "Reminders and the morning email", by: "worker", schedule: "every hour", everyMs: HOUR },
-  { key: "company-rules", label: "Company rules: demos ending, payments due", by: "worker", schedule: "every hour", everyMs: HOUR },
-  { key: "follow-ups", label: "Follow-up reminders", by: "worker", schedule: "every 5 minutes", everyMs: 5 * 60_000 },
-  { key: "own-domains", label: "Companies' own domains", by: "worker", schedule: "every 5 minutes", everyMs: 5 * 60_000 },
-  { key: "server-check", label: "Server checks and warning emails", by: "worker", schedule: "every 5 minutes", everyMs: 5 * 60_000 },
-  { key: "insights-nightly", label: "Insights tables, checked in full", by: "worker", schedule: "once a day", everyMs: DAY },
-  { key: "ledger-nightly", label: "Ledger, checked against the figures", by: "worker", schedule: "once a day", everyMs: DAY },
-  { key: "backup", label: "Database backup", by: "server", schedule: "every night", everyMs: DAY },
-  { key: "offsite", label: "Off-site copy of the backup", by: "server", schedule: "after each backup", everyMs: DAY },
-  { key: "restore-test", label: "Restore test", by: "server", schedule: "once a month", everyMs: 31 * DAY },
-  { key: "cleanup", label: "Disk clean-up", by: "server", schedule: "every night, 03:30", everyMs: DAY },
-  { key: "status", label: "Server status (this page's figures)", by: "server", schedule: "every minute", everyMs: 60_000 },
-];
 
 const late = (lastAt: string | null, everyMs: number, now: Date) =>
   !lastAt || now.getTime() - Date.parse(lastAt) > everyMs * 2.5 + 10 * 60_000;
@@ -95,16 +82,18 @@ export class DevToolsMoreService {
         tookMs: null,
       },
       offsite: {
-        lastAt: backup && backup.offsite !== "off" ? backup.at : null,
+        lastAt: backup && backup.offsite !== "off" ? (backup.offsite === "failed" ? backup.at : (offsiteGoodAt(backup) ?? backup.at)) : null,
         ok: backup?.offsite === "ok" ? true : backup?.offsite === "failed" ? false : null,
         result:
           backup?.offsite === "off"
             ? "off: backups stay on this server"
             : backup?.offsite === "failed"
               ? (backup.message ?? "failed")
-              : backup
-                ? "copied"
-                : null,
+              : backup?.offsite === "pending"
+                ? "not made by the last backup run"
+                : backup
+                  ? "copied"
+                  : null,
         tookMs: null,
       },
       "restore-test": {
@@ -382,7 +371,7 @@ export class DevToolsMoreService {
       db.appError.groupBy({ by: ["companyName"], where: { lastAt: { gte: week } }, _sum: { count: true } }),
       db.$queryRaw<{ h: number; n: bigint }[]>`
         select extract(hour from minute at time zone ${this.env.APP_TIME_ZONE})::int as h, sum(count)::bigint as n
-        from request_minutes where minute >= ${week} and route <> 'outside check' group by 1`,
+        from request_minutes where minute >= ${week} and route <> 'outside check' and route not like 'PAGE %' group by 1`,
     ]);
     const list: DevCompany[] = companies.map((c) => {
       const p = people.find((x) => x.company_id === c.id);

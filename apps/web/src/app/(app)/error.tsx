@@ -3,11 +3,14 @@
 import { useEffect } from "react";
 import { RotateCcw, TriangleAlert } from "lucide-react";
 import { Button, ButtonLink } from "@kebo/ui";
+import { errorReport, report } from "@/lib/telemetry";
 
 /** Board "Messages after an action": a page that could not load says so, keeps you here, and offers to try again. */
 export default function PageError({ error, retry }: { error: unknown; retry: () => void }) {
   useEffect(() => {
     console.error(error);
+    // Caught here, so the browser's own error event never sees it: sent to Dev tools like the others.
+    report(errorReport(error));
   }, [error]);
   return (
     <div className="flex flex-col items-center gap-2.5 rounded-2xl border border-line bg-surface px-6 py-12 text-center">

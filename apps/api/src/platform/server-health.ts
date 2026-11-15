@@ -20,8 +20,14 @@ export interface BackupStatus {
   message?: string | null;
   lastGoodAt?: string | null;
   dump?: string | null;
-  offsite?: "off" | "ok" | "failed";
+  /** off: not set up; pending: set up, but this run did not get to it (it failed before). */
+  offsite?: "off" | "ok" | "failed" | "pending";
+  /** When the off-site copy last worked (older status files: none; then `at` when offsite is ok). */
+  offsiteAt?: string | null;
 }
+
+/** When the off-site copy last worked, as far as the status says. */
+export const offsiteGoodAt = (b: BackupStatus): string | null => b.offsiteAt ?? (b.offsite === "ok" ? b.at : null);
 
 /** backups/status/disk.json, written by deploy/server/docker-cleanup.sh every night. */
 export interface DiskStatus {
@@ -32,7 +38,19 @@ export interface DiskStatus {
 
 export interface ServerWarning {
   /** Stable per kind of problem: the same one is emailed at most once a day. */
-  key: "backup_old" | "backup_failed" | "offsite_failed" | "status_unreadable" | "disk_full" | "service_down" | "errors" | "certificate" | "restore_failed";
+  key:
+    | "backup_old"
+    | "backup_failed"
+    | "offsite_failed"
+    | "offsite_off"
+    | "offsite_old"
+    | "status_unreadable"
+    | "disk_full"
+    | "service_down"
+    | "errors"
+    | "certificate"
+    | "restore_failed"
+    | "job_slow";
   title: string;
   detail: string;
 }
@@ -64,6 +82,35 @@ export const CERT_WARN_DAYS = 14;
 /** A status file: missing, unreadable, or read. */
 export type Read<T> = { state: "missing" } | { state: "unreadable"; error: string } | { state: "ok"; value: T };
 
+const DAY = 24 * HOUR;
+
+/** The jobs that run by themselves: the worker's (job_runs) and the server's (status files). */
+export const JOBS: { key: string; label: string; by: "worker" | "server"; schedule: string; everyMs: number }[] = [
+  { key: "reminders", label: "Reminders and the morning email", by: "worker", schedule: "every hour", everyMs: HOUR },
+  { key: "company-rules", label: "Company rules: demos ending, payments due", by: "worker", schedule: "every hour", everyMs: HOUR },
+  { key: "follow-ups", label: "Follow-up reminders", by: "worker", schedule: "every 5 minutes", everyMs: 5 * 60_000 },
+  { key: "own-domains", label: "Companies' own domains", by: "worker", schedule: "every 5 minutes", everyMs: 5 * 60_000 },
+  { key: "server-check", label: "Server checks and warning emails", by: "worker", schedule: "every 5 minutes", everyMs: 5 * 60_000 },
+  { key: "insights-nightly", label: "Insights tables, checked in full", by: "worker", schedule: "once a day", everyMs: DAY },
+  { key: "ledger-nightly", label: "Ledger, checked against the figures", by: "worker", schedule: "once a day", everyMs: DAY },
+  { key: "backup", label: "Database backup", by: "server", schedule: "every night", everyMs: DAY },
+  { key: "offsite", label: "Off-site copy of the backup", by: "server", schedule: "after each backup", everyMs: DAY },
+  { key: "restore-test", label: "Restore test", by: "server", schedule: "once a month", everyMs: 31 * DAY },
+  { key: "cleanup", label: "Disk clean-up", by: "server", schedule: "every night, 03:30", everyMs: DAY },
+  { key: "status", label: "Server status (this page's figures)", by: "server", schedule: "every minute", everyMs: 60_000 },
+];
+
+/** A worker job's last run (job_runs) and how often it runs. */
+export interface JobLastRun {
+  job: string;
+  label: string;
+  startedAt: string;
+  tookMs: number;
+  beatMs: number;
+}
+
+const minutesOf = (ms: number) => (ms < 90_000 ? `${Math.round(ms / 1000)} s` : ms < 2 * HOUR ? `${Math.round(ms / 60_000)} min` : `${Math.round(ms / HOUR)} h`);
+
 const age = (now: Date, iso: string | null | undefined) => {
   const t = iso ? Date.parse(iso) : NaN;
   return Number.isFinite(t) ? (now.getTime() - t) / HOUR : Infinity;
@@ -82,6 +129,8 @@ export function serverWarnings(input: {
   server?: Read<ServerFacts>;
   restore?: Read<RestoreStatus>;
   errorsLastHour?: number;
+  /** Each worker job's last run in the last day, with its beat: how often it runs (JOBS). */
+  jobs?: JobLastRun[];
 }): ServerWarning[] {
   const { now, backup, disk } = input;
   const out: ServerWarning[] = [];
@@ -115,11 +164,25 @@ export function serverWarnings(input: {
         title: "The last backup failed",
         detail: b.message ?? "No reason given; see docker compose logs backup.",
       });
+    const offsiteAge = age(now, offsiteGoodAt(b));
     if (b.offsite === "failed")
       out.push({
         key: "offsite_failed",
         title: "The off-site copy of the backup failed",
-        detail: `${b.message ?? "No reason given."} The local backup${b.dump ? ` (${b.dump})` : ""} is on the server only.`,
+        detail: `${b.message ?? "No reason given."} The local backup${b.dump ? ` (${b.dump})` : ""} is on the server only. Last good off-site copy: ${hours(offsiteAge)}.`,
+      });
+    else if (b.offsite === "off" || b.offsite === undefined)
+      out.push({
+        key: "offsite_off",
+        title: "The backups have no off-site copy",
+        detail:
+          "They are kept on this server only: if the server is lost, the backups go with it. Set up the off-site copy: deploy/server/enable-offsite.sh (docs/restore.md).",
+      });
+    else if (offsiteAge > BACKUP_MAX_AGE_HOURS)
+      out.push({
+        key: "offsite_old",
+        title: "The last off-site copy is more than a day old",
+        detail: `Last good off-site copy: ${hours(offsiteAge)}. Last backup run: ${hours(age(now, b.at))}${b.ok ? "" : `, failed: ${b.message ?? "no reason given"}`}.`,
       });
   }
 
@@ -153,6 +216,16 @@ export function serverWarnings(input: {
       title: `${input.errorsLastHour} server errors in the last hour`,
       detail: "See Dev tools › Speed and errors: each error with its stack, and Copy for Claude.",
     });
+  // A run longer than its beat: while it runs the next one is skipped (follow-up reminders, these checks).
+  const slow = (input.jobs ?? []).filter((j) => j.tookMs > j.beatMs && age(now, j.startedAt) <= 24);
+  if (slow.length) {
+    const words = slow.map((j) => `${j.label} took ${minutesOf(j.tookMs)} (it runs every ${minutesOf(j.beatMs)})`);
+    out.push({
+      key: "job_slow",
+      title: slow.length === 1 ? `A background job is slower than its beat: ${slow[0]!.label}` : `${slow.length} background jobs are slower than their beat`,
+      detail: `${words.join("; ")}. While a run goes on, the next is skipped, so reminders and these checks come late. See Dev tools › Jobs and emails.`,
+    });
+  }
   if (input.restore?.state === "ok" && !input.restore.value.ok && age(now, input.restore.value.at) <= 24 * 7)
     out.push({
       key: "restore_failed",
@@ -160,6 +233,20 @@ export function serverWarnings(input: {
       detail: `${input.restore.value.message ?? "No reason given"}. A backup that cannot be put back is no backup: see docs/restore.md.`,
     });
   return out;
+}
+
+/** The worker finished no job for this long: it is stopped or stuck (its own checks cannot say so). */
+export const WORKER_SILENT_MINUTES = 60;
+
+/**
+ * For the outside watcher (GET /api/health?from=outside): why the worker looks stopped, or null. `lastDone` is
+ * when its last job finished (job_runs); none at all is a new server, not a problem.
+ */
+export function workerSilence(lastDone: Date | null, now: Date): string | null {
+  if (!lastDone) return null;
+  const minutes = Math.floor((now.getTime() - lastDone.getTime()) / 60_000);
+  if (minutes < WORKER_SILENT_MINUTES) return null;
+  return `The background worker has finished no job for ${minutes} minutes: reminders and the server's checks are stopped. On the server: sudo docker compose ps worker; sudo docker compose logs --tail 200 worker`;
 }
 
 /** The warnings not emailed in the last WARNING_REPEAT_HOURS. */
@@ -212,6 +299,21 @@ export class ServerHealthService {
     }
   }
 
+  /** Each worker job's last run in the last day, with the beat it must fit in (the hourly round or the 5-minute one). */
+  private async jobRuns(now: Date): Promise<JobLastRun[]> {
+    try {
+      const rows = await this.prisma.platform.$queryRaw<{ job: string; started_at: Date; took_ms: number }[]>`
+        select distinct on (job) job, started_at, took_ms from job_runs
+         where started_at >= ${new Date(now.getTime() - DAY)} order by job, started_at desc`;
+      return rows.flatMap((r) => {
+        const j = JOBS.find((x) => x.key === r.job && x.by === "worker");
+        return j ? [{ job: r.job, label: j.label, startedAt: r.started_at.toISOString(), tookMs: r.took_ms, beatMs: Math.min(j.everyMs, HOUR) }] : [];
+      });
+    } catch {
+      return [];
+    }
+  }
+
   async run(now = new Date()) {
     const dir = this.env.SERVER_STATUS_DIR;
     if (!dir) return [];
@@ -223,6 +325,7 @@ export class ServerHealthService {
       server: await readStatus<ServerFacts>(path.join(dir, "server.json")),
       restore: await readStatus<RestoreStatus>(path.join(dir, "restore-status.json")),
       errorsLastHour: await this.errorsLastHour(now),
+      jobs: await this.jobRuns(now),
     });
     if (!warnings.length) return [];
     const since = new Date(now.getTime() - WARNING_REPEAT_HOURS * HOUR);

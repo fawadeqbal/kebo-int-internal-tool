@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
+import { WebVitals } from "@/components/common/web-vitals";
 
 export const metadata: Metadata = {
   title: { default: "RFQ Desk", template: "%s · RFQ Desk" },
@@ -18,7 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="min-h-dvh font-sans">{children}</body>
+      <body className="min-h-dvh font-sans">
+        <WebVitals />
+        {children}
+      </body>
     </html>
   );
 }

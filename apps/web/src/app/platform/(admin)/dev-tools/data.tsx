@@ -73,7 +73,19 @@ export function DataTab({ d }: { d: DevDataView }) {
               items={[
                 { label: "Last good backup", value: b.lastGoodAt ? agoText(b.lastGoodAt) : null },
                 { label: "Last try", value: b.lastTryAt ? `${agoText(b.lastTryAt)}${b.ok === false ? ", failed" : ""}` : null },
-                { label: "Off-site copy", value: b.offsite === "ok" ? "made" : b.offsite === "failed" ? "failed" : b.offsite === "off" ? "off: on this server only" : null },
+                {
+                  label: "Off-site copy",
+                  value:
+                    b.offsite === "off"
+                      ? "off: on this server only"
+                      : b.offsite === "failed"
+                        ? `failed${b.offsiteAt ? ` · last made ${agoText(b.offsiteAt)}` : ""}`
+                        : b.offsite === "pending"
+                          ? `not made by the last run${b.offsiteAt ? ` · last made ${agoText(b.offsiteAt)}` : ""}`
+                          : b.offsite === "ok"
+                            ? `made ${b.offsiteAt ? agoText(b.offsiteAt) : ""}`.trim()
+                            : null,
+                },
                 { label: "File", value: b.dump },
               ]}
             />
