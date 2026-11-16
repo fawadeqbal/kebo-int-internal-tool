@@ -14,6 +14,7 @@ import '../data/sales_data.dart';
 import '../domain/sales_terms.dart';
 import '../../follow_ups/presentation/follow_up_form.dart';
 import 'quotation_card.dart';
+import 'quote_actions.dart';
 
 /// One inquiry: who and what, where it stands, the quotation in its two views, what is
 /// planned, and the notes. Putting on hold, losing and reopening are a tap away.
@@ -330,17 +331,34 @@ class _Body extends ConsumerWidget {
                 title: 'Quotation',
                 children: [
                   switch (quote) {
-                    AsyncValue(:final value?) when value.revisions.isNotEmpty => QuotationCard(
-                      refNo: value.refNo,
-                      revision: value.revisions.first,
-                      revisionCount: value.revisions.length,
+                    AsyncValue(:final value?) when value.revisions.isNotEmpty => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        QuotationCard(
+                          refNo: value.refNo,
+                          revision: value.revisions.first,
+                          revisionCount: value.revisions.length,
+                        ),
+                        QuoteActions(
+                          inquiryId: i.id,
+                          latest: value.revisions.first,
+                          canStart: value.canStart,
+                          onChanged: onChanged,
+                        ),
+                      ],
                     ),
-                    AsyncValue(:final value?) => KCard(
-                      child: KEmptyState(
-                        icon: KIcons.file,
-                        title: 'Not quoted yet',
-                        message: value.whyNotStart ?? 'Make the quotation on the web, from the factory offers. It shows here as soon as it is saved.',
-                      ),
+                    AsyncValue(:final value?) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        KCard(
+                          child: KEmptyState(
+                            icon: KIcons.file,
+                            title: 'Not quoted yet',
+                            message: value.whyNotStart ?? 'Make it from the factory offers with Make the quotation.',
+                          ),
+                        ),
+                        QuoteActions(inquiryId: i.id, latest: null, canStart: value.canStart, onChanged: onChanged),
+                      ],
                     ),
                     AsyncValue(:final error?) => KBanner(error.toString(), tone: KTone.danger),
                     _ => const KSkeleton(height: 120),

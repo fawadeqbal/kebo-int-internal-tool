@@ -3,6 +3,15 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-beta.6 — 2026-11-16
+
+Quotations on the phone.
+
+- Make the quotation, or a new revision: it starts from the latest one, or from the best factory offer at your usual margin. Each line shows its cost and margin (Internal) next to our price; set one margin for every line, change any price, the validity and the payment terms, and save it as a draft. The total and the overall margin stay at the bottom.
+- Edit a draft revision, then mark it as sent (email, WhatsApp, WeChat, in person) with the day.
+- Record the answer: Accepted makes the order from the option they chose (with their PO number), with a small celebration; or Rejected (why), or Expired.
+- Charges, extra options and the PDF stay on the web.
+
 ## 3.0.0-beta.5 — 2026-11-16
 
 Factory prices on the phone.

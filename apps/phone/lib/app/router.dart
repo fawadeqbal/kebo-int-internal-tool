@@ -22,6 +22,7 @@ import '../features/orders/presentation/order_screen.dart';
 import '../features/orders/presentation/orders_screen.dart';
 import '../features/sales/presentation/factory_prices_screen.dart';
 import '../features/sales/presentation/inquiry_screen.dart';
+import '../features/sales/presentation/quotation_editor_screen.dart';
 import '../features/sales/presentation/new_inquiry_screen.dart';
 import '../features/sales/presentation/sales_screen.dart';
 import 'shell.dart';
@@ -65,6 +66,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'prices',
                         builder: (context, state) => FactoryPricesScreen(inquiryId: state.pathParameters['id']!),
+                      ),
+                      GoRoute(
+                        path: 'quote',
+                        builder: (context, state) => QuotationEditorScreen(
+                          inquiryId: state.pathParameters['id']!,
+                          revisionId: state.uri.queryParameters['rev'],
+                        ),
                       ),
                     ],
                   ),
