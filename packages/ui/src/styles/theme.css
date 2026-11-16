@@ -39,8 +39,8 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root,
-[data-colours="green"][data-mode="light"] {
+[data-colours="green"][data-mode="light"],
+:root {
   /* Kebo ERP look (client video, Nov 2026): light green-grey ground, white cards, green brand, orange for the one main action. */
   --bg: #f4f7f5;
   --surface: #ffffff;
@@ -102,8 +102,8 @@
   --chart-5: #0f7c80;
 }
 
-.dark,
-[data-colours="green"][data-mode="dark"] {
+[data-colours="green"][data-mode="dark"],
+.dark {
   --bg: #0b120e;
   --surface: #111a15;
   --surface-2: #17221c;

@@ -106,7 +106,8 @@ describe("the app's colour sets", () => {
 
   it.each(EVERY)("%s %s: the page and its preview take the same block", (set, mode) => {
     const { selectors } = block(set, mode);
-    if (set === "green") expect(selectors.split(/\s*,\s*/)[0]).toBe(mode === "light" ? ":root" : ".dark");
+    // Green is the page's own (":root {" and ".dark {", last, as apps/app-v2/gen reads them).
+    if (set === "green") expect(selectors.split(/\s*,\s*/).at(-1)).toBe(mode === "light" ? ":root" : ".dark");
     else expect(selectors).toContain(`${mode === "dark" ? ":root.dark" : ":root"}:has(#app-colours[data-colours="${set}"])`);
   });
 
