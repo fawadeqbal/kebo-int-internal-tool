@@ -1,4 +1,27 @@
-import type { AttachmentKind, BalanceTerms, BasisStep, Incoterm, InquiryChannel, LineType, LostReason, RevisionStatus, SentVia } from "@kebo/shared";
+import type {
+  AttachmentKind,
+  BalanceTerms,
+  BasisStep,
+  Incoterm,
+  InquiryChannel,
+  LeadFrom,
+  LineType,
+  LostReason,
+  PaymentRoute,
+  RevisionStatus,
+  SentVia,
+  TermPart,
+  WarrantyFrom,
+} from "@kebo/shared";
+
+/** A factory's terms as facts, to check a promise against (an older offer's words read where they say them). */
+export interface FactoryTerms {
+  leadDays: number | null;
+  leadFrom: LeadFrom | null;
+  parts: TermPart[];
+  warrantyMonths: number | null;
+  warrantyFrom: WarrantyFrom | null;
+}
 
 /** Response shapes for the deal-work screens: inquiry form, factory prices, quotation, reports. */
 
@@ -113,13 +136,21 @@ export interface FactoryQuoteView {
   /** What the factory's prices already pay for (EXW, FOB…), and where. */
   basis: Incoterm | null;
   basisPlace: string | null;
+  /** The lead time's words ("30 days after the advance"). */
   leadTime: string | null;
+  /** The lead time as days from a moment (null: only its words, an older offer). */
+  leadDays: number | null;
+  leadFrom: LeadFrom | null;
   moq: string | null;
   paymentTerms: string | null;
-  /** The warranty the factory gives. */
+  /** The warranty's words: what it covers (with months), or an older offer's whole warranty. */
   warranty: string | null;
+  warrantyMonths: number | null;
+  warrantyFrom: WarrantyFrom | null;
   /** The advance the factory asks when we order, in % (null: the company's default). */
   advancePercent: number | null;
+  /** What the factory asks, as parts (an older offer's advance and the rest when ready). */
+  paymentParts: TermPart[];
   notes: string | null;
   fxRate: number | null;
   lines: FactoryQuoteLineView[];
@@ -147,10 +178,16 @@ export interface LastOffer {
   basis: Incoterm | null;
   basisPlace: string | null;
   leadTime: string | null;
+  leadDays: number | null;
+  leadFrom: LeadFrom | null;
   moq: string | null;
   paymentTerms: string | null;
   advancePercent: number | null;
+  /** What it asked, as parts (null: an older offer, only its advance %). */
+  paymentParts: TermPart[] | null;
   warranty: string | null;
+  warrantyMonths: number | null;
+  warrantyFrom: WarrantyFrom | null;
 }
 
 export interface SourcingOption extends FactoryQuoteLineView {
@@ -249,6 +286,9 @@ export interface OptionView {
   factory: { id: string; name: string } | null;
   factoryQuoteId: string | null;
   leadTime: string | null;
+  /** The lead time we promise as days from a moment (null: only its words). */
+  leadDays: number | null;
+  leadFrom: LeadFrom | null;
   subtotal: string;
   discount: string;
   total: string;
@@ -258,6 +298,8 @@ export interface OptionView {
   /** People who see costs: the factory's basis when priced, what it takes to reach ours, and those costs. */
   factoryBasis?: Incoterm | null;
   factoryBasisPlace?: string | null;
+  /** People who see costs: what the option's factory gives now, to check the promise against. */
+  factoryTerms?: FactoryTerms | null;
   gap?: { needed: BasisStep[]; extra: BasisStep[] } | null;
   costs?: BasisCost[];
 }
@@ -269,8 +311,14 @@ export interface RevisionView {
   currency: string;
   incoterm: Incoterm;
   incotermPlace: string | null;
+  /** Where the goods go (printed as the port of discharge). */
+  portOfDischarge: string | null;
   depositPercent: number;
   balanceTerms: BalanceTerms;
+  /** How the customer pays (null: not decided yet). */
+  paymentRoute: PaymentRoute | null;
+  /** The payment as parts (an older quotation's deposit and balance). */
+  paymentParts: TermPart[];
   validUntil: string;
   /** Read from the options (the revision keeps none of its own): the accepted option's, else Option A's. */
   leadTime: string | null;
@@ -283,8 +331,10 @@ export interface RevisionView {
   paymentTerms: string | null;
   /** Printed under the delivery (packing, inspection…). */
   deliveryTerms: string | null;
-  /** The warranty printed on the quotation. */
+  /** The warranty's words: what it covers (with months), or an older quotation's whole warranty. */
   warranty: string | null;
+  warrantyMonths: number | null;
+  warrantyFrom: WarrantyFrom | null;
   notes: string | null;
   sentOn: string | null;
   /** How it went to the customer (null: not said). */
@@ -308,6 +358,8 @@ export interface QuotationView {
 export interface OptionValues {
   factoryQuoteId: string | null;
   leadTime: string | null;
+  leadDays?: number | null;
+  leadFrom?: LeadFrom | null;
   discount: number;
   prices: { lineId: string; unitPrice: number }[];
   charges: {
@@ -327,14 +379,20 @@ export interface RevisionDraft {
   currency: string;
   incoterm: Incoterm;
   incotermPlace: string | null;
+  portOfDischarge?: string | null;
   depositPercent: number;
   balanceTerms: BalanceTerms;
+  paymentRoute?: PaymentRoute | null;
+  /** The payment as parts (an older client's draft: none, its deposit and balance). */
+  paymentParts?: TermPart[] | null;
   validUntil: string;
   /** Printed under the payment (beyond the deposit and balance). */
   paymentTerms: string | null;
   /** Printed under the delivery (packing, inspection…). */
   deliveryTerms: string | null;
   warranty: string | null;
+  warrantyMonths?: number | null;
+  warrantyFrom?: WarrantyFrom | null;
   notes: string | null;
   options: OptionValues[];
   /** A first revision: where its starting values came from (said under the field; all can be changed). */
@@ -376,6 +434,11 @@ export interface QuoteOffers {
     receivedOn: string;
     validUntil: string | null;
     leadTime: string | null;
+    /** Its lead time as typed (null: only its words). */
+    leadDays?: number | null;
+    leadFrom?: LeadFrom | null;
+    /** What the factory gives, to check each option's promise against. */
+    terms?: FactoryTerms;
     coverage: Coverage;
     missingRate: boolean;
     totalCost: string | null;

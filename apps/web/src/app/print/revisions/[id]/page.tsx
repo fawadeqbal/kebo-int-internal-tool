@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { fromMinor, landedUnitCosts, toMinor } from "@kebo/money";
-import { basisText, paymentSentenceOf } from "@kebo/shared";
+import { basisText, paymentSentenceOf, quotePaymentSentence, warrantyLine } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { docBrand, hasFeature, load } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
@@ -65,6 +65,8 @@ export default async function QuotationPrint({
   ]);
   const c = r.currency;
   const internal = sp.copy === "internal";
+  // Its months from a moment and what it covers (an older quotation: its words as they are).
+  const warranty = warrantyLine({ warrantyMonths: r.warrantyMonths ?? null, warrantyFrom: r.warrantyFrom ?? null, warranty: r.warranty });
   // Once the customer accepted one option, the quotation shows that one; before, every option.
   const options = r.options.some((o) => o.status === "accepted") ? r.options.filter((o) => o.status === "accepted") : r.options;
   const single = options.length === 1;
@@ -145,14 +147,15 @@ export default async function QuotationPrint({
         rows={[]}
         groups={groups}
         bullets={[
-          paymentSentenceOf(r.depositPercent, r.balanceTerms),
+          // The payment's parts (an older quotation's deposit and balance print Kebo's sentence as they always did).
+          r.paymentParts?.length ? quotePaymentSentence(r.paymentParts) : paymentSentenceOf(r.depositPercent, r.balanceTerms),
           ...textBullets(r.paymentTerms),
           single ? (options[0]!.leadTime ? `Delivery: ${options[0]!.leadTime}` : null) : null,
           ...textBullets(r.deliveryTerms),
-          r.warranty ? (/^warranty/i.test(r.warranty) ? r.warranty : `Warranty: ${r.warranty}`) : null,
+          warranty ? (/^warranty/i.test(warranty) ? warranty : `Warranty: ${warranty}`) : null,
           single ? null : `Please choose one of the ${options.length} options above (${options.map((o) => o.letter).join(", ")}); each is priced on its own.`,
           ...textBullets(r.notes),
-          ...portBullets(r.incoterm, r.incotermPlace),
+          ...portBullets(r.incoterm, r.incotermPlace, r.portOfDischarge),
           `This quotation is valid until ${docDate(r.validUntil)}.`,
         ].filter(Boolean)}
         internal={

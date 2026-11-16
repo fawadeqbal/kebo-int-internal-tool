@@ -353,13 +353,14 @@ export class OrdersService {
     // changed by hand). The plan is built from it: the deposit dated, the balance with its due rule.
     const days = (await this.settings.get()).reminders;
     const terms = routeFromTerms(rev.balanceTerms);
-    // Chosen when it was accepted ("Payment route"): another route than the terms imply.
+    // Chosen when it was accepted ("Payment route"), else on the quotation ("How they pay"): another route than the terms imply.
+    const chosen = accept.route ?? rev.paymentRoute ?? undefined;
     const implied: typeof terms =
-      !accept.route || accept.route === terms.route
+      !chosen || chosen === terms.route
         ? terms
-        : accept.route === "informal"
+        : chosen === "informal"
           ? { route: "informal", balanceWhen: terms.balanceWhen ?? (rev.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment"), lcTerms: null, lcDays: null }
-          : accept.route === "letter_of_credit"
+          : chosen === "letter_of_credit"
             ? { route: "letter_of_credit", balanceWhen: null, lcTerms: "at_sight", lcDays: null }
             : { route: "bank_contract", balanceWhen: null, lcTerms: null, lcDays: null };
     const route =

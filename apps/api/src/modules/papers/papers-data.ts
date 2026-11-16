@@ -22,6 +22,7 @@ import {
   shipByVsLc,
   SAT_RESULT_LABEL,
   SHIP_MODE_LABEL,
+  warrantyLine,
   type OrderDocumentKind,
   type PaperCell,
   type PaperCheck,
@@ -152,9 +153,12 @@ const bullets = (text: string | null | undefined) =>
     .split(/\r?\n/)
     .map((l) => l.replace(/^\s*(?:\d+[.)]|[-•*])\s*/, "").trim())
     .filter(Boolean);
-/** The warranty the papers print: the one on this order's quotation, else the company's usual one (Settings). */
+/**
+ * The warranty the papers print: the one on this order's quotation (its months from a moment and what it
+ * covers, or an older quotation's words), else the company's usual one (Settings).
+ */
 const warrantyOf = (c: PaperCtx) => {
-  const own = c.o.revision.warranty?.trim();
+  const own = warrantyLine(c.o.revision);
   return own ? (/^warranty/i.test(own) ? own : `Warranty: ${own}`) : c.settings.sales.warrantyTerms;
 };
 
@@ -348,7 +352,7 @@ function salesContract(c: PaperCtx): Built {
         { fix: "shipBy", warn: vsLc?.late ? `Ours is later than the LC allows: ship by ${paperDateText(lcLatest!)}, or ask for an amendment.` : null },
       ),
       hs.check,
-      check("warranty", "Warranty", c.o.revision.warranty ? "from the quotation" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
+      check("warranty", "Warranty", warrantyLine(c.o.revision) ? "from the quotation" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
         href: "/settings/sales",
       }),
     ],
@@ -957,7 +961,7 @@ function satCertificate(c: PaperCtx): Built {
       ),
       check("done", "Signed off on", on ? paperDateText(on) : "not yet", !!on, { required: true, href: "delivery" }),
       check("by", "Signed by", c.o.delivery?.satSignedBy ?? "not recorded", !!c.o.delivery?.satSignedBy, { href: "delivery" }),
-      check("warranty", "Warranty", c.o.revision.warranty ? "from the quotation" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
+      check("warranty", "Warranty", warrantyLine(c.o.revision) ? "from the quotation" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
         href: "/settings/sales",
       }),
     ],

@@ -27,8 +27,9 @@ const total = (v: string, currency: string) => money(v, currency);
 
 /**
  * The quotation's window, the same for "New quotation R1" and "Edit quotation R1": which offers to quote
- * (each ticked one is an option), the deal, the payment and what is printed. The whole draft is saved.
- * The prices are not here: they have their own editor (Edit lines).
+ * (each ticked one is an option), then the quotation's terms in the groups every offer and order uses
+ * (Delivery · Payment · Warranty · Conditions). The whole draft is saved. The prices are not here: they have
+ * their own editor (Edit lines).
  */
 export function TermsPanel({
   number,
@@ -57,7 +58,6 @@ export function TermsPanel({
   return (
     <PanelBody>
       <RevisionEditor
-        part="terms"
         action={action}
         number={number}
         initial={initial}

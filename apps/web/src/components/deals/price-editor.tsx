@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardPaste, Lock, Plus, X } from "lucide-react";
 import { convertMinor, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
-import { basisText, BASIS_STEP_LABEL, optionLetter } from "@kebo/shared";
+import { basisText, BASIS_STEP_LABEL, leadWords, optionLetter } from "@kebo/shared";
 import { Badge, Button, Card, cn, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { EditButton } from "@/components/common/edit-button";
@@ -487,12 +487,12 @@ export function PriceEditor({
             </div>
           </Card>
 
-          {/* The option's own term. */}
-          <div className="max-w-sm">
-            <TermBox label="Lead time" id={`lead-${opt.key}`} hint={s.options.length > 1 ? `Option ${letter}` : "Printed on the quotation"}>
-              <Input id={`lead-${opt.key}`} value={opt.leadTime} maxLength={120} placeholder="e.g. 60 days after the deposit" onChange={(e) => setOption(at, { leadTime: e.target.value })} />
-            </TermBox>
-          </div>
+          {/* The option's lead time, as the quotation's form has it (one thing, one form: it is changed there, under Delivery). */}
+          <p className="text-sm">
+            <span className="font-medium">Lead time{s.options.length > 1 ? ` of Option ${letter}` : ""}:</span>{" "}
+            {opt.leadDays.trim() ? leadWords(Number(opt.leadDays) || 0, opt.leadFrom, "customer") : opt.leadTime || <span className="text-muted">not said</span>}
+            <span className="ml-1.5 text-xs text-muted">changed in the quotation&apos;s Edit, under Delivery</span>
+          </p>
 
           <ErrorText error={st.errors?.options ?? st.errors?.currency} />
 
@@ -573,19 +573,6 @@ function PriceInput({ value, onChange, className, ...props }: Omit<React.Compone
       onBlur={() => setTyping(false)}
       onChange={(e) => onChange(e.target.value)}
     />
-  );
-}
-
-function TermBox({ label, id, hint, error, children }: { label: string; id: string; hint?: string; error?: string[]; children: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-        {hint && <span className="ml-1.5 text-xs font-normal text-muted">{hint}</span>}
-      </label>
-      {children}
-      <ErrorText error={error} />
-    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, Download, Eye, Send } from "lucide-react";
-import { BALANCE_TERMS_LABEL, BASIS_STEP_LABEL, can, routeFromTerms, SENT_VIA_TEXT, type BasisStep } from "@kebo/shared";
+import { toMinor } from "@kebo/money";
+import { BASIS_STEP_LABEL, can, partsWords, routeFromTerms, SENT_VIA_TEXT, termsChecks, warrantyLine, type BasisStep, type PaymentRoute } from "@kebo/shared";
 import { Alert, Badge, buttonClass, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
 import { FollowUpForm } from "@/components/notes/note-forms";
@@ -15,6 +16,7 @@ import { DetailsCard, type DetailField } from "@/components/orders/step-view";
 import { StartRevision } from "@/components/deals/quotation-panels";
 import { OptionsCard, QuotationNext, TermsPanel } from "@/components/deals/quotation-step";
 import { WithSide } from "../side";
+import { shortName } from "@/components/deals/offer-facts";
 import { PriceEditor } from "@/components/deals/price-editor";
 import { createRevisionAction, deleteRevisionAction, emailRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
 import { DeleteDraftButton, SendWindow } from "@/components/deals/send-quote";
@@ -219,7 +221,7 @@ export default async function QuotationPage({
         ) : undefined
       }
       subtitle={`${quoRef} · ${d.customer.name}`}
-      route={live ? routeFromTerms(live.balanceTerms).route : null}
+      route={live ? (live.paymentRoute ?? routeFromTerms(live.balanceTerms).route) : null}
     />
   );
   const COLS = "md:grid-cols-[16px_40px_92px_minmax(0,1fr)_150px_96px_96px]";
@@ -390,22 +392,39 @@ export default async function QuotationPage({
   );
 }
 
+const ROUTE_TEXT: Record<PaymentRoute, string> = { informal: "Informal", bank_contract: "Bank contract", letter_of_credit: "Letter of credit" };
+
 /**
- * Everything a revision keeps, on its card: currency, delivery, validity, deposit, balance, lead time, the
- * printed payment, delivery and warranty lines, the notes, and when it was made, sent (and how) and answered.
+ * Everything a revision keeps, on its card, in the groups every offer, quotation and order uses (design "terms
+ * that travel"): the currency and validity, then Delivery (the Incoterm and place, the port of discharge, the
+ * lead time, the delivery conditions) · Payment (how they pay and the parts, the payment conditions) ·
+ * Warranty · Conditions (the notes), and when it was made, sent (and how) and answered.
  */
 function termsFields(r: RevisionView): DetailField[] {
   const long = (v: string | null) => (v ? <span className="line-clamp-4 font-normal whitespace-pre-line">{v}</span> : undefined);
+  const warranty = warrantyLine(r);
   return [
     { label: "Currency", value: r.currency },
-    { label: "Delivery", value: r.incoterm, show: `${r.incoterm}${r.incotermPlace ? ` ${r.incotermPlace}` : ""}` },
     { name: "validUntil", label: "Valid until", type: "date", value: r.validUntil, show: date(r.validUntil) },
-    { label: "Deposit", value: String(r.depositPercent), show: `${r.depositPercent}%` },
-    { label: "Balance", value: r.balanceTerms, show: BALANCE_TERMS_LABEL[r.balanceTerms] },
+    {
+      label: "Delivery",
+      value: r.incoterm,
+      show: `${r.incoterm}${r.incotermPlace ? ` ${r.incotermPlace}` : ""}${r.portOfDischarge ? ` · to ${r.portOfDischarge}` : ""}`,
+    },
     { label: "Lead time", value: r.leadTime, show: r.leadTime ? `${r.leadTime}${r.figuresOf ? ` (${r.figuresOf})` : ""}` : undefined },
-    { name: "paymentTerms", label: "Payment terms", type: "textarea", value: r.paymentTerms, show: long(r.paymentTerms) },
-    { name: "deliveryTerms", label: "Delivery terms", type: "textarea", value: r.deliveryTerms, show: long(r.deliveryTerms) },
-    { name: "warranty", label: "Warranty", value: r.warranty, show: long(r.warranty) },
+    { name: "deliveryTerms", label: "Delivery conditions", type: "textarea", value: r.deliveryTerms, show: long(r.deliveryTerms) },
+    {
+      label: "Payment",
+      value: r.paymentParts.length ? "parts" : null,
+      show: (
+        <span className="flex flex-col gap-0.5">
+          <span>{partsWords(r.paymentParts, "customer")}</span>
+          <span className="text-xs font-normal text-text-2">{r.paymentRoute ? ROUTE_TEXT[r.paymentRoute] : "How they pay: not decided yet"}</span>
+        </span>
+      ),
+    },
+    { name: "paymentTerms", label: "Payment conditions", type: "textarea", value: r.paymentTerms, show: long(r.paymentTerms) },
+    { name: "warranty", label: "Warranty", value: warranty, show: long(warranty) },
     { name: "notes", label: "Notes", type: "textarea", value: r.notes, show: long(r.notes) },
     { label: "Made", value: r.createdAt, show: date(r.createdAt), uncounted: true },
     // A draft has not gone anywhere yet: its sent and answered days come with the sending.
@@ -447,6 +466,15 @@ function draftChecks(r: RevisionView): string[] {
       }
     }
     if (o.costing && o.costing.marginPercent !== null && o.costing.marginPercent < 0) out.push(`${who} sells below cost.`);
+    // What we promise against what the factory gives (people who see costs): lead time, payment, warranty.
+    if (o.factory && o.factoryTerms) {
+      const factoryMinor = o.costing ? o.costing.costMinor - o.costing.extraCostMinor : 0;
+      const checks = termsChecks(
+        { leadDays: o.leadDays, leadFrom: o.leadFrom, parts: r.paymentParts, warrantyMonths: r.warrantyMonths, warrantyFrom: r.warrantyFrom, totalMinor: toMinor(o.total), currency: r.currency },
+        { factory: shortName(o.factory.name), ...o.factoryTerms, costMinor: factoryMinor > 0 ? factoryMinor : null },
+      );
+      for (const c of checks) if (!c.ok) out.push(`${who}: ${c.text}`);
+    }
     return out;
   });
   return checks;

@@ -169,18 +169,26 @@ export const PANEL_FORM = "flex flex-1 flex-col gap-5";
 /** A section of a panel's form: a small-caps title, then its fields, two columns at most (one on a phone). */
 export function PanelSection({
   title,
+  sub,
   children,
   className,
   first,
 }: {
   title?: string;
+  /** A few words after the title: what the section is for. */
+  sub?: string;
   children: ReactNode;
   className?: string;
   first?: boolean;
 }) {
   return (
     <fieldset className={cn("flex min-w-0 flex-col gap-3", !first && "border-t border-line pt-5")}>
-      {title && <legend className="float-left mb-1 w-full text-sm font-bold text-text">{title}</legend>}
+      {title && (
+        <legend className="float-left mb-1 w-full text-sm font-bold text-text">
+          {title}
+          {sub && <span className="ml-2 text-xs font-normal text-muted">{sub}</span>}
+        </legend>
+      )}
       <div className={cn("grid grid-cols-1 gap-x-3 gap-y-3.5 sm:grid-cols-2", className)}>{children}</div>
     </fieldset>
   );

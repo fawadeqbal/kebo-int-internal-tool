@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, toDbDate, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, Prisma, toDbDate } from "@kebo/database";
 import { convertMinor, costSummary, documentTotals, factoryUnitCostMinor, fromMinor, fxRate, priceForMargin, toMinor } from "@kebo/money";
 import {
   BASIS_STEP_LABEL,
   BASIS_STEPS,
+  balanceTermsOfParts,
   basisGap,
   can,
   canAnswer,
@@ -12,14 +13,23 @@ import {
   canStartRevision,
   coverage,
   CURRENCIES,
+  depositOfParts,
   draftsDiscardedBy,
+  isLeadFrom,
+  isWarrantyFrom,
+  leadWords,
   isEditable,
   latestRevision,
   QUOTED_STATUSES,
   type Currency,
   lineNumbers,
   numberQuoteLines,
+  offerPartsOf,
   optionLetter,
+  parseLead,
+  parseWarranty,
+  quotePartsOf,
+  storedParts,
   supersededBy,
   type Incoterm,
   type OptionInput,
@@ -27,6 +37,7 @@ import {
   type RevisionStatus,
   type Settings,
   type PaymentRoute,
+  type QuotePartRule,
   type SentVia,
 } from "@kebo/shared";
 import { addDays, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
@@ -57,7 +68,22 @@ const revisionInclude = {
   options: {
     orderBy: { sortOrder: "asc" },
     include: {
-      factoryQuote: { select: { id: true, currency: true, factory: { select: { id: true, name: true } } } },
+      factoryQuote: {
+        select: {
+          id: true,
+          currency: true,
+          factory: { select: { id: true, name: true } },
+          // What the factory gives (its terms now), beside what this option promises the customer.
+          leadTime: true,
+          leadDays: true,
+          leadFrom: true,
+          paymentParts: true,
+          advancePercent: true,
+          warranty: true,
+          warrantyMonths: true,
+          warrantyFrom: true,
+        },
+      },
       lines: { orderBy: { sortOrder: "asc" }, include: numberedLineInclude },
       costs: true,
     },
@@ -89,6 +115,42 @@ export function companySnapshot(s: Settings) {
 export { customerSnapshot };
 
 type Db = Tx | PrismaService["db"];
+
+/**
+ * A factory offer's terms as facts (design "terms that travel"): its lead time as days from a moment, its
+ * payment as parts (an older offer: its advance, or the company's usual one, and the rest when ready), its
+ * warranty as months from a moment. An older offer's words are read for them where they say them plainly.
+ */
+export function factoryTerms(
+  q: {
+    leadTime: string | null;
+    leadDays: number | null;
+    leadFrom: string | null;
+    paymentParts: Prisma.JsonValue | null;
+    advancePercent: Prisma.Decimal | null;
+    warranty: string | null;
+    warrantyMonths: number | null;
+    warrantyFrom: string | null;
+  },
+  usualAdvance: number,
+) {
+  const lead = q.leadDays !== null ? { days: q.leadDays, from: isLeadFrom(q.leadFrom) ? q.leadFrom : ("after_payment" as const) } : parseLead(q.leadTime);
+  const warranty = q.warrantyMonths !== null ? { months: q.warrantyMonths, from: isWarrantyFrom(q.warrantyFrom) ? q.warrantyFrom : ("shipment" as const) } : parseWarranty(q.warranty);
+  return {
+    leadDays: lead?.days ?? null,
+    leadFrom: lead?.from ?? null,
+    parts: offerPartsOf(q, usualAdvance),
+    warrantyMonths: warranty?.months ?? null,
+    warrantyFrom: warranty?.from ?? null,
+  };
+}
+
+/** An option's lead time as stored: its days and moment with the words worked out from them, or its words alone. */
+function optionLead(o: { leadDays?: number | null; leadFrom?: string | null; leadTime: string | null }) {
+  if (o.leadDays === null || o.leadDays === undefined) return { leadDays: null, leadFrom: null, leadTime: o.leadTime };
+  const from = isLeadFrom(o.leadFrom) ? o.leadFrom : "after_payment";
+  return { leadDays: o.leadDays, leadFrom: from, leadTime: leadWords(o.leadDays, from, "customer") };
+}
 
 /**
  * One quotation per deal, with revisions R1, R2… Each revision offers one or
@@ -179,6 +241,14 @@ export class QuotationsService {
         receivedOn: fromDbDate(q.receivedOn),
         validUntil: fromDbDateOrNull(q.validUntil),
         leadTime: q.leadTime,
+        /** Its lead time as days from a moment, as typed (null: only its words, an older offer). */
+        leadDays: q.leadDays,
+        leadFrom: isLeadFrom(q.leadFrom) ? q.leadFrom : null,
+        /**
+         * What the factory gives (design "terms that travel"), to check a promise against: its lead time, its
+         * payment as parts and its warranty (an older offer's words read for them where they say them plainly).
+         */
+        terms: factoryTerms(q, sales.factoryAdvancePercent),
         coverage: coverage(
           refs,
           q.lines.map((l) => l.requestedItemId),
@@ -213,7 +283,7 @@ export class QuotationsService {
 
   /* ---------------------------------------------------------------- reading */
 
-  private optionView(user: SessionUser, o: OptionRow, items: { id: string; parentId: string | null; no: string }[], selling: Incoterm) {
+  private optionView(user: SessionUser, o: OptionRow, items: { id: string; parentId: string | null; no: string }[], selling: Incoterm, usualAdvance: number) {
     const seeCosts = can(user, "sourcing.manage");
     const no = numbersOf(o.lines);
     const extra = o.costs.reduce((t, c) => t + decimalToMinor(c.cost), 0);
@@ -237,6 +307,9 @@ export class QuotationsService {
       factory: seeCosts ? (o.factoryQuote?.factory ?? null) : null,
       factoryQuoteId: seeCosts ? o.factoryQuoteId : null,
       leadTime: o.leadTime,
+      /** The lead time we promise as days from a moment (null: only its words, an older option). */
+      leadDays: o.leadDays,
+      leadFrom: isLeadFrom(o.leadFrom) ? o.leadFrom : null,
       subtotal: o.subtotal.toFixed(2),
       discount: o.discount.toFixed(2),
       total: o.total.toFixed(2),
@@ -273,6 +346,8 @@ export class QuotationsService {
             /** The factory's price basis this option was priced on, and what it takes to reach ours. */
             factoryBasis: o.factoryBasis,
             factoryBasisPlace: o.factoryBasisPlace,
+            /** What the option's factory gives now (its offer's terms), to check the promise against. */
+            factoryTerms: o.factoryQuote ? factoryTerms(o.factoryQuote, usualAdvance) : null,
             gap,
             costs: o.costs
               .sort((a, b) => BASIS_STEPS.indexOf(a.step) - BASIS_STEPS.indexOf(b.step))
@@ -282,7 +357,7 @@ export class QuotationsService {
     };
   }
 
-  private view(user: SessionUser, r: RevisionRow, items: { id: string; parentId: string | null; no: string }[]) {
+  private view(user: SessionUser, r: RevisionRow, items: { id: string; parentId: string | null; no: string }[], usualAdvance: number) {
     return {
       id: r.id,
       number: r.number,
@@ -290,14 +365,22 @@ export class QuotationsService {
       currency: r.currency,
       incoterm: r.incoterm,
       incotermPlace: r.incotermPlace,
+      portOfDischarge: r.portOfDischarge,
       depositPercent: Number(r.depositPercent),
       balanceTerms: r.balanceTerms,
+      /** How the customer pays (null: not decided yet). */
+      paymentRoute: r.paymentRoute,
+      /** The payment as parts: the ones kept, else (an older quotation) its deposit and balance. */
+      paymentParts: quotePartsOf(r),
       validUntil: fromDbDate(r.validUntil),
       /** The accepted option's figures (before that, Option A's), read from the options: `figuresOf` says which. */
       ...figuresOf(r),
       paymentTerms: r.paymentTerms,
       deliveryTerms: r.deliveryTerms,
       warranty: r.warranty,
+      /** The warranty as months from a moment (null: only its words, an older quotation). */
+      warrantyMonths: r.warrantyMonths,
+      warrantyFrom: isWarrantyFrom(r.warrantyFrom) ? r.warrantyFrom : null,
       notes: r.notes,
       sentOn: fromDbDateOrNull(r.sentOn),
       /** How it went to the customer (null: not said, or sent before this was kept). */
@@ -306,7 +389,7 @@ export class QuotationsService {
       customerSnapshot: r.customerSnapshot,
       companySnapshot: r.companySnapshot,
       createdAt: r.createdAt,
-      options: r.options.map((o) => this.optionView(user, o, items, r.incoterm)),
+      options: r.options.map((o) => this.optionView(user, o, items, r.incoterm, usualAdvance)),
     };
   }
 
@@ -317,6 +400,7 @@ export class QuotationsService {
       include: { revisions: { where: { deletedAt: null }, include: revisionInclude, orderBy: { number: "desc" } } },
     });
     const items = await this.items(this.prisma.db, inquiryId);
+    const usual = (await this.settings.get()).sales.factoryAdvancePercent;
     const revisions = q?.revisions ?? [];
     const refs = revisions.map((r) => ({ number: r.number, status: r.status }));
     const start = canStartRevision(refs);
@@ -324,7 +408,7 @@ export class QuotationsService {
       inquiry: { id: inquiry.id, refNo: inquiry.refNo, stage: inquiry.stage },
       quotation: q && { id: q.id, refNo: q.refNo },
       revisions: revisions.map((r) => ({
-        ...this.view(user, r, items),
+        ...this.view(user, r, items, usual),
         canAnswer: canAnswer(refs, r.number),
         editable: isEditable(r.status),
       })),
@@ -340,17 +424,26 @@ export class QuotationsService {
       currency: r.currency as Currency,
       incoterm: r.incoterm,
       incotermPlace: r.incotermPlace,
+      portOfDischarge: r.portOfDischarge,
       depositPercent: Number(r.depositPercent),
       balanceTerms: r.balanceTerms,
+      paymentRoute: r.paymentRoute,
+      // The parts it keeps (an older quotation: none, its deposit and balance say it), so a client that sends
+      // these values back with another deposit or balance changes them as before.
+      paymentParts: storedParts(r.paymentParts, "customer")?.map((p) => ({ ...p, rule: p.rule as QuotePartRule })) ?? null,
       validUntil: fromDbDate(r.validUntil),
       paymentTerms: r.paymentTerms,
       deliveryTerms: r.deliveryTerms,
       warranty: r.warranty,
+      warrantyMonths: r.warrantyMonths,
+      warrantyFrom: isWarrantyFrom(r.warrantyFrom) ? r.warrantyFrom : null,
       notes: r.notes,
       options: r.options.map((o) => ({
         factoryQuoteId: o.factoryQuoteId,
         discount: Number(o.discount),
         leadTime: o.leadTime,
+        leadDays: o.leadDays,
+        leadFrom: isLeadFrom(o.leadFrom) ? o.leadFrom : null,
         prices: o.lines
           .filter((l) => l.type === "goods" && (o.factoryQuoteId ? l.factoryQuoteLineId : l.requestedItemId))
           .map((l) => ({ lineId: (o.factoryQuoteId ? l.factoryQuoteLineId : l.requestedItemId)!, unitPrice: Number(l.unitPrice) })),
@@ -418,7 +511,11 @@ export class QuotationsService {
       ? {
           factoryQuoteId: best.factoryQuoteId,
           discount: 0,
-          leadTime: best.leadTime,
+          // What the factory gives, promised to the customer from the same moment (the days can be raised);
+          // an older offer's words as they are.
+          ...(best.leadDays !== null
+            ? { leadDays: best.leadDays, leadFrom: best.leadFrom, leadTime: leadWords(best.leadDays, best.leadFrom, "customer") }
+            : { leadTime: best.leadTime }),
           charges: [],
           costs: [],
           prices: best.lines.map((l) => ({
@@ -430,22 +527,33 @@ export class QuotationsService {
           factoryQuoteId: null,
           discount: 0,
           leadTime: null,
+          leadDays: null,
+          leadFrom: null,
           charges: [],
           costs: [],
           prices: available.items.map((i) => ({ lineId: i.id, unitPrice: 0 })),
         };
+    // The company's usual warranty, to change for this quotation: as months from a moment when its words say them.
+    const usualWarranty = settings.sales.warrantyTerms?.replace(/^warranty\s*:\s*/i, "").slice(0, 300) || null;
+    const warranty = parseWarranty(usualWarranty);
     return {
       number: 1,
       currency,
       incoterm: before?.incoterm ?? settings.sales.defaultIncoterm,
       incotermPlace: before?.incotermPlace ?? null,
+      portOfDischarge: null,
       depositPercent: settings.sales.defaultDepositPercent,
       balanceTerms: settings.sales.defaultBalanceTerms,
+      // How they pay is decided later unless it is chosen here; the payment starts as the company's deposit and
+      // balance (no parts kept until the form sends them).
+      paymentRoute: null,
+      paymentParts: null,
       validUntil,
       paymentTerms: settings.sales.defaultPaymentTerms || null,
       deliveryTerms: settings.sales.defaultDeliveryTerms || null,
-      // The company's usual warranty, to change for this quotation.
-      warranty: settings.sales.warrantyTerms?.replace(/^warranty\s*:\s*/i, "").slice(0, 300) || null,
+      ...(warranty
+        ? { warrantyMonths: warranty.months, warrantyFrom: warranty.from, warranty: warranty.rest }
+        : { warrantyMonths: null, warrantyFrom: null, warranty: usualWarranty }),
       notes: null,
       options: [option],
       from: {
@@ -556,7 +664,7 @@ export class QuotationsService {
           sortOrder: n,
           factoryQuoteId: o.factoryQuoteId ?? null,
           ...basis,
-          leadTime: o.leadTime,
+          ...optionLead(o),
           subtotal: fromMinor(totals.subtotal),
           discount: fromMinor(totals.discount),
           total: fromMinor(totals.total),
@@ -565,20 +673,28 @@ export class QuotationsService {
         costs,
       });
     }
+    // The payment as parts (design "terms that travel"): the deposit and the balance's rule are worked out from
+    // them, for what reads those. Sent without parts (an older client): its deposit and balance, no parts kept.
+    const parts = input.paymentParts ?? null;
+    const months = input.warrantyMonths;
     return {
       built,
       header: {
         currency: input.currency,
         incoterm: input.incoterm,
         incotermPlace: input.incotermPlace,
-        depositPercent: input.depositPercent,
-        balanceTerms: input.balanceTerms,
+        depositPercent: parts ? depositOfParts(parts) : input.depositPercent,
+        balanceTerms: parts ? balanceTermsOfParts(parts) : input.balanceTerms,
+        paymentParts: parts ?? Prisma.DbNull,
         validUntil: toDbDate(input.validUntil),
         paymentTerms: input.paymentTerms,
         deliveryTerms: input.deliveryTerms,
-        // Left out by an older form: kept as it is.
-        ...(input.warranty !== undefined ? { warranty: input.warranty } : {}),
         notes: input.notes,
+        // Left out by an older form: kept as it is.
+        ...(input.portOfDischarge !== undefined ? { portOfDischarge: input.portOfDischarge } : {}),
+        ...(input.paymentRoute !== undefined ? { paymentRoute: input.paymentRoute } : {}),
+        ...(input.warranty !== undefined ? { warranty: input.warranty } : {}),
+        ...(months !== undefined ? { warrantyMonths: months, warrantyFrom: months === null ? null : (input.warrantyFrom ?? "shipment") } : {}),
       },
     };
   }
@@ -647,7 +763,8 @@ export class QuotationsService {
   async revision(user: SessionUser, revisionId: string) {
     const { r } = await this.loadRevision(user, revisionId);
     const items = await this.items(this.prisma.db, r.quotation.inquiryId);
-    return { quotation: { id: r.quotation.id, refNo: r.quotation.refNo, inquiryId: r.quotation.inquiryId }, ...this.view(user, r, items) };
+    const usual = (await this.settings.get()).sales.factoryAdvancePercent;
+    return { quotation: { id: r.quotation.id, refNo: r.quotation.refNo, inquiryId: r.quotation.inquiryId }, ...this.view(user, r, items, usual) };
   }
 
   /** A saved draft as the editor sends it back. */

@@ -1,6 +1,6 @@
 import type { AttachedFileInfo } from "./types-money";
 import type { OfferFile } from "./types-deals";
-import type { BalanceTerms, Incoterm, LineCondition, LineType, OrderStage, OrderStatus, OrderWord, PaymentKind, PaymentMethod, RevisionStatus, ShipMode } from "@kebo/shared";
+import type { BalanceTerms, Incoterm, LineCondition, LineType, OrderStage, OrderStatus, OrderWord, PaymentKind, PaymentMethod, RevisionStatus, ShipMode, TermPart } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for orders (four stages), their payments and the printed documents. Keep in step with apps/api/src/modules/orders. */
@@ -382,8 +382,12 @@ export interface RevisionDoc {
   currency: string;
   incoterm: Incoterm;
   incotermPlace: string | null;
+  /** Where the goods go (printed as the port of discharge). */
+  portOfDischarge?: string | null;
   depositPercent: number;
   balanceTerms: BalanceTerms;
+  /** The payment as parts (an older quotation's deposit and balance): its payment sentence is made from them. */
+  paymentParts?: TermPart[];
   leadTime: string | null;
   validUntil: string;
   subtotal: string;
@@ -393,8 +397,10 @@ export interface RevisionDoc {
   paymentTerms: string | null;
   /** Printed under the delivery (packing, inspection…). */
   deliveryTerms: string | null;
-  /** The warranty line. */
+  /** The warranty's words: what it covers with its months, or an older quotation's whole warranty line. */
   warranty: string | null;
+  warrantyMonths?: number | null;
+  warrantyFrom?: string | null;
   notes: string | null;
   sentOn: string | null;
   customerSnapshot: CustomerSnapshot | null;

@@ -21,8 +21,9 @@ import {
   REVISION_STATUSES,
   SENT_VIA,
 } from "../enums";
-import { amount, bool, currency, email, id, isoDate, keptText, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, optionalPercent, percentOr, phone, quantity, text } from "./common";
+import { amount, bool, currency, email, id, isoDate, keptEnum, keptInt, keptText, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, optionalPercent, partShare, percentOr, phone, quantity, text } from "./common";
 import { DEFAULT_TAX_RATE } from "../workflows/tax";
+import { LEAD_FROMS, OFFER_PART_RULES, PART_RULE_DAYS, partsAddUp, QUOTE_PART_RULES, WARRANTY_FROMS, type TermsSide } from "../workflows/terms";
 import { PLAN_DUE_RULES } from "../workflows/money-route";
 import { CANCEL_CUSTOMER_MONEY, CANCEL_FACTORY_MONEY, FACTORY_DUE_RULES } from "../workflows/money-route";
 import { FLOW_STEPS } from "../workflows/flow";
@@ -197,6 +198,37 @@ export const inquiryListQuery = listQuery.extend({
 });
 export type InquiryListQuery = z.infer<typeof inquiryListQuery>;
 
+/* ---------------------------------------------------------------- terms (design "terms that travel") */
+
+/** A part's days: only for the rules that take them (their usual days when left empty), else none. */
+const partDays =
+  (side: TermsSide) =>
+  <P extends { rule: string; days?: number | null }>(p: P): Omit<P, "days"> & { days: number | null } => {
+    const usual = PART_RULE_DAYS[side][p.rule];
+    return { ...p, days: usual === undefined ? null : (p.days ?? usual) };
+  };
+
+/** One part of a customer's payment (a quotation's): its name, its share of the total, and when it falls due. */
+export const quotePartInput = z
+  .object({
+    label: text(80, "Give each part a name"),
+    percent: partShare,
+    rule: z.enum(QUOTE_PART_RULES, "Choose when it is paid"),
+    days: keptInt(0, 3650),
+  })
+  .transform(partDays("customer"));
+/** One part of what a factory asks (its offer's): its name, its share, and when we pay it. */
+export const offerPartInput = z
+  .object({
+    label: text(80, "Give each part a name"),
+    percent: partShare,
+    rule: z.enum(OFFER_PART_RULES, "Choose when it is paid"),
+    days: keptInt(0, 3650),
+  })
+  .transform(partDays("factory"));
+export const quotePartsInput = z.array(quotePartInput).min(1, "Add a part").max(8, "Use at most 8 parts").refine(partsAddUp, "The parts must add up to 100%");
+export const offerPartsInput = z.array(offerPartInput).min(1, "Add a part").max(8, "Use at most 8 parts").refine(partsAddUp, "The parts must add up to 100%");
+
 /* ---------------------------------------------------------------- sourcing */
 
 export const factoryQuoteLineInput = z.object({
@@ -235,16 +267,29 @@ export const factoryQuoteInput = z
     /** The factory's price basis (EXW, FOB…) and its place ("Zhangjiagang", "Qingdao"). */
     basis: z.preprocess((v) => (v === "" ? null : v), z.enum(INCOTERMS).nullable().default(null)),
     basisPlace: optionalText(60),
+    /** The lead time's words; with leadDays they are worked out from them ("30 days after the advance"). */
     leadTime: optionalText(120),
+    /** The lead time as days from a moment (design "terms that travel"). Left out: kept as it is. */
+    leadDays: keptInt(0, 3650, "Enter the days"),
+    leadFrom: keptEnum(LEAD_FROMS, "Choose what the days count from"),
     moq: optionalText(60),
     paymentTerms: optionalText(2000),
-    /** The warranty the factory gives. Left out: kept as it is. */
+    /** The warranty's words: what it covers (with warrantyMonths), or the whole warranty. Left out: kept as it is. */
     warranty: keptText(300),
+    /** The warranty as months from a moment (shipment, delivery, the site test). Left out: kept as it is. */
+    warrantyMonths: keptInt(0, 240, "Enter the months"),
+    warrantyFrom: keptEnum(WARRANTY_FROMS, "Choose what the months count from"),
     /**
      * The advance the factory asks when we order, in % (seeds its payment plan on the order and is printed on
      * the purchase order; the payment terms text stays as a note). Empty: the company's default (Settings).
+     * With paymentParts it is worked out from them.
      */
     advancePercent: optionalPercent,
+    /**
+     * What the factory asks, as parts (like its plan on an order): their "when we order" parts are the advance.
+     * Left out: the advance % as it is (and the rest when ready).
+     */
+    paymentParts: offerPartsInput.nullish(),
     notes: optionalText(5000),
     /** Left out: the lines are not touched (they are added one by one, see factoryLinesInput). */
     lines: z.array(factoryQuoteLineInput).max(1000).optional(),
@@ -336,7 +381,11 @@ export const optionInput = z.object({
   charges: z.array(chargeInput).max(20).default([]),
   costs: z.array(basisCostInput).max(BASIS_STEPS.length).default([]),
   discount: amountOr(0),
+  /** The lead time's words; with leadDays they are worked out from them ("45 days after the deposit"). */
   leadTime: optionalText(120),
+  /** The lead time we promise as days from a moment (design "terms that travel"). */
+  leadDays: keptInt(0, 3650, "Enter the days"),
+  leadFrom: keptEnum(LEAD_FROMS, "Choose what the days count from"),
 });
 export type OptionInput = z.infer<typeof optionInput>;
 
@@ -344,15 +393,25 @@ export const revisionInput = z.object({
   currency: currency.default("USD"),
   incoterm: z.enum(INCOTERMS).default("FOB"),
   incotermPlace: optionalText(80),
+  /** Where the goods go, printed as the port of discharge. Left out: kept as it is. */
+  portOfDischarge: keptText(80),
+  /** With paymentParts: worked out from them (their "on the order" parts; the balance's rule). */
   depositPercent: percentOr(30),
   balanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
+  /** How the customer pays; empty: not decided yet (chosen on the order). Left out: kept as it is. */
+  paymentRoute: keptEnum(PAYMENT_ROUTES, "Choose how they pay"),
+  /** The payment as parts, the plan the order starts with. Left out: the deposit % and the balance terms. */
+  paymentParts: quotePartsInput.nullish(),
   validUntil: isoDate(),
   /** Printed under the payment (deposit and balance), e.g. "By T/T; L/C at sight accepted". */
   paymentTerms: optionalText(5000),
   /** Printed under the delivery, e.g. "Packing: export wooden cases. Inspection before shipment." */
   deliveryTerms: optionalText(5000),
-  /** The warranty printed on the quotation ("12 months from commissioning"). Left out: kept as it is. */
+  /** The warranty's words: what it covers (with warrantyMonths), or the whole warranty. Left out: kept as it is. */
   warranty: keptText(300),
+  /** The warranty as months from a moment (shipment, delivery, the site test). Left out: kept as it is. */
+  warrantyMonths: keptInt(0, 240, "Enter the months"),
+  warrantyFrom: keptEnum(WARRANTY_FROMS, "Choose what the months count from"),
   notes: optionalText(5000),
   /** Options A, B… in this order; the customer accepts exactly one. */
   options: z.array(optionInput).min(1, "Add at least one option").max(6, "Use at most 6 options"),

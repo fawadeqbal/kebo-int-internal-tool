@@ -1,10 +1,15 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, isSupplier, newSupplier } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, isSupplier, newSupplier, Prisma, toDbDate, toDbDateOrNull } from "@kebo/database";
 import { convertAmount, convertMinor, factoryTaxMinor, factoryUnitCostMinor, fxRate, fromMinor, multiplyMinor } from "@kebo/money";
 import {
   can,
   coverage,
+  depositOfParts,
+  isLeadFrom,
+  isWarrantyFrom,
+  leadWords,
   lineNumbers,
+  offerPartsOf,
   offerTaxText,
   taxSentence,
   type CopyLinesInput,
@@ -136,12 +141,20 @@ export class SourcingService {
         basis: q.basis,
         basisPlace: q.basisPlace,
         leadTime: q.leadTime,
+        /** The lead time as days from a moment (null: only its words, an older offer). */
+        leadDays: q.leadDays,
+        leadFrom: isLeadFrom(q.leadFrom) ? q.leadFrom : null,
         moq: q.moq,
         paymentTerms: q.paymentTerms,
-        /** The warranty the factory gives. */
+        /** The warranty's words: what it covers (with months), or an older offer's whole warranty. */
         warranty: q.warranty,
+        /** The warranty as months from a moment (null: only its words). */
+        warrantyMonths: q.warrantyMonths,
+        warrantyFrom: isWarrantyFrom(q.warrantyFrom) ? q.warrantyFrom : null,
         /** The advance the factory asks when we order, in % (null: the company's default). */
         advancePercent: q.advancePercent === null ? null : Number(q.advancePercent),
+        /** What the factory asks, as parts: the ones kept, else its advance (or the company's usual one) and the rest when ready. */
+        paymentParts: offerPartsOf(q, sales.factoryAdvancePercent),
         notes: q.notes,
         /** null when the exchange rate for this currency is missing in Settings. */
         fxRate: rate,
@@ -296,7 +309,17 @@ export class SourcingService {
     }
   }
 
-  private header(input: FactoryQuoteInput) {
+  /**
+   * The offer's head as stored. Its lead time and warranty are facts with their words (design "terms that
+   * travel"): days from a moment, the words worked out from them ("30 days after the advance"); months from a
+   * moment, beside the words of what it covers. Its payment is parts, whose "when we order" parts are the advance.
+   * What an older form leaves out is kept as it is (`was`: the offer before this change).
+   */
+  private header(input: FactoryQuoteInput, was?: { leadDays: number | null; leadFrom: string | null; warrantyMonths: number | null; warrantyFrom: string | null }) {
+    const leadDays = input.leadDays !== undefined ? input.leadDays : (was?.leadDays ?? null);
+    const leadFrom = leadDays === null ? null : ((input.leadFrom !== undefined ? input.leadFrom : was?.leadFrom) ?? "after_payment");
+    const months = input.warrantyMonths !== undefined ? input.warrantyMonths : (was?.warrantyMonths ?? null);
+    const parts = input.paymentParts;
     return {
       reference: input.reference,
       receivedOn: toDbDate(input.receivedOn),
@@ -304,12 +327,23 @@ export class SourcingService {
       currency: input.currency,
       basis: input.basis,
       basisPlace: input.basisPlace,
-      leadTime: input.leadTime,
+      leadTime: leadDays === null ? input.leadTime : leadWords(leadDays, leadFrom, "factory"),
+      leadDays,
+      leadFrom,
       moq: input.moq,
       paymentTerms: input.paymentTerms,
-      // Left out on an edit: kept as it is (a new offer takes the company's default, see create).
-      ...(input.advancePercent !== undefined ? { advancePercent: input.advancePercent } : {}),
+      // The parts, with the advance worked out from them. None sent (an older form): its advance %, the parts
+      // then no longer kept; neither: both as they are (a new offer takes the company's default, see create).
+      ...(parts
+        ? { paymentParts: parts, advancePercent: depositOfParts(parts) }
+        : input.advancePercent !== undefined
+          ? { paymentParts: Prisma.DbNull, advancePercent: input.advancePercent }
+          : parts === null
+            ? { paymentParts: Prisma.DbNull }
+            : {}),
       ...(input.warranty !== undefined ? { warranty: input.warranty } : {}),
+      warrantyMonths: months,
+      warrantyFrom: months === null ? null : ((input.warrantyFrom !== undefined ? input.warrantyFrom : was?.warrantyFrom) ?? "shipment"),
       notes: input.notes,
     };
   }
@@ -325,7 +359,7 @@ export class SourcingService {
       const { sales } = await this.settings.get();
       const tax = { taxIncluded: input.taxIncluded ?? sales.factoryTaxIncluded, taxRate: input.taxRate ?? sales.factoryTaxRate };
       // The advance not said: the company's default (Settings), so the plan and the PO show what was assumed.
-      const advancePercent = input.advancePercent ?? sales.factoryAdvancePercent;
+      const advancePercent = input.paymentParts ? depositOfParts(input.paymentParts) : (input.advancePercent ?? sales.factoryAdvancePercent);
       const q = await tx.factoryQuote.create({ data: { ...this.header(input), ...tax, advancePercent, inquiryId, factoryId: factory.id, createdById: user.id } });
       if (input.lines) await this.writeLines(tx, q.id, inquiryId, input.lines, tax.taxRate);
       await this.audit.record(tx, {
@@ -416,7 +450,7 @@ export class SourcingService {
       const reason = changes.length
         ? requireReason(input.reason, "factoryPrice", "you are changing prices a quotation uses")
         : input.reason;
-      const updated = await tx.factoryQuote.update({ where: { id: quoteId }, data: { ...this.header(input), ...tax, factoryId: factory.id } });
+      const updated = await tx.factoryQuote.update({ where: { id: quoteId }, data: { ...this.header(input, q), ...tax, factoryId: factory.id } });
       if (input.lines) await this.writeLines(tx, quoteId, q.inquiryId, input.lines, tax.taxRate);
       if (followers.length)
         await tx.factoryQuoteLine.updateMany({ where: { id: { in: followers.map((f) => f.id) } }, data: { taxRate: tax.taxRate } });
@@ -491,10 +525,16 @@ export class SourcingService {
       basis: q.basis,
       basisPlace: q.basisPlace,
       leadTime: q.leadTime,
+      leadDays: q.leadDays,
+      leadFrom: isLeadFrom(q.leadFrom) ? q.leadFrom : null,
       moq: q.moq,
       paymentTerms: q.paymentTerms,
       advancePercent: q.advancePercent === null ? null : Number(q.advancePercent),
+      /** What it asked, as parts (null: an older offer, only its advance %). */
+      paymentParts: q.paymentParts === null ? null : offerPartsOf(q, Number(q.advancePercent ?? 0)),
       warranty: q.warranty,
+      warrantyMonths: q.warrantyMonths,
+      warrantyFrom: isWarrantyFrom(q.warrantyFrom) ? q.warrantyFrom : null,
     };
   }
 

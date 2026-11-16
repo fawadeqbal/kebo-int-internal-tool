@@ -120,6 +120,35 @@ export const percentOr = (fallback: number) => z.preprocess(blank, percentNumber
 /** A percentage that may be left out: blank → undefined (the caller decides). */
 export const optionalPercent = z.preprocess(blank, percentNumber.optional());
 
+/** A share of a total, more than 0 and at most 100%, with at most 2 decimals (a part of a payment). */
+export const partShare = z.preprocess(
+  blank,
+  z.coerce
+    .number({ message: "Enter its share" })
+    .gt(0, "More than 0%")
+    .max(100, "Cannot be more than 100%")
+    .refine(decimals(2), "Use at most 2 decimals"),
+);
+
+/**
+ * A whole number an older form may not send at all: left out it stays undefined (the saved value is kept),
+ * empty it is null (cleared).
+ */
+export const keptInt = (min: number, max: number, message = "Enter a whole number") =>
+  z.preprocess(
+    (v) => (v === undefined ? undefined : blank(v) === undefined ? null : v),
+    z.coerce
+      .number({ message })
+      .int("Use a whole number")
+      .min(min, `At least ${min}`)
+      .max(max, `At most ${max}`)
+      .nullish(),
+  );
+
+/** One of `values`, which an older form may not send at all: left out undefined (kept), empty null (cleared). */
+export const keptEnum = <const T extends readonly [string, ...string[]]>(values: T, message?: string) =>
+  z.preprocess((v) => (v === undefined ? undefined : v === "" || v === null ? null : v), z.enum(values, message).nullish());
+
 /** Quantities are NUMERIC(12,2): at least 0.01, at most 2 decimals. */
 export const quantity = z.preprocess(
   blank,

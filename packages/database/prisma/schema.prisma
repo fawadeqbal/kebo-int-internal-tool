@@ -906,14 +906,26 @@ model FactoryQuote {
   basis          Incoterm?
   /// Where the basis applies: "Zhangjiagang" (EXW), "Qingdao" (FOB)…
   basisPlace     String?   @map("basis_place") @db.VarChar(60)
+  /// The lead time in words ("30 days after the advance"): worked out from leadDays when they are given.
   leadTime       String?   @map("lead_time") @db.VarChar(120)
+  /// The lead time as days from a moment (design "terms that travel"), so a ready date can be worked out.
+  leadDays       Int?      @map("lead_days")
+  /// What the days count from: after_payment (the advance) | after_order | after_drawings (approved).
+  leadFrom       String?   @map("lead_from")
   moq            String?   @db.VarChar(60)
   paymentTerms   String?   @map("payment_terms")
   /// The advance the factory asks when we order, in % (empty: the company's default in Settings). Seeds the
   /// factory's payment plan on the order and is printed on the purchase order; paymentTerms stays as a note.
+  /// With paymentParts: their "when we order" parts added up.
   advancePercent Decimal?  @map("advance_percent") @db.Decimal(5, 2)
-  /// The warranty the factory gives ("12 months from commissioning").
+  /// The factory's payment as parts, like its plan on an order: [{ label, percent, rule, days }] with the rules
+  /// on_order | on_ready | after_shipping (days). Empty (an older offer): advancePercent, the rest when ready.
+  paymentParts   Json?     @map("payment_parts")
+  /// The warranty's words: what it covers ("parts, not labour"); an older offer's whole sentence.
   warranty       String?   @db.VarChar(300)
+  /// The warranty as months from a moment: shipment | delivery | sat (the site test).
+  warrantyMonths Int?      @map("warranty_months")
+  warrantyFrom   String?   @map("warranty_from")
   notes          String?
   createdById    String    @map("created_by") @db.Uuid
   createdBy      User      @relation("FactoryQuoteCreator", fields: [createdById], references: [id])
@@ -1010,16 +1022,29 @@ model QuotationRevision {
   currency         String         @default("USD") @db.Char(3)
   incoterm         Incoterm       @default(FOB)
   incotermPlace    String?        @map("incoterm_place") @db.VarChar(80)
+  /// Where the goods go (printed on the quotation as the port of discharge).
+  portOfDischarge  String?        @map("port_of_discharge") @db.VarChar(80)
+  /// With paymentParts: their "on the order" parts added up, and the balance's rule.
   depositPercent   Decimal        @default(30) @map("deposit_percent") @db.Decimal(5, 2)
   balanceTerms     BalanceTerms   @default(before_shipment) @map("balance_terms")
+  /// How the customer pays (empty: not decided yet, chosen on the order).
+  paymentRoute     PaymentRoute?  @map("payment_route")
+  /// The payment as parts, the plan the order starts with: [{ label, percent, rule, days }] with the rules
+  /// on_order | before_shipment | against_bl_copy | after_shipping | after_arrival | lc | after_sat (days where
+  /// they take them). Empty (an older quotation): the deposit % and the balance terms.
+  paymentParts     Json?          @map("payment_parts")
   validUntil       DateTime       @map("valid_until") @db.Date
   /// Payment terms printed on the quotation (beyond the deposit and balance above), e.g. "By T/T; L/C at sight accepted".
   paymentTerms     String?        @map("payment_terms")
   /// Delivery terms printed on the quotation, e.g. "Packing: export wooden cases. Inspection before shipment."
   deliveryTerms    String?        @map("delivery_terms")
   notes            String?
-  /// The warranty printed on the quotation (it starts from the company's usual warranty in Settings).
+  /// The warranty's words printed on the quotation: what it covers (an older quotation's whole sentence, which
+  /// started from the company's usual warranty in Settings).
   warranty         String?        @db.VarChar(300)
+  /// The warranty as months from a moment: shipment | delivery | sat (the site test).
+  warrantyMonths   Int?           @map("warranty_months")
+  warrantyFrom     String?        @map("warranty_from")
   sentOn           DateTime?      @map("sent_on") @db.Date
   /// How it went to the customer: email | whatsapp | wechat | in_person | other.
   sentVia          String?        @map("sent_via") @db.VarChar(20)
@@ -1059,7 +1084,11 @@ model QuotationOption {
   factoryQuoteId    String?           @map("factory_quote_id") @db.Uuid
   factoryQuote      FactoryQuote?     @relation(fields: [factoryQuoteId], references: [id])
   status            OptionStatus      @default(open)
+  /// The lead time we promise in words ("45 days after the deposit"): worked out from leadDays when given.
   leadTime          String?           @map("lead_time") @db.VarChar(120)
+  /// The lead time as days from a moment: after_payment (the deposit) | after_order | after_drawings.
+  leadDays          Int?              @map("lead_days")
+  leadFrom          String?           @map("lead_from")
   subtotal          Decimal           @default(0) @db.Decimal(14, 2)
   discount          Decimal           @default(0) @db.Decimal(14, 2)
   total             Decimal           @default(0) @db.Decimal(14, 2)

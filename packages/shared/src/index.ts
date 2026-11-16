@@ -3,6 +3,7 @@ export * from "./labels";
 export * from "./permissions";
 export * from "./workflows/inquiry";
 export * from "./workflows/quotation";
+export * from "./workflows/terms";
 export * from "./workflows/order";
 export * from "./workflows/shipment";
 export * from "./workflows/tax";
