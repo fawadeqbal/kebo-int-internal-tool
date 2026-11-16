@@ -180,6 +180,37 @@ jobs:
       # The tests that call a running API are skipped here (no KEBO_API_URL); widget and unit tests run.
       - run: flutter test
 
+  phone:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/phone
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: flutter pub get
+      # Colours, type and sizes come from the Kestrel tokens: the Dart must match them.
+      - run: dart run tool/gen_tokens.dart --check
+      # pubspec version, Android build number and CHANGELOG entry agree.
+      - run: dart run tool/version.dart check
+      - run: flutter analyze
+      - run: flutter test
+      # A test APK of this commit (debug-signed), to install and review on a phone.
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rfq-desk-test-apk
+          path: apps/phone/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
   app-v2:
     runs-on: ubuntu-latest
     defaults:

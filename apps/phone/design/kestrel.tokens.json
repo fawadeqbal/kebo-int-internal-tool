@@ -1,0 +1,869 @@
+{
+ "name": "Kestrel",
+ "version": 1,
+ "color": {
+  "themes": [
+   {
+    "id": "light",
+    "name": "Light"
+   },
+   {
+    "id": "dark",
+    "name": "Dark"
+   }
+  ],
+  "tokens": [
+   {
+    "name": "neutral-0",
+    "value": "#ffffff",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-25",
+    "value": "#f8f9f8",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-50",
+    "value": "#f1f3f2",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-100",
+    "value": "#e4e8e6",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-200",
+    "value": "#cdd3d0",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-300",
+    "value": "#aab3af",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-400",
+    "value": "#7d8783",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-500",
+    "value": "#68726e",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-600",
+    "value": "#4b5451",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-700",
+    "value": "#363e3b",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-800",
+    "value": "#252b29",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-850",
+    "value": "#1d2220",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-900",
+    "value": "#161a19",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "neutral-950",
+    "value": "#0e1211",
+    "usage": "Primitive neutral step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-50",
+    "value": "#e8f5f2",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-100",
+    "value": "#c9e9e2",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-200",
+    "value": "#95d3c6",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-300",
+    "value": "#5cb8a7",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-400",
+    "value": "#2f9a88",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-500",
+    "value": "#147f6e",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-600",
+    "value": "#0d6a5c",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-700",
+    "value": "#0a5649",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-800",
+    "value": "#08433a",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "teal-900",
+    "value": "#062f29",
+    "usage": "Primitive teal step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "amber-50",
+    "value": "#fdf5e7",
+    "usage": "Primitive amber step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "amber-100",
+    "value": "#fae6c2",
+    "usage": "Primitive amber step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "amber-300",
+    "value": "#f2bf66",
+    "usage": "Primitive amber step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "amber-400",
+    "value": "#eba63a",
+    "usage": "Primitive amber step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "amber-500",
+    "value": "#d48b1c",
+    "usage": "Primitive amber step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "amber-700",
+    "value": "#8a560b",
+    "usage": "Primitive amber step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "amber-900",
+    "value": "#3f2805",
+    "usage": "Primitive amber step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "red-50",
+    "value": "#fdeeed",
+    "usage": "Primitive red step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "red-100",
+    "value": "#f9d4d1",
+    "usage": "Primitive red step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "red-300",
+    "value": "#f0928a",
+    "usage": "Primitive red step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "red-600",
+    "value": "#b42c23",
+    "usage": "Primitive red step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "red-700",
+    "value": "#8f2119",
+    "usage": "Primitive red step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "red-900",
+    "value": "#45100c",
+    "usage": "Primitive red step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "green-50",
+    "value": "#eaf6ec",
+    "usage": "Primitive green step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "green-300",
+    "value": "#7cc68c",
+    "usage": "Primitive green step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "green-600",
+    "value": "#237a37",
+    "usage": "Primitive green step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "green-700",
+    "value": "#1b5f2b",
+    "usage": "Primitive green step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "green-900",
+    "value": "#0f3318",
+    "usage": "Primitive green step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "blue-50",
+    "value": "#eaf2fc",
+    "usage": "Primitive blue step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "blue-300",
+    "value": "#86b6f2",
+    "usage": "Primitive blue step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "blue-600",
+    "value": "#2160b8",
+    "usage": "Primitive blue step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "blue-700",
+    "value": "#1a4c92",
+    "usage": "Primitive blue step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "blue-900",
+    "value": "#0d2647",
+    "usage": "Primitive blue step. Do not use in components — reference it through a semantic token."
+   },
+   {
+    "name": "bg",
+    "value": {
+     "light": "{neutral-25}",
+     "dark": "{neutral-950}"
+    },
+    "usage": "App background behind every screen. Never put text directly on a photo; put it on bg or surface."
+   },
+   {
+    "name": "surface",
+    "value": {
+     "light": "{neutral-0}",
+     "dark": "{neutral-900}"
+    },
+    "usage": "Cards, sheets, list rows, text fields. The default reading surface."
+   },
+   {
+    "name": "surface-raised",
+    "value": {
+     "light": "{neutral-0}",
+     "dark": "{neutral-850}"
+    },
+    "usage": "Floating layers: dialogs, bottom sheets, menus, toasts (pair with an elevation shadow in light)."
+   },
+   {
+    "name": "surface-sunken",
+    "value": {
+     "light": "{neutral-50}",
+     "dark": "{neutral-950}"
+    },
+    "usage": "Grouped-list background, segmented-control track, skeleton base."
+   },
+   {
+    "name": "line",
+    "value": {
+     "light": "{neutral-100}",
+     "dark": "{neutral-800}"
+    },
+    "usage": "Hairline dividers and card outlines. Decorative only — never the only cue for an interactive boundary."
+   },
+   {
+    "name": "line-strong",
+    "value": {
+     "light": "{neutral-400}",
+     "dark": "{neutral-500}"
+    },
+    "usage": "Borders of interactive controls (text fields, checkboxes, unselected chips). Meets 3:1 against surface and bg in both themes (WCAG 1.4.11)."
+   },
+   {
+    "name": "ink",
+    "value": {
+     "light": "{neutral-900}",
+     "dark": "{neutral-50}"
+    },
+    "usage": "Primary text and icons on bg, surface, surface-raised and surface-sunken."
+   },
+   {
+    "name": "ink-muted",
+    "value": {
+     "light": "{neutral-600}",
+     "dark": "{neutral-300}"
+    },
+    "usage": "Secondary text: supporting lines, helper text, timestamps, placeholder. 4.5:1+ on every surface in both themes."
+   },
+   {
+    "name": "ink-disabled",
+    "value": {
+     "light": "{neutral-300}",
+     "dark": "{neutral-600}"
+    },
+    "usage": "Text and icons of disabled controls only (exempt from contrast rules). Never for content people need to read."
+   },
+   {
+    "name": "primary",
+    "value": {
+     "light": "{teal-600}",
+     "dark": "{teal-300}"
+    },
+    "usage": "Brand action colour: primary buttons, selected tab, switch on, checkbox checked, links. Text in primary is legible on surface and bg in both themes."
+   },
+   {
+    "name": "primary-pressed",
+    "value": {
+     "light": "{teal-700}",
+     "dark": "{teal-200}"
+    },
+    "usage": "Pressed/active state of primary fills."
+   },
+   {
+    "name": "on-primary",
+    "value": {
+     "light": "{neutral-0}",
+     "dark": "{teal-900}"
+    },
+    "usage": "Text and icons on a primary fill."
+   },
+   {
+    "name": "primary-soft",
+    "value": {
+     "light": "{teal-50}",
+     "dark": "{teal-900}"
+    },
+    "usage": "Tinted fill: selected chip, selected list row, info-neutral highlights."
+   },
+   {
+    "name": "on-primary-soft",
+    "value": {
+     "light": "{teal-800}",
+     "dark": "{teal-100}"
+    },
+    "usage": "Text and icons on primary-soft."
+   },
+   {
+    "name": "accent",
+    "value": {
+     "light": "{amber-400}",
+     "dark": "{amber-300}"
+    },
+    "usage": "Brand accent for highlights and illustration — badges for 'new', rating stars, progress celebration. Never a button fill for the main action."
+   },
+   {
+    "name": "on-accent",
+    "value": {
+     "light": "{amber-900}",
+     "dark": "{amber-900}"
+    },
+    "usage": "Text on an accent fill."
+   },
+   {
+    "name": "danger",
+    "value": {
+     "light": "{red-600}",
+     "dark": "{red-300}"
+    },
+    "usage": "Destructive actions and error text/icons. Legible on surface and bg."
+   },
+   {
+    "name": "on-danger",
+    "value": {
+     "light": "{neutral-0}",
+     "dark": "{red-900}"
+    },
+    "usage": "Text on a danger fill (destructive button)."
+   },
+   {
+    "name": "danger-soft",
+    "value": {
+     "light": "{red-50}",
+     "dark": "{red-900}"
+    },
+    "usage": "Error banner and error field background."
+   },
+   {
+    "name": "on-danger-soft",
+    "value": {
+     "light": "{red-700}",
+     "dark": "{red-100}"
+    },
+    "usage": "Text on danger-soft."
+   },
+   {
+    "name": "success",
+    "value": {
+     "light": "{green-600}",
+     "dark": "{green-300}"
+    },
+    "usage": "Success icons and text. Always paired with an icon or word — never colour alone."
+   },
+   {
+    "name": "success-soft",
+    "value": {
+     "light": "{green-50}",
+     "dark": "{green-900}"
+    },
+    "usage": "Success banner background."
+   },
+   {
+    "name": "on-success-soft",
+    "value": {
+     "light": "{green-700}",
+     "dark": "{green-300}"
+    },
+    "usage": "Text on success-soft."
+   },
+   {
+    "name": "warning",
+    "value": {
+     "light": "{amber-700}",
+     "dark": "{amber-300}"
+    },
+    "usage": "Warning icons and text (darkened amber so it reads as text)."
+   },
+   {
+    "name": "warning-soft",
+    "value": {
+     "light": "{amber-50}",
+     "dark": "{amber-900}"
+    },
+    "usage": "Warning banner background."
+   },
+   {
+    "name": "on-warning-soft",
+    "value": {
+     "light": "{amber-700}",
+     "dark": "{amber-100}"
+    },
+    "usage": "Text on warning-soft."
+   },
+   {
+    "name": "info",
+    "value": {
+     "light": "{blue-600}",
+     "dark": "{blue-300}"
+    },
+    "usage": "Informational icons and text."
+   },
+   {
+    "name": "info-soft",
+    "value": {
+     "light": "{blue-50}",
+     "dark": "{blue-900}"
+    },
+    "usage": "Info banner background."
+   },
+   {
+    "name": "on-info-soft",
+    "value": {
+     "light": "{blue-700}",
+     "dark": "{blue-300}"
+    },
+    "usage": "Text on info-soft."
+   },
+   {
+    "name": "brand-surface",
+    "value": {
+     "light": "{teal-700}",
+     "dark": "{teal-900}"
+    },
+    "usage": "The branded header band on Home (and splash/sign-in). Same deep teal in both themes so the brand reads at a glance."
+   },
+   {
+    "name": "on-brand-surface",
+    "value": {
+     "light": "{neutral-0}",
+     "dark": "{teal-50}"
+    },
+    "usage": "Text and icons on brand-surface (≥ 9:1 in both themes)."
+   },
+   {
+    "name": "on-brand-surface-muted",
+    "value": {
+     "light": "{teal-100}",
+     "dark": "{teal-200}"
+    },
+    "usage": "Secondary text on brand-surface: dates, sync status (≥ 4.5:1)."
+   },
+   {
+    "name": "focus",
+    "value": {
+     "light": "{blue-600}",
+     "dark": "{blue-300}"
+    },
+    "usage": "Keyboard / switch-access focus ring: 2px, offset 2px. Distinct from primary so focus is never confused with selection."
+   },
+   {
+    "name": "scrim",
+    "value": {
+     "light": "rgba(14, 18, 17, 0.48)",
+     "dark": "rgba(0, 0, 0, 0.64)"
+    },
+    "usage": "Overlay behind dialogs and bottom sheets. Tapping it dismisses non-critical layers."
+   }
+  ]
+ },
+ "type": {
+  "fonts": [],
+  "families": {
+   "sans": "Inter, -apple-system, \"SF Pro Text\", Roboto, system-ui, sans-serif"
+  },
+  "groups": [
+   {
+    "name": "Display & titles",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "display",
+      "fontSize": "34px",
+      "lineHeight": "40px",
+      "fontWeight": 700,
+      "usage": "Hero numbers and onboarding headlines. Max one per screen.",
+      "letterSpacing": "-0.02em",
+      "sample": "Good morning"
+     },
+     {
+      "name": "title-1",
+      "fontSize": "28px",
+      "lineHeight": "34px",
+      "fontWeight": 700,
+      "usage": "Large screen title (collapsing top bar, expanded state).",
+      "letterSpacing": "-0.01em",
+      "sample": "Your orders"
+     },
+     {
+      "name": "title-2",
+      "fontSize": "22px",
+      "lineHeight": "28px",
+      "fontWeight": 600,
+      "usage": "Section headers inside a screen; dialog titles.",
+      "sample": "Recent activity"
+     },
+     {
+      "name": "title-3",
+      "fontSize": "18px",
+      "lineHeight": "24px",
+      "fontWeight": 600,
+      "usage": "Card titles, bottom-sheet titles, compact top bar title.",
+      "sample": "Delivery address"
+     }
+    ]
+   },
+   {
+    "name": "Body",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "body",
+      "fontSize": "16px",
+      "lineHeight": "24px",
+      "fontWeight": 400,
+      "usage": "Default reading text. Never below 16px for paragraphs — it also prevents iOS zoom-on-focus in inputs.",
+      "sample": "Your order is on its way and should arrive by 6 pm."
+     },
+     {
+      "name": "body-strong",
+      "fontSize": "16px",
+      "lineHeight": "24px",
+      "fontWeight": 600,
+      "usage": "Emphasis inside body; list-row primary line.",
+      "sample": "Order #4821"
+     },
+     {
+      "name": "callout",
+      "fontSize": "15px",
+      "lineHeight": "20px",
+      "fontWeight": 400,
+      "usage": "Dense secondary content: list-row supporting line, banner text.",
+      "sample": "Arrives tomorrow · 3 items"
+     }
+    ]
+   },
+   {
+    "name": "Labels & small",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "label",
+      "fontSize": "15px",
+      "lineHeight": "20px",
+      "fontWeight": 600,
+      "usage": "Button and chip labels, tab-bar labels at large size. Sentence case.",
+      "letterSpacing": "0.01em",
+      "sample": "Continue"
+     },
+     {
+      "name": "label-sm",
+      "fontSize": "13px",
+      "lineHeight": "16px",
+      "fontWeight": 600,
+      "usage": "Badges, tab-bar labels, overlines.",
+      "letterSpacing": "0.02em",
+      "sample": "New"
+     },
+     {
+      "name": "footnote",
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": 400,
+      "usage": "Helper and error text under fields, timestamps, legal notes.",
+      "sample": "We'll only use this to send receipts."
+     },
+     {
+      "name": "caption",
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "fontWeight": 400,
+      "usage": "Image captions and chart axes only. Smallest allowed size.",
+      "sample": "Updated 2 min ago"
+     }
+    ]
+   }
+  ]
+ },
+ "spacing": {
+  "note": "4-point grid. Every margin, padding and gap is one of these steps.",
+  "tokens": [
+   {
+    "name": "space-1",
+    "value": "4px",
+    "usage": "Icon-to-label gap inside chips and badges."
+   },
+   {
+    "name": "space-2",
+    "value": "8px",
+    "usage": "Gap between tightly related items (icon + text, stacked label + value)."
+   },
+   {
+    "name": "space-3",
+    "value": "12px",
+    "usage": "Gap between list-row elements; chip row gap; small card padding."
+   },
+   {
+    "name": "space-4",
+    "value": "16px",
+    "usage": "Screen side margin (gutter) on phones; card padding; default stack gap."
+   },
+   {
+    "name": "space-5",
+    "value": "20px",
+    "usage": "Screen side margin on large phones (≥ 428pt) and tablets in compact layouts."
+   },
+   {
+    "name": "space-6",
+    "value": "24px",
+    "usage": "Gap between groups within a section; sheet and dialog padding."
+   },
+   {
+    "name": "space-8",
+    "value": "32px",
+    "usage": "Gap between sections of a screen."
+   },
+   {
+    "name": "space-10",
+    "value": "40px",
+    "usage": "Empty-state and onboarding vertical breathing room."
+   },
+   {
+    "name": "space-12",
+    "value": "48px",
+    "usage": "Top padding above a large title; space above a sticky primary action."
+   },
+   {
+    "name": "space-16",
+    "value": "64px",
+    "usage": "Hero spacing only."
+   }
+  ]
+ },
+ "radius": {
+  "tokens": [
+   {
+    "name": "radius-xs",
+    "value": "4px",
+    "usage": "Badges, progress bars, focus-ring corners on small items."
+   },
+   {
+    "name": "radius-sm",
+    "value": "8px",
+    "usage": "Chips, segmented-control segments, small thumbnails."
+   },
+   {
+    "name": "radius-md",
+    "value": "12px",
+    "usage": "Buttons, text fields, list groups, toasts."
+   },
+   {
+    "name": "radius-lg",
+    "value": "16px",
+    "usage": "Cards and dialogs."
+   },
+   {
+    "name": "radius-xl",
+    "value": "24px",
+    "usage": "Top corners of bottom sheets."
+   },
+   {
+    "name": "radius-full",
+    "value": "999px",
+    "usage": "Avatars, switches, icon buttons, pill chips."
+   }
+  ]
+ },
+ "shadow": {
+  "note": "Elevation is shown by shadow in light and by a lighter surface (surface-raised) in dark; dark shadows are kept faint.",
+  "tokens": [
+   {
+    "name": "elevation-1",
+    "value": {
+     "light": "0 1px 2px rgba(14, 18, 17, 0.06), 0 1px 3px rgba(14, 18, 17, 0.08)",
+     "dark": "0 1px 2px rgba(0, 0, 0, 0.4)"
+    },
+    "usage": "Cards that sit on bg; raised tab bar."
+   },
+   {
+    "name": "elevation-2",
+    "value": {
+     "light": "0 4px 12px rgba(14, 18, 17, 0.10), 0 2px 4px rgba(14, 18, 17, 0.06)",
+     "dark": "0 4px 12px rgba(0, 0, 0, 0.5)"
+    },
+    "usage": "Toasts, menus, floating buttons."
+   },
+   {
+    "name": "elevation-3",
+    "value": {
+     "light": "0 12px 32px rgba(14, 18, 17, 0.16), 0 4px 8px rgba(14, 18, 17, 0.08)",
+     "dark": "0 12px 32px rgba(0, 0, 0, 0.6)"
+    },
+    "usage": "Dialogs and bottom sheets over a scrim."
+   }
+  ]
+ },
+ "size": {
+  "note": "Fitts's law in tokens: anything tappable is at least size-touch, whatever its drawn size.",
+  "tokens": [
+   {
+    "name": "size-touch",
+    "value": "48px",
+    "usage": "Minimum hit area for every tappable element (Material 48dp; exceeds Apple 44pt and WCAG 2.5.8)."
+   },
+   {
+    "name": "size-control",
+    "value": "48px",
+    "usage": "Height of buttons, text fields, list rows (single line)."
+   },
+   {
+    "name": "size-control-lg",
+    "value": "56px",
+    "usage": "Height of the primary bottom action and two-line list rows."
+   },
+   {
+    "name": "size-icon-sm",
+    "value": "16px",
+    "usage": "Icons inside badges and footnotes."
+   },
+   {
+    "name": "size-icon",
+    "value": "24px",
+    "usage": "Default icon size (toolbars, list rows, tab bar)."
+   },
+   {
+    "name": "size-avatar-sm",
+    "value": "32px",
+    "usage": "Avatars in dense lists and chips."
+   },
+   {
+    "name": "size-avatar",
+    "value": "40px",
+    "usage": "Avatars in list rows."
+   },
+   {
+    "name": "size-avatar-lg",
+    "value": "64px",
+    "usage": "Profile headers."
+   },
+   {
+    "name": "size-topbar",
+    "value": "56px",
+    "usage": "Compact top bar height (below the status-bar safe area)."
+   },
+   {
+    "name": "size-tabbar",
+    "value": "64px",
+    "usage": "Bottom tab bar height (above the home-indicator safe area)."
+   }
+  ]
+ },
+ "opacity": {
+  "tokens": [
+   {
+    "name": "opacity-disabled",
+    "value": "0.38",
+    "usage": "Disabled controls (whole control)."
+   },
+   {
+    "name": "opacity-pressed",
+    "value": "0.12",
+    "usage": "Pressed-state overlay on non-filled controls (ink at this opacity)."
+   },
+   {
+    "name": "opacity-hover",
+    "value": "0.08",
+    "usage": "Hover/pointer overlay on tablets with trackpads."
+   }
+  ]
+ },
+ "zIndex": {
+  "tokens": [
+   {
+    "name": "z-content",
+    "value": "0",
+    "usage": "Screen content."
+   },
+   {
+    "name": "z-sticky",
+    "value": "10",
+    "usage": "Sticky headers, top bar, tab bar."
+   },
+   {
+    "name": "z-fab",
+    "value": "20",
+    "usage": "Floating action button."
+   },
+   {
+    "name": "z-sheet",
+    "value": "40",
+    "usage": "Bottom sheets and their scrim."
+   },
+   {
+    "name": "z-dialog",
+    "value": "50",
+    "usage": "Dialogs and their scrim."
+   },
+   {
+    "name": "z-toast",
+    "value": "60",
+    "usage": "Toasts — always above everything so feedback is never hidden."
+   }
+  ]
+ }
+}
