@@ -76,7 +76,7 @@ export default async function SourcingPage({
         searchFactories={searchFactoriesAction}
         lastOffer={lastOfferAction}
         createAction={saveFactoryQuoteAction.bind(null, d.id, null)}
-        taxDefault={{ included: settings.sales.factoryTaxIncluded ?? false, rate: settings.sales.factoryTaxRate ?? 0 }}
+        taxDefault={{ included: settings.sales.factoryTaxIncluded ?? false, rate: settings.sales.factoryTaxRate ?? 0, advance: settings.sales.factoryAdvancePercent ?? 30 }}
         variant={props.variant}
         size={props.size}
         label={props.label}

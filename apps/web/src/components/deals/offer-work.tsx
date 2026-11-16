@@ -4,7 +4,7 @@ import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Download, Eye, FileText, Info, ListPlus, Plus, Trash2 } from "lucide-react";
 import { formatMinor, toMinor } from "@kebo/money";
-import { ATTACHMENT_KIND_LABEL, basisText, INCOTERMS, offerTaxText, type AttachmentKind } from "@kebo/shared";
+import { ATTACHMENT_KIND_LABEL, basisText, INCOTERMS, offerTaxText, partsWords, warrantyLine, type AttachmentKind } from "@kebo/shared";
 import { Badge, Button, cn, Field, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -101,15 +101,18 @@ export function OfferDetails({
 }) {
   const [adding, setAdding] = useState(false);
   const rate = q.currency !== mainCurrency ? rateSentence({ main: mainCurrency, rates }, mainCurrency, q.currency) : null;
+  // In the groups every offer, quotation and order uses (design "terms that travel"): Delivery · Payment ·
+  // Warranty · Conditions; each is changed in the offer's form (Edit).
   const fields: DetailField[] = [
     {
       name: "basis",
-      label: "Price basis",
+      label: "Delivery basis",
       type: "select",
       value: q.basis,
       options: INCOTERMS.map((t) => ({ value: t, label: t })),
       show: q.basis ? basisText(q.basis, q.basisPlace) : undefined,
     },
+    { name: "leadTime", label: "Lead time", value: q.leadTime, placeholder: "e.g. 45 days" },
     {
       label: "Currency",
       value: q.currency,
@@ -120,9 +123,21 @@ export function OfferDetails({
           `${q.currency}${rate ? ` · ${rate}` : ""}`
         ),
     },
-    { name: "leadTime", label: "Lead time", value: q.leadTime, placeholder: "e.g. 45 days" },
     // Changed with the offer's form (Edit): it moves the lines' tax too.
     { label: "Tax", value: String(q.taxRate), show: offerTaxText(q.taxRate, q.taxIncluded), uncounted: true },
+    {
+      name: "paymentParts",
+      label: "Payment",
+      value: q.paymentParts.length ? "parts" : null,
+      show: (
+        <span className="flex flex-col gap-0.5">
+          <span>{partsWords(q.paymentParts, "factory")}</span>
+          {q.paymentTerms && <span className="text-xs font-normal text-text-2">{q.paymentTerms}</span>}
+        </span>
+      ),
+    },
+    { name: "warranty", label: "Warranty", value: warrantyLine(q), show: warrantyLine(q) ?? undefined },
+    { name: "moq", label: "Minimum order", value: q.moq },
     {
       name: "validUntil",
       label: "Valid until",
@@ -130,17 +145,6 @@ export function OfferDetails({
       value: q.validUntil,
       show: q.validUntil ? dateText(q.validUntil) : undefined,
     },
-    {
-      name: "advancePercent",
-      label: "Advance when we order",
-      type: "number",
-      value: q.advancePercent === null ? null : String(q.advancePercent),
-      show: q.advancePercent === null ? undefined : `${q.advancePercent}% · starts the factory's plan, printed on the PO`,
-      placeholder: "e.g. 30",
-    },
-    { name: "paymentTerms", label: "Payment terms (note)", value: q.paymentTerms, placeholder: "e.g. 70% before shipment, by T/T" },
-    { name: "warranty", label: "Warranty", value: q.warranty, placeholder: "e.g. 12 months from commissioning" },
-    { name: "moq", label: "Minimum order", value: q.moq },
     { name: "reference", label: "Their ref.", value: q.reference, placeholder: "Their quote no." },
     { label: "Received", value: q.receivedOn, show: dateText(q.receivedOn), uncounted: true },
     {
@@ -237,7 +241,7 @@ function OfferWindow({
   saveAction: Action;
   removeAction?: Action;
   removeFile?: OfferLineActions["removeFile"];
-  taxDefault?: { included: boolean; rate: number };
+  taxDefault?: { included: boolean; rate: number; advance?: number };
   /** "Save & enter another": the window starts again, empty. */
   onAnother?: () => void;
 }) {
@@ -354,7 +358,7 @@ function OfferWindow({
         searchFactories={searchFactories}
         lastOffer={lastOffer}
         onDone={(st) => void done(st)}
-        defaults={taxDefault ? { taxIncluded: taxDefault.included, taxRate: taxDefault.rate } : undefined}
+        defaults={taxDefault ? { taxIncluded: taxDefault.included, taxRate: taxDefault.rate, advancePercent: taxDefault.advance } : undefined}
         files={fileRows}
         note={
           <>
@@ -972,8 +976,8 @@ export function AddOfferButton({
   lastOffer?: (factoryId: string) => Promise<LastOffer | null>;
   /** saveFactoryQuoteAction bound to the deal and null (a new offer). */
   createAction: Action;
-  /** A new offer's tax: the company's default (Settings). */
-  taxDefault: { included: boolean; rate: number };
+  /** A new offer's tax and advance: the company's defaults (Settings). */
+  taxDefault: { included: boolean; rate: number; advance?: number };
   label?: string;
   variant?: "primary" | "secondary" | "ghost";
   size?: "xs" | "sm" | "md";

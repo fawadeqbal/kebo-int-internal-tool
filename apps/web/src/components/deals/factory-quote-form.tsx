@@ -3,7 +3,16 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Factory, Loader2, Plus } from "lucide-react";
 import { fxRate } from "@kebo/money";
-import { INCOTERMS, type Incoterm } from "@kebo/shared";
+import {
+  INCOTERMS,
+  leadWords,
+  offerPartsFrom,
+  parseLead,
+  parseWarranty,
+  type Incoterm,
+  type LeadFrom,
+  type WarrantyFrom,
+} from "@kebo/shared";
 import { Button, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -13,6 +22,18 @@ import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
 import { PANEL_FORM, PanelSection } from "@/components/common/panel";
+import { money } from "@/lib/format";
+import {
+  LeadField,
+  PartsField,
+  partRows,
+  partsPayload,
+  partsProblem,
+  WarrantyFields,
+  wholeOrNull,
+  type PartRow,
+  type PartsPreset,
+} from "./terms-fields";
 
 /** The usual Chinese ports, offered under the Port field (any other can be typed). */
 const PORTS = ["Qingdao", "Shanghai", "Ningbo", "Tianjin", "Shenzhen", "Guangzhou", "Xiamen", "Dalian"];
@@ -174,12 +195,7 @@ export function TaxBox({
           {choice(true, "Tax included", "the price already has the tax in it")}
         </div>
       </div>
-      <Field
-        label="Tax %"
-        htmlFor={`${idPrefix}-tax-rate`}
-        error={error}
-        hint="0 unless the factory charges tax, e.g. 13% VAT in China"
-      >
+      <Field label="Tax %" htmlFor={`${idPrefix}-tax-rate`} error={error} hint="0 unless the factory charges tax, e.g. 13% VAT in China">
         <span className="flex items-center gap-2">
           <Input
             id={`${idPrefix}-tax-rate`}
@@ -239,13 +255,20 @@ export interface QuoteState {
   validUntil: string;
   basis: Incoterm | "";
   basisPlace: string;
+  /** The lead time's words: an older offer's, kept until days are typed (with days they are worked out). */
   leadTime: string;
+  /** The lead time as days from a moment. */
+  leadDays: string;
+  leadFrom: LeadFrom;
   moq: string;
+  /** A note on how they are paid (by T/T to their account…). */
   paymentTerms: string;
-  /** The advance they ask when we order, % ("": the company's default). */
-  advancePercent: string;
-  /** The warranty the factory gives. */
+  /** What they ask, as parts (like their plan on an order); its "when we order" parts are the advance. */
+  parts: PartRow[];
+  /** The warranty's words: what it covers (an older offer: its whole warranty). */
   warranty: string;
+  warrantyMonths: string;
+  warrantyFrom: WarrantyFrom;
   notes: string;
   /** Their prices have the tax in them (null: a new offer, the company's default). */
   taxIncluded: boolean | null;
@@ -253,7 +276,19 @@ export interface QuoteState {
   taxRate: string;
 }
 
-function initialState(quote: FactoryQuoteView | null, today: string): QuoteState {
+/**
+ * How the form opens. An older offer kept its lead time and warranty as words: where they say the days or
+ * months plainly the form starts from them (and says so), else the words stay as they are.
+ */
+function initialState(quote: FactoryQuoteView | null, today: string, usualAdvance: number): QuoteState {
+  const lead =
+    quote?.leadDays !== null && quote?.leadDays !== undefined
+      ? { days: quote.leadDays, from: quote.leadFrom ?? "after_payment" }
+      : parseLead(quote?.leadTime);
+  const warranty =
+    quote?.warrantyMonths !== null && quote?.warrantyMonths !== undefined
+      ? { months: quote.warrantyMonths, from: quote.warrantyFrom ?? "shipment", rest: quote.warranty }
+      : parseWarranty(quote?.warranty);
   return {
     factory: quote ? { id: quote.factory.id, name: quote.factory.name } : null,
     reference: quote?.reference ?? "",
@@ -263,11 +298,15 @@ function initialState(quote: FactoryQuoteView | null, today: string): QuoteState
     validUntil: quote?.validUntil ?? "",
     basis: quote?.basis ?? "",
     basisPlace: quote?.basisPlace ?? "",
-    leadTime: quote?.leadTime ?? "",
+    leadTime: lead ? "" : (quote?.leadTime ?? ""),
+    leadDays: lead ? String(lead.days) : "",
+    leadFrom: lead?.from ?? "after_payment",
     moq: quote?.moq ?? "",
     paymentTerms: quote?.paymentTerms ?? "",
-    advancePercent: quote?.advancePercent === null || quote?.advancePercent === undefined ? "" : String(quote.advancePercent),
-    warranty: quote?.warranty ?? "",
+    parts: partRows(quote ? quote.paymentParts : offerPartsFrom(usualAdvance)),
+    warranty: warranty ? (warranty.rest ?? "") : (quote?.warranty ?? ""),
+    warrantyMonths: warranty ? String(warranty.months) : "",
+    warrantyFrom: warranty?.from ?? "shipment",
     notes: quote?.notes ?? "",
     taxIncluded: quote ? quote.taxIncluded : null,
     taxRate: quote ? String(quote.taxRate) : "",
@@ -276,6 +315,7 @@ function initialState(quote: FactoryQuoteView | null, today: string): QuoteState
 
 /** The offer's details; its lines are added and changed in the line table, one at a time. */
 function payload(s: QuoteState, convertible?: boolean) {
+  const days = wholeOrNull(s.leadDays);
   return {
     factoryId: s.factory?.id ?? null,
     newFactoryName: s.factory && !s.factory.id ? s.factory.name : null,
@@ -286,12 +326,16 @@ function payload(s: QuoteState, convertible?: boolean) {
     convertPrices: s.convertPrices && !!convertible,
     basis: s.basis || null,
     basisPlace: s.basisPlace,
-    leadTime: s.leadTime,
+    // With days the words are worked out from them; without, an older offer's words are kept.
+    leadDays: days,
+    leadFrom: s.leadFrom,
+    leadTime: days === null ? s.leadTime : null,
     moq: s.moq,
     paymentTerms: s.paymentTerms,
-    // Not set: a new offer takes the company's default; an edited one keeps its own.
-    ...(s.advancePercent.trim() === "" ? {} : { advancePercent: s.advancePercent.trim() }),
+    paymentParts: partsPayload(s.parts, "factory"),
     warranty: s.warranty,
+    warrantyMonths: wholeOrNull(s.warrantyMonths),
+    warrantyFrom: s.warrantyFrom,
     notes: s.notes,
     // Not set (a new offer): the company's default.
     ...(s.taxIncluded === null ? {} : { taxIncluded: s.taxIncluded }),
@@ -299,22 +343,73 @@ function payload(s: QuoteState, convertible?: boolean) {
   };
 }
 
+/** The usual payments to start from (the same as a supplier's plan on an order). */
+const OFFER_PRESETS: PartsPreset[] = [
+  {
+    label: "30% when we order · 70% when ready",
+    parts: [
+      { name: "Advance", share: 30, rule: "on_order" },
+      { name: "Balance", share: 70, rule: "on_ready" },
+    ],
+  },
+  {
+    label: "50 / 50",
+    parts: [
+      { name: "Advance", share: 50, rule: "on_order" },
+      { name: "Balance", share: 50, rule: "on_ready" },
+    ],
+  },
+  { label: "All when ready", parts: [{ name: "Payment", share: 100, rule: "on_ready" }] },
+  { label: "All after shipping", parts: [{ name: "Payment after shipping", share: 100, rule: "after_shipping", days: 30 }] },
+];
+
 /** What a factory's last offer can fill in a new one (its lines, dates, reference and notes are always the new offer's own). */
-const FROM_LAST = ["currency", "basis", "basisPlace", "taxIncluded", "taxRate", "leadTime", "paymentTerms", "advancePercent", "warranty"] as const;
+const FROM_LAST = [
+  "currency",
+  "basis",
+  "basisPlace",
+  "taxIncluded",
+  "taxRate",
+  "leadTime",
+  "leadDays",
+  "leadFrom",
+  "paymentTerms",
+  "parts",
+  "warranty",
+  "warrantyMonths",
+  "warrantyFrom",
+] as const;
 export type FromLast = Partial<Pick<QuoteState, (typeof FROM_LAST)[number]>>;
 
 /** The last offer as the form's values; what it did not say is left out. */
 export function lastOfferValues(last: LastOffer): FromLast {
+  const lead =
+    last.leadDays !== null && last.leadDays !== undefined
+      ? { days: last.leadDays, from: last.leadFrom ?? "after_payment" }
+      : parseLead(last.leadTime);
+  const months =
+    last.warrantyMonths !== null && last.warrantyMonths !== undefined
+      ? { months: last.warrantyMonths, from: last.warrantyFrom ?? "shipment", rest: last.warranty }
+      : parseWarranty(last.warranty);
+  const parts = last.paymentParts?.length
+    ? last.paymentParts
+    : last.advancePercent === null || last.advancePercent === undefined
+      ? null
+      : offerPartsFrom(last.advancePercent);
   const v: FromLast = {
     currency: last.currency,
     taxIncluded: last.taxIncluded,
     taxRate: String(last.taxRate),
     ...(last.basis ? { basis: last.basis } : {}),
     ...(last.basisPlace ? { basisPlace: last.basisPlace } : {}),
-    ...(last.leadTime ? { leadTime: last.leadTime } : {}),
+    ...(lead ? { leadDays: String(lead.days), leadFrom: lead.from } : last.leadTime ? { leadTime: last.leadTime } : {}),
     ...(last.paymentTerms ? { paymentTerms: last.paymentTerms } : {}),
-    ...(last.advancePercent === null ? {} : { advancePercent: String(last.advancePercent) }),
-    ...(last.warranty ? { warranty: last.warranty } : {}),
+    ...(parts ? { parts: partRows(parts) } : {}),
+    ...(months
+      ? { warrantyMonths: String(months.months), warrantyFrom: months.from, ...(months.rest ? { warranty: months.rest } : {}) }
+      : last.warranty
+        ? { warranty: last.warranty }
+        : {}),
   };
   return v;
 }
@@ -461,9 +556,12 @@ export function FactoryPicker({
 }
 
 /**
- * The offer's window, the same for "Enter factory offer" and "Edit the offer": four sections in the same
- * order (Who, Price, Terms, Notes and their quotation). Its lines are not here: they have their own editor.
- * `files` is the right half of the last section; `footer` the window's buttons (inside the form).
+ * The offer's window, the same for "Enter factory offer" and "Edit the offer", in the groups every offer,
+ * quotation, order and purchase order uses (design "terms that travel"): Who and when · Price · Delivery ·
+ * Payment · Warranty · Conditions and their quotation. The price basis is under Delivery (where they hand the
+ * goods over); the lead time is days from a moment; the payment is parts, like their plan on an order. Its
+ * lines are not here: they have their own editor. `files` sits in the last section; `footer` is the window's
+ * buttons (inside the form).
  */
 export function OfferHeaderForm({
   action,
@@ -488,8 +586,8 @@ export function OfferHeaderForm({
   /** A new offer: what the chosen factory said on its last offer (the window starts from it). */
   lastOffer?: (factoryId: string) => Promise<LastOffer | null>;
   onDone: (state: ActionState) => void;
-  /** A new offer's tax: the company's default (Settings). */
-  defaults?: { taxIncluded: boolean; taxRate: number };
+  /** A new offer's tax and advance: the company's defaults (Settings). */
+  defaults?: { taxIncluded: boolean; taxRate: number; advancePercent?: number };
   /** The factory's own quotation files: the ones it has, and the place to add more. */
   files: ReactNode;
   /** Said above the buttons (a new offer: its lines come next). */
@@ -499,7 +597,7 @@ export function OfferHeaderForm({
   const { date } = useTime();
   // How the window opens; a field still like this has not been typed in.
   const [start] = useState<QuoteState>(() => ({
-    ...initialState(quote, today),
+    ...initialState(quote, today, defaults?.advancePercent ?? 30),
     ...(!quote && defaults ? { taxIncluded: defaults.taxIncluded, taxRate: String(defaults.taxRate) } : {}),
   }));
   const [s, setS] = useState<QuoteState>(start);
@@ -543,15 +641,24 @@ export function OfferHeaderForm({
       <fieldset className="flex flex-col gap-2 rounded-lg border border-warn/30 bg-warn-soft/40 p-3 sm:col-span-2 md:col-span-3">
         <legend className="sr-only">What to do with the prices</legend>
         <p className="text-sm font-medium">
-          Its {priced.length} price{priced.length === 1 ? " is" : "s are"} in {quote!.currency}. What should happen to {priced.length === 1 ? "it" : "them"}?
+          Its {priced.length} price{priced.length === 1 ? " is" : "s are"} in {quote!.currency}. What should happen to{" "}
+          {priced.length === 1 ? "it" : "them"}?
         </p>
         <label className={cn("flex items-start gap-2 text-sm", !canConvert && "text-muted")}>
-          <input type="radio" name="fq-convert" className="mt-1" checked={canConvert && s.convertPrices} disabled={!canConvert} onChange={() => set("convertPrices", true)} />
+          <input
+            type="radio"
+            name="fq-convert"
+            className="mt-1"
+            checked={canConvert && s.convertPrices}
+            disabled={!canConvert}
+            onChange={() => set("convertPrices", true)}
+          />
           <span>
             Convert them to {currency}
             {canConvert ? (
               <span className="block text-xs text-text-2">
-                At {rateSentence(fx, quote!.currency, currency)}: {sample!.description.split("\n")[0]} {quote!.currency} {Number(sample!.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })} → {currency}{" "}
+                At {rateSentence(fx, quote!.currency, currency)}: {sample!.description.split("\n")[0]} {quote!.currency}{" "}
+                {Number(sample!.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })} → {currency}{" "}
                 {Number(sampleTo).toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </span>
             ) : (
@@ -560,7 +667,13 @@ export function OfferHeaderForm({
           </span>
         </label>
         <label className="flex items-start gap-2 text-sm">
-          <input type="radio" name="fq-convert" className="mt-1" checked={!canConvert || !s.convertPrices} onChange={() => set("convertPrices", false)} />
+          <input
+            type="radio"
+            name="fq-convert"
+            className="mt-1"
+            checked={!canConvert || !s.convertPrices}
+            onChange={() => set("convertPrices", false)}
+          />
           <span>
             Keep the numbers
             <span className="block text-xs text-text-2">They were typed in {currency} already; only the currency was wrong.</span>
@@ -570,116 +683,237 @@ export function OfferHeaderForm({
       </fieldset>
     );
 
+  // The payment's parts: what 100% is when the offer has lines, and what stops a save.
+  const total = quote && Number(quote.factoryTotal) > 0 ? money(quote.factoryTotal, quote.currency) : null;
+  const [partsTried, setPartsTried] = useState(false);
+  const partsBad = partsProblem(s.parts);
+  const daysTyped = s.leadDays.trim() !== "";
+  // An older offer's words the form read its days or months from, said under the field.
+  const leadWordsWere = quote && quote.leadDays === null && quote.leadTime && !s.leadTime ? quote.leadTime : null;
+  const warrantyWordsWere =
+    quote && quote.warrantyMonths === null && quote.warranty && parseWarranty(quote.warranty) ? quote.warranty : null;
+
   return (
-      <ActionForm action={action} onDone={onDone} className={PANEL_FORM} keepFields showSuccess={false}>
-        {(st) => (
-          <>
-            <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
-            {/* The factory's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
-            <input type="hidden" name="factoryLabel" value={s.factory?.name ?? ""} />
-            {filled && s.factory && (
-              <p role="status" className="rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
-                Filled from {s.factory.name}’s last offer:{" "}
-                <strong>
-                  {filled.last.inquiryRef} · {date(filled.last.receivedOn)}
-                </strong>
-                .{" "}
-                <button type="button" onClick={startEmpty} className="font-semibold text-info underline underline-offset-2 hover:no-underline">
-                  Start empty
-                </button>
-              </p>
-            )}
-            <PanelSection title="Who" first className="md:grid-cols-3">
-              <Field label="Factory" htmlFor="factory" required error={st.errors?.factoryId ?? st.errors?.newFactoryName} className="md:col-span-2">
-                <FactoryPicker value={s.factory} search={searchFactories} error={st.errors?.factoryId} onChange={(f) => void pickFactory(f)} />
-              </Field>
-              <Field label="Their reference" htmlFor="reference" optional error={st.errors?.reference}>
-                <Input id="reference" value={s.reference} onChange={(e) => set("reference", e.target.value)} maxLength={80} placeholder="Their quote no." />
-              </Field>
-              <Field label="Received on" htmlFor="receivedOn" required error={st.errors?.receivedOn}>
-                <Input id="receivedOn" type="date" value={s.receivedOn} max={today} onChange={(e) => set("receivedOn", e.target.value)} />
-              </Field>
-              <Field label="Valid until" htmlFor="validUntil" optional error={st.errors?.validUntil}>
-                <Input id="validUntil" type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
-              </Field>
-            </PanelSection>
-            <PanelSection title="Price" className="md:grid-cols-3">
-              <Field
-                label="Currency"
-                htmlFor="currency"
-                error={st.errors?.currency}
-                hint={hintOf("currency", rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined))}
+    <ActionForm
+      action={action}
+      onDone={onDone}
+      className={PANEL_FORM}
+      keepFields
+      showSuccess={false}
+      beforeSend={() => {
+        if (!partsBad) return true;
+        setPartsTried(true);
+        document.getElementById("fq-parts")?.scrollIntoView?.({ block: "center" });
+        return false;
+      }}
+    >
+      {(st) => (
+        <>
+          <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
+          {/* The factory's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
+          <input type="hidden" name="factoryLabel" value={s.factory?.name ?? ""} />
+          {filled && s.factory && (
+            <p role="status" className="rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
+              Filled from {s.factory.name}’s last offer:{" "}
+              <strong>
+                {filled.last.inquiryRef} · {date(filled.last.receivedOn)}
+              </strong>
+              .{" "}
+              <button
+                type="button"
+                onClick={startEmpty}
+                className="font-semibold text-info underline underline-offset-2 hover:no-underline"
               >
-                <CurrencySelect id="currency" value={s.currency} onChange={(e) => set("currency", e.target.value)} />
-              </Field>
-              <Field
-                label="Price basis"
-                htmlFor="basis"
-                error={st.errors?.basis}
-                hint={hintOf("basis", s.basis ? BASIS_HINT[s.basis] : "What their prices already pay for: needed to work out freight and the like")}
-              >
-                <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")}>
-                  <option value="">Not said</option>
-                  {INCOTERMS.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                      {BASIS_WORDS[t] ? ` · ${BASIS_WORDS[t]}` : ""}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label={s.basis === "EXW" ? "Town" : "Port"} htmlFor="basisPlace" optional error={st.errors?.basisPlace} hint={hintOf("basisPlace")}>
-                <PortPicker id="basisPlace" value={s.basisPlace} onChange={(v) => set("basisPlace", v)} exw={s.basis === "EXW"} />
-              </Field>
-              {recurrencyBox(st)}
-              <TaxBox
-                idPrefix="fq"
-                className="sm:col-span-2"
-                included={s.taxIncluded ?? false}
-                rate={s.taxRate}
-                onIncluded={(v) => set("taxIncluded", v)}
-                onRate={(v) => set("taxRate", v)}
-                error={st.errors?.taxRate ?? st.errors?.taxIncluded}
-                note={quote ? taxRateNote(quote.lines, quote.taxRate, s.taxRate) : from("taxIncluded", "taxRate") ? `As on their last offer. Applies to every line; a line can still have its own %.` : undefined}
+                Start empty
+              </button>
+            </p>
+          )}
+          <PanelSection title="Who and when" first className="md:grid-cols-3">
+            <Field
+              label="Factory"
+              htmlFor="factory"
+              required
+              error={st.errors?.factoryId ?? st.errors?.newFactoryName}
+              className="md:col-span-2"
+            >
+              <FactoryPicker
+                value={s.factory}
+                search={searchFactories}
+                error={st.errors?.factoryId}
+                onChange={(f) => void pickFactory(f)}
               />
+            </Field>
+            <Field label="Their reference" htmlFor="reference" optional error={st.errors?.reference}>
+              <Input
+                id="reference"
+                value={s.reference}
+                onChange={(e) => set("reference", e.target.value)}
+                maxLength={80}
+                placeholder="Their quote no."
+              />
+            </Field>
+            <Field label="Received on" htmlFor="receivedOn" required error={st.errors?.receivedOn}>
+              <Input id="receivedOn" type="date" value={s.receivedOn} max={today} onChange={(e) => set("receivedOn", e.target.value)} />
+            </Field>
+            <Field label="Valid until" htmlFor="validUntil" optional error={st.errors?.validUntil}>
+              <Input id="validUntil" type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
+            </Field>
+          </PanelSection>
+          <PanelSection title="Price" className="md:grid-cols-3">
+            <Field
+              label="Currency"
+              htmlFor="currency"
+              error={st.errors?.currency}
+              hint={hintOf(
+                "currency",
+                rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined),
+              )}
+            >
+              <CurrencySelect id="currency" value={s.currency} onChange={(e) => set("currency", e.target.value)} />
+            </Field>
+            {recurrencyBox(st)}
+            <TaxBox
+              idPrefix="fq"
+              className="sm:col-span-2"
+              included={s.taxIncluded ?? false}
+              rate={s.taxRate}
+              onIncluded={(v) => set("taxIncluded", v)}
+              onRate={(v) => set("taxRate", v)}
+              error={st.errors?.taxRate ?? st.errors?.taxIncluded}
+              note={
+                quote
+                  ? taxRateNote(quote.lines, quote.taxRate, s.taxRate)
+                  : from("taxIncluded", "taxRate")
+                    ? `As on their last offer. Applies to every line; a line can still have its own %.`
+                    : undefined
+              }
+            />
+          </PanelSection>
+          <PanelSection title="Delivery" sub="where they hand the goods over, and how long they need" className="md:grid-cols-4">
+            <Field
+              label="Delivery basis (Incoterm)"
+              htmlFor="basis"
+              error={st.errors?.basis}
+              hint={hintOf(
+                "basis",
+                s.basis ? BASIS_HINT[s.basis] : "What their prices already pay for: needed to work out freight and the like",
+              )}
+            >
+              <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")}>
+                <option value="">Not said</option>
+                {INCOTERMS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                    {BASIS_WORDS[t] ? ` · ${BASIS_WORDS[t]}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field
+              label={s.basis === "EXW" ? "Town" : "Port"}
+              htmlFor="basisPlace"
+              optional
+              error={st.errors?.basisPlace}
+              hint={hintOf("basisPlace")}
+            >
+              <PortPicker id="basisPlace" value={s.basisPlace} onChange={(v) => set("basisPlace", v)} exw={s.basis === "EXW"} />
+            </Field>
+            <LeadField
+              id="leadDays"
+              className="sm:col-span-2"
+              side="factory"
+              days={s.leadDays}
+              from={s.leadFrom}
+              onDays={(v) => set("leadDays", v)}
+              onFrom={(v) => set("leadFrom", v)}
+              error={st.errors?.leadDays ?? st.errors?.leadFrom ?? st.errors?.leadTime}
+              hint={
+                from("leadDays", "leadFrom") ? (
+                  FROM
+                ) : daysTyped ? (
+                  <>
+                    Printed as “{leadWords(Number(s.leadDays) || 0, s.leadFrom, "factory")}”
+                    {leadWordsWere ? `, worked out from their words “${leadWordsWere}”` : ""}
+                  </>
+                ) : s.leadTime ? (
+                  <>
+                    Their words: “{s.leadTime}”, kept until you type the days.{" "}
+                    <button type="button" className="font-medium text-primary hover:underline" onClick={() => set("leadTime", "")}>
+                      Clear
+                    </button>
+                  </>
+                ) : (
+                  "So a ready date can be worked out"
+                )
+              }
+            />
+          </PanelSection>
+          <PanelSection title="Payment" sub="the parts, as in their payment plan on an order" className="md:grid-cols-3">
+            <PartsField
+              id="fq-parts"
+              idPrefix="fq-part"
+              side="factory"
+              rows={s.parts}
+              onChange={(rows) => set("parts", rows)}
+              presets={OFFER_PRESETS}
+              amounts={total}
+              error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts}
+            />
+            {from("parts") && <p className="text-xs text-muted sm:col-span-2 md:col-span-3">The parts are {FROM}.</p>}
+            <Field
+              label="Payment note"
+              htmlFor="paymentTerms"
+              optional
+              error={st.errors?.paymentTerms}
+              hint={hintOf("paymentTerms")}
+              className="sm:col-span-2 md:col-span-3"
+            >
+              <Input
+                id="paymentTerms"
+                value={s.paymentTerms}
+                onChange={(e) => set("paymentTerms", e.target.value)}
+                maxLength={2000}
+                placeholder="e.g. By T/T, bank charges outside China for us"
+              />
+            </Field>
+          </PanelSection>
+          <PanelSection title="Warranty" className="md:grid-cols-3">
+            <WarrantyFields
+              idPrefix="fq"
+              months={s.warrantyMonths}
+              from={s.warrantyFrom}
+              covers={s.warranty}
+              onMonths={(v) => set("warrantyMonths", v)}
+              onFrom={(v) => set("warrantyFrom", v)}
+              onCovers={(v) => set("warranty", v)}
+              errors={{ months: st.errors?.warrantyMonths, from: st.errors?.warrantyFrom, covers: st.errors?.warranty }}
+              coversHint={
+                from("warrantyMonths") ? FROM : warrantyWordsWere ? `Worked out from their words “${warrantyWordsWere}”` : undefined
+              }
+            />
+          </PanelSection>
+          <PanelSection title="Conditions and their quotation">
+            <div className="flex flex-col gap-3.5">
               <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq}>
                 <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} placeholder="e.g. 1 set" />
               </Field>
-            </PanelSection>
-            <PanelSection title="Terms" className="md:grid-cols-3">
-              <Field label="Lead time" htmlFor="leadTime" optional error={st.errors?.leadTime} hint={hintOf("leadTime")}>
-                <Input id="leadTime" value={s.leadTime} onChange={(e) => set("leadTime", e.target.value)} maxLength={120} placeholder="e.g. 25 days after deposit" />
-              </Field>
-              <Field label="Advance when we order" htmlFor="advancePercent" optional hint={hintOf("advancePercent", "Starts the factory's payment plan; printed on the PO")} error={st.errors?.advancePercent}>
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    id="advancePercent"
-                    inputMode="decimal"
-                    className="w-24 tabular"
-                    value={s.advancePercent}
-                    onChange={(e) => set("advancePercent", e.target.value.replace(/[^0-9.]/g, ""))}
-                    placeholder="default"
-                  />
-                  <span className="text-sm text-text-2">%</span>
-                </div>
-              </Field>
-              <Field label="Warranty" htmlFor="fq-warranty" optional error={st.errors?.warranty} hint={hintOf("warranty")}>
-                <Input id="fq-warranty" value={s.warranty} onChange={(e) => set("warranty", e.target.value)} maxLength={300} placeholder="e.g. 12 months from commissioning" />
-              </Field>
-              <Field label="Payment terms (note)" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms} hint={hintOf("paymentTerms")} className="md:col-span-3">
-                <Input id="paymentTerms" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} placeholder="e.g. 30% advance, 70% before shipping, by T/T" />
-              </Field>
-            </PanelSection>
-            <PanelSection title="Notes and their quotation">
               <Field label="Notes" htmlFor="fq-notes" optional error={st.errors?.notes}>
-                <Textarea id="fq-notes" rows={4} className="min-h-0" value={s.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Packing, samples, anything to remember about this offer" />
+                <Textarea
+                  id="fq-notes"
+                  rows={3}
+                  className="min-h-0"
+                  value={s.notes}
+                  onChange={(e) => set("notes", e.target.value)}
+                  placeholder="Packing, samples, anything to remember about this offer"
+                />
               </Field>
-              <div className="min-w-0">{files}</div>
-            </PanelSection>
-            {note}
-            {footer}
-          </>
-        )}
-      </ActionForm>
-    );
+            </div>
+            <div className="min-w-0">{files}</div>
+          </PanelSection>
+          {note}
+          {footer}
+        </>
+      )}
+    </ActionForm>
+  );
 }

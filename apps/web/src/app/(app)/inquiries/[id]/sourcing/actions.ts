@@ -149,13 +149,20 @@ export async function offerFieldsAction(dealId: string, quoteId: string, _prev: 
         basis: q.basis,
         basisPlace: q.basisPlace,
         leadTime: q.leadTime,
+        leadDays: q.leadDays,
+        leadFrom: q.leadFrom,
         moq: q.moq,
         paymentTerms: q.paymentTerms,
-        advancePercent: q.advancePercent,
+        paymentParts: q.paymentParts,
         warranty: q.warranty,
+        warrantyMonths: q.warrantyMonths,
+        warrantyFrom: q.warrantyFrom,
         notes: q.notes,
       };
       for (const k of OFFER_FIELDS) if (k in v) body[k] = v[k]!.trim() === "" ? null : v[k]!.trim();
+      // Words typed for the lead time, or an advance %, replace the days and the parts they were worked out from.
+      if ("leadTime" in v) body.leadDays = null;
+      if ("advancePercent" in v) delete body.paymentParts;
       return api.put(`/factory-quotes/${quoteId}`, { ...body, reason: reasonOf(form) });
     },
     "Saved.",
