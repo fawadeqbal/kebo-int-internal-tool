@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { Alert } from "@kebo/ui";
@@ -16,7 +17,11 @@ const DEMO_LOGINS = [
   { label: "Sales person", hint: "Only their own inquiries and orders", email: "bilal@example.com", password: "Demo@12345" },
 ];
 
-export const metadata = { title: "Sign in" };
+/** White label: the browser tab names the company at its own address, never the product. */
+export async function generateMetadata(): Promise<Metadata> {
+  const look = await companyLook();
+  return { title: look ? { absolute: `Sign in · ${look.name}` } : "Sign in" };
+}
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; moved?: string }> }) {
   const { next, moved } = await searchParams;
