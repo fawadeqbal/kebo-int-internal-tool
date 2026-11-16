@@ -584,14 +584,15 @@ export class FactsReadService {
       db.$queryRaw<{ won: number; lost: number }[]>`
         select count(*) filter (where f.outcome = 'won')::int as won, count(*) filter (where f.outcome = 'lost')::int as lost
         from inquiry_facts f where f.closed_on > ${yearAgo}::date`,
-      // The latest quotation sent on each open inquiry, valid until within the next 7 days.
+      // Open inquiries with a quotation sent and valid until within the next 7 days (any of its quotations: each
+      // has at most one revision sent and waiting), each inquiry counted once at its quoted value.
       db.$queryRaw<{ count: number; value: string }[]>`
         select count(*)::int as count, coalesce(sum(f.quoted_value_main), 0)::text as value
         from inquiry_facts f
-        join quotations qn on qn.inquiry_id = f.inquiry_id
-        join lateral (select r.valid_until from quotation_revisions r where r.quotation_id = qn.id and r.deleted_at is null and r.status = 'sent'
-                      order by r.number desc limit 1) r on true
-        where f.outcome = 'open' and r.valid_until between ${today}::date and ${week}::date`,
+        where f.outcome = 'open' and exists (
+          select 1 from quotations qn join quotation_revisions r on r.quotation_id = qn.id
+          where qn.inquiry_id = f.inquiry_id and r.deleted_at is null and r.status = 'sent'
+            and r.valid_until between ${today}::date and ${week}::date)`,
       db.$queryRaw<{ customerId: string; name: string; amount: string; days: number }[]>`
         select x.customer_id as "customerId", c.name, sum(x.overdue)::text as amount, max(x.days)::int as days
         from (select f.customer_id, ${openSql(today, 1, null)} as overdue,

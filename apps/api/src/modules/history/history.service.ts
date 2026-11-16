@@ -41,7 +41,7 @@ export class HistoryService {
         select: {
           id: true,
           factoryQuotes: { select: { id: true } },
-          quotation: { select: { revisions: { select: { id: true } } } },
+          quotations: { select: { revisions: { select: { id: true } } } },
           attachments: { select: { id: true, factoryQuoteId: true } },
           orders: { select: { id: true } },
         },
@@ -51,7 +51,8 @@ export class HistoryService {
       return [
         { entityType: "inquiry", ids: [i.id] },
         { entityType: "factory_quote", ids: seeCosts ? i.factoryQuotes.map((f) => f.id) : [] },
-        { entityType: "quotation", ids: i.quotation?.revisions.map((r) => r.id) ?? [] },
+        // Every quotation's revisions (A, B, C…).
+        { entityType: "quotation", ids: i.quotations.flatMap((q) => q.revisions.map((r) => r.id)) },
         // A factory offer's files only for people who see factory prices.
         { entityType: "attachment", ids: i.attachments.filter((a) => seeCosts || !a.factoryQuoteId).map((a) => a.id) },
         { entityType: "order", ids: i.orders.map((o) => o.id) },

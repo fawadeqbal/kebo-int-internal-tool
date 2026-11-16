@@ -1,6 +1,7 @@
 import { livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor, orderCosting, orderMoney, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
+  dealRevision,
   factoryReadyActual,
   plannedAndSpent,
   planStatus,
@@ -19,7 +20,7 @@ import { convert, MainMoney, orderRate } from "../../money/order-money";
 import { livePlansOf } from "../../billing/api";
 import { factoryPositionOf, fxOf, positionOf, type MoneyCtx, supplierPaidRelation } from "../../billing/api";
 import { factoryReadyOf, readyOnOf } from "@kebo/database";
-import { optionFigures, worthOf } from "../../quotations/revision-figures";
+import { optionFigures, worthInMain, worthOf } from "../../quotations/revision-figures";
 
 /*
  * Insights data (PR B): the rows of the three calculated tables, worked out ONLY through the shared rules —
@@ -307,12 +308,13 @@ const inquirySelect = {
   closedAt: true,
   customer: { select: { country: true } },
   _count: { select: { factoryQuotes: { where: { deletedAt: null } } } },
-  quotation: {
+  quotations: {
     select: {
+      letter: true,
       revisions: {
         where: { deletedAt: null },
         orderBy: { number: "desc" },
-        select: { status: true, sentOn: true, currency: true, ...optionFigures },
+        select: { number: true, status: true, sentOn: true, currency: true, ...optionFigures },
       },
     },
   },
@@ -324,11 +326,12 @@ export async function inquiryFactsOf(db: Db, ids: string[], ctx: FactsCtx): Prom
   const inquiries = await db.inquiry.findMany({ where: { id: { in: ids }, deletedAt: null }, select: inquirySelect });
   return inquiries.map((i) => {
     const receivedOn = dateIn(i.createdAt, ctx.timeZone);
-    const revisions = i.quotation?.revisions ?? [];
+    const revisions = i.quotations.flatMap((q) => q.revisions);
     const sent = revisions.map((r) => fromDbDateOrNull(r.sentOn)).filter((d): d is ISODate => !!d).sort();
     const firstQuote = sent[0] ?? null;
-    // The latest quotation that went out, at its accepted option, else its lowest (revision worth).
-    const latest = revisions.find((r) => r.status !== "draft");
+    // The deal counts once (any number of quotations): the accepted one; else, of each quotation's newest revision
+    // that went out, the lowest still waiting, else the lowest answered; at its accepted option, else its lowest.
+    const latest = dealRevision(i.quotations, worthInMain(ctx.fx.main, ctx.fx.rates));
     const outcome = i.stage === "won" || i.stage === "lost" ? i.stage : "open";
     const closedOn = outcome !== "open" && i.closedAt ? dateIn(i.closedAt, ctx.timeZone) : null;
     return {

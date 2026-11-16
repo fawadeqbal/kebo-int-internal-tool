@@ -435,7 +435,7 @@ export interface DocLine {
 
 /** GET /revisions/:id (printing a quotation). */
 export interface RevisionDoc {
-  quotation: { id: string; refNo: string; inquiryId: string };
+  quotation: { id: string; refNo: string; letter: string; inquiryId: string };
   id: string;
   number: number;
   status: RevisionStatus;

@@ -81,6 +81,7 @@ export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   expired: "Expired",
   superseded: "Replaced by a newer revision",
   void: "Order cancelled",
+  not_chosen: "Not chosen",
 };
 
 export const ATTACHMENT_KIND_LABEL: Record<AttachmentKind, string> = { urs: "URS", drawing: "Drawing", photo: "Photo", specification: "Specification", factory_quote: "Factory quotation", other: "Other" };
@@ -157,6 +158,7 @@ export const REVISION_STATUS_TONE: Record<RevisionStatus, Tone> = {
   expired: "warn",
   superseded: "neutral",
   void: "neutral",
+  not_chosen: "neutral",
 };
 
 export const ORDER_STAGE_TONE: Record<OrderStage, Tone> = {

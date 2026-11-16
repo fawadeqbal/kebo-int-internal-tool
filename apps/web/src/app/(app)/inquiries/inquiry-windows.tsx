@@ -49,7 +49,7 @@ export async function EditRequestWindow({ d }: { d: DealDetail }) {
   if (!d.allowed.edit) return null;
   const [me, settings, people] = await Promise.all([requireUser(), getSettings(), getPeople()]);
   const primary = d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0] ?? null;
-  const sent = d.quotation?.revisions.some((r) => r.status !== "draft");
+  const sent = d.quotations.some((q) => q.revisions.some((r) => r.status !== "draft"));
   return (
     <InquiryPanel
       mode="edit"

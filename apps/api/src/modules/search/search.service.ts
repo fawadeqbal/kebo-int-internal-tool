@@ -373,15 +373,27 @@ export class SearchService {
   /** A number typed whole: its record, when this person may open it. */
   private async exact(user: SessionUser, term: string): Promise<SearchResult["exact"]> {
     const t = term.toUpperCase().replace(/\s+/g, " ").trim();
-    const m = /^([A-Z]{2,4})-(\d{4}-\d{3,})(?:-(\d+))?(?: R\d+)?$/.exec(t);
+    // A paper's number has a count after it (PR-2026-0004-2); a quotation, its letter (QUO-2026-0531-B).
+    const m = /^([A-Z]{2,4})-(\d{4}-\d{3,})(?:-(\d+|[A-Z]{1,3}))?(?: R\d+)?$/.exec(t);
     if (!m) return null;
-    const [, prefix, tail] = m;
+    const [, prefix, tail, suffix] = m;
     if (prefix === "RFQ") {
       const i = await this.prisma.db.inquiry.findFirst({ where: { refNo: same(`RFQ-${tail}`), deletedAt: null, ...inquiryAccess(user) }, select: { id: true, refNo: true } });
       return i && { kind: "inquiries", label: i.refNo, href: `/inquiries/${i.id}` };
     }
     if (prefix === "QUO") {
-      const qt = await this.prisma.db.quotation.findFirst({ where: { refNo: same(`QUO-${tail}`), inquiry: { deletedAt: null, ...inquiryAccess(user) } }, select: { refNo: true, inquiryId: true } });
+      // QUO-2026-0531-B: that quotation. QUO-2026-0531: an older quotation with that number, else the inquiry's
+      // quotations (A first), which all carry it.
+      const seen = { inquiry: { deletedAt: null, ...inquiryAccess(user) } };
+      const qt =
+        (await this.prisma.db.quotation.findFirst({ where: { ...seen, refNo: same(suffix ? `QUO-${tail}-${suffix}` : `QUO-${tail}`) }, select: { refNo: true, inquiryId: true } })) ??
+        (suffix
+          ? null
+          : await this.prisma.db.quotation.findFirst({
+              where: { ...seen, refNo: { startsWith: `QUO-${tail}-`, mode: "insensitive" } },
+              orderBy: { createdAt: "asc" },
+              select: { refNo: true, inquiryId: true },
+            }));
       return qt && { kind: "quotations", label: qt.refNo, href: `/inquiries/${qt.inquiryId}/quotation` };
     }
     if (prefix === "PO" && can(user, "sourcing.manage")) {
