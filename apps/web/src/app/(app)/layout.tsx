@@ -13,6 +13,7 @@ import { buildModules, FOLD_COOKIE, MODULE_PAGES, OPEN_COOKIE, type ModuleKey } 
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
 import { AccountsProvider, type AccountOption } from "@/components/money/accounts";
 import { CompanyTime } from "@/lib/time-client";
+import { RememberColours } from "./remember-colours";
 import { getSettings } from "@/lib/loaders";
 
 /** The company's own logo (Settings → Company), at a link that changes when the logo does; none: the app's icon. */
@@ -76,6 +77,7 @@ export default async function AppLayout({ children, window: win }: { children: R
       {/* The company's colours (Settings › Company › The app's colours): the page takes the set it names, from the
           first paint and without a script (packages/ui/src/styles/theme.css). */}
       <span id="app-colours" data-colours={settings.company.colours} hidden />
+      <RememberColours colours={settings.company.colours} />
       <AppShell modules={modules} initialOpen={initialOpen} initialFold={initialFold} newItems={newItems} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
         {me.viaPlatform && (
           <form action={leaveCompanyAction} className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary-soft/60 px-3 py-2 text-sm">
