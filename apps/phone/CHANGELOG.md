@@ -3,6 +3,44 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-beta.1 — 2026-11-16
+
+Step 9: push notifications, and the first beta: every part of the plan is in.
+
+- Push notifications: after you sign in, the phone asks once and registers with the server. Tapping a notification opens its page (an order, an inquiry, Alerts). One that arrives while the app is open updates the bell. Signing out removes the phone from the server.
+- Push turns on once this app is registered in Firebase (see the README); until then everything else works and push stays off.
+
+## 3.0.0-alpha.8 — 2026-11-16
+
+Step 8: partners, search and files.
+
+- Customers and factories (More › Customers and factories): searchable lists; a customer's page with their contacts, deals and orders and Call / Chat / Mail; a factory's page with how to reach them (WeChat too), their offers, and bank details marked Internal.
+- Search from any tab's header: one search over inquiries, orders, customers and factories, grouped.
+- Files open in the app: PDFs page by page with pinch to zoom, photos with zoom. Other files open on the web to download.
+- Web links to customers and factories open in the app.
+
+## 3.0.0-alpha.7 — 2026-11-16
+
+Step 7: Money.
+
+- The Money tab: what customers still owe (late ones marked), what we owe each factory, and our accounts with their balances (for managers).
+- "Received" on any order with money due: the amount (the due amount filled in), the day, how it came, which account, the reference, bank charges, a note and the slip. Take a photo of the slip or choose a file.
+- People who record payments make the receipt at once; others send it to a manager, and the form says so.
+- "Expense" from the Money tab or on an order: what it was, what for, the amount and currency, the day and the receipt.
+- A success check when it is saved. Without signal the payment or expense waits on the phone, with its photo, and is sent in order when you are back.
+- Files over the limit (25 MB, videos 100 MB) are refused with their size.
+
+## 3.0.0-alpha.6 — 2026-11-16
+
+Step 6: Orders.
+
+- The Orders tab lists every order with where it stands in one word (Confirmed, In production, Shipped, Arrived, Delivered, Done), what it needs now and what is still due. Late ones come first. Chips for Open, Late, each stage, Done and Cancelled show their counts; search and "Mine" narrow it down.
+- An order opens on its record header: total, received and due, its progress, and what it needs next (in red when late).
+- "Where it stands": payment, factory, production, shipping, documents and delivery, each with its word, its facts and what is missing.
+- Money (total, advance, received, still due, bank charges, with a received bar), the lines, the papers (final, draft or needed) and every file of the order.
+- "Delivered in full" and "SAT passed" are confirmed from the phone with their day. Without signal they wait on the phone and are sent when you are back.
+- Web links to orders open in the app.
+
 ## 3.0.0-alpha.5 — 2026-11-16
 
 Step 5: Sales.

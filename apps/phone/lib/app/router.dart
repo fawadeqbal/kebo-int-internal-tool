@@ -10,11 +10,17 @@ import '../features/gallery/gallery_screen.dart';
 import '../features/gallery/patterns_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/more/presentation/more_screen.dart';
+import '../features/files/file_viewer_screen.dart';
+import '../features/money/presentation/money_screen.dart';
+import '../features/partners/presentation/partner_screens.dart';
+import '../features/partners/presentation/partners_screen.dart';
+import '../features/search/search_screen.dart';
 import '../features/notifications/presentation/alerts_screen.dart';
+import '../features/orders/presentation/order_screen.dart';
+import '../features/orders/presentation/orders_screen.dart';
 import '../features/sales/presentation/inquiry_screen.dart';
 import '../features/sales/presentation/new_inquiry_screen.dart';
 import '../features/sales/presentation/sales_screen.dart';
-import '../features/tabs/coming_tab.dart';
 import 'shell.dart';
 
 /// Every route of the app, in one place: the five tabs (each with its own stack), and the
@@ -61,27 +67,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/orders',
-                builder: (context, state) => const ComingTab(
-                  title: 'Orders',
-                  icon: KIcons.box,
-                  step: 6,
-                  what: 'Every order with its steps, shipping, papers, delivery and SAT.',
-                ),
+                builder: (context, state) => const OrdersScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'order/:id',
+                    builder: (context, state) => OrderScreen(id: state.pathParameters['id']!),
+                  ),
+                ],
               ),
             ],
           ),
           StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/money',
-                builder: (context, state) => const ComingTab(
-                  title: 'Money',
-                  icon: KIcons.wallet,
-                  step: 7,
-                  what: 'Payments in and out, verification, transfers and expenses.',
-                ),
-              ),
-            ],
+            routes: [GoRoute(path: '/money', builder: (context, state) => const MoneyScreen())],
           ),
           StatefulShellBranch(
             routes: [GoRoute(path: '/more', builder: (context, state) => const MoreScreen())],
@@ -89,6 +86,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/sales/new', builder: (context, state) => const NewInquiryScreen()),
+      GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
+      GoRoute(
+        path: '/partners',
+        builder: (context, state) => PartnersScreen(factories: state.uri.queryParameters['kind'] == 'factories'),
+        routes: [
+          GoRoute(
+            path: 'customer/:id',
+            builder: (context, state) => CustomerScreen(id: state.pathParameters['id']!),
+          ),
+          GoRoute(
+            path: 'factory/:id',
+            builder: (context, state) => FactoryScreen(id: state.pathParameters['id']!),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/file',
+        builder: (context, state) => FileViewerScreen(
+          path: state.uri.queryParameters['path']!,
+          name: state.uri.queryParameters['name'] ?? 'File',
+        ),
+      ),
       GoRoute(path: '/alerts', builder: (context, state) => const AlertsScreen()),
       GoRoute(path: '/needs', builder: (context, state) => const NeedsScreen()),
       GoRoute(

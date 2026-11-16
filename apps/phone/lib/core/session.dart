@@ -5,6 +5,7 @@ import 'company_time.dart';
 import 'json.dart';
 import 'keep.dart';
 import 'outbox.dart';
+import 'push.dart';
 import 'secrets.dart';
 
 enum SessionStatus { starting, signedOut, needsCode, signedIn }
@@ -120,6 +121,7 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    await Push.forget(api);
     try {
       await api.post('/api/auth/logout');
     } on ApiException {

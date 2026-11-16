@@ -1,7 +1,9 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import 'api.dart';
 import 'bell.dart';
+import 'picker.dart';
 import 'session.dart';
 
 /// The RFQ Desk server this build talks to. `--dart-define=KEBO_SERVER=https://…` points
@@ -26,3 +28,6 @@ final bellProvider = ChangeNotifierProvider<Bell>((ref) {
   ref.onDispose(() => s.removeListener(sync));
   return bell;
 });
+
+/// Camera and files; a fake in tests.
+final pickerProvider = Provider<Picker>((ref) => const PhonePicker());

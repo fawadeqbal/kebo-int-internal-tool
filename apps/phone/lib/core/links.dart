@@ -16,6 +16,13 @@ String? appPathFor(String? href) {
   if (path == '/inquiries') return '/sales';
   final inquiry = RegExp(r'^/inquiries/([0-9a-fA-F-]{36})').firstMatch(path);
   if (inquiry != null) return '/sales/inquiry/${inquiry.group(1)}';
+  if (path == '/orders') return '/orders';
+  final customer = RegExp(r'^/customers/([0-9a-fA-F-]{36})').firstMatch(path);
+  if (customer != null) return '/partners/customer/${customer.group(1)}';
+  final factory = RegExp(r'^/factories/([0-9a-fA-F-]{36})').firstMatch(path);
+  if (factory != null) return '/partners/factory/${factory.group(1)}';
+  final order = RegExp(r'^/orders/([0-9a-fA-F-]{36})').firstMatch(path);
+  if (order != null) return '/orders/order/${order.group(1)}';
   return appPages.contains(path) ? path : null;
 }
 
@@ -23,7 +30,7 @@ String? appPathFor(String? href) {
 Future<void> openLink(BuildContext context, Api api, String? href) async {
   final inApp = appPathFor(href);
   if (inApp != null) {
-    if (inApp == '/home' || inApp == '/more' || inApp == '/sales') {
+    if (inApp == '/home' || inApp == '/more' || inApp == '/sales' || inApp == '/orders') {
       context.go(inApp);
     } else {
       await context.push(inApp);
@@ -32,4 +39,17 @@ Future<void> openLink(BuildContext context, Api api, String? href) async {
   }
   if (href == null) return;
   await launchUrl(Uri.parse('${api.server}$href'), mode: LaunchMode.externalApplication);
+}
+
+/// Opens a file of the system: PDFs and photos in the app's viewer, anything else on the web.
+Future<void> openFile(BuildContext context, Api api, String href, String name) async {
+  final path = href.startsWith('/api/') ? href : '/api$href';
+  if (RegExp(r'\.(pdf|jpe?g|png|webp|gif|heic)$', caseSensitive: false).hasMatch(name)) {
+    await context.push(Uri(path: '/file', queryParameters: {'path': path, 'name': name}).toString());
+    return;
+  }
+  await launchUrl(
+    Uri.parse('${api.server}${href.startsWith('/api/') ? href : path}'),
+    mode: LaunchMode.externalApplication,
+  );
 }

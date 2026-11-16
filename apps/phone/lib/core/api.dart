@@ -183,6 +183,9 @@ class Api {
   Future<Json> patch(String path, Object body) => _map(() => _dio.patch<Object?>(path, data: body));
   Future<void> delete(String path) => _send(() => _dio.delete<Object?>(path));
 
+  /// A DELETE that says what to delete in its body.
+  Future<void> deleteWith(String path, Object body) => _send(() => _dio.delete<Object?>(path, data: body));
+
   /// A file with its name from Content-Disposition; [progress] goes 0 → 1 when the size is known.
   Future<Downloaded> download(String path, {void Function(double)? progress}) async {
     try {

@@ -87,6 +87,12 @@ class MoreScreen extends ConsumerWidget {
                   child: Column(
                     children: [
                       KListItem(
+                        leading: KIcon(KIcons.users, color: context.k.inkMuted),
+                        title: 'Customers and factories',
+                        subtitle: 'Who they are, how to reach them, their deals',
+                        onPressed: () => context.push('/partners'),
+                      ),
+                      KListItem(
                         leading: KIcon(KIcons.grid, color: context.k.inkMuted),
                         title: 'Design gallery',
                         subtitle: 'Every Kestrel component, for review',

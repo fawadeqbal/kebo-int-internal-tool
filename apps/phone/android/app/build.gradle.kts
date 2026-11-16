@@ -6,6 +6,12 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Push notifications need this app registered in Firebase (package dev.fawadiqbal.rfqdesk)
+// and its google-services.json here. Without it the app builds and runs, with push off.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Release signing: android/key.properties and the .jks it names (never committed).
 // Local and CI test builds without it are signed with the debug key; the release workflow
 // refuses to publish a debug-signed APK (see .github/workflows/phone-release.yml).

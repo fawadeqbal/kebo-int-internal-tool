@@ -37,7 +37,7 @@ class TabHeader extends ConsumerWidget {
           userRole: me?.role ?? '',
           unread: unread,
           onBell: () => context.push('/alerts'),
-          onSearch: () => showKToast(context, 'Search arrives with the sales and orders tabs.'),
+          onSearch: () => context.push('/search'),
           onAccount: () => context.go('/more'),
           onCompany: net.offline ? () => net.check() : null,
         );
