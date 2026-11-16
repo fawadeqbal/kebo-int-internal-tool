@@ -11,6 +11,7 @@ import '../../follow_ups/presentation/follow_up_row.dart';
 import '../../home/data/home_data.dart';
 import '../data/sales_data.dart';
 import '../domain/sales_terms.dart';
+import '../../follow_ups/presentation/follow_up_form.dart';
 import 'quotation_card.dart';
 
 /// One inquiry: who and what, where it stands, the quotation in its two views, what is
@@ -340,6 +341,12 @@ class _Body extends ConsumerWidget {
               const SizedBox(height: KSpace.s6),
               KSection(
                 title: 'Follow-ups',
+                actionLabel: 'Plan',
+                onAction: () async {
+                  if (await openFollowUpForm(context, target: ('inquiryId', i.id), about: '${i.refNo} · ${i.what}')) {
+                    onChanged();
+                  }
+                },
                 children: [
                   KCard(
                     padding: EdgeInsets.zero,
@@ -347,7 +354,7 @@ class _Body extends ConsumerWidget {
                       AsyncValue(:final value?) when value.where((f) => f['done'] != true).isEmpty => const KEmptyState(
                         icon: KIcons.calendar,
                         title: 'Nothing planned',
-                        message: 'An open inquiry should always have a next step. Plan one on the web for now.',
+                        message: 'An open inquiry should always have a next step. Plan one with Plan.',
                       ),
                       AsyncValue(:final value?) => Column(
                         children: [
@@ -357,7 +364,9 @@ class _Body extends ConsumerWidget {
                               api: api,
                               divider: n < value.length - 1,
                               onChanged: onChanged,
-                              onOpen: () {},
+                              onOpen: () async {
+                                if (await openFollowUpForm(context, existing: f)) onChanged();
+                              },
                             ),
                         ],
                       ),

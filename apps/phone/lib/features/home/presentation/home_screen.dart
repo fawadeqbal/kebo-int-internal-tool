@@ -8,6 +8,7 @@ import '../../../core/format.dart';
 import '../../../core/links.dart';
 import '../../../core/providers.dart';
 import '../../../design/design.dart';
+import '../../follow_ups/presentation/follow_up_form.dart';
 import '../../follow_ups/presentation/follow_up_row.dart';
 import '../data/home_data.dart';
 
@@ -124,6 +125,10 @@ class _Body extends ConsumerWidget {
         const SizedBox(height: KSpace.s6),
         KSection(
           title: 'Today',
+          actionLabel: 'Plan',
+          onAction: () async {
+            if (await openFollowUpForm(context)) onChanged();
+          },
           caption: data.today.isEmpty
               ? null
               : '${data.today.length} follow-up${data.today.length == 1 ? '' : 's'}${data.today.any((f) => f.late) ? ', ${data.today.where((f) => f.late).length} late' : ''}',

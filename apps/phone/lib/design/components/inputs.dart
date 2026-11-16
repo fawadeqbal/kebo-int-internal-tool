@@ -74,19 +74,36 @@ class KTextField extends StatefulWidget {
 }
 
 class _KTextFieldState extends State<KTextField> {
-  late final FocusNode _focus = widget.focusNode ?? FocusNode();
-  late final TextEditingController _ctrl = widget.controller ?? TextEditingController(text: widget.initialValue);
+  // The field's own controller and focus, used only when none is given. Always read the
+  // given ones through these getters: a field can be reused for another (e.g. when a field
+  // appears above it), and must then follow the new controller, not keep the old one.
+  late final TextEditingController _ownCtrl = TextEditingController(text: widget.initialValue);
+  final FocusNode _ownFocus = FocusNode();
+  TextEditingController get _ctrl => widget.controller ?? _ownCtrl;
+  FocusNode get _focus => widget.focusNode ?? _ownFocus;
+
+  void _focusChanged() => setState(() {});
 
   @override
   void initState() {
     super.initState();
-    _focus.addListener(() => setState(() {}));
+    _focus.addListener(_focusChanged);
+  }
+
+  @override
+  void didUpdateWidget(KTextField old) {
+    super.didUpdateWidget(old);
+    if ((old.focusNode ?? _ownFocus) != _focus) {
+      (old.focusNode ?? _ownFocus).removeListener(_focusChanged);
+      _focus.addListener(_focusChanged);
+    }
   }
 
   @override
   void dispose() {
-    if (widget.focusNode == null) _focus.dispose();
-    if (widget.controller == null) _ctrl.dispose();
+    _focus.removeListener(_focusChanged);
+    _ownFocus.dispose();
+    _ownCtrl.dispose();
     super.dispose();
   }
 
