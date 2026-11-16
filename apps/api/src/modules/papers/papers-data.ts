@@ -22,6 +22,10 @@ import {
   shipByVsLc,
   SAT_RESULT_LABEL,
   SHIP_MODE_LABEL,
+  leadWords,
+  planSentence,
+  plainQuoteParts,
+  quotePartsOf,
   warrantyLine,
   type OrderDocumentKind,
   type PaperCell,
@@ -158,7 +162,7 @@ const bullets = (text: string | null | undefined) =>
  * covers, or an older quotation's words), else the company's usual one (Settings).
  */
 const warrantyOf = (c: PaperCtx) => {
-  const own = warrantyLine(c.o.revision);
+  const own = agreedOf(c.o).warranty;
   return own ? (/^warranty/i.test(own) ? own : `Warranty: ${own}`) : c.settings.sales.warrantyTerms;
 };
 
@@ -228,11 +232,40 @@ export function positionOf(c: PaperCtx) {
 const chargedLine = (chargedMinor: number, currency: string) =>
   chargedMinor > 0 ? [`Includes ${formatMinor(chargedMinor, currency)} of expenses charged to you.`] : [];
 
-/** The payment sentence from the route (route, balance when, LC terms and days) and the plan's deposit. */
-export const termsSentence = (c: PaperCtx) => routePaymentSentence(positionOf(c).depositPercent, termsOf(c.o), c.o.balanceTerms);
+/**
+ * The payment sentence from the route (route, balance when, LC terms and days) and the plan's deposit. An order
+ * whose quotation's payment was more than a deposit and one balance (design "terms that travel": 30 · 60 · 10
+ * after the site test): each part of its plan as it stands now.
+ */
+export const termsSentence = (c: PaperCtx) =>
+  plainQuoteParts(quotePartsOf(c.o.revision))
+    ? routePaymentSentence(positionOf(c).depositPercent, termsOf(c.o), c.o.balanceTerms)
+    : planSentence(
+        c.o.receivables.map((r) => ({ amountMinor: decimalToMinor(r.amount), part: r.part, dueRule: r.dueRule, dueDays: r.dueDays, dueOn: fromDbDateOrNull(r.dueOn) })),
+        decimalToMinor(c.o.total),
+      );
 
-/** The quotation's own payment text: while the route is still the accepted one, or when chosen on the Make page. */
-const quotedTerms = (c: PaperCtx) => (quotedTermsPrinted(c.o) ? bullets(c.o.revision.paymentTerms) : []);
+/**
+ * What was agreed with the customer, as the order's papers print it: the order's own copy (taken when the
+ * quotation was accepted, changed on the order after), else (an older order) its quotation's.
+ */
+export const agreedOf = (o: PaperCtx["o"]) =>
+  o.termsCopied
+    ? {
+        paymentConditions: o.paymentConditions,
+        deliveryConditions: o.deliveryConditions,
+        warranty: warrantyLine({ warrantyMonths: o.warrantyMonths, warrantyFrom: o.warrantyFrom, warranty: o.warrantyWords }),
+        leadTime: o.leadDays === null ? figuresOf(o.revision).leadTime : leadWords(o.leadDays, o.leadFrom, "customer"),
+      }
+    : {
+        paymentConditions: o.revision.paymentTerms,
+        deliveryConditions: o.revision.deliveryTerms,
+        warranty: warrantyLine(o.revision),
+        leadTime: figuresOf(o.revision).leadTime,
+      };
+
+/** The payment conditions agreed: while the route is still the accepted one, or when chosen on the Make page. */
+const quotedTerms = (c: PaperCtx) => (quotedTermsPrinted(c.o) ? bullets(agreedOf(c.o).paymentConditions) : []);
 
 /** The shipment the papers speak of (Shipment 1), shipped on (the earliest departure), its B/L and container. */
 const shipOf = (c: PaperCtx) => shipFacts(c.o.shipments);
@@ -304,9 +337,8 @@ function salesContract(c: PaperCtx): Built {
   const { pol, pod } = portsOf(c);
   const route = routeOf(c.o);
   const b = c.o.bankContract;
-  const rev = c.o.revision;
-  // The accepted option's lead time (the revision keeps none of its own).
-  const leadTime = figuresOf(rev).leadTime;
+  // The lead time agreed (the order's copy; an older order: the accepted option's).
+  const leadTime = agreedOf(c.o).leadTime;
   const shipBy = fromDbDateOrNull(c.o.shipBy);
   // With an LC: its latest shipment date beside ours, and a warning when ours is later (we keep our own).
   const lcLatest = LC(c) ? fromDbDateOrNull(b?.latestShipOn) : null;
@@ -352,7 +384,7 @@ function salesContract(c: PaperCtx): Built {
         { fix: "shipBy", warn: vsLc?.late ? `Ours is later than the LC allows: ship by ${paperDateText(lcLatest!)}, or ask for an amendment.` : null },
       ),
       hs.check,
-      check("warranty", "Warranty", warrantyLine(c.o.revision) ? "from the quotation" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
+      check("warranty", "Warranty", agreedOf(c.o).warranty ? "as agreed" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
         href: "/settings/sales",
       }),
     ],
@@ -376,7 +408,7 @@ function salesContract(c: PaperCtx): Built {
           ? "Inspection: FAT at the factory before shipment; SAT at the buyer's site."
           : "Inspection: FAT at the factory before shipment.",
         ...bullets(warrantyOf(c)),
-        ...bullets(rev.deliveryTerms),
+        ...bullets(agreedOf(c.o).deliveryConditions),
       ],
       bank: c.settings.company.bankDetails || null,
       signatures: { left: `For the seller · ${c.company.name}`, right: `For the buyer · ${c.customer.name}` },
@@ -961,7 +993,7 @@ function satCertificate(c: PaperCtx): Built {
       ),
       check("done", "Signed off on", on ? paperDateText(on) : "not yet", !!on, { required: true, href: "delivery" }),
       check("by", "Signed by", c.o.delivery?.satSignedBy ?? "not recorded", !!c.o.delivery?.satSignedBy, { href: "delivery" }),
-      check("warranty", "Warranty", warrantyLine(c.o.revision) ? "from the quotation" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
+      check("warranty", "Warranty", agreedOf(c.o).warranty ? "as agreed" : c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!warrantyOf(c), {
         href: "/settings/sales",
       }),
     ],

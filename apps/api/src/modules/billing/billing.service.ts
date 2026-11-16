@@ -106,7 +106,7 @@ export class BillingService {
         const dueDays =
           rule === "on_ship_plus_days"
             ? (i.dueDays ?? old?.dueDays ?? reminders.balanceDays)
-            : rule === "after_papers"
+            : rule === "after_papers" || rule === "after_sat"
               ? (i.dueDays ?? old?.dueDays ?? 0)
               : null;
         return {

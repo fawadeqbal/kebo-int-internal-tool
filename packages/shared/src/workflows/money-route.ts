@@ -58,18 +58,22 @@ export interface RouteTerms {
  * - fixed: on its own date (typed by hand, or the deposit's: some days after the order);
  * - on_ready: the order's ready date (the latest factory's; the ship date when none is known);
  * - on_ship_plus_days: `dueDays` after the goods left (the earliest shipment's departure);
- * - after_papers: `dueDays` after the papers reached the customer's bank (an LC).
+ * - after_papers: `dueDays` after the papers reached the customer's bank (an LC);
+ * - after_sat: `dueDays` after the site acceptance test was done (Delivery & SAT; design "terms that travel").
  * Only a fixed row keeps a date; the others are worked out each time (planItemDue), so moving the ready or
  * ship date moves them. No rule: no date yet.
  */
-export const PLAN_DUE_RULES = ["fixed", "on_ready", "on_ship_plus_days", "after_papers"] as const;
+export const PLAN_DUE_RULES = ["fixed", "on_ready", "on_ship_plus_days", "after_papers", "after_sat"] as const;
 export type PlanDueRule = (typeof PLAN_DUE_RULES)[number];
 export const PLAN_DUE_RULE_LABEL: Record<PlanDueRule, string> = {
   fixed: "On a date",
   on_ready: "On the ready date",
   on_ship_plus_days: "Days after shipping",
   after_papers: "After the papers (LC)",
+  after_sat: "After the site test (SAT)",
 };
+/** The rules a row keeps days for, and the days a new one starts with when none are given. */
+export const PLAN_RULE_DAYS: Partial<Record<PlanDueRule, number>> = { on_ship_plus_days: 14, after_papers: 0, after_sat: 0 };
 
 /** The order's dates an instalment's rule reads. */
 export interface PlanDates {
@@ -79,6 +83,8 @@ export interface PlanDates {
   shippedOn: ISODate | null;
   /** The papers reached the customer's bank (the bank step). */
   papersOn: ISODate | null;
+  /** The site acceptance test was done (Delivery & SAT); left out: not known. */
+  satOn?: ISODate | null;
 }
 
 export interface PlanRuleItem {
@@ -96,6 +102,8 @@ export function planItemDue(item: PlanRuleItem, d: PlanDates): ISODate | null {
       return d.shippedOn ? addDays(d.shippedOn, Math.max(item.dueDays ?? 0, 0)) : null;
     case "after_papers":
       return d.papersOn ? addDays(d.papersOn, Math.max(item.dueDays ?? 0, 0)) : null;
+    case "after_sat":
+      return d.satOn ? addDays(d.satOn, Math.max(item.dueDays ?? 0, 0)) : null;
     default:
       return item.dueOn;
   }
@@ -111,6 +119,8 @@ export function dueRuleWords(item: { dueRule: string | null; dueDays: number | n
       return days ? `${days} day${days === 1 ? "" : "s"} after shipping` : "when the goods leave";
     case "after_papers":
       return days ? `${days} days after the papers` : "when the papers reach their bank";
+    case "after_sat":
+      return days ? `${days} day${days === 1 ? "" : "s"} after the site test` : "after the site test";
     default:
       return null;
   }

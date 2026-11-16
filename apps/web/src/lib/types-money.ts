@@ -75,7 +75,7 @@ export interface OrderMoney {
     /** May send a request to the customer (kept as sent). */
     canSend: boolean;
     /** The order's dates the rules read (the ready date: the latest factory's). */
-    dates: { readyOn: string | null; shippedOn: string | null; papersOn: string | null };
+    dates: { readyOn: string | null; shippedOn: string | null; papersOn: string | null; satOn?: string | null };
     matchesTotal: boolean;
     difference: string;
     next: { label: string; open: string; dueOn: string | null; status: InstalmentStatus } | null;

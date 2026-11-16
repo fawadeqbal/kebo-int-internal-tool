@@ -12,6 +12,11 @@ import {
   orderReadyOn,
   routeFromTerms,
   routePlan,
+  isLeadFrom,
+  isWarrantyFrom,
+  partsPlan,
+  plainQuoteParts,
+  quotePartsOf,
   nextStage,
   numberQuoteLines,
   orderNeeds,
@@ -36,7 +41,7 @@ import {
   orderWord,
   orderWordColumn,
 } from "@kebo/shared";
-import { dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
+import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -47,7 +52,7 @@ import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
 import { ordersWithMoneyDue } from "../billing/api";
-import { chargedExpenses, fxOf, moneyFacts, positionOf, type MoneyCtx } from "../billing/api";
+import { chargedExpenses, fxOf, moneyFacts, positionOf, reachedOn, type MoneyCtx } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
 import { factoryPlansFor } from "../billing/api";
 import { createPlan, termsOf } from "../billing/api";
@@ -261,6 +266,49 @@ export class OrdersService {
     private readonly ledger: LedgerPosting,
   ) {}
 
+  /** A payment recorded: an order whose lead time counts from the deposit gets its ship-by date once the deposit is in. */
+  onModuleInit() {
+    this.events.on("payment.recorded", (e) => this.shipByFromDeposit(e.orderId));
+  }
+
+  /**
+   * Ship by, worked out (design "terms that travel"): the lead time agreed counted from the day the deposit was in
+   * (paid in full), unless someone typed the date by hand. Moves with the payments (a voided one moves it back);
+   * nothing happens while the deposit is not in.
+   */
+  async shipByFromDeposit(orderId: string) {
+    await this.prisma.tx(async (tx) => {
+      const o = await tx.order.findUnique({
+        where: { id: orderId },
+        select: {
+          refNo: true,
+          status: true,
+          leadDays: true,
+          leadFrom: true,
+          shipBy: true,
+          shipByTyped: true,
+          receivables: { where: { part: "deposit" }, select: { amount: true } },
+          allocations: { where: livePart, orderBy: [{ on: "asc" }, { createdAt: "asc" }], select: { amount: true, bankCharges: true, on: true } },
+        },
+      });
+      if (!o || o.status === "cancelled" || o.leadDays === null || o.leadFrom !== "after_payment" || o.shipByTyped) return;
+      const depositMinor = o.receivables.reduce((t, r) => t + decimalToMinor(r.amount), 0);
+      const inOn = depositMinor > 0 ? reachedOn(o.allocations, depositMinor) : null;
+      const shipBy = inOn ? addDays(inOn, o.leadDays) : null;
+      if (!shipBy || fromDbDateOrNull(o.shipBy) === shipBy) return;
+      await tx.order.update({ where: { id: orderId }, data: { shipBy: toDbDate(shipBy) } });
+      await this.audit.record(tx, {
+        userId: null,
+        action: "update",
+        entityType: "order",
+        entityId: orderId,
+        summary: `${o.refNo}: ship by ${shipBy}, ${o.leadDays} days after the deposit came in (${inOn})`,
+        oldValues: { shipBy: fromDbDateOrNull(o.shipBy) },
+        newValues: { shipBy },
+      });
+    });
+  }
+
   /* ---------------------------------------------------------------- creating and cancelling */
 
   /** The order made when a revision is accepted (inside that transaction): the accepted lines frozen and the terms copied. */
@@ -315,6 +363,20 @@ export class OrdersService {
         balanceTerms: rev.balanceTerms,
         incoterm: rev.incoterm,
         incotermPlace: rev.incotermPlace,
+        // Agreed with the customer (design "terms that travel"): the quotation's terms copied, so the order keeps
+        // them while the quotation stays as it was sent. Ship by: worked out from the lead time when it counts from
+        // the order (after the deposit: once the deposit is in, see OrderTermsEvents).
+        termsCopied: true,
+        portOfDischarge: rev.portOfDischarge,
+        leadDays: option.leadDays,
+        leadFrom: option.leadDays === null ? null : isLeadFrom(option.leadFrom) ? option.leadFrom : "after_payment",
+        shipBy: option.leadDays !== null && option.leadFrom === "after_order" ? toDbDate(addDays(acceptedOn, option.leadDays)) : null,
+        warrantyMonths: rev.warrantyMonths,
+        warrantyFrom: rev.warrantyMonths === null ? null : isWarrantyFrom(rev.warrantyFrom) ? rev.warrantyFrom : "shipment",
+        warrantyWords: rev.warranty,
+        deliveryConditions: rev.deliveryTerms,
+        paymentConditions: rev.paymentTerms,
+        conditionsNotes: rev.notes,
         mainCurrency: sales.currency,
         mainRate,
         buyerSnapshot: buyer as unknown as Prisma.InputJsonValue,
@@ -367,7 +429,12 @@ export class OrdersService {
       implied.route && implied.route !== "informal" && !(await this.limits.allows("bank_contracts"))
         ? { route: null, balanceWhen: balanceWhenOf(rev.balanceTerms), lcTerms: null, lcDays: null }
         : implied;
-    const plan = routePlan(decimalToMinor(option.total), Number(rev.depositPercent), route, acceptedOn, days.depositDays, days.balanceDays);
+    // A deposit and one balance: the route builds the plan, as it always did. More parts (30 · 60 · 10 after the
+    // site test): the plan is the quotation's parts, each dated by its rule.
+    const parts = quotePartsOf(rev);
+    const plan = plainQuoteParts(parts)
+      ? routePlan(decimalToMinor(option.total), Number(rev.depositPercent), route, acceptedOn, days.depositDays, days.balanceDays)
+      : partsPlan(parts, decimalToMinor(option.total), acceptedOn, days.depositDays, days.balanceDays);
     await createPlan(tx, order.id, plan);
     // How the customer pays: its own row (order_payment_terms), made with every order.
     await setPaymentTerms(tx, order.id, { route: route.route, balanceWhen: route.balanceWhen, lcTerms: route.lcTerms, lcDays: route.lcDays });
@@ -1254,7 +1321,11 @@ export class OrdersService {
       const o = await this.load(user, id, tx);
       if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
       const data: Prisma.OrderUpdateInput = {};
-      if (input.shipBy !== undefined) data.shipBy = toDbDateOrNull(input.shipBy);
+      if (input.shipBy !== undefined) {
+        data.shipBy = toDbDateOrNull(input.shipBy);
+        // Typed by hand: the lead time no longer moves it; emptied: it is worked out again.
+        if ((input.shipBy ?? null) !== fromDbDateOrNull(o.shipBy)) data.shipByTyped = input.shipBy !== null;
+      }
       if (input.documentTitle !== undefined) data.documentTitle = input.documentTitle;
       if (input.portOfDischarge !== undefined) data.portOfDischarge = input.portOfDischarge;
       if (input.shippingMarks !== undefined) data.shippingMarks = input.shippingMarks;
