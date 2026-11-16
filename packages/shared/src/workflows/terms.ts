@@ -2,7 +2,7 @@ import { formatMinor, type Minor } from "@kebo/money";
 import { addDays, type ISODate } from "@kebo/utils";
 import type { BalanceTerms } from "../enums";
 import { paymentSentenceOf } from "./quotation";
-import type { PlanDueRule, PlanPart } from "./money-route";
+import type { FactoryDueRule, FactoryPlanRow, PlanDueRule, PlanPart } from "./money-route";
 
 /**
  * Terms that travel (design "RFQ Desk — terms that travel, one thing in one place", 16 Nov 2026): the factory
@@ -430,6 +430,39 @@ export function warrantyCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | 
 /** Every check of one option against its factory (only those both sides say enough for). */
 export const termsChecks = (ours: OurTerms, theirs: TheirTerms): TermsCheck[] =>
   [leadCheck(ours, theirs), paymentCheck(ours, theirs), warrantyCheck(ours, theirs)].filter((c): c is TermsCheck => c !== null);
+
+/* ---------------------------------------------------------------- the factory's plan from its offer's parts */
+
+/** An offer's parts are an advance and the rest when ready (or one of them): the company's usual factory plan. */
+export function plainOfferParts(parts: Pick<TermPart, "rule">[]): boolean {
+  const rules = parts.map((p) => p.rule);
+  return rules.length > 0 && rules.length <= 2 && rules.every((r, i) => (r === "on_order" && i === 0) || (r === "on_ready" && i === rules.length - 1));
+}
+
+/**
+ * The factory's plan on an order from its offer's parts (design "terms that travel", step 3): each part its share
+ * of what we owe (the last the rest, so they add up exactly), due when we order, when they say ready, or days after
+ * the goods leave. Null when the parts are the usual advance and the rest when ready — the company's default plan
+ * is that, to the cent and in the same words, as before.
+ */
+export function offerPlan(parts: TermPart[], owedMinor: Minor): FactoryPlanRow[] | null {
+  if (!parts.length || !partsAddUp(parts) || plainOfferParts(parts)) return null;
+  let left = owedMinor;
+  return parts.map((p, i) => {
+    const amountMinor = i === parts.length - 1 ? left : Math.round((owedMinor * p.percent) / 100);
+    left -= amountMinor;
+    const dueRule: FactoryDueRule = p.rule === "on_order" ? "on_order" : p.rule === "on_ready" ? "on_ready" : "on_ship_plus_days";
+    const when = partWhen(p, "factory");
+    return {
+      label: p.label.trim() || `${percentText(p.percent)}% ${when}`.replace(/^./, (c) => c.toUpperCase()),
+      percent: p.percent,
+      amountMinor,
+      dueRule,
+      dueOn: null,
+      ...(dueRule === "on_ship_plus_days" ? { dueDays: Math.max(Math.round(p.days ?? 0), 0) } : {}),
+    };
+  });
+}
 
 /* ---------------------------------------------------------------- the order's plan from the parts */
 

@@ -21,6 +21,8 @@ export interface PurchaseOrderView {
   sentBy: { id: string; name: string } | null;
   supplierRef: string | null;
   sentEarlyReason: string | null;
+  /** The factory's offer its lines were bought on (design "terms that travel"). */
+  offer?: { id: string; reference: string | null; receivedOn: string; basis: string | null; basisPlace: string | null } | null;
 }
 
 const HOW = ["Email", "WeChat", "WhatsApp", "By hand"];
