@@ -15,7 +15,7 @@ import { ConfirmDialog } from "@/components/common/dialog";
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, money as amount } from "@/lib/format";
 import { rateSentence } from "@/lib/fx";
-import type { FactoryOption, FactoryQuoteView, LastOffer, OfferFile, SourcingView } from "@/lib/types-deals";
+import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import { FileDrop, send, type Staged } from "./documents-panel";
 import { FileRow, FileZone } from "@/components/common/file-zone";
@@ -221,7 +221,6 @@ function OfferWindow({
   mainCurrency,
   rates,
   searchFactories,
-  lastOffer,
   saveAction,
   removeAction,
   removeFile,
@@ -236,8 +235,6 @@ function OfferWindow({
   mainCurrency: string;
   rates: Record<string, number>;
   searchFactories: (q: string) => Promise<FactoryOption[]>;
-  /** A new offer: the chosen factory's last offer, to start from. */
-  lastOffer?: (factoryId: string) => Promise<LastOffer | null>;
   saveAction: Action;
   removeAction?: Action;
   removeFile?: OfferLineActions["removeFile"];
@@ -356,7 +353,6 @@ function OfferWindow({
         mainCurrency={mainCurrency}
         rates={rates}
         searchFactories={searchFactories}
-        lastOffer={lastOffer}
         onDone={(st) => void done(st)}
         defaults={taxDefault ? { taxIncluded: taxDefault.included, taxRate: taxDefault.rate, advancePercent: taxDefault.advance } : undefined}
         files={fileRows}
@@ -956,7 +952,6 @@ export function AddOfferButton({
   mainCurrency,
   rates,
   searchFactories,
-  lastOffer,
   createAction,
   taxDefault,
   label = "Add an offer",
@@ -972,8 +967,6 @@ export function AddOfferButton({
   mainCurrency: string;
   rates: Record<string, number>;
   searchFactories: (q: string) => Promise<FactoryOption[]>;
-  /** The chosen factory's last offer: the window starts from it. */
-  lastOffer?: (factoryId: string) => Promise<LastOffer | null>;
   /** saveFactoryQuoteAction bound to the deal and null (a new offer). */
   createAction: Action;
   /** A new offer's tax and advance: the company's defaults (Settings). */
@@ -1006,7 +999,6 @@ export function AddOfferButton({
             mainCurrency={mainCurrency}
             rates={rates}
             searchFactories={searchFactories}
-            lastOffer={lastOffer}
             saveAction={createAction}
             taxDefault={taxDefault}
             onAnother={() => setRound((n) => n + 1)}

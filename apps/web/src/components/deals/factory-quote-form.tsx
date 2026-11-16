@@ -16,8 +16,7 @@ import {
 import { Button, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
-import type { FactoryOption, FactoryQuoteView, LastOffer } from "@/lib/types-deals";
-import { useTime } from "@/lib/time-client";
+import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
@@ -363,72 +362,6 @@ const OFFER_PRESETS: PartsPreset[] = [
   { label: "All after shipping", parts: [{ name: "Payment after shipping", share: 100, rule: "after_shipping", days: 30 }] },
 ];
 
-/** What a factory's last offer can fill in a new one (its lines, dates, reference and notes are always the new offer's own). */
-const FROM_LAST = [
-  "currency",
-  "basis",
-  "basisPlace",
-  "taxIncluded",
-  "taxRate",
-  "leadTime",
-  "leadDays",
-  "leadFrom",
-  "paymentTerms",
-  "parts",
-  "warranty",
-  "warrantyMonths",
-  "warrantyFrom",
-] as const;
-export type FromLast = Partial<Pick<QuoteState, (typeof FROM_LAST)[number]>>;
-
-/** The last offer as the form's values; what it did not say is left out. */
-export function lastOfferValues(last: LastOffer): FromLast {
-  const lead =
-    last.leadDays !== null && last.leadDays !== undefined
-      ? { days: last.leadDays, from: last.leadFrom ?? "after_payment" }
-      : parseLead(last.leadTime);
-  const months =
-    last.warrantyMonths !== null && last.warrantyMonths !== undefined
-      ? { months: last.warrantyMonths, from: last.warrantyFrom ?? "shipment", rest: last.warranty }
-      : parseWarranty(last.warranty);
-  const parts = last.paymentParts?.length
-    ? last.paymentParts
-    : last.advancePercent === null || last.advancePercent === undefined
-      ? null
-      : offerPartsFrom(last.advancePercent);
-  const v: FromLast = {
-    currency: last.currency,
-    taxIncluded: last.taxIncluded,
-    taxRate: String(last.taxRate),
-    ...(last.basis ? { basis: last.basis } : {}),
-    ...(last.basisPlace ? { basisPlace: last.basisPlace } : {}),
-    ...(lead ? { leadDays: String(lead.days), leadFrom: lead.from } : last.leadTime ? { leadTime: last.leadTime } : {}),
-    ...(last.paymentTerms ? { paymentTerms: last.paymentTerms } : {}),
-    ...(parts ? { parts: partRows(parts) } : {}),
-    ...(months
-      ? { warrantyMonths: String(months.months), warrantyFrom: months.from, ...(months.rest ? { warranty: months.rest } : {}) }
-      : last.warranty
-        ? { warranty: last.warranty }
-        : {}),
-  };
-  return v;
-}
-
-/** Fill a new offer from the factory's last one: only the fields nobody has typed in yet (still as the window opened). */
-export function fillFromLast(s: QuoteState, start: QuoteState, values: FromLast): QuoteState {
-  const next = { ...s };
-  for (const k of FROM_LAST) if (values[k] !== undefined && s[k] === start[k]) Object.assign(next, { [k]: values[k] });
-  return next;
-}
-
-/** "Start empty", or another factory chosen: what was filled and not typed over goes back to how the window opened. */
-export function unfill(s: QuoteState, start: QuoteState, values: FromLast | null | undefined): QuoteState {
-  if (!values) return s;
-  const next = { ...s };
-  for (const k of FROM_LAST) if (values[k] !== undefined && s[k] === values[k]) Object.assign(next, { [k]: start[k] });
-  return next;
-}
-
 /** Choose a known factory, or type a new one's name (it is added to the factory list on save). */
 export function FactoryPicker({
   value,
@@ -570,7 +503,6 @@ export function OfferHeaderForm({
   mainCurrency,
   rates,
   searchFactories,
-  lastOffer,
   onDone,
   defaults,
   files,
@@ -583,8 +515,6 @@ export function OfferHeaderForm({
   mainCurrency: string;
   rates: Record<string, number>;
   searchFactories: (q: string) => Promise<FactoryOption[]>;
-  /** A new offer: what the chosen factory said on its last offer (the window starts from it). */
-  lastOffer?: (factoryId: string) => Promise<LastOffer | null>;
   onDone: (state: ActionState) => void;
   /** A new offer's tax and advance: the company's defaults (Settings). */
   defaults?: { taxIncluded: boolean; taxRate: number; advancePercent?: number };
@@ -594,38 +524,15 @@ export function OfferHeaderForm({
   note?: ReactNode;
   footer: ReactNode;
 }) {
-  const { date } = useTime();
-  // How the window opens; a field still like this has not been typed in.
+  // How the window opens: a fresh start, with the company's usual tax and advance (Settings).
   const [start] = useState<QuoteState>(() => ({
     ...initialState(quote, today, defaults?.advancePercent ?? 30),
     ...(!quote && defaults ? { taxIncluded: defaults.taxIncluded, taxRate: String(defaults.taxRate) } : {}),
   }));
   const [s, setS] = useState<QuoteState>(start);
   const set = <K extends keyof QuoteState>(k: K, v: QuoteState[K]) => setS((st) => ({ ...st, [k]: v }));
-  // A new offer starts from the chosen factory's last one; what was filled, so each field can say so.
-  const [filled, setFilled] = useState<{ last: LastOffer; values: FromLast } | null>(null);
-  const asked = useRef(0);
-  const pickFactory = async (f: QuoteState["factory"]) => {
-    const n = ++asked.current;
-    const before = filled?.values;
-    setS((st) => ({ ...unfill(st, start, before), factory: f }));
-    setFilled(null);
-    if (quote || !f?.id || !lastOffer) return;
-    const last = await lastOffer(f.id);
-    if (n !== asked.current || !last) return;
-    const values = lastOfferValues(last);
-    setS((st) => fillFromLast(st, start, values));
-    setFilled({ last, values });
-  };
-  const startEmpty = () => {
-    const before = filled?.values;
-    setS((st) => unfill(st, start, before));
-    setFilled(null);
-  };
-  /** This field still shows what the last offer said. */
-  const from = (...keys: (keyof FromLast)[]) => !!filled && keys.every((k) => filled.values[k] !== undefined && s[k] === filled.values[k]);
-  const FROM = "from their last offer";
-  const hintOf = (k: keyof FromLast, rest?: string) => (from(k) ? [FROM, rest].filter(Boolean).join(" · ") : rest);
+  // Every new offer starts fresh (nothing is filled from the factory's last offer: decided 16 Nov 2026).
+  const pickFactory = (f: QuoteState["factory"]) => set("factory", f);
   const currency = s.currency.trim().toUpperCase();
   const fx = { main: mainCurrency, rates };
   const rate = fxRate(currency, mainCurrency, mainCurrency, rates);
@@ -712,22 +619,6 @@ export function OfferHeaderForm({
           <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
           {/* The factory's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
           <input type="hidden" name="factoryLabel" value={s.factory?.name ?? ""} />
-          {filled && s.factory && (
-            <p role="status" className="rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
-              Filled from {s.factory.name}’s last offer:{" "}
-              <strong>
-                {filled.last.inquiryRef} · {date(filled.last.receivedOn)}
-              </strong>
-              .{" "}
-              <button
-                type="button"
-                onClick={startEmpty}
-                className="font-semibold text-info underline underline-offset-2 hover:no-underline"
-              >
-                Start empty
-              </button>
-            </p>
-          )}
           <PanelSection title="Who and when" first className="md:grid-cols-3">
             <Field
               label="Factory"
@@ -764,10 +655,7 @@ export function OfferHeaderForm({
               label="Currency"
               htmlFor="currency"
               error={st.errors?.currency}
-              hint={hintOf(
-                "currency",
-                rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined),
-              )}
+              hint={rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined)}
             >
               <CurrencySelect id="currency" value={s.currency} onChange={(e) => set("currency", e.target.value)} />
             </Field>
@@ -780,13 +668,7 @@ export function OfferHeaderForm({
               onIncluded={(v) => set("taxIncluded", v)}
               onRate={(v) => set("taxRate", v)}
               error={st.errors?.taxRate ?? st.errors?.taxIncluded}
-              note={
-                quote
-                  ? taxRateNote(quote.lines, quote.taxRate, s.taxRate)
-                  : from("taxIncluded", "taxRate")
-                    ? `As on their last offer. Applies to every line; a line can still have its own %.`
-                    : undefined
-              }
+              note={quote ? taxRateNote(quote.lines, quote.taxRate, s.taxRate) : undefined}
             />
           </PanelSection>
           <PanelSection title="Delivery" sub="where they hand the goods over, and how long they need" className="md:grid-cols-4">
@@ -794,10 +676,7 @@ export function OfferHeaderForm({
               label="Delivery basis (Incoterm)"
               htmlFor="basis"
               error={st.errors?.basis}
-              hint={hintOf(
-                "basis",
-                s.basis ? BASIS_HINT[s.basis] : "What their prices already pay for: needed to work out freight and the like",
-              )}
+              hint={s.basis ? BASIS_HINT[s.basis] : "What their prices already pay for: needed to work out freight and the like"}
             >
               <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")}>
                 <option value="">Not said</option>
@@ -814,7 +693,6 @@ export function OfferHeaderForm({
               htmlFor="basisPlace"
               optional
               error={st.errors?.basisPlace}
-              hint={hintOf("basisPlace")}
             >
               <PortPicker id="basisPlace" value={s.basisPlace} onChange={(v) => set("basisPlace", v)} exw={s.basis === "EXW"} />
             </Field>
@@ -828,9 +706,7 @@ export function OfferHeaderForm({
               onFrom={(v) => set("leadFrom", v)}
               error={st.errors?.leadDays ?? st.errors?.leadFrom ?? st.errors?.leadTime}
               hint={
-                from("leadDays", "leadFrom") ? (
-                  FROM
-                ) : daysTyped ? (
+                daysTyped ? (
                   <>
                     Printed as “{leadWords(Number(s.leadDays) || 0, s.leadFrom, "factory")}”
                     {leadWordsWere ? `, worked out from their words “${leadWordsWere}”` : ""}
@@ -859,13 +735,11 @@ export function OfferHeaderForm({
               amounts={total}
               error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts}
             />
-            {from("parts") && <p className="text-xs text-muted sm:col-span-2 md:col-span-3">The parts are {FROM}.</p>}
             <Field
               label="Payment note"
               htmlFor="paymentTerms"
               optional
               error={st.errors?.paymentTerms}
-              hint={hintOf("paymentTerms")}
               className="sm:col-span-2 md:col-span-3"
             >
               <Input
@@ -887,9 +761,7 @@ export function OfferHeaderForm({
               onFrom={(v) => set("warrantyFrom", v)}
               onCovers={(v) => set("warranty", v)}
               errors={{ months: st.errors?.warrantyMonths, from: st.errors?.warrantyFrom, covers: st.errors?.warranty }}
-              coversHint={
-                from("warrantyMonths") ? FROM : warrantyWordsWere ? `Worked out from their words “${warrantyWordsWere}”` : undefined
-              }
+              coversHint={warrantyWordsWere ? `Worked out from their words “${warrantyWordsWere}”` : undefined}
             />
           </PanelSection>
           <PanelSection title="Conditions and their quotation">
