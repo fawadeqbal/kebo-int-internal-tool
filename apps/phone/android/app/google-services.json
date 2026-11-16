@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "250265311162",
+    "project_id": "kebo-rfq",
+    "storage_bucket": "kebo-rfq.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:250265311162:android:26f601068688c7d348af83",
+        "android_client_info": {
+          "package_name": "dev.fawadiqbal.rfqdesk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUWuBP0KpUHzs35nJqZXiQ6LYP52T7IPs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
