@@ -39,6 +39,11 @@ const amount2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits
 /** The option the lines window opens on (0 = A): the one shown on the card it was opened from. */
 export const OptionAt = createContext(0);
 
+/**
+ * "Edit lines" of a draft quotation, in the same window as an offer's lines editor: the price sheet, and at the
+ * bottom Save changes and Cancel with the totals, cost, profit and margin. Only prices are changed here; which
+ * offers are quoted, and the terms, are in the quotation's window. The whole revision is saved, as before.
+ */
 export function PriceEditor({
   action,
   initial,
@@ -56,17 +61,68 @@ export function PriceEditor({
   const [s, setS] = useState<EditorState>(() => fromDraft(initial));
   const [saved] = useState(() => JSON.stringify(fromDraft(initial)));
   const [active, setActive] = useState(Math.min(Math.max(0, initialOption), initial.options.length - 1));
-  // The box starts with the margin the options have now (not the usual one from Settings).
-  const [margin, setMargin] = useState(() => startMargin(fromDraft(initial), offers));
-  const [costsOpen, setCostsOpen] = useState(false);
-  const [paste, setPaste] = useState<string | null>(null);
-  const [chargesOpen, setChargesOpen] = useState(false);
   const dirty = JSON.stringify(s) !== saved;
   // The window asks "Throw away your changes?" only when a price really changed.
   useEffect(() => {
     reportDirty(dirty);
     return () => reportDirty(null);
   }, [dirty, reportDirty]);
+  return (
+    <PanelBody>
+    <ActionForm action={action} onDone={(state) => close(state)} className={PANEL_FORM}>
+      {(st) => (
+        <>
+          <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
+          <PriceSheet s={s} setS={setS} offers={offers} showCosts={showCosts} active={active} setActive={setActive} errors={st.errors} />
+          {/* Always in view: Save changes and Cancel as in every lines editor, then the option's money. */}
+          <PanelActions>
+            <SubmitButton size="sm" pendingText="Saving…" disabled={!dirty}>
+              Save changes
+            </SubmitButton>
+            <Button size="sm" variant="ghost" onClick={() => close()}>
+              Cancel
+            </Button>
+            <span className="text-xs text-muted max-lg:hidden">{dirty ? "Changes not saved yet" : "Nothing changed yet"}</span>
+            <PriceTotals s={s} setS={setS} offers={offers} showCosts={showCosts} active={active} />
+          </PanelActions>
+        </>
+      )}
+    </ActionForm>
+    </PanelBody>
+  );
+}
+
+/**
+ * The price sheet of a draft quotation, shared by "Edit lines" and the steps window's Lines step: the options as
+ * tabs; the open option's lines with a price box in each row (Enter goes to the next line, a column pasted from
+ * Excel fills down); the costs to reach our basis as one internal line; charges of our own; the option's lead
+ * time. Controlled: the draft's values are the caller's (`s`), so one Save sends everything.
+ */
+export function PriceSheet({
+  s,
+  setS,
+  offers,
+  showCosts,
+  active,
+  setActive,
+  errors,
+  steps = false,
+}: {
+  s: EditorState;
+  setS: React.Dispatch<React.SetStateAction<EditorState>>;
+  offers: QuoteOffers;
+  showCosts: boolean;
+  active: number;
+  setActive: (i: number) => void;
+  errors?: Record<string, string[] | string | undefined>;
+  /** In the steps window (the lead time is changed under Delivery, in the same window). */
+  steps?: boolean;
+}) {
+  // The box starts with the margin the options have now (not the usual one from Settings).
+  const [margin, setMargin] = useState(() => startMargin(s, offers));
+  const [costsOpen, setCostsOpen] = useState(false);
+  const [paste, setPaste] = useState<string | null>(null);
+  const [chargesOpen, setChargesOpen] = useState(false);
   const setOption = (i: number, patch: Partial<OptionState> | ((o: OptionState) => Partial<OptionState>)) =>
     setS((st) => ({ ...st, options: st.options.map((o, n) => (n === i ? { ...o, ...(typeof patch === "function" ? patch(o) : patch) } : o)) }));
 
@@ -83,7 +139,7 @@ export function PriceEditor({
   const opt = s.options[Math.min(active, s.options.length - 1)]!;
   const at = s.options.indexOf(opt);
   const letter = optionLetter(at);
-  const { lines, totals, costing, extra } = totalsOf(opt);
+  const { lines, totals, extra } = totalsOf(opt);
   const landed = landedUnitCosts(
     lines.map((l) => ({ unitCostMinor: l.unitCost === null ? null : toMinor(l.unitCost), quantity: numberText(l.quantity) || 0 })),
     extra.minor,
@@ -126,7 +182,8 @@ export function PriceEditor({
     const cost = landed[i] ?? null;
     const m = showCosts && cost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), cost) : null;
     const part = l.no.includes(".");
-    const second = [l.model ? `model ${l.model}` : null, opt.factoryQuoteId && l.answersNo ? `for item ${l.answersNo}` : null, offer && !part ? shortName(offer.factory.name) : null].filter(Boolean).join(" · ");
+    // Under the line: its model (the offer's name and the item it answers are said once, above the table).
+    const second = l.model ? `model ${l.model}` : "";
     return { l, i, price, cost, m, part, second };
   });
   const setPrice = (id: string, v: string) => setOption(at, (o) => ({ prices: { ...o.prices, [id]: v } }));
@@ -216,17 +273,15 @@ export function PriceEditor({
   };
 
   return (
-    <PanelBody>
-    <ActionForm action={action} onDone={(state) => close(state)} className={PANEL_FORM}>
-      {(st) => (
-        <>
-          <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
-
+    <>
           {/* The options as tabs, and the margin for everything. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div role="tablist" aria-label="Options" className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] max-sm:w-full">
-              {s.options.map(optionCard)}
-            </div>
+            {/* One option (a quotation from one offer): nothing to choose between. */}
+            {s.options.length > 1 && (
+              <div role="tablist" aria-label="Options" className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] max-sm:w-full">
+                {s.options.map(optionCard)}
+              </div>
+            )}
             {showCosts && (
               <div className="ml-auto flex items-center gap-2 max-sm:w-full">
                 <label htmlFor="price-all" className="text-xs text-text-2">
@@ -491,20 +546,72 @@ export function PriceEditor({
           <p className="text-sm">
             <span className="font-medium">Lead time{s.options.length > 1 ? ` of Option ${letter}` : ""}:</span>{" "}
             {opt.leadDays.trim() ? leadWords(Number(opt.leadDays) || 0, opt.leadFrom, "customer") : opt.leadTime || <span className="text-muted">not said</span>}
-            <span className="ml-1.5 text-xs text-muted">changed in the quotation&apos;s Edit, under Delivery</span>
+            <span className="ml-1.5 text-xs text-muted">{steps ? "changed under Delivery" : "changed in the quotation's Edit, under Delivery"}</span>
           </p>
 
-          <ErrorText error={st.errors?.options ?? st.errors?.currency} />
+          <ErrorText error={errors?.options ?? errors?.currency} />
 
-          {/* Always in view: Save changes and Cancel as in every lines editor, then the option's money. */}
-          <PanelActions>
-            <SubmitButton size="sm" pendingText="Saving…" disabled={!dirty}>
-              Save changes
-            </SubmitButton>
-            <Button size="sm" variant="ghost" onClick={() => close()}>
-              Cancel
-            </Button>
-            <span className="text-xs text-muted max-lg:hidden">{dirty ? "Changes not saved yet" : "Nothing changed yet"}</span>
+    </>
+  );
+}
+
+/** The open option's money: subtotal, the discount box, total, and (people who see costs) cost, profit and margin. */
+export function PriceTotals({
+  s,
+  setS,
+  offers,
+  showCosts,
+  active,
+  inline = false,
+}: {
+  s: EditorState;
+  setS: React.Dispatch<React.SetStateAction<EditorState>>;
+  offers: QuoteOffers;
+  showCosts: boolean;
+  active: number;
+  /** Under the sheet (the steps window) rather than in a window's footer. */
+  inline?: boolean;
+}) {
+  const currency = /^[A-Za-z]{3}$/.test(s.currency.trim()) ? s.currency.trim().toUpperCase() : "—";
+  const fmt = (minor: number) => formatMinor(minor, currency);
+  const tone = (m: number | null) => (m === null ? "text-muted" : m < 0 ? "text-bad" : m < offers.defaultMargin - 2 ? "text-warn" : "text-ok");
+  const opt = s.options[Math.min(active, s.options.length - 1)]!;
+  const at = s.options.indexOf(opt);
+  const letter = optionLetter(at);
+  const { totals, costing } = optionTotals(opt, offers, s.incoterm, currency);
+  const setOption = (i: number, patch: Partial<OptionState>) => setS((st) => ({ ...st, options: st.options.map((o, n) => (n === i ? { ...o, ...patch } : o)) }));
+  if (inline)
+    return (
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-line bg-surface-2/50 px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Fig label="Subtotal">{fmt(totals.subtotal)}</Fig>
+        <div className="flex flex-col">
+          <dt>
+            <label htmlFor={`disc-${opt.key}`} className="text-xs text-text-2">
+              Discount
+            </label>
+          </dt>
+          <dd>
+            <PriceInput id={`disc-${opt.key}`} className="h-8 w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
+          </dd>
+        </div>
+        <Fig label={s.options.length > 1 ? `Option ${letter} total` : "Total"} strong>
+          {fmt(totals.total)}
+        </Fig>
+        {showCosts && (
+          <>
+            <Fig label="Cost">{fmt(costing.costMinor)}</Fig>
+            <Fig label="Profit" className={costing.profitMinor < 0 ? "text-bad" : undefined}>
+              {fmt(costing.profitMinor)}
+            </Fig>
+            <Fig label="Margin" strong className={tone(costing.marginPercent)}>
+              {costing.marginPercent === null ? "—" : `${costing.marginPercent.toFixed(1)}%`}
+            </Fig>
+          </>
+        )}
+      </dl>
+    );
+  return (
+    <>
             <dl className="ml-auto flex flex-wrap items-end gap-x-5 gap-y-2 max-sm:hidden">
               <Fig label="Subtotal">{fmt(totals.subtotal)}</Fig>
               <div className="flex flex-col">
@@ -543,11 +650,7 @@ export function PriceEditor({
                 {showCosts && costing.marginPercent !== null ? ` · ${costing.marginPercent.toFixed(1)}%` : ""}
               </p>
             </div>
-          </PanelActions>
-        </>
-      )}
-    </ActionForm>
-    </PanelBody>
+    </>
   );
 }
 

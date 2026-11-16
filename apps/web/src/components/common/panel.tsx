@@ -174,6 +174,7 @@ export function PanelSection({
   children,
   className,
   first,
+  quiet,
 }: {
   title?: string;
   /** A few words after the title: what the section is for. */
@@ -181,11 +182,13 @@ export function PanelSection({
   children: ReactNode;
   className?: string;
   first?: boolean;
+  /** In a steps window the step's heading says what it is: the title stays for screen readers only. */
+  quiet?: boolean;
 }) {
   return (
-    <fieldset className={cn("flex min-w-0 flex-col gap-3", !first && "border-t border-line pt-5")}>
+    <fieldset className={cn("flex min-w-0 flex-col gap-3", !first && !quiet && "border-t border-line pt-5")}>
       {title && (
-        <legend className="float-left mb-1 w-full text-sm font-bold text-text">
+        <legend className={quiet ? "sr-only" : "float-left mb-1 w-full text-sm font-bold text-text"}>
           {title}
           {sub && <span className="ml-2 text-xs font-normal text-muted">{sub}</span>}
         </legend>

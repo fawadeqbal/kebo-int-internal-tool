@@ -10,11 +10,11 @@ import { date, money, companyToday } from "@/lib/format";
 import { dealOf, quotationOf } from "@/lib/deal-data";
 import type { QuotationOfDeal, QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
 import { StartRevision } from "@/components/deals/quotation-panels";
-import { TermsPanel } from "@/components/deals/quotation-step";
+import { QuoteStepsPanel } from "@/components/deals/quotation-step";
+import type { QuoteStep } from "@/components/deals/revision-editor";
 import { AnswerButton, NewQuotationsButton } from "@/components/deals/quotation-tab";
 import { checksOf, CheckChip, optionOf, QuoteLines, QuoteTerms, termsFacts } from "@/components/deals/quote-view";
 import { shortName } from "@/components/deals/offer-facts";
-import { PriceEditor } from "@/components/deals/price-editor";
 import {
   deleteRevisionAction,
   emailRevisionAction,
@@ -298,32 +298,20 @@ function QuotationOpen({
   const meta = isDraft
     ? `${sentBefore?.sentOn ? `R${sentBefore.number} sent ${date(sentBefore.sentOn)} · ` : ""}Valid until ${date(r.validUntil)}`
     : `${r.sentOn ? `${date(r.sentOn)}${r.sentVia ? ` ${SENT_VIA_TEXT[r.sentVia]}` : ""} · ` : ""}Valid until ${date(r.validUntil)}${r.status === "sent" && r.validUntil < today ? ", which has passed" : ""}`;
-  // The pencils and Edit lines open the draft's windows (the steps window comes next).
-  const termsWindow = (group: string) =>
+  // Each pencil opens the draft's steps window on its step (Lines · Delivery · Payment · Warranty & conditions).
+  const stepsWindow = (step: QuoteStep, what: string) =>
     edit ? (
       <PanelButton
         variant="ghost"
         size="xs"
         icon={<Pencil aria-hidden />}
-        label={<span className="sr-only">Edit {group}</span>}
+        label={<span className="sr-only">Edit {what}</span>}
         title={`Edit · ${x.refNo} R${r.number}`}
         description="Draft"
-        panelClassName="md:w-[860px]"
-        body={<TermsPanel number={r.number} initial={draftValues!} offers={offers!} loadOffers={loadOffers} showCosts={showCosts} action={updateRevisionAction.bind(null, dealId, r.id)} />}
+        panelClassName="md:w-[1180px]"
+        body={<QuoteStepsPanel number={r.number} initial={draftValues!} offers={offers!} loadOffers={loadOffers} showCosts={showCosts} action={updateRevisionAction.bind(null, dealId, r.id)} step={step} />}
       />
     ) : undefined;
-  const linesWindow = edit ? (
-    <PanelButton
-      variant="ghost"
-      size="xs"
-      icon={<Pencil aria-hidden />}
-      label={<span className="sr-only">Edit lines</span>}
-      title={`Edit lines · ${x.refNo} R${r.number}`}
-      description="Type a price, Enter goes to the next line. A column copied from Excel fills the lines below."
-      panelClassName="md:w-[1180px]"
-      body={<PriceEditor key={r.id} action={updateRevisionAction.bind(null, dealId, r.id)} initial={draftValues!} offers={offers!} showCosts={showCosts} />}
-    />
-  ) : null;
   const canAnswer = r.status === "sent" && r.canAnswer && manage;
   const o = optionOf(r);
   return (
@@ -420,7 +408,7 @@ function QuotationOpen({
         <h3 className="flex min-h-7 items-center gap-2 text-[15px] font-semibold">
           Lines
           {o && o.factory && <span className="text-xs font-normal text-text-2">{shortName(o.factory.name)}</span>}
-          <span className="ml-auto">{linesWindow}</span>
+          <span className="ml-auto">{stepsWindow("lines", "lines")}</span>
         </h3>
         <QuoteLines r={r} />
       </section>
@@ -430,7 +418,7 @@ function QuotationOpen({
         <QuoteTerms
           r={r}
           showChecks={showCosts}
-          edit={edit ? (g) => termsWindow(g === "delivery" ? "delivery" : g === "payment" ? "payment" : "warranty and conditions") : undefined}
+          edit={edit ? (g) => stepsWindow(g, g === "warranty" ? "warranty and conditions" : g) : undefined}
         />
       </section>
     </section>
