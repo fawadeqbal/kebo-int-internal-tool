@@ -16,7 +16,7 @@ import { money, qty } from "@/lib/format";
 import type { OptionView, QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
 import { shortName } from "./offer-facts";
 import { OptionAt } from "./price-editor";
-import { CostingBox, RevisionEditor } from "./revision-editor";
+import { CostingBox, RevisionEditor, type QuoteStep } from "./revision-editor";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -72,6 +72,47 @@ export function TermsPanel({
           close(state);
           onSaved?.();
         }}
+        onCancel={() => close()}
+      />
+    </PanelBody>
+  );
+}
+
+/**
+ * The draft's steps window (design "one way, any number"): Lines · Delivery · Payment · Warranty & conditions,
+ * opened on the step whose pencil was tapped; one Save sends every step.
+ */
+export function QuoteStepsPanel({
+  number,
+  initial,
+  offers,
+  loadOffers,
+  showCosts,
+  action,
+  step,
+}: {
+  number: number;
+  initial: RevisionDraft;
+  offers: QuoteOffers;
+  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  showCosts: boolean;
+  action: Action;
+  step: QuoteStep;
+}) {
+  const close = useClosePanel();
+  return (
+    <PanelBody className="p-0 sm:px-0">
+      <RevisionEditor
+        action={action}
+        number={number}
+        initial={initial}
+        offers={offers}
+        loadOffers={loadOffers}
+        showCosts={showCosts}
+        submitLabel="Save"
+        requireChanges
+        stepsAt={step}
+        onDone={(state) => close(state)}
         onCancel={() => close()}
       />
     </PanelBody>

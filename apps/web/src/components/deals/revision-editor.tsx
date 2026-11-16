@@ -46,6 +46,8 @@ import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { PANEL_FORM, PanelFooter, PanelSection } from "@/components/common/panel";
+import { StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
+import { PriceSheet, PriceTotals } from "./price-editor";
 import { shortName } from "./offer-facts";
 import {
   CheckNote,
@@ -64,6 +66,29 @@ import {
 } from "./terms-fields";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
+
+/** The steps of a quotation's window (design "one way, any number"). */
+export type QuoteStep = "lines" | "delivery" | "payment" | "warranty";
+export const QUOTE_STEPS: { key: QuoteStep; label: string }[] = [
+  { key: "lines", label: "Lines" },
+  { key: "delivery", label: "Delivery" },
+  { key: "payment", label: "Payment" },
+  { key: "warranty", label: "Warranty & conditions" },
+];
+/** The form's sections, and the step each is on (the offers to quote are not a step). */
+type Section = "options" | "quotation" | "delivery" | "payment" | "warranty" | "conditions";
+const SECTION_STEP: Record<Section, QuoteStep | null> = { options: null, quotation: "lines", delivery: "delivery", payment: "payment", warranty: "warranty", conditions: "warranty" };
+const ROUTE_SHORT: Record<PaymentRoute, string> = { informal: "informal", bank_contract: "bank", letter_of_credit: "LC" };
+
+/** A step's check on the right of its heading: a few words (the whole sentence is in the step, and on hover). */
+function StepChip({ ok, title, children }: { ok: boolean; title?: string; children: ReactNode }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-[13px] font-semibold", ok ? "text-ok" : "text-warn")} title={title}>
+      {ok ? <CheckCircle2 className="size-4 shrink-0" aria-hidden /> : <AlertTriangle className="size-4 shrink-0" aria-hidden />}
+      {children}
+    </span>
+  );
+}
 
 export interface ChargeState {
   key: string;
@@ -415,7 +440,10 @@ export function RevisionEditor({
   onCancel,
   tickAll = false,
   footNote,
+  stepsAt,
 }: {
+  /** In the steps window (design "one way, any number"): the step it opens on; one Save sends every step. */
+  stepsAt?: QuoteStep;
   /** The window of a first revision: every factory offer that has lines starts ticked. */
   tickAll?: boolean;
   /** The window's footer, on the left ("Once sent, a change needs a new revision."). */
@@ -452,6 +480,11 @@ export function RevisionEditor({
   /** The margin every ticked offer was last priced at from the box in this window (said under it). */
   const [pricedAt, setPricedAt] = useState<number | null>(null);
   const [partsTried, setPartsTried] = useState(false);
+  const [step, setStep] = useState<QuoteStep | null>(stepsAt ?? null);
+  const [active, setActive] = useState(0);
+  // Which sections each step holds (the offers to quote are not a step: a quotation is one offer's).
+  const show = (section: Section) => !step || (section !== "options" && SECTION_STEP[section] === step);
+  const stepAt = step ? QUOTE_STEPS.findIndex((x) => x.key === step) : 0;
   const dirty = JSON.stringify(s) !== saved;
   const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => setS((st) => ({ ...st, [k]: v }));
   const setOption = (key: string, patch: Partial<OptionState>) =>
@@ -579,6 +612,49 @@ export function RevisionEditor({
   const totalsText = s.options.map((o, i) => `${many ? `${optionLetter(i)} ` : ""}${fmt(totalsOf(o).totals.total)}`).join(" · ");
   const presets = s.paymentRoute === "letter_of_credit" ? [...CUSTOMER_PRESETS, LC_PRESET] : CUSTOMER_PRESETS;
 
+  /* ---- the steps window: each step with what it holds, and its check against the factory */
+  const shown = s.options[Math.min(active, s.options.length - 1)]!;
+  const shownTotals = totalsOf(shown);
+  const stepsInfo: StepInfo<QuoteStep>[] = QUOTE_STEPS.map(({ key, label }) => {
+    if (key === "lines") {
+      const n = shownTotals.lines.length;
+      const priced = shownTotals.lines.every((l) => valid(shown.prices[l.id] ?? "") && Number(numberText(shown.prices[l.id]!)) > 0);
+      return { key, label, summary: `${n} line${n === 1 ? "" : "s"} · ${fmt(shownTotals.totals.total)}`, done: n > 0 && priced };
+    }
+    if (key === "delivery") {
+      const lead = shown.leadDays.trim() ? `${shown.leadDays.trim()} days` : shown.leadTime.trim() || null;
+      return { key, label, summary: [`${s.incoterm}${s.incotermPlace.trim() ? ` ${s.incotermPlace.trim()}` : ""}`, lead].filter(Boolean).join(" · "), done: !!lead };
+    }
+    if (key === "payment")
+      return {
+        key,
+        label,
+        summary: [s.parts.map((x) => `${x.share || "0"}%`).join(" · "), s.paymentRoute ? ROUTE_SHORT[s.paymentRoute] : null].filter(Boolean).join(" · "),
+        done: !partsBad,
+      };
+    return {
+      key,
+      label,
+      summary: [s.warrantyMonths.trim() ? `${s.warrantyMonths.trim()} months` : s.warranty.trim() ? "words only" : "none", s.notes.trim() ? "notes" : null].filter(Boolean).join(" · "),
+      done: !!(s.warrantyMonths.trim() || s.warranty.trim()),
+    };
+  });
+  const stepCheck = (k: QuoteStep): ReactNode => {
+    if (k === "lines") {
+      const m = showCosts ? shownTotals.costing.marginPercent : null;
+      return m === null ? null : <StepChip ok={m >= 0}>Margin {m.toFixed(1)}%</StepChip>;
+    }
+    const theirs = theirsOf(shown);
+    if (!theirs) return null;
+    const ours = oursOf(shown);
+    const c = k === "delivery" ? leadCheck(ours, theirs) : k === "payment" ? paymentCheck(ours, theirs) : warrantyCheck(ours, theirs);
+    return c ? (
+      <StepChip ok={c.ok} title={c.text}>
+        {c.word}
+      </StepChip>
+    ) : null;
+  };
+
   return (
     <ActionForm
       action={action}
@@ -589,357 +665,398 @@ export function RevisionEditor({
       beforeSend={() => {
         if (!partsBad) return true;
         setPartsTried(true);
+        if (step) setStep("payment");
         document.getElementById(`parts-${number}`)?.scrollIntoView?.({ block: "center" });
         return false;
       }}
       className={PANEL_FORM}
     >
-      {(st) => (
-        <>
-          <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
-
-          <PanelSection title="Options: which offers to quote" first className="sm:grid-cols-1">
-            <ul className="flex flex-col divide-y divide-line rounded-xl border border-line" aria-label="Factory offers">
-              {listed.map((off) => {
-                const i = s.options.findIndex((o) => o.factoryQuoteId === off.factoryQuoteId);
-                const on = i >= 0;
-                const t = on ? totalsOf(s.options[i]!) : null;
-                const none = off.lines.length === 0;
-                const last = on && s.options.length === 1;
-                const facts = [
-                  none
-                    ? "No lines yet: add its lines on Factory offers to quote it"
-                    : off.coverage.missing.length
-                      ? `Does not include item ${off.coverage.missing.join(", ")}`
-                      : "Covers every item",
-                  off.leadTime,
-                  showCosts && off.totalCost ? `cost ${formatMinor(toMinor(off.totalCost), currency)}` : null,
-                  showCosts && t && t.costing.marginPercent !== null ? `margin ${t.costing.marginPercent.toFixed(1)}%` : null,
-                ].filter(Boolean);
-                return (
-                  <li key={off.factoryQuoteId}>
-                    <label
-                      className={cn("flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm", none && "cursor-default opacity-60")}
-                      title={last ? "A quotation keeps at least one option" : undefined}
-                    >
+      {(st) => {
+        const sections = (
+          <>
+            {show("options") && (
+            <PanelSection quiet={!!step} title="Options: which offers to quote" first className="sm:grid-cols-1">
+              <ul className="flex flex-col divide-y divide-line rounded-xl border border-line" aria-label="Factory offers">
+                {listed.map((off) => {
+                  const i = s.options.findIndex((o) => o.factoryQuoteId === off.factoryQuoteId);
+                  const on = i >= 0;
+                  const t = on ? totalsOf(s.options[i]!) : null;
+                  const none = off.lines.length === 0;
+                  const last = on && s.options.length === 1;
+                  const facts = [
+                    none
+                      ? "No lines yet: add its lines on Factory offers to quote it"
+                      : off.coverage.missing.length
+                        ? `Does not include item ${off.coverage.missing.join(", ")}`
+                        : "Covers every item",
+                    off.leadTime,
+                    showCosts && off.totalCost ? `cost ${formatMinor(toMinor(off.totalCost), currency)}` : null,
+                    showCosts && t && t.costing.marginPercent !== null ? `margin ${t.costing.marginPercent.toFixed(1)}%` : null,
+                  ].filter(Boolean);
+                  return (
+                    <li key={off.factoryQuoteId}>
+                      <label
+                        className={cn("flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm", none && "cursor-default opacity-60")}
+                        title={last ? "A quotation keeps at least one option" : undefined}
+                      >
+                        <input
+                          type="checkbox"
+                          className="size-[18px] shrink-0 accent-primary"
+                          checked={on}
+                          disabled={none || last}
+                          onChange={() =>
+                            on
+                              ? setS((x) => ({ ...x, options: x.options.filter((o) => o.factoryQuoteId !== off.factoryQuoteId) }))
+                              : addOption(off.factoryQuoteId)
+                          }
+                        />
+                        <span className="w-4 shrink-0 font-bold">{on ? optionLetter(i) : ""}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-semibold">{off.factory.name}</span>
+                          <span className="block text-xs text-text-2">{facts.join(" · ")}</span>
+                        </span>
+                        <span className="shrink-0 font-semibold tabular">{t ? fmt(t.totals.total) : "—"}</span>
+                      </label>
+                    </li>
+                  );
+                })}
+                {(s.options.some((o) => o.factoryQuoteId === null) || offers.offers.length === 0) && (
+                  <li>
+                    <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm">
                       <input
                         type="checkbox"
                         className="size-[18px] shrink-0 accent-primary"
-                        checked={on}
-                        disabled={none || last}
+                        checked={s.options.some((o) => o.factoryQuoteId === null)}
+                        disabled={s.options.length === 1 && s.options[0]!.factoryQuoteId === null}
                         onChange={() =>
-                          on
-                            ? setS((x) => ({ ...x, options: x.options.filter((o) => o.factoryQuoteId !== off.factoryQuoteId) }))
-                            : addOption(off.factoryQuoteId)
+                          s.options.some((o) => o.factoryQuoteId === null)
+                            ? setS((x) => ({ ...x, options: x.options.filter((o) => o.factoryQuoteId !== null) }))
+                            : addOption(null)
                         }
                       />
-                      <span className="w-4 shrink-0 font-bold">{on ? optionLetter(i) : ""}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold">{off.factory.name}</span>
-                        <span className="block text-xs text-text-2">{facts.join(" · ")}</span>
+                      <span className="w-4 shrink-0 font-bold">
+                        {s.options.some((o) => o.factoryQuoteId === null)
+                          ? optionLetter(s.options.findIndex((o) => o.factoryQuoteId === null))
+                          : ""}
                       </span>
-                      <span className="shrink-0 font-semibold tabular">{t ? fmt(t.totals.total) : "—"}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold">The customer&rsquo;s items, priced by hand</span>
+                        <span className="block text-xs text-text-2">No factory prices: the items as the customer asked for them</span>
+                      </span>
                     </label>
                   </li>
-                );
-              })}
-              {(s.options.some((o) => o.factoryQuoteId === null) || offers.offers.length === 0) && (
-                <li>
-                  <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      className="size-[18px] shrink-0 accent-primary"
-                      checked={s.options.some((o) => o.factoryQuoteId === null)}
-                      disabled={s.options.length === 1 && s.options[0]!.factoryQuoteId === null}
-                      onChange={() =>
-                        s.options.some((o) => o.factoryQuoteId === null)
-                          ? setS((x) => ({ ...x, options: x.options.filter((o) => o.factoryQuoteId !== null) }))
-                          : addOption(null)
-                      }
-                    />
-                    <span className="w-4 shrink-0 font-bold">
-                      {s.options.some((o) => o.factoryQuoteId === null)
-                        ? optionLetter(s.options.findIndex((o) => o.factoryQuoteId === null))
-                        : ""}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-semibold">The customer&rsquo;s items, priced by hand</span>
-                      <span className="block text-xs text-text-2">No factory prices: the items as the customer asked for them</span>
-                    </span>
-                  </label>
-                </li>
-              )}
-            </ul>
-            {showCosts && (
-              <div className="flex flex-col gap-1 text-[13px] text-text-2">
-                <p className="flex flex-wrap items-center gap-2">
-                  <label htmlFor={`margin-${number}`}>Price every ticked offer at</label>
-                  <Input
-                    id={`margin-${number}`}
-                    inputMode="decimal"
-                    className="h-9 w-16 text-right tabular"
-                    value={margin}
-                    onChange={(e) => priceEveryOffer(e.target.value)}
-                  />
-                  <span>% on our cost. Each price can be changed after, in Edit lines.</span>
-                </p>
-                {pricedAt !== null && marginOk && (
-                  <p role="status" className="text-text">
-                    {s.options.length === 1 ? "The offer is" : `All ${s.options.length} offers are`} priced at {pricedAt}% now: the totals
-                    above are the new ones. Prices typed by hand before are replaced when you save.
-                  </p>
                 )}
-                {!marginOk && margin.trim() !== "" && <p className="text-bad">Type a margin from 0 to 99.</p>}
-              </div>
-            )}
-            {initial.options
-              .map((o, i) => ({ o, i }))
-              .filter(({ o }) => requireChanges && !s.options.some((x) => x.factoryQuoteId === o.factoryQuoteId))
-              .map(({ o, i }) => (
-                <p key={o.factoryQuoteId ?? "items"} className="rounded-lg bg-warn-soft/60 px-3 py-2 text-[13px]">
-                  Option {optionLetter(i)}
-                  {o.factoryQuoteId
-                    ? ` (${offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.factory.name ?? "its offer"})`
-                    : ""}{" "}
-                  and the prices you set for it will be removed when you save.
-                </p>
-              ))}
-            <ErrorText error={st.errors?.options} />
-          </PanelSection>
-
-          <PanelSection title="The quotation">
-            <Field
-              label="Currency"
-              htmlFor={`cur-${number}`}
-              error={st.errors?.currency}
-              hint={
-                converted ? (
-                  <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span>
-                ) : fromCustomer ? (
-                  `${initial.from?.customer ?? "The customer"} is quoted in ${initial.currency} (from the customer)`
-                ) : (
-                  "Changing it converts the prices"
-                )
-              }
-            >
-              <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
-            </Field>
-            <Field label="Valid until" htmlFor={`valid-${number}`} error={st.errors?.validUntil}>
-              <Input id={`valid-${number}`} type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
-            </Field>
-          </PanelSection>
-
-          <PanelSection title="Delivery" sub="where we hand the goods over, and when" className="md:grid-cols-3">
-            <Field
-              label="Delivery basis (Incoterm)"
-              htmlFor={`inco-${number}`}
-              error={st.errors?.incoterm}
-              hint={fromLast && s.incoterm === initial.incoterm ? lastWords : undefined}
-            >
-              <Select id={`inco-${number}`} value={s.incoterm} onChange={(e) => set("incoterm", e.target.value as Incoterm)}>
-                {INCOTERMS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
+              </ul>
+              {showCosts && (
+                <div className="flex flex-col gap-1 text-[13px] text-text-2">
+                  <p className="flex flex-wrap items-center gap-2">
+                    <label htmlFor={`margin-${number}`}>Price every ticked offer at</label>
+                    <Input
+                      id={`margin-${number}`}
+                      inputMode="decimal"
+                      className="h-9 w-16 text-right tabular"
+                      value={margin}
+                      onChange={(e) => priceEveryOffer(e.target.value)}
+                    />
+                    <span>% on our cost. Each price can be changed after, in Edit lines.</span>
+                  </p>
+                  {pricedAt !== null && marginOk && (
+                    <p role="status" className="text-text">
+                      {s.options.length === 1 ? "The offer is" : `All ${s.options.length} offers are`} priced at {pricedAt}% now: the totals
+                      above are the new ones. Prices typed by hand before are replaced when you save.
+                    </p>
+                  )}
+                  {!marginOk && margin.trim() !== "" && <p className="text-bad">Type a margin from 0 to 99.</p>}
+                </div>
+              )}
+              {initial.options
+                .map((o, i) => ({ o, i }))
+                .filter(({ o }) => requireChanges && !s.options.some((x) => x.factoryQuoteId === o.factoryQuoteId))
+                .map(({ o, i }) => (
+                  <p key={o.factoryQuoteId ?? "items"} className="rounded-lg bg-warn-soft/60 px-3 py-2 text-[13px]">
+                    Option {optionLetter(i)}
+                    {o.factoryQuoteId
+                      ? ` (${offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.factory.name ?? "its offer"})`
+                      : ""}{" "}
+                    and the prices you set for it will be removed when you save.
+                  </p>
                 ))}
-              </Select>
-            </Field>
-            <Field
-              label="Place"
-              htmlFor={`place-${number}`}
-              optional
-              error={st.errors?.incotermPlace}
-              hint={
-                fromLast && initial.incotermPlace && s.incotermPlace === initial.incotermPlace
-                  ? lastWords
-                  : (sharedPlace ?? "The port or place for the Incoterm")
-              }
-            >
-              <Input
-                id={`place-${number}`}
-                value={s.incotermPlace}
-                maxLength={80}
-                placeholder="e.g. Qingdao"
-                onChange={(e) => set("incotermPlace", e.target.value)}
-              />
-            </Field>
-            <Field
-              label="Port of discharge"
-              htmlFor={`pod-${number}`}
-              optional
-              error={st.errors?.portOfDischarge}
-              hint="Where the goods go; printed on the quotation"
-            >
-              <Input
-                id={`pod-${number}`}
-                value={s.portOfDischarge}
-                maxLength={80}
-                placeholder="e.g. Karachi"
-                onChange={(e) => set("portOfDischarge", e.target.value)}
-              />
-            </Field>
-            <div className="sm:col-span-2 md:col-span-3">
-              <table className="w-full border-collapse text-sm" aria-label="Lead time of each option">
-                <thead>
-                  <tr className="text-left text-xs text-text-2">
-                    <th className="pb-1.5 font-medium max-md:hidden">Option</th>
-                    <th className="pb-1.5 font-medium">Lead time we promise</th>
-                    <th className="pb-1.5 font-medium max-md:hidden">{showCosts ? "The factory gives" : ""}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {s.options.map((o, i) => {
-                    const theirs = theirsOf(o);
-                    const check = theirs ? leadCheck(oursOf(o), theirs) : null;
-                    const off = offerOf(o);
-                    const was = opened.leadWords[o.key];
-                    const days = o.leadDays.trim() !== "";
-                    return (
-                      <tr key={o.key} className="border-t border-line align-top">
-                        <th scope="row" className="py-2 pr-3 text-left font-semibold max-md:hidden md:whitespace-nowrap">
-                          {optionLetter(i)} · {nameOf(o)}
-                        </th>
-                        <td className="py-2 md:pr-3">
-                          <p className="mb-1 text-sm font-semibold md:hidden">
-                            {optionLetter(i)} · {nameOf(o)}
-                          </p>
-                          <LeadInputs
-                            id={`lead-${o.key}`}
-                            daysLabel={`Option ${optionLetter(i)} lead time`}
-                            side="customer"
-                            days={o.leadDays}
-                            from={o.leadFrom}
-                            onDays={(v) => setOption(o.key, { leadDays: v })}
-                            onFrom={(v) => setOption(o.key, { leadFrom: v })}
-                          />
-                          <p className="mt-1 text-xs text-muted">
-                            {days
-                              ? `Printed as “${leadWords(Number(o.leadDays) || 0, o.leadFrom, "customer")}”${was ? `, worked out from “${was}”` : ""}`
-                              : o.leadTime
-                                ? `Its words: “${o.leadTime}”, kept until you type the days.`
-                                : "So the ship-by date can be worked out"}
-                          </p>
-                          {check && (
-                            <CheckNote ok={check.ok} className="mt-1.5 md:hidden">
-                              {check.text}
-                            </CheckNote>
-                          )}
-                        </td>
-                        <td className="py-2 max-md:hidden">
-                          {check ? (
-                            <CheckNote ok={check.ok}>{check.text}</CheckNote>
-                          ) : off && showCosts ? (
-                            <span className="text-xs text-muted">
-                              {off.leadTime ? `Their words: “${off.leadTime}”` : "Their lead time is not said"}
-                            </span>
-                          ) : null}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <ErrorText error={st.errors?.leadDays ?? st.errors?.leadFrom} />
-            </div>
-            <Field
-              label="Delivery conditions"
-              htmlFor={`del-terms-${number}`}
-              optional
-              error={st.errors?.deliveryTerms}
-              hint="Printed under the delivery time"
-              className="sm:col-span-2 md:col-span-3"
-            >
-              <Textarea
-                id={`del-terms-${number}`}
-                rows={2}
-                className="min-h-0"
-                placeholder="e.g. Export wooden cases; inspection before shipment"
-                value={s.deliveryTerms}
-                onChange={(e) => set("deliveryTerms", e.target.value)}
-              />
-            </Field>
-          </PanelSection>
-
-          <PanelSection title="Payment" sub="the plan the order starts with" className="md:grid-cols-3">
-            <RouteChoice idPrefix={`route-${number}`} value={s.paymentRoute} onChange={(v) => set("paymentRoute", v)} />
-            <PartsField
-              id={`parts-${number}`}
-              idPrefix={`part-${number}`}
-              side="customer"
-              rows={s.parts}
-              onChange={(rows) => set("parts", rows)}
-              presets={presets}
-              amounts={totalsText}
-              error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts ?? st.errors?.depositPercent}
-            />
-            {checksOf("payment").map((c) => (
-              <CheckNote key={c.key} ok={c.ok} className="sm:col-span-2 md:col-span-3">
-                {c.text}
-              </CheckNote>
-            ))}
-            <Field
-              label="Payment conditions"
-              htmlFor={`pay-terms-${number}`}
-              optional
-              error={st.errors?.paymentTerms}
-              hint="The parts print by themselves; this is printed after them"
-              className="sm:col-span-2 md:col-span-3"
-            >
-              <Textarea
-                id={`pay-terms-${number}`}
-                rows={2}
-                className="min-h-0"
-                placeholder="e.g. Bank charges outside China are for the buyer"
-                value={s.paymentTerms}
-                onChange={(e) => set("paymentTerms", e.target.value)}
-              />
-            </Field>
-          </PanelSection>
-
-          <PanelSection title="Warranty" className="md:grid-cols-3">
-            <WarrantyFields
-              idPrefix={`q${number}`}
-              months={s.warrantyMonths}
-              from={s.warrantyFrom}
-              covers={s.warranty}
-              onMonths={(v) => set("warrantyMonths", v)}
-              onFrom={(v) => set("warrantyFrom", v)}
-              onCovers={(v) => set("warranty", v)}
-              errors={{ months: st.errors?.warrantyMonths, from: st.errors?.warrantyFrom, covers: st.errors?.warranty }}
-              coversHint={opened.warrantyWords ? `Worked out from “${opened.warrantyWords}”` : undefined}
-            />
-            {checksOf("warranty").map((c) => (
-              <CheckNote key={c.key} ok={c.ok} className="sm:col-span-2 md:col-span-3">
-                {c.text}
-              </CheckNote>
-            ))}
-          </PanelSection>
-
-          <PanelSection title="Conditions" className="sm:grid-cols-1">
-            <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last">
-              <Textarea
-                id={`notes-${number}`}
-                rows={3}
-                className="min-h-0"
-                placeholder="Prices include export wooden cases and loading at the port…"
-                value={s.notes}
-                onChange={(e) => set("notes", e.target.value)}
-              />
-            </Field>
-          </PanelSection>
-
-          <PanelFooter start={footNote}>
-            {onCancel && (
-              <Button type="button" variant="ghost" onClick={onCancel}>
-                Cancel
-              </Button>
+              <ErrorText error={st.errors?.options} />
+            </PanelSection>
             )}
-            <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
-              <Check aria-hidden /> {submitLabel}
-            </SubmitButton>
-          </PanelFooter>
-        </>
-      )}
+            {show("quotation") && (
+            <PanelSection quiet={!!step} title="The quotation">
+              <Field
+                label="Currency"
+                htmlFor={`cur-${number}`}
+                error={st.errors?.currency}
+                hint={
+                  converted ? (
+                    <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span>
+                  ) : fromCustomer ? (
+                    `${initial.from?.customer ?? "The customer"} is quoted in ${initial.currency} (from the customer)`
+                  ) : (
+                    "Changing it converts the prices"
+                  )
+                }
+              >
+                <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
+              </Field>
+              <Field label="Valid until" htmlFor={`valid-${number}`} error={st.errors?.validUntil}>
+                <Input id={`valid-${number}`} type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
+              </Field>
+            </PanelSection>
+            )}
+            {step === "lines" && (
+              <>
+                <PriceSheet s={s} setS={setS} offers={offers} showCosts={showCosts} active={active} setActive={setActive} errors={st.errors} steps />
+                <PriceTotals s={s} setS={setS} offers={offers} showCosts={showCosts} active={active} inline />
+              </>
+            )}
+            {show("delivery") && (
+            <PanelSection quiet={!!step} title="Delivery" sub="where we hand the goods over, and when" className="md:grid-cols-3">
+              <Field
+                label="Delivery basis (Incoterm)"
+                htmlFor={`inco-${number}`}
+                error={st.errors?.incoterm}
+                hint={fromLast && s.incoterm === initial.incoterm ? lastWords : undefined}
+              >
+                <Select id={`inco-${number}`} value={s.incoterm} onChange={(e) => set("incoterm", e.target.value as Incoterm)}>
+                  {INCOTERMS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field
+                label="Place"
+                htmlFor={`place-${number}`}
+                optional
+                error={st.errors?.incotermPlace}
+                hint={
+                  fromLast && initial.incotermPlace && s.incotermPlace === initial.incotermPlace
+                    ? lastWords
+                    : (sharedPlace ?? "The port or place for the Incoterm")
+                }
+              >
+                <Input
+                  id={`place-${number}`}
+                  value={s.incotermPlace}
+                  maxLength={80}
+                  placeholder="e.g. Qingdao"
+                  onChange={(e) => set("incotermPlace", e.target.value)}
+                />
+              </Field>
+              <Field
+                label="Port of discharge"
+                htmlFor={`pod-${number}`}
+                optional
+                error={st.errors?.portOfDischarge}
+                hint="Where the goods go; printed on the quotation"
+              >
+                <Input
+                  id={`pod-${number}`}
+                  value={s.portOfDischarge}
+                  maxLength={80}
+                  placeholder="e.g. Karachi"
+                  onChange={(e) => set("portOfDischarge", e.target.value)}
+                />
+              </Field>
+              <div className="sm:col-span-2 md:col-span-3">
+                <table className="w-full border-collapse text-sm" aria-label="Lead time of each option">
+                  <thead>
+                    <tr className="text-left text-xs text-text-2">
+                      <th className="pb-1.5 font-medium max-md:hidden">Option</th>
+                      <th className="pb-1.5 font-medium">Lead time we promise</th>
+                      <th className="pb-1.5 font-medium max-md:hidden">{showCosts ? "The factory gives" : ""}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {s.options.map((o, i) => {
+                      const theirs = theirsOf(o);
+                      const check = theirs ? leadCheck(oursOf(o), theirs) : null;
+                      const off = offerOf(o);
+                      const was = opened.leadWords[o.key];
+                      const days = o.leadDays.trim() !== "";
+                      return (
+                        <tr key={o.key} className="border-t border-line align-top">
+                          <th scope="row" className="py-2 pr-3 text-left font-semibold max-md:hidden md:whitespace-nowrap">
+                            {optionLetter(i)} · {nameOf(o)}
+                          </th>
+                          <td className="py-2 md:pr-3">
+                            <p className="mb-1 text-sm font-semibold md:hidden">
+                              {optionLetter(i)} · {nameOf(o)}
+                            </p>
+                            <LeadInputs
+                              id={`lead-${o.key}`}
+                              daysLabel={`Option ${optionLetter(i)} lead time`}
+                              side="customer"
+                              days={o.leadDays}
+                              from={o.leadFrom}
+                              onDays={(v) => setOption(o.key, { leadDays: v })}
+                              onFrom={(v) => setOption(o.key, { leadFrom: v })}
+                            />
+                            <p className="mt-1 text-xs text-muted">
+                              {days
+                                ? `Printed as “${leadWords(Number(o.leadDays) || 0, o.leadFrom, "customer")}”${was ? `, worked out from “${was}”` : ""}`
+                                : o.leadTime
+                                  ? `Its words: “${o.leadTime}”, kept until you type the days.`
+                                  : "So the ship-by date can be worked out"}
+                            </p>
+                            {check && (
+                              <CheckNote ok={check.ok} className="mt-1.5 md:hidden">
+                                {check.text}
+                              </CheckNote>
+                            )}
+                          </td>
+                          <td className="py-2 max-md:hidden">
+                            {check ? (
+                              <CheckNote ok={check.ok}>{check.text}</CheckNote>
+                            ) : off && showCosts ? (
+                              <span className="text-xs text-muted">
+                                {off.leadTime ? `Their words: “${off.leadTime}”` : "Their lead time is not said"}
+                              </span>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <ErrorText error={st.errors?.leadDays ?? st.errors?.leadFrom} />
+              </div>
+              <Field
+                label="Delivery conditions"
+                htmlFor={`del-terms-${number}`}
+                optional
+                error={st.errors?.deliveryTerms}
+                hint="Printed under the delivery time"
+                className="sm:col-span-2 md:col-span-3"
+              >
+                <Textarea
+                  id={`del-terms-${number}`}
+                  rows={2}
+                  className="min-h-0"
+                  placeholder="e.g. Export wooden cases; inspection before shipment"
+                  value={s.deliveryTerms}
+                  onChange={(e) => set("deliveryTerms", e.target.value)}
+                />
+              </Field>
+            </PanelSection>
+            )}
+            {show("payment") && (
+            <PanelSection quiet={!!step} title="Payment" sub="the plan the order starts with" className="md:grid-cols-3">
+              <RouteChoice idPrefix={`route-${number}`} value={s.paymentRoute} onChange={(v) => set("paymentRoute", v)} />
+              <PartsField
+                id={`parts-${number}`}
+                idPrefix={`part-${number}`}
+                side="customer"
+                rows={s.parts}
+                onChange={(rows) => set("parts", rows)}
+                presets={presets}
+                amounts={totalsText}
+                error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts ?? st.errors?.depositPercent}
+              />
+              {checksOf("payment").map((c) => (
+                <CheckNote key={c.key} ok={c.ok} className="sm:col-span-2 md:col-span-3">
+                  {c.text}
+                </CheckNote>
+              ))}
+              <Field
+                label="Payment conditions"
+                htmlFor={`pay-terms-${number}`}
+                optional
+                error={st.errors?.paymentTerms}
+                hint="The parts print by themselves; this is printed after them"
+                className="sm:col-span-2 md:col-span-3"
+              >
+                <Textarea
+                  id={`pay-terms-${number}`}
+                  rows={2}
+                  className="min-h-0"
+                  placeholder="e.g. Bank charges outside China are for the buyer"
+                  value={s.paymentTerms}
+                  onChange={(e) => set("paymentTerms", e.target.value)}
+                />
+              </Field>
+            </PanelSection>
+            )}
+            {show("warranty") && (
+            <PanelSection quiet={!!step} title="Warranty" className="md:grid-cols-3">
+              <WarrantyFields
+                idPrefix={`q${number}`}
+                months={s.warrantyMonths}
+                from={s.warrantyFrom}
+                covers={s.warranty}
+                onMonths={(v) => set("warrantyMonths", v)}
+                onFrom={(v) => set("warrantyFrom", v)}
+                onCovers={(v) => set("warranty", v)}
+                errors={{ months: st.errors?.warrantyMonths, from: st.errors?.warrantyFrom, covers: st.errors?.warranty }}
+                coversHint={opened.warrantyWords ? `Worked out from “${opened.warrantyWords}”` : undefined}
+              />
+              {checksOf("warranty").map((c) => (
+                <CheckNote key={c.key} ok={c.ok} className="sm:col-span-2 md:col-span-3">
+                  {c.text}
+                </CheckNote>
+              ))}
+            </PanelSection>
+            )}
+            {show("conditions") && (
+            <PanelSection quiet={!!step} title="Conditions" className="sm:grid-cols-1">
+              <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last">
+                <Textarea
+                  id={`notes-${number}`}
+                  rows={3}
+                  className="min-h-0"
+                  placeholder="Prices include export wooden cases and loading at the port…"
+                  value={s.notes}
+                  onChange={(e) => set("notes", e.target.value)}
+                />
+              </Field>
+            </PanelSection>
+            )}
+          </>
+        );
+        return (
+          <>
+            <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
+            {step ? (
+              <StepsFrame
+                steps={stepsInfo}
+                at={step}
+                onGo={setStep}
+                heading={stepCheck(step)}
+                footer={
+                  <StepsFooter
+                    first={stepAt === 0}
+                    last={stepAt === QUOTE_STEPS.length - 1}
+                    onBack={() => setStep(QUOTE_STEPS[Math.max(0, stepAt - 1)]!.key)}
+                    onNext={() => setStep(QUOTE_STEPS[Math.min(QUOTE_STEPS.length - 1, stepAt + 1)]!.key)}
+                    canSave={!requireChanges || dirty}
+                  />
+                }
+              >
+                {sections}
+              </StepsFrame>
+            ) : (
+              <>
+                {sections}
+              <PanelFooter start={footNote}>
+                {onCancel && (
+                  <Button type="button" variant="ghost" onClick={onCancel}>
+                    Cancel
+                  </Button>
+                )}
+                <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
+                  <Check aria-hidden /> {submitLabel}
+                </SubmitButton>
+              </PanelFooter>
+              </>
+            )}
+          </>
+        );
+      }}
     </ActionForm>
   );
 }
