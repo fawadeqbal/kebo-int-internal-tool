@@ -156,6 +156,15 @@ describe("the factory's side starts from its offer", () => {
     expect(lead?.changes).toEqual([{ field: "leadTime", from: "30 days after the advance", to: "35 days after the advance" }]);
   });
 
+  it("ordered from the factory by its day (no purchase order sent one by one): what was agreed is kept too", async () => {
+    const id = await accepted(THREE);
+    await api(app, sana).patch(`/orders/${id}/factory-order`, { factoryOrderedOn: today }).expect(200);
+    const po = (await purchaseOrders(id)).items[0];
+    expect(po.agreed).toMatchObject({ copied: true, leadDays: 30, paymentNote: "By T/T to their account in Jinan." });
+    // It went to the factory: a lead time other than the offer's asks why.
+    await api(app, sana).patch(`/orders/${id}/purchase-orders/${po.id}/terms`, { leadDays: 40 }).expect(409);
+  });
+
   it("an older offer (an advance %, words only) keeps its usual plan and prints as before", async () => {
     const id = await accepted({ advancePercent: 40, paymentTerms: "40% advance, balance before shipment", leadTime: "about six weeks" });
     const plan = (await money(id)).factories.plans[0];

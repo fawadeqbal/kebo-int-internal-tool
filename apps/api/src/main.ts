@@ -8,6 +8,7 @@ import { configureApp } from "./setup";
 import { DocumentsService } from "./modules/orders/documents.service";
 import { FactsService } from "./modules/insights/facts/facts.service";
 import { LedgerService } from "./modules/ledger/ledger.service";
+import { TermsFillService } from "./modules/flow/terms-fill.service";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
@@ -27,7 +28,10 @@ async function bootstrap() {
     .catch((e) => Logger.error(`Insights tables: ${(e as Error).stack ?? e}`, "Bootstrap"))
     // The ledger: posted from every record for a company whose ledger never was (first start after it came, a restore).
     .then(() => app.get(LedgerService).onStart())
-    .catch((e) => Logger.error(`ledger: ${(e as Error).stack ?? e}`, "Bootstrap"));
+    .catch((e) => Logger.error(`ledger: ${(e as Error).stack ?? e}`, "Bootstrap"))
+    // Old orders and sent purchase orders take, once, the terms they show (design "terms that travel", step 4).
+    .then(() => app.get(TermsFillService).fillAll())
+    .catch((e) => Logger.error(`terms agreed: ${(e as Error).stack ?? e}`, "Bootstrap"));
 }
 
 void bootstrap();
