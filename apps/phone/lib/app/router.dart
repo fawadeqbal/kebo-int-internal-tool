@@ -20,6 +20,7 @@ import '../features/search/search_screen.dart';
 import '../features/notifications/presentation/alerts_screen.dart';
 import '../features/orders/presentation/order_screen.dart';
 import '../features/orders/presentation/orders_screen.dart';
+import '../features/sales/presentation/factory_prices_screen.dart';
 import '../features/sales/presentation/inquiry_screen.dart';
 import '../features/sales/presentation/new_inquiry_screen.dart';
 import '../features/sales/presentation/sales_screen.dart';
@@ -60,6 +61,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'inquiry/:id',
                     builder: (context, state) => InquiryScreen(id: state.pathParameters['id']!),
+                    routes: [
+                      GoRoute(
+                        path: 'prices',
+                        builder: (context, state) => FactoryPricesScreen(inquiryId: state.pathParameters['id']!),
+                      ),
+                    ],
                   ),
                 ],
               ),
