@@ -3,6 +3,16 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-beta.4 — 2026-11-16
+
+Making papers on the phone.
+
+- On an order, tap a paper the app makes (contract, invoices, packing list, certificates…) to open it: what it takes from the order, each with a tick, and what is missing.
+- Missing details (B/L number, vessel, ETD / ETA, LC number, banks, ready and ship-by dates, port) are added right there, and saved where they belong so every paper uses them.
+- Choose what goes on the paper, make a draft, then make it final (the number is locked); later changes make a new version. Delete a draft you don't need.
+- Uploaded papers (like a B/L from the shipping line) open in the viewer. Printing is on the web.
+- The papers list shows the system's words: Ready, Draft, Can be made, Waiting for data, Uploaded, Missing, Kept elsewhere.
+
 ## 3.0.0-beta.3 — 2026-11-16
 
 Paying factories and moving money.
