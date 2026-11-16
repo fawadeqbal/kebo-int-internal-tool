@@ -12,7 +12,6 @@ import {
   paperNumber,
   paperWordsText,
   routePaymentSentence,
-  defaultFactoryPlan,
   FACTORY_DUE_RULE_LABEL,
   type FactoryDueRule,
   documentDone,
@@ -46,7 +45,7 @@ import { quotedTermsPrinted } from "../orders/order-docs";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
 import { factoryReadyOf, readySelect } from "@kebo/database";
 import { livePlanOfOrder } from "../billing/api";
-import { advanceOf } from "../billing/api";
+import { startingPlan } from "../billing/api";
 import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /** Everything one order's papers are made from, read in one query. */
@@ -60,8 +59,30 @@ export const paperOrderInclude = {
           requestedItemId: true,
           requestedItem: { select: { parentId: true } },
           factoryQuoteLineId: true,
-          // The offer's advance %: the factory's plan starts from it (and the PO prints it).
-          factoryQuoteLine: { select: { parentId: true, factoryQuote: { select: { advancePercent: true } } } },
+          // The offer: the factory's plan starts from its payment (its parts, else its advance %), and the PO
+          // prints which offer it was, its delivery basis, lead time and warranty (design "terms that travel").
+          factoryQuoteLine: {
+            select: {
+              parentId: true,
+              factoryQuote: {
+                select: {
+                  advancePercent: true,
+                  paymentParts: true,
+                  reference: true,
+                  receivedOn: true,
+                  basis: true,
+                  basisPlace: true,
+                  leadTime: true,
+                  leadDays: true,
+                  leadFrom: true,
+                  warranty: true,
+                  warrantyMonths: true,
+                  warrantyFrom: true,
+                  paymentTerms: true,
+                },
+              },
+            },
+          },
         },
       },
       factory: { select: { id: true, name: true, address: true } },
@@ -535,7 +556,7 @@ function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMi
         dueOn: fromDbDateOrNull(r.dueOn),
         dueDays: r.dueDays,
       }))
-    : defaultFactoryPlan(owedMinor, advanceOf(c.o.lines, factoryId, c.settings.sales.factoryAdvancePercent));
+    : startingPlan(c.o.lines, factoryId, c.settings.sales.factoryAdvancePercent, owedMinor);
   if (!rows.length || owedMinor <= 0) return null;
   const when = (r: (typeof rows)[number]) =>
     r.dueRule === "on_order"
@@ -550,6 +571,35 @@ function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMi
   const named = (r: (typeof rows)[number]) =>
     r.percent !== null && !/%/.test(r.label) ? `${r.label} ${Math.round(r.percent * 100) / 100}%` : r.label;
   return `Payment: ${rows.map((r) => `${named(r)}, ${formatMinor(r.amountMinor, currency)}, ${when(r)}`).join("; ")}.`;
+}
+
+/** What the factory said in a PO paper's words: the lead time counts from our advance, our order, or the drawings. */
+const PO_LEAD_FROM: Record<string, string> = { after_payment: "after our advance", after_order: "after our order", after_drawings: "after the drawings are approved" };
+
+/**
+ * The offer a factory's lines were bought on, as the purchase order prints it (design "terms that travel", step 3):
+ * its number and day ("Your offer"), the delivery basis, the lead time with the ready date, the warranty, and —
+ * for an offer whose payment is kept as parts — its payment note. An offer that says none of it prints as before.
+ */
+function poOffer(lines: PaperCtx["o"]["lines"], readyOn: ISODate | null) {
+  const q = lines.map((l) => l.quoteLine?.factoryQuoteLine?.factoryQuote).find((x) => !!x);
+  if (!q) return null;
+  const basis = q.basis ? `${q.basis}${q.basisPlace ? ` ${q.basisPlace}` : ""}` : null;
+  const lead =
+    q.leadDays !== null
+      ? `ready ${q.leadDays} day${q.leadDays === 1 ? "" : "s"} ${PO_LEAD_FROM[q.leadFrom ?? "after_payment"] ?? PO_LEAD_FROM.after_payment}`
+      : q.leadTime?.trim()
+        ? `lead time ${q.leadTime.trim().replace(/[.;,\s]+$/, "")}`
+        : null;
+  const said = [basis, lead].filter(Boolean).join(", ");
+  const warranty = warrantyLine({ warrantyMonths: q.warrantyMonths, warrantyFrom: q.warrantyFrom, warranty: q.warranty });
+  return {
+    ref: `${q.reference ? `${q.reference} of` : "dated"} ${paperDateText(fromDbDate(q.receivedOn))}`,
+    delivery: said ? `Delivery: ${said}${readyOn ? `, by ${paperDateText(readyOn)}` : ""}.` : null,
+    warranty: warranty ? `Warranty: ${warranty}` : null,
+    // The note beside the parts (an older offer's payment words are its terms, not a note: the plan prints those).
+    note: Array.isArray(q.paymentParts) && q.paymentTerms?.trim() ? q.paymentTerms.trim() : null,
+  };
 }
 
 function purchaseOrder(c: PaperCtx): Built {
@@ -568,6 +618,7 @@ function purchaseOrder(c: PaperCtx): Built {
   const position = f && currency ? (factoryPositionOf(c.o, fxOf(c.settings, has(c, "expenses"))).find((r) => r.key === `${f.id}:${currency}`) ?? null) : null;
   const borne = c.o.expenses.filter((e) => f && e.borneBy === "factory" && e.factoryId === f.id);
   const terms = f && currency ? poPaymentTerms(c, f.id, currency, tax.owedMinor) : null;
+  const offer = poOffer(mine, readyOn);
   return {
     n: factories.length > 1 && f ? factories.indexOf(f) + 1 : null,
     checks: [
@@ -592,6 +643,7 @@ function purchaseOrder(c: PaperCtx): Built {
       date: fromDbDateOrNull(c.o.factoryOrderedOn) ?? c.today,
       meta: [
         { label: "Our order", value: c.o.refNo },
+        ...(offer?.ref ? [{ label: "Your offer", value: offer.ref }] : []),
         { label: "Ready by", value: date(readyOn) ?? "to confirm" },
       ],
       heading: c.o.documentTitle,
@@ -617,9 +669,11 @@ function purchaseOrder(c: PaperCtx): Built {
       foot: null,
       boxTitle: "Terms",
       bullets: [
-        readyOn ? { label: "Ready by:", value: date(readyOn) } : "Ready date: to be confirmed by the factory.",
+        offer?.delivery ?? (readyOn ? { label: "Ready by:", value: date(readyOn) } : "Ready date: to be confirmed by the factory."),
         ...(tax.sentence ? [tax.sentence] : []),
         ...(terms ? [terms] : []),
+        ...(offer?.note ? [offer.note] : []),
+        ...(offer?.warranty ? [offer.warranty] : []),
         ...paid.map((p) => ({ label: `Paid on ${paperDateText(fromDbDate(p.paidOn))}:`, value: money(p.amount.toString(), p.currency) })),
         // Expenses the factory bears come off what we owe it (as on the order's money).
         ...borne.map((e) => ({ label: `Charged to you on ${paperDateText(fromDbDate(e.spentOn))}:`, value: money(e.amount.toString(), e.currency) })),

@@ -10,6 +10,8 @@ import {
   parseWarranty,
   partsWords,
   paymentCheck,
+  offerPlan,
+  plainOfferParts,
   plainQuoteParts,
   planParts,
   quotePartsInput,
@@ -227,5 +229,26 @@ describe("what we promise, beside what the factory gives", () => {
     ]);
     expect(planParts(dated, 3_012_500, "2026-11-25")[1]!.rule).toBe("after_shipping");
     expect(planParts(dated, 0, null)).toEqual([]);
+  });
+});
+
+describe("the factory's plan on an order, from its offer's parts", () => {
+  it("an advance and the rest when ready is the usual plan (left to it, as before)", () => {
+    expect(plainOfferParts(JINAN)).toBe(true);
+    expect(plainOfferParts([part("All when ready", 100, "on_ready")])).toBe(true);
+    expect(plainOfferParts([part("All with the order", 100, "on_order")])).toBe(true);
+    expect(offerPlan(JINAN, 18_600_000)).toBeNull();
+    expect(plainOfferParts([part("Advance 30%", 30, "on_order"), part("Ready 60%", 60, "on_ready"), part("After shipping 10%", 10, "after_shipping", 30)])).toBe(false);
+  });
+
+  it("other parts: each its share of what we owe, the last the rest, dated by its rule", () => {
+    const parts = [part("Advance 30%", 30, "on_order"), part("Ready 60%", 60, "on_ready"), part("", 10, "after_shipping", 30)];
+    expect(offerPlan(parts, 18_600_001)).toEqual([
+      { label: "Advance 30%", percent: 30, amountMinor: 5_580_000, dueRule: "on_order", dueOn: null },
+      { label: "Ready 60%", percent: 60, amountMinor: 11_160_001, dueRule: "on_ready", dueOn: null },
+      { label: "10% 30 days after shipment", percent: 10, amountMinor: 1_860_000, dueRule: "on_ship_plus_days", dueOn: null, dueDays: 30 },
+    ].map((r, i, all) => (i === all.length - 1 ? { ...r, amountMinor: 18_600_001 - 5_580_000 - 11_160_001 } : r)));
+    // Parts that do not add up are not a plan.
+    expect(offerPlan([part("Advance 30%", 30, "on_order"), part("Later", 60, "after_shipping", 30)], 1000)).toBeNull();
   });
 });

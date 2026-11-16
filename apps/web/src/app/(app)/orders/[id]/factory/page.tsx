@@ -147,9 +147,26 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
               ),
             },
             ...(seesMoney ? [{ label: "Total", value: po.total && po.currency ? money(po.total, po.currency) : null }] : []),
-            ...(seesMoney ? [{ label: "Price basis", value: basis }] : []),
+            ...(seesMoney ? [{ label: "Price basis", value: po.offer?.basis ? `${po.offer.basis}${po.offer.basisPlace ? ` ${po.offer.basisPlace}` : ""}` : basis }] : []),
             { label: "Sent on", value: po.sentOn ? `${date(po.sentOn)}${po.sentBy ? ` · ${po.sentBy.name}` : ""}` : null },
             { label: "Their order no.", value: po.supplierRef ?? orderNo },
+            ...(po.offer
+              ? [
+                  {
+                    label: "Made from their offer",
+                    value: seesMoney ? (
+                      <>
+                        <Link href={`/inquiries/${o.inquiry.id}/sourcing?offer=${po.offer.id}#offer`} className="text-primary underline underline-offset-2">
+                          {po.offer.reference ?? "Their offer"}
+                        </Link>
+                        <span className="font-normal"> · {date(po.offer.receivedOn)}</span>
+                      </>
+                    ) : (
+                      `${po.offer.reference ?? "Their offer"} · ${date(po.offer.receivedOn)}`
+                    ),
+                  },
+                ]
+              : []),
             ...(po.sentEarlyReason ? [{ label: "Why before the deposit", value: po.sentEarlyReason }] : []),
           ]}
           actions={

@@ -682,7 +682,16 @@ export class FlowService {
             sentBy: { select: { id: true, name: true } },
           },
         },
-        lines: { select: { factoryId: true, quantity: true, factoryUnitPrice: true, factoryCurrency: true } },
+        lines: {
+          select: {
+            factoryId: true,
+            quantity: true,
+            factoryUnitPrice: true,
+            factoryCurrency: true,
+            // The offer each line was bought on: the purchase order says which offer it was made from.
+            quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { id: true, reference: true, receivedOn: true, basis: true, basisPlace: true } } } } } },
+          },
+        },
         ...readySelect,
       },
     });
@@ -696,10 +705,13 @@ export class FlowService {
         const lines = o.lines.filter((l) => l.factoryId === p.supplier.id);
         const totalMinor = lines.reduce((t, l) => t + Math.round(decimalToMinor(l.factoryUnitPrice ?? 0) * Number(l.quantity)), 0);
         const sentOn = p.sentOn ? fromDbDate(p.sentOn) : o.factoryOrderedOn ? fromDbDate(o.factoryOrderedOn) : null;
+        const offer = lines.map((l) => l.quoteLine?.factoryQuoteLine?.factoryQuote).find((q) => !!q) ?? null;
         return {
           id: p.id,
           number: p.number,
           supplier: p.supplier,
+          /** The factory's offer its lines were bought on (design "terms that travel": made from their offer). */
+          offer: offer && { id: offer.id, reference: offer.reference, receivedOn: fromDbDate(offer.receivedOn), basis: offer.basis, basisPlace: offer.basisPlace },
           lines: lines.length,
           currency: lines.find((l) => l.factoryCurrency)?.factoryCurrency ?? null,
           total: seeCosts ? fromMinor(totalMinor) : null,

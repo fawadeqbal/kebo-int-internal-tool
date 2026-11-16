@@ -1,6 +1,6 @@
 import { decimalToMinor, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
-import { defaultFactoryPlan, factoryPlanStatus, shippedOnOf, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
+import { defaultFactoryPlan, factoryPlanStatus, offerPlan, shippedOnOf, storedParts, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
 import { factoryReadyOf, readySelect } from "@kebo/database";
@@ -33,12 +33,15 @@ const planLines = {
     factoryTaxRate: true,
     factoryTaxIncluded: true,
     quantity: true,
-    // The offer the line was bought on: the advance it asks.
-    quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { advancePercent: true } } } } } },
+    // The offer the line was bought on: the advance it asks, and its payment as parts.
+    quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { advancePercent: true, paymentParts: true } } } } } },
   },
 } as const;
 
-type AdvanceLine = { factoryId: string | null; quoteLine: { factoryQuoteLine: { factoryQuote: { advancePercent: Prisma.Decimal | null } } | null } | null };
+type AdvanceLine = {
+  factoryId: string | null;
+  quoteLine: { factoryQuoteLine: { factoryQuote: { advancePercent: Prisma.Decimal | null; paymentParts?: Prisma.JsonValue } } | null } | null;
+};
 
 /**
  * The advance a factory asks on this order: its offer's (FactoryQuote.advancePercent, the offer the lines
@@ -50,6 +53,21 @@ export function advanceOf(lines: AdvanceLine[], factoryId: string, fallback: num
     if (p !== null && p !== undefined) return Number(p);
   }
   return fallback;
+}
+
+/**
+ * A factory's plan on an order until one is saved (design "terms that travel", step 3): its offer's parts when
+ * they are more than an advance and the rest when ready; else the company's usual plan — the advance its offer
+ * asks (else Settings') when we order, the rest on its ready date — as before.
+ */
+export function startingPlan(lines: AdvanceLine[], factoryId: string, fallback: number, owedMinor: number): FactoryPlanRow[] {
+  for (const l of lines) {
+    const parts = l.factoryId === factoryId ? storedParts(l.quoteLine?.factoryQuoteLine?.factoryQuote.paymentParts, "factory") : null;
+    const plan = parts ? offerPlan(parts, owedMinor) : null;
+    if (plan) return plan;
+    if (l.factoryId === factoryId && l.quoteLine?.factoryQuoteLine) break;
+  }
+  return defaultFactoryPlan(owedMinor, advanceOf(lines, factoryId, fallback));
 }
 
 /**
@@ -113,7 +131,7 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
           dueOn: fromDbDateOrNull(r.dueOn),
           dueDays: r.dueDays,
         }))
-      : defaultFactoryPlan(f.owedMinor, advanceOf(o.lines, f.factory.id, advancePercent)).map((r) => ({ ...r, id: null, supplierRef: null }));
+      : startingPlan(o.lines, f.factory.id, advancePercent, f.owedMinor).map((r) => ({ ...r, id: null, supplierRef: null }));
     const paidMinor = f.settledMinor;
     const planMinor = rows.reduce((t, r) => t + r.amountMinor, 0);
     // This factory's own ready date (one per factory; the order's is the latest).
@@ -199,7 +217,7 @@ export async function seedFactoryPlans(tx: Tx, orderId: string, advancePercent: 
   for (const [key, f] of owedByFactory(o.lines)) {
     if (f.owedMinor <= 0 || o.payables.some((r) => `${r.supplierId}:${r.currency}` === key)) continue;
     await tx.invoice.createMany({
-      data: defaultFactoryPlan(f.owedMinor, advanceOf(o.lines, f.factory.id, advancePercent)).map((r, i) => ({
+      data: startingPlan(o.lines, f.factory.id, advancePercent, f.owedMinor).map((r, i) => ({
         purchaseOrderId: orderId,
         supplierId: f.factory.id,
         label: r.label,
@@ -207,6 +225,7 @@ export async function seedFactoryPlans(tx: Tx, orderId: string, advancePercent: 
         amount: fromMinor(r.amountMinor),
         currency: f.currency,
         dueRule: r.dueRule,
+        dueDays: r.dueDays ?? null,
         sortOrder: i,
       })),
     });
