@@ -16,7 +16,7 @@ type PlanOrder = {
 } & WithTerms;
 
 /** A new order's plan: the instalments its route builds (routePlan), in order; each gets its payment request number. */
-export async function createPlan(tx: Tx, orderId: string, plan: ReturnType<typeof routePlan>) {
+export async function createPlan(tx: Tx, orderId: string, plan: (Omit<ReturnType<typeof routePlan>[number], "part"> & { part: string | null })[]) {
   await tx.invoice.createMany({
     data: plan.map((p, i) => ({
       orderId,

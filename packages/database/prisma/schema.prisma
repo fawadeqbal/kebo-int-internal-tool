@@ -1206,8 +1206,26 @@ model Order {
   lastReceiptNo    Int               @default(0) @map("last_receipt_no")
   lastRequestNo    Int               @default(0) @map("last_request_no")
   /// Ship date promised to the customer (ours: with an LC its latest shipment date is shown beside it, and a
-  /// ship-by later than that is warned about).
+  /// ship-by later than that is warned about). Worked out from the lead time agreed (leadDays from its moment)
+  /// unless typed by hand (shipByTyped).
   shipBy           DateTime?         @map("ship_by") @db.Date
+  /// The ship-by date was typed by hand: the lead time no longer moves it.
+  shipByTyped      Boolean           @default(false) @map("ship_by_typed")
+  // Agreed with the customer (design "terms that travel"): copied from the accepted quotation, changed here after.
+  /// The quotation's terms were copied into the order when it was accepted: its papers print the order's copy
+  /// (an older order has none: its papers read its quotation, as before).
+  termsCopied      Boolean           @default(false) @map("terms_copied")
+  /// The lead time promised, as days from a moment: after_payment (the deposit) | after_order | after_drawings.
+  leadDays         Int?              @map("lead_days")
+  leadFrom         String?           @map("lead_from")
+  /// The warranty given: months from a moment (shipment | delivery | sat), and the words of what it covers.
+  warrantyMonths   Int?              @map("warranty_months")
+  warrantyFrom     String?           @map("warranty_from")
+  warrantyWords    String?           @map("warranty_words") @db.VarChar(300)
+  /// The conditions printed with the delivery and with the payment, and the notes printed last.
+  deliveryConditions String?         @map("delivery_conditions")
+  paymentConditions  String?         @map("payment_conditions")
+  conditionsNotes    String?         @map("conditions_notes")
   // The ready date is each factory's (OrderFactory.readyOn); the order's is the latest of them (worked out).
   /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
   documentTitle    String?           @map("document_title") @db.VarChar(200)

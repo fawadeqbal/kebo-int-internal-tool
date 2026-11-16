@@ -18,6 +18,7 @@ export const planDatesSelect = {
   ...readySelect,
   shipments: { select: { departedOn: true } },
   bankSteps: { where: { step: "customer_bank_received" }, select: { doneOn: true }, orderBy: { doneOn: "asc" } },
+  delivery: { select: { satDoneOn: true } },
 } satisfies Prisma.OrderSelect;
 
 type DatesOrder = {
@@ -25,6 +26,7 @@ type DatesOrder = {
   lines: { factoryId: string | null }[];
   shipments: { departedOn: Date | null }[];
   bankSteps: { doneOn: Date }[];
+  delivery?: { satDoneOn: Date | null } | null;
 };
 
 /** The order's dates the plan's rules read. */
@@ -33,6 +35,7 @@ export function planDatesOf(o: DatesOrder): PlanDates {
     readyOn: readyOnOf(o),
     shippedOn: shippedOnOf(o.shipments.map((s) => ({ departedOn: fromDbDateOrNull(s.departedOn) }))),
     papersOn: fromDbDateOrNull(o.bankSteps[0]?.doneOn ?? null),
+    satOn: fromDbDateOrNull(o.delivery?.satDoneOn ?? null),
   };
 }
 

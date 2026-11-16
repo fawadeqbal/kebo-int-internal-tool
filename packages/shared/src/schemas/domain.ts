@@ -733,11 +733,11 @@ export const paymentPlanInput = z.object({
         /** The date of a fixed row; a date typed without a rule makes the row fixed. */
         dueOn: optionalDate,
         /**
-         * When it falls due (fixed | on_ready | on_ship_plus_days | after_papers; empty: no date yet). Left out:
-         * a row with a date becomes fixed, one without keeps its rule.
+         * When it falls due (fixed | on_ready | on_ship_plus_days | after_papers | after_sat; empty: no date yet).
+         * Left out: a row with a date becomes fixed, one without keeps its rule.
          */
         dueRule: z.preprocess((v) => (v === "" ? null : v), z.enum(PLAN_DUE_RULES).nullable().optional()),
-        /** on_ship_plus_days / after_papers: how many days after. */
+        /** on_ship_plus_days / after_papers / after_sat: how many days after. */
         dueDays: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number().int().min(0).max(3650).optional()),
       }),
     )

@@ -1,6 +1,8 @@
 import { formatMinor, type Minor } from "@kebo/money";
+import { addDays, type ISODate } from "@kebo/utils";
 import type { BalanceTerms } from "../enums";
 import { paymentSentenceOf } from "./quotation";
+import type { PlanDueRule, PlanPart } from "./money-route";
 
 /**
  * Terms that travel (design "RFQ Desk — terms that travel, one thing in one place", 16 Nov 2026): the factory
@@ -389,3 +391,95 @@ export function warrantyCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | 
 /** Every check of one option against its factory (only those both sides say enough for). */
 export const termsChecks = (ours: OurTerms, theirs: TheirTerms): TermsCheck[] =>
   [leadCheck(ours, theirs), paymentCheck(ours, theirs), warrantyCheck(ours, theirs)].filter((c): c is TermsCheck => c !== null);
+
+/* ---------------------------------------------------------------- the order's plan from the parts */
+
+/** One row of an order's plan made from a quotation's parts. */
+export interface PartsPlanRow {
+  label: string;
+  amountMinor: Minor;
+  /** A fixed row's date (the deposit's); null for the others (worked out from the rule). */
+  dueOn: ISODate | null;
+  /** The first part due with the order is the deposit; the others are parts of their own. */
+  part: PlanPart | null;
+  dueRule: PlanDueRule;
+  dueDays: number | null;
+}
+
+/** About how long after the goods leave they arrive (a part due "after arrival"). */
+export const ARRIVAL_DAYS = 30;
+
+/**
+ * The order's plan from the quotation's parts, when they are more than a deposit and one balance (design "terms
+ * that travel", step 2): each part its share of the total (the last one the rest, so they add up exactly), dated
+ * by its rule — the first part due with the order is the deposit, a few days after the order (as a route's
+ * deposit); before shipment on the ready date; against the B/L copy some days after the goods leave; days after
+ * shipping, and after arrival, after the goods leave; by a letter of credit when the papers reach their bank (or
+ * days after); after the site test, days after it is done.
+ */
+export function partsPlan(parts: TermPart[], totalMinor: Minor, orderedOn: ISODate, depositDays: number, balanceDays: number): PartsPlanRow[] {
+  let left = totalMinor;
+  let deposit = false;
+  return parts.map((p, i) => {
+    const amountMinor = i === parts.length - 1 ? left : Math.round((totalMinor * p.percent) / 100);
+    left -= amountMinor;
+    const days = Math.max(p.days ?? 0, 0);
+    const row = (dueRule: PlanDueRule, dueDays: number | null, dueOn: ISODate | null = null, part: PlanPart | null = null): PartsPlanRow => ({
+      label: p.label,
+      amountMinor,
+      dueOn,
+      part,
+      dueRule,
+      dueDays,
+    });
+    switch (p.rule) {
+      case "on_order": {
+        const first = !deposit;
+        deposit = true;
+        return row("fixed", null, addDays(orderedOn, depositDays), first ? "deposit" : null);
+      }
+      case "before_shipment":
+        return row("on_ready", null);
+      case "against_bl_copy":
+        return row("on_ship_plus_days", Math.max(balanceDays, 0));
+      case "after_shipping":
+        return row("on_ship_plus_days", days);
+      case "after_arrival":
+        return row("on_ship_plus_days", ARRIVAL_DAYS);
+      case "lc":
+        return row("after_papers", days);
+      default:
+        return row("after_sat", days);
+    }
+  });
+}
+
+/** When a row of a plan falls due, in a paper's words ("before shipment", "30 days after shipment"). */
+function rowWhen(r: { part: string | null; dueRule: string | null; dueDays: number | null; dueOn: ISODate | null }): string {
+  const d = Math.max(r.dueDays ?? 0, 0);
+  switch (r.dueRule) {
+    case "on_ready":
+      return "before shipment";
+    case "on_ship_plus_days":
+      return d ? `${plural(d, "day")} after shipment` : "on shipment";
+    case "after_papers":
+      return d ? `by letter of credit, ${plural(d, "day")} after the documents` : "by letter of credit at sight";
+    case "after_sat":
+      return d ? `${plural(d, "day")} after the site acceptance test (SAT)` : "after the site acceptance test (SAT)";
+    case "fixed":
+      return r.part === "deposit" ? "Advance deposit" : r.dueOn ? `by ${r.dueOn.split("-").reverse().join("/")}` : "";
+    default:
+      return "later";
+  }
+}
+
+/**
+ * The payment sentence of an order whose plan was made from the quotation's parts: each row's share of the
+ * total and when it falls due, as the plan stands now ("Our usual payment is made by 30% Advance deposit, 60%
+ * before shipment and 10% after the site acceptance test (SAT).").
+ */
+export function planSentence(rows: { amountMinor: Minor; part: string | null; dueRule: string | null; dueDays: number | null; dueOn: ISODate | null }[], totalMinor: Minor): string {
+  const pct = (m: Minor) => percentText(totalMinor > 0 ? (m * 100) / totalMinor : 0);
+  const bits = rows.filter((r) => r.amountMinor > 0).map((r) => `${pct(r.amountMinor)}% ${rowWhen(r)}`.trim());
+  return `Our usual payment is made by ${listJoin(bits)}.`;
+}

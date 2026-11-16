@@ -479,6 +479,7 @@ const CUSTOMER_RULES: PlanRule[] = [
   { value: "on_ready", label: "On the ready date" },
   { value: "on_ship_plus_days", label: "Days after shipping", needs: "days", days: 14 },
   { value: "after_papers", label: "After the papers (LC)", needs: "days", days: 0 },
+  { value: "after_sat", label: "After the site test (SAT)", needs: "days", days: 0 },
   { value: "", label: "No date yet" },
 ];
 
@@ -577,7 +578,9 @@ export function CustomerPlanWindow({
               ? `${Number(p.dueDays) || 0} days after the goods leave${after(d.shippedOn, p.dueDays)}: when shipping moves, so does the due day.`
               : p.rule === "after_papers"
                 ? `${Number(p.dueDays) || 0} days after the papers reach their bank${after(d.papersOn, p.dueDays)}.`
-                : p.rule === ""
+                : p.rule === "after_sat"
+                  ? `${Number(p.dueDays) || 0} days after the site test is done${after(d.satOn ?? null, p.dueDays)}: dated once it is.`
+                  : p.rule === ""
                   ? "No date yet: it is not chased until it has one."
                   : null,
         action,
@@ -588,7 +591,7 @@ export function CustomerPlanWindow({
             amount: fromMinor(minorOf(p.amount)),
             dueRule: p.rule || null,
             dueOn: p.rule === "fixed" ? p.dueOn || null : null,
-            ...(p.rule === "on_ship_plus_days" || p.rule === "after_papers" ? { dueDays: p.dueDays || "0" } : {}),
+            ...(p.rule === "on_ship_plus_days" || p.rule === "after_papers" || p.rule === "after_sat" ? { dueDays: p.dueDays || "0" } : {}),
           })),
         }),
       }}

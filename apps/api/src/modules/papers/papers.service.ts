@@ -78,6 +78,7 @@ import {
   positionOf,
   receiptMark,
   fatOf,
+  agreedOf,
   type PaperCtx,
   type PaperOrder,
   type StatementData,
@@ -425,7 +426,7 @@ export class PapersService implements OnModuleInit {
   /** "The quotation said 'By T/T'; the route is now LC at sight": print it or not (default not), for the papers with payment terms. */
   private termsOf(o: PaperOrder, kind: PaperKind) {
     if (kind !== "sales-contract" && kind !== "payment-request") return null;
-    const text = o.revision.paymentTerms?.trim();
+    const text = agreedOf(o).paymentConditions?.trim();
     const t = termsOf(o);
     if (!text || routeAsAccepted(t, o.balanceTerms)) return null;
     return { quoted: text, route: routeWords(t, o.balanceTerms), printed: quotedTermsPrinted(o) };
