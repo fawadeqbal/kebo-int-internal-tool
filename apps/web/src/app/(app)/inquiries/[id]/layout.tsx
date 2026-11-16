@@ -7,6 +7,7 @@ import { requireUser, hasFeature } from "@/lib/session";
 import { dealOf } from "@/lib/deal-data";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { InquiryNext, InquiryTabs, type InquiryTab } from "@/components/deals/inquiry-nav";
+import { DealBody, DealChrome } from "@/components/deals/deal-chrome";
 import { offerFactsOf } from "./facts";
 import { inquiryNext, quotationStatus, statusWords } from "./steps";
 
@@ -57,45 +58,47 @@ export default async function DealLayout({ children, params }: { children: React
 
   return (
     <div>
-      <PageHeader
-        crumbs={[{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }]}
-        icon={MessageSquareText}
-        title={d.title ? d.title : <span className="tabular">{d.refNo}</span>}
-        summary={
-          <p className="min-w-0">
-            {meta.map((m, i) => (
-              <span key={i}>
-                {i > 0 && (
-                  <span aria-hidden className="px-1.5 text-muted">
-                    ·
-                  </span>
-                )}
-                {m}
-              </span>
-            ))}
-          </p>
-        }
-        primary={
-          order && d.stage === "won" ? (
-            <ButtonLink href={`/orders/${order.id}`} variant="primary">
-              Go to the order <ArrowRight aria-hidden />
-            </ButtonLink>
-          ) : undefined
-        }
-        more={<MoreMenu label={`More for ${d.refNo}`} items={more} />}
-      />
-      {d.customer.country === "ZZ" && (
-        <Banner meaning="warn" className="mt-3">
-          This customer&apos;s country is not set.{" "}
-          <Link href={`/customers/${d.customer.id}?panel=edit-customer&id=${d.customer.id}`} className="font-medium underline">
-            Add it
-          </Link>{" "}
-          — it decides shipping.
-        </Banner>
-      )}
-      <InquiryTabs base={base} tabs={tabs} order={order && d.stage === "won" ? { href: `/orders/${order.id}`, refNo: order.refNo } : null} />
-      {next && <InquiryNext base={base} tab={next.tab} title={next.title} meta={next.meta} href={next.href} label={next.label} />}
-      <div className="mt-4">{children}</div>
+      <DealChrome>
+        <PageHeader
+          crumbs={[{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }]}
+          icon={MessageSquareText}
+          title={d.title ? d.title : <span className="tabular">{d.refNo}</span>}
+          summary={
+            <p className="min-w-0">
+              {meta.map((m, i) => (
+                <span key={i}>
+                  {i > 0 && (
+                    <span aria-hidden className="px-1.5 text-muted">
+                      ·
+                    </span>
+                  )}
+                  {m}
+                </span>
+              ))}
+            </p>
+          }
+          primary={
+            order && d.stage === "won" ? (
+              <ButtonLink href={`/orders/${order.id}`} variant="primary">
+                Go to the order <ArrowRight aria-hidden />
+              </ButtonLink>
+            ) : undefined
+          }
+          more={<MoreMenu label={`More for ${d.refNo}`} items={more} />}
+        />
+        {d.customer.country === "ZZ" && (
+          <Banner meaning="warn" className="mt-3">
+            This customer&apos;s country is not set.{" "}
+            <Link href={`/customers/${d.customer.id}?panel=edit-customer&id=${d.customer.id}`} className="font-medium underline">
+              Add it
+            </Link>{" "}
+            — it decides shipping.
+          </Banner>
+        )}
+        <InquiryTabs base={base} tabs={tabs} order={order && d.stage === "won" ? { href: `/orders/${order.id}`, refNo: order.refNo } : null} />
+        {next && <InquiryNext base={base} tab={next.tab} title={next.title} meta={next.meta} href={next.href} label={next.label} />}
+      </DealChrome>
+      <DealBody>{children}</DealBody>
     </div>
   );
 }
