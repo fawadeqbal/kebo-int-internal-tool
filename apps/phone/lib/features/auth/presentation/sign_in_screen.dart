@@ -71,29 +71,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     _go(() => s.signIn(_email.text, _password.text, company: company));
   }
 
-  Future<void> _changeServer(Session s) async {
-    final ctl = TextEditingController(text: s.api.server);
-    await showKSheet<void>(
-      context,
-      title: 'Server',
-      builder: (_) => KTextField(
-        label: 'Server address',
-        controller: ctl,
-        keyboardType: TextInputType.url,
-        hint: 'https://rfq.example.com',
-        help: 'Only change this if your company runs its own RFQ Desk server.',
-      ),
-      footer: KButton(
-        'Use this server',
-        fullWidth: true,
-        onPressed: () async {
-          if (ctl.text.trim().isNotEmpty) await s.setServer(ctl.text);
-          if (mounted) Navigator.of(context).pop();
-        },
-      ),
-    );
-    ctl.dispose();
-  }
+  Future<void> _changeServer(Session s) => showKSheet<void>(
+    context,
+    title: 'Server',
+    builder: (_) => _ServerForm(session: s),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -292,4 +274,46 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       onPressed: _busy ? null : s.signOut,
     ),
   ];
+}
+
+/// The server address form; owns its field.
+class _ServerForm extends StatefulWidget {
+  const _ServerForm({required this.session});
+  final Session session;
+
+  @override
+  State<_ServerForm> createState() => _ServerFormState();
+}
+
+class _ServerFormState extends State<_ServerForm> {
+  late final _ctl = TextEditingController(text: widget.session.api.server);
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      KTextField(
+        label: 'Server address',
+        controller: _ctl,
+        keyboardType: TextInputType.url,
+        hint: 'https://rfq.example.com',
+        help: 'Only change this if your company runs its own RFQ Desk server.',
+      ),
+      const SizedBox(height: KSpace.s6),
+      KButton(
+        'Use this server',
+        fullWidth: true,
+        onPressed: () async {
+          if (_ctl.text.trim().isNotEmpty) await widget.session.setServer(_ctl.text);
+          if (context.mounted) Navigator.of(context).pop();
+        },
+      ),
+    ],
+  );
 }

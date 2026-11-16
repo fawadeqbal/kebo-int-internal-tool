@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rfq_desk/app/app.dart';
+import 'package:rfq_desk/core/bell.dart';
 import 'package:rfq_desk/app/router.dart';
 import 'package:rfq_desk/core/providers.dart';
 import 'package:rfq_desk/design/design.dart';
@@ -13,6 +14,7 @@ import 'support/fake_server.dart';
 void main() {
   setUp(() {
     KHaptics.enabled = false;
+    Bell.autoRefresh = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
       const MethodChannel('dev.fluttercommunity.plus/package_info'),
       (call) async => {'appName': 'RFQ Desk', 'packageName': 'x', 'version': '3.0.0-alpha.3', 'buildNumber': '3000003'},

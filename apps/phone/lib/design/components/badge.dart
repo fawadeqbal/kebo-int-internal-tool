@@ -52,7 +52,14 @@ class KBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (ic != null) ...[KIcon(ic, size: 14, color: fg), const SizedBox(width: KSpace.s1)],
-          Text(label, style: KType.labelSm.copyWith(color: fg)),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: KType.labelSm.copyWith(color: fg),
+            ),
+          ),
         ],
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rfq_desk/app/app.dart';
+import 'package:rfq_desk/core/bell.dart';
 import 'package:rfq_desk/core/providers.dart';
 import 'package:rfq_desk/core/session.dart';
 import 'package:rfq_desk/design/design.dart';
@@ -20,6 +21,7 @@ const _me = {
 
 Future<Session> _open(WidgetTester t, Map<String, Object?> answers) async {
   KHaptics.enabled = false;
+  Bell.autoRefresh = false;
   t.view.physicalSize = const Size(390 * 3, 844 * 3);
   t.view.devicePixelRatio = 3;
   addTearDown(t.view.reset);
@@ -76,7 +78,7 @@ void main() {
     await t.tap(find.text('Kebo Afghanistan'));
     await t.pumpAndSettle();
     expect(s.status, SessionStatus.signedIn);
-    expect(find.text('fawad@example.com'), findsOneWidget);
+    expect(find.textContaining('Fawad'), findsWidgets);
   });
 
   testWidgets('two-step code, then home; sign out goes back to sign-in', (t) async {
@@ -96,7 +98,12 @@ void main() {
     await t.pumpAndSettle();
     expect(s.status, SessionStatus.signedIn);
     expect(find.text('Kebo International'), findsWidgets);
-    await t.scrollUntilVisible(find.text('Sign out'), 300, scrollable: find.byType(Scrollable).first);
+    await t.tap(find.text('More'));
+    await t.pumpAndSettle();
+    final list = find.ancestor(of: find.text('Appearance'), matching: find.byType(Scrollable)).first;
+    await t.scrollUntilVisible(find.text('Sign out'), 300, scrollable: list);
+    await t.drag(list, const Offset(0, -300)); // clear the tab bar
+    await t.pumpAndSettle();
     await t.tap(find.text('Sign out'));
     await t.pumpAndSettle();
     expect(s.status, SessionStatus.signedOut);

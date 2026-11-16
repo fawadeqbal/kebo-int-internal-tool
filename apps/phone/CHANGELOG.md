@@ -3,6 +3,18 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-alpha.4 — 2026-11-16
+
+Step 4: Home and the tabs.
+
+- Home opens on the brand band with your greeting, the date and how many things need you.
+- "Needs you now": overdue money, missing papers and dates, most urgent first, each opening where it points. "All" lists every one.
+- "Today": your follow-ups due today or late, each with Done. Marking the last follow-up of an open inquiry done asks for the next one, so no inquiry is left with nothing planned.
+- "This month": won (and how far to target), received, still to receive and open orders.
+- The bell shows the unread count on every tab and opens Alerts: grouped by day, unread ones stand out, "Unread" filter, mark all as read.
+- The five tabs: Home, Sales, Orders, Money and More. More has your account, light / dark / phone appearance, what waits on this phone, and sign out. Sales, Orders and Money fill in over the next steps.
+- When there's no signal, every header says "Offline" with the time of the figures, and Home says what waits to send.
+
 ## 3.0.0-alpha.3 — 2026-11-16
 
 Step 3: the core. The app now signs in to your RFQ Desk server.
