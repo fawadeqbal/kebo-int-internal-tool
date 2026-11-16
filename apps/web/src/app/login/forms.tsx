@@ -15,6 +15,7 @@ export interface DemoLogin {
 
 export function LoginForm({ next, demo, forgotHref }: { next?: string; demo?: DemoLogin[]; forgotHref: string }) {
   const [state, action] = useActionState(loginAction, {});
+  const [showPassword, setShowPassword] = useState(false);
   const form = useRef<HTMLFormElement>(null);
   const pick = (d: DemoLogin) => {
     const f = form.current;
@@ -58,18 +59,30 @@ export function LoginForm({ next, demo, forgotHref }: { next?: string; demo?: De
         </fieldset>
       )}
       {state.code !== "choose_company" && state.values?.company && <input type="hidden" name="company" value={state.values.company} />}
-      <Field label="Email" required htmlFor="email" error={state.errors?.email}>
+      <Field label="Work email" required htmlFor="email" error={state.errors?.email}>
         <Input id="email" name="email" type="email" autoComplete="username" autoFocus required defaultValue={state.values?.email ?? ""} />
       </Field>
       <Field label="Password" required htmlFor="password" error={state.errors?.password}>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          autoFocus={state.code === "choose_company"}
-        />
+        <div className="relative">
+          <Input
+            id="password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            required
+            autoFocus={state.code === "choose_company"}
+            className="pr-16"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            className="absolute inset-y-1 right-1 rounded-md px-2.5 text-[13px] font-semibold text-text-2 hover:bg-surface-2"
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
       </Field>
       <div className="flex items-center justify-between gap-3 text-[13px]">
         <input type="hidden" name="keepAsked" value="1" />
@@ -81,7 +94,7 @@ export function LoginForm({ next, demo, forgotHref }: { next?: string; demo?: De
           Forgot password?
         </Link>
       </div>
-      <SubmitButton pendingText="Signing in…" className="h-[46px] w-full text-[15px]">
+      <SubmitButton pendingText="Signing in…" className="h-11 w-full text-[15px]">
         Sign in
       </SubmitButton>
       {state.message && state.code !== "choose_company" && <Alert tone="error">{state.message}</Alert>}

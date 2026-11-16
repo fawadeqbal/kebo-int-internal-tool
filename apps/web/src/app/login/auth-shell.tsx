@@ -1,76 +1,69 @@
 import { Suspense, type ReactNode } from "react";
+import { cookies, headers } from "next/headers";
 import { Toast } from "@kebo/ui/client";
-import { Truck, TrendingUp, Wallet } from "lucide-react";
+import { Lock } from "lucide-react";
+import { COLOURS_COOKIE, savedColours } from "@/lib/colours";
 import { PRODUCT_NAME } from "@/lib/product";
 
 /**
- * The frame of sign-in, the two-step code and the public pages (request a demo, sign up), RFQ Desk
- * look. Phone first: the brand mark and the form. From a laptop up, a soft green panel on the left
- * says what the app does.
+ * The frame of sign-in, the two-step code, setting a password and the public pages (request a demo, sign up).
+ * Board "Trusted sign in": a quiet page in the app's own colours (the company's set last used on this device,
+ * light or dark as the person chose), a thin brand line on top, one card in the middle and under it the address
+ * the person is signing in at. No selling words: the card says what this page is and nothing more.
  */
-export function AuthShell({
+export async function AuthShell({
   children,
   wide = false,
   title = PRODUCT_NAME,
-  subtitle = "Sign in to your company",
+  subtitle,
   footer,
   tag = true,
 }: {
   children: ReactNode;
   wide?: boolean;
   title?: string;
+  /** A small line over the card's content (sign-in shows its own heading). */
   subtitle?: string;
   footer?: ReactNode;
-  /** From a laptop up, the subtitle over the form when one is given (sign-in shows its own). */
+  /** Show the subtitle over the content (on by default). */
   tag?: boolean;
 }) {
+  const colours = savedColours((await cookies()).get(COLOURS_COOKIE)?.value);
+  const host = (await headers()).get("host");
   return (
-    <main className="flex min-h-dvh flex-col lg:flex-row">
-      <aside className="flex flex-col justify-between gap-8 bg-primary-soft px-6 py-14 sm:p-14 lg:w-[55%]">
-        <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-xl bg-primary-solid text-xl font-bold text-primary-fg" aria-hidden>
-            K
-          </span>
-          <span className="text-xl font-bold text-text">{title}</span>
+    <div className="flex min-h-dvh flex-col border-t-[3px] border-primary-solid bg-bg">
+      {/* The page takes this set's colours from the first paint (packages/ui/src/styles/theme.css). */}
+      <span id="app-colours" data-colours={colours} hidden />
+      <header className="flex items-center gap-2.5 px-5 py-5 sm:px-8">
+        <span className="grid size-7 place-items-center rounded-[7px] bg-primary-solid text-sm font-bold text-primary-fg" aria-hidden>
+          K
+        </span>
+        <span className="text-[15px] font-semibold tracking-tight text-text">{title}</span>
+      </header>
+      <main className="flex flex-1 flex-col items-center justify-center px-4 pt-2 pb-10">
+        <div className={wide ? "w-full max-w-xl" : "w-full max-w-[420px]"}>
+          <div className="rounded-[14px] border border-line bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.04),0_10px_28px_rgb(0_0_0/0.06)]">
+            <div className="p-6 sm:p-9">
+              {tag && subtitle && <p className="mb-4 text-sm font-medium text-text-2">{subtitle}</p>}
+              {children}
+            </div>
+            {host && (
+              <p className="flex items-center justify-center gap-1.5 rounded-b-[14px] border-t border-line bg-faint px-5 py-3.5 text-[13px] font-medium text-text-2">
+                <Lock className="size-3.5 text-primary" aria-hidden />
+                <span className="sr-only">Secure address: </span>
+                {host}
+              </p>
+            )}
+          </div>
+          {footer && <div className="mx-auto mt-5 max-w-[420px] text-center text-[13px] leading-relaxed text-muted">{footer}</div>}
         </div>
-        <div>
-          <p className="text-[44px] leading-[1.1] font-bold tracking-tight text-text">
-            From the first inquiry
-            <br />
-            to the money in the bank.
-          </p>
-          <p className="mt-4 max-w-[520px] text-[17px] text-text-2">
-            Inquiries, supplier offers, quotations, orders, shipping, documents and payments, for one trading company or many.
-          </p>
-        </div>
-        <ul className="grid grid-cols-3 gap-2 sm:gap-3">
-          {(
-            [
-              [TrendingUp, "Sales", "RFQ → quotation → order"],
-              [Truck, "Operations", "Factories, shipping, papers"],
-              [Wallet, "Money", "Payments, ledger, profit"],
-            ] as const
-          ).map(([Icon, name, line]) => (
-            <li key={name} className="rounded-[14px] bg-surface p-3 sm:p-3.5">
-              <Icon className="size-[22px] text-primary" aria-hidden />
-              <p className="mt-2 text-sm font-bold text-text sm:text-base">{name}</p>
-              <p className="text-xs text-muted sm:text-[13px]">{line}</p>
-            </li>
-          ))}
-        </ul>
-      </aside>
-      <div className="flex flex-1 items-center justify-center bg-surface px-6 py-10 lg:py-12">
-        <div className={wide ? "w-full max-w-xl" : "w-full max-w-[400px]"}>
-          {tag && subtitle !== "Sign in to your company" && (
-            <p className="mb-6 text-sm font-medium text-text-2">{subtitle}</p>
-          )}
-          {children}
-          {footer && <p className="mt-8 text-xs text-muted">{footer}</p>}
-        </div>
-      </div>
+      </main>
+      <footer className="px-6 pb-7 text-center text-[13px] text-muted">
+        © {new Date().getFullYear()} {PRODUCT_NAME}
+      </footer>
       <Suspense>
         <Toast />
       </Suspense>
-    </main>
+    </div>
   );
 }
