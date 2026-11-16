@@ -3,6 +3,17 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-alpha.5 — 2026-11-16
+
+Step 5: Sales.
+
+- The Sales tab lists every inquiry with who, what, where it stands, items, offers in and the quoted total. Chips for Open, New, Getting prices, Quoted, Overdue, On hold, Won and Lost show their counts; search and "Mine" narrow it down; more load as you scroll.
+- An inquiry opens on its record header: stage, overdue / on hold / urgent, items, needed by, its progress from New to Won, and Call, Chat (WhatsApp) and Mail for the contact.
+- Then the details (empty ones say "Not set"), what they need, the items, the quotation, the follow-ups and the notes. Add a note right there.
+- The quotation has two views of one document: Customer (exactly what they receive) and Internal (adds the factory, cost, profit and margin, each marked Internal, with a warning when the margin is low or lines have no cost).
+- Put on hold or take off hold, mark as lost (with the reason, so reports can learn), and reopen.
+- New inquiry in three short steps (who asked, what they need, their items) and a review, with a success check when it is saved.
+
 ## 3.0.0-alpha.4 — 2026-11-16
 
 Step 4: Home and the tabs.

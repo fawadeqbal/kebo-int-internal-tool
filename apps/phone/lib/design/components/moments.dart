@@ -11,17 +11,39 @@ import '../theme.dart';
 /// A check that draws itself inside a circle, with a success haptic. For "Payment sent
 /// for verification", "Quotation sent", "Verified". Under reduced motion it appears drawn.
 class SuccessCheck extends StatefulWidget {
-  const SuccessCheck({super.key, this.size = 72, this.label = 'Done'});
+  const SuccessCheck({
+    super.key,
+    this.size = 72,
+    this.label = 'Done',
+    this.hold = const Duration(milliseconds: 500),
+    this.onDone,
+  });
 
   final double size;
   final String label;
+
+  /// How long the drawn check stays before [onDone] (time to see it).
+  final Duration hold;
+
+  /// Called once the check is drawn and has been seen: the screen moves on then.
+  final VoidCallback? onDone;
 
   @override
   State<SuccessCheck> createState() => _SuccessCheckState();
 }
 
 class _SuccessCheckState extends State<SuccessCheck> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+  // The draw (600 ms) and the hold after it, as one animation, so it runs on frames and
+  // never on a loose timer.
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 600) + widget.hold)
+        ..addStatusListener((s) {
+          if (s == AnimationStatus.completed) widget.onDone?.call();
+        });
+  late final Animation<double> _draw = CurvedAnimation(
+    parent: _c,
+    curve: Interval(0, 600 / (600 + widget.hold.inMilliseconds), curve: Curves.linear),
+  );
 
   @override
   void initState() {
@@ -33,7 +55,10 @@ class _SuccessCheckState extends State<SuccessCheck> with SingleTickerProviderSt
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (KMotion.of(context).reduced) {
-      _c.value = 1;
+      if (_c.value == 0) {
+        _c.value = 1;
+        WidgetsBinding.instance.addPostFrameCallback((_) => widget.onDone?.call());
+      }
     } else if (_c.value == 0) {
       _c.forward();
     }
@@ -56,7 +81,7 @@ class _SuccessCheckState extends State<SuccessCheck> with SingleTickerProviderSt
         builder: (context, _) => CustomPaint(
           size: Size.square(widget.size),
           painter: _CheckPainter(
-            progress: KMotion.standardCurve.transform(_c.value),
+            progress: KMotion.standardCurve.transform(_draw.value),
             fill: k.successSoft,
             stroke: k.success,
           ),

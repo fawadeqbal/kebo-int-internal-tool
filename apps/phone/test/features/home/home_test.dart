@@ -133,7 +133,7 @@ void main() {
 
   testWidgets('tabs: each opens, More shows the account and theme', (t) async {
     await _open(t, _answers(unread: 0));
-    for (final tab in ['Sales', 'Orders', 'Money']) {
+    for (final tab in ['Orders', 'Money']) {
       await t.tap(find.text(tab).last);
       await t.pumpAndSettle();
       expect(find.textContaining('$tab arrives in step'), findsOneWidget);
