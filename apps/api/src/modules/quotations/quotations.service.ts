@@ -407,7 +407,16 @@ export class QuotationsService {
     const inquiry = await this.inquiries.find(user, inquiryId);
     const quotations = await this.quotationsOf(this.prisma.db, inquiryId);
     const items = await this.items(this.prisma.db, inquiryId);
-    const usual = (await this.settings.get()).sales.factoryAdvancePercent;
+    const settings = await this.settings.get();
+    const usual = settings.sales.factoryAdvancePercent;
+    // What New quotations starts with: the currency of the deal's latest quotation (else the customer's own, or
+    // the company's), the usual validity and margin.
+    const newest = quotations.flatMap((q) => q.revisions).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    const newDefaults = {
+      currency: newest?.currency ?? (await this.firstTerms(inquiry, settings)).currency,
+      validUntil: addDays(this.clock.today(), settings.sales.quotationValidityDays),
+      margin: settings.sales.defaultMarginPercent,
+    };
     // A quotation whose drafts were all deleted is not shown (its letter is given to the next new one).
     const views = quotations.filter((q) => q.revisions.length > 0).map((q) => this.quotationView(user, q, items, usual, inquiry.stage));
     // The first quotation, as the page shows it until it lists them all (with none yet: R1 can be started).
@@ -421,6 +430,7 @@ export class QuotationsService {
       whyNotStart: first ? first.whyNotStart : open ? null : "This inquiry is closed. Reopen it to quote again.",
       /** Every quotation of the deal, A, B, C…, each with its revisions. */
       quotations: views,
+      newDefaults,
     };
   }
 
@@ -956,8 +966,9 @@ export class QuotationsService {
   /**
    * Draft → sent (frozen, with who it was for and from), older sent revisions
    * superseded, the deal moves to Quoted. Then: accepted — exactly one option,
-   * the others not chosen; the order is made from it and the deal is Won —
-   * rejected, or expired; only on the newest sent revision.
+   * the others not chosen; the order is made from it and the deal is Won; the
+   * deal's other quotations the customer has become Not chosen and their drafts
+   * are put away — rejected, or expired; only on the newest sent revision.
    */
   async move(
     user: SessionUser,
@@ -1045,6 +1056,35 @@ export class QuotationsService {
             });
           const { event } = await this.orders.createFromRevision(tx, r.id, chosen.id, day, user.id, accept);
           events.push(event);
+          // The deal's other quotations: what the customer has is Not chosen (kept exactly as sent), and their
+          // drafts are put away. Answered ones (rejected, expired) stay as they are.
+          const others = await tx.quotationRevision.findMany({
+            where: { deletedAt: null, status: { in: ["sent", "draft"] }, quotation: { inquiryId: inquiry.id, id: { not: r.quotationId } } },
+            select: { id: true, number: true, status: true, quotation: { select: { refNo: true } } },
+          });
+          const notChosen = others.filter((o) => o.status === "sent");
+          if (notChosen.length)
+            await tx.quotationRevision.updateMany({ where: { id: { in: notChosen.map((o) => o.id) } }, data: { status: "not_chosen", answeredOn: toDbDate(day) } });
+          const putAway = others.filter((o) => o.status === "draft");
+          if (putAway.length) await tx.quotationRevision.updateMany({ where: { id: { in: putAway.map((o) => o.id) } }, data: { deletedAt: new Date() } });
+          for (const o of notChosen)
+            await this.audit.record(tx, {
+              userId: user.id,
+              action: "status_change",
+              entityType: "quotation",
+              entityId: o.id,
+              summary: `${o.quotation.refNo} R${o.number}: sent → not chosen (the customer accepted ${r.quotation.refNo} R${r.number})`,
+              oldValues: { status: "sent" },
+              newValues: { status: "not_chosen" },
+            });
+          for (const o of putAway)
+            await this.audit.record(tx, {
+              userId: user.id,
+              action: "delete",
+              entityType: "quotation",
+              entityId: o.id,
+              summary: `${o.quotation.refNo} R${o.number} draft put away (the customer accepted ${r.quotation.refNo} R${r.number})`,
+            });
           const moved = await this.stages.after(tx, inquiry, "quotation_accepted", user.id);
           if (moved) events.push(moved);
         } else {

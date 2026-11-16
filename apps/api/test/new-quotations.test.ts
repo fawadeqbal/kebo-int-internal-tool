@@ -140,6 +140,26 @@ describe("new quotations from the offers", () => {
     expect((await api(app, sana).get(`/inquiries/${inquiryId}`)).body.stage).toBe("quoted");
   });
 
+  it("accepting one makes the others Not chosen and puts their drafts away", async () => {
+    const before = await page();
+    const a = of(before, "A");
+    await api(app, sana).post(`/revisions/${a.revisions[0]!.id}/status`, { to: "sent" }).expect(200);
+    const b = of(before, "B");
+    const r1 = b.revisions.find((r) => r.number === 1)!;
+    await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "accepted" }).expect(200);
+    const after = await page();
+    // C and D were drafts: put away. A was with the customer: Not chosen, kept as sent. B: accepted (its R2 draft discarded).
+    expect(after.quotations.map((q) => [q.letter, q.revisions.map((r) => `R${r.number} ${r.status}`).join(", ")])).toEqual([
+      ["A", "R1 not_chosen"],
+      ["B", "R1 accepted"],
+    ]);
+    const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
+    expect(deal.stage).toBe("won");
+    expect(deal.quotation.refNo).toBe(b.refNo);
+    // A quotation not chosen is final: it is not answered again.
+    await api(app, sana).post(`/revisions/${of(after, "A").revisions[0]!.id}/status`, { to: "accepted" }).expect(409);
+  });
+
   it("refuses an offer that is not on the inquiry, and a closed inquiry", async () => {
     const other = (await api(app, sana).get("/inquiries?pageSize=5")).body.rows.find((r: { id: string }) => r.id !== inquiryId);
     const foreign = other ? (await api(app, sana).get(`/inquiries/${other.id}/sourcing`)).body.quotes?.[0]?.id : null;

@@ -7,7 +7,7 @@ import { withChromium } from "@/app/pdf/render";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail } from "@/lib/types";
 import { LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
-import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
+import type { NewQuotationsResult, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
@@ -27,6 +27,36 @@ export async function createRevisionAction(dealId: string, _prev: ActionState, f
     message: `Quotation ${revisionName(d) ?? `R${d.number}`} drafted`,
     detail: `${options > 1 ? `${options} options · ` : ""}Check it, then send it`,
   };
+}
+
+/**
+ * New quotations: one draft for each offer ticked (or own prices), lettered A, B, C… The window sends the offers
+ * (`offer` once per tick; "own" for own prices), the currency, valid until and the margin.
+ */
+export async function newQuotationsAction(dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const offers = form.getAll("offer").map((o) => (o === "own" ? null : String(o)));
+  if (!offers.length) return { ok: false, message: "Tick at least one offer.", errors: { offer: ["Tick at least one offer"] }, values: v };
+  const r = await attempt(form, () =>
+    api.post<NewQuotationsResult>(`/inquiries/${dealId}/quotations`, { offers, currency: (v.currency ?? "").trim().toUpperCase(), validUntil: v.validUntil, margin: v.margin }),
+  );
+  if (!r.ok) return r;
+  refresh(dealId);
+  const made = (r.data as NewQuotationsResult).quotations;
+  return {
+    ...r,
+    message: made.length === 1 ? `${made[0]!.refNo} drafted` : `${made.length} quotations drafted`,
+    detail: made.length === 1 ? "Check it, then send it" : made.map((q) => q.letter).join(", "),
+    data: { first: made[0]?.id ?? null },
+  };
+}
+
+/** One quotation's next revision (after the customer has seen one, the API asks why). */
+export async function reviseAction(dealId: string, quotationId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.post<{ number: number }>(`/quotations/${quotationId}/revisions`, formBody(form)));
+  if (!r.ok) return r;
+  refresh(dealId);
+  return { ...r, message: `${revisionName(r.data as RevisionAnswer) ?? "The new revision"} drafted`, detail: "Change what is different, then send it" };
 }
 
 export async function updateRevisionAction(dealId: string, revisionId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
@@ -115,6 +145,22 @@ export async function lostAction(dealId: string, revisionId: string | null, _pre
   refresh(dealId);
   const n = (r.data as { refNo?: string } | undefined)?.refNo;
   return { ...r, message: n ? `${n} marked lost` : "Marked lost", detail: why };
+}
+
+/**
+ * The customer said no to one quotation: it is recorded as rejected (with why). With `close` ticked the
+ * inquiry is closed as lost too (as Lost… does); unticked, its other quotations stay open.
+ */
+export async function saidNoAction(dealId: string, revisionId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  if (v.close === "on") return lostAction(dealId, revisionId, _prev, form);
+  const why = v.note?.trim() || (v.lostReason ? LOST_REASON_LABEL[v.lostReason as LostReason] : "");
+  if (!why) return { ok: false, message: "Say why they said no.", errors: { note: ["Say why"] }, values: v };
+  const r = await attempt(form, () => api.post(`/revisions/${revisionId}/status`, { to: "rejected", on: v.on || null, reason: why.slice(0, 500) }), "Recorded: the customer said no.");
+  if (!r.ok) return r;
+  refresh(dealId);
+  const name = revisionName(r.data as RevisionAnswer);
+  return { ...r, message: name ? `${name}: the customer said no` : "Recorded: the customer said no", detail: why };
 }
 
 const TERM_FIELDS = ["validUntil", "incotermPlace", "paymentTerms", "deliveryTerms", "warranty", "notes"] as const;

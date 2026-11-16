@@ -387,13 +387,14 @@ export function MarkSentButton({
  * lines, lead time and margin), the day, their PO or reference and how they
  * pay, then what happens. It makes the order.
  */
-function AcceptForm({
+export function AcceptForm({
   options,
   currency,
   action,
   today,
   onOrder,
   route,
+  others = [],
 }: {
   options: OptionView[];
   currency: string;
@@ -402,11 +403,13 @@ function AcceptForm({
   onOrder: (o: { orderId: string; orderRefNo: string }) => void;
   /** The route the quotation's terms imply. */
   route: PaymentRoute | null;
+  /** The deal's other quotations the customer has: they become "Not chosen". */
+  others?: string[];
 }) {
   const close = useClosePanel();
   const [optionId, setOptionId] = useState(options.length === 1 ? options[0]!.id : (options[0]?.id ?? ""));
   const chosen = options.find((o) => o.id === optionId);
-  const others = options.filter((o) => o.id !== optionId);
+  const rest = options.filter((o) => o.id !== optionId);
   const factories = chosen?.factory ? [chosen.factory.name] : [];
   return (
     <ActionForm
@@ -477,8 +480,13 @@ function AcceptForm({
                     · A purchase order is opened for {factories.join(", ")} (sent later, from the order).
                   </span>
                 )}
+                {others.length > 0 && (
+                  <span className="block">
+                    · {others.join(", ")} {others.length === 1 ? "becomes" : "become"} <strong className="text-text">Not chosen</strong>, kept as sent.
+                  </span>
+                )}
                 <span className="block">
-                  · {others.length ? `${others.map((o) => `Option ${o.letter}`).join(", ")} ${others.length === 1 ? "is" : "are"} marked “not chosen”; the` : "The"} inquiry becomes{" "}
+                  · {rest.length ? `${rest.map((o) => `Option ${o.letter}`).join(", ")} ${rest.length === 1 ? "is" : "are"} marked “not chosen”; the` : "The"} inquiry becomes{" "}
                   <strong className="text-text">Won</strong>.
                 </span>
               </div>
@@ -544,7 +552,7 @@ function LostForm({ action, today, number }: { action: Action; today: string; nu
 }
 
 /** Expired: the validity passed without an answer. */
-function ExpiredForm({ action, today, number }: { action: Action; today: string; number: number }) {
+export function ExpiredForm({ action, today, number }: { action: Action; today: string; number: number }) {
   const close = useClosePanel();
   return (
     <PanelBody>
