@@ -4,12 +4,13 @@ import { MoneyModule } from "../money/money.module";
 import { ClaimsController, OrderBoardController, FactoryRequestsController, OrderDocumentsController, OrderFlowController, ShipmentsController } from "./flow.controller";
 import { FlowService } from "./flow.service";
 import { FactoryRequestsService } from "./factory-requests.service";
+import { TermsFillService } from "./terms-fill.service";
 
 /** The order flow after the quotation, and asking factories for prices (see @kebo/shared workflows/flow). */
 @Module({
   imports: [OrdersModule, MoneyModule],
   controllers: [OrderFlowController, OrderBoardController, ShipmentsController, OrderDocumentsController, ClaimsController, FactoryRequestsController],
-  providers: [FlowService, FactoryRequestsService],
-  exports: [FlowService],
+  providers: [FlowService, FactoryRequestsService, TermsFillService],
+  exports: [FlowService, TermsFillService],
 })
 export class FlowModule {}

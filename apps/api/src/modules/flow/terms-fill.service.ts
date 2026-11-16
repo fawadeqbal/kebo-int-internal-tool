@@ -2,8 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../database/prisma.service";
 import { CompanyContext } from "../../common/company/company-context";
 import { toInfo } from "../../common/company/companies.service";
-import { agreedView } from "./orders.service";
-import { copyOfOffer, offerTermsSelect } from "../flow/factory-terms";
+import { agreedView } from "../orders/orders.service";
+import { copyOfOffer, offerTermsSelect } from "./factory-terms";
 
 /**
  * Old records, filled once (design "RFQ Desk — terms that travel", step 4): an order made before it kept its own

@@ -8,7 +8,7 @@ import { configureApp } from "./setup";
 import { DocumentsService } from "./modules/orders/documents.service";
 import { FactsService } from "./modules/insights/facts/facts.service";
 import { LedgerService } from "./modules/ledger/ledger.service";
-import { TermsFillService } from "./modules/orders/terms-fill.service";
+import { TermsFillService } from "./modules/flow/terms-fill.service";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });

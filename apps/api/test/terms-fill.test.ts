@@ -7,7 +7,7 @@ import { Clock } from "../src/common/time/clock.service";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
 import { CompanyContext } from "../src/common/company/company-context";
-import { TermsFillService } from "../src/modules/orders/terms-fill.service";
+import { TermsFillService } from "../src/modules/flow/terms-fill.service";
 
 /**
  * Design "RFQ Desk — terms that travel" (16 Nov 2026), step 4: old records filled once. An order made before it kept
