@@ -161,5 +161,24 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(instructions.getByText("Karachi")).toBeVisible();
   await page.goto(`/orders/${orderId}/documents`);
   await expect(page.getByRole("region", { name: "How the papers print" }).getByText("Agreed payment conditions")).toBeVisible();
+
+  // The factory's side, in the same groups: its offer's terms until the purchase order is sent.
+  await page.goto(`/orders/${orderId}/factory`);
+  await expect(page.getByRole("region", { name: "Purchase order" }).getByText("Made from their offer")).toBeVisible();
+  const factory = page.getByRole("region", { name: "Agreed with the factory" });
+  await expect(factory.getByText("30 days after the advance")).toBeVisible();
+  await expect(factory.getByText("12 months", { exact: true })).toBeVisible();
+  expect(await accessibilityProblems(page), "the factory order meets WCAG 2.2 AA").toEqual([]);
+  await factory.getByRole("button", { name: "Change", exact: true }).click();
+  const terms = page.getByRole("dialog", { name: /What we agreed with Jinan Terms/ });
+  await expect(terms.getByText(/Not sent yet/)).toBeVisible();
+  expect(await accessibilityProblems(page), "the factory's Change window meets WCAG 2.2 AA").toEqual([]);
+  await terms.locator("#fac-lead").fill("35");
+  await terms.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(terms).toBeHidden();
+  await expect(factory.getByText("35 days after the advance")).toBeVisible();
+  // The purchase order's paper prints it.
+  await page.goto(`/print/orders/${orderId}/purchase-order`);
+  await expect(page.getByText("Delivery: FOB Qingdao, ready 35 days after our advance.")).toBeVisible();
   expect(errors).toEqual([]);
 });

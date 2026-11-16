@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: 
 
 const { sideBySide, shipByNote } = await import("@/components/order-sections/agreed");
 const { AgreedWindow } = await import("@/components/order-sections/overview-windows");
+const { FactoryAgreedWindow } = await import("@/components/order-sections/factory-windows");
 
 const agreed = (a: Partial<NonNullable<OrderView["agreed"]>> = {}): NonNullable<OrderView["agreed"]> => ({
   copied: true,
@@ -188,5 +189,54 @@ describe("Change what we agreed with the customer", () => {
     fireEvent.change(d.querySelector("#agr-warranty-months") as HTMLInputElement, { target: { value: "" } });
     expect(hidden("warrantyMonths")).toBe("");
     expect(hidden("warrantyFrom")).toBe("");
+  });
+});
+
+describe("Change what we agreed with the factory", () => {
+  const open = (sent: boolean) => {
+    render(
+      <FactoryAgreedWindow
+        title="What we agreed with Jinan Pharma Machinery"
+        sub="PO-2026-0617 · from their offer JP-2611-08"
+        action={async () => ({ ok: true })}
+        sent={sent}
+        values={{
+          basis: "FOB",
+          basisPlace: "Qingdao",
+          leadDays: 30,
+          leadFrom: "after_payment",
+          warrantyMonths: 12,
+          warrantyFrom: "shipment",
+          warranty: "parts, not labour",
+          paymentNote: "By T/T to their account in Jinan.",
+          moq: "1 set",
+          notes: null,
+        }}
+        payment="Advance 30%, paid · Balance 70%"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Change/ }));
+    return screen.getByRole("dialog");
+  };
+  const hidden = (name: string) => (document.querySelector(`input[type="hidden"][name="${name}"]`) as HTMLInputElement).value;
+
+  it("Delivery, the payment's note, Warranty and Conditions, filled with what the purchase order keeps", () => {
+    const d = open(true);
+    expect((within(d).getByLabelText(/Delivery basis/) as HTMLSelectElement).value).toBe("FOB");
+    expect((d.querySelector("#fac-place") as HTMLInputElement).value).toBe("Qingdao");
+    expect((d.querySelector("#fac-note") as HTMLTextAreaElement).value).toBe("By T/T to their account in Jinan.");
+    expect((d.querySelector("#fac-moq") as HTMLInputElement).value).toBe("1 set");
+    expect(within(d).getByText("Advance 30%, paid · Balance 70%")).toBeTruthy();
+    expect(hidden("leadDays")).toBe("30");
+    expect(hidden("warrantyFrom")).toBe("shipment");
+    fireEvent.change(d.querySelector("#fac-lead") as HTMLInputElement, { target: { value: "35" } });
+    expect(hidden("leadDays")).toBe("35");
+    expect(within(d).getByText(/differs from their offer asks why/)).toBeTruthy();
+  });
+
+  it("not sent yet: it says what goes to the factory, and asks no why", () => {
+    const d = open(false);
+    expect(within(d).getByText(/Not sent yet/)).toBeTruthy();
+    expect(within(d).queryByText(/asks why/)).toBeNull();
   });
 });

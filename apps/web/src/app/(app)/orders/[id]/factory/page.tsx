@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { Mail, Printer } from "lucide-react";
-import { can, PAYMENT_METHOD_LABEL } from "@kebo/shared";
+import { can, PAYMENT_METHOD_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
 import { ButtonLink, RefCode } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
-import { date, money } from "@/lib/format";
+import { date, dayMonth, money } from "@/lib/format";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
-import { ChangeFactoryPaymentWindow, FactoryOrderWindow, PayFactoryWindow } from "@/components/order-sections/factory-windows";
+import { ChangeFactoryPaymentWindow, FactoryAgreedWindow, FactoryOrderWindow, PayFactoryWindow } from "@/components/order-sections/factory-windows";
+import { Fact, Group, Printed } from "@/components/order-sections/agreed";
 import { SendForm, type PurchaseOrderView } from "@/components/orders/purchase-order-card";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { PanelButton } from "@/components/orders/step-view";
@@ -20,6 +21,7 @@ import { PaymentsList } from "@/components/order-sections/payments-list";
 import { ROW_LINK } from "@/components/order-sections/section-window";
 import { factoryPaymentAction, factoryPlanAction, removePaymentFileAction, voidFactoryPaymentAction } from "../../../money/actions";
 import { sendPurchaseOrderAction } from "../../flow-actions";
+import { factoryTermsAction } from "../../actions";
 import { fieldsAction } from "../../light-actions";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
@@ -121,6 +123,99 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       currency={o.currency}
     />
   );
+  // Agreed with the factory (design "terms that travel", step 3b): the purchase order's own copy once sent, else
+  // its offer's, in the four groups; the payment is its plan's.
+  const agreedOf = (po: PurchaseOrderView, many: boolean) => {
+    const a = po.agreed;
+    if (!a) return null;
+    const plan = plans.find((p) => p.factory.id === po.supplier.id);
+    const r = a.readyBy;
+    const readyNote = !r
+      ? null
+      : r.by === "drawings"
+        ? "Type it on Production once the drawings are approved"
+        : r.readyOn
+          ? r.by === "advance"
+            ? `Worked out: the advance went ${dayMonth(r.on!)}`
+            : `Worked out: ${a.leadDays} days after we ordered`
+          : r.by === "advance"
+            ? "Worked out once the advance is paid"
+            : "Worked out once we order";
+    const invoices = plan ? [...new Set(plan.rows.map((x) => x.supplierRef).filter(Boolean))] : [];
+    const from = po.offer ? (po.offer.reference ?? `their offer of ${date(po.offer.receivedOn)}`) : null;
+    return (
+      <Section
+        key={`agreed-${po.id}`}
+        id={many ? undefined : "factory-agreed"}
+        title={many ? `Agreed with the factory · ${po.supplier.name}` : "Agreed with the factory"}
+        actions={
+          <>
+            {from && <span className="text-xs text-text-2 max-sm:hidden">From their offer {from}</span>}
+            {a.changes > 0 && (
+              <Link href={`/orders/${o.id}/history?q=${encodeURIComponent(`${po.number}: what was agreed`)}`} className="text-xs font-medium text-primary hover:underline">
+                Changed {a.changes}×
+              </Link>
+            )}
+            {canEdit && (
+              <FactoryAgreedWindow
+                title={`What we agreed with ${po.supplier.name}`}
+                sub={`${po.number}${from ? ` · from their offer ${from}` : ""}`}
+                action={factoryTermsAction.bind(null, o.id, po.id)}
+                sent={!!po.sentOn}
+                values={{
+                  basis: a.basis,
+                  basisPlace: a.basisPlace,
+                  leadDays: a.leadDays,
+                  leadFrom: a.leadFrom,
+                  warrantyMonths: a.warrantyMonths,
+                  warrantyFrom: a.warrantyFrom,
+                  warranty: a.warranty,
+                  paymentNote: a.paymentNote,
+                  moq: a.moq,
+                  notes: a.notes,
+                }}
+                payment={plan ? plan.rows.map((x) => `${x.label}${x.status === "paid" ? ", paid" : ""}`).join(" · ") : "The plan is under Payment plan below."}
+              />
+            )}
+          </>
+        }
+      >
+        <div className="grid gap-3 px-[18px] pt-1 pb-3.5 md:grid-cols-2">
+          <Group title="Delivery" big={a.basis ? `${a.basis}${a.basisPlace ? ` ${a.basisPlace}` : ""}` : "Basis not said"}>
+            <Fact label="Lead time">{a.leadTime}</Fact>
+            <Fact label="Ready by">{r && "readyOn" in r && r.readyOn ? date(r.readyOn) : null}</Fact>
+            {readyNote && <p className="text-xs text-text-2">{readyNote}</p>}
+            <p className="text-xs text-muted">Their own ready date, when they give one, is kept on Production.</p>
+          </Group>
+          <Group title="Payment" big={plan ? `${plan.rows.length} part${plan.rows.length === 1 ? "" : "s"}` : "Its plan"}>
+            {plan && (
+              <ul className="flex flex-col gap-0.5">
+                {plan.rows.map((x, i) => (
+                  <li key={x.id ?? i} className="flex min-w-0 items-baseline justify-between gap-3">
+                    <span className="min-w-0 text-text-2">{x.label}</span>
+                    <b className={x.status === "paid" ? "shrink-0 font-semibold text-ok" : "shrink-0 font-semibold tabular"}>
+                      {x.status === "paid" ? "paid" : money(x.open, plan.currency)}
+                    </b>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {plan && <Fact label="Their invoices">{invoices.length ? invoices.join(", ") : "none yet"}</Fact>}
+            <Printed text={a.paymentNote} />
+            {plan && <div className="mt-0.5 self-start">{editPlan(plan, "Change the plan")}</div>}
+          </Group>
+          <Group title="Warranty" big={a.warrantyMonths !== null ? `${a.warrantyMonths} month${a.warrantyMonths === 1 ? "" : "s"}` : a.warranty ? "As they said" : "None said"}>
+            {a.warrantyMonths !== null && <p className="text-text-2">from {WARRANTY_FROM_LABEL[a.warrantyFrom ?? "shipment"]}</p>}
+            {a.warranty && <p className="text-text-2">{a.warranty.replace(/^./, (c) => c.toUpperCase())}</p>}
+          </Group>
+          <Group title="Conditions" big={a.moq ? `Minimum order ${a.moq}` : a.notes ? "Notes" : "None"}>
+            <Printed text={a.notes} />
+          </Group>
+        </div>
+      </Section>
+    );
+  };
+
   const depositText = pos
     ? Number(pos.deposit.paid) > 0
       ? `${money(pos.deposit.paid, o.currency)} of the deposit ${money(pos.deposit.asked, o.currency)} is recorded; the rest is not in yet.`
@@ -129,7 +224,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
 
   return (
     <OrderPage id={id}>
-      {(pos?.items ?? []).map((po, n) => (
+      {(pos?.items ?? []).map((po, n) => [
         <Section
           key={po.id}
           title={(pos?.items.length ?? 0) > 1 ? `Purchase order · ${po.supplier.name}` : "Purchase order"}
@@ -191,8 +286,9 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
             </>
           }
           files={n === 0 ? <SectionFiles orderId={o.id} section="purchase_order" canAdd={d.canFiles} /> : undefined}
-        />
-      ))}
+        />,
+        agreedOf(po, (pos?.items.length ?? 0) > 1),
+      ])}
       {pos && pos.items.length === 0 && <EmptySection title="Purchase order" text="No line of this order was quoted from a factory, so there is no purchase order." />}
 
       {plans.length > 0 && (

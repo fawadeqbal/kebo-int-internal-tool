@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Alert, Field, Input } from "@kebo/ui";
+import { useState, type ReactNode } from "react";
+import { INCOTERMS, isLeadFrom, isWarrantyFrom, type LeadFrom, type WarrantyFrom } from "@kebo/shared";
+import { Alert, Field, Input, Select, Textarea } from "@kebo/ui";
+import { PanelSection } from "@/components/common/panel";
+import { LeadField, WarrantyFields } from "@/components/deals/terms-fields";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryOwed, FactoryPaymentView } from "@/lib/types-money";
 import type { Person } from "@/lib/types";
@@ -115,5 +118,128 @@ export function ChangeFactoryPaymentWindow({
         </>
       )}
     </FormWindow>
+  );
+}
+
+/** What the factory Change window starts from: what the purchase order keeps as agreed now. */
+export interface FactoryAgreedValues {
+  basis: string | null;
+  basisPlace: string | null;
+  leadDays: number | null;
+  leadFrom: LeadFrom | null;
+  warrantyMonths: number | null;
+  warrantyFrom: WarrantyFrom | null;
+  warranty: string | null;
+  paymentNote: string | null;
+  moq: string | null;
+  notes: string | null;
+}
+
+function FactoryAgreedFields({ state, values, payment, sent }: { state: ActionState; values: FactoryAgreedValues; payment: ReactNode; sent: boolean }) {
+  // After "Why?" the form is drawn again from what was typed (state.values).
+  const typed = state.values ?? {};
+  const pick = (k: keyof FactoryAgreedValues, fallback: string) => (k in typed ? (typed[k] ?? "") : fallback);
+  const whole = (n: number | null) => (n === null ? "" : String(n));
+  const [leadDays, setLeadDays] = useState(pick("leadDays", whole(values.leadDays)));
+  const [leadFrom, setLeadFrom] = useState<LeadFrom>(() => {
+    const f = pick("leadFrom", values.leadFrom ?? "after_payment");
+    return isLeadFrom(f) ? f : "after_payment";
+  });
+  const [months, setMonths] = useState(pick("warrantyMonths", whole(values.warrantyMonths)));
+  const [wFrom, setWFrom] = useState<WarrantyFrom>(() => {
+    const f = pick("warrantyFrom", values.warrantyFrom ?? "shipment");
+    return isWarrantyFrom(f) ? f : "shipment";
+  });
+  const [covers, setCovers] = useState(pick("warranty", values.warranty ?? ""));
+  const e = state.errors ?? {};
+  const v = (k: "basis" | "basisPlace" | "paymentNote" | "moq" | "notes") => pick(k, values[k] ?? "");
+  return (
+    <>
+      <p className="rounded-md bg-info-soft px-3 py-2 text-xs text-text">
+        {sent
+          ? "Their offer stays as they sent it. What you change here is what this purchase order and its paper use from now on; a paper already made final keeps what it said."
+          : "Not sent yet: it goes to the factory with what you set here."}
+      </p>
+      <input type="hidden" name="leadDays" value={leadDays.trim()} />
+      <input type="hidden" name="leadFrom" value={leadDays.trim() ? leadFrom : ""} />
+      <input type="hidden" name="warrantyMonths" value={months.trim()} />
+      <input type="hidden" name="warrantyFrom" value={months.trim() ? wFrom : ""} />
+      <input type="hidden" name="warranty" value={covers} />
+
+      <PanelSection title="Delivery" sub="where they hand the goods over, and how long they need" first>
+        <Field label="Delivery basis (Incoterm)" htmlFor="fac-basis" optional error={e.basis}>
+          <Select id="fac-basis" name="basis" defaultValue={v("basis")}>
+            <option value="">Not said</option>
+            {INCOTERMS.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Place" htmlFor="fac-place" optional error={e.basisPlace} hint="Where they hand the goods over">
+          <Input id="fac-place" name="basisPlace" maxLength={60} placeholder="e.g. Qingdao" defaultValue={v("basisPlace")} />
+        </Field>
+        <LeadField id="fac-lead" side="factory" days={leadDays} from={leadFrom} onDays={setLeadDays} onFrom={setLeadFrom} error={e.leadDays ?? e.leadFrom} className="sm:col-span-2" />
+      </PanelSection>
+
+      <PanelSection title="Payment" sub="its parts are its plan's" className="sm:grid-cols-1">
+        <div className="rounded-md border border-line bg-surface-2/40 px-3 py-2 text-[13px]">{payment}</div>
+        <Field label="Payment note" htmlFor="fac-note" optional error={e.paymentNote} hint="Printed after the parts">
+          <Textarea id="fac-note" name="paymentNote" rows={2} className="min-h-0" maxLength={2000} placeholder="e.g. By T/T to their account in Jinan" defaultValue={v("paymentNote")} />
+        </Field>
+      </PanelSection>
+
+      <PanelSection title="Warranty" className="md:grid-cols-3">
+        <WarrantyFields
+          idPrefix="fac"
+          months={months}
+          from={wFrom}
+          covers={covers}
+          onMonths={setMonths}
+          onFrom={setWFrom}
+          onCovers={setCovers}
+          errors={{ months: e.warrantyMonths, from: e.warrantyFrom, covers: e.warranty }}
+        />
+      </PanelSection>
+
+      <PanelSection title="Conditions" className="sm:grid-cols-1">
+        <Field label="Minimum order" htmlFor="fac-moq" optional error={e.moq}>
+          <Input id="fac-moq" name="moq" maxLength={60} placeholder="e.g. 1 set" defaultValue={v("moq")} />
+        </Field>
+        <Field label="Notes to the factory" htmlFor="fac-notes" optional error={e.notes} hint="Printed last on the purchase order">
+          <Textarea id="fac-notes" name="notes" rows={3} className="min-h-0" maxLength={5000} defaultValue={v("notes")} />
+        </Field>
+      </PanelSection>
+      {sent && <p className="text-xs text-text-2">Anything that differs from their offer asks why when you save; the reason is kept in the order’s history.</p>}
+    </>
+  );
+}
+
+/**
+ * Change what we agreed with the factory (design "terms that travel", step 3b): Delivery, the payment's note,
+ * Warranty and Conditions on its purchase order; the parts are changed in its plan. Once sent, a change from
+ * their offer asks why.
+ */
+export function FactoryAgreedWindow({
+  title,
+  sub,
+  action,
+  values,
+  payment,
+  sent,
+}: {
+  title: string;
+  sub: string;
+  action: Action;
+  values: FactoryAgreedValues;
+  /** The plan in a line. */
+  payment: ReactNode;
+  sent: boolean;
+}) {
+  return (
+    <SectionWindow button={{ label: "Change" }} title={title} sub={sub} action={action} size="md">
+      {(s) => <FactoryAgreedFields state={s} values={values} payment={payment} sent={sent} />}
+    </SectionWindow>
   );
 }
