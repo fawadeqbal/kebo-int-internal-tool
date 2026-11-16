@@ -1,7 +1,19 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, UploadedFiles, UseInterceptors } from "@nestjs/common";
+import { FilesInterceptor } from "@nestjs/platform-express";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { currency, newQuotationsInput, revisionEmailInput, revisionInput, revisionMoveInput, type NewQuotationsInput, type RevisionInput } from "@kebo/shared";
+import {
+  currency,
+  newQuotationsInput,
+  quotationsEmailForm,
+  quotationsSentInput,
+  revisionEmailInput,
+  revisionInput,
+  revisionMoveInput,
+  type NewQuotationsInput,
+  type QuotationsEmailForm,
+  type RevisionInput,
+} from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -48,6 +60,28 @@ export class QuotationsController {
   @RequirePermissions("quotations.manage")
   createMany(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(newQuotationsInput)) body: NewQuotationsInput) {
     return this.quotations.createQuotations(user, id, body);
+  }
+
+  /** Several drafts in one email: multipart, these fields and their PDFs as `pdfs` (in the order of `revisionIds`); each is then sent. */
+  @Post("inquiries/:id/quotations/email")
+  @HttpCode(200)
+  @RequirePermissions("quotations.manage")
+  @UseInterceptors(FilesInterceptor("pdfs", 10, { limits: { fileSize: 20 * 1024 * 1024, files: 10 } }))
+  emailMany(
+    @CurrentUser() user: SessionUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(quotationsEmailForm)) body: QuotationsEmailForm,
+    @UploadedFiles() pdfs: Express.Multer.File[] | undefined,
+  ) {
+    return this.quotations.emailMany(user, id, body, pdfs ?? []);
+  }
+
+  /** Several drafts marked sent at once (sent another way). */
+  @Post("inquiries/:id/quotations/sent")
+  @HttpCode(200)
+  @RequirePermissions("quotations.manage")
+  markSent(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(quotationsSentInput)) body: z.infer<typeof quotationsSentInput>) {
+    return this.quotations.markManySent(user, id, body);
   }
 
   /** Starting values for one quotation's next revision (a copy of its latest). */

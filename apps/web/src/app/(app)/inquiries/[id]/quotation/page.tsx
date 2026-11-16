@@ -25,7 +25,7 @@ import {
   saidNoAction,
   updateRevisionAction,
 } from "./actions";
-import { DeleteDraftButton, SendWindow } from "@/components/deals/send-quote";
+import { DeleteDraftButton, SendWindow, type SendItem } from "@/components/deals/send-quote";
 import { inquiryTitle } from "@/lib/titles";
 
 export const generateMetadata = inquiryTitle("Quotation");
@@ -110,10 +110,22 @@ export default async function QuotationPage({
   // "Send R1…": one window with two choices (email it from here, or I sent it myself). A sent one can only be emailed again.
   const who = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
   const copy = d.customer.contacts.filter((c) => c.email && c.id !== who?.id).map((c) => c.email);
+  const dear = `Dear ${who?.name.split(" ")[0] ?? "Sir or Madam"},`;
+  // The deal's drafts ready to go (every option priced), in letter order: a draft's window can include the others.
+  const ready: SendItem[] = quotations.flatMap((x) => {
+    const c = currentOf(x);
+    return c.status === "draft" && c.options.length > 0 && c.options.every((o) => Number(o.total) > 0)
+      ? [{ id: c.id, refNo: x.refNo, letter: x.letter, number: c.number, total: money(c.total, c.currency), printHref: printHref(c), pdfHref: pdfHref(c) }]
+      : [];
+  });
   const sendWindow = (x: QuotationOfDeal, r: RevisionView) => {
     const quoteRef = `${x.refNo} R${r.number}`;
     return (
       <SendWindow
+        revisionId={r.id}
+        together={r.status === "draft" ? ready : []}
+        subjectMany={`Quotations {names} — ${d.title}`}
+        messageMany={`${dear} please find our quotations for ${d.title}.`}
         number={r.number}
         customer={d.customer.name}
         emailAction={emailRevisionAction.bind(null, d.id, r.id, `${quoteRef}.pdf`)}
@@ -121,7 +133,7 @@ export default async function QuotationPage({
         to={who?.email ?? ""}
         cc={copy.slice(0, 2).join(", ")}
         subject={`Quotation ${quoteRef} — ${d.title}`}
-        message={`Dear ${who?.name.split(" ")[0] ?? "Sir or Madam"}, please find our ${r.number > 1 ? "revised " : ""}quotation for ${d.title}.`}
+        message={`${dear} please find our ${r.number > 1 ? "revised " : ""}quotation for ${d.title}.`}
         fileName={`${quoteRef}.pdf`}
         printHref={printHref(r)}
         pdfHref={pdfHref(r)}

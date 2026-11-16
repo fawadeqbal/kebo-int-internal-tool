@@ -452,6 +452,29 @@ export const newQuotationsInput = z.object({
 });
 export type NewQuotationsInput = z.infer<typeof newQuotationsInput>;
 
+/** A list typed in one box ("a@x.com, b@y.com"), as the multipart form sends it. */
+const listOf = (s: string | undefined) => (s ?? "").split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+
+/**
+ * Several quotations of one inquiry in one email (multipart: these fields, and their PDFs as files `pdfs` in the
+ * same order as `revisionIds`); each draft is then marked sent by email.
+ */
+export const quotationsEmailForm = z.object({
+  revisionIds: z.string().transform(listOf).pipe(z.array(z.string().uuid("Choose the quotations")).min(1, "Choose the quotations").max(10, "Send at most 10 at once")),
+  to: z.string().transform(listOf).pipe(z.array(z.string().email("Check the email address")).min(1, "Who is it to?").max(10)),
+  cc: z.string().optional().transform(listOf).pipe(z.array(z.string().email("Check the copy address")).max(10)),
+  subject: text(300, "Write a subject"),
+  message: optionalText(10000),
+});
+export type QuotationsEmailForm = z.infer<typeof quotationsEmailForm>;
+
+/** Several quotations marked sent at once (sent another way: WhatsApp, in person…). */
+export const quotationsSentInput = z.object({
+  revisionIds: z.array(z.string().uuid("Choose the quotations")).min(1, "Choose the quotations").max(10, "At most 10 at once"),
+  on: optionalDate,
+  via: z.preprocess((v) => (v === "" ? undefined : v), z.enum(SENT_VIA).optional()),
+});
+
 /** Email a revision: to whom, a copy, the subject and message, and its PDF (base64, made by the web app). */
 export const revisionEmailInput = z.object({
   to: z.array(z.string().trim().email("Check the email address")).min(1, "Who is it to?").max(10),

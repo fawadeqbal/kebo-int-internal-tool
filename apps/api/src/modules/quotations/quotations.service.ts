@@ -43,6 +43,7 @@ import {
   type PaymentRoute,
   type QuotePartRule,
   type SentVia,
+  SENT_VIA_TEXT,
 } from "@kebo/shared";
 import { addDays, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -961,6 +962,56 @@ export class QuotationsService {
       summary: `${head.quotation.refNo} R${r.number} emailed again to ${input.to.join(", ")}`,
     });
     return { ok: true };
+  }
+
+  /** Drafts of one inquiry to send together: each its quotation's newest, still a draft, with a price. */
+  private async sendable(user: SessionUser, inquiryId: string, revisionIds: string[]) {
+    this.assertCan(user);
+    const inquiry = await this.inquiries.findWorkable(user, inquiryId);
+    if (!canQuote(inquiry.stage)) throw new DomainError("This inquiry is closed. Reopen it to quote again.");
+    const revs = await this.prisma.db.quotationRevision.findMany({
+      where: { id: { in: revisionIds }, deletedAt: null, quotation: { inquiryId } },
+      select: { id: true, number: true, status: true, quotation: { select: { refNo: true } }, options: { select: { total: true } } },
+    });
+    if (revs.length !== new Set(revisionIds).size) throw new DomainError("One of the quotations is no longer on this inquiry. Reload the page.");
+    for (const r of revs) {
+      if (r.status !== "draft") throw new GateError(`${r.quotation.refNo} R${r.number} was sent already.`, "revision_move");
+      if (r.options.some((o) => !(Number(o.total) > 0))) throw new DomainError(`Price ${r.quotation.refNo} R${r.number} before sending: it comes to 0.`);
+    }
+    return revisionIds.map((id) => revs.find((r) => r.id === id)!);
+  }
+
+  /**
+   * Several quotations in one email (design "one way, any number"): their PDFs attached (made by the web app,
+   * in the same order), then each draft marked sent by email.
+   */
+  async emailMany(user: SessionUser, inquiryId: string, input: { revisionIds: string[]; to: string[]; cc: string[]; subject: string; message?: string | null }, pdfs: { buffer: Buffer }[]) {
+    const revs = await this.sendable(user, inquiryId, input.revisionIds);
+    const mailer = await this.mail.mailer();
+    if (!mailer.enabled)
+      throw new DomainError("Email is not set up yet (an admin sets it under Admin settings › Email sending). Download the PDFs, send them yourself, then use “I sent it myself”.");
+    await mailer.send({
+      to: input.to,
+      cc: input.cc.length ? input.cc : undefined,
+      subject: input.subject,
+      text: input.message?.trim() || input.subject,
+      replyTo: user.email ?? undefined,
+      // Each PDF is named for its quotation here ("QUO-2026-0531-C R1.pdf"), whatever the file was called.
+      attachments: pdfs.length
+        ? revs.flatMap((r, i) => (pdfs[i] ? [{ filename: `${r.quotation.refNo} R${r.number}.pdf`, content: pdfs[i].buffer, contentType: "application/pdf" }] : []))
+        : undefined,
+    });
+    const how = `By email to ${input.to.join(", ")}`;
+    for (const r of revs) await this.move(user, r.id, "sent", null, how, null, { via: "email" });
+    return { sent: revs.map((r) => `${r.quotation.refNo} R${r.number}`) };
+  }
+
+  /** Several drafts marked sent at once (sent another way). */
+  async markManySent(user: SessionUser, inquiryId: string, input: { revisionIds: string[]; on?: ISODate | null; via?: SentVia }) {
+    const revs = await this.sendable(user, inquiryId, input.revisionIds);
+    const how = input.via ? `Sent ${SENT_VIA_TEXT[input.via]}` : null;
+    for (const r of revs) await this.move(user, r.id, "sent", input.on ?? null, how, null, { via: input.via });
+    return { sent: revs.map((r) => `${r.quotation.refNo} R${r.number}`) };
   }
 
   /**
