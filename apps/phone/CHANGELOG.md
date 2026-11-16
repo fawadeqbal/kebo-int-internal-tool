@@ -3,6 +3,16 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-alpha.3 — 2026-11-16
+
+Step 3: the core. The app now signs in to your RFQ Desk server.
+
+- Sign in with your work email and password. If your email is in more than one company you choose which; if two-step sign-in is on you enter the code (or a recovery code).
+- You stay signed in between launches; the token lives in the phone's secure keystore.
+- Works without signal: pages you opened are kept and shown with their time ("Offline · 9:41"), and what you save waits on the phone and is sent when you are back. Money saves are sent exactly once.
+- The server can be changed on the sign-in screen, for companies that run their own.
+- Signing out removes everything of yours from the phone, and asks first when something is still waiting to send.
+
 ## 3.0.0-alpha.2 — 2026-11-16
 
 Step 2: every Kestrel component the screens need. Still opens the design gallery; tap "Open screens and patterns" to see them with real RFQ Desk content.
