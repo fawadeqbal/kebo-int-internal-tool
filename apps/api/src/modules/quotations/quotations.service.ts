@@ -21,6 +21,9 @@ import {
   leadWords,
   isEditable,
   nextQuotationLetter,
+  quotationBase,
+  quotationNumber,
+  type NewQuotationsInput,
   latestRevision,
   QUOTED_STATUSES,
   type Currency,
@@ -404,8 +407,18 @@ export class QuotationsService {
     const inquiry = await this.inquiries.find(user, inquiryId);
     const quotations = await this.quotationsOf(this.prisma.db, inquiryId);
     const items = await this.items(this.prisma.db, inquiryId);
-    const usual = (await this.settings.get()).sales.factoryAdvancePercent;
-    const views = quotations.map((q) => this.quotationView(user, q, items, usual, inquiry.stage));
+    const settings = await this.settings.get();
+    const usual = settings.sales.factoryAdvancePercent;
+    // What New quotations starts with: the currency of the deal's latest quotation (else the customer's own, or
+    // the company's), the usual validity and margin.
+    const newest = quotations.flatMap((q) => q.revisions).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    const newDefaults = {
+      currency: newest?.currency ?? (await this.firstTerms(inquiry, settings)).currency,
+      validUntil: addDays(this.clock.today(), settings.sales.quotationValidityDays),
+      margin: settings.sales.defaultMarginPercent,
+    };
+    // A quotation whose drafts were all deleted is not shown (its letter is given to the next new one).
+    const views = quotations.filter((q) => q.revisions.length > 0).map((q) => this.quotationView(user, q, items, usual, inquiry.stage));
     // The first quotation, as the page shows it until it lists them all (with none yet: R1 can be started).
     const first = views[0] ?? null;
     const open = canQuote(inquiry.stage);
@@ -417,6 +430,7 @@ export class QuotationsService {
       whyNotStart: first ? first.whyNotStart : open ? null : "This inquiry is closed. Reopen it to quote again.",
       /** Every quotation of the deal, A, B, C…, each with its revisions. */
       quotations: views,
+      newDefaults,
     };
   }
 
@@ -478,19 +492,8 @@ export class QuotationsService {
     if (quotationId && !q) throw new NotFoundError("Quotation");
     const latest = q?.revisions[0];
     const validUntil = addDays(this.clock.today(), settings.sales.quotationValidityDays);
-    // A first revision starts from what is already known about this customer (every field can be changed):
-    // their own currency, when Settings has a rate for it, and the delivery terms of the last quotation to them.
-    const customer = latest ? null : await this.prisma.db.party.findUnique({ where: { id: inquiry.customerId }, select: { name: true, defaultCurrency: true } });
-    const theirs = CURRENCIES.find((c) => c === customer?.defaultCurrency?.trim().toUpperCase()) ?? null;
-    const currency = theirs && fxRate(theirs, settings.sales.currency, settings.sales.currency, settings.sales.exchangeRates) !== null ? theirs : settings.sales.currency;
-    const before = latest
-      ? null
-      : await this.prisma.db.quotationRevision.findFirst({
-          where: { deletedAt: null, status: { in: [...QUOTED_STATUSES] }, quotation: { inquiry: { customerId: inquiry.customerId, deletedAt: null, id: { not: inquiryId } } } },
-          orderBy: { createdAt: "desc" },
-          select: { incoterm: true, incotermPlace: true, quotation: { select: { inquiry: { select: { refNo: true } } } } },
-        });
-    const available = await this.offers(user, inquiryId, latest?.currency ?? currency);
+    const first = latest ? null : await this.firstTerms(inquiry, settings);
+    const available = await this.offers(user, inquiryId, latest?.currency ?? first!.currency);
     if (latest) {
       const input = this.asInput(latest);
       const live = new Set(available.offers.map((o) => o.factoryQuoteId));
@@ -502,45 +505,40 @@ export class QuotationsService {
         options: options.length ? options : input.options,
       };
     }
-    const margin = settings.sales.defaultMarginPercent;
+    // A quotation whose drafts were all deleted goes on from its last number (numbers are never used twice).
+    const number = q ? ((await this.prisma.db.quotationRevision.aggregate({ where: { quotationId: q.id }, _max: { number: true } }))._max.number ?? 0) + 1 : 1;
     const best = [...available.offers].sort(
       (a, b) =>
         a.coverage.missing.length - b.coverage.missing.length ||
         a.unpriced - b.unpriced ||
         (a.totalCost === null ? 1 : b.totalCost === null ? -1 : Number(a.totalCost) - Number(b.totalCost)),
     )[0];
-    const option: OptionInput = best
-      ? {
-          factoryQuoteId: best.factoryQuoteId,
-          discount: 0,
-          // What the factory gives, promised to the customer from the same moment (the days can be raised);
-          // an older offer's words as they are.
-          ...(best.leadDays !== null
-            ? { leadDays: best.leadDays, leadFrom: best.leadFrom, leadTime: leadWords(best.leadDays, best.leadFrom, "customer") }
-            : { leadTime: best.leadTime }),
-          charges: [],
-          costs: [],
-          prices: best.lines.map((l) => ({
-            lineId: l.id,
-            unitPrice: l.unitCost === null ? 0 : Number(fromMinor(priceForMargin(toMinor(l.unitCost), margin))),
-          })),
-        }
-      : {
-          factoryQuoteId: null,
-          discount: 0,
-          leadTime: null,
-          leadDays: null,
-          leadFrom: null,
-          charges: [],
-          costs: [],
-          prices: available.items.map((i) => ({ lineId: i.id, unitPrice: 0 })),
-        };
-    // The company's usual warranty, to change for this quotation: as months from a moment when its words say them.
+    return {
+      number,
+      currency: first!.currency,
+      ...first!.terms,
+      options: [this.optionFrom(best, available.items, settings.sales.defaultMarginPercent)],
+      from: first!.from,
+    };
+  }
+
+  /**
+   * The terms a deal's first revision starts with (every one can be changed): the customer's own currency, when
+   * Settings has a rate for it; the delivery terms of the last quotation to them; the company's usual payment,
+   * conditions and warranty (as months from a moment when its words say them).
+   */
+  private async firstTerms(inquiry: { id: string; customerId: string }, settings: Settings) {
+    const customer = await this.prisma.db.party.findUnique({ where: { id: inquiry.customerId }, select: { name: true, defaultCurrency: true } });
+    const theirs = CURRENCIES.find((c) => c === customer?.defaultCurrency?.trim().toUpperCase()) ?? null;
+    const currency = theirs && fxRate(theirs, settings.sales.currency, settings.sales.currency, settings.sales.exchangeRates) !== null ? theirs : settings.sales.currency;
+    const before = await this.prisma.db.quotationRevision.findFirst({
+      where: { deletedAt: null, status: { in: [...QUOTED_STATUSES] }, quotation: { inquiry: { customerId: inquiry.customerId, deletedAt: null, id: { not: inquiry.id } } } },
+      orderBy: { createdAt: "desc" },
+      select: { incoterm: true, incotermPlace: true, quotation: { select: { inquiry: { select: { refNo: true } } } } },
+    });
     const usualWarranty = settings.sales.warrantyTerms?.replace(/^warranty\s*:\s*/i, "").slice(0, 300) || null;
     const warranty = parseWarranty(usualWarranty);
-    return {
-      number: 1,
-      currency,
+    const terms = {
       incoterm: before?.incoterm ?? settings.sales.defaultIncoterm,
       incotermPlace: before?.incotermPlace ?? null,
       portOfDischarge: null,
@@ -550,21 +548,124 @@ export class QuotationsService {
       // balance (no parts kept until the form sends them).
       paymentRoute: null,
       paymentParts: null,
-      validUntil,
+      validUntil: addDays(this.clock.today(), settings.sales.quotationValidityDays),
       paymentTerms: settings.sales.defaultPaymentTerms || null,
       deliveryTerms: settings.sales.defaultDeliveryTerms || null,
       ...(warranty
         ? { warrantyMonths: warranty.months, warrantyFrom: warranty.from, warranty: warranty.rest }
         : { warrantyMonths: null, warrantyFrom: null, warranty: usualWarranty }),
       notes: null,
-      options: [option],
-      from: {
-        customer: customer?.name ?? null,
-        currency: currency === theirs && currency !== settings.sales.currency ? "customer" : "settings",
-        delivery: before ? "last_quotation" : "settings",
-        lastQuotation: before?.quotation.inquiry.refNo ?? null,
-      },
+    } satisfies Omit<RevisionInput, "currency" | "options">;
+    const from: DraftFrom = {
+      customer: customer?.name ?? null,
+      currency: currency === theirs && currency !== settings.sales.currency ? "customer" : "settings",
+      delivery: before ? "last_quotation" : "settings",
+      lastQuotation: before?.quotation.inquiry.refNo ?? null,
     };
+    return { currency, terms, from };
+  }
+
+  /**
+   * An option quoting one factory offer: its lines priced at `margin` (on the price) over their cost, and what
+   * the factory gives promised to the customer from the same moment (the days can be raised; an older offer's
+   * words as they are). Without an offer: the customer's items, to be priced by hand.
+   */
+  private optionFrom(
+    offer: Awaited<ReturnType<QuotationsService["offers"]>>["offers"][number] | null | undefined,
+    items: { id: string }[],
+    margin: number,
+  ): OptionInput {
+    if (!offer) return { factoryQuoteId: null, discount: 0, leadTime: null, leadDays: null, leadFrom: null, charges: [], costs: [], prices: items.map((i) => ({ lineId: i.id, unitPrice: 0 })) };
+    return {
+      factoryQuoteId: offer.factoryQuoteId,
+      discount: 0,
+      ...(offer.leadDays !== null
+        ? { leadDays: offer.leadDays, leadFrom: offer.leadFrom, leadTime: leadWords(offer.leadDays, offer.leadFrom, "customer") }
+        : { leadTime: offer.leadTime }),
+      charges: [],
+      costs: [],
+      prices: offer.lines.map((l) => ({
+        lineId: l.id,
+        unitPrice: l.unitCost === null ? 0 : Number(fromMinor(priceForMargin(toMinor(l.unitCost), margin))),
+      })),
+    };
+  }
+
+  /**
+   * New quotations (design "one way, any number"): one draft for each offer ticked, or one from the customer's
+   * items priced by hand (null), each its own quotation: QUO-2026-0531-B, -C… An offer already quoted can be
+   * quoted again on other terms. A quotation whose drafts were all deleted before any was sent gives its letter
+   * back first. Each starts in the currency, validity and margin chosen, with the deal's usual first terms.
+   */
+  async createQuotations(user: SessionUser, inquiryId: string, input: NewQuotationsInput) {
+    this.assertCan(user);
+    const settings = await this.settings.get();
+    const seen = await this.inquiries.find(user, inquiryId);
+    const first = await this.firstTerms(seen, settings);
+    const available = await this.offers(user, inquiryId, input.currency);
+    if (input.offers.some((id) => id) && !can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see factory prices can quote a factory's offer.");
+    const made = await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from inquiries where id = ${inquiryId}::uuid for update`;
+      const inquiry = await this.inquiries.findWorkable(user, inquiryId, tx);
+      if (!canQuote(inquiry.stage)) throw new DomainError("This inquiry is closed. Reopen it to quote again.");
+      const existing = byLetter(await tx.quotation.findMany({ where: { inquiryId }, include: { revisions: { select: { status: true, deletedAt: true } } } }));
+      const free = existing.filter((q) => q.revisions.every((r) => r.status === "draft" && r.deletedAt !== null));
+      const letters = existing.map((q) => q.letter);
+      let base = existing[0] ? quotationBase(existing[0]) : null;
+      const out: { id: string; refNo: string; letter: string; revisionId: string; number: number }[] = [];
+      for (const offerId of input.offers) {
+        const offer = offerId ? available.offers.find((o) => o.factoryQuoteId === offerId) : null;
+        if (offerId && !offer) throw new DomainError("One of the offers is no longer on this inquiry, or has no lines yet. Reload the page.");
+        const values: RevisionInput = {
+          ...first.terms,
+          currency: input.currency as Currency,
+          validUntil: input.validUntil,
+          options: [this.optionFrom(offer, available.items, input.margin)],
+        };
+        let q = free.shift() ?? null;
+        if (!q) {
+          base ??= await nextReference(tx, "quotation", Number(this.clock.today().slice(0, 4)));
+          const letter = nextQuotationLetter(letters);
+          letters.push(letter);
+          q = { ...(await tx.quotation.create({ data: { inquiryId, letter, refNo: quotationNumber(base, letter) } })), revisions: [] };
+        }
+        const max = await tx.quotationRevision.aggregate({ where: { quotationId: q.id }, _max: { number: true } });
+        const number = (max._max.number ?? 0) + 1;
+        const { built, header } = await this.rows(tx, user, inquiryId, values);
+        const rev = await tx.quotationRevision.create({ data: { ...header, quotationId: q.id, number, createdById: user.id } });
+        await this.writeOptions(tx, rev.id, built);
+        await this.audit.record(tx, {
+          userId: user.id,
+          action: "create",
+          entityType: "quotation",
+          entityId: rev.id,
+          summary: `${q.refNo} R${number} drafted for ${inquiry.refNo} from ${offer ? `${offer.factory.name}'s offer` : "own prices"} — ${input.currency} ${String(built[0]!.option.total)}`,
+        });
+        out.push({ id: q.id, refNo: q.refNo, letter: q.letter, revisionId: rev.id, number });
+      }
+      return out;
+    });
+    return { quotations: made };
+  }
+
+  /** The quotation (any of the deal's), for people who may see its deal. */
+  private async quotationOfId(user: SessionUser, quotationId: string) {
+    const q = await this.prisma.db.quotation.findUnique({ where: { id: quotationId }, select: { id: true, inquiryId: true } });
+    if (!q) throw new NotFoundError("Quotation");
+    await this.inquiries.find(user, q.inquiryId);
+    return q;
+  }
+
+  /** Starting values for a quotation's next revision (a copy of its latest). */
+  async draftFor(user: SessionUser, quotationId: string) {
+    const q = await this.quotationOfId(user, quotationId);
+    return this.draft(user, q.inquiryId, q.id);
+  }
+
+  /** A quotation's next revision (after the customer has seen one: with the reason it changes). */
+  async createRevisionOn(user: SessionUser, quotationId: string, input: RevisionInput) {
+    const q = await this.quotationOfId(user, quotationId);
+    return this.createRevision(user, q.inquiryId, input, q.id);
   }
 
   /* ---------------------------------------------------------------- writing revisions */
@@ -658,7 +759,8 @@ export class QuotationsService {
         lines.map((l) => ({ quantity: String(l.quantity), unitPrice: String(l.unitPrice) })),
         o.discount,
       );
-      if (totals.total <= 0) throw new DomainError(`Option ${letter}: the total must be more than zero.`);
+      // A draft can wait for its prices (own prices start at 0); sending needs them (see move).
+      if (totals.total < 0) throw new DomainError(`Option ${letter}: the discount is more than the lines.`);
       if (totals.total > MAX_TOTAL_MINOR) throw new DomainError(`Option ${letter}: the total is too large.`);
       built.push({
         option: {
@@ -726,17 +828,12 @@ export class QuotationsService {
       const refs = (q?.revisions ?? []).map((r) => ({ number: r.number, status: r.status }));
       const start = canStartRevision(refs);
       if (!start.ok) throw new GateError(start.reason, "revision_blocked");
-      // The deal's first quotation: letter A, the inquiry's QUO number as it is.
-      q ??= {
-        ...(await tx.quotation.create({
-          data: {
-            inquiryId,
-            letter: nextQuotationLetter(quotations.map((x) => x.letter)),
-            refNo: await nextReference(tx, "quotation", Number(this.clock.today().slice(0, 4))),
-          },
-        })),
-        revisions: [],
-      };
+      // The deal's first quotation: a new QUO number, with its letter (QUO-2026-0531-A).
+      if (!q) {
+        const letter = nextQuotationLetter(quotations.map((x) => x.letter));
+        const base = await nextReference(tx, "quotation", Number(this.clock.today().slice(0, 4)));
+        q = { ...(await tx.quotation.create({ data: { inquiryId, letter, refNo: quotationNumber(base, letter) } })), revisions: [] };
+      }
       // Numbers count every revision ever made (including deleted drafts), so R-numbers are never reused.
       const max = await tx.quotationRevision.aggregate({ where: { quotationId: q.id }, _max: { number: true } });
       const number = (max._max.number ?? 0) + 1;
@@ -869,8 +966,9 @@ export class QuotationsService {
   /**
    * Draft → sent (frozen, with who it was for and from), older sent revisions
    * superseded, the deal moves to Quoted. Then: accepted — exactly one option,
-   * the others not chosen; the order is made from it and the deal is Won —
-   * rejected, or expired; only on the newest sent revision.
+   * the others not chosen; the order is made from it and the deal is Won; the
+   * deal's other quotations the customer has become Not chosen and their drafts
+   * are put away — rejected, or expired; only on the newest sent revision.
    */
   async move(
     user: SessionUser,
@@ -906,6 +1004,8 @@ export class QuotationsService {
 
       if (to === "sent") {
         if (r.number !== latestRevision(refs)!.number) throw new GateError("Only the newest revision can be sent.", "not_latest");
+        if (r.options.some((o) => !(Number(o.total) > 0)))
+          throw new DomainError(r.options.length > 1 ? "Price every option before sending: one of them comes to 0." : "Price the lines before sending: the quotation comes to 0.");
         if (!canQuote(inquiry.stage)) throw new DomainError("This inquiry is closed. Reopen it to quote again.");
         const settings = await this.settings.get();
         await tx.quotationRevision.update({
@@ -956,6 +1056,35 @@ export class QuotationsService {
             });
           const { event } = await this.orders.createFromRevision(tx, r.id, chosen.id, day, user.id, accept);
           events.push(event);
+          // The deal's other quotations: what the customer has is Not chosen (kept exactly as sent), and their
+          // drafts are put away. Answered ones (rejected, expired) stay as they are.
+          const others = await tx.quotationRevision.findMany({
+            where: { deletedAt: null, status: { in: ["sent", "draft"] }, quotation: { inquiryId: inquiry.id, id: { not: r.quotationId } } },
+            select: { id: true, number: true, status: true, quotation: { select: { refNo: true } } },
+          });
+          const notChosen = others.filter((o) => o.status === "sent");
+          if (notChosen.length)
+            await tx.quotationRevision.updateMany({ where: { id: { in: notChosen.map((o) => o.id) } }, data: { status: "not_chosen", answeredOn: toDbDate(day) } });
+          const putAway = others.filter((o) => o.status === "draft");
+          if (putAway.length) await tx.quotationRevision.updateMany({ where: { id: { in: putAway.map((o) => o.id) } }, data: { deletedAt: new Date() } });
+          for (const o of notChosen)
+            await this.audit.record(tx, {
+              userId: user.id,
+              action: "status_change",
+              entityType: "quotation",
+              entityId: o.id,
+              summary: `${o.quotation.refNo} R${o.number}: sent → not chosen (the customer accepted ${r.quotation.refNo} R${r.number})`,
+              oldValues: { status: "sent" },
+              newValues: { status: "not_chosen" },
+            });
+          for (const o of putAway)
+            await this.audit.record(tx, {
+              userId: user.id,
+              action: "delete",
+              entityType: "quotation",
+              entityId: o.id,
+              summary: `${o.quotation.refNo} R${o.number} draft put away (the customer accepted ${r.quotation.refNo} R${r.number})`,
+            });
           const moved = await this.stages.after(tx, inquiry, "quotation_accepted", user.id);
           if (moved) events.push(moved);
         } else {

@@ -55,10 +55,17 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await expect(page.locator("dd", { hasText: "50% when we order · 50% when ready" })).toBeVisible();
   await expect(page.locator("dd", { hasText: "12 months from shipment." })).toBeVisible();
 
-  // The quotation: the factory's lead time beside ours, a usual payment in one tap, the warranty checked.
+  // The quotation: New quotations makes its draft from the offer; a pencil opens the draft's window, where the
+  // factory's lead time is beside ours, a usual payment is one tap, and the warranty is checked.
   await page.goto(`/inquiries/${deal.id}/quotation`);
-  await page.getByRole("button", { name: /Make the quotation/ }).first().click();
-  const form = page.getByRole("dialog", { name: /New quotation R1/ });
+  await page.getByRole("button", { name: "New quotations" }).first().click();
+  const make = page.getByRole("dialog", { name: "New quotations" });
+  await expect(make.getByRole("checkbox").first()).toBeChecked();
+  expect(await accessibilityProblems(page), "New quotations meets WCAG 2.2 AA").toEqual([]);
+  await make.getByRole("button", { name: /Make the draft/ }).click();
+  await expect(make).toBeHidden();
+  await page.getByRole("button", { name: "Edit delivery" }).click();
+  const form = page.getByRole("dialog", { name: /Edit · QUO-\d{4}-\d{4}-A R1/ });
   const leads = form.getByRole("table", { name: "Lead time of each option" });
   await expect(leads.getByLabel("Option A lead time", { exact: true })).toHaveValue("30");
   // (On a wide screen the check is in its own column; on a phone under the boxes.)
@@ -70,13 +77,15 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await form.getByLabel("Counted from").selectOption("sat");
   await expect(form.getByText(/the last 2 months of ours are not covered by the factory/)).toBeVisible();
   expect(await accessibilityProblems(page), "the quotation's form meets WCAG 2.2 AA").toEqual([]);
-  await form.getByRole("button", { name: /Save draft/ }).click();
+  await form.getByRole("button", { name: /Save changes/ }).click();
   await expect(form).toBeHidden();
 
-  // Before it is sent, the quotation says what to look at; its card has the parts.
+  // Before it is sent, the quotation says what to look at; its Payment group has the parts.
   await expect(page.getByText(/Before you send R1/)).toBeVisible();
   await expect(page.getByText(/the last 2 months of ours are not covered/).filter({ visible: true }).first()).toBeVisible();
-  await expect(page.locator("dd", { hasText: "30% with the order · 60% before shipment · 10% after the site acceptance test (SAT)" })).toBeVisible();
+  const payment = page.getByRole("region", { name: "Payment", exact: true });
+  for (const part of ["30% with the order", "60% before shipment", "10% after the site acceptance test (SAT)"]) await expect(payment.getByText(part)).toBeVisible();
+  expect(await accessibilityProblems(page), "the Quotations tab meets WCAG 2.2 AA").toEqual([]);
 
   // The paper prints the parts and the warranty.
   const quotation = await (await page.request.get(`/api/inquiries/${deal.id}/quotation`)).json();

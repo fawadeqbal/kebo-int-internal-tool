@@ -1,24 +1,30 @@
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, Download, Eye, Send } from "lucide-react";
-import { toMinor } from "@kebo/money";
-import { BASIS_STEP_LABEL, can, partsWords, routeFromTerms, SENT_VIA_TEXT, termsChecks, warrantyLine, type BasisStep, type PaymentRoute } from "@kebo/shared";
-import { Alert, Badge, buttonClass, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
+import type { ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Download, Eye, Pencil, Send } from "lucide-react";
+import { BASIS_STEP_LABEL, can, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, type BasisStep } from "@kebo/shared";
+import { Alert, buttonClass, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
-import { FollowUpForm } from "@/components/notes/note-forms";
-import { addFollowUpAction } from "../../../follow-ups/actions";
-import { getPeople } from "@/lib/loaders";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { date, money, companyToday } from "@/lib/format";
 import { dealOf, quotationOf } from "@/lib/deal-data";
-import type { QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
-import { DetailsCard, type DetailField } from "@/components/orders/step-view";
+import type { QuotationOfDeal, QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
 import { StartRevision } from "@/components/deals/quotation-panels";
-import { OptionsCard, QuotationNext, TermsPanel } from "@/components/deals/quotation-step";
-import { WithSide } from "../side";
+import { TermsPanel } from "@/components/deals/quotation-step";
+import { AnswerButton, NewQuotationsButton } from "@/components/deals/quotation-tab";
+import { checksOf, CheckChip, optionOf, QuoteLines, QuoteTerms, termsFacts } from "@/components/deals/quote-view";
 import { shortName } from "@/components/deals/offer-facts";
 import { PriceEditor } from "@/components/deals/price-editor";
-import { createRevisionAction, deleteRevisionAction, emailRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
+import {
+  deleteRevisionAction,
+  emailRevisionAction,
+  moveRevisionAction,
+  newQuotationsAction,
+  offersAction,
+  reviseAction,
+  saidNoAction,
+  updateRevisionAction,
+} from "./actions";
 import { DeleteDraftButton, SendWindow } from "@/components/deals/send-quote";
 import { inquiryTitle } from "@/lib/titles";
 
@@ -27,89 +33,91 @@ export const generateMetadata = inquiryTitle("Quotation");
 const printHref = (r: { id: string }) => `/print/revisions/${r.id}`;
 const pdfHref = (r: { id: string }) => `/pdf/revisions/${r.id}`;
 
+/** A quotation's total; a draft still without prices says so. */
+const totalText = (r: RevisionView) => (r.status === "draft" && !(Number(r.total) > 0) ? "To price" : money(r.total, r.currency));
+
+/** The revision a quotation shows first: its open draft, else its newest one. */
+const currentOf = (q: QuotationOfDeal) => q.revisions.find((r) => r.status === "draft") ?? q.revisions[0]!;
+
 /**
- * Quotations: one line per revision (made, its options, total, valid until, status; View and PDF). A click
- * opens a line in place: its terms (Edit: the form in the panel), its options and the lines the customer
- * sees (Edit lines: the lines editor), the internal costing folded. Only a draft can change; a sent one is
- * kept as sent. "Do next" on top holds the buttons: Send, then the customer's answer (accepted, lost, revise).
+ * Quotations (design "one way, any number"): the deal's quotations, A, B, C…, one row each (its number and
+ * offer, total, delivery, payment, warranty, status). A tap opens one in full under its row, read only — a bar
+ * with its status, its revisions (R1 ▾) and what can be done; its lines in the clean table; its terms in three
+ * groups, each with a pencil on a draft — and a tap again closes it. "New quotations" makes one draft per offer.
  */
 export default async function QuotationPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ start?: string; edit?: string; option?: string; add?: string; send?: string; rev?: string }>;
+  searchParams: Promise<{ q?: string; rev?: string; start?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const me = await requireUser();
-  const [d, q, people] = await Promise.all([dealOf(id), quotationOf(id), getPeople().catch(() => [])]);
+  const [d, q] = await Promise.all([dealOf(id), quotationOf(id)]);
   const quoter = can(me, "quotations.manage");
   const manage = quoter && d.allowed.quote;
   const showCosts = can(me, "sourcing.manage");
   const today = companyToday();
   const base = `/inquiries/${d.id}`;
-  const revs = [...q.revisions].sort((a, b) => b.number - a.number);
-  const draft = revs.find((r) => r.status === "draft") ?? null;
-  const live = revs.find((r) => r.status !== "draft") ?? null;
-  const current = draft ?? live;
-  // The editor's values and what it can offer (each factory offer, costed in the quotation currency).
-  const [startValues, draftValues] = await Promise.all([
-    manage && q.canStartRevision ? api.get<RevisionDraft>(`/inquiries/${id}/quotation/draft`).catch(() => null) : null,
+  const quotations = q.quotations;
+
+  // The quotation open under its row: the one asked for (?q=), none after a tap that closed it, else the one
+  // changed last.
+  const lastChanged = [...quotations].sort((a, b) => (currentOf(b).createdAt > currentOf(a).createdAt ? 1 : -1))[0];
+  const open = sp.q === "none" ? null : (quotations.find((x) => x.id === sp.q) ?? lastChanged ?? null);
+  const draft = open?.revisions.find((r) => r.status === "draft") ?? null;
+  const shown = open ? (open.revisions.find((r) => r.id === sp.rev) ?? currentOf(open)) : null;
+
+  // What the windows need: the draft's values (its pencils), the next revision's starting values (New
+  // revision) and the offers costed in their currency; New quotations' offers in its own currency.
+  const [draftValues, startValues] = await Promise.all([
     manage && draft ? api.get<RevisionDraft>(`/revisions/${draft.id}/values`).catch(() => null) : null,
+    manage && open?.canStartRevision ? api.get<RevisionDraft>(`/quotations/${open.id}/draft`).catch(() => null) : null,
   ]);
-  const currencyOf = draftValues?.currency ?? startValues?.currency;
-  const offers = manage && currencyOf ? await api.get<QuoteOffers>(`/inquiries/${id}/quotation/offers`, { currency: currencyOf }).catch(() => null) : null;
+  const editCurrency = draftValues?.currency ?? startValues?.currency ?? null;
   const loadOffers = offersAction.bind(null, d.id);
-  const accepted = revs.find((r) => r.status === "accepted");
-  const order = d.orders.find((o) => o.status !== "cancelled");
-  const move = (r: RevisionView) => moveRevisionAction.bind(null, d.id, r.id);
-  const checks = draft ? draftChecks(draft) : [];
-  // R1 starts from the offer the API picks: say which, so nobody has to guess.
-  const firstOffer = revs.length === 0 && startValues?.options[0]?.factoryQuoteId ? (offers?.offers.find((o) => o.factoryQuoteId === startValues.options[0]!.factoryQuoteId) ?? null) : null;
-  // What R1 starts with, under the editor's title (and over the button while it is closed).
-  const startNote = firstOffer ? (
-    <>
-      Starts with <b className="font-semibold text-text">{firstOffer.factory.name}</b>:{" "}
-      {firstOffer.coverage.missing.length ? `covers all but ${firstOffer.coverage.missing.join(", ")}` : "covers everything asked for"}
-      {showCosts && firstOffer.totalCost ? `, cost ${money(firstOffer.totalCost, offers!.currency)}` : ""}, priced at your default {offers!.defaultMargin}%.
-      {offers!.offers.length > 1 ? " Add more offers as Options B, C… for the customer to choose from." : ""}
-    </>
-  ) : undefined;
-  const start = (props: { open?: boolean; label?: string; empty?: boolean; variant?: "primary" | "secondary" }) =>
-    quoter ? (
-      <StartRevision
-        key={props.open ? "open" : "closed"}
-        action={createRevisionAction.bind(null, d.id)}
-        draft={startValues}
-        offers={offers}
+  const [editOffers, newOffers] = await Promise.all([
+    manage && editCurrency ? loadOffers(editCurrency) : null,
+    manage && editCurrency !== q.newDefaults.currency ? loadOffers(q.newDefaults.currency) : null,
+  ]);
+  const offersForNew = editCurrency === q.newDefaults.currency ? editOffers : newOffers;
+
+  // Which quotations each offer is in (an offer can be quoted again on other terms).
+  const usedIn: Record<string, string[]> = {};
+  for (const x of quotations) for (const o of currentOf(x).options) if (o.factoryQuoteId) (usedIn[o.factoryQuoteId] ??= []).push(x.letter);
+  const letters = quotations.map((x) => x.letter);
+  const newButton = (variant: "primary" | "secondary" = "secondary") =>
+    manage ? (
+      <NewQuotationsButton
+        key={sp.start === "1" ? "start" : "button"}
+        action={newQuotationsAction.bind(null, d.id)}
+        offers={offersForNew}
         loadOffers={loadOffers}
-        allowed={manage && q.canStartRevision && !!startValues}
-        whyNot={q.whyNotStart ?? (!manage ? "Only the person handling this inquiry (or a manager) can quote." : null)}
-        showCosts={showCosts}
-        first={revs.length === 0}
-        defaultOpen={props.open}
-        label={props.label}
-        variant={props.variant}
-        note={revs.length === 0 ? startNote : undefined}
-        empty={
-          props.empty
-            ? { title: "No quotation yet", description: "Each option you offer is one factory's offer from Factory offers, with your prices. The customer accepts one option." }
-            : undefined
-        }
+        defaults={q.newDefaults}
+        usedIn={usedIn}
+        letters={letters}
+        variant={variant}
+        defaultOpen={sp.start === "1"}
       />
     ) : null;
+
+  const accepted = quotations.flatMap((x) => x.revisions).find((r) => r.status === "accepted");
+  const order = d.orders.find((o) => o.status !== "cancelled");
+  const waiting = quotations.filter((x) => x.revisions.some((r) => r.status === "sent" && r.canAnswer));
+
   // "Send R1…": one window with two choices (email it from here, or I sent it myself). A sent one can only be emailed again.
   const who = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
   const copy = d.customer.contacts.filter((c) => c.email && c.id !== who?.id).map((c) => c.email);
-  const sendWindow = (r: RevisionView) => {
-    const quoteRef = `${d.quotation?.refNo ?? d.refNo} R${r.number}`;
+  const sendWindow = (x: QuotationOfDeal, r: RevisionView) => {
+    const quoteRef = `${x.refNo} R${r.number}`;
     return (
       <SendWindow
         number={r.number}
         customer={d.customer.name}
         emailAction={emailRevisionAction.bind(null, d.id, r.id, `${quoteRef}.pdf`)}
-        markAction={r.status === "draft" ? move(r) : null}
+        markAction={r.status === "draft" ? moveRevisionAction.bind(null, d.id, r.id) : null}
         to={who?.email ?? ""}
         cc={copy.slice(0, 2).join(", ")}
         subject={`Quotation ${quoteRef} — ${d.title}`}
@@ -121,113 +129,17 @@ export default async function QuotationPage({
       />
     );
   };
-  // The customer said no (or let it lapse) and nothing new is being drafted: the next step is a new revision.
-  const closedLive = !draft && live && (live.status === "rejected" || live.status === "expired") ? live : null;
 
-  const editTerms = !!(draft && manage && draftValues && offers);
-
-  // "Edit lines": the lines editor in its window, the same frame as an offer's lines editor.
-  const linesEditor = editTerms ? (
-    <PriceEditor key={draft!.id} action={updateRevisionAction.bind(null, d.id, draft!.id)} initial={draftValues!} offers={offers!} showCosts={showCosts} />
-  ) : null;
-  // The terms of a revision as a card: the draft's with Edit (the form in the panel), a sent one's read only.
-  const termsOf = (r: RevisionView) => {
-    const editable = editTerms && r.id === draft!.id;
-    return (
-      <DetailsCard
-        title={`R${r.number} · the quotation`}
-        description={r.status === "draft" ? "A draft: seen only inside the company, and it can still change." : undefined}
-        fields={termsFields(r)}
-        action={editable ? revisionFieldsAction.bind(null, d.id, r.id) : undefined}
-        canEdit={editable}
-        panelTitle={`Edit quotation R${r.number}`}
-        panelDescription={`${quoRef} · ${d.customer.name} · a draft: it can change until it is sent`}
-        panelClassName="md:w-[860px]"
-        panelBody={
-          editable ? (
-            <TermsPanel number={r.number} initial={draftValues!} offers={offers!} loadOffers={loadOffers} showCosts={showCosts} action={updateRevisionAction.bind(null, d.id, r.id)} />
-          ) : undefined
-        }
-      />
-    );
+  const statusOf = (x: QuotationOfDeal) => {
+    const c = currentOf(x);
+    const before = x.revisions.find((r) => r.status !== "draft");
+    if (c.status === "draft" && before) return <StatusBadge meaning="neutral">Draft R{c.number}</StatusBadge>;
+    return <RevisionBadge status={c.status} />;
   };
-
-  const statusCell = (r: RevisionView) =>
-    r.status === "sent" ? (
-      <StatusBadge meaning="info">Sent</StatusBadge>
-    ) : r.status === "superseded" ? (
-      <Badge tone="neutral" dot>
-        Replaced
-      </Badge>
-    ) : (
-      <RevisionBadge status={r.status} />
-    );
-  const quoRef = q.quotation?.refNo ?? d.quotation?.refNo ?? d.refNo;
-  const totalOf = (r: RevisionView) => {
-    const totals = r.options.map((o) => Number(o.total));
-    const taken = r.options.find((o) => o.status === "accepted");
-    if (taken) return money(taken.total, r.currency);
-    return `${new Set(totals).size > 1 ? "from " : ""}${money(Math.min(...totals), r.currency)}`;
-  };
-  // Which line is open: the current revision unless another was clicked ("none": all closed).
-  const openId = sp.rev === "none" ? null : (revs.find((r) => r.id === sp.rev)?.id ?? current?.id ?? null);
-  const waiting = !draft && live?.status === "sent" ? live : null;
-  const next = (
-    <QuotationNext
-      customer={d.customer.name}
-      quoRef={quoRef}
-      draft={
-        draft
-          ? {
-              number: draft.number,
-              meta: `${draft.options.length === 1 ? "1 option" : `${draft.options.length} options`}, ${totalOf(draft)} · valid until ${date(draft.validUntil)}`,
-              previewHref: printHref(draft),
-              send: manage ? sendWindow(draft) : null,
-            }
-          : null
-      }
-      live={
-        live?.canAnswer
-          ? {
-              number: live.number,
-              options: live.options,
-              meta: `${live.sentOn ? `sent ${date(live.sentOn)}${live.sentVia ? ` ${SENT_VIA_TEXT[live.sentVia]}` : ""} · ` : ""}valid until ${date(live.validUntil)}${live.status === "sent" && live.validUntil < today ? ", which has passed" : ""}`,
-              overdue: live.status === "sent" && live.validUntil < today,
-            }
-          : null
-      }
-      closed={closedLive ? { number: closedLive.number, how: closedLive.status === "rejected" ? "rejected" : "expired" } : null}
-      currency={live?.currency ?? draft?.currency ?? ""}
-      today={today}
-      answerAction={live?.canAnswer && manage ? move(live) : null}
-      lostAction={live?.canAnswer && manage && d.canWork ? lostAction.bind(null, d.id, live.id) : null}
-      startNext={
-        !draft && manage && q.canStartRevision
-          ? closedLive
-            ? start({ label: `Start R${closedLive.number + 1} from R${closedLive.number}`, variant: "primary" })
-            : start({ label: `Revise (R${(live?.number ?? 0) + 1})`, variant: "secondary" })
-          : null
-      }
-      followUp={
-        waiting && quoter ? (
-          <PanelButton
-            variant="ghost"
-            icon={<Clock aria-hidden />}
-            label="Add follow-up"
-            title="New follow-up"
-            description={`On ${d.refNo}. Shows on the dashboard on its day, with a reminder.`}
-            body={<FollowUpForm action={addFollowUpAction.bind(null, { key: "inquiryId", id: d.id })} people={people} meId={me.id} today={today} record={`${d.refNo} · ${d.customer.name}`} />}
-          />
-        ) : undefined
-      }
-      subtitle={`${quoRef} · ${d.customer.name}`}
-      route={live ? (live.paymentRoute ?? routeFromTerms(live.balanceTerms).route) : null}
-    />
-  );
-  const COLS = "md:grid-cols-[16px_40px_92px_minmax(0,1fr)_150px_96px_96px]";
+  const COLS = "md:grid-cols-[28px_minmax(0,1.5fr)_130px_minmax(0,1.1fr)_96px] xl:grid-cols-[28px_minmax(0,1.5fr)_130px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.1fr)_96px]";
 
   return (
-    <WithSide id={id} top={accepted && order ? null : (draft || live?.canAnswer || closedLive) && next}>
+    <div className="flex flex-col gap-4">
       {accepted && order && (
         <section aria-label="Order created" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok-soft p-4">
           <p className="flex items-center gap-2 text-sm">
@@ -238,216 +150,297 @@ export default async function QuotationPage({
               {money(order.total, order.currency)}); the work continues there.
             </span>
           </p>
+          <ButtonLink href={`/orders/${order.id}`} size="sm">
+            Open the order
+          </ButtonLink>
         </section>
       )}
 
-      {revs.length > 0 && !manage && !(accepted && order) && (
-        <Alert tone="info">
-          {quoter && q.whyNotStart ? q.whyNotStart : "Only the person handling this inquiry (or a manager) can change the quotation or record the customer's answer."}
-        </Alert>
+      {quotations.length > 0 && !manage && !(accepted && order) && (
+        <Alert tone="info">{quoter && q.whyNotStart ? q.whyNotStart : "Only the person handling this inquiry (or a manager) can change the quotations or record the customer's answer."}</Alert>
       )}
 
-      {revs.length === 0 &&
-        (quoter ? (
-          start({ open: sp.start === "1", empty: true })
-        ) : (
-          <Card>
-            <CardHeader
-              title="No quotation yet"
-              description="Each option you offer is one factory's offer from Factory offers, with your prices. The customer accepts one option."
-            />
-            <CardBody>
-              <p className="text-sm text-muted">{q.whyNotStart ?? "The person handling this inquiry makes the quotation."}</p>
-            </CardBody>
-          </Card>
-        ))}
-
-      {revs.length > 0 && (
+      {quotations.length === 0 ? (
+        <Card>
+          <CardHeader title="Quotations" actions={newButton("primary")} />
+          <CardBody>
+            <p className="text-sm text-text-2">
+              {manage
+                ? "None yet. New quotations makes one draft for each factory offer you tick, or one priced by hand."
+                : (q.whyNotStart ?? "The person handling this inquiry makes the quotations.")}
+            </p>
+          </CardBody>
+        </Card>
+      ) : (
         <Card className="overflow-clip">
           <CardHeader
             title={
               <>
-                Quotations<span className="font-normal text-text-2"> · {quoRef}</span>
+                Quotations<span className="font-normal text-text-2"> · {quotations.length}</span>
               </>
             }
+            actions={newButton()}
           />
-          <div className={cn("hidden items-center gap-x-4 border-b border-line py-2 pr-[124px] pl-5 text-xs font-medium text-text-2 md:grid", COLS)}>
+          <div aria-hidden className={cn("hidden items-center gap-x-4 border-b border-line bg-surface-2/60 px-5 py-2 text-xs font-medium text-text-2 md:grid", COLS)}>
             <span />
-            <span>Rev.</span>
-            <span>Made</span>
-            <span>Options</span>
+            <span>Quotation</span>
             <span className="text-right">Total</span>
-            <span>Valid until</span>
+            <span>Delivery</span>
+            <span className="max-xl:hidden">Payment</span>
+            <span className="max-xl:hidden">Warranty</span>
             <span>Status</span>
           </div>
-          {revs.map((r) => {
-            const open = r.id === openId;
-            const isDraft = r.status === "draft";
+          {quotations.map((x) => {
+            const isOpen = x.id === open?.id;
+            const c = currentOf(x);
+            const o = optionOf(c);
+            const facts = termsFacts(c);
+            const checks = showCosts ? checksOf(c, o) : [];
+            const problem = checks.find((k) => !k.ok);
+            const from = o?.factory ? shortName(o.factory.name) : o && !o.factoryQuoteId ? "Own prices" : null;
             return (
-              <div key={r.id} id={open ? "revision" : undefined} className="scroll-mt-24 border-b border-line last:border-b-0">
-                <div className={cn("flex items-center", open && "bg-primary-soft/40")}>
-                  <Link
-                    href={open ? `${base}/quotation?rev=none` : `${base}/quotation?rev=${r.id}#revision`}
-                    scroll={false}
-                    aria-expanded={open}
-                    className={cn("grid min-w-0 flex-1 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-3 pl-5 text-sm hover:bg-surface-2/60 max-md:pr-4", COLS)}
-                  >
-                    {open ? <ChevronDown className="size-4 text-text-2" aria-hidden /> : <ChevronRight className="size-4 text-text-2" aria-hidden />}
-                    <span className="font-semibold max-md:hidden">R{r.number}</span>
-                    <span className="whitespace-nowrap max-md:hidden">{date(r.createdAt)}</span>
-                    <span className="min-w-0">
-                      <span className="font-semibold md:hidden">R{r.number} · </span>
-                      {r.options.map((o, i) => (
-                        // One option never breaks in two: in a narrow column the next option goes to the next line.
-                        <span key={o.id} className={cn("inline-block whitespace-nowrap", o.status === "accepted" && "font-semibold")}>
-                          {i > 0 && <span aria-hidden>·&nbsp;</span>}
-                          {o.letter}
-                          {o.factory ? ` ${o.factory.name.split(" ")[0]}` : ""}
-                          {o.status === "accepted" ? ", chosen" : ""}
-                          {i < r.options.length - 1 && <>&nbsp;</>}
-                        </span>
-                      ))}
-                      <span className="block text-xs text-text-2 md:hidden">
-                        {date(r.createdAt)} · valid until {date(r.validUntil)}
-                      </span>
-                    </span>
-                    <span className="text-right font-semibold whitespace-nowrap tabular max-md:col-start-2 max-md:text-left">{totalOf(r)}</span>
-                    <span className="whitespace-nowrap max-md:hidden">{date(r.validUntil)}</span>
-                    <span className="max-md:col-start-3 max-md:row-start-1">{statusCell(r)}</span>
-                  </Link>
-                  <span className="flex w-[124px] shrink-0 justify-end gap-3 pr-5 text-[13px] font-medium max-md:hidden">
-                    <a href={printHref(r)} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                      View
-                    </a>
-                    <a href={pdfHref(r)} className="text-primary hover:underline" aria-label={`Download R${r.number} as PDF`}>
-                      PDF
-                    </a>
+              <div key={x.id} id={`q-${x.id}`} className="scroll-mt-24 border-b border-line last:border-b-0">
+                <Link
+                  href={isOpen ? `${base}/quotation?q=none` : `${base}/quotation?q=${x.id}#q-${x.id}`}
+                  scroll={false}
+                  aria-expanded={isOpen}
+                  className={cn(
+                    "grid grid-cols-[28px_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 px-5 py-3 text-[13px] hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-text",
+                    COLS,
+                    isOpen && "bg-surface-2/70",
+                  )}
+                >
+                  <span className={cn("mt-0.5 grid size-6 place-items-center rounded-lg border", isOpen ? "border-text text-text" : "border-line-strong text-text-2")}>
+                    {isOpen ? <ChevronUp className="size-3.5" aria-hidden /> : <ChevronDown className="size-3.5" aria-hidden />}
                   </span>
-                </div>
-                {open && (
-                  <div className="flex flex-col gap-4 border-t border-line bg-surface-2/40 p-2 sm:p-4 md:pl-12">
-                    {isDraft && checks.length > 0 && (
-                      <div role="status" className="flex items-start gap-2 rounded-xl border border-warn/30 bg-warn-soft/60 px-4 py-3 text-sm">
-                        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
-                        <div>
-                          <p className="font-medium">Before you send R{r.number}</p>
-                          <ul className="mt-0.5 list-disc pl-4 text-text-2">
-                            {checks.map((c) => (
-                              <li key={c}>{c}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    )}
-                    {!isDraft && r.sentOn && (
-                      <p className="rounded-lg bg-primary-soft/60 px-3 py-2 text-[13px]">
-                        Sent {date(r.sentOn)}
-                        {r.sentVia && <b className="font-semibold"> {SENT_VIA_TEXT[r.sentVia]}</b>}.{" "}
-                        {r.status === "accepted"
-                          ? `Accepted${r.answeredOn ? ` ${date(r.answeredOn)}` : ""}: the order was made from it, and it is kept exactly as sent.`
-                          : r.status === "sent" && !draft
-                            ? `It is kept exactly as sent: a change needs R${revs[0]!.number + 1}.`
-                            : "It is kept exactly as sent."}
-                      </p>
-                    )}
-                    {termsOf(r)}
-                    <OptionsCard
-                      key={r.id}
-                      r={r}
-                      edit={isDraft && linesEditor ? { lines: linesEditor } : null}
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <ButtonLink href={printHref(r)} target="_blank" size="sm">
-                        <Eye aria-hidden /> View / Print
-                      </ButtonLink>
-                      <a href={pdfHref(r)} className={buttonClass("secondary", "sm")}>
-                        <Download aria-hidden /> Download PDF
-                      </a>
-                      {r.status === "sent" && manage && (
-                        <PanelButton
-                          variant="ghost"
-                          size="sm"
-                          icon={<Send aria-hidden />}
-                          label="Send again"
-                          title={`Send R${r.number} again`}
-                          description={`${quoRef} · the same PDF, by email`}
-                          panelClassName="md:w-[620px]"
-                          body={sendWindow(r)}
-                        />
-                      )}
-                      {isDraft && manage && (
-                        <span className="ml-auto">
-                          <DeleteDraftButton number={r.number} action={deleteRevisionAction.bind(null, d.id, r.id)} backHref={`${base}/quotation`} />
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-text">{x.refNo}</span>
+                    <span className="block truncate text-xs text-text-2">
+                      {[from, `R${c.number}`].filter(Boolean).join(" · ")}
+                      <span className="md:hidden"> · {totalText(c)}</span>
+                    </span>
+                  </span>
+                  <span className="text-right font-semibold whitespace-nowrap tabular max-md:hidden">{totalText(c)}</span>
+                  <span className="min-w-0 max-md:hidden">
+                    <span className="block">{facts.delivery}</span>
+                    {facts.lead && <span className="block truncate text-xs text-text-2">{facts.lead}</span>}
+                  </span>
+                  <span className="min-w-0 max-xl:hidden">{facts.payment || "—"}</span>
+                  <span className="min-w-0 max-xl:hidden">
+                    <span className="block">{facts.warranty ?? "—"}</span>
+                    {problem ? <CheckChip check={problem} /> : checks.length > 0 ? <CheckChip check={{ ...checks[0]!, word: "OK" }} /> : null}
+                  </span>
+                  <span className="justify-self-end md:justify-self-start">{statusOf(x)}</span>
+                </Link>
+                {isOpen && shown && (
+                  <QuotationOpen
+                    x={x}
+                    r={shown}
+                    base={base}
+                    manage={manage}
+                    showCosts={showCosts}
+                    today={today}
+                    customer={d.customer.name}
+                    draftValues={shown.status === "draft" ? draftValues : null}
+                    startValues={startValues}
+                    offers={editOffers}
+                    loadOffers={loadOffers}
+                    send={manage && (shown.status === "draft" || shown.status === "sent") ? sendWindow(x, shown) : null}
+                    dealId={d.id}
+                    others={waiting.filter((w) => w.id !== x.id).map((w) => w.refNo)}
+                  />
                 )}
               </div>
             );
           })}
         </Card>
       )}
-    </WithSide>
+    </div>
   );
 }
 
-const ROUTE_TEXT: Record<PaymentRoute, string> = { informal: "Informal", bank_contract: "Bank contract", letter_of_credit: "Letter of credit" };
-
-/**
- * Everything a revision keeps, on its card, in the groups every offer, quotation and order uses (design "terms
- * that travel"): the currency and validity, then Delivery (the Incoterm and place, the port of discharge, the
- * lead time, the delivery conditions) · Payment (how they pay and the parts, the payment conditions) ·
- * Warranty · Conditions (the notes), and when it was made, sent (and how) and answered.
- */
-function termsFields(r: RevisionView): DetailField[] {
-  const long = (v: string | null) => (v ? <span className="line-clamp-4 font-normal whitespace-pre-line">{v}</span> : undefined);
-  const warranty = warrantyLine(r);
-  return [
-    { label: "Currency", value: r.currency },
-    { name: "validUntil", label: "Valid until", type: "date", value: r.validUntil, show: date(r.validUntil) },
-    {
-      label: "Delivery",
-      value: r.incoterm,
-      show: `${r.incoterm}${r.incotermPlace ? ` ${r.incotermPlace}` : ""}${r.portOfDischarge ? ` · to ${r.portOfDischarge}` : ""}`,
-    },
-    { label: "Lead time", value: r.leadTime, show: r.leadTime ? `${r.leadTime}${r.figuresOf ? ` (${r.figuresOf})` : ""}` : undefined },
-    { name: "deliveryTerms", label: "Delivery conditions", type: "textarea", value: r.deliveryTerms, show: long(r.deliveryTerms) },
-    {
-      label: "Payment",
-      value: r.paymentParts.length ? "parts" : null,
-      show: (
-        <span className="flex flex-col gap-0.5">
-          <span>{partsWords(r.paymentParts, "customer")}</span>
-          <span className="text-xs font-normal text-text-2">{r.paymentRoute ? ROUTE_TEXT[r.paymentRoute] : "How they pay: not decided yet"}</span>
+/** One quotation open under its row: the bar (status, R▾, what can be done), its lines and its terms. */
+function QuotationOpen({
+  x,
+  r,
+  base,
+  manage,
+  showCosts,
+  today,
+  customer,
+  draftValues,
+  startValues,
+  offers,
+  loadOffers,
+  send,
+  dealId,
+  others,
+}: {
+  x: QuotationOfDeal;
+  r: RevisionView;
+  base: string;
+  manage: boolean;
+  showCosts: boolean;
+  today: string;
+  customer: string;
+  draftValues: RevisionDraft | null;
+  startValues: RevisionDraft | null;
+  offers: QuoteOffers | null;
+  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  send: ReactNode | null;
+  dealId: string;
+  others: string[];
+}) {
+  const isDraft = r.status === "draft";
+  const edit = isDraft && manage && !!draftValues && !!offers;
+  const checks = isDraft ? draftChecks(r) : [];
+  const sentBefore = x.revisions.find((v) => v.status !== "draft" && v.number < r.number);
+  const meta = isDraft
+    ? `${sentBefore?.sentOn ? `R${sentBefore.number} sent ${date(sentBefore.sentOn)} · ` : ""}Valid until ${date(r.validUntil)}`
+    : `${r.sentOn ? `${date(r.sentOn)}${r.sentVia ? ` ${SENT_VIA_TEXT[r.sentVia]}` : ""} · ` : ""}Valid until ${date(r.validUntil)}${r.status === "sent" && r.validUntil < today ? ", which has passed" : ""}`;
+  // The pencils and Edit lines open the draft's windows (the steps window comes next).
+  const termsWindow = (group: string) =>
+    edit ? (
+      <PanelButton
+        variant="ghost"
+        size="xs"
+        icon={<Pencil aria-hidden />}
+        label={<span className="sr-only">Edit {group}</span>}
+        title={`Edit · ${x.refNo} R${r.number}`}
+        description="Draft"
+        panelClassName="md:w-[860px]"
+        body={<TermsPanel number={r.number} initial={draftValues!} offers={offers!} loadOffers={loadOffers} showCosts={showCosts} action={updateRevisionAction.bind(null, dealId, r.id)} />}
+      />
+    ) : undefined;
+  const linesWindow = edit ? (
+    <PanelButton
+      variant="ghost"
+      size="xs"
+      icon={<Pencil aria-hidden />}
+      label={<span className="sr-only">Edit lines</span>}
+      title={`Edit lines · ${x.refNo} R${r.number}`}
+      description="Type a price, Enter goes to the next line. A column copied from Excel fills the lines below."
+      panelClassName="md:w-[1180px]"
+      body={<PriceEditor key={r.id} action={updateRevisionAction.bind(null, dealId, r.id)} initial={draftValues!} offers={offers!} showCosts={showCosts} />}
+    />
+  ) : null;
+  const canAnswer = r.status === "sent" && r.canAnswer && manage;
+  const o = optionOf(r);
+  return (
+    <section aria-label={`${x.refNo} R${r.number}`} className="flex flex-col gap-4 border-t border-line bg-surface-2/30 px-5 pt-3 pb-5 max-md:px-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <RevisionBadge status={r.status} />
+        {x.revisions.length > 1 ? (
+          <details className="relative">
+            <summary className="flex h-7 cursor-pointer list-none items-center gap-1 rounded-lg border border-line-strong bg-surface px-2.5 text-[13px] font-bold [&::-webkit-details-marker]:hidden">
+              R{r.number} <ChevronDown className="size-3.5" aria-hidden />
+              <span className="sr-only">, revisions</span>
+            </summary>
+            <ul className="absolute top-8 left-0 z-10 flex w-56 flex-col rounded-xl border border-line-strong bg-surface p-1 shadow-lg">
+              {x.revisions.map((v) => (
+                <li key={v.id}>
+                  <Link
+                    href={`${base}/quotation?q=${x.id}&rev=${v.id}#q-${x.id}`}
+                    scroll={false}
+                    aria-current={v.id === r.id ? "true" : undefined}
+                    className={cn("flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[13px] hover:bg-surface-2", v.id === r.id && "bg-surface-2 font-semibold")}
+                  >
+                    R{v.number}
+                    <span className="text-xs text-text-2">{REVISION_STATUS_LABEL[v.status]}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : (
+          <span className="text-[13px] font-bold">R{r.number}</span>
+        )}
+        <span className="text-[13px] text-text-2">{meta}</span>
+        <span className="ml-auto flex flex-wrap items-center gap-2">
+          <a href={printHref(r)} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
+            <Eye aria-hidden /> Print
+          </a>
+          <a href={pdfHref(r)} className={buttonClass("secondary", "sm")} aria-label={`Download ${x.refNo} R${r.number} as PDF`}>
+            <Download aria-hidden /> PDF
+          </a>
+          {isDraft && manage && <DeleteDraftButton number={r.number} action={deleteRevisionAction.bind(null, dealId, r.id)} backHref={`${base}/quotation`} />}
+          {r.status === "sent" && manage && send && (
+            <PanelButton variant="ghost" size="sm" icon={<Send aria-hidden />} label="Send again" title={`Send ${x.refNo} R${r.number} again`} description="The same PDF, by email" panelClassName="md:w-[620px]" body={send} />
+          )}
+          {manage && x.canStartRevision && !isDraft && (
+            <StartRevision
+              action={reviseAction.bind(null, dealId, x.id)}
+              draft={startValues}
+              offers={offers}
+              loadOffers={loadOffers}
+              allowed={!!startValues}
+              whyNot={x.whyNotStart}
+              showCosts={showCosts}
+              first={false}
+              label="New revision"
+              variant="secondary"
+            />
+          )}
+          {isDraft && manage && send && (
+            <PanelButton variant="primary" size="sm" icon={<Send aria-hidden />} label={`Send R${r.number}`} title={`Send ${x.refNo} R${r.number} to ${customer}`} description={`Valid until ${date(r.validUntil)}`} panelClassName="md:w-[620px]" body={send} />
+          )}
+          {canAnswer && (
+            <AnswerButton
+              number={r.number}
+              refNo={x.refNo}
+              customer={customer}
+              options={r.options}
+              currency={r.currency}
+              today={today}
+              answerAction={moveRevisionAction.bind(null, dealId, r.id)}
+              noAction={saidNoAction.bind(null, dealId, r.id)}
+              others={others}
+              overdue={r.validUntil < today}
+              route={r.paymentRoute ?? routeFromTerms(r.balanceTerms).route}
+            />
+          )}
         </span>
-      ),
-    },
-    { name: "paymentTerms", label: "Payment conditions", type: "textarea", value: r.paymentTerms, show: long(r.paymentTerms) },
-    { name: "warranty", label: "Warranty", value: warranty, show: long(warranty) },
-    { name: "notes", label: "Notes", type: "textarea", value: r.notes, show: long(r.notes) },
-    { label: "Made", value: r.createdAt, show: date(r.createdAt), uncounted: true },
-    // A draft has not gone anywhere yet: its sent and answered days come with the sending.
-    ...(r.status === "draft" ? [] : sentFields(r)),
-  ];
-}
+      </div>
 
-function sentFields(r: RevisionView): DetailField[] {
-  return [
-    {
-      label: "Sent",
-      value: r.sentOn,
-      show: r.sentOn ? `${date(r.sentOn)}${r.sentVia ? ` · ${SENT_VIA_TEXT[r.sentVia]}` : ""}` : undefined,
-      uncounted: true,
-    },
-    { label: "Customer answered", value: r.answeredOn, show: r.answeredOn ? date(r.answeredOn) : undefined, uncounted: true },
-  ];
+      {isDraft && checks.length > 0 && (
+        <div role="status" className="flex items-start gap-2 rounded-xl border border-warn/30 bg-warn-soft/60 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
+          <div>
+            <p className="font-medium">Before you send R{r.number}</p>
+            <ul className="mt-0.5 list-disc pl-4 text-text-2">
+              {checks.map((c) => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      <section aria-label="Lines" className="flex flex-col gap-2">
+        <h3 className="flex min-h-7 items-center gap-2 text-[15px] font-semibold">
+          Lines
+          {o && o.factory && <span className="text-xs font-normal text-text-2">{shortName(o.factory.name)}</span>}
+          <span className="ml-auto">{linesWindow}</span>
+        </h3>
+        <QuoteLines r={r} />
+      </section>
+
+      <section aria-label="Terms" className="flex flex-col gap-2">
+        <h3 className="text-[15px] font-semibold">Terms</h3>
+        <QuoteTerms
+          r={r}
+          showChecks={showCosts}
+          edit={edit ? (g) => termsWindow(g === "delivery" ? "delivery" : g === "payment" ? "payment" : "warranty and conditions") : undefined}
+        />
+      </section>
+    </section>
+  );
 }
 
 /** What to look at before a draft goes to the customer: lines without a price, items an option leaves out. */
 function draftChecks(r: RevisionView): string[] {
   const many = r.options.length > 1;
-  const checks = r.options.flatMap((o) => {
+  return r.options.flatMap((o) => {
     const who = many ? `Option ${o.letter}` : "The quotation";
     const out: string[] = [];
     const unpriced = o.lines.filter((l) => !(Number(l.unitPrice) > 0)).length;
@@ -460,22 +453,14 @@ function draftChecks(r: RevisionView): string[] {
       else if (o.gap) {
         const have = new Set((o.costs ?? []).map((c) => c.step));
         const asLine = (step: BasisStep) => o.lines.some((l) => l.type === "charge" && l.description.toLowerCase().startsWith(BASIS_STEP_LABEL[step].toLowerCase().split(" ")[0]!));
-        const missing = o.gap.needed.filter((x) => !have.has(x) && !asLine(x));
+        const missing = o.gap.needed.filter((s) => !have.has(s) && !asLine(s));
         if (missing.length)
-          out.push(`${who}: ${missing.map((x) => BASIS_STEP_LABEL[x].toLowerCase()).join(" and ")} to reach ${r.incoterm} ${missing.length === 1 ? "is" : "are"} not entered, so its cost and margin are too low.`);
+          out.push(`${who}: ${missing.map((s) => BASIS_STEP_LABEL[s].toLowerCase()).join(" and ")} to reach ${r.incoterm} ${missing.length === 1 ? "is" : "are"} not entered, so its cost and margin are too low.`);
       }
     }
     if (o.costing && o.costing.marginPercent !== null && o.costing.marginPercent < 0) out.push(`${who} sells below cost.`);
     // What we promise against what the factory gives (people who see costs): lead time, payment, warranty.
-    if (o.factory && o.factoryTerms) {
-      const factoryMinor = o.costing ? o.costing.costMinor - o.costing.extraCostMinor : 0;
-      const checks = termsChecks(
-        { leadDays: o.leadDays, leadFrom: o.leadFrom, parts: r.paymentParts, warrantyMonths: r.warrantyMonths, warrantyFrom: r.warrantyFrom, totalMinor: toMinor(o.total), currency: r.currency },
-        { factory: shortName(o.factory.name), ...o.factoryTerms, costMinor: factoryMinor > 0 ? factoryMinor : null },
-      );
-      for (const c of checks) if (!c.ok) out.push(`${who}: ${c.text}`);
-    }
+    for (const c of checksOf({ ...r, options: [o] }, o)) if (!c.ok) out.push(`${who}: ${c.text}`);
     return out;
   });
-  return checks;
 }

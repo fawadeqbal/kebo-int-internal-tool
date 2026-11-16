@@ -174,7 +174,7 @@ export function DeleteDraftButton({ number, action, backHref }: { number: number
   const [busy, start] = useTransition();
   return (
     <>
-      <button type="button" onClick={() => setAsking(true)} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline">
+      <button type="button" onClick={() => setAsking(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-bad hover:bg-bad-soft">
         <Trash2 className="size-4" aria-hidden /> Delete draft
       </button>
       {asking && (

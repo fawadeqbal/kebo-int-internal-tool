@@ -73,10 +73,13 @@ type QuotationWithRevisions = {
 };
 
 /**
- * A deal's quotations for lists and its page: in their letters' order, and the one that speaks for the deal
- * (the accepted one, else the lowest still waiting, else the lowest answered; while all are drafts, A).
+ * A deal's quotations for lists and its page: those with a revision, in their letters' order, and the one that
+ * speaks for the deal (the accepted one, else the lowest still waiting, else the lowest answered; while all are
+ * drafts, the first).
  */
 export function dealQuotations<Q extends QuotationWithRevisions>(quotations: Q[], main: string, rates: Rates) {
   const worth = worthInMain(main, rates);
-  return { all: byLetter(quotations), deal: dealQuotation<Q>(quotations, (r) => worth(r)) };
+  // A quotation whose drafts were all deleted is not one of the deal's (its letter goes to the next new one).
+  const shown = quotations.filter((q) => q.revisions.length > 0);
+  return { all: byLetter(shown), deal: dealQuotation<Q>(shown, (r) => worth(r)) };
 }

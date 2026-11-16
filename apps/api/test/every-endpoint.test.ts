@@ -47,6 +47,11 @@ describe("every read endpoint answers for every record", () => {
       await ok(manager, `/inquiries/${d.id}/factory-requests`);
       const q = await ok(manager, `/inquiries/${d.id}/quotation`);
       for (const r of (q?.revisions ?? []) as { id: string }[]) await ok(manager, `/revisions/${r.id}`);
+      // Every quotation of the deal (A, B, C…): its revisions and its next revision's starting values.
+      for (const one of (q?.quotations ?? []) as { id: string; revisions: { id: string }[] }[]) {
+        for (const r of one.revisions) await ok(manager, `/revisions/${r.id}`);
+        await ok(manager, `/quotations/${one.id}/draft`);
+      }
     }
   });
 

@@ -420,7 +420,8 @@ export const revisionInput = z.object({
 export type RevisionInput = z.infer<typeof revisionInput>;
 
 export const revisionMoveInput = z.object({
-  to: z.enum(REVISION_STATUSES).exclude(["draft", "superseded", "void"]),
+  // "Not chosen" is not an answer anyone records: it follows when the customer accepts another quotation.
+  to: z.enum(REVISION_STATUSES).exclude(["draft", "superseded", "void", "not_chosen"]),
   /** Accepted: the option the customer chose (needed when there is more than one). */
   optionId: optionalId,
   /** The day it was sent or answered; today when empty. */
@@ -433,6 +434,23 @@ export const revisionMoveInput = z.object({
   route: z.preprocess((v) => (v === "" ? undefined : v), z.enum(PAYMENT_ROUTES).optional()),
   reason: reasonField,
 });
+
+/**
+ * New quotations (any number per inquiry, A, B, C…): one draft for each factory offer ticked, or null for one
+ * priced by hand from the customer's items ("Own prices"); an offer can be quoted again on other terms. Each
+ * starts in this currency, valid until this day, its lines priced at this margin (on the price).
+ */
+export const newQuotationsInput = z.object({
+  offers: z
+    .array(z.string().trim().uuid("Choose an offer").nullable())
+    .min(1, "Tick at least one offer")
+    .max(10, "Make at most 10 at once")
+    .refine((ids) => new Set(ids).size === ids.length, "Each offer once"),
+  currency: currency,
+  validUntil: isoDate(),
+  margin: z.coerce.number({ error: "Enter the margin" }).min(0, "The margin cannot be below 0%").lt(100, "The margin must be under 100%"),
+});
+export type NewQuotationsInput = z.infer<typeof newQuotationsInput>;
 
 /** Email a revision: to whom, a copy, the subject and message, and its PDF (base64, made by the web app). */
 export const revisionEmailInput = z.object({

@@ -332,6 +332,13 @@ export interface QuotationView {
   whyNotStart: string | null;
   /** Every quotation of the deal, A, B, C…, each with its revisions (newest first). */
   quotations: QuotationOfDeal[];
+  /** What New quotations starts with: the currency, valid until and the margin (%). */
+  newDefaults: { currency: string; validUntil: string; margin: number };
+}
+
+/** POST /inquiries/:id/quotations: the quotations made, one per offer ticked. */
+export interface NewQuotationsResult {
+  quotations: { id: string; refNo: string; letter: string; revisionId: string; number: number }[];
 }
 
 /** One of the deal's quotations (QUO-2026-0531-B) with its revisions. */

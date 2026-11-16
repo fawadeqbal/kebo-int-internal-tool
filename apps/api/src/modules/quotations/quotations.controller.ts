@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { currency, revisionEmailInput, revisionInput, revisionMoveInput, type RevisionInput } from "@kebo/shared";
+import { currency, newQuotationsInput, revisionEmailInput, revisionInput, revisionMoveInput, type NewQuotationsInput, type RevisionInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -12,7 +12,7 @@ import { QuotationsService } from "./quotations.service";
 export class QuotationsController {
   constructor(private readonly quotations: QuotationsService) {}
 
-  /** The deal's quotation with every revision (costs only for people who may see them). */
+  /** The deal's quotations, A, B, C…, each with every revision (costs only for people who may see them). */
   @SignedIn("checked inside: sourcing.manage")
   @Get("inquiries/:id/quotation")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
@@ -41,6 +41,27 @@ export class QuotationsController {
   @RequirePermissions("quotations.manage")
   create(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(revisionInput)) body: RevisionInput) {
     return this.quotations.createRevision(user, id, body);
+  }
+
+  /** New quotations: one draft for each factory offer ticked (or own prices), lettered A, B, C… */
+  @Post("inquiries/:id/quotations")
+  @RequirePermissions("quotations.manage")
+  createMany(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(newQuotationsInput)) body: NewQuotationsInput) {
+    return this.quotations.createQuotations(user, id, body);
+  }
+
+  /** Starting values for one quotation's next revision (a copy of its latest). */
+  @Get("quotations/:id/draft")
+  @RequirePermissions("quotations.manage")
+  draftOf(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.quotations.draftFor(user, id);
+  }
+
+  /** One quotation's next revision (after the customer has seen one: with the reason it changes). */
+  @Post("quotations/:id/revisions")
+  @RequirePermissions("quotations.manage")
+  revise(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(revisionInput)) body: RevisionInput) {
+    return this.quotations.createRevisionOn(user, id, body);
   }
 
   @SignedIn("checked inside: sourcing.manage")
