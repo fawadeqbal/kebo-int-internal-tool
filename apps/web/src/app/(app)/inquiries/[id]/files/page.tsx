@@ -38,7 +38,8 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
     remove: removeFileAction.bind(null, d.id, f.id),
   }));
   const quoteFiles = (s?.quotes ?? []).flatMap((q) => q.files.map((f) => ({ ...f, offer: [q.factory.name, q.reference].filter(Boolean).join(" · ") })));
-  const made = [...(d.quotation?.revisions ?? [])].sort((a, b) => b.number - a.number);
+  // Every quotation's revisions (A, B, C…), each named by its own number.
+  const made = d.quotations.flatMap((q) => [...q.revisions].sort((a, b) => b.number - a.number).map((r) => ({ ...r, refNo: q.refNo })));
 
   return (
     <div className="flex flex-col gap-4">
@@ -111,7 +112,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
         </Card>
       )}
 
-      {made.length > 0 && d.quotation && (
+      {made.length > 0 && (
         <Card>
           <CardHeader title="Made here" />
           <CardBody className="flex flex-col gap-2">
@@ -119,7 +120,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
               {made.map((r) => (
                 <a key={r.id} href={`/pdf/revisions/${r.id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
                   <FileIcon className="size-3.5" aria-hidden />
-                  {d.quotation!.refNo} R{r.number}.pdf
+                  {r.refNo} R{r.number}.pdf
                 </a>
               ))}
             </div>

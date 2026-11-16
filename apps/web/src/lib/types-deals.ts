@@ -325,7 +325,21 @@ export interface RevisionView {
 
 export interface QuotationView {
   inquiry: { id: string; refNo: string; stage: string };
-  quotation: { id: string; refNo: string } | null;
+  /** The first quotation (A) and its revisions, as the page shows them until it lists every quotation. */
+  quotation: { id: string; refNo: string; letter: string } | null;
+  revisions: RevisionView[];
+  canStartRevision: boolean;
+  whyNotStart: string | null;
+  /** Every quotation of the deal, A, B, C…, each with its revisions (newest first). */
+  quotations: QuotationOfDeal[];
+}
+
+/** One of the deal's quotations (QUO-2026-0531-B) with its revisions. */
+export interface QuotationOfDeal {
+  id: string;
+  refNo: string;
+  /** A, B … Z, AA (an older inquiry's first quotation is A, its number without the letter). */
+  letter: string;
   revisions: RevisionView[];
   canStartRevision: boolean;
   whyNotStart: string | null;

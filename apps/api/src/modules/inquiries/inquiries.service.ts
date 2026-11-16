@@ -23,7 +23,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { requireReason } from "../../common/audit/reason";
 import { SettingsService } from "../settings/settings.service";
 import { StagesService } from "./stages.service";
-import { optionFigures, revisionRow } from "../quotations/revision-figures";
+import { dealQuotations, optionFigures, revisionRow } from "../quotations/revision-figures";
 
 /** Staff see the deals they handle or created; managers see all. */
 export function inquiryAccess(user: SessionUser): Prisma.InquiryWhereInput {
@@ -117,13 +117,13 @@ export class InquiriesService {
           customer: { select: { id: true, name: true, country: true } },
           assignee: { select: { id: true, name: true } },
           _count: { select: { items: true, factoryQuotes: { where: { deletedAt: null } }, factoryRequests: true } },
-          quotation: {
+          quotations: {
             select: {
               refNo: true,
+              letter: true,
               revisions: {
                 where: { deletedAt: null },
                 orderBy: { number: "desc" },
-                take: 1,
                 select: { number: true, status: true, currency: true, ...optionFigures },
               },
             },
@@ -137,6 +137,7 @@ export class InquiriesService {
       this.prisma.db.inquiry.count({ where: this.where(user, { ...q, stage: "overdue" }) }),
       this.prisma.db.inquiry.count({ where: this.where(user, { ...q, stage: "on_hold" }) }),
     ]);
+    const { sales } = await this.settings.get();
     const sorted =
       q.sort === "priority"
         ? rows.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]).slice((q.page - 1) * q.pageSize, q.page * q.pageSize)
@@ -148,31 +149,35 @@ export class InquiriesService {
       pageSize: q.pageSize,
       /** By stage, and `overdue` / `on_hold` (open ones past their needed-by date / on hold). */
       counts: { ...Object.fromEntries(byStage.map((g) => [g.stage, g._count])), overdue, on_hold: onHold } as Record<string, number>,
-      rows: sorted.map((i) => ({
-        id: i.id,
-        refNo: i.refNo,
-        title: i.title,
-        category: i.category,
-        channel: i.channel,
-        priority: i.priority,
-        stage: i.stage,
-        onHold: i.onHold,
-        lostReason: i.lostReason,
-        requiredBy: fromDbDateOrNull(i.requiredBy),
-        overdue: isOpen(i.stage) && !!i.requiredBy && fromDbDateOrNull(i.requiredBy)! < today,
-        customer: i.customer,
-        assignee: i.assignee,
-        items: i._count.items,
-        /** Factories asked for prices, and the offers in. */
-        asked: i._count.factoryRequests,
-        offers: i._count.factoryQuotes,
-        quotation: i.quotation
-          ? { refNo: i.quotation.refNo, latest: i.quotation.revisions[0] ? revisionRow(i.quotation.revisions[0]) : null }
-          : null,
-        order: i.orders[0] ?? null,
-        createdAt: i.createdAt,
-        updatedAt: i.updatedAt,
-      })),
+      rows: sorted.map((i) => {
+        const deal = dealQuotations(i.quotations, sales.currency, sales.exchangeRates).deal;
+        return {
+          id: i.id,
+          refNo: i.refNo,
+          title: i.title,
+          category: i.category,
+          channel: i.channel,
+          priority: i.priority,
+          stage: i.stage,
+          onHold: i.onHold,
+          lostReason: i.lostReason,
+          requiredBy: fromDbDateOrNull(i.requiredBy),
+          overdue: isOpen(i.stage) && !!i.requiredBy && fromDbDateOrNull(i.requiredBy)! < today,
+          customer: i.customer,
+          assignee: i.assignee,
+          items: i._count.items,
+          /** Factories asked for prices, and the offers in. */
+          asked: i._count.factoryRequests,
+          offers: i._count.factoryQuotes,
+          /** The quotation that speaks for the deal (accepted, else the lowest still waiting…), with its newest revision. */
+          quotation: deal ? { refNo: deal.refNo, latest: deal.revisions[0] ? revisionRow(deal.revisions[0]) : null } : null,
+          /** How many quotations the deal has. */
+          quotations: i.quotations.length,
+          order: i.orders[0] ?? null,
+          createdAt: i.createdAt,
+          updatedAt: i.updatedAt,
+        };
+      }),
     };
   }
 
@@ -205,7 +210,7 @@ export class InquiriesService {
         attachments: { where: { deletedAt: null, factoryQuoteId: null, replacedById: null }, orderBy: { createdAt: "desc" } },
         stageChanges: { orderBy: { changedAt: "asc" } },
         assignments: { orderBy: { assignedAt: "asc" } },
-        quotation: {
+        quotations: {
           include: {
             revisions: {
               where: { deletedAt: null },
@@ -263,9 +268,16 @@ export class InquiriesService {
       ).map((l) => l.requestedItemId!),
     );
     const numbers = lineNumbers(i.items.map((it) => ({ key: it.id, parentKey: it.parentId })));
+    const { sales } = await this.settings.get();
+    const { all, deal } = dealQuotations(i.quotations, sales.currency, sales.exchangeRates);
+    const withRows = <Q extends (typeof all)[number]>(q: Q) => ({ ...q, revisions: q.revisions.map(revisionRow) });
+    const { quotations: _quotations, ...rest } = i;
     return {
-      ...i,
-      quotation: i.quotation ? { ...i.quotation, revisions: i.quotation.revisions.map(revisionRow) } : null,
+      ...rest,
+      /** The quotation that speaks for the deal (accepted, else the lowest still waiting…; while all are drafts, A). */
+      quotation: deal ? withRows(deal) : null,
+      /** Every quotation, A, B, C…, each with its revisions (newest first). */
+      quotations: all.map(withRows),
       /** Items in order, parts right after their item: "3", "3.1"; `priced` once a factory has priced it (changing it then needs a reason). */
       items: i.items.map((it, n) => ({ ...it, no: numbers[n], priced: priced.has(it.id) })),
       requiredBy: fromDbDateOrNull(i.requiredBy),

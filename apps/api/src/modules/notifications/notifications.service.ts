@@ -266,9 +266,10 @@ export class NotificationsService implements OnModuleInit {
     if (e.to !== "lost") return;
     const i = await inquiryFacts(this.prisma.db, e.inquiryId);
     if (!i) return;
+    // The quotation that went out last (of any of the deal's quotations).
     const last = await this.prisma.db.quotationRevision.findFirst({
       where: { quotation: { inquiryId: i.id }, deletedAt: null, status: { not: "draft" } },
-      orderBy: { number: "desc" },
+      orderBy: [{ sentOn: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
       select: { id: true },
     });
     const r = last ? await revisionFacts(this.prisma.db, last.id) : null;

@@ -28,11 +28,14 @@ export interface DealRow {
   /** Factories asked for prices, and the offers in. */
   asked?: number;
   offers?: number;
+  /** The quotation that speaks for the deal (accepted, else the lowest still waiting…; while all are drafts, A). */
   quotation: {
     refNo: string;
     /** `total` is the accepted option's, else the lowest option's; `totalUpTo` the highest when the options differ. */
     latest: { number: number; status: RevisionStatus; total: string; totalUpTo: string | null; totalOf: string; currency: string } | null;
   } | null;
+  /** How many quotations the deal has (A, B, C…). */
+  quotations?: number;
   order: { id: string; refNo: string; status: OrderStatus } | null;
   createdAt: string;
 }
@@ -126,24 +129,32 @@ export interface DealDetail {
     changedAt: string;
   }[];
   assignments: { id: string; assigneeId: string | null; assignedById: string; assignedAt: string }[];
-  quotation: {
-    id: string;
-    refNo: string;
-    revisions: {
-      id: string;
-      number: number;
-      status: RevisionStatus;
-      /** The accepted option's total, else the lowest option's; `totalUpTo` the highest when the options differ. */
-      total: string;
-      totalUpTo: string | null;
-      totalOf: string;
-      currency: string;
-      validUntil: string;
-      sentOn: string | null;
-    }[];
-  } | null;
+  /** The quotation that speaks for the deal (accepted, else the lowest still waiting…; while all are drafts, A). */
+  quotation: DealQuotation | null;
+  /** Every quotation, A, B, C…, each with its revisions (newest first). */
+  quotations: DealQuotation[];
   orders: { id: string; refNo: string; status: OrderStatus; orderedOn: string; total: string; currency: string; customerRef?: string | null }[];
   people: Record<string, string>;
   canWork: boolean;
   allowed: { edit: boolean; quote: boolean; source: boolean; assign: boolean; hold: boolean; reopen: boolean };
+}
+
+/** One of a deal's quotations (QUO-2026-0531-B) with its revisions, newest first. */
+export interface DealQuotation {
+  id: string;
+  refNo: string;
+  /** A, B … Z, AA (an older inquiry's first quotation is A, its number without the letter). */
+  letter: string;
+  revisions: {
+    id: string;
+    number: number;
+    status: RevisionStatus;
+    /** The accepted option's total, else the lowest option's; `totalUpTo` the highest when the options differ. */
+    total: string;
+    totalUpTo: string | null;
+    totalOf: string;
+    currency: string;
+    validUntil: string;
+    sentOn: string | null;
+  }[];
 }

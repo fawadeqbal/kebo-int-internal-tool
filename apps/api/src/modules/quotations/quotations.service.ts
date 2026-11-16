@@ -5,6 +5,7 @@ import {
   BASIS_STEP_LABEL,
   BASIS_STEPS,
   balanceTermsOfParts,
+  byLetter,
   basisGap,
   can,
   canAnswer,
@@ -19,6 +20,7 @@ import {
   isWarrantyFrom,
   leadWords,
   isEditable,
+  nextQuotationLetter,
   latestRevision,
   QUOTED_STATUSES,
   type Currency,
@@ -126,12 +128,11 @@ function optionLead(o: { leadDays?: number | null; leadFrom?: string | null; lea
 }
 
 /**
- * One quotation per deal, with revisions R1, R2… Each revision offers one or
- * more options (A, B…): each option is one factory's whole offer — its lines
- * exactly as the factory gave them, locked — with our prices, discount, lead
- * time and charges. (Without factory prices, an option is the customer's items
- * priced by hand.) A revision is edited only as a draft; sending freezes it;
- * the customer accepts exactly one option, which becomes the order.
+ * Any number of quotations per deal, A, B, C… (QUO-2026-0531-B), each with revisions R1, R2… A revision offers
+ * one or more options (older quotations have several; a quotation from one factory offer has one): an option is
+ * one factory's whole offer — its lines exactly as the factory gave them, locked — with our prices, discount,
+ * lead time and charges. (Without factory prices, an option is the customer's items priced by hand.) A revision
+ * is edited only as a draft; sending freezes it; the customer accepts exactly one option, which becomes the order.
  */
 /** Where a first revision's starting values came from (said under each field; all of them can be changed). */
 export interface DraftFrom {
@@ -366,27 +367,56 @@ export class QuotationsService {
     };
   }
 
-  async get(user: SessionUser, inquiryId: string) {
-    const inquiry = await this.inquiries.find(user, inquiryId);
-    const q = await this.prisma.db.quotation.findUnique({
+  /** The deal's quotations, A, B, C… (by letter), each with its live revisions, newest first. */
+  private async quotationsOf(db: Db, inquiryId: string) {
+    const all = await db.quotation.findMany({
       where: { inquiryId },
       include: { revisions: { where: { deletedAt: null }, include: revisionInclude, orderBy: { number: "desc" } } },
     });
-    const items = await this.items(this.prisma.db, inquiryId);
-    const usual = (await this.settings.get()).sales.factoryAdvancePercent;
-    const revisions = q?.revisions ?? [];
-    const refs = revisions.map((r) => ({ number: r.number, status: r.status }));
+    return byLetter(all);
+  }
+
+  /** One quotation with its revisions, and whether a new revision can be started on it. */
+  private quotationView(
+    user: SessionUser,
+    q: Awaited<ReturnType<QuotationsService["quotationsOf"]>>[number],
+    items: { id: string; parentId: string | null; no: string }[],
+    usual: number,
+    stage: Parameters<typeof canQuote>[0],
+  ) {
+    const refs = q.revisions.map((r) => ({ number: r.number, status: r.status }));
     const start = canStartRevision(refs);
     return {
-      inquiry: { id: inquiry.id, refNo: inquiry.refNo, stage: inquiry.stage },
-      quotation: q && { id: q.id, refNo: q.refNo },
-      revisions: revisions.map((r) => ({
+      id: q.id,
+      refNo: q.refNo,
+      letter: q.letter,
+      revisions: q.revisions.map((r) => ({
         ...this.view(user, r, items, usual),
         canAnswer: canAnswer(refs, r.number),
         editable: isEditable(r.status),
       })),
-      canStartRevision: canQuote(inquiry.stage) && start.ok,
-      whyNotStart: !canQuote(inquiry.stage) ? "This inquiry is closed. Reopen it to quote again." : start.ok ? null : start.reason,
+      canStartRevision: canQuote(stage) && start.ok,
+      whyNotStart: !canQuote(stage) ? "This inquiry is closed. Reopen it to quote again." : start.ok ? null : start.reason,
+    };
+  }
+
+  async get(user: SessionUser, inquiryId: string) {
+    const inquiry = await this.inquiries.find(user, inquiryId);
+    const quotations = await this.quotationsOf(this.prisma.db, inquiryId);
+    const items = await this.items(this.prisma.db, inquiryId);
+    const usual = (await this.settings.get()).sales.factoryAdvancePercent;
+    const views = quotations.map((q) => this.quotationView(user, q, items, usual, inquiry.stage));
+    // The first quotation, as the page shows it until it lists them all (with none yet: R1 can be started).
+    const first = views[0] ?? null;
+    const open = canQuote(inquiry.stage);
+    return {
+      inquiry: { id: inquiry.id, refNo: inquiry.refNo, stage: inquiry.stage },
+      quotation: first && { id: first.id, refNo: first.refNo, letter: first.letter },
+      revisions: first?.revisions ?? [],
+      canStartRevision: first ? first.canStartRevision : open,
+      whyNotStart: first ? first.whyNotStart : open ? null : "This inquiry is closed. Reopen it to quote again.",
+      /** Every quotation of the deal, A, B, C…, each with its revisions. */
+      quotations: views,
     };
   }
 
@@ -440,13 +470,12 @@ export class QuotationsService {
    * whose offer was removed are left out), or for R1 the offer that covers the
    * most items at the lowest cost, priced at the default margin.
    */
-  async draft(user: SessionUser, inquiryId: string): Promise<RevisionInput & { number: number; from?: DraftFrom }> {
+  async draft(user: SessionUser, inquiryId: string, quotationId?: string): Promise<RevisionInput & { number: number; from?: DraftFrom }> {
     const inquiry = await this.inquiries.find(user, inquiryId); // only for people who may see the deal
     const settings = await this.settings.get();
-    const q = await this.prisma.db.quotation.findUnique({
-      where: { inquiryId },
-      include: { revisions: { where: { deletedAt: null }, include: revisionInclude, orderBy: { number: "desc" } } },
-    });
+    const quotations = await this.quotationsOf(this.prisma.db, inquiryId);
+    const q = quotationId ? quotations.find((x) => x.id === quotationId) : quotations[0];
+    if (quotationId && !q) throw new NotFoundError("Quotation");
     const latest = q?.revisions[0];
     const validUntil = addDays(this.clock.today(), settings.sales.quotationValidityDays);
     // A first revision starts from what is already known about this customer (every field can be changed):
@@ -680,22 +709,31 @@ export class QuotationsService {
     }
   }
 
-  async createRevision(user: SessionUser, inquiryId: string, input: RevisionInput) {
+  async createRevision(user: SessionUser, inquiryId: string, input: RevisionInput, quotationId?: string) {
     this.assertCan(user);
     const id = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from inquiries where id = ${inquiryId}::uuid for update`;
       const inquiry = await this.inquiries.findWorkable(user, inquiryId, tx);
       if (!canQuote(inquiry.stage)) throw new DomainError("This inquiry is closed. Reopen it to quote again.");
-      let q = await tx.quotation.findUnique({
-        where: { inquiryId },
-        include: { revisions: { where: { deletedAt: null }, select: { number: true, status: true } } },
-      });
+      const quotations = byLetter(
+        await tx.quotation.findMany({
+          where: { inquiryId },
+          include: { revisions: { where: { deletedAt: null }, select: { number: true, status: true } } },
+        }),
+      );
+      let q = quotationId ? quotations.find((x) => x.id === quotationId) : quotations[0];
+      if (quotationId && !q) throw new NotFoundError("Quotation");
       const refs = (q?.revisions ?? []).map((r) => ({ number: r.number, status: r.status }));
       const start = canStartRevision(refs);
       if (!start.ok) throw new GateError(start.reason, "revision_blocked");
+      // The deal's first quotation: letter A, the inquiry's QUO number as it is.
       q ??= {
         ...(await tx.quotation.create({
-          data: { inquiryId, refNo: await nextReference(tx, "quotation", Number(this.clock.today().slice(0, 4))) },
+          data: {
+            inquiryId,
+            letter: nextQuotationLetter(quotations.map((x) => x.letter)),
+            refNo: await nextReference(tx, "quotation", Number(this.clock.today().slice(0, 4))),
+          },
         })),
         revisions: [],
       };
@@ -737,7 +775,10 @@ export class QuotationsService {
     const { r } = await this.loadRevision(user, revisionId);
     const items = await this.items(this.prisma.db, r.quotation.inquiryId);
     const usual = (await this.settings.get()).sales.factoryAdvancePercent;
-    return { quotation: { id: r.quotation.id, refNo: r.quotation.refNo, inquiryId: r.quotation.inquiryId }, ...this.view(user, r, items, usual) };
+    return {
+      quotation: { id: r.quotation.id, refNo: r.quotation.refNo, letter: r.quotation.letter, inquiryId: r.quotation.inquiryId },
+      ...this.view(user, r, items, usual),
+    };
   }
 
   /** A saved draft as the editor sends it back. */
@@ -888,6 +929,13 @@ export class QuotationsService {
       } else {
         if (!canAnswer(refs, r.number)) throw new GateError("Answers are recorded on the newest revision the customer has.", "not_latest");
         if (to === "accepted") {
+          // One quotation of the deal is accepted.
+          const taken = await tx.quotationRevision.findFirst({
+            where: { status: "accepted", deletedAt: null, quotation: { inquiryId: inquiry.id, id: { not: r.quotationId } } },
+            select: { number: true, quotation: { select: { refNo: true } } },
+          });
+          if (taken)
+            throw new GateError(`The customer already accepted ${taken.quotation.refNo} R${taken.number}. Cancel its order to accept another quotation.`, "revision_move");
           // Exactly one option: the one the customer chose (the only one, when there is one).
           chosen = optionId ? (r.options.find((o) => o.id === optionId) ?? null) : r.options.length === 1 ? r.options[0]! : null;
           if (!chosen)

@@ -1,6 +1,6 @@
 import { decimalToMinor, type Prisma } from "@kebo/database";
-import { fromMinor } from "@kebo/money";
-import { revisionOption, revisionWorth } from "@kebo/shared";
+import { fromMinor, fxRate, type Rates } from "@kebo/money";
+import { byLetter, dealQuotation, revisionOption, revisionWorth, type RevisionStatus } from "@kebo/shared";
 
 /**
  * A revision keeps no figures of its own: its total, discount and lead time are read from its options
@@ -54,4 +54,29 @@ export function worthView(rev: { options: FigureOption[] }) {
 export function revisionRow<R extends { options: FigureOption[] }>(r: R): Omit<R, "options"> & ReturnType<typeof worthView> {
   const { options: _options, ...rest } = r;
   return { ...rest, ...worthView(r) };
+}
+
+/**
+ * What a revision is worth (its lowest option) in the main currency, so a deal's quotations in different
+ * currencies can be compared; null without a rate (it then counts after those that have one).
+ */
+export function worthInMain(main: string, rates: Rates) {
+  return (r: { currency: string; options: FigureOption[] }) => {
+    const rate = fxRate(r.currency, main, main, rates);
+    return rate ? worthOf(r).lowMinor / rate : null;
+  };
+}
+
+type QuotationWithRevisions = {
+  letter: string;
+  revisions: { number: number; status: RevisionStatus; currency: string; options: FigureOption[] }[];
+};
+
+/**
+ * A deal's quotations for lists and its page: in their letters' order, and the one that speaks for the deal
+ * (the accepted one, else the lowest still waiting, else the lowest answered; while all are drafts, A).
+ */
+export function dealQuotations<Q extends QuotationWithRevisions>(quotations: Q[], main: string, rates: Rates) {
+  const worth = worthInMain(main, rates);
+  return { all: byLetter(quotations), deal: dealQuotation<Q>(quotations, (r) => worth(r)) };
 }

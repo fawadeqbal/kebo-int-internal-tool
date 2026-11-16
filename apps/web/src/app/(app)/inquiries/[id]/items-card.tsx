@@ -19,7 +19,8 @@ export async function ItemsCard({ id }: { id: string }) {
   const me = await requireUser();
   const d = await dealOf(id);
   const sourcing = can(me, "sourcing.manage") ? await sourcingOf(id).catch(() => null) : null;
-  const quoted = d.quotation?.revisions.some((r) => r.status !== "draft") ?? false;
+  // Any of the deal's quotations sent to the customer.
+  const quoted = d.quotations.some((q) => q.revisions.some((r) => r.status !== "draft"));
   // How many offers price each item.
   const offers = new Map<string, number>();
   for (const q of sourcing?.quotes ?? []) for (const item of new Set(q.lines.map((l) => l.requestedItemId).filter((x): x is string => !!x))) offers.set(item, (offers.get(item) ?? 0) + 1);

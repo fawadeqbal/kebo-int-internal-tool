@@ -70,7 +70,7 @@ export type PartyRole = (typeof PARTY_ROLES)[number];
 
 /** Status of one revision (R1, R2…) of a quotation. */
 /** "void": accepted, but the order made from it was later cancelled (the deal can be reopened and quoted again). */
-export const REVISION_STATUSES = values("draft", "sent", "accepted", "rejected", "expired", "superseded", "void");
+export const REVISION_STATUSES = values("draft", "sent", "accepted", "rejected", "expired", "superseded", "void", "not_chosen");
 export type RevisionStatus = (typeof REVISION_STATUSES)[number];
 
 /** How a quotation went to the customer (kept beside the day it was sent). */

@@ -2,8 +2,8 @@ import type { BalanceTerms, RevisionStatus } from "../enums";
 import { BALANCE_TERMS_LABEL } from "../labels";
 
 /**
- * A deal has one quotation (QUO-2026-0007) with revisions R1, R2… Only the
- * newest revision is live. A revision cannot change after it is sent; a price
+ * A deal has any number of quotations, A, B, C… (QUO-2026-0531-B; see quotationLetter below), each from one
+ * factory offer or own prices, each with revisions R1, R2… Within a quotation only the newest revision is live. A revision cannot change after it is sent; a price
  * change is a new revision, so what the customer saw is never altered. When a
  * newer revision is sent, the previous sent one becomes "superseded", so it no
  * longer counts as waiting for a reply, in reminders or in quoted value.
@@ -24,6 +24,7 @@ export const REVISION_MOVES: Record<RevisionStatus, { to: RevisionStatus; label:
   expired: [],
   superseded: [],
   void: [],
+  not_chosen: [],
 };
 
 export const canMoveRevision = (from: RevisionStatus, to: RevisionStatus) => REVISION_MOVES[from].some((m) => m.to === to);
@@ -31,7 +32,7 @@ export const canMoveRevision = (from: RevisionStatus, to: RevisionStatus) => REV
 export const isEditable = (status: RevisionStatus) => status === "draft";
 
 /** Statuses that count as "we quoted the customer" (for reports: only the live revision is counted). */
-export const QUOTED_STATUSES: readonly RevisionStatus[] = ["sent", "accepted", "rejected", "expired"];
+export const QUOTED_STATUSES: readonly RevisionStatus[] = ["sent", "accepted", "rejected", "expired", "not_chosen"];
 
 export interface RevisionRef {
   number: number;
@@ -180,4 +181,94 @@ export function revisionWorth<O extends OptionRef>(
   const lowMinor = Math.min(...all);
   const highMinor = Math.max(...all);
   return { lowMinor, highMinor, accepted: false, label: lowMinor === highMinor ? "" : `lowest–highest of ${options.length} options` };
+}
+
+/* ---------------------------------------------------------------- many quotations per inquiry */
+
+/**
+ * A quotation's letter by its place, as spreadsheet columns: 0 → A … 25 → Z, 26 → AA, 27 → AB. The inquiry keeps
+ * one QUO number and each quotation prints it with its letter: QUO-2026-0531-A, -B … -Z, -AA.
+ */
+export function quotationLetter(index: number): string {
+  let n = Math.max(0, Math.floor(index)) + 1;
+  let letter = "";
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    letter = String.fromCharCode(65 + r) + letter;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letter;
+}
+
+/** The place of a letter (A → 0, Z → 25, AA → 26): quotations are listed in this order. */
+export function letterIndex(letter: string): number {
+  let n = 0;
+  for (const c of letter.toUpperCase()) n = n * 26 + (c.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+/** A new quotation's letter: the first one free (a draft deleted before it was sent gives its letter back). */
+export function nextQuotationLetter(used: Iterable<string>): string {
+  const taken = new Set(used);
+  let i = 0;
+  while (taken.has(quotationLetter(i))) i += 1;
+  return quotationLetter(i);
+}
+
+/**
+ * The inquiry's QUO number, read from one of its quotations: QUO-2026-0531-B → QUO-2026-0531. An older inquiry's
+ * first quotation kept its number without a letter (QUO-2026-0007, letter A): its number is the inquiry's.
+ */
+export const quotationBase = (q: { refNo: string; letter: string }) =>
+  q.refNo.endsWith(`-${q.letter}`) ? q.refNo.slice(0, -(q.letter.length + 1)) : q.refNo;
+
+/** A quotation's printed number: the inquiry's QUO number and the letter. */
+export const quotationNumber = (base: string, letter: string) => `${base}-${letter}`;
+
+/** Quotations in their letters' order (A, B … Z, AA). */
+export const byLetter = <Q extends { letter: string }>(quotations: readonly Q[]): Q[] =>
+  [...quotations].sort((a, b) => letterIndex(a.letter) - letterIndex(b.letter));
+
+/**
+ * The revision that speaks for a deal with several quotations, so lists, the pipeline and reports count the deal
+ * once: the accepted one; else, of each quotation's newest revision the customer has seen (not a draft), the ones
+ * still waiting for an answer (sent) before the answered ones, the one worth least (`worth`, in one currency's
+ * minor units or comparable; unknown counts last). Null while every quotation is still a draft. With a single
+ * quotation it is that quotation's newest revision the customer has seen, as before.
+ */
+export function dealRevision<R extends RevisionRef>(
+  quotations: readonly { revisions: readonly R[] }[],
+  worth: (r: R) => number | null = () => null,
+): R | null {
+  const all = quotations.flatMap((q) => q.revisions);
+  const accepted = all.find((r) => r.status === "accepted");
+  if (accepted) return accepted;
+  const seen = quotations
+    .map((q) => latestRevision(q.revisions.filter((r) => r.status !== "draft")))
+    .filter((r): r is R => r !== null);
+  const waiting = seen.filter((r) => r.status === "sent");
+  const pool = waiting.length ? waiting : seen;
+  let best: R | null = null;
+  let bestWorth = Number.POSITIVE_INFINITY;
+  for (const r of pool) {
+    const w = worth(r) ?? Number.POSITIVE_INFINITY;
+    if (best === null || w < bestWorth) {
+      best = r;
+      bestWorth = w;
+    }
+  }
+  return best;
+}
+
+/**
+ * The quotation a deal shows in one line (the inquiries list, a customer's deals): the one whose revision speaks
+ * for the deal (dealRevision); while all are drafts, the first by letter. Null without quotations.
+ */
+export function dealQuotation<Q extends { letter: string; revisions: readonly RevisionRef[] }>(
+  quotations: readonly Q[],
+  worth?: (r: Q["revisions"][number]) => number | null,
+): Q | null {
+  const speaking = dealRevision<Q["revisions"][number]>(quotations, worth);
+  if (speaking) return quotations.find((q) => q.revisions.includes(speaking)) ?? null;
+  return byLetter(quotations)[0] ?? null;
 }
