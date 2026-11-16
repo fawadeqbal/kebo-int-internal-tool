@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app/app.dart';
@@ -76,6 +77,14 @@ class _GalleryScreenState extends ConsumerState<GalleryScreen> {
               padding: const EdgeInsets.all(KSpace.s4),
               sliver: SliverList.list(
                 children: [
+                  KButton(
+                    'Open screens and patterns',
+                    icon: KIcons.grid,
+                    variant: KButtonVariant.secondary,
+                    fullWidth: true,
+                    onPressed: () => context.push('/gallery/patterns'),
+                  ),
+                  const SizedBox(height: KSpace.s4),
                   _Section('Moments', [
                     Row(
                       children: [
