@@ -459,7 +459,9 @@ describe("companies: isolation and the platform", () => {
     // At Kebo's address it works as before (and the wrong ones above count there now).
     await login({ email, password: "Staff@12345" }, "kebo").expect(200);
     (app.get(AuthService) as unknown as { attempts: Map<string, unknown> }).attempts.clear();
-  });
+    // About 15 sign-ins, each with a real bcrypt check (slow on purpose): more than the
+    // default 20 s on a busy CI runner, so this one gets a minute.
+  }, 60_000);
 
   it("the platform admin opens a company and works as themself, in its history", async () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
