@@ -399,7 +399,7 @@ export function FunnelSection({ d, p }: { d: Awaited<ReturnType<typeof loadFunne
                 <span className="truncate">{s.label}</span>
                 <span className="h-7">
                   <span
-                    className="flex h-7 min-w-9 items-center rounded-r-md bg-chart-1 px-2.5 text-xs font-semibold text-white"
+                    className="flex h-7 min-w-9 items-center rounded-r-md bg-primary-solid px-2.5 text-xs font-semibold text-primary-fg"
                     style={{ width: `${Math.max(2, (s.count / max) * 100)}%` }}
                   >
                     {s.count}
