@@ -14,7 +14,7 @@ import { OrderPage } from "@/components/order-sections/order-side";
 import { Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import { AgreedWindow, OrderWindow } from "@/components/order-sections/overview-windows";
-import { AgreedGroups, sideBySide, SideBySideTable } from "@/components/order-sections/agreed";
+import { AgreedGroups } from "@/components/order-sections/agreed";
 import type { OrderView } from "@/lib/types-orders";
 import { agreedAction, detailsAction, moveStageAction } from "../actions";
 import { StageActions } from "./forms";
@@ -44,8 +44,8 @@ function shipHintOf(a: NonNullable<OrderView["agreed"]>): string {
 /**
  * The order's Overview (design "the order, final"; "terms that travel"): where each stage stands in one line;
  * their order (their PO and the quotation they accepted); what was agreed with the customer (Delivery · Payment ·
- * Warranty · Conditions, copied from the quotation when it was accepted); the customer beside the factory; the
- * items with what came in, was packed and was delivered; and every file of the order. Nothing is done here
+ * Warranty · Conditions, copied from the quotation when it was accepted); the items with what came in, was
+ * packed and was delivered; and every file of the order. Nothing is done here
  * except their PO, changing what was agreed and closing the order; each line opens its tab.
  */
 export default async function OrderOverview({ params }: { params: Promise<{ id: string }> }) {
@@ -65,9 +65,6 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const a = o.agreed ?? null;
   const q = o.quotation;
   const from = q ? `${q.refNo} R${q.number}` : null;
-  const sides = sideBySide(o, m);
-  const look = sides.reduce((t, x) => t + x.look, 0);
-  const checked = sides.some((x) => x.rows.some((r) => r.check && r.check.ok !== null));
   const payLine = m
     ? [m.route.route ? ROUTE_NAME[m.route.route] : "How they pay: not decided yet", ...m.plan.items.map((i) => `${i.label}${i.status === "paid" ? ", paid" : ""}`)].join(" · ")
     : "The plan is on the Payment tab.";
@@ -210,16 +207,8 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
         </Section>
       )}
 
-      {sides.length > 0 && (
-        <Section title="The customer and the factory, side by side" state={look ? `${look} to look at` : checked ? "Covered" : null} tone={look ? "warn" : "ok"}>
-          {sides.map((t) => (
-            <SideBySideTable key={t.key} table={t} customer={o.customer.name} many={sides.length > 1} />
-          ))}
-          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">
-            Worked out from what was agreed with the customer and the factory’s offer; nothing to type. The same check shows on the quotation before it is sent.
-          </p>
-        </Section>
-      )}
+      {/* "The customer and the factory, side by side" (sideBySide / SideBySideTable in order-sections/agreed) is hidden
+          for now (Fawad, 16 Nov 2026): quotation options will each carry their own terms first. */}
 
       <section aria-label="Items" className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
         <h2 className="px-5 pt-4 pb-2 text-[15px] font-bold">

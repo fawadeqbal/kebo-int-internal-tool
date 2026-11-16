@@ -167,29 +167,6 @@ export interface FactoryQuoteView {
   files: OfferFile[];
 }
 
-/** What a factory said on its last offer: a new offer from it starts here (every field can be typed over). */
-export interface LastOffer {
-  /** The inquiry that offer was for, and when it came. */
-  inquiryRef: string;
-  receivedOn: string;
-  currency: string;
-  taxIncluded: boolean;
-  taxRate: number;
-  basis: Incoterm | null;
-  basisPlace: string | null;
-  leadTime: string | null;
-  leadDays: number | null;
-  leadFrom: LeadFrom | null;
-  moq: string | null;
-  paymentTerms: string | null;
-  advancePercent: number | null;
-  /** What it asked, as parts (null: an older offer, only its advance %). */
-  paymentParts: TermPart[] | null;
-  warranty: string | null;
-  warrantyMonths: number | null;
-  warrantyFrom: WarrantyFrom | null;
-}
-
 export interface SourcingOption extends FactoryQuoteLineView {
   factory: { id: string; name: string };
   quoteId: string;

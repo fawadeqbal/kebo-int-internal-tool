@@ -134,10 +134,8 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(agreed.getByText("45 days after the deposit")).toBeVisible();
   await expect(agreed.getByText("Worked out once the deposit is in")).toBeVisible();
   await expect(agreed.getByText("12 months", { exact: true })).toBeVisible();
-  const sides = page.getByRole("region", { name: "The customer and the factory, side by side" });
-  await expect(sides.getByText("15 days to spare")).toBeVisible();
-  await expect(sides.getByText("2 months not covered")).toBeVisible();
-  await expect(sides.getByText(/ask Jinan Terms .* for 14 months/)).toBeVisible();
+  // The customer beside the factory is hidden for now (16 Nov 2026).
+  await expect(page.getByRole("region", { name: "The customer and the factory, side by side" })).toHaveCount(0);
   expect(await accessibilityProblems(page), "the order's Overview meets WCAG 2.2 AA").toEqual([]);
 
   // Change: a new port differs from the quotation, so it asks why; the reason goes with it.
