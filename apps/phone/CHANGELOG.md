@@ -3,6 +3,13 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-beta.7 — 2026-11-16
+
+Push notifications are on.
+
+- The app is registered in Firebase (project kebo-rfq), so after you sign in the phone asks once and then gets notifications: payments, approvals, papers and dates that need you. Tapping one opens its page.
+- The first release signed with the RFQ Desk release key.
+
 ## 3.0.0-beta.6 — 2026-11-16
 
 Quotations on the phone.
