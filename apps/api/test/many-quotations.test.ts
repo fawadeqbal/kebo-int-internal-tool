@@ -6,8 +6,8 @@ import { api, signIn, startApp } from "./app";
 
 /**
  * Build step 1 of "one way, any number": an inquiry holds any number of quotations, A, B, C…, each with its own
- * revisions, and everything that reads them reads them all. Nothing makes a second quotation yet (step 2 does),
- * so this test puts one in the database: quotation B, a copy of A's R1 at a lower price, sent.
+ * revisions, and everything that reads them reads them all. This test puts a second one in the database:
+ * quotation B, a copy of A's R1 at a lower price, sent (New quotations has its own test).
  */
 describe("many quotations per inquiry", () => {
   let app: INestApplication;
@@ -20,6 +20,8 @@ describe("many quotations per inquiry", () => {
   let revB: string;
   const tag = Date.now().toString(36);
   const db = () => prisma.company(FIRST_COMPANY_ID);
+  /** The inquiry's QUO number: its quotations carry it with their letter. */
+  const base = () => refA.replace(/-A$/, "");
 
   beforeAll(async () => {
     app = await startApp();
@@ -66,7 +68,7 @@ describe("many quotations per inquiry", () => {
       include: { revisions: { include: { options: { include: { lines: true, costs: true } } } } },
     });
     const { id: _id, quotationId: _q, createdAt: _c, updatedAt: _u, options, ...head } = a.revisions[0]!;
-    const b = await db().quotation.create({ data: { inquiryId, letter: "B", refNo: `${a.refNo}-B` } });
+    const b = await db().quotation.create({ data: { inquiryId, letter: "B", refNo: `${base()}-B` } });
     const rev = await db().quotationRevision.create({
       data: {
         ...head,
@@ -95,12 +97,12 @@ describe("many quotations per inquiry", () => {
     return { quotationId: b.id, revisionId: rev.id, refNo: b.refNo };
   }
 
-  it("keeps the inquiry's first quotation as A, with its number as it was", async () => {
+  it("makes the inquiry's first quotation A, its number with the letter", async () => {
     const page = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation`).expect(200)).body;
     expect(page.quotations).toHaveLength(1);
     expect(page.quotations[0]).toMatchObject({ letter: "A" });
     expect(page.quotation).toMatchObject({ letter: "A", refNo: page.quotations[0].refNo });
-    expect(page.quotation.refNo).toMatch(/^QUO-\d{4}-\d{4}$/);
+    expect(page.quotation.refNo).toMatch(/^QUO-\d{4}-\d{4}-A$/);
     refA = page.quotation.refNo;
     const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`).expect(200)).body;
     expect(deal.quotations.map((q: { letter: string }) => q.letter)).toEqual(["A"]);
@@ -112,14 +114,14 @@ describe("many quotations per inquiry", () => {
     const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`).expect(200)).body;
     expect(deal.quotations.map((q: { letter: string; refNo: string }) => [q.letter, q.refNo])).toEqual([
       ["A", refA],
-      ["B", `${refA}-B`],
+      ["B", `${base()}-B`],
     ]);
-    expect(deal.quotation.refNo).toBe(`${refA}-B`);
+    expect(deal.quotation.refNo).toBe(`${base()}-B`);
     expect(deal.quotations[1].revisions[0]).toMatchObject({ number: 1, status: "sent" });
 
     const list = (await api(app, sana).get(`/inquiries?${new URLSearchParams({ q: tag })}`).expect(200)).body;
     const row = list.rows.find((r: { id: string }) => r.id === inquiryId);
-    expect(row).toMatchObject({ quotations: 2, quotation: { refNo: `${refA}-B`, latest: { number: 1, status: "sent" } } });
+    expect(row).toMatchObject({ quotations: 2, quotation: { refNo: `${base()}-B`, latest: { number: 1, status: "sent" } } });
     expect(Number(row.quotation.latest.total)).toBeLessThan(Number(deal.quotations[0].revisions[0].total));
 
     const page = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation`).expect(200)).body;
@@ -132,18 +134,19 @@ describe("many quotations per inquiry", () => {
 
   it("finds a quotation by its number with its letter, and the inquiry's by its number alone", async () => {
     const find = async (q: string) => (await api(app, sana).get(`/search?${new URLSearchParams({ q })}`).expect(200)).body.exact;
-    expect(await find(`${refA}-B`)).toMatchObject({ kind: "quotations", label: `${refA}-B`, href: `/inquiries/${inquiryId}/quotation` });
-    expect(await find(`${refA}-b r1`)).toMatchObject({ label: `${refA}-B` });
-    expect(await find(refA)).toMatchObject({ label: refA });
+    expect(await find(`${base()}-B`)).toMatchObject({ kind: "quotations", label: `${base()}-B`, href: `/inquiries/${inquiryId}/quotation` });
+    expect(await find(`${base()}-b r1`)).toMatchObject({ label: `${base()}-B` });
+    // The inquiry's number alone: its first quotation.
+    expect(await find(base())).toMatchObject({ label: refA });
   });
 
   it("accepts one quotation per deal", async () => {
     await db().quotationRevision.update({ where: { id: revB }, data: { status: "accepted" } });
     try {
       const refused = await api(app, sana).post(`/revisions/${revA}/status`, { to: "accepted" }).expect(409);
-      expect(refused.body.error).toContain(`${refA}-B R1`);
+      expect(refused.body.error).toContain(`${base()}-B R1`);
       const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`).expect(200)).body;
-      expect(deal.quotation.refNo).toBe(`${refA}-B`);
+      expect(deal.quotation.refNo).toBe(`${base()}-B`);
     } finally {
       await db().quotationRevision.update({ where: { id: revB }, data: { status: "sent" } });
     }
@@ -151,15 +154,15 @@ describe("many quotations per inquiry", () => {
 
   it("says every quotation's revisions in the deal's history", async () => {
     await db().auditLog.create({
-      data: { action: "create", entityType: "quotation", entityId: revB, summary: `${refA}-B R1 drafted ${tag}` },
+      data: { action: "create", entityType: "quotation", entityId: revB, summary: `${base()}-B R1 drafted ${tag}` },
     });
     const history = (await api(app, sana).get(`/history?${new URLSearchParams({ type: "deal", id: inquiryId })}`).expect(200)).body;
     const rows = (history.rows ?? history) as { summary: string | null }[];
-    expect(rows.some((h) => h.summary === `${refA}-B R1 drafted ${tag}`)).toBe(true);
+    expect(rows.some((h) => h.summary === `${base()}-B R1 drafted ${tag}`)).toBe(true);
   });
 
   it("keeps the second quotation's own number free of the first's (one letter per inquiry)", async () => {
-    await expect(db().quotation.create({ data: { inquiryId, letter: "B", refNo: `${refA}-B2` } })).rejects.toThrow();
+    await expect(db().quotation.create({ data: { inquiryId, letter: "B", refNo: `${base()}-B2` } })).rejects.toThrow();
     expect(quotationB).toBeTruthy();
   });
 });

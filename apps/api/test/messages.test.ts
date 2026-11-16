@@ -123,7 +123,7 @@ describe("messages", () => {
     const r = (await api(app, sana).post(`/inquiries/${inquiry.id}/quotation/revisions`, { ...draft, currency: "USD", options }).expect(201)).body;
     await api(app, sana).post(`/revisions/${r.id}/status`, { to: "sent", via: "email" }).expect(200);
     const [quoted] = await bell(manager, "quotation.sent");
-    expect(quoted!.title).toMatch(new RegExp(`^Quotation QUO-\\d{4}-\\d{4} R1 sent to ${customer} — USD 119,500$`));
+    expect(quoted!.title).toMatch(new RegExp(`^Quotation QUO-\\d{4}-\\d{4}-A R1 sent to ${customer} — USD 119,500$`));
     expect(quoted!.message!.sentence).toMatch(/^Sana sent quotation QUO-.* by email\.$/);
 
     // Accepted (by the manager): Sana, who handles it and made the quotation, hears it — one message, with the order's money.
