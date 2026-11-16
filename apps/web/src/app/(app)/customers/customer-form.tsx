@@ -255,7 +255,7 @@ export function CustomerForm({
           )}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-[13px]">
-              <thead className="bg-[#f8faf9] text-left text-text-2 dark:bg-surface-2">
+              <thead className="bg-faint text-left text-text-2">
                 <tr>
                   <th className="w-[22%] px-2 py-2.5 font-semibold">
                     Name <span className="text-bad">*</span>

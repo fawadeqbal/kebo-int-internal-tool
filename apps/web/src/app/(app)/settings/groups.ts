@@ -1,4 +1,4 @@
-import { BALANCE_TERMS, BALANCE_TERMS_LABEL, INCOTERMS, type SettingsKey } from "@kebo/shared";
+import { BALANCE_TERMS, BALANCE_TERMS_LABEL, COLOUR_SET_LABEL, COLOUR_SETS, INCOTERMS, type SettingsKey } from "@kebo/shared";
 
 /**
  * What each settings group shows, in plain words. The form draws these fields
@@ -37,6 +37,8 @@ export interface SettingCard {
   switches?: boolean;
   /** Shows the top of the documents as these values make it. */
   preview?: boolean;
+  /** The app's colours: the sets side by side, light and dark, chosen at once (no panel). */
+  colours?: boolean;
 }
 
 export interface SettingGroup {
@@ -115,6 +117,8 @@ export const SETTING_GROUPS: SettingGroup[] = [
       },
       { name: "dateFormat", label: "Dates", kind: "select", options: DATE_FORMAT_OPTIONS },
       { name: "timeFormat", label: "Times", kind: "select", options: TIME_FORMAT_OPTIONS },
+      // Listed so that saving any other card keeps it as it is (the API takes the whole group).
+      { name: "colours", label: "The app's colours", kind: "select", options: COLOUR_SETS.map((c) => ({ value: c, label: COLOUR_SET_LABEL[c] })) },
     ],
     cards: [
       {
@@ -141,6 +145,13 @@ export const SETTING_GROUPS: SettingGroup[] = [
         title: "Time and dates",
         description: "The company's time zone and how dates and times are written, on every page, email and reminder.",
         fields: ["timeZone", "dateFormat", "timeFormat"],
+      },
+      {
+        key: "colours",
+        title: "The app's colours",
+        description: "How the app looks for everyone in the company. Choosing one changes it at once.",
+        fields: ["colours"],
+        colours: true,
       },
     ],
   },

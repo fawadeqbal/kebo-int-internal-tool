@@ -19,6 +19,8 @@
 //   NODE_PATH=$(npm root -g) node apps/web/test/a11y/all-pages.mjs
 // SHOTS=<dir> saves a screenshot of every page at 1440 and 390 there, with an index.html
 // contact sheet. PAGES=<file> keeps the list of pages found for the next run. ONLY=<regex> checks just the pages whose path matches; WIDTHS=1440,390 picks widths.
+// THEME=dark checks the dark side (the browser asks for dark; the app follows on Auto); the colours are the set the
+// company has chosen (Company settings › The app's colours).
 import { createRequire } from "node:module";
 import { createHmac } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
@@ -32,6 +34,7 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 const SHOTS = process.env.SHOTS;
 const ONLY = process.env.ONLY ? new RegExp(process.env.ONLY) : null;
 const WIDTHS = (process.env.WIDTHS ?? "1440,1100,390").split(",").map(Number);
+const SCHEME = process.env.THEME === "dark" ? "dark" : "light";
 const DEEP = new Set([1440, 390]); // keyboard, dialogs and menus at these widths
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -509,7 +512,8 @@ function totp(secret) {
 
 /* ------------------------------------------------------------------ run */
 
-const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
+// CHROME_PATH: a Chrome of your own, as in apps/web-e2e.
+const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"], ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
 const visited = new Set();
 
 async function run(page, list, title) {
@@ -531,7 +535,7 @@ async function run(page, list, title) {
 
 // 1. Signed out.
 {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: SCHEME });
   const page = await context.newPage();
   const list = ["/login", "/sign-up", "/sign-up/confirm", "/request-a-demo", "/set-password?token=x", "/site", "/site/sign-in", "/", "/forbidden", "/no-company", "/platform/login", "/platform/set-password?token=x", "/platform/preview"];
   const landed = [];
@@ -547,7 +551,7 @@ async function run(page, list, title) {
 
 // 2. The company app, as its admin.
 {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: SCHEME });
   const page = await context.newPage();
   await page.goto(`${BASE}/login`);
   await page.fill("#email", process.env.EMAIL ?? "admin@example.com");
@@ -616,7 +620,7 @@ async function run(page, list, title) {
 
 // 3. The platform, as a platform admin.
 if (process.env.PLATFORM_EMAIL) {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: SCHEME });
   const page = await context.newPage();
   const keyFile = SHOTS ? join(SHOTS, ".platform-totp") : null;
   let secret = process.env.PLATFORM_TOTP_SECRET ?? (keyFile && existsSync(keyFile) ? readFileSync(keyFile, "utf8").trim() : "");

@@ -506,7 +506,7 @@ export function Table({ className, ...props }: ComponentProps<"table">) {
   );
 }
 export function THead({ className, ...props }: ComponentProps<"thead">) {
-  return <thead className={cn("bg-[#f8faf9] dark:bg-surface-2", className)} {...props} />;
+  return <thead className={cn("bg-faint", className)} {...props} />;
 }
 export function Th({ className, ...props }: ComponentProps<"th">) {
   // relative: a hidden (sr-only) name inside is placed in its cell, so a table that scrolls

@@ -136,7 +136,7 @@ export function Toaster() {
     }
   };
   const k = KINDS[kind];
-  const link = "font-semibold text-[#9be0b2] hover:text-white hover:underline disabled:opacity-60 dark:text-primary";
+  const link = "font-semibold text-note-link hover:text-note-fg hover:underline disabled:opacity-60";
   const steps = [...(t.action ? [{ label: t.action.label, href: t.action.href }] : []), ...(t.actions ?? [])];
   return (
     <div
@@ -147,7 +147,7 @@ export function Toaster() {
       onFocus={() => setHeld(true)}
       onBlur={() => setHeld(false)}
       data-note={kind}
-      className="no-print fixed inset-x-3 bottom-24 z-[95] flex animate-in items-start gap-3 overflow-hidden rounded-[14px] bg-[#15211a] py-3 pr-2.5 pl-3.5 text-sm text-white shadow-pop sm:inset-x-auto sm:right-5 sm:w-[400px] md:bottom-5 dark:bg-surface-3 dark:text-text"
+      className="no-print fixed inset-x-3 bottom-24 z-[95] flex animate-in items-start gap-3 overflow-hidden rounded-[14px] bg-note py-3 pr-2.5 pl-3.5 text-sm text-note-fg shadow-pop sm:inset-x-auto sm:right-5 sm:w-[400px] md:bottom-5"
     >
       <span className={`mt-px grid size-6 shrink-0 place-items-center rounded-full text-white ${k.className}`}>
         {k.icon}
@@ -155,7 +155,7 @@ export function Toaster() {
       </span>
       <div className="min-w-0 flex-1">
         <p className="leading-snug font-semibold">{t.message}</p>
-        {t.detail && <p className="mt-0.5 text-[12.5px] leading-snug text-[#c9d6cd] dark:text-text-2">{t.detail}</p>}
+        {t.detail && <p className="mt-0.5 text-[12.5px] leading-snug text-note-sub">{t.detail}</p>}
         {(t.undo || steps.length > 0) && (
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
             {t.undo && (
@@ -185,13 +185,13 @@ export function Toaster() {
           </div>
         )}
       </div>
-      <button onClick={() => dismissToast(t.id)} className="grid size-6 shrink-0 place-items-center rounded text-white/60 hover:text-white dark:text-muted" aria-label="Dismiss">
+      <button onClick={() => dismissToast(t.id)} className="grid size-6 shrink-0 place-items-center rounded text-note-sub hover:text-note-fg" aria-label="Dismiss">
         <X className="size-4" aria-hidden />
       </button>
       {/* How long it has left (with Undo): a thin line that runs out, still while held. */}
       {t.undo && !held && !busy && (
-        <span aria-hidden className="absolute inset-x-3.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-white/15">
-          <span key={t.id} className="block h-full origin-left rounded-full bg-[#9be0b2]" style={{ animation: `note-time ${ms}ms linear forwards` }} />
+        <span aria-hidden className="absolute inset-x-3.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-note-fg/15">
+          <span key={t.id} className="block h-full origin-left rounded-full bg-note-link" style={{ animation: `note-time ${ms}ms linear forwards` }} />
         </span>
       )}
     </div>

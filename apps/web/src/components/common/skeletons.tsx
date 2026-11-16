@@ -135,7 +135,7 @@ export function TableSkeleton({ rows = 8, cols = 6, className }: { rows?: number
         ))}
       </ul>
       <div className="max-sm:hidden">
-        <div className="flex h-[42px] items-center gap-6 border-b border-line bg-[#f8faf9] px-3.5 dark:bg-surface-2">
+        <div className="flex h-[42px] items-center gap-6 border-b border-line bg-faint px-3.5">
           {Array.from({ length: cols }, (_, i) => (
             <Bar key={i} className={cn("h-3 shrink-0", i === 1 ? "w-24" : "w-16", i === cols - 1 && "ml-auto")} />
           ))}

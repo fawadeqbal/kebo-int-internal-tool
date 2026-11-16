@@ -29,6 +29,15 @@ const days = (fallback: number, max = 365) => z.coerce.number().int().min(0).max
 /** The company's time and date settings: kept on the company row, never in the stored settings. */
 export const COMPANY_TIME_KEYS = ["timeZone", "dateFormat", "timeFormat"] as const;
 
+/**
+ * The app's colours, chosen for the whole company (Company settings › The app's colours); each set has a light
+ * and a dark side, and each person still picks light, dark or auto. Green is the default. The colours themselves
+ * are in packages/ui/src/styles/theme.css.
+ */
+export const COLOUR_SETS = ["green", "graphite", "midnight", "warm"] as const;
+export type ColourSet = (typeof COLOUR_SETS)[number];
+export const COLOUR_SET_LABEL: Record<ColourSet, string> = { green: "Green", graphite: "Graphite", midnight: "Midnight", warm: "Warm" };
+
 export const companySettings = z.object({
   /**
    * Time and dates: the company's time zone (IANA) and how it writes dates and times. Kept on the company itself
@@ -73,6 +82,8 @@ export const companySettings = z.object({
     .max(400_000, "The stamp image is too large (keep it under 300 KB)")
     .refine((v) => v === "" || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v), "Upload the stamp as a PNG or JPEG image")
     .default(""),
+  /** The app's colours for everyone in the company (not the documents, which keep their own). */
+  colours: z.enum(COLOUR_SETS, `Choose ${COLOUR_SETS.join(", ")}`).default("green"),
 });
 
 export const salesSettings = z.object({
@@ -218,7 +229,11 @@ export function readSettings(stored: Partial<Record<string, unknown>>): Settings
   for (const key of Object.keys(SETTINGS) as SettingsKey[]) {
     let raw = stored[key] ?? {};
     // Time and dates come from the company row; a stray copy in the stored JSON is ignored (and never breaks the rest).
-    if (key === "company" && raw && typeof raw === "object") raw = Object.fromEntries(Object.entries(raw).filter(([k]) => !(COMPANY_TIME_KEYS as readonly string[]).includes(k)));
+    // Colours no longer offered go back to the default, rather than making the whole group unreadable.
+    if (key === "company" && raw && typeof raw === "object")
+      raw = Object.fromEntries(
+        Object.entries(raw).filter(([k, v]) => !(COMPANY_TIME_KEYS as readonly string[]).includes(k) && (k !== "colours" || (COLOUR_SETS as readonly unknown[]).includes(v))),
+      );
     const parsed = SETTINGS[key].safeParse(raw);
     out[key] = parsed.success ? parsed.data : SETTINGS[key].parse({});
   }

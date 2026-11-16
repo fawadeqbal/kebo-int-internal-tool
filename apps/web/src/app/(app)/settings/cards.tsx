@@ -1,6 +1,6 @@
 "use client";
 
-import { CURRENCIES, CURRENCY_LABEL } from "@kebo/shared";
+import { CURRENCIES, CURRENCY_LABEL, type ColourSet } from "@kebo/shared";
 import { Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -9,6 +9,7 @@ import { useFeature } from "@/components/common/features";
 import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
 import { SwitchList } from "@/components/common/switch-list";
 import type { ActionState } from "@/lib/actions";
+import { ColoursCard } from "./colours";
 import { BrandPreview, Control, CurrenciesControl, rateText } from "./forms";
 import { useTime } from "@/lib/time-client";
 import { SETTING_GROUPS, toFormText, type SettingCard, type SettingField, type SettingGroup } from "./groups";
@@ -94,6 +95,21 @@ export function SettingsCard({
   const emailReports = useFeature("email_reports");
   const panel = useSidePanel(`settings-${card.key}`);
   const fields = card.fields.map((n) => group.fields.find((f) => f.name === n)!).filter((f) => emailReports || f.name !== "dailySummary");
+
+  if (card.colours)
+    return (
+      <ColoursCard
+        title={card.title}
+        description={card.description}
+        value={(values.colours as ColourSet | undefined) ?? "green"}
+        save={(set) => {
+          const form = new FormData();
+          form.set("_fields", "colours");
+          form.set("colours", set);
+          return action({}, form);
+        }}
+      />
+    );
 
   if (card.switches)
     return (
