@@ -1,4 +1,7 @@
-# Releases the RFQ Desk phone app: push the tag phone-v<version> (see apps/phone/README.md).
+# Releases the RFQ Desk phone app (see apps/phone/README.md), in either of two ways:
+#   * GitHub › Actions › Phone release › Run workflow (on main): releases the version in
+#     apps/phone/pubspec.yaml and makes its tag phone-v<version>.
+#   * push the tag phone-v<version> yourself.
 #
 # Needs these repository secrets (Settings › Secrets and variables › Actions):
 #   ANDROID_KEYSTORE_BASE64    the release .jks, base64-encoded (base64 -w0 release.jks)
@@ -11,6 +14,7 @@ name: Phone release
 on:
   push:
     tags: ["phone-v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -40,8 +44,25 @@ jobs:
       - name: The tag, pubspec version, build number and changelog agree
         run: |
           flutter pub get
-          dart run tool/version.dart check --tag "$GITHUB_REF_NAME"
-          echo "VERSION=${GITHUB_REF_NAME#phone-v}" >> "$GITHUB_ENV"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            if [ "$GITHUB_REF" != refs/heads/main ]; then
+              echo "::error::Run the release on main (it was started on $GITHUB_REF_NAME)."
+              exit 1
+            fi
+            VERSION=$(dart run tool/version.dart | awk '/^version/ {print $2}')
+            TAG="phone-v$VERSION"
+            if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+              echo "::error::$TAG is already released. Bump the version first (dart run tool/version.dart bump beta)."
+              exit 1
+            fi
+          else
+            TAG="$GITHUB_REF_NAME"
+            VERSION="${TAG#phone-v}"
+          fi
+          dart run tool/version.dart check --tag "$TAG"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Releasing $TAG" >> "$GITHUB_STEP_SUMMARY"
 
       - name: The release key is set
         env:
@@ -94,7 +115,7 @@ jobs:
           } >> notes.md
           PRE=""
           case "$VERSION" in *-*) PRE="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" dist/* --title "RFQ Desk $VERSION" --notes-file notes.md $PRE
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "RFQ Desk $VERSION" --notes-file notes.md $PRE
 
       - name: Remove the key from the runner
         if: always()
