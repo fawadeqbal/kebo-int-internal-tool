@@ -9,6 +9,7 @@ import '../../../core/providers.dart';
 import '../../../design/design.dart';
 import '../data/money_data.dart';
 import 'money_forms.dart';
+import 'pay_out_forms.dart';
 
 /// Money: what customers still owe us (record what came in), what we owe factories, our
 /// accounts, and expenses.
@@ -132,9 +133,13 @@ class MoneyScreen extends ConsumerWidget {
                                     title: p.at('factory.name') ?? '',
                                     subtitle:
                                         'Owed ${fmtShort(p.strOrNull('owed'), p.strOrNull('currency'))} · paid ${fmtShort(p.strOrNull('paid'), p.strOrNull('currency'))}',
-                                    trailing: Text(
-                                      fmtShort(p.strOrNull('toPay'), p.strOrNull('currency')) ?? '',
-                                      style: KType.bodyStrong.copyWith(color: context.k.ink),
+                                    meta: '${fmtShort(p.strOrNull('toPay'), p.strOrNull('currency'))} to pay',
+                                    trailing: KButton(
+                                      'Pay',
+                                      variant: KButtonVariant.secondary,
+                                      onPressed: () async {
+                                        if (await openPayFactory(context, p)) reload();
+                                      },
                                     ),
                                     divider: i < value.length - 1,
                                     chevron: false,
@@ -151,6 +156,10 @@ class MoneyScreen extends ConsumerWidget {
                     const SizedBox(height: KSpace.s6),
                     KSection(
                       title: 'Accounts',
+                      actionLabel: s.can('expenses.manage') && accounts.value!.length > 1 ? 'Move money' : null,
+                      onAction: () async {
+                        if (await openTransfer(context, accounts.value!)) reload();
+                      },
                       children: [
                         KCard(
                           padding: EdgeInsets.zero,

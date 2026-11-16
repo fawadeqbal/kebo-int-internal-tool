@@ -46,15 +46,25 @@ Map<String, Object?> _answers() => {
   },
   '/api/money/payables': [
     {
-      'factory': {'name': 'Shanghai Pharma Machinery'},
+      'factory': {'id': 'fac1', 'name': 'Shanghai Pharma Machinery'},
       'currency': 'CNY',
       'owed': '280000.00',
       'paid': '84000.00',
       'toPay': '196000.00',
+      'orders': [
+        {
+          'id': 'o1',
+          'refNo': 'SO-2026-0035',
+          'customer': 'Kabul Medical Supplies',
+          'word': 'In production',
+          'toPay': '196000.00',
+        },
+      ],
     },
   ],
   '/api/money/accounts': [
     {'id': 'a1', 'name': 'HBL USD', 'kind': 'bank', 'currency': 'USD', 'balance': '52310.00'},
+    {'id': 'a2', 'name': 'ICBC CNY', 'kind': 'bank', 'currency': 'CNY', 'balance': '210000.00'},
   ],
   '/api/settings': {
     'sales': {'currency': 'USD'},
@@ -64,6 +74,9 @@ Map<String, Object?> _answers() => {
   '/api/submissions': {'id': 's9'},
   '/api/submissions/s9/file': {'ok': true},
   '/api/expenses': {'id': 'e3'},
+  '/api/orders/o1/factory-payments': {'createdId': 'fp1'},
+  '/api/factory-payments/fp1/file': {'ok': true},
+  '/api/money/transfers': {'ok': true},
   '/api/notifications': {'unread': 0},
 };
 
@@ -155,5 +168,39 @@ void main() {
     expect(server.sent('POST', '/api/expenses'), containsPair('category', 'travel'));
     expect(server.sent('POST', '/api/expenses'), containsPair('amount', '35'));
     await t.pumpAndSettle();
+  });
+
+  testWidgets('pay a factory for an order, with the slip, from the right account', (t) async {
+    final (_, server) = await _open(t);
+    await t.scrollUntilVisible(find.text('Pay'), 300, scrollable: find.byType(Scrollable).first);
+    await _inSheet(t, 'Pay');
+    expect(find.textContaining('Still to pay on this order'), findsOneWidget);
+    await _inSheet(t, 'Balance');
+    await _inSheet(t, 'Take photo');
+    await _inSheet(t, 'Record payment');
+    final body = server.sent('POST', '/api/orders/o1/factory-payments')!;
+    expect(body['factoryId'], 'fac1');
+    expect(body['kind'], 'balance');
+    expect(body['amount'], '196000.00');
+    expect(body['currency'], 'CNY');
+    expect(body['accountId'], 'a2');
+    expect(server.calls.any((c) => c.path == '/api/factory-payments/fp1/file'), isTrue);
+  });
+
+  testWidgets('move money between accounts in two currencies asks what arrived', (t) async {
+    final (_, server) = await _open(t);
+    await t.scrollUntilVisible(find.text('Move money'), 300, scrollable: find.byType(Scrollable).first);
+    await _inSheet(t, 'Move money');
+    await _inSheet(t, 'Choose an account');
+    await _inSheet(t, 'HBL USD');
+    await t.tap(find.text('Choose an account'));
+    await t.pumpAndSettle();
+    await _inSheet(t, 'ICBC CNY');
+    await t.enterText(find.widgetWithText(KTextField, 'Amount'), '10000');
+    await _inSheet(t, 'Move money');
+    expect(find.textContaining('How much arrived, in'), findsOneWidget); // two currencies: asks what arrived
+    await t.enterText(find.widgetWithText(KTextField, 'Arrived'), '71500');
+    await _inSheet(t, 'Move money');
+    expect(server.sent('POST', '/api/money/transfers'), containsPair('amountIn', '71500'));
   });
 }
