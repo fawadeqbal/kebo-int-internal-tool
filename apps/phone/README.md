@@ -82,7 +82,9 @@ dart run tool/version.dart check            # what CI runs
 
 **To release:**
 1. `dart run tool/version.dart bump <part>`, write the CHANGELOG entry, open a PR, merge it.
-2. On the merged commit: `git tag phone-v<version> && git push origin phone-v<version>`.
+2. GitHub › **Actions** › **Phone release** › **Run workflow** (branch `main`). It releases the version in
+   `pubspec.yaml` and makes the tag `phone-v<version>` itself. (Or push that tag yourself:
+   `git tag phone-v<version> && git push origin phone-v<version>`.) A version already released is refused.
 3. The **Phone release** workflow checks the tag against pubspec and the changelog, runs the tests, builds
    the APK, refuses a debug-signed one, and publishes a GitHub release with `rfq-desk-<version>.apk`,
    its SHA-256 and the notes. Pre-releases (`-alpha`, `-beta`, `-rc`) are marked as such.
