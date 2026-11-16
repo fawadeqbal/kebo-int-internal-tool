@@ -13,6 +13,7 @@ import '../features/more/presentation/more_screen.dart';
 import '../features/approvals/approvals_screen.dart';
 import '../features/files/file_viewer_screen.dart';
 import '../features/money/presentation/money_screen.dart';
+import '../features/papers/paper_screen.dart';
 import '../features/partners/presentation/partner_screens.dart';
 import '../features/partners/presentation/partners_screen.dart';
 import '../features/search/search_screen.dart';
@@ -73,6 +74,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'order/:id',
                     builder: (context, state) => OrderScreen(id: state.pathParameters['id']!),
+                    routes: [
+                      GoRoute(
+                        path: 'paper/:kind',
+                        builder: (context, state) => PaperScreen(
+                          orderId: state.pathParameters['id']!,
+                          kind: state.pathParameters['kind']!,
+                          paperRef: state.uri.queryParameters['ref'],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

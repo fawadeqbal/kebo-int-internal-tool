@@ -74,8 +74,16 @@ Map<String, Object?> _answers() => {
   },
   '/api/orders/$_id/papers': {
     'papers': [
-      {'id': 'p1', 'label': 'Sales contract', 'number': 'SC-2026-0035', 'state': 'final'},
-      {'id': 'p2', 'label': 'Bill of lading', 'state': 'missing'},
+      {
+        'key': 'contract',
+        'kind': 'contract',
+        'label': 'Sales contract',
+        'number': 'SC-2026-0035',
+        'state': 'ready',
+        'stateLabel': 'Ready',
+        'makeable': true,
+      },
+      {'key': 'bl', 'kind': 'bl', 'label': 'Bill of lading', 'state': 'miss', 'stateLabel': 'Missing'},
     ],
   },
   '/api/orders/$_id/files': {
@@ -84,6 +92,26 @@ Map<String, Object?> _answers() => {
     ],
   },
   '/api/orders/$_id/delivery/all-good': {'ok': true},
+  '/api/orders/$_id/papers/invoice/checks': {
+    'refNo': 'SO-2026-0035',
+    'kind': 'invoice',
+    'label': 'Commercial invoice',
+    'canMake': true,
+    'checks': [
+      {'key': 'lines', 'label': 'Lines', 'value': '1 line · USD 48,200', 'ok': true, 'required': true},
+      {'key': 'bl', 'label': 'B/L number', 'value': 'Missing', 'ok': false, 'required': true, 'fix': 'blNo'},
+    ],
+    'fixes': {
+      'blNo': {'label': 'B/L number', 'type': 'text', 'saves': 'the shipment'},
+    },
+    'options': [
+      {'key': 'stamp', 'label': 'Our stamp', 'on': true},
+    ],
+    'paper': null,
+    'versions': <Object?>[],
+  },
+  '/api/orders/$_id/papers/invoice/fix': {'ok': true},
+  '/api/orders/$_id/papers/invoice': {'ok': true},
   '/api/notifications': {'unread': 0},
 };
 
@@ -121,8 +149,8 @@ void main() {
     expect(find.text('B/L not in yet'), findsOneWidget);
     await t.scrollUntilVisible(find.text('Bank charges'), 300, scrollable: _list());
     expect(find.text('USD 25.00'), findsOneWidget);
-    await t.scrollUntilVisible(find.text('Needed'), 300, scrollable: _list());
-    expect(find.text('Final'), findsOneWidget);
+    await t.scrollUntilVisible(find.text('Missing'), 300, scrollable: _list());
+    expect(find.text('Ready'), findsOneWidget);
     await t.scrollUntilVisible(find.text('loading-photo.jpg'), 300, scrollable: _list());
   });
 
@@ -153,5 +181,23 @@ void main() {
     expect(find.textContaining('sent when you are back online'), findsOneWidget);
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 7));
+  });
+
+  testWidgets('a paper: what is missing is added, then a draft is made', (t) async {
+    final (_, server) = await _open(t, '/orders/order/$_id/paper/invoice');
+    expect(find.text('1 thing missing before it can be made final.'), findsOneWidget);
+    await t.tap(find.text('Add'));
+    await t.pumpAndSettle();
+    expect(find.text('Saved on the shipment, so every paper uses it.'), findsOneWidget);
+    await t.enterText(find.widgetWithText(KTextField, 'B/L number'), 'MSCU1234567');
+    await t.tap(find.text('Save').last);
+    await t.pumpAndSettle();
+    expect(server.sent('POST', '/api/orders/$_id/papers/invoice/fix'), {'field': 'blNo', 'value': 'MSCU1234567'});
+    await t.scrollUntilVisible(find.text('Make a draft'), 300, scrollable: _list());
+    await t.tap(find.text('Make a draft'));
+    await t.pumpAndSettle();
+    expect(server.sent('POST', '/api/orders/$_id/papers/invoice'), {
+      'options': {'stamp': true},
+    });
   });
 }

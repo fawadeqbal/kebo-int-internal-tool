@@ -282,9 +282,23 @@ class _Body extends ConsumerWidget {
                                   leading: KIcon(KIcons.file, color: c.inkMuted),
                                   title: p.str('label', p.str('name')),
                                   subtitle: [p.strOrNull('number'), p.strOrNull('sub')].whereType<String>().join(' · '),
-                                  status: _paperState(p.str('state')),
+                                  status: _paperState(p),
                                   divider: i < o.papers.length - 1,
-                                  chevron: false,
+                                  onPressed: p.boolean('makeable')
+                                      ? () => context.push(
+                                          Uri(
+                                            path: '/orders/order/${o.id}/paper/${p.str('kind')}',
+                                            queryParameters: {'ref': ?p.strOrNull('ref')},
+                                          ).toString(),
+                                        )
+                                      : p.at('doc.file.id') != null
+                                      ? () => openFile(
+                                          context,
+                                          s.api,
+                                          '/api/files/${p.at('doc.file.id')}',
+                                          p.at('doc.file.name') ?? p.str('label'),
+                                        )
+                                      : null,
                                 ),
                             ],
                           ),
@@ -405,21 +419,16 @@ class _Body extends ConsumerWidget {
     if (ok == true) onChanged();
   }
 
-  static Widget _paperState(String state) => switch (state) {
-    'final' || 'sent' || 'uploaded' || 'kept' => KBadge(
-      state == 'kept'
-          ? 'Kept elsewhere'
-          : state == 'uploaded'
-          ? 'In'
-          : state == 'sent'
-          ? 'Sent'
-          : 'Final',
-      tone: KTone.success,
-    ),
-    'draft' => const KBadge('Draft'),
-    'missing' || 'needed' => const KBadge('Needed', tone: KTone.warning),
-    _ => KBadge(state.isEmpty ? 'Not yet' : state),
-  };
+  /// Ready, Draft, Can be made, Waiting for data, Uploaded, Missing, Kept elsewhere: the server's words.
+  static Widget _paperState(Json p) {
+    final tone = switch (p.str('state')) {
+      'ready' || 'up' || 'else' => KTone.success,
+      'draft' => KTone.info,
+      'wait' || 'miss' => KTone.warning,
+      _ => KTone.neutral,
+    };
+    return KBadge(p.str('stateLabel', p.str('state')), tone: tone);
+  }
 
   static KIconData _fileIcon(String name) {
     final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
