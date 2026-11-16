@@ -32,6 +32,12 @@ const FIELD: Record<string, string> = {
   paymentTerms: "Payment terms",
   deliveryTerms: "Delivery terms",
   warranty: "Warranty",
+  incotermPlace: "Place",
+  leadTime: "Lead time",
+  deliveryConditions: "Delivery conditions",
+  paymentConditions: "Payment conditions",
+  notes: "Notes",
+  printQuotedTerms: "Agreed payment conditions printed",
   sentVia: "Sent by",
   step: "Stage",
 };

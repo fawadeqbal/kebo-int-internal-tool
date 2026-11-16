@@ -24,9 +24,8 @@ import {
   type Currency,
   lineNumbers,
   numberQuoteLines,
-  offerPartsOf,
+  offerTermsOf,
   optionLetter,
-  parseLead,
   parseWarranty,
   quotePartsOf,
   storedParts,
@@ -116,34 +115,8 @@ export { customerSnapshot };
 
 type Db = Tx | PrismaService["db"];
 
-/**
- * A factory offer's terms as facts (design "terms that travel"): its lead time as days from a moment, its
- * payment as parts (an older offer: its advance, or the company's usual one, and the rest when ready), its
- * warranty as months from a moment. An older offer's words are read for them where they say them plainly.
- */
-export function factoryTerms(
-  q: {
-    leadTime: string | null;
-    leadDays: number | null;
-    leadFrom: string | null;
-    paymentParts: Prisma.JsonValue | null;
-    advancePercent: Prisma.Decimal | null;
-    warranty: string | null;
-    warrantyMonths: number | null;
-    warrantyFrom: string | null;
-  },
-  usualAdvance: number,
-) {
-  const lead = q.leadDays !== null ? { days: q.leadDays, from: isLeadFrom(q.leadFrom) ? q.leadFrom : ("after_payment" as const) } : parseLead(q.leadTime);
-  const warranty = q.warrantyMonths !== null ? { months: q.warrantyMonths, from: isWarrantyFrom(q.warrantyFrom) ? q.warrantyFrom : ("shipment" as const) } : parseWarranty(q.warranty);
-  return {
-    leadDays: lead?.days ?? null,
-    leadFrom: lead?.from ?? null,
-    parts: offerPartsOf(q, usualAdvance),
-    warrantyMonths: warranty?.months ?? null,
-    warrantyFrom: warranty?.from ?? null,
-  };
-}
+/** A factory offer's terms as facts (design "terms that travel"): see @kebo/shared offerTermsOf. */
+export const factoryTerms = offerTermsOf;
 
 /** An option's lead time as stored: its days and moment with the words worked out from them, or its words alone. */
 function optionLead(o: { leadDays?: number | null; leadFrom?: string | null; leadTime: string | null }) {

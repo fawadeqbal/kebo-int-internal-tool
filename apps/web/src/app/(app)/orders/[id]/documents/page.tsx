@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BANK_STEP_LABEL, can, dayMonth, type BankStepKind } from "@kebo/shared";
 import { Badge } from "@kebo/ui";
 import { getSettings } from "@/lib/loaders";
@@ -13,7 +14,7 @@ import { PapersTable, type PaperLineRow, type PapersTab } from "@/components/ord
 import type { BankStepView } from "@/lib/types-flow";
 import { lightAction } from "../../light-actions";
 import { addDocumentAction, updateDocumentAction } from "../../flow-actions";
-import { issueProformaAction } from "../../actions";
+import { issueProformaAction, papersPrintAction } from "../../actions";
 import { bankPaidAction } from "../../section-actions";
 import { docHref } from "../shared";
 import { stageData } from "../stage-data";
@@ -105,8 +106,79 @@ export default async function OrderDocuments({ params, searchParams }: { params:
     step === "sent_to_our_bank" ? (contract?.ourBank ?? "") : step === "customer_bank_received" ? (contract?.customerBank ?? "") : step === "bank_paid_us" ? "recorded with the payment" : "";
   const originals = !viaBank ? (bankSteps.find((b) => b.step === "copies_to_customer") ?? null) : null;
 
+  // How the papers print (design "terms that travel"): what decides how this order's papers look, in one place.
+  const agreedConditions = o.agreed?.paymentConditions?.trim() ?? "";
+  const pp = o.papers;
+  const conditionsWord = !agreedConditions
+    ? "None agreed"
+    : !pp?.conditionsChoice
+      ? "Printed"
+      : pp.conditionsPrinted
+        ? "Printed, although the route changed"
+        : "Left off: the route changed";
+  const canPrint = can(me, "orders.update") && open;
+  const howPrint = (
+    <Section
+      title="How the papers print"
+      cols={4}
+      rows={[
+        { label: "Heading over the items", value: o.documentTitle || <span className="font-normal text-text-2">{o.inquiry.title} (the inquiry’s title)</span> },
+        { label: "Agreed payment conditions", value: conditionsWord },
+        {
+          label: "Shipping marks",
+          value: (
+            <Link href={`/orders/${o.id}/shipping`} className="font-normal text-primary hover:underline">
+              On Shipping › Packing
+            </Link>
+          ),
+        },
+        {
+          label: "Letterhead and stamp",
+          value: can(me, "settings.manage") ? (
+            <Link href="/settings/company" className="font-normal text-primary hover:underline">
+              Company settings
+            </Link>
+          ) : (
+            <span className="font-normal text-text-2">The company’s</span>
+          ),
+        },
+      ]}
+      actions={
+        canPrint && (
+          <FieldsWindow
+            button={{ label: "Edit" }}
+            title="How the papers print"
+            sub={sub}
+            action={papersPrintAction.bind(null, o.id)}
+            whats={["Papers made final keep what they said; the next ones use what is set here."]}
+            fields={[
+              { name: "documentTitle", label: "Heading over the items", value: o.documentTitle, placeholder: o.inquiry.title, wide: true, hint: "Empty: the inquiry’s title." },
+              ...(pp?.conditionsChoice
+                ? [
+                    {
+                      name: "printConditions",
+                      label: "The agreed payment conditions",
+                      type: "select" as const,
+                      value: pp.conditionsPrinted ? "yes" : "no",
+                      options: [
+                        { value: "no", label: "Leave them off (the route changed)" },
+                        { value: "yes", label: "Print them too" },
+                      ],
+                      wide: true,
+                      hint: `The route is no longer the one accepted; the papers word the payment from the route. Agreed: “${agreedConditions.split(/\r?\n/)[0]}”`,
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        )
+      }
+    />
+  );
+
   return (
     <OrderPage id={id}>
+      {howPrint}
       {papers && (
         <PapersTable
           orderId={o.id}

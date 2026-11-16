@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { can, ORDER_SECTION_LABEL } from "@kebo/shared";
-import { Badge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { can, ROUTE_NAME } from "@kebo/shared";
+import { Badge, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
-import { orderFilesOf, orderOf, orderSectionsOf } from "@/lib/order-data";
-import { date, money } from "@/lib/format";
+import { orderFilesOf, orderMoneyOf, orderOf, orderSectionsOf } from "@/lib/order-data";
+import { date, dayMonth, money } from "@/lib/format";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
 import { HeaderSlot } from "@/components/orders/header-slot";
@@ -13,10 +13,11 @@ import { FileChip } from "@/components/files/file-tools";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
-import { OrderWindow } from "@/components/order-sections/overview-windows";
-import { detailsAction, moveStageAction } from "../actions";
+import { AgreedWindow, OrderWindow } from "@/components/order-sections/overview-windows";
+import { AgreedGroups, sideBySide, SideBySideTable } from "@/components/order-sections/agreed";
+import type { OrderView } from "@/lib/types-orders";
+import { agreedAction, detailsAction, moveStageAction } from "../actions";
 import { StageActions } from "./forms";
-import { incotermOf } from "./shared";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -26,16 +27,32 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 const DASH = <span className="font-normal text-muted">—</span>;
 
+/** The Change window's line under Ship by: how it is worked out, and when to type one. */
+function shipHintOf(a: NonNullable<OrderView["agreed"]>): string {
+  const f = a.shipByFrom;
+  const days = a.leadDays ?? 0;
+  if (f?.by === "typed") return "Typed by hand. Empty it to have it worked out from the lead time again.";
+  if (f?.by === "drawings") return "Type it once the drawings are approved.";
+  if (f?.by === "order") return `Worked out: ${days} days after the order. Type a date only when the customer agreed another one.`;
+  if (f?.by === "deposit")
+    return f.on
+      ? `Worked out: ${days} days after the deposit of ${dayMonth(f.on)}. Type a date only when the customer agreed another one.`
+      : "Worked out once the deposit is in. Type a date only when the customer agreed one.";
+  return "Type a date only when the customer agreed one.";
+}
+
 /**
- * The order's Overview (design "the order, final"): where each stage stands in one line, the order
- * itself, its items with what came in, was packed and was delivered, and every file of the order.
- * Nothing is done here except editing the order's own details and closing it; each line opens its tab.
+ * The order's Overview (design "the order, final"; "terms that travel"): where each stage stands in one line;
+ * their order (their PO and the quotation they accepted); what was agreed with the customer (Delivery · Payment ·
+ * Warranty · Conditions, copied from the quotation when it was accepted); the customer beside the factory; the
+ * items with what came in, was packed and was delivered; and every file of the order. Nothing is done here
+ * except their PO, changing what was agreed and closing the order; each line opens its tab.
  */
 export default async function OrderOverview({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
   const o = await orderOf(id);
-  const [sections, files] = await Promise.all([optional(() => orderSectionsOf(id)), optional(() => orderFilesOf(id))]);
+  const [sections, files, m] = await Promise.all([optional(() => orderSectionsOf(id)), optional(() => orderFilesOf(id)), optional(() => orderMoneyOf(id))]);
   const base = `/orders/${o.id}`;
   const now = today();
   const open = o.status === "open";
@@ -45,6 +62,15 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const closable = canEdit && o.next?.to === "done" && (o.word === "Delivered" || !(sections?.stages ?? []).includes("delivery"));
   const all = files?.files ?? [];
   const n = (v: string) => Number(v).toLocaleString("en-US");
+  const a = o.agreed ?? null;
+  const q = o.quotation;
+  const from = q ? `${q.refNo} R${q.number}` : null;
+  const sides = sideBySide(o, m);
+  const look = sides.reduce((t, x) => t + x.look, 0);
+  const checked = sides.some((x) => x.rows.some((r) => r.check && r.check.ok !== null));
+  const payLine = m
+    ? [m.route.route ? ROUTE_NAME[m.route.route] : "How they pay: not decided yet", ...m.plan.items.map((i) => `${i.label}${i.status === "paid" ? ", paid" : ""}`)].join(" · ")
+    : "The plan is on the Payment tab.";
 
   return (
     <OrderPage id={id}>
@@ -84,40 +110,39 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
       )}
 
       <Section
-        title={ORDER_SECTION_LABEL.order}
-        cols={3}
+        title="Their order"
+        cols={4}
         rows={[
           {
             label: "Customer",
             value: (
               <>
-                <Link href={`/customers/${o.customer.id}`} className="text-primary hover:underline">
+                {/* A link with words beside it is underlined: told apart without its colour. */}
+                <Link href={`/customers/${o.customer.id}`} className={cn("text-primary hover:underline", o.contactName && "underline underline-offset-2")}>
                   {o.customer.name}
                 </Link>
-                {o.contactName ? ` · ${o.contactName}` : ""}
+                {o.contactName && <span className="font-normal"> · {o.contactName}</span>}
               </>
             ),
           },
-          { label: "Their PO", value: o.customerRef ? `${o.customerRef}${o.customerPoOn ? ` · ${date(o.customerPoOn)}` : ""}` : null },
+          { label: "Their PO no.", value: o.customerRef },
+          { label: "PO date", value: o.customerPoOn ? date(o.customerPoOn) : null },
           {
-            label: "Accepted",
-            value: o.quotation ? (
+            label: "They accepted",
+            value: q ? (
               <>
-                <Link href={`/inquiries/${o.inquiry.id}/quotation`} className="text-primary hover:underline">
-                  {o.quotation.refNo} R{o.quotation.number}
+                <Link href={`/inquiries/${o.inquiry.id}/quotation`} className="text-primary underline underline-offset-2">
+                  {from}
                 </Link>
-                {o.quotation.option ? ` · Option ${o.quotation.option}` : ""}
+                <span className="font-normal">
+                  {q.option ? ` · Option ${q.option}` : ""}
+                  {q.acceptedOn ? ` · ${dayMonth(q.acceptedOn)}` : ""}
+                </span>
               </>
             ) : (
               date(o.orderedOn)
             ),
           },
-          { label: "Incoterm", value: incotermOf(o) },
-          { label: "Consignee", value: o.consignee || o.customer.name },
-          { label: "Notify party", value: o.notifyParty || "Same as consignee" },
-          { label: "Delivery address", value: o.deliveryAddress },
-          { label: "Ship by", value: o.shipBy ? date(o.shipBy) : null },
-          { label: "Port of discharge", value: o.portOfDischarge },
         ]}
         actions={
           canEdit && (
@@ -126,24 +151,75 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
               sub={`${o.refNo} · ${o.customer.name}`}
               action={detailsAction.bind(null, o.id)}
               today={now}
-              customer={o.customer.name}
-              heading={o.inquiry.title}
               canFiles={!!files?.canUpload}
-              values={{
-                customerRef: o.customerRef ?? null,
-                customerPoOn: o.customerPoOn ?? null,
-                consignee: o.consignee ?? null,
-                notifyParty: o.notifyParty ?? null,
-                deliveryAddress: o.deliveryAddress ?? null,
-                shipBy: o.shipBy,
-                portOfDischarge: o.portOfDischarge,
-                documentTitle: o.documentTitle,
-              }}
+              values={{ customerRef: o.customerRef ?? null, customerPoOn: o.customerPoOn ?? null }}
             />
           )
         }
         files={<SectionFiles orderId={o.id} section="order" canAdd={!!files?.canUpload && open} />}
       />
+
+      {a && (
+        <Section
+          id="agreed"
+          title="Agreed with the customer"
+          actions={
+            <>
+              {from && (
+                <span className="text-xs text-text-2 max-sm:hidden">
+                  From{" "}
+                  <Link href={`/inquiries/${o.inquiry.id}/quotation`} className="font-medium text-primary hover:underline">
+                    {from}
+                  </Link>
+                  {q?.acceptedOn ? `, accepted ${dayMonth(q.acceptedOn)}` : ""}
+                </span>
+              )}
+              {a.changes > 0 && (
+                <Link href={`${base}/history?q=${encodeURIComponent("agreed with the customer")}`} className="text-xs font-medium text-primary hover:underline">
+                  Changed {a.changes}×
+                </Link>
+              )}
+              {canEdit && (
+                <AgreedWindow
+                  title={`What we agreed with ${o.customer.name}`}
+                  sub={`${o.refNo}${from ? ` · from ${from}${q?.acceptedOn ? `, accepted ${date(q.acceptedOn)}` : ""}` : ""}`}
+                  action={agreedAction.bind(null, o.id)}
+                  values={{
+                    incoterm: o.incoterm,
+                    incotermPlace: o.incotermPlace,
+                    portOfDischarge: a.portOfDischarge,
+                    leadDays: a.leadDays,
+                    leadFrom: a.leadFrom,
+                    shipBy: o.shipBy,
+                    warrantyMonths: a.warrantyMonths,
+                    warrantyFrom: a.warrantyFrom,
+                    warranty: a.warranty,
+                    deliveryConditions: a.deliveryConditions,
+                    paymentConditions: a.paymentConditions,
+                    notes: a.notes,
+                  }}
+                  shipHint={shipHintOf(a)}
+                  payment={payLine}
+                  paymentHref={`${base}/payment`}
+                />
+              )}
+            </>
+          }
+        >
+          <AgreedGroups o={o} m={m} base={base} satTab={(sections?.stages ?? []).includes("delivery")} />
+        </Section>
+      )}
+
+      {sides.length > 0 && (
+        <Section title="The customer and the factory, side by side" state={look ? `${look} to look at` : checked ? "Covered" : null} tone={look ? "warn" : "ok"}>
+          {sides.map((t) => (
+            <SideBySideTable key={t.key} table={t} customer={o.customer.name} many={sides.length > 1} />
+          ))}
+          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">
+            Worked out from what was agreed with the customer and the factory’s offer; nothing to type. The same check shows on the quotation before it is sent.
+          </p>
+        </Section>
+      )}
 
       <section aria-label="Items" className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
         <h2 className="px-5 pt-4 pb-2 text-[15px] font-bold">

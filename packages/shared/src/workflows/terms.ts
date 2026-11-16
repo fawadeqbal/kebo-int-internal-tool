@@ -286,6 +286,35 @@ export function quotePaymentSentence(parts: TermPart[]): string {
   return `Our usual payment is made by ${listJoin(bits)}.`;
 }
 
+/**
+ * A factory offer's terms as facts, to check a promise against: its lead time as days from a moment, its payment
+ * as parts (an older offer: its advance, or the company's usual one, and the rest when ready), its warranty as
+ * months from a moment. An older offer's words are read for them where they say them plainly.
+ */
+export function offerTermsOf(
+  q: {
+    leadTime: string | null;
+    leadDays: number | null;
+    leadFrom: string | null;
+    paymentParts: unknown;
+    advancePercent: number | { toString(): string } | null;
+    warranty: string | null;
+    warrantyMonths: number | null;
+    warrantyFrom: string | null;
+  },
+  usualAdvance: number,
+): { leadDays: number | null; leadFrom: LeadFrom | null; parts: TermPart[]; warrantyMonths: number | null; warrantyFrom: WarrantyFrom | null } {
+  const lead = q.leadDays !== null ? { days: q.leadDays, from: isLeadFrom(q.leadFrom) ? q.leadFrom : ("after_payment" as const) } : parseLead(q.leadTime);
+  const warranty = q.warrantyMonths !== null ? { months: q.warrantyMonths, from: isWarrantyFrom(q.warrantyFrom) ? q.warrantyFrom : ("shipment" as const) } : parseWarranty(q.warranty);
+  return {
+    leadDays: lead?.days ?? null,
+    leadFrom: lead?.from ?? null,
+    parts: offerPartsOf(q, usualAdvance),
+    warrantyMonths: warranty?.months ?? null,
+    warrantyFrom: warranty?.from ?? null,
+  };
+}
+
 /* ---------------------------------------------------------------- what we promise beside what the factory gives */
 
 /** What we promise the customer in an option. */
@@ -316,6 +345,8 @@ export interface TheirTerms {
 export interface TermsCheck {
   key: "lead" | "payment" | "warranty";
   ok: boolean;
+  /** In a few words, for a badge ("14 days to spare", "We may pay first", "2 months not covered"). */
+  word: string;
   text: string;
 }
 
@@ -328,11 +359,15 @@ export function leadCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | null
     return {
       key: "lead",
       ok: false,
+      word: "Allow for the drawings",
       text: `${theirs.factory} gives ${given}; we promise ${leadWords(ours.leadDays, ours.leadFrom, "customer")}: allow for the drawings being approved.`,
     };
   const spare = ours.leadDays - theirs.leadDays;
-  if (spare >= 0) return { key: "lead", ok: true, text: `${theirs.factory} gives ${given} · ${spare ? `${plural(spare, "day")} to spare` : "nothing to spare"}` };
-  return { key: "lead", ok: false, text: `${theirs.factory} needs ${given}: ${plural(-spare, "day")} more than we promise.` };
+  if (spare >= 0) {
+    const word = spare ? `${plural(spare, "day")} to spare` : "Nothing to spare";
+    return { key: "lead", ok: true, word, text: `${theirs.factory} gives ${given} · ${word.toLowerCase()}` };
+  }
+  return { key: "lead", ok: false, word: `${plural(-spare, "day")} short`, text: `${theirs.factory} needs ${given}: ${plural(-spare, "day")} more than we promise.` };
 }
 
 /**
@@ -352,6 +387,7 @@ export function paymentCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | n
     return {
       key: "payment",
       ok: false,
+      word: "We may pay first",
       text: `${theirs.factory} wants ${percentText(adv)}% when we order (≈ ${fmt(advMinor)}); the customer's deposit is ${percentText(dep)}% (${fmt(depMinor)}): we pay about ${fmt(advMinor - depMinor)} of it first.`,
     };
   const ourPre = shareOf(ours.parts, ["on_order", "before_shipment"]);
@@ -362,11 +398,13 @@ export function paymentCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | n
     return {
       key: "payment",
       ok: false,
+      word: "We may pay first",
       text: `Before the goods leave, ${theirs.factory} wants ${percentText(theirPre)}% (≈ ${fmt(theirPreMinor)}); the customer has paid ${percentText(ourPre)}% (${fmt(ourPreMinor)}) by then: we pay about ${fmt(theirPreMinor - ourPreMinor)} first, until the rest comes in.`,
     };
   return {
     key: "payment",
     ok: true,
+    word: "Covered",
     text: `Covered: the customer pays ${fmt(depMinor)} with the order and ${fmt(ourPreMinor)} before shipping; ${theirs.factory} wants ${fmt(advMinor)} and ${fmt(theirPreMinor)}.`,
   };
 }
@@ -378,12 +416,13 @@ export function warrantyCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | 
   const theirFrom = isWarrantyFrom(theirs.warrantyFrom) ? theirs.warrantyFrom : "shipment";
   const given = `${plural(theirs.warrantyMonths, "month")} from ${WARRANTY_FROM_LABEL[theirFrom]}`;
   const gap = WARRANTY_FROM_MONTHS[ourFrom] + ours.warrantyMonths - (WARRANTY_FROM_MONTHS[theirFrom] + theirs.warrantyMonths);
-  if (gap <= 0) return { key: "warranty", ok: true, text: `Covered: ${theirs.factory} gives ${given}.` };
+  if (gap <= 0) return { key: "warranty", ok: true, word: "Covered", text: `Covered: ${theirs.factory} gives ${given}.` };
   const later = WARRANTY_FROM_MONTHS[ourFrom] - WARRANTY_FROM_MONTHS[theirFrom];
   const why = later > 0 ? ` (${ourFrom === "sat" ? "the site test" : WARRANTY_FROM_LABEL[ourFrom]} is about ${plural(later, "month")} after ${WARRANTY_FROM_LABEL[theirFrom]})` : "";
   return {
     key: "warranty",
     ok: false,
+    word: `${plural(gap, "month")} not covered`,
     text: `${theirs.factory} gives ${given}${why}, so the last ${plural(gap, "month")} of ours are not covered by the factory: ask ${theirs.factory} for ${theirs.warrantyMonths + gap} months, or keep it in mind.`,
   };
 }
@@ -452,6 +491,40 @@ export function partsPlan(parts: TermPart[], totalMinor: Minor, orderedOn: ISODa
         return row("after_sat", days);
     }
   });
+}
+
+/**
+ * An order's plan as parts of its total, for the checks against the factory (design "terms that travel": the
+ * customer and the factory, side by side): the deposit is due with the order; a part due on the ready date is
+ * before shipment; a dated part before shipment when it falls on or before ship by (else after shipping); the
+ * others after shipping, by a letter of credit or after the site test, with their days.
+ */
+export function planParts(
+  rows: { label: string; amountMinor: Minor; part: string | null; dueRule: string | null; dueDays: number | null; dueOn: ISODate | null }[],
+  totalMinor: Minor,
+  shipBy: ISODate | null,
+): TermPart[] {
+  if (totalMinor <= 0) return [];
+  return rows
+    .filter((r) => r.amountMinor > 0)
+    .map((r) => {
+      const percent = round2((r.amountMinor * 100) / totalMinor);
+      const days = r.dueDays === null ? null : Math.max(r.dueDays, 0);
+      const part = (rule: QuotePartRule, d: number | null = null): TermPart => ({ label: r.label, percent, rule, days: d });
+      if (r.part === "deposit") return part("on_order");
+      switch (r.dueRule) {
+        case "on_ready":
+          return part("before_shipment");
+        case "on_ship_plus_days":
+          return part("after_shipping", days ?? 0);
+        case "after_papers":
+          return part("lc", days ?? 0);
+        case "after_sat":
+          return part("after_sat", days ?? 0);
+        default:
+          return r.dueOn && shipBy && r.dueOn <= shipBy ? part("before_shipment") : part("after_shipping", 0);
+      }
+    });
 }
 
 /** When a row of a plan falls due, in a paper's words ("before shipment", "30 days after shipment"). */

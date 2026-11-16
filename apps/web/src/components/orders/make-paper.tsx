@@ -299,11 +299,8 @@ function BuyerBox({
 }
 
 /** The quotation's payment text against the route, when they differ: print it too, or not (the default). */
-function TermsBox({ p, editing, pending, onChange }: { p: PaperChecks; editing: boolean; pending: boolean; onChange: (print: boolean) => void }) {
+function TermsBox({ p }: { p: PaperChecks }) {
   const t = p.terms;
-  // Ticked at once while it is saved; then as saved.
-  const [mine, setMine] = useState<boolean | null>(null);
-  const on = pending && mine !== null ? mine : !!t?.printed;
   if (!t) return null;
   return (
     <section aria-labelledby="terms" className="rounded-lg border border-warn/40 bg-warn-soft p-3">
@@ -314,18 +311,13 @@ function TermsBox({ p, editing, pending, onChange }: { p: PaperChecks; editing: 
         The quotation said <q className="font-medium">{t.quoted.split(/\r?\n/)[0]!.replace(/[\s.;,]+$/, "")}</q>; the route is now{" "}
         <strong>{t.route}</strong>.
       </p>
-      <p className="mt-0.5 text-xs text-text-2">The paper words the payment terms from the route.</p>
-      <label className="mt-2 flex items-center gap-2.5 text-sm">
-        <Checkbox
-          checked={on}
-          disabled={!editing || pending}
-          onChange={(e) => {
-            setMine(e.target.checked);
-            onChange(e.target.checked);
-          }}
-        />
-        Print the quotation&apos;s text too
-      </label>
+      <p className="mt-0.5 text-xs text-text-2">
+        The paper words the payment terms from the route; the agreed conditions are {t.printed ? "printed too" : "left off"}.{" "}
+        {/* One place for how the order's papers print (design "terms that travel"). */}
+        <Link href={`/orders/${p.orderId}/documents`} className="font-medium text-primary hover:underline">
+          Change in How the papers print
+        </Link>
+      </p>
     </section>
   );
 }
@@ -475,7 +467,7 @@ export function MakePaper({
           pending={pending}
           onRefresh={async (reason) => !!(await call("buyer", null, { reason })).ok}
         />
-        <TermsBox p={p} editing={p.canRefreshBuyer && !final} pending={pending} onChange={(print) => call("quotedTerms", null, { print })} />
+        <TermsBox p={p} />
 
         {editing && p.options.length > 0 && (
           <fieldset>

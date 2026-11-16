@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL } from "@kebo/shared";
+import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
 import { Badge } from "@kebo/ui";
 import { getPeople } from "@/lib/loaders";
 import { date } from "@/lib/format";
@@ -49,8 +50,12 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
   const goodsLines = o.lines.filter((l) => l.type === "goods");
   const delivered = goodsLines.filter((l) => Number(l.delivered?.qty) >= Number(l.quantity)).length;
   const open = dv.claims.filter((c) => c.status === "open" || c.status === "with_factory").length;
-  const from = dv.satDoneOn ?? dv.deliveredOn;
-  const until = from && dv.warrantyMonths ? addMonths(from, dv.warrantyMonths) : null;
+  // The warranty (design "terms that travel"): as agreed with the customer, counted from the moment agreed; one
+  // typed here before (an older order) stays as it was, from the SAT day or, without a SAT, the delivery day.
+  const agreedW = !dv.warrantyMonths && o.agreed?.warrantyMonths ? { months: o.agreed.warrantyMonths, from: o.agreed.warrantyFrom ?? "shipment" } : null;
+  const months = dv.warrantyMonths ?? agreedW?.months ?? null;
+  const from = !agreedW ? (dv.satDoneOn ?? dv.deliveredOn) : agreedW.from === "shipment" ? o.shippedOn : agreedW.from === "delivery" ? dv.deliveredOn : (dv.satDoneOn ?? dv.deliveredOn);
+  const until = from && months ? addMonths(from, months) : null;
   const passed = dv.sat.filter((c) => c.result === "pass" || c.result === "not_applicable").length;
   const action = fieldsAction.bind(null, o.id, "delivery");
   const sub = `${o.refNo} · ${o.customer.name}`;
@@ -202,7 +207,25 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
           <EmptySection title="Installation and SAT" text="Not planned yet." action={satWindow(false)} />
         )}
 
-        {dv.warrantyMonths ? (
+        {agreedW ? (
+          <Section
+            title="Warranty"
+            state={until ? `To ${date(until)}` : "Not started"}
+            tone={until ? "ok" : "neutral"}
+            cols={2}
+            rows={[
+              { label: "Counted from", value: WARRANTY_FROM_LABEL[agreedW.from].replace(/^./, (c) => c.toUpperCase()) },
+              { label: "Months", value: String(agreedW.months) },
+              { label: "Starts on", value: from ? date(from) : null },
+              { label: "Ends on", value: until ? date(until) : null },
+            ]}
+            actions={
+              <Link href={`/orders/${o.id}#agreed`} className="text-[13px] font-medium whitespace-nowrap text-primary hover:underline">
+                As agreed with the customer
+              </Link>
+            }
+          />
+        ) : dv.warrantyMonths ? (
           <Section
             title="Warranty"
             state={until ? `To ${date(until)}` : "Not started"}

@@ -11,6 +11,7 @@ import {
   partsWords,
   paymentCheck,
   plainQuoteParts,
+  planParts,
   quotePartsInput,
   quotePartsOf,
   quotePaymentSentence,
@@ -158,9 +159,10 @@ describe("what we promise, beside what the factory gives", () => {
   });
 
   it("lead time: the days to spare, or the days the factory needs more", () => {
-    expect(leadCheck(ours(), theirs())).toEqual({ key: "lead", ok: true, text: "Jinan gives 30 days after the advance · 15 days to spare" });
-    expect(leadCheck(ours({ leadDays: 25 }), theirs())).toEqual({ key: "lead", ok: false, text: "Jinan needs 30 days after the advance: 5 days more than we promise." });
-    expect(leadCheck(ours(), theirs({ leadFrom: "after_drawings" }))?.ok).toBe(false);
+    expect(leadCheck(ours(), theirs())).toEqual({ key: "lead", ok: true, word: "15 days to spare", text: "Jinan gives 30 days after the advance · 15 days to spare" });
+    expect(leadCheck(ours({ leadDays: 30 }), theirs())?.word).toBe("Nothing to spare");
+    expect(leadCheck(ours({ leadDays: 25 }), theirs())).toEqual({ key: "lead", ok: false, word: "5 days short", text: "Jinan needs 30 days after the advance: 5 days more than we promise." });
+    expect(leadCheck(ours(), theirs({ leadFrom: "after_drawings" }))).toMatchObject({ ok: false, word: "Allow for the drawings" });
     expect(leadCheck(ours({ leadDays: null }), theirs())).toBeNull();
   });
 
@@ -168,6 +170,7 @@ describe("what we promise, beside what the factory gives", () => {
     expect(paymentCheck(ours(), theirs())).toEqual({
       key: "payment",
       ok: true,
+      word: "Covered",
       text: "Covered: the customer pays USD 9,037.50 with the order and USD 27,112.50 before shipping; Jinan wants USD 7,859.15 and USD 26,197.18.",
     });
     // The balance after shipping: we pay the factory before the customer pays us.
@@ -175,6 +178,7 @@ describe("what we promise, beside what the factory gives", () => {
     expect(paymentCheck(late, theirs())).toEqual({
       key: "payment",
       ok: false,
+      word: "We may pay first",
       text: "Before the goods leave, Jinan wants 100% (≈ USD 26,197.18); the customer has paid 30% (USD 9,037.50) by then: we pay about USD 17,159.68 first, until the rest comes in.",
     });
     // A bigger advance than the deposit.
@@ -189,9 +193,10 @@ describe("what we promise, beside what the factory gives", () => {
     expect(warrantyCheck(ours(), theirs())).toEqual({
       key: "warranty",
       ok: false,
+      word: "2 months not covered",
       text: "Jinan gives 12 months from shipment (the site test is about 2 months after shipment), so the last 2 months of ours are not covered by the factory: ask Jinan for 14 months, or keep it in mind.",
     });
-    expect(warrantyCheck(ours({ warrantyFrom: "shipment" }), theirs())).toEqual({ key: "warranty", ok: true, text: "Covered: Jinan gives 12 months from shipment." });
+    expect(warrantyCheck(ours({ warrantyFrom: "shipment" }), theirs())).toEqual({ key: "warranty", ok: true, word: "Covered", text: "Covered: Jinan gives 12 months from shipment." });
     expect(warrantyCheck(ours(), theirs({ warrantyMonths: null }))).toBeNull();
   });
 
@@ -202,5 +207,25 @@ describe("what we promise, beside what the factory gives", () => {
       ["warranty", false],
     ]);
     expect(termsChecks(ours({ leadDays: null, warrantyMonths: null }), theirs({ parts: null }))).toEqual([]);
+  });
+
+  it("an order's plan reads as parts of its total, for the same checks", () => {
+    const row = (label: string, amountMinor: number, part: string | null, dueRule: string | null, dueDays: number | null = null, dueOn: string | null = null) => ({ label, amountMinor, part, dueRule, dueDays, dueOn });
+    const plan = [
+      row("Deposit 30%", 903_750, "deposit", "fixed", null, "2026-11-20"),
+      row("Before shipment 60%", 1_807_500, null, "on_ready"),
+      row("After the site test 10%", 301_250, null, "after_sat", 15),
+    ];
+    expect(planParts(plan, 3_012_500, null)).toEqual([part("Deposit 30%", 30, "on_order"), part("Before shipment 60%", 60, "before_shipment"), part("After the site test 10%", 10, "after_sat", 15)]);
+    expect(paymentCheck(ours({ parts: planParts(plan, 3_012_500, null) }), theirs())?.ok).toBe(true);
+    // A dated part counts before shipment when it falls by ship by; a part due after the goods leave, after.
+    const dated = [row("Deposit", 1_000_000, "deposit", "fixed", null, "2026-11-20"), row("On 1 Dec", 1_000_000, null, "fixed", null, "2026-12-01"), row("Balance", 1_012_500, "balance", "on_ship_plus_days", 14)];
+    expect(planParts(dated, 3_012_500, "2026-12-31").map((p) => [p.rule, p.days])).toEqual([
+      ["on_order", null],
+      ["before_shipment", null],
+      ["after_shipping", 14],
+    ]);
+    expect(planParts(dated, 3_012_500, "2026-11-25")[1]!.rule).toBe("after_shipping");
+    expect(planParts(dated, 0, null)).toEqual([]);
   });
 });

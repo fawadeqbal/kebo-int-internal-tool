@@ -96,7 +96,8 @@ export function SidePanel({
   useEffect(() => {
     if (!mounted || !box.current) return;
     const body = box.current.querySelector<HTMLElement>("[data-panel-body]") ?? box.current;
-    const first = focusables(body).find((el) => el.matches("input,select,textarea"));
+    // The first field that can be typed in (a read-only box is only there to be read).
+    const first = focusables(body).find((el) => el.matches("input:not([readonly]),select,textarea:not([readonly])"));
     (first ?? head.current)?.focus({ preventScroll: true });
   }, [mounted]);
 
