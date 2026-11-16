@@ -11,6 +11,9 @@ import '../features/gallery/patterns_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/more/presentation/more_screen.dart';
 import '../features/notifications/presentation/alerts_screen.dart';
+import '../features/sales/presentation/inquiry_screen.dart';
+import '../features/sales/presentation/new_inquiry_screen.dart';
+import '../features/sales/presentation/sales_screen.dart';
 import '../features/tabs/coming_tab.dart';
 import 'shell.dart';
 
@@ -44,12 +47,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/sales',
-                builder: (context, state) => const ComingTab(
-                  title: 'Sales',
-                  icon: KIcons.chart,
-                  step: 5,
-                  what: 'Inquiries, factory offers and quotations, with the internal and customer views.',
-                ),
+                builder: (context, state) => const SalesScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'inquiry/:id',
+                    builder: (context, state) => InquiryScreen(id: state.pathParameters['id']!),
+                  ),
+                ],
               ),
             ],
           ),
@@ -84,6 +88,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      GoRoute(path: '/sales/new', builder: (context, state) => const NewInquiryScreen()),
       GoRoute(path: '/alerts', builder: (context, state) => const AlertsScreen()),
       GoRoute(path: '/needs', builder: (context, state) => const NeedsScreen()),
       GoRoute(
