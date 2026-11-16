@@ -131,13 +131,8 @@ void main() {
     expect(find.text('New'), findsNothing);
   });
 
-  testWidgets('tabs: each opens, More shows the account and theme', (t) async {
+  testWidgets('More shows the account and the theme switch', (t) async {
     await _open(t, _answers(unread: 0));
-    for (final tab in ['Money']) {
-      await t.tap(find.text(tab).last);
-      await t.pumpAndSettle();
-      expect(find.textContaining('$tab arrives in step'), findsOneWidget);
-    }
     await t.tap(find.text('More').last);
     await t.pumpAndSettle();
     expect(find.text('f@example.com'), findsOneWidget);

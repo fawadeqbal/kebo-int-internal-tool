@@ -10,6 +10,7 @@ import '../../../core/links.dart';
 import '../../../core/providers.dart';
 import '../../../core/send.dart';
 import '../../../design/design.dart';
+import '../../money/presentation/money_forms.dart';
 import '../data/orders_data.dart';
 
 /// One order: its identity and money at the top, what it needs now, where each stage
@@ -178,6 +179,44 @@ class _Body extends ConsumerWidget {
                   value: received / total,
                   label: 'Received',
                   tone: received >= total ? KTone.success : KTone.brand,
+                ),
+              ],
+              if (o.status == 'open') ...[
+                const SizedBox(height: KSpace.s3),
+                Row(
+                  children: [
+                    Expanded(
+                      child: KButton(
+                        'Money received',
+                        icon: KIcons.arrowIn,
+                        variant: KButtonVariant.secondary,
+                        fullWidth: true,
+                        onPressed: () async {
+                          if (await openMoneyReceived(
+                            context,
+                            orderId: o.id,
+                            refNo: o.refNo,
+                            currency: o.currency ?? 'USD',
+                            due: o.due,
+                          )) {
+                            onChanged();
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: KSpace.s2),
+                    Expanded(
+                      child: KButton(
+                        'Expense',
+                        icon: KIcons.plus,
+                        variant: KButtonVariant.secondary,
+                        fullWidth: true,
+                        onPressed: () async {
+                          if (await openExpense(context, orderId: o.id, refNo: o.refNo)) onChanged();
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
               const SizedBox(height: KSpace.s6),

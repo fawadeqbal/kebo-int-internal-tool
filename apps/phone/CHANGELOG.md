@@ -3,6 +3,17 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-alpha.7 — 2026-11-16
+
+Step 7: Money.
+
+- The Money tab: what customers still owe (late ones marked), what we owe each factory, and our accounts with their balances (for managers).
+- "Received" on any order with money due: the amount (the due amount filled in), the day, how it came, which account, the reference, bank charges, a note and the slip. Take a photo of the slip or choose a file.
+- People who record payments make the receipt at once; others send it to a manager, and the form says so.
+- "Expense" from the Money tab or on an order: what it was, what for, the amount and currency, the day and the receipt.
+- A success check when it is saved. Without signal the payment or expense waits on the phone, with its photo, and is sent in order when you are back.
+- Files over the limit (25 MB, videos 100 MB) are refused with their size.
+
 ## 3.0.0-alpha.6 — 2026-11-16
 
 Step 6: Orders.

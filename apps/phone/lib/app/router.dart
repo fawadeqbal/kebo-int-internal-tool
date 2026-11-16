@@ -10,13 +10,13 @@ import '../features/gallery/gallery_screen.dart';
 import '../features/gallery/patterns_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/more/presentation/more_screen.dart';
+import '../features/money/presentation/money_screen.dart';
 import '../features/notifications/presentation/alerts_screen.dart';
 import '../features/orders/presentation/order_screen.dart';
 import '../features/orders/presentation/orders_screen.dart';
 import '../features/sales/presentation/inquiry_screen.dart';
 import '../features/sales/presentation/new_inquiry_screen.dart';
 import '../features/sales/presentation/sales_screen.dart';
-import '../features/tabs/coming_tab.dart';
 import 'shell.dart';
 
 /// Every route of the app, in one place: the five tabs (each with its own stack), and the
@@ -74,17 +74,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/money',
-                builder: (context, state) => const ComingTab(
-                  title: 'Money',
-                  icon: KIcons.wallet,
-                  step: 7,
-                  what: 'Payments in and out, verification, transfers and expenses.',
-                ),
-              ),
-            ],
+            routes: [GoRoute(path: '/money', builder: (context, state) => const MoneyScreen())],
           ),
           StatefulShellBranch(
             routes: [GoRoute(path: '/more', builder: (context, state) => const MoreScreen())],
