@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, Res } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
@@ -36,6 +37,8 @@ import {
 import { DomainError, NotFoundError } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
 import { CompaniesService } from "../common/company/companies.service";
+import { CompanyContext } from "../common/company/company-context";
+import { SettingsService } from "../modules/settings/settings.service";
 import { OwnDomainService } from "../common/company/own-domain.service";
 import { Validate } from "../common/http/zod.pipe";
 import { Public } from "../common/auth/decorators";
@@ -87,6 +90,7 @@ export class PlatformPublicController {
     private readonly companies: CompaniesService,
     private readonly site: SiteService,
     private readonly domains: OwnDomainService,
+    private readonly settings: SettingsService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -196,6 +200,38 @@ export class PlatformPublicController {
     if (!c) throw new NotFoundError("Company");
     // Its own domain, only while one is connected: its address under ours then sends people on to it.
     return { exists: true, slug: c.slug, name: c.status === "active" ? c.name : null, ...(this.domains.enabled && c.domain ? { domain: c.domain } : {}) };
+  }
+
+  /**
+   * The company's own look for the pages before sign-in (white label): its name, its colour set and whether it
+   * has a logo (with a version, so the picture can be kept until it changes). Only while it is switched on; the
+   * same things anyone sees on its sign-in page, nothing else.
+   */
+  @Public()
+  @Get("company-look")
+  async companyLook(@Query("slug") slug = "") {
+    const c = await this.activeCompany(slug);
+    const s = (await CompanyContext.run(c, () => this.settings.get())).company;
+    return {
+      name: s.name || c.name,
+      colours: s.colours,
+      logo: s.logo ? createHash("sha256").update(s.logo).digest("hex").slice(0, 12) : null,
+    };
+  }
+
+  /** The company's logo for its sign-in page (a data: URL, as stored), or null. Only while it is switched on. */
+  @Public()
+  @Get("company-logo")
+  async companyLogo(@Query("slug") slug = "") {
+    const c = await this.activeCompany(slug);
+    return { logo: (await CompanyContext.run(c, () => this.settings.get())).company.logo || null };
+  }
+
+  private async activeCompany(slug: string) {
+    const c = await this.companies.bySlug(slug);
+    // Switched on (or read-only: its people can still sign in to look); never one that is off or deleted.
+    if (!c || (c.status !== "active" && c.status !== "read_only")) throw new NotFoundError("Company");
+    return c;
   }
 
   /** The company whose own domain an address is (connected ones only): its short name, for the web app. 404: none. */

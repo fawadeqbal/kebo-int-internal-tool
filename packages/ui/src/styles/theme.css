@@ -503,6 +503,13 @@
   }
 }
 
+/* The welcome splash on the sign-in page: its thin bar fills while it shows. */
+@keyframes splash-bar {
+  from {
+    transform: scaleX(0);
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
