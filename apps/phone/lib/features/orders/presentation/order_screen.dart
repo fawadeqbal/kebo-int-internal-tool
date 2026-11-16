@@ -317,7 +317,7 @@ class _Body extends ConsumerWidget {
                                   divider: i < o.files.length - 1,
                                   onPressed: f.strOrNull('href') == null
                                       ? null
-                                      : () => openLink(context, s.api, f.str('href')),
+                                      : () => openFile(context, s.api, f.str('href'), f.str('name')),
                                 ),
                             ],
                           ),

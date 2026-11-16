@@ -3,6 +3,15 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-alpha.8 — 2026-11-16
+
+Step 8: partners, search and files.
+
+- Customers and factories (More › Customers and factories): searchable lists; a customer's page with their contacts, deals and orders and Call / Chat / Mail; a factory's page with how to reach them (WeChat too), their offers, and bank details marked Internal.
+- Search from any tab's header: one search over inquiries, orders, customers and factories, grouped.
+- Files open in the app: PDFs page by page with pinch to zoom, photos with zoom. Other files open on the web to download.
+- Web links to customers and factories open in the app.
+
 ## 3.0.0-alpha.7 — 2026-11-16
 
 Step 7: Money.
