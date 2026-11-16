@@ -13,12 +13,14 @@ import { Clock } from "../src/common/time/clock.service";
 describe("the factory's side starts from its offer", () => {
   let app: INestApplication;
   let sana: string;
+  let manager: string;
   let today = "";
   const tag = Date.now().toString(36);
 
   beforeAll(async () => {
     app = await startApp();
     sana = await signIn(app, "sana@example.com");
+    manager = await signIn(app, "manager@example.com", "Manager@12345");
     today = app.get(Clock).today();
   });
 
@@ -110,6 +112,48 @@ describe("the factory's side starts from its offer", () => {
     expect(paper.bullets).toContain("Payment: Advance 30%, CNY 55,800.00, when we order; Ready 60%, CNY 111,600.00, on the ready date; After shipping 10%, CNY 18,600.00, 30 days after shipping.");
     expect(paper.bullets).toContain("By T/T to their account in Jinan.");
     expect(paper.bullets).toContain("Warranty: 12 months from shipment, parts, not labour.");
+  });
+
+  it("agreed with the factory: its offer's until sent, its own once sent; a change from the offer asks why; ready by from the advance", async () => {
+    const id = await accepted(THREE);
+    const po = (await purchaseOrders(id)).items[0];
+    expect(po.agreed).toMatchObject({
+      copied: false,
+      basis: "FOB",
+      basisPlace: "Qingdao",
+      leadDays: 30,
+      leadTime: "30 days after the advance",
+      warrantyLine: "12 months from shipment, parts, not labour.",
+      paymentNote: "By T/T to their account in Jinan.",
+      readyBy: { by: "advance", on: null, readyOn: null },
+      changes: 0,
+    });
+    // Before it is sent, it is still being prepared: no why.
+    await api(app, sana).patch(`/orders/${id}/purchase-orders/${po.id}/terms`, { notes: "Pack each machine in a fumigated case." }).expect(200);
+    await api(app, sana).post(`/orders/${id}/purchase-orders/${po.id}/send`, { sentOn: today, reason: "The factory needs the order this week" }).expect(200);
+    const sent = (await purchaseOrders(id)).items[0];
+    expect(sent.agreed).toMatchObject({ copied: true, leadDays: 30, notes: "Pack each machine in a fumigated case.", changes: 1 });
+    // Sent: a lead time other than the offer's asks why; the same values again change nothing.
+    await api(app, sana).patch(`/orders/${id}/purchase-orders/${po.id}/terms`, { leadDays: 35 }).expect(409);
+    await api(app, sana).patch(`/orders/${id}/purchase-orders/${po.id}/terms`, { leadDays: 35, reason: "Agreed a new lead time" }).expect(200);
+    await api(app, sana).patch(`/orders/${id}/purchase-orders/${po.id}/terms`, { leadDays: 35, leadFrom: "after_payment", basis: "FOB", basisPlace: "Qingdao" }).expect(200);
+    const changed = (await purchaseOrders(id)).items[0];
+    expect(changed.agreed).toMatchObject({ leadDays: 35, leadTime: "35 days after the advance", changes: 2, offered: { leadDays: 30 } });
+    // The advance paid in full: the ready date is worked out from it.
+    const factoryId = (await money(id)).factories.plans[0].factory.id;
+    await api(app, manager).post(`/orders/${id}/factory-payments`, { factoryId, kind: "deposit", amount: 55800, currency: "CNY", paidOn: today }).expect(201);
+    expect((await purchaseOrders(id)).items[0].agreed.readyBy).toEqual({ by: "advance", on: today, readyOn: addDays(today, 35) });
+    // The paper and the customer's side by side use what was agreed.
+    const paper = await poPaper(id);
+    expect(paper.bullets).toContain("Delivery: FOB Qingdao, ready 35 days after our advance.");
+    expect(paper.bullets.at(-1)).toBe("Pack each machine in a fumigated case.");
+    const order = (await api(app, sana).get(`/orders/${id}`).expect(200)).body;
+    expect(order.factoryTerms[0].terms.leadDays).toBe(35);
+    // The history: what changed, in words, under the factory order.
+    const history = (await api(app, sana).get(`/history?type=order&id=${id}`).expect(200)).body as { summary: string; step: string | null; reason: string | null; changes: { field: string; from: string | null; to: string | null }[] }[];
+    const lead = history.find((e) => e.summary.includes(`${po.number}: what was agreed with`) && e.summary.includes("lead time 35 days after the advance"));
+    expect(lead).toMatchObject({ step: "factory", reason: "Agreed a new lead time" });
+    expect(lead?.changes).toEqual([{ field: "leadTime", from: "30 days after the advance", to: "35 days after the advance" }]);
   });
 
   it("an older offer (an advance %, words only) keeps its usual plan and prints as before", async () => {

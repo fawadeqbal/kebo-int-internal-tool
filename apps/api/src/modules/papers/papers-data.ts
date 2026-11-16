@@ -47,6 +47,7 @@ import { factoryReadyOf, readySelect } from "@kebo/database";
 import { livePlanOfOrder } from "../billing/api";
 import { startingPlan } from "../billing/api";
 import { figuresOf, optionFigures } from "../quotations/revision-figures";
+import { factoryAgreed, offerTermsSelect, poTermsSelect } from "../flow/factory-terms";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
@@ -64,23 +65,7 @@ export const paperOrderInclude = {
           factoryQuoteLine: {
             select: {
               parentId: true,
-              factoryQuote: {
-                select: {
-                  advancePercent: true,
-                  paymentParts: true,
-                  reference: true,
-                  receivedOn: true,
-                  basis: true,
-                  basisPlace: true,
-                  leadTime: true,
-                  leadDays: true,
-                  leadFrom: true,
-                  warranty: true,
-                  warrantyMonths: true,
-                  warrantyFrom: true,
-                  paymentTerms: true,
-                },
-              },
+              factoryQuote: { select: { advancePercent: true, ...offerTermsSelect } },
             },
           },
         },
@@ -90,6 +75,8 @@ export const paperOrderInclude = {
   },
   // The accepted option's discount and lead time (the revision keeps no figures of its own).
   revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
+  // What was agreed with each factory, kept on its purchase order once sent (design "terms that travel").
+  purchaseOrders: { select: { supplierId: true, ...poTermsSelect } },
   // Receipts are numbered when the payment is recorded (its allocation's receiptNo); listed in date order.
   allocations: livePartsWithEntry,
   receivables: { orderBy: { sortOrder: "asc" } },
@@ -577,28 +564,30 @@ function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMi
 const PO_LEAD_FROM: Record<string, string> = { after_payment: "after our advance", after_order: "after our order", after_drawings: "after the drawings are approved" };
 
 /**
- * The offer a factory's lines were bought on, as the purchase order prints it (design "terms that travel", step 3):
- * its number and day ("Your offer"), the delivery basis, the lead time with the ready date, the warranty, and —
- * for an offer whose payment is kept as parts — its payment note. An offer that says none of it prints as before.
+ * What was agreed with the factory, as its purchase order prints it (design "terms that travel", step 3): the offer
+ * its lines were bought on ("Your offer", its number and day), the delivery basis, the lead time with the ready date,
+ * the warranty, the payment note and our notes — the purchase order's own copy once sent, else the offer's. An offer
+ * that says none of it prints as before.
  */
-function poOffer(lines: PaperCtx["o"]["lines"], readyOn: ISODate | null) {
-  const q = lines.map((l) => l.quoteLine?.factoryQuoteLine?.factoryQuote).find((x) => !!x);
-  if (!q) return null;
-  const basis = q.basis ? `${q.basis}${q.basisPlace ? ` ${q.basisPlace}` : ""}` : null;
+function poOffer(c: PaperCtx, factoryId: string | null, lines: PaperCtx["o"]["lines"], readyOn: ISODate | null) {
+  const q = lines.map((l) => l.quoteLine?.factoryQuoteLine?.factoryQuote).find((x) => !!x) ?? null;
+  const po = c.o.purchaseOrders.find((p) => p.supplierId === factoryId) ?? null;
+  if (!q && !po?.termsCopied) return null;
+  const a = po ? factoryAgreed(po, q) : factoryAgreed({ termsCopied: false } as Parameters<typeof factoryAgreed>[0], q);
+  const basis = a.basis ? `${a.basis}${a.basisPlace ? ` ${a.basisPlace}` : ""}` : null;
   const lead =
-    q.leadDays !== null
-      ? `ready ${q.leadDays} day${q.leadDays === 1 ? "" : "s"} ${PO_LEAD_FROM[q.leadFrom ?? "after_payment"] ?? PO_LEAD_FROM.after_payment}`
-      : q.leadTime?.trim()
-        ? `lead time ${q.leadTime.trim().replace(/[.;,\s]+$/, "")}`
+    a.leadDays !== null
+      ? `ready ${a.leadDays} day${a.leadDays === 1 ? "" : "s"} ${PO_LEAD_FROM[a.leadFrom ?? "after_payment"] ?? PO_LEAD_FROM.after_payment}`
+      : a.leadTime?.trim()
+        ? `lead time ${a.leadTime.trim().replace(/[.;,\s]+$/, "")}`
         : null;
   const said = [basis, lead].filter(Boolean).join(", ");
-  const warranty = warrantyLine({ warrantyMonths: q.warrantyMonths, warrantyFrom: q.warrantyFrom, warranty: q.warranty });
   return {
-    ref: `${q.reference ? `${q.reference} of` : "dated"} ${paperDateText(fromDbDate(q.receivedOn))}`,
+    ref: q ? `${q.reference ? `${q.reference} of` : "dated"} ${paperDateText(fromDbDate(q.receivedOn))}` : null,
     delivery: said ? `Delivery: ${said}${readyOn ? `, by ${paperDateText(readyOn)}` : ""}.` : null,
-    warranty: warranty ? `Warranty: ${warranty}` : null,
-    // The note beside the parts (an older offer's payment words are its terms, not a note: the plan prints those).
-    note: Array.isArray(q.paymentParts) && q.paymentTerms?.trim() ? q.paymentTerms.trim() : null,
+    warranty: a.warrantyLine ? `Warranty: ${a.warrantyLine}` : null,
+    note: a.paymentNote?.trim() || null,
+    notes: a.notes?.trim() || null,
   };
 }
 
@@ -618,7 +607,7 @@ function purchaseOrder(c: PaperCtx): Built {
   const position = f && currency ? (factoryPositionOf(c.o, fxOf(c.settings, has(c, "expenses"))).find((r) => r.key === `${f.id}:${currency}`) ?? null) : null;
   const borne = c.o.expenses.filter((e) => f && e.borneBy === "factory" && e.factoryId === f.id);
   const terms = f && currency ? poPaymentTerms(c, f.id, currency, tax.owedMinor) : null;
-  const offer = poOffer(mine, readyOn);
+  const offer = poOffer(c, f?.id ?? null, mine, readyOn);
   return {
     n: factories.length > 1 && f ? factories.indexOf(f) + 1 : null,
     checks: [
@@ -680,6 +669,7 @@ function purchaseOrder(c: PaperCtx): Built {
         ...(position && (paid.length || borne.length) ? [{ label: "Still to pay:", value: money(fromMinor(position.toPayMinor), position.currency) }] : []),
         `Please quote our order number ${c.o.refNo} on every paper and on the packing.`,
         ...(c.o.shippingMarks ? [{ label: "Shipping marks:", value: `\n${c.o.shippingMarks}` }] : []),
+        ...(offer?.notes ? [offer.notes] : []),
       ],
       bank: null,
       signatures: { left: `For the buyer · ${c.company.name}`, right: `For the factory · ${f?.name ?? ""}` },

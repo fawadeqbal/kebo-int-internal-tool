@@ -23,6 +23,8 @@ export const REASON_CHOICES = {
   plan: ["Customer asked for more time", "Agreed a new schedule", "Order changed", "Mistake fixed"],
   /** Changing what was agreed with the customer after the quotation was accepted (design "terms that travel"). */
   agreed: ["Customer asked for it", "Agreed a new port", "Factory changed its lead time", "Typed wrong", "Mistake fixed"],
+  /** Changing what was agreed with a factory after its purchase order was sent (design "terms that travel"). */
+  factory_terms: ["The factory asked for it", "Agreed a new lead time", "Agreed a longer warranty", "Typed wrong", "Mistake fixed"],
   /** Changing what a card already saved (lines or values): Save changes asks why. */
   /** Saving something the order's checks asked about (a date out of order). */
   anyway: ["It did happen, not recorded yet", "Agreed with the customer", "The other date is wrong"],

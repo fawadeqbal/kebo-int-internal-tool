@@ -2934,6 +2934,23 @@ model PurchaseOrder {
   sentEarlyReason String?   @map("sent_early_reason") @db.VarChar(300)
   /// The supplier's own number for our order ("their order no.").
   supplierRef     String?   @map("supplier_ref") @db.VarChar(60)
+  /// Agreed with the factory (design "terms that travel"): its own copy, taken from the offer when it was sent
+  /// (false: not sent yet, or sent before it was kept — the offer's terms show).
+  termsCopied     Boolean   @default(false) @map("terms_copied")
+  basis           Incoterm?
+  basisPlace      String?   @map("basis_place") @db.VarChar(60)
+  /// The lead time as days from a moment: after_payment (the advance) | after_order | after_drawings.
+  leadDays        Int?      @map("lead_days")
+  leadFrom        String?   @map("lead_from")
+  warrantyMonths  Int?      @map("warranty_months")
+  /// shipment | delivery | sat
+  warrantyFrom    String?   @map("warranty_from")
+  /// What the warranty covers ("parts, not labour"); an older offer's whole sentence.
+  warrantyWords   String?   @map("warranty_words") @db.VarChar(300)
+  /// Printed after the payment's parts ("By T/T to their account in Jinan").
+  paymentNote     String?   @map("payment_note")
+  moq             String?   @db.VarChar(60)
+  conditionsNotes String?   @map("conditions_notes")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 

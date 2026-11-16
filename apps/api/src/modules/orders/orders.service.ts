@@ -868,18 +868,35 @@ export class OrdersService {
     });
     const { sales } = await this.settings.get();
     const ready = readyByOf(o);
-    return quotes.map((q) => ({
-      factory: q.factory,
-      offer: { id: q.id, reference: q.reference, receivedOn: fromDbDate(q.receivedOn) },
-      basis: q.basis,
-      basisPlace: q.basisPlace,
-      terms: offerTermsOf(q, sales.factoryAdvancePercent),
-      /** Its goods' cost on the order, in the order's currency (what we pay it, at the rate quoted). */
-      costMinor: o.lines
-        .filter((l) => l.type === "goods" && l.factoryId === q.factoryId && l.unitCost !== null)
-        .reduce((t, l) => t + Math.round(decimalToMinor(l.unitCost!) * Number(l.quantity)), 0),
-      readyOn: ready.find((r) => r.factoryId === q.factoryId)?.readyOn ?? null,
-    }));
+    // Agreed with each factory: its purchase order's own copy once sent (design "terms that travel", step 3b).
+    const pos = await this.prisma.db.purchaseOrder.findMany({
+      where: { orderId: o.id, termsCopied: true },
+      select: { supplierId: true, basis: true, basisPlace: true, leadDays: true, leadFrom: true, warrantyMonths: true, warrantyFrom: true },
+    });
+    return quotes.map((q) => {
+      const po = pos.find((p) => p.supplierId === q.factoryId);
+      const terms = offerTermsOf(q, sales.factoryAdvancePercent);
+      return {
+        factory: q.factory,
+        offer: { id: q.id, reference: q.reference, receivedOn: fromDbDate(q.receivedOn) },
+        basis: po ? po.basis : q.basis,
+        basisPlace: po ? po.basisPlace : q.basisPlace,
+        terms: po
+          ? {
+              ...terms,
+              leadDays: po.leadDays,
+              leadFrom: isLeadFrom(po.leadFrom) ? po.leadFrom : null,
+              warrantyMonths: po.warrantyMonths,
+              warrantyFrom: isWarrantyFrom(po.warrantyFrom) ? po.warrantyFrom : null,
+            }
+          : terms,
+        /** Its goods' cost on the order, in the order's currency (what we pay it, at the rate quoted). */
+        costMinor: o.lines
+          .filter((l) => l.type === "goods" && l.factoryId === q.factoryId && l.unitCost !== null)
+          .reduce((t, l) => t + Math.round(decimalToMinor(l.unitCost!) * Number(l.quantity)), 0),
+        readyOn: ready.find((r) => r.factoryId === q.factoryId)?.readyOn ?? null,
+      };
+    });
   }
 
   /**

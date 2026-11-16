@@ -34,7 +34,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 type Agreed = NonNullable<OrderView["agreed"]>;
 
 /** One of the four groups: its name, its main fact in bold, the rest under it. */
-function Group({ title, big, children }: { title: string; big: ReactNode; children?: ReactNode }) {
+export function Group({ title, big, children }: { title: string; big: ReactNode; children?: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-lg border border-line bg-surface-2/40 px-3.5 py-3 text-[13px] [overflow-wrap:anywhere]">
       <h3 className="text-xs font-semibold text-text-2">{title}</h3>
@@ -45,7 +45,7 @@ function Group({ title, big, children }: { title: string; big: ReactNode; childr
 }
 
 /** "Port of discharge Karachi": a fact with its value in bold (a dash when empty). */
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <p className="text-text-2">
       {label} {children === null || children === undefined || children === "" ? <span className="text-muted">—</span> : <b className="font-semibold text-text">{children}</b>}
@@ -54,7 +54,7 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** A condition as printed: its first lines, as typed. */
-const Printed = ({ text }: { text: string | null }) => (text?.trim() ? <p className="line-clamp-4 whitespace-pre-line text-text-2">{text}</p> : null);
+export const Printed = ({ text }: { text: string | null }) => (text?.trim() ? <p className="line-clamp-4 whitespace-pre-line text-text-2">{text}</p> : null);
 
 /** How ship by came about, in a few words (null: nothing to say). */
 export function shipByNote(a: Agreed, shipBy: string | null): { ok: boolean; text: string } | null {

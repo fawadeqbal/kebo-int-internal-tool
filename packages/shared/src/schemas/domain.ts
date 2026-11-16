@@ -451,6 +451,26 @@ export const revisionEmailInput = z.object({
  * travel"): Delivery (the place, the port of discharge, the lead time, ship by), Warranty and Conditions. The
  * payment is changed in its plan. Left out: kept as it is. Changed from what the quotation said: Why? is asked.
  */
+/**
+ * Changing what was agreed with a factory (design "terms that travel", step 3b): Delivery (the basis and its place,
+ * the lead time), the payment's note (the parts are its plan's), Warranty and Conditions (minimum order, notes).
+ * Left out: kept as it is. Changed from what its offer said: Why? is asked.
+ */
+export const factoryTermsInput = z.object({
+  basis: z.preprocess((v) => (v === "" ? null : v), z.enum(INCOTERMS).nullish()),
+  basisPlace: keptText(60),
+  leadDays: keptInt(0, 3650, "Enter the days"),
+  leadFrom: keptEnum(LEAD_FROMS, "Choose what the days count from"),
+  warrantyMonths: keptInt(0, 240, "Enter the months"),
+  warrantyFrom: keptEnum(WARRANTY_FROMS, "Choose what the months count from"),
+  warranty: keptText(300),
+  paymentNote: keptText(2000),
+  moq: keptText(60),
+  notes: keptText(5000),
+  reason: reasonField,
+});
+export type FactoryTermsInput = z.infer<typeof factoryTermsInput>;
+
 export const agreedTermsInput = z.object({
   incotermPlace: keptText(80),
   portOfDischarge: keptText(120),

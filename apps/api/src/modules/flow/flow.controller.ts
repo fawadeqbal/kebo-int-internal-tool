@@ -18,6 +18,8 @@ import {
   paymentRouteInput,
   satInput,
   sendPurchaseOrderInput,
+  factoryTermsInput,
+  type FactoryTermsInput,
   shipmentInput,
   shipmentUpdateInput,
   type BankContractInput,
@@ -113,6 +115,18 @@ export class OrderFlowController {
     @Body(Validate(sendPurchaseOrderInput)) body: SendPurchaseOrderInput,
   ) {
     return this.flow.sendPurchaseOrder(user, id, poId, body);
+  }
+
+  /** What was agreed with the purchase order's factory (design "terms that travel"): a change from its offer asks why once sent. */
+  @SignedIn("checked inside: orders.update")
+  @Patch(":id/purchase-orders/:poId/terms")
+  factoryTerms(
+    @CurrentUser() user: SessionUser,
+    @Param("id", uuid) id: string,
+    @Param("poId", uuid) poId: string,
+    @Body(Validate(factoryTermsInput)) body: FactoryTermsInput,
+  ) {
+    return this.flow.setFactoryTerms(user, id, poId, body);
   }
 
   @Post(":id/shipments")

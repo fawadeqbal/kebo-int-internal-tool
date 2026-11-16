@@ -44,6 +44,9 @@ import {
   type ShipmentInput,
   type ShipmentUpdateInput,
   type SendPurchaseOrderInput,
+  type FactoryTermsInput,
+  leadWords,
+  warrantyLine,
 } from "@kebo/shared";
 import { fromMinor } from "@kebo/money";
 import { addDays, DomainError, ForbiddenError, GateError, NotFoundError } from "@kebo/utils";
@@ -58,6 +61,9 @@ import { OrdersService } from "../orders/orders.service";
 import type { DomainEvent } from "../../common/events/event-bus";
 import { SettingsService } from "../settings/settings.service";
 import { lcChecksOf, rebuildRoutePlan, termsOf } from "../billing/api";
+import { factoryPlansOf } from "../billing/api";
+import { requireReason } from "../../common/audit/reason";
+import { advancePaidOn, copyOfOffer, factoryAgreed, offerTermsSelect, poTermsSelect, readyFromLead, type OfferTermsRow } from "./factory-terms";
 import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
 import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../billing/api";
 import { seedFactoryPlans } from "../billing/api";
@@ -69,6 +75,11 @@ const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 
 type FlowAction =
   "route" | "bank_contract" | "factory_order" | "purchase_order" | "production" | "shipment" | "document" | "bank_step" | "delivery" | "sat" | "claim";
+
+/** The words an order's history says when what was agreed with a factory changes (and counts them by). */
+export const FACTORY_TERMS_CHANGED = "what was agreed with";
+
+const warrantyLineOf = (t: { warrantyMonths: number | null; warrantyFrom: string | null; warranty: string | null }) => warrantyLine(t);
 
 /** What the step line is worked out from (see @kebo/shared flowSteps), for one order with its flow rows. */
 interface FlowRows {
@@ -680,6 +691,7 @@ export class FlowService {
             supplierRef: true,
             supplier: { select: { id: true, name: true } },
             sentBy: { select: { id: true, name: true } },
+            ...poTermsSelect,
           },
         },
         lines: {
@@ -688,8 +700,8 @@ export class FlowService {
             quantity: true,
             factoryUnitPrice: true,
             factoryCurrency: true,
-            // The offer each line was bought on: the purchase order says which offer it was made from.
-            quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { id: true, reference: true, receivedOn: true, basis: true, basisPlace: true } } } } } },
+            // The offer each line was bought on: the purchase order says which offer it was made from, and what it said.
+            quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: offerTermsSelect } } } } },
           },
         },
         ...readySelect,
@@ -699,6 +711,17 @@ export class FlowService {
     const seeCosts = can(user, "sourcing.manage");
     const ready = new Map(readyByOf(o).map((r) => [r.factoryId, r.readyOn] as const));
     const deposit = await this.depositState(this.prisma.db, id);
+    // When each factory's advance was paid in full (its plan's parts due when we order): the ready date counts from it.
+    const s = await this.settings.get();
+    const plans = await factoryPlansOf(this.prisma.db, id, s.sales.factoryAdvancePercent, this.clock.today(), s.reminders.dueSoonDays, fxOf(s, await this.limits.allows("expenses")));
+    const paymentIds = plans.flatMap((pl) => pl.rows.flatMap((r) => r.payments.map((x) => x.id)));
+    const paidDays = new Map(
+      (paymentIds.length ? await this.prisma.db.allocation.findMany({ where: { id: { in: paymentIds } }, select: { id: true, on: true } }) : []).map((a) => [a.id, a.on] as const),
+    );
+    const changes = await this.prisma.db.auditLog.findMany({
+      where: { entityType: "order", entityId: id, summary: { contains: FACTORY_TERMS_CHANGED } },
+      select: { summary: true },
+    });
     return {
       deposit,
       items: o.purchaseOrders.map((p) => {
@@ -706,12 +729,21 @@ export class FlowService {
         const totalMinor = lines.reduce((t, l) => t + Math.round(decimalToMinor(l.factoryUnitPrice ?? 0) * Number(l.quantity)), 0);
         const sentOn = p.sentOn ? fromDbDate(p.sentOn) : o.factoryOrderedOn ? fromDbDate(o.factoryOrderedOn) : null;
         const offer = lines.map((l) => l.quoteLine?.factoryQuoteLine?.factoryQuote).find((q) => !!q) ?? null;
+        const agreed = factoryAgreed(p, offer);
+        const plan = plans.find((pl) => pl.factory.id === p.supplier.id);
         return {
           id: p.id,
           number: p.number,
           supplier: p.supplier,
           /** The factory's offer its lines were bought on (design "terms that travel": made from their offer). */
           offer: offer && { id: offer.id, reference: offer.reference, receivedOn: fromDbDate(offer.receivedOn), basis: offer.basis, basisPlace: offer.basisPlace },
+          /** Agreed with the factory: its own copy once sent, else its offer's (design "terms that travel", step 3b). */
+          agreed: {
+            ...agreed,
+            /** The ready date worked out from the lead time (the factory's own date, when it gives one, is on Production). */
+            readyBy: readyFromLead(agreed, sentOn, plan ? advancePaidOn(plan.rows, paidDays) : null),
+            changes: changes.filter((c) => c.summary?.startsWith(`${p.number}: `)).length,
+          },
           lines: lines.length,
           currency: lines.find((l) => l.factoryCurrency)?.factoryCurrency ?? null,
           total: seeCosts ? fromMinor(totalMinor) : null,
@@ -723,6 +755,106 @@ export class FlowService {
         };
       }),
     };
+  }
+
+  /** The offer a factory's lines on this order were bought on (null: none of them came from an offer). */
+  private async offerOf(tx: Tx | PrismaService["db"], orderId: string, supplierId: string): Promise<OfferTermsRow | null> {
+    const line = await tx.orderLine.findFirst({
+      where: { orderId, factoryId: supplierId, quoteLine: { factoryQuoteLine: { isNot: null } } },
+      orderBy: { sortOrder: "asc" },
+      select: { quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: offerTermsSelect } } } } } },
+    });
+    return line?.quoteLine?.factoryQuoteLine?.factoryQuote ?? null;
+  }
+
+  /**
+   * Changing what was agreed with a factory (design "terms that travel", step 3b): its delivery basis and place,
+   * the lead time, the payment's note, the warranty, the minimum order and our notes (the payment's parts are its
+   * plan's). A purchase order not sent yet takes its offer's first. Once sent, a change that leaves it other than
+   * the offer said asks why; it is kept in the order's history.
+   */
+  async setFactoryTerms(user: SessionUser, id: string, poId: string, input: FactoryTermsInput) {
+    await this.must(user, "orders.update", null, "change orders");
+    await this.prisma.tx(async (tx) => {
+      const o = await this.lockOrder(tx, user, id);
+      if (o.status !== "open") throw new DomainError("This order is not open.");
+      const po = await tx.purchaseOrder.findFirst({
+        where: { id: poId, orderId: id },
+        select: { id: true, number: true, sentOn: true, supplierId: true, supplier: { select: { name: true } }, ...poTermsSelect },
+      });
+      if (!po) throw new NotFoundError("Purchase order");
+      const offer = await this.offerOf(tx, id, po.supplierId);
+      const was = factoryAgreed(po, offer);
+      const keep = <T>(v: T | undefined, old: T) => (v === undefined ? old : v);
+      const next = {
+        basis: keep(input.basis, was.basis),
+        basisPlace: keep(input.basisPlace, was.basisPlace),
+        leadDays: keep(input.leadDays, was.leadDays),
+        leadFrom: keep(input.leadFrom, was.leadFrom),
+        warrantyMonths: keep(input.warrantyMonths, was.warrantyMonths),
+        warrantyFrom: keep(input.warrantyFrom, was.warrantyFrom),
+        warranty: keep(input.warranty, was.warranty),
+        paymentNote: keep(input.paymentNote, was.paymentNote),
+        moq: keep(input.moq, was.moq),
+        notes: keep(input.notes, was.notes),
+      };
+      const leadFrom = next.leadDays === null ? null : (next.leadFrom ?? "after_payment");
+      const warrantyFrom = next.warrantyMonths === null ? null : (next.warrantyFrom ?? "shipment");
+      const same = (a: unknown, b: unknown) => (a ?? null) === (b ?? null) || (typeof a === "string" && typeof b === "string" && a.trim() === b.trim());
+      const q = was.offered;
+      const lead = (d: number | null, f: string | null) => (d === null ? "none" : leadWords(d, f, "factory"));
+      const now: { what: string; fromOffer: boolean }[] = [];
+      if (!same(next.basis, was.basis) || !same(next.basisPlace, was.basisPlace))
+        now.push({ what: `basis ${[next.basis, next.basisPlace].filter(Boolean).join(" ") || "none"}`, fromOffer: !same(next.basis, q.basis) || !same(next.basisPlace, q.basisPlace) });
+      if (!same(next.leadDays, was.leadDays) || !same(leadFrom, was.leadFrom))
+        now.push({ what: `lead time ${lead(next.leadDays, leadFrom)}`, fromOffer: !same(next.leadDays, q.leadDays) || (next.leadDays !== null && !same(leadFrom, q.leadFrom ?? "after_payment")) });
+      if (!same(next.warrantyMonths, was.warrantyMonths) || !same(warrantyFrom, was.warrantyFrom) || !same(next.warranty, was.warranty))
+        now.push({
+          what: "warranty",
+          fromOffer: !same(next.warrantyMonths, q.warrantyMonths) || (next.warrantyMonths !== null && !same(warrantyFrom, q.warrantyFrom ?? "shipment")) || !same(next.warranty, q.warranty),
+        });
+      if (!same(next.paymentNote, was.paymentNote)) now.push({ what: "payment note", fromOffer: !same(next.paymentNote, q.paymentNote) });
+      if (!same(next.moq, was.moq)) now.push({ what: "minimum order", fromOffer: !same(next.moq, q.moq) });
+      if (!same(next.notes, was.notes)) now.push({ what: "notes", fromOffer: !!next.notes?.trim() });
+      if (!now.length) return;
+      const differs = now.filter((c) => c.fromOffer).map((c) => c.what);
+      const reason = po.sentOn && differs.length ? requireReason(input.reason, "factory_terms", `what was agreed with ${po.supplier.name} changes from their offer`) : input.reason;
+      await tx.purchaseOrder.update({
+        where: { id: poId },
+        data: {
+          termsCopied: true,
+          basis: next.basis,
+          basisPlace: next.basisPlace,
+          leadDays: next.leadDays,
+          leadFrom,
+          warrantyMonths: next.warrantyMonths,
+          warrantyFrom,
+          warrantyWords: next.warranty,
+          paymentNote: next.paymentNote,
+          moq: next.moq,
+          conditionsNotes: next.notes,
+        },
+      });
+      const snap = (t: { basis: string | null; basisPlace: string | null; leadDays: number | null; leadFrom: string | null; warrantyMonths: number | null; warrantyFrom: string | null; warranty: string | null; paymentNote: string | null; moq: string | null; notes: string | null }) => ({
+        basis: [t.basis, t.basisPlace].filter(Boolean).join(" ") || null,
+        leadTime: t.leadDays === null ? null : leadWords(t.leadDays, t.leadFrom, "factory"),
+        warranty: warrantyLineOf(t),
+        paymentNote: t.paymentNote,
+        moq: t.moq,
+        notes: t.notes,
+      });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "flow.factory_order",
+        entityType: "order",
+        entityId: id,
+        summary: `${po.number}: ${FACTORY_TERMS_CHANGED} ${po.supplier.name} changed (${now.map((c) => c.what).join(", ")})`,
+        oldValues: { ...snap(was), step: "factory" },
+        newValues: { ...snap({ ...next, leadFrom, warrantyFrom }), step: "factory" },
+        reason: reason ?? null,
+      });
+    });
+    return this.purchaseOrders(user, id);
   }
 
   /** The deposit asked and how much of it the recorded deposit payments cover (verified when they cover it). */
@@ -759,6 +891,8 @@ export class FlowService {
           sentById: user.id,
           supplierRef: input.supplierRef?.trim() || po.supplierRef,
           sentEarlyReason: deposit.verified ? null : reason,
+          // Sent: what was agreed with the factory is its offer's, kept on the purchase order from now on.
+          ...(po.termsCopied ? {} : copyOfOffer(await this.offerOf(tx, id, po.supplierId))),
         },
       });
       await this.log(
