@@ -10,6 +10,7 @@ import '../../../core/links.dart';
 import '../../../core/providers.dart';
 import '../../../core/send.dart';
 import '../../../design/design.dart';
+import '../../follow_ups/presentation/follow_up_form.dart';
 import '../../money/presentation/money_forms.dart';
 import '../data/orders_data.dart';
 
@@ -366,6 +367,18 @@ class _Body extends ConsumerWidget {
                   ],
                 ),
               ],
+              const SizedBox(height: KSpace.s6),
+              KButton(
+                'Plan a follow-up',
+                icon: KIcons.calendar,
+                variant: KButtonVariant.secondary,
+                fullWidth: true,
+                onPressed: () async {
+                  if (await openFollowUpForm(context, target: ('orderId', o.id), about: o.refNo)) {
+                    if (context.mounted) showKToast(context, 'Follow-up planned', icon: KIcons.check);
+                  }
+                },
+              ),
               if (o.inquiryId != null) ...[
                 const SizedBox(height: KSpace.s6),
                 KButton(

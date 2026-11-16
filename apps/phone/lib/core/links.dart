@@ -6,13 +6,14 @@ import 'api.dart';
 
 /// Pages of the phone app that a web link can land on. Records join as their steps ship
 /// (sales in step 5, orders in step 6, money in step 7).
-const appPages = {'/home', '/alerts', '/needs', '/follow-ups', '/more'};
+const appPages = {'/home', '/alerts', '/needs', '/follow-ups', '/more', '/approvals'};
 
 /// The app page for a web link (`/needs?x=1` → `/needs`), or null when it isn't in the app yet.
 String? appPathFor(String? href) {
   if (href == null || !href.startsWith('/')) return null;
   final path = Uri.parse(href).path;
   if (path == '/dashboard' || path == '/') return '/home';
+  if (path == '/submissions' || path == '/approvals') return '/approvals';
   if (path == '/inquiries') return '/sales';
   final inquiry = RegExp(r'^/inquiries/([0-9a-fA-F-]{36})').firstMatch(path);
   if (inquiry != null) return '/sales/inquiry/${inquiry.group(1)}';

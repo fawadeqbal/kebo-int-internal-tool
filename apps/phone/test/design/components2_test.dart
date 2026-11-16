@@ -210,4 +210,30 @@ void main() {
     );
     expect(t.takeException(), isNull);
   });
+
+  testWidgets('KTextField follows a new controller when the field is reused', (t) async {
+    final a = TextEditingController(), b = TextEditingController();
+    var showFirst = false;
+    late StateSetter set;
+    await t.pumpWidget(
+      host(
+        StatefulBuilder(
+          builder: (c, s) {
+            set = s;
+            return Column(
+              children: [
+                if (showFirst) KTextField(label: 'Where', controller: a),
+                KTextField(label: 'Note', controller: b),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+    set(() => showFirst = true);
+    await t.pump();
+    await t.enterText(find.widgetWithText(KTextField, 'Where'), 'Herat');
+    expect(a.text, 'Herat');
+    expect(b.text, isEmpty);
+  });
 }

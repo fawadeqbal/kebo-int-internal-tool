@@ -3,6 +3,14 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-beta.2 — 2026-11-16
+
+Approvals and follow-ups in the app.
+
+- Approvals (More › Approvals): payments and expenses sent for approval, Waiting / Sent back / Approved. Open one to see every detail and its slip or receipt, then Approve (for a payment, the receipt is made) or Send back with the reason. People who sent one can withdraw it.
+- Plan follow-ups: "Plan" on Home's Today and on an inquiry, and "Plan a follow-up" on an order. Call, visit, meeting or other; the day, a time if it has one, where, and a note. Tap a follow-up on an inquiry to change or delete it.
+- Fixed: when a field appeared in a form (like "Where" for a visit), what you typed could go into the field below it.
+
 ## 3.0.0-beta.1 — 2026-11-16
 
 Step 9: push notifications, and the first beta: every part of the plan is in.

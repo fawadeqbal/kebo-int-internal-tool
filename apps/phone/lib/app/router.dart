@@ -10,6 +10,7 @@ import '../features/gallery/gallery_screen.dart';
 import '../features/gallery/patterns_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/more/presentation/more_screen.dart';
+import '../features/approvals/approvals_screen.dart';
 import '../features/files/file_viewer_screen.dart';
 import '../features/money/presentation/money_screen.dart';
 import '../features/partners/presentation/partner_screens.dart';
@@ -86,6 +87,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/sales/new', builder: (context, state) => const NewInquiryScreen()),
+      GoRoute(path: '/approvals', builder: (context, state) => const ApprovalsScreen()),
       GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
       GoRoute(
         path: '/partners',
