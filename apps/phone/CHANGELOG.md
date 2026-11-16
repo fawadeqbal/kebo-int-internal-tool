@@ -3,6 +3,14 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-beta.3 — 2026-11-16
+
+Paying factories and moving money.
+
+- Pay a factory from Money › To pay factories: choose the order when there are several, then advance, balance or other, the amount (what is still to pay filled in), the day, how, which of our accounts in that currency (with its balance), the reference and the bank slip.
+- Move money between our accounts (Money › Accounts › Move money). Between two currencies it also asks what arrived after the exchange.
+- Both work without signal: they wait on the phone with the slip and are sent in order.
+
 ## 3.0.0-beta.2 — 2026-11-16
 
 Approvals and follow-ups in the app.
