@@ -7,8 +7,8 @@ import { accessibilityProblems, watchErrors } from "./check";
  * each option's lead time beside what its factory gives and says where we promise more; the paper prints the parts.
  */
 
-/** A deal of its own (through the API, as the signed-in person): a customer, one item, one factory's offer with its words only. */
-async function newDeal(page: Page) {
+/** A deal of its own (through the API, as the signed-in person): a customer, one item, one factory's offer (its words only, unless more is given). */
+async function newDeal(page: Page, more: object = {}) {
   const tag = Date.now().toString(36);
   const send = async (url: string, data: object) => {
     const r = await page.request.post(`/api${url}`, { data });
@@ -27,8 +27,9 @@ async function newDeal(page: Page) {
     basis: "FOB",
     basisPlace: "Qingdao",
     lines: [{ requestedItemId: item, description: "Blister packing machine", model: "DPP-260", quantity: 1, unit: "set", unitPrice: 186000 }],
+    ...more,
   });
-  return { id: inquiry.id as string, offer: offer.id as string };
+  return { id: inquiry.id as string, offer: offer.id as string, customer: customer.name as string };
 }
 
 test("the offer and the quotation in four groups; the quotation checked against the factory; the paper prints the parts", async ({ page }) => {
@@ -83,5 +84,82 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await expect(page.getByText("Our usual payment is made by 30% Advance deposit, 60% before shipment and 10% after the site acceptance test (SAT).")).toBeVisible();
   await expect(page.getByText(/Warranty: 12 months from the site acceptance test \(SAT\)/)).toBeVisible();
   await expect(page.getByText("Delivery: 45 days after the deposit")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("the order keeps what was agreed: their order, the agreed terms (a change asks why), the factory beside them; the shipping and paper settings in their tabs", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  const deal = await newDeal(page, {
+    leadDays: 30,
+    leadFrom: "after_payment",
+    paymentParts: [
+      { label: "Advance 30%", percent: 30, rule: "on_order" },
+      { label: "Balance 70%", percent: 70, rule: "on_ready" },
+    ],
+    warrantyMonths: 12,
+    warrantyFrom: "shipment",
+  });
+  // Quoted with three parts, 12 months from the site test and 45 days after the deposit; accepted.
+  const send = async (url: string, data: object) => {
+    const r = await page.request.post(`/api${url}`, { data });
+    expect(r.ok(), `${url}: ${await r.text()}`).toBe(true);
+    return r.json();
+  };
+  const draft = await (await page.request.get(`/api/inquiries/${deal.id}/quotation/draft`)).json();
+  const revision = await send(`/inquiries/${deal.id}/quotation/revisions`, {
+    ...draft,
+    incoterm: "FOB",
+    incotermPlace: "Qingdao",
+    paymentParts: [
+      { label: "Deposit 30%", percent: 30, rule: "on_order" },
+      { label: "Before shipment 60%", percent: 60, rule: "before_shipment" },
+      { label: "After the site test 10%", percent: 10, rule: "after_sat" },
+    ],
+    warrantyMonths: 12,
+    warrantyFrom: "sat",
+    warranty: "parts and service",
+    options: [{ ...draft.options[0], prices: [{ lineId: draft.options[0].prices[0].lineId, unitPrice: 30125 }], leadDays: 45, leadFrom: "after_payment" }],
+  });
+  await send(`/revisions/${revision.id}/status`, { to: "sent" });
+  await send(`/revisions/${revision.id}/status`, { to: "accepted", route: "informal", customerRef: "AS/PO/2611" });
+  const orderId = (await (await page.request.get(`/api/inquiries/${deal.id}`)).json()).orders[0].id as string;
+
+  // The Overview: their order; what was agreed, copied from the quotation; the factory beside it.
+  await page.goto(`/orders/${orderId}`);
+  const theirs = page.getByRole("region", { name: "Their order" });
+  await expect(theirs.locator("dd", { hasText: "AS/PO/2611" })).toBeVisible();
+  const agreed = page.getByRole("region", { name: "Agreed with the customer" });
+  await expect(agreed.getByText("FOB Qingdao")).toBeVisible();
+  await expect(agreed.getByText("45 days after the deposit")).toBeVisible();
+  await expect(agreed.getByText("Worked out once the deposit is in")).toBeVisible();
+  await expect(agreed.getByText("12 months", { exact: true })).toBeVisible();
+  const sides = page.getByRole("region", { name: "The customer and the factory, side by side" });
+  await expect(sides.getByText("15 days to spare")).toBeVisible();
+  await expect(sides.getByText("2 months not covered")).toBeVisible();
+  await expect(sides.getByText(/ask Jinan Terms .* for 14 months/)).toBeVisible();
+  expect(await accessibilityProblems(page), "the order's Overview meets WCAG 2.2 AA").toEqual([]);
+
+  // Change: a new port differs from the quotation, so it asks why; the reason goes with it.
+  await agreed.getByRole("button", { name: "Change", exact: true }).click();
+  const form = page.getByRole("dialog", { name: `What we agreed with ${deal.customer}` });
+  for (const group of ["Delivery", "Payment", "Warranty", "Conditions"]) await expect(form.locator("legend", { hasText: group }).first()).toBeVisible();
+  await expect(form.getByRole("link", { name: "Open the payment plan" })).toBeVisible();
+  expect(await accessibilityProblems(page), "the Change window meets WCAG 2.2 AA").toEqual([]);
+  await form.locator("#agr-pod").fill("Karachi");
+  await form.getByRole("button", { name: "Save", exact: true }).click();
+  await form.getByRole("button", { name: "Agreed a new port" }).click();
+  await form.getByRole("button", { name: "Save with this reason" }).click();
+  await expect(form).toBeHidden();
+  await expect(agreed.getByText("Karachi")).toBeVisible();
+  await expect(agreed.getByRole("link", { name: "Changed 1×" })).toBeVisible();
+
+  // Who the goods go to is on Shipping now; how the papers print, on Documents.
+  await page.goto(`/orders/${orderId}/shipping`);
+  const instructions = page.getByRole("region", { name: "Shipping instructions" });
+  await expect(instructions.locator("dd", { hasText: deal.customer })).toBeVisible();
+  await expect(instructions.getByText("Karachi")).toBeVisible();
+  await page.goto(`/orders/${orderId}/documents`);
+  await expect(page.getByRole("region", { name: "How the papers print" }).getByText("Agreed payment conditions")).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Globe } from "lucide-react";
 import { can, dayMonth, FREIGHT_TERMS, FREIGHT_TERMS_LABEL, portsOf, SHIP_MODE_LABEL, SHIP_MODES, shipByVsLc, trackingLink, type FreightTerms, type OrderSection } from "@kebo/shared";
 import { Badge, buttonClass, ButtonLink, cn } from "@kebo/ui";
@@ -50,18 +51,60 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
   const many = shipments.length > 1;
   const packGoods = goodsOf(o);
   const advice = papers?.papers.find((p) => p.kind === "shipping-advice") ?? null;
+  const port = o.agreed?.portOfDischarge ?? o.portOfDischarge;
+
+  // Shipping instructions (design "terms that travel"): who the goods go to and who is told; they print on the
+  // B/L instructions and the shipping papers, and each new shipment starts from them. The port is as agreed.
+  const instructions = (
+    <Section
+      title="Shipping instructions"
+      cols={4}
+      rows={[
+        { label: "Consignee", value: <span className="whitespace-pre-line">{o.consignee || o.customer.name}</span> },
+        { label: "Notify party", value: <span className="whitespace-pre-line">{o.notifyParty || "Same as the consignee"}</span> },
+        { label: "Deliver to", value: o.deliveryAddress ? <span className="whitespace-pre-line">{o.deliveryAddress}</span> : null },
+        {
+          label: "Port of discharge",
+          value: (
+            <>
+              {port ?? <span className="font-normal text-muted">—</span>} ·{" "}
+              <Link href={`/orders/${o.id}#agreed`} className="font-normal text-primary hover:underline">
+                as agreed
+              </Link>
+            </>
+          ),
+        },
+      ]}
+      actions={
+        canEdit && (
+          <FieldsWindow
+            button={{ label: "Edit" }}
+            title="Shipping instructions"
+            sub={`${o.refNo} · ${o.customer.name}`}
+            action={fieldsAction.bind(null, o.id, "order")}
+            fields={[
+              { name: "consignee", label: "Consignee", type: "textarea", value: o.consignee ?? null, placeholder: o.customer.name, wide: true },
+              { name: "notifyParty", label: "Notify party", type: "textarea", value: o.notifyParty ?? null, placeholder: "Same as the consignee", wide: true },
+              { name: "deliveryAddress", label: "Deliver to", type: "textarea", value: o.deliveryAddress ?? null, placeholder: "Where the goods go after the port", wide: true },
+            ]}
+          />
+        )
+      }
+    />
+  );
 
   // A company without the shipping module keeps the few values the order itself holds.
   if (!shipping)
     return (
       <OrderPage id={id}>
+        {instructions}
         <Section
           title="Shipping"
           state={o.shippedOn ? `Shipped ${dayMonth(o.shippedOn)}` : "Not shipped yet"}
           tone={o.shippedOn ? "ok" : "neutral"}
           cols={4}
           rows={[
-            { label: "To", value: o.portOfDischarge },
+            { label: "To", value: port },
             { label: "Shipped on", value: o.shippedOn ? date(o.shippedOn) : null },
             { label: "B/L no.", value: o.blNo },
             { label: "Container no.", value: o.goods.containerNo },
@@ -74,7 +117,6 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                 sub={o.refNo}
                 action={fieldsAction.bind(null, o.id, "order")}
                 fields={[
-                  { name: "portOfDischarge", label: "To", value: o.portOfDischarge },
                   { name: "shippedOn", label: "Shipped on", value: o.shippedOn, type: "date", max: now },
                   { name: "blNo", label: "B/L no.", value: o.blNo },
                   { name: "containerNo", label: "Container no.", value: o.goods.containerNo },
@@ -89,6 +131,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
 
   return (
     <OrderPage id={id}>
+      {instructions}
       {shipments.map((s, i) => {
         const air = s.mode === "air";
         // Several shipments: each has its heading; the sections keep their short names.

@@ -1,8 +1,12 @@
 import type { INestApplication } from "@nestjs/common";
 import { addDays } from "@kebo/utils";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { FIRST_COMPANY_ID } from "@kebo/database";
 import { api, signIn, startApp } from "./app";
 import { Clock } from "../src/common/time/clock.service";
+import { PrismaService } from "../src/database/prisma.service";
+import { CompaniesService } from "../src/common/company/companies.service";
+import { CompanyContext } from "../src/common/company/company-context";
 
 /**
  * Design "RFQ Desk — terms that travel" (16 Nov 2026), step 2: accepting a quotation copies what was agreed with
@@ -121,6 +125,89 @@ describe("agreed with the customer: the quotation's terms in the order", () => {
     expect(text).toContain("Delivery: 45 days after the deposit.");
     expect(text).toContain("Warranty: 12 months from the site acceptance test (SAT), parts and service.");
     expect(text).toContain("Export wooden cases.");
+  });
+
+  it("the order shows what was agreed and what the factory gives; a change from the quotation asks why", async () => {
+    const o = await order(threeId);
+    expect(o.agreed).toMatchObject({ copied: true, leadDays: 45, leadFrom: "after_payment", leadTime: "45 days after the deposit", warrantyMonths: 12, warrantyFrom: "sat", deliveryConditions: "Export wooden cases." });
+    expect(o.agreed.warrantyLine).toBe("12 months from the site acceptance test (SAT), parts and service.");
+    expect(o.factoryTerms).toHaveLength(1);
+    expect(o.factoryTerms[0]).toMatchObject({ terms: { leadDays: 30, leadFrom: "after_payment" }, costMinor: 2_000_000 });
+    // A new port of discharge differs from the quotation: why?
+    const asked = await api(app, sana).patch(`/orders/${threeId}/agreed`, { portOfDischarge: "Port Qasim" }).expect(409);
+    expect(JSON.stringify(asked.body)).toMatch(/reason/i);
+    const saved = (await api(app, sana).patch(`/orders/${threeId}/agreed`, { portOfDischarge: "Port Qasim", reason: "Agreed a new port" }).expect(200)).body;
+    expect(saved.agreed).toMatchObject({ portOfDischarge: "Port Qasim", quoted: { portOfDischarge: null } });
+    // The lead time from the order: ship by follows it, unless typed (it was typed above).
+    await api(app, sana).patch(`/orders/${threeId}/agreed`, { shipBy: null, leadDays: 50, leadFrom: "after_order", reason: "Factory changed its lead time" }).expect(200);
+    const after = await order(threeId);
+    expect(after.shipBy).toBe(addDays(after.orderedOn, 50));
+    expect(after.agreed.shipByTyped).toBe(false);
+    expect(after.agreed.shipByFrom).toEqual({ by: "order", on: after.orderedOn });
+    // While the route is the one accepted, the agreed payment conditions print (no choice to make).
+    expect(after.papers).toEqual({ conditionsPrinted: true, conditionsChoice: false });
+  });
+
+  it("saving what is there changes nothing; back to the quotation needs no why; a typed ship by does; the history says what changed", async () => {
+    const before = await order(threeId);
+    const a = before.agreed;
+    // The form sends every field as it stands: nothing is changed, nothing asked, ship by stays worked out.
+    await api(app, sana)
+      .patch(`/orders/${threeId}/agreed`, {
+        incotermPlace: before.incotermPlace,
+        portOfDischarge: a.portOfDischarge,
+        leadDays: a.leadDays,
+        leadFrom: a.leadFrom,
+        shipBy: before.shipBy,
+        warrantyMonths: a.warrantyMonths,
+        warrantyFrom: a.warrantyFrom,
+        warranty: a.warranty,
+        deliveryConditions: a.deliveryConditions,
+        paymentConditions: a.paymentConditions,
+        notes: a.notes,
+      })
+      .expect(200);
+    const same = await order(threeId);
+    expect(same.agreed.changes).toBe(a.changes);
+    expect(same.agreed.shipByTyped).toBe(false);
+    // Back to what the quotation said (no port): no why.
+    await api(app, sana).patch(`/orders/${threeId}/agreed`, { portOfDischarge: null }).expect(200);
+    const back = await order(threeId);
+    expect(back.agreed.portOfDischarge).toBeNull();
+    expect(back.agreed.changes).toBe(a.changes + 1);
+    // A ship-by date typed by hand asks why; then it stays as typed.
+    await api(app, sana).patch(`/orders/${threeId}/agreed`, { shipBy: addDays(back.orderedOn, 70) }).expect(409);
+    await api(app, sana).patch(`/orders/${threeId}/agreed`, { shipBy: addDays(back.orderedOn, 70), reason: "Customer asked for it" }).expect(200);
+    const typed = await order(threeId);
+    expect(typed.shipBy).toBe(addDays(back.orderedOn, 70));
+    expect(typed.agreed).toMatchObject({ shipByTyped: true, shipByFrom: { by: "typed" }, changes: a.changes + 2 });
+    // The history: each change with only what changed, by the same names before and after.
+    const history = (await api(app, sana).get(`/history?type=order&id=${threeId}`).expect(200)).body as { summary: string; changes: { field: string; from: string | null; to: string | null }[] }[];
+    const port = history.find((e) => e.summary.includes("what was agreed with the customer changed (port of discharge none)"));
+    expect(port?.changes).toEqual([{ field: "portOfDischarge", from: "Port Qasim", to: null }]);
+    const lead = history.find((e) => e.summary.includes("lead time 50 days after the order"));
+    expect(lead?.changes.map((c) => c.field).sort()).toEqual(["leadTime", "shipBy"]);
+    expect(lead?.changes.find((c) => c.field === "leadTime")).toMatchObject({ from: "45 days after the deposit", to: "50 days after the order" });
+  });
+
+  it("an older order shows its quotation's terms; changing them keeps the ship-by date typed on it", async () => {
+    const id = await accepted(THREE, { leadDays: 45, leadFrom: "after_payment" });
+    const typedOn = addDays(today, 90);
+    // As an order made before it kept its own copy: the date typed on it, nothing copied.
+    const asCompany = async <T>(fn: () => Promise<T>) => CompanyContext.run((await app.get(CompaniesService).byId(FIRST_COMPANY_ID))!, fn);
+    await asCompany(() =>
+      app.get(PrismaService).db.order.update({ where: { id }, data: { termsCopied: false, shipBy: new Date(`${typedOn}T00:00:00Z`), leadDays: null, leadFrom: null, warrantyMonths: null, warrantyFrom: null, deliveryConditions: null } }),
+    );
+    const old = await order(id);
+    expect(old.agreed).toMatchObject({ copied: false, leadDays: 45, warrantyMonths: 12, deliveryConditions: "Export wooden cases.", shipByFrom: null });
+    const deposit = (await money(id)).plan.items[0];
+    await api(app, manager).post(`/orders/${id}/payments`, { kind: "deposit", amount: deposit.amount, currency: "USD", paidOn: today }).expect(201);
+    expect((await order(id)).shipBy).toBe(typedOn);
+    // Changed on the order: it takes the quotation's as its own, and the date typed on it stays.
+    await api(app, sana).patch(`/orders/${id}/agreed`, { notes: "Loading at Qingdao.", reason: "Customer asked for it" }).expect(200);
+    const now = await order(id);
+    expect(now.shipBy).toBe(typedOn);
+    expect(now.agreed).toMatchObject({ copied: true, leadDays: 45, notes: "Loading at Qingdao.", shipByTyped: true });
   });
 
   it("a deposit and one balance build the plan from the route, as before", async () => {

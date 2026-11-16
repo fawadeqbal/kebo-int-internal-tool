@@ -10,7 +10,7 @@ import { revisionOption, revisionWorth } from "@kebo/shared";
  */
 export const optionFigures = {
   options: {
-    select: { letter: true, sortOrder: true, status: true, subtotal: true, discount: true, total: true, leadTime: true },
+    select: { letter: true, sortOrder: true, status: true, subtotal: true, discount: true, total: true, leadTime: true, leadDays: true, leadFrom: true },
     orderBy: [{ sortOrder: "asc" }, { letter: "asc" }],
   },
 } as const satisfies Prisma.QuotationRevisionSelect;

@@ -446,6 +446,28 @@ export const revisionEmailInput = z.object({
 
 /* ---------------------------------------------------------------- orders */
 
+/**
+ * What was agreed with the customer, changed on the order after the quotation was accepted (design "terms that
+ * travel"): Delivery (the place, the port of discharge, the lead time, ship by), Warranty and Conditions. The
+ * payment is changed in its plan. Left out: kept as it is. Changed from what the quotation said: Why? is asked.
+ */
+export const agreedTermsInput = z.object({
+  incotermPlace: keptText(80),
+  portOfDischarge: keptText(120),
+  leadDays: keptInt(0, 3650, "Enter the days"),
+  leadFrom: keptEnum(LEAD_FROMS, "Choose what the days count from"),
+  /** A date typed: kept as typed (the lead time no longer moves it); empty: worked out from the lead time again. */
+  shipBy: z.preprocess((v) => (v === "" ? null : v), optionalDate.optional()),
+  warrantyMonths: keptInt(0, 240, "Enter the months"),
+  warrantyFrom: keptEnum(WARRANTY_FROMS, "Choose what the months count from"),
+  warranty: keptText(300),
+  deliveryConditions: keptText(5000),
+  paymentConditions: keptText(5000),
+  notes: keptText(5000),
+  reason: reasonField,
+});
+export type AgreedTermsInput = z.infer<typeof agreedTermsInput>;
+
 /** Move an order one stage forward or back. When the move has warnings, send it again with confirm: true. */
 export const moveStageInput = z.object({
   to: z.enum(ORDER_STAGES),

@@ -82,6 +82,40 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
   return r;
 }
 
+/**
+ * How the papers print (Documents): the heading over the items, and — when the route differs from the one
+ * accepted — whether the agreed payment conditions print too. Only what the form has is sent.
+ */
+export async function papersPrintAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(
+    form,
+    async () => {
+      if ("documentTitle" in v) await api.patch(`/orders/${orderId}/details`, { documentTitle: v.documentTitle?.trim() || null, reason: reasonOf(form) });
+      if ("printConditions" in v && v.printConditions) await api.post(`/orders/${orderId}/quoted-terms`, { print: v.printConditions === "yes" });
+      return null;
+    },
+    "Saved.",
+  );
+  if (r.ok) refresh(orderId);
+  return { ...r, data: undefined };
+}
+
+const AGREED_FIELDS = ["incotermPlace", "portOfDischarge", "leadDays", "leadFrom", "shipBy", "warrantyMonths", "warrantyFrom", "warranty", "deliveryConditions", "paymentConditions", "notes"] as const;
+
+/**
+ * What was agreed with the customer (design "terms that travel"): Delivery, Warranty and Conditions; a change
+ * from the quotation asks why (the form asks, then sends again).
+ */
+export async function agreedAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const body: Record<string, string | null> = {};
+  for (const k of AGREED_FIELDS) if (k in v) body[k] = v[k]?.trim() || null;
+  const r = await attempt(form, () => api.patch(`/orders/${orderId}/agreed`, { ...body, reason: reasonOf(form) }), "What was agreed is saved.");
+  if (r.ok) refresh(orderId);
+  return r;
+}
+
 /** The packing list: payload { shippingMarks, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] } (the container is the shipment's). */
 export async function packingAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.put(`/orders/${orderId}/packing`, formBody(form)), "Packing list saved.");

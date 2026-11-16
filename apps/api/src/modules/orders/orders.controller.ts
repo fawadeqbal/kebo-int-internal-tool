@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, P
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
+  agreedTermsInput,
+  type AgreedTermsInput,
   buyerRefreshInput,
   quotedTermsInput,
   type BuyerRefreshInput,
@@ -103,6 +105,16 @@ export class OrdersController {
   @Patch(":id/details")
   details(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(orderDetailsInput)) body: OrderDetailsInput) {
     return this.orders.setDetails(user, id, body);
+  }
+
+  /**
+   * What was agreed with the customer (design "terms that travel"): the place, the port of discharge, the lead
+   * time and ship by, the warranty and the conditions; a change from the quotation asks why.
+   */
+  @SignedIn("checked inside: orders.update")
+  @Patch(":id/agreed")
+  agreed(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(agreedTermsInput)) body: AgreedTermsInput) {
+    return this.orders.setAgreed(user, id, body);
   }
 
   /** { on?, lines: [{ lineId, receivedQty }] } — how many of each goods line came in from the factory so far. */

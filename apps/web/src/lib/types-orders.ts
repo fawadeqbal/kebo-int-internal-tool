@@ -1,6 +1,21 @@
 import type { AttachedFileInfo } from "./types-money";
 import type { OfferFile } from "./types-deals";
-import type { BalanceTerms, Incoterm, LineCondition, LineType, OrderStage, OrderStatus, OrderWord, PaymentKind, PaymentMethod, RevisionStatus, ShipMode, TermPart } from "@kebo/shared";
+import type {
+  BalanceTerms,
+  Incoterm,
+  LeadFrom,
+  LineCondition,
+  LineType,
+  OrderStage,
+  OrderStatus,
+  OrderWord,
+  PaymentKind,
+  PaymentMethod,
+  RevisionStatus,
+  ShipMode,
+  TermPart,
+  WarrantyFrom,
+} from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for orders (four stages), their payments and the printed documents. Keep in step with apps/api/src/modules/orders. */
@@ -85,6 +100,15 @@ export interface OrderView {
   documentTitle: string | null;
   /** The contract destination (the default port of discharge of a new shipment). */
   portOfDischarge: string | null;
+  /** Agreed with the customer (design "terms that travel"): the order's copy, else (an older order) its quotation's. */
+  agreed?: AgreedView;
+  /** How the order's papers print (Documents › How the papers print). */
+  papers?: {
+    /** The agreed payment conditions are printed (always, while the route is the one accepted). */
+    conditionsPrinted: boolean;
+    /** The route differs from the one accepted: printing them is a choice. */
+    conditionsChoice: boolean;
+  };
   currency: string;
   total: string;
   depositPercent: number;
@@ -133,6 +157,42 @@ export interface OrderView {
   proforma: { number: string; issuedOn: string | null } | null;
   /** The chosen factory's own quotation, catalogue and screenshots (people who see factory prices). */
   factoryFiles: (OfferFile & { factory: string })[];
+  /** What each factory gives, beside what was agreed with the customer (people who see factory prices). */
+  factoryTerms?: {
+    factory: { id: string; name: string };
+    offer: { id: string; reference: string | null; receivedOn: string };
+    basis: Incoterm | null;
+    basisPlace: string | null;
+    terms: { leadDays: number | null; leadFrom: LeadFrom | null; parts: TermPart[]; warrantyMonths: number | null; warrantyFrom: WarrantyFrom | null };
+    costMinor: number;
+    readyOn: string | null;
+  }[];
+}
+
+/** What was agreed with the customer: Delivery, Warranty and Conditions as the order has them, and as quoted. */
+export interface AgreedTerms {
+  portOfDischarge: string | null;
+  leadDays: number | null;
+  leadFrom: LeadFrom | null;
+  leadTime: string | null;
+  warrantyMonths: number | null;
+  warrantyFrom: WarrantyFrom | null;
+  warranty: string | null;
+  deliveryConditions: string | null;
+  paymentConditions: string | null;
+  notes: string | null;
+  warrantyLine: string | null;
+}
+export interface AgreedView extends AgreedTerms {
+  /** The order has its own copy (false: an older order, shown from its quotation). */
+  copied: boolean;
+  /** Ship by was typed by hand. */
+  shipByTyped: boolean;
+  /** How ship by came about (null: nothing to say — an older order, or no lead time). */
+  shipByFrom: { by: "typed" } | { by: "deposit"; on: string | null } | { by: "order"; on: string } | { by: "drawings" } | null;
+  /** Changed on the order this many times after the quotation was accepted. */
+  changes: number;
+  quoted: AgreedTerms;
 }
 
 /** The packing list figures of one goods line (null until filled in). */

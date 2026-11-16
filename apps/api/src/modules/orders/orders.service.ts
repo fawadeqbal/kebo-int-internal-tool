@@ -14,6 +14,10 @@ import {
   routePlan,
   isLeadFrom,
   isWarrantyFrom,
+  leadWords,
+  offerTermsOf,
+  warrantyLine,
+  type AgreedTermsInput,
   partsPlan,
   plainQuoteParts,
   quotePartsOf,
@@ -40,6 +44,7 @@ import {
   type PaymentRoute,
   orderWord,
   orderWordColumn,
+  routeAsAccepted,
 } from "@kebo/shared";
 import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -58,7 +63,7 @@ import { factoryPlansFor } from "../billing/api";
 import { createPlan, termsOf } from "../billing/api";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { setPaymentTerms } from "./payment-terms";
-import { freezeOrderDoc, packingFinalNow } from "./order-docs";
+import { freezeOrderDoc, packingFinalNow, quotedTermsPrinted } from "./order-docs";
 import { LedgerPosting } from "../ledger/posting.service";
 import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
 import { readyWords, setReadyAll, setReadyDates } from "./ready";
@@ -123,8 +128,15 @@ const orderInclude = {
       number: true,
       answeredOn: true,
       deliveryTerms: true,
+      // What it said, beside what the order keeps as agreed (design "terms that travel").
+      paymentTerms: true,
+      notes: true,
+      portOfDischarge: true,
+      warranty: true,
+      warrantyMonths: true,
+      warrantyFrom: true,
       quotation: { select: { refNo: true } },
-      options: { where: { status: "accepted" }, select: { letter: true } },
+      options: { where: { status: "accepted" }, select: { letter: true, status: true, leadTime: true, leadDays: true, leadFrom: true } },
     },
   },
   // The shipments hold the B/L, the day the goods left and the container (Shipment 1 first).
@@ -253,6 +265,132 @@ function goodsSummary(o: Pick<OrderRow, "lines" | "packedAt" | "shipments" | "sh
  * a time. Nothing blocks a move: a warning (no deposit yet, money still due)
  * asks the person to confirm, and every move is kept in the order's history.
  */
+/** What was agreed with the customer as an order keeps it (and its quotation's, to tell a change from it). */
+type AgreedOrder = {
+  termsCopied: boolean;
+  orderedOn: Date;
+  portOfDischarge: string | null;
+  leadDays: number | null;
+  leadFrom: string | null;
+  shipByTyped: boolean;
+  warrantyMonths: number | null;
+  warrantyFrom: string | null;
+  warrantyWords: string | null;
+  deliveryConditions: string | null;
+  paymentConditions: string | null;
+  conditionsNotes: string | null;
+  revision: {
+    portOfDischarge: string | null;
+    warrantyMonths: number | null;
+    warrantyFrom: string | null;
+    warranty: string | null;
+    deliveryTerms: string | null;
+    paymentTerms: string | null;
+    notes: string | null;
+    options: { status: string; leadTime: string | null; leadDays?: number | null; leadFrom?: string | null }[];
+  };
+};
+
+/** The words an order's history says when what was agreed with the customer changes (and counts them by). */
+export const AGREED_CHANGED = "what was agreed with the customer changed";
+
+/** What was agreed, as the history keeps it: one key per field, choices in words. */
+function agreedSnapshot(a: {
+  incotermPlace: string | null;
+  portOfDischarge: string | null;
+  leadDays: number | null;
+  leadFrom: string | null;
+  warrantyMonths: number | null;
+  warrantyFrom: string | null;
+  warranty: string | null;
+  deliveryConditions: string | null;
+  paymentConditions: string | null;
+  notes: string | null;
+  shipBy: string | null;
+}) {
+  return {
+    incotermPlace: a.incotermPlace,
+    portOfDischarge: a.portOfDischarge,
+    leadTime: a.leadDays === null ? null : leadWords(a.leadDays, a.leadFrom, "customer"),
+    warranty: warrantyLine({ warrantyMonths: a.warrantyMonths, warrantyFrom: isWarrantyFrom(a.warrantyFrom) ? a.warrantyFrom : null, warranty: a.warranty }),
+    deliveryConditions: a.deliveryConditions,
+    paymentConditions: a.paymentConditions,
+    notes: a.notes,
+    shipBy: a.shipBy,
+  };
+}
+
+/**
+ * How ship by came about (design "terms that travel"): typed by hand; worked out from the day the deposit was in
+ * (or waiting for it), or from the order; waiting for the drawings. Null: nothing to say (an older order, no lead time).
+ */
+export function shipByFromOf(o: {
+  termsCopied: boolean;
+  shipByTyped: boolean;
+  shipBy: Date | null;
+  leadDays: number | null;
+  leadFrom: string | null;
+  orderedOn: Date;
+  receivables: { amount: Prisma.Decimal; part: string | null }[];
+  allocations: { amount: Prisma.Decimal; bankCharges: Prisma.Decimal; on: Date }[];
+}): { by: "typed" } | { by: "deposit"; on: ISODate | null } | { by: "order"; on: ISODate } | { by: "drawings" } | null {
+  if (o.shipByTyped && o.shipBy) return { by: "typed" };
+  if (!o.termsCopied || o.leadDays === null) return null;
+  if (o.leadFrom === "after_order") return { by: "order", on: fromDbDate(o.orderedOn) };
+  if (o.leadFrom === "after_drawings") return { by: "drawings" };
+  return { by: "deposit", on: depositInOn(o) };
+}
+
+/** The day the plan's deposit was in, paid in full (null: not yet, or no deposit). */
+function depositInOn(o: { receivables: { amount: Prisma.Decimal; part: string | null }[]; allocations: { amount: Prisma.Decimal; bankCharges: Prisma.Decimal; on: Date }[] }): ISODate | null {
+  const depositMinor = o.receivables.filter((r) => r.part === "deposit").reduce((t, r) => t + decimalToMinor(r.amount), 0);
+  return depositMinor > 0 ? reachedOn(o.allocations, depositMinor) : null;
+}
+
+/**
+ * Agreed with the customer (design "terms that travel"): the order's own copy (taken when the quotation was
+ * accepted, changed on the order after), else (an older order) its quotation's; and the quotation's beside it.
+ */
+export function agreedView(o: AgreedOrder) {
+  const option = o.revision.options.find((x) => x.status === "accepted") ?? o.revision.options[0];
+  const quoted = {
+    portOfDischarge: o.revision.portOfDischarge,
+    leadDays: option?.leadDays ?? null,
+    leadFrom: isLeadFrom(option?.leadFrom) ? option!.leadFrom! : null,
+    leadTime: option?.leadTime ?? null,
+    warrantyMonths: o.revision.warrantyMonths,
+    warrantyFrom: isWarrantyFrom(o.revision.warrantyFrom) ? o.revision.warrantyFrom : null,
+    warranty: o.revision.warranty,
+    deliveryConditions: o.revision.deliveryTerms,
+    paymentConditions: o.revision.paymentTerms,
+    notes: o.revision.notes,
+  };
+  const own = o.termsCopied
+    ? {
+        portOfDischarge: o.portOfDischarge,
+        leadDays: o.leadDays,
+        leadFrom: isLeadFrom(o.leadFrom) ? o.leadFrom : null,
+        leadTime: o.leadDays === null ? quoted.leadTime : leadWords(o.leadDays, o.leadFrom, "customer"),
+        warrantyMonths: o.warrantyMonths,
+        warrantyFrom: isWarrantyFrom(o.warrantyFrom) ? o.warrantyFrom : null,
+        warranty: o.warrantyWords,
+        deliveryConditions: o.deliveryConditions,
+        paymentConditions: o.paymentConditions,
+        notes: o.conditionsNotes,
+      }
+    : { ...quoted, portOfDischarge: o.portOfDischarge ?? quoted.portOfDischarge };
+  return {
+    /** The order has its own copy (false: an order made before it was kept; shown from its quotation). */
+    copied: o.termsCopied,
+    ...own,
+    /** The warranty as the papers print it. */
+    warrantyLine: warrantyLine({ warrantyMonths: own.warrantyMonths, warrantyFrom: own.warrantyFrom, warranty: own.warranty }),
+    /** Ship by was typed by hand (the lead time no longer moves it). */
+    shipByTyped: o.shipByTyped,
+    quoted: { ...quoted, warrantyLine: warrantyLine(quoted) },
+  };
+}
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -619,6 +757,20 @@ export class OrdersService {
         : null,
       documentTitle: o.documentTitle,
       portOfDischarge: o.portOfDischarge,
+      /** Agreed with the customer (design "terms that travel"): Delivery, Warranty and Conditions as the order has them. */
+      agreed: {
+        ...agreedView(o),
+        shipByFrom: shipByFromOf(o),
+        /** How many times it was changed on the order after the quotation was accepted. */
+        changes: await this.prisma.db.auditLog.count({ where: { entityType: "order", entityId: o.id, summary: { contains: AGREED_CHANGED } } }),
+      },
+      /** How the order's papers print (Documents › How the papers print). */
+      papers: {
+        /** The agreed payment conditions are printed (always, while the route is the one accepted). */
+        conditionsPrinted: quotedTermsPrinted(o),
+        /** The route differs from the one accepted: printing them is a choice. */
+        conditionsChoice: !routeAsAccepted(termsOf(o), o.balanceTerms) && !!agreedView(o).paymentConditions?.trim(),
+      },
       customerPoOn: fromDbDateOrNull(o.customerPoOn),
       consignee: o.consignee,
       notifyParty: o.notifyParty,
@@ -683,7 +835,161 @@ export class OrdersService {
 
   async get(user: SessionUser, id: string) {
     const o = await this.load(user, id);
-    return { ...(await this.view(o, user)), factoryFiles: await this.factoryFilesOf(user, o.id) };
+    return { ...(await this.view(o, user)), factoryFiles: await this.factoryFilesOf(user, o.id), factoryTerms: await this.factoryTermsOf(user, o) };
+  }
+
+  /**
+   * What each factory of the order gives (its offer's terms), beside what we agreed with the customer (design
+   * "terms that travel": the customer and the factory, side by side): its delivery basis, lead time, payment
+   * parts and warranty, what its goods cost us in the order's currency, and its ready date. People who see
+   * factory prices only.
+   */
+  private async factoryTermsOf(user: SessionUser, o: OrderRow) {
+    if (!can(user, "sourcing.manage")) return [];
+    const quotes = await this.prisma.db.factoryQuote.findMany({
+      where: { lines: { some: { quoteLines: { some: { orderLines: { some: { orderId: o.id } } } } } } },
+      select: {
+        id: true,
+        reference: true,
+        receivedOn: true,
+        factoryId: true,
+        factory: { select: { id: true, name: true } },
+        basis: true,
+        basisPlace: true,
+        leadTime: true,
+        leadDays: true,
+        leadFrom: true,
+        paymentParts: true,
+        advancePercent: true,
+        warranty: true,
+        warrantyMonths: true,
+        warrantyFrom: true,
+      },
+    });
+    const { sales } = await this.settings.get();
+    const ready = readyByOf(o);
+    return quotes.map((q) => ({
+      factory: q.factory,
+      offer: { id: q.id, reference: q.reference, receivedOn: fromDbDate(q.receivedOn) },
+      basis: q.basis,
+      basisPlace: q.basisPlace,
+      terms: offerTermsOf(q, sales.factoryAdvancePercent),
+      /** Its goods' cost on the order, in the order's currency (what we pay it, at the rate quoted). */
+      costMinor: o.lines
+        .filter((l) => l.type === "goods" && l.factoryId === q.factoryId && l.unitCost !== null)
+        .reduce((t, l) => t + Math.round(decimalToMinor(l.unitCost!) * Number(l.quantity)), 0),
+      readyOn: ready.find((r) => r.factoryId === q.factoryId)?.readyOn ?? null,
+    }));
+  }
+
+  /**
+   * Changing what was agreed with the customer (design "terms that travel"): the place, the port of discharge,
+   * the lead time and ship by, the warranty and the conditions (the payment is its plan's). An older order takes
+   * its quotation's as its own copy first. Anything that then differs from what the quotation said asks why; the
+   * quotation stays as it was sent. Ship by follows the lead time unless a date is typed.
+   */
+  async setAgreed(user: SessionUser, id: string, input: AgreedTermsInput) {
+    if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
+      const o = await this.load(user, id, tx);
+      if (o.status !== "open") throw new DomainError("This order is not open.");
+      const was = agreedView(o);
+      const keep = <T>(v: T | undefined, old: T) => (v === undefined ? old : v);
+      const next = {
+        incotermPlace: keep(input.incotermPlace, o.incotermPlace),
+        portOfDischarge: keep(input.portOfDischarge, was.portOfDischarge),
+        leadDays: keep(input.leadDays, was.leadDays),
+        leadFrom: keep(input.leadFrom, was.leadFrom),
+        warrantyMonths: keep(input.warrantyMonths, was.warrantyMonths),
+        warrantyFrom: keep(input.warrantyFrom, was.warrantyFrom),
+        warrantyWords: keep(input.warranty, was.warranty),
+        deliveryConditions: keep(input.deliveryConditions, was.deliveryConditions),
+        paymentConditions: keep(input.paymentConditions, was.paymentConditions),
+        conditionsNotes: keep(input.notes, was.notes),
+      };
+      const leadFrom = next.leadDays === null ? null : (next.leadFrom ?? "after_payment");
+      const warrantyFrom = next.warrantyMonths === null ? null : (next.warrantyFrom ?? "shipment");
+      const same = (a: unknown, b: unknown) => (a ?? null) === (b ?? null) || (typeof a === "string" && typeof b === "string" && a.trim() === b.trim());
+      // Ship by: a date typed (another one than it has) is kept as typed; emptied, it is worked out again.
+      const shipByWas = fromDbDateOrNull(o.shipBy);
+      const shipByNew = input.shipBy !== undefined && !same(input.shipBy, shipByWas);
+      // Each thing changed now, and whether it now differs from what the quotation said (the place: from the order's as accepted).
+      const q = was.quoted;
+      const now: { what: string; fromQuote: boolean }[] = [];
+      const leadNow = (days: number | null, from: string | null) => (days === null ? "none" : leadWords(days, from, "customer"));
+      if (!same(next.portOfDischarge, was.portOfDischarge)) now.push({ what: `port of discharge ${next.portOfDischarge ?? "none"}`, fromQuote: !same(next.portOfDischarge, q.portOfDischarge) });
+      if (!same(next.leadDays, was.leadDays) || !same(leadFrom, was.leadFrom))
+        now.push({ what: `lead time ${leadNow(next.leadDays, leadFrom)}`, fromQuote: !same(next.leadDays, q.leadDays) || (next.leadDays !== null && !same(leadFrom, q.leadFrom ?? "after_payment")) });
+      if (!same(next.warrantyMonths, was.warrantyMonths) || !same(warrantyFrom, was.warrantyFrom) || !same(next.warrantyWords, was.warranty))
+        now.push({
+          what: "warranty",
+          fromQuote: !same(next.warrantyMonths, q.warrantyMonths) || (next.warrantyMonths !== null && !same(warrantyFrom, q.warrantyFrom ?? "shipment")) || !same(next.warrantyWords, q.warranty),
+        });
+      if (!same(next.deliveryConditions, was.deliveryConditions)) now.push({ what: "delivery conditions", fromQuote: !same(next.deliveryConditions, q.deliveryConditions) });
+      if (!same(next.paymentConditions, was.paymentConditions)) now.push({ what: "payment conditions", fromQuote: !same(next.paymentConditions, q.paymentConditions) });
+      if (!same(next.conditionsNotes, was.notes)) now.push({ what: "notes", fromQuote: !same(next.conditionsNotes, q.notes) });
+      if (!same(next.incotermPlace, o.incotermPlace)) now.push({ what: `place ${next.incotermPlace ?? "none"}`, fromQuote: true });
+      if (shipByNew && input.shipBy) now.push({ what: `ship by ${input.shipBy} typed`, fromQuote: true });
+      if (shipByNew && !input.shipBy) now.push({ what: "ship by worked out again", fromQuote: false });
+      if (!now.length) return;
+      // Why? when a change leaves the order other than the quotation said, or a ship-by date is typed by hand.
+      const differs = now.filter((c) => c.fromQuote).map((c) => c.what);
+      const reason = differs.length ? requireReason(input.reason, "agreed", "what was agreed with the customer changes from the quotation") : input.reason;
+      let shipBy = shipByWas;
+      // An older order's ship by was typed by hand (before ship by was worked out): it stays as it is.
+      let shipByTyped = o.shipByTyped || (!o.termsCopied && shipByWas !== null);
+      if (shipByNew) {
+        shipByTyped = input.shipBy !== null;
+        shipBy = input.shipBy ?? null;
+      }
+      // Worked out: from the order now; from the deposit once it is in (below); emptied with nothing to count from, empty.
+      if (!shipByTyped && next.leadDays !== null && leadFrom === "after_order") shipBy = addDays(fromDbDate(o.orderedOn), next.leadDays);
+      else if (!shipByTyped && next.leadDays !== null && leadFrom === "after_payment") {
+        const inOn = depositInOn(o);
+        shipBy = inOn ? addDays(inOn, next.leadDays) : null;
+      }
+      else if (!shipByTyped && shipByNew) shipBy = null;
+      await tx.order.update({
+        where: { id },
+        data: {
+          termsCopied: true,
+          incotermPlace: next.incotermPlace,
+          portOfDischarge: next.portOfDischarge,
+          leadDays: next.leadDays,
+          leadFrom,
+          warrantyMonths: next.warrantyMonths,
+          warrantyFrom,
+          warrantyWords: next.warrantyWords,
+          deliveryConditions: next.deliveryConditions,
+          paymentConditions: next.paymentConditions,
+          conditionsNotes: next.conditionsNotes,
+          shipBy: toDbDateOrNull(shipBy),
+          shipByTyped,
+        },
+      });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "update",
+        entityType: "order",
+        entityId: id,
+        summary: `${o.refNo}: ${AGREED_CHANGED} (${now.map((c) => c.what).join(", ")})`,
+        // The same keys before and after, in words where a value is a choice (the history lists what changed).
+        oldValues: agreedSnapshot({ ...was, incotermPlace: o.incotermPlace, shipBy: shipByWas }),
+        newValues: agreedSnapshot({
+          ...next,
+          warranty: next.warrantyWords,
+          notes: next.conditionsNotes,
+          leadFrom,
+          warrantyFrom,
+          shipBy,
+        }),
+        reason,
+      });
+    });
+    // The deposit may already be in: a lead time from the deposit dates ship by now.
+    await this.shipByFromDeposit(id);
+    return this.get(user, id);
   }
 
   /**
