@@ -16,6 +16,9 @@ String? appPathFor(String? href) {
   if (path == '/inquiries') return '/sales';
   final inquiry = RegExp(r'^/inquiries/([0-9a-fA-F-]{36})').firstMatch(path);
   if (inquiry != null) return '/sales/inquiry/${inquiry.group(1)}';
+  if (path == '/orders') return '/orders';
+  final order = RegExp(r'^/orders/([0-9a-fA-F-]{36})').firstMatch(path);
+  if (order != null) return '/orders/order/${order.group(1)}';
   return appPages.contains(path) ? path : null;
 }
 
@@ -23,7 +26,7 @@ String? appPathFor(String? href) {
 Future<void> openLink(BuildContext context, Api api, String? href) async {
   final inApp = appPathFor(href);
   if (inApp != null) {
-    if (inApp == '/home' || inApp == '/more' || inApp == '/sales') {
+    if (inApp == '/home' || inApp == '/more' || inApp == '/sales' || inApp == '/orders') {
       context.go(inApp);
     } else {
       await context.push(inApp);

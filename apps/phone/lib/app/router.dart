@@ -11,6 +11,8 @@ import '../features/gallery/patterns_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/more/presentation/more_screen.dart';
 import '../features/notifications/presentation/alerts_screen.dart';
+import '../features/orders/presentation/order_screen.dart';
+import '../features/orders/presentation/orders_screen.dart';
 import '../features/sales/presentation/inquiry_screen.dart';
 import '../features/sales/presentation/new_inquiry_screen.dart';
 import '../features/sales/presentation/sales_screen.dart';
@@ -61,12 +63,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/orders',
-                builder: (context, state) => const ComingTab(
-                  title: 'Orders',
-                  icon: KIcons.box,
-                  step: 6,
-                  what: 'Every order with its steps, shipping, papers, delivery and SAT.',
-                ),
+                builder: (context, state) => const OrdersScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'order/:id',
+                    builder: (context, state) => OrderScreen(id: state.pathParameters['id']!),
+                  ),
+                ],
               ),
             ],
           ),

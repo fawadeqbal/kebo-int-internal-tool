@@ -2,7 +2,7 @@ name: rfq_desk
 description: "RFQ Desk on the phone, built on the Kestrel design system."
 publish_to: 'none'
 
-version: 3.0.0-alpha.5+3000005
+version: 3.0.0-alpha.6+3000006
 environment:
   sdk: ^3.13.5
 

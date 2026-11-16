@@ -3,6 +3,17 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-alpha.6 — 2026-11-16
+
+Step 6: Orders.
+
+- The Orders tab lists every order with where it stands in one word (Confirmed, In production, Shipped, Arrived, Delivered, Done), what it needs now and what is still due. Late ones come first. Chips for Open, Late, each stage, Done and Cancelled show their counts; search and "Mine" narrow it down.
+- An order opens on its record header: total, received and due, its progress, and what it needs next (in red when late).
+- "Where it stands": payment, factory, production, shipping, documents and delivery, each with its word, its facts and what is missing.
+- Money (total, advance, received, still due, bank charges, with a received bar), the lines, the papers (final, draft or needed) and every file of the order.
+- "Delivered in full" and "SAT passed" are confirmed from the phone with their day. Without signal they wait on the phone and are sent when you are back.
+- Web links to orders open in the app.
+
 ## 3.0.0-alpha.5 — 2026-11-16
 
 Step 5: Sales.
