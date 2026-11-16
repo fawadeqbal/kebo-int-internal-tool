@@ -75,7 +75,7 @@ function CheckRow({
   ) : (
     <span
       role="img"
-      className={cn("mx-1 block size-2.5 shrink-0 rounded-full", c.required ? "bg-[#9a3412]" : "bg-warn")}
+      className={cn("mx-1 block size-2.5 shrink-0 rounded-full", c.required ? "bg-action" : "bg-warn")}
       aria-label={c.required ? "Needed" : "Missing"}
     />
   );
@@ -276,7 +276,7 @@ function BuyerBox({
       )}
       {numbers && <p className="text-xs text-muted">{numbers}</p>}
       {changes.length > 0 ? (
-        <p className="mt-2 text-xs text-[#9a3412]">
+        <p className="mt-2 text-xs text-action">
           The customer&apos;s {changes.join(", ")} changed since. This paper prints the buyer as on the order until it is refreshed.
         </p>
       ) : (
@@ -534,7 +534,7 @@ export function MakePaper({
                 </Link>
               </div>
               {!p.ready && required.length > 0 && (
-                <p className="text-xs text-[#9a3412]">Still needed: {required.map((c) => inSentence(c.label)).join(", ")}.</p>
+                <p className="text-xs text-action">Still needed: {required.map((c) => inSentence(c.label)).join(", ")}.</p>
               )}
               <p className="text-xs text-muted">
                 Final locks the number and ticks the item. If the order changes later, <strong>Make again</strong> creates version{" "}

@@ -166,7 +166,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-line bg-[#f8faf9] font-bold dark:bg-surface-2">
+                <tr className="border-t-2 border-line bg-faint font-bold">
                   <Td colSpan={3} />
                   <Td>Total ({cur})</Td>
                   <Td className="text-right tabular">{two(owedSum)}</Td>

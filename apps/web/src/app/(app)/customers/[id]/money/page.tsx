@@ -193,7 +193,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-line bg-[#f8faf9] font-bold dark:bg-surface-2">
+                <tr className="border-t-2 border-line bg-faint font-bold">
                   <Td colSpan={3} />
                   <Td>Total ({main})</Td>
                   <Td className="text-right tabular">{amount(charged) || "0.00"}</Td>

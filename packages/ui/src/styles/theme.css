@@ -29,12 +29,18 @@
  * Design tokens (same system as the Vibe admin panel).
  * Components use the semantic names (bg-surface, text-muted, border-line…),
  * never raw colours, so theming and dark mode live in this one file.
- * To re-brand, change the --primary* values only.
+ *
+ * Colour sets (Company settings › The app's colours): Green below is the default; Graphite, Midnight and Warm
+ * follow, each with a light and a dark side. The app's frame carries <span id="app-colours" data-colours="…">
+ * and the page takes that set; a preview of a set carries data-colours and data-mode="light|dark".
+ * Every set defines every colour token below (but the ring, shadows and charts, which all sets share), and
+ * every pair of words and what is behind them passes WCAG AA: apps/web/test/colour-sets.test.tsx checks both.
  */
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
+:root,
+[data-colours="green"][data-mode="light"] {
   /* Kebo ERP look (client video, Nov 2026): light green-grey ground, white cards, green brand, orange for the one main action. */
   --bg: #f4f7f5;
   --surface: #ffffff;
@@ -42,6 +48,8 @@
   --surface-3: #e3eae5;
   --line: #e2e8e4;
   --line-strong: #d0d9d3;
+  /* The faintest fill: table heads, the search box. */
+  --faint: #f8faf9;
   --text: #15211a;
   --text-2: #3d4c43;
   /* Text colours pass WCAG AA (4.5:1) on every surface and soft background. */
@@ -76,6 +84,12 @@
   --info: #1f57c3;
   --info-soft: #e8f0fe;
 
+  /* The note at the bottom right: dark on a light page, a raised card on a dark one. */
+  --note: #15211a;
+  --note-fg: #ffffff;
+  --note-sub: #c9d6cd;
+  --note-link: #9be0b2;
+
   --ring: color-mix(in oklab, var(--primary-solid) 45%, transparent);
   --shadow: 0 1px 2px rgb(21 33 26 / 0.04);
   --shadow-lg: 0 24px 60px -12px rgb(21 33 26 / 0.25), 0 2px 6px rgb(21 33 26 / 0.06);
@@ -88,13 +102,15 @@
   --chart-5: #0f7c80;
 }
 
-.dark {
+.dark,
+[data-colours="green"][data-mode="dark"] {
   --bg: #0b120e;
   --surface: #111a15;
   --surface-2: #17221c;
   --surface-3: #1f2c25;
   --line: #24322a;
   --line-strong: #314238;
+  --faint: #17221c;
   --text: #eef4f0;
   --text-2: #b6c4bb;
   --muted: #93a49a;
@@ -105,10 +121,11 @@
   --primary-line: #1f3d2a;
   --primary-fg: #ffffff;
   --primary-solid: #1e7b3c;
-  --primary-solid-hover: #23904a;
+  /* Under the pointer the filled buttons get darker, as in light: lighter ones left white words under 4.5:1. */
+  --primary-solid-hover: #17682f;
   --action: #f59a5f;
   --action-solid: #c2510a;
-  --action-solid-hover: #d65c10;
+  --action-solid-hover: #a8460a;
   --action-soft: #2c1a0e;
   --bad-solid: #c4321f;
 
@@ -125,6 +142,11 @@
   --info: #7aa7f5;
   --info-soft: #111f33;
 
+  --note: #1f2c25;
+  --note-fg: #eef4f0;
+  --note-sub: #b6c4bb;
+  --note-link: #6fcf8f;
+
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
 
@@ -135,6 +157,264 @@
   --chart-5: #22a3a8;
 }
 
+/* Graphite: plain greys with no tint; green only for links, the filled button and what is done. */
+:root:has(#app-colours[data-colours="graphite"]),
+[data-colours="graphite"][data-mode="light"] {
+  --bg: #f4f5f6;
+  --surface: #ffffff;
+  --surface-2: #f0f1f3;
+  --surface-3: #e5e7ea;
+  --line: #e2e4e7;
+  --line-strong: #cfd2d7;
+  --faint: #f8f8f9;
+  --text: #17181b;
+  --text-2: #3d4047;
+  --muted: #5b5f67;
+  --primary: #1b6e37;
+  --primary-hover: #124d26;
+  --primary-soft: #eceef0;
+  --primary-line: #d5d8dd;
+  --primary-fg: #ffffff;
+  --primary-solid: #1e7b3c;
+  --primary-solid-hover: #17682f;
+  --action: #b04808;
+  --action-solid: #c2510a;
+  --action-solid-hover: #a8460a;
+  --action-soft: #fdf0e7;
+  --bad-solid: #b42318;
+  --trust: #0b6a6e;
+  --trust-soft: #e4f3f3;
+  --money: #9a5b00;
+  --money-soft: #fbf3e4;
+  --ok: #1c6b35;
+  --ok-soft: #e5f3ea;
+  --warn: #8a4a05;
+  --warn-soft: #fdf3e1;
+  --bad: #a12020;
+  --bad-soft: #fcecec;
+  --info: #1f57c3;
+  --info-soft: #e9effc;
+  --note: #1d1e21;
+  --note-fg: #ffffff;
+  --note-sub: #c8cbd0;
+  --note-link: #93d4ab;
+}
+
+/* Graphite, dark: plain dark greys; soft mint links. */
+:root.dark:has(#app-colours[data-colours="graphite"]),
+[data-colours="graphite"][data-mode="dark"] {
+  --bg: #0f1012;
+  --surface: #17181b;
+  --surface-2: #1e2023;
+  --surface-3: #27292d;
+  --line: #2b2d31;
+  --line-strong: #3b3e44;
+  --faint: #1e2023;
+  --text: #f1f2f4;
+  --text-2: #c5c8cd;
+  --muted: #9da1a9;
+  --primary: #93d4ab;
+  --primary-hover: #b3e2c4;
+  --primary-soft: #25272b;
+  --primary-line: #34373c;
+  --primary-fg: #ffffff;
+  --primary-solid: #1e7b3c;
+  --primary-solid-hover: #17682f;
+  --action: #f59a5f;
+  --action-solid: #c2510a;
+  --action-solid-hover: #a8460a;
+  --action-soft: #2d1d13;
+  --bad-solid: #c4321f;
+  --trust: #5ed6d9;
+  --trust-soft: #11292a;
+  --money: #f5c451;
+  --money-soft: #2a2314;
+  --ok: #79cc96;
+  --ok-soft: #18271e;
+  --warn: #f1b54a;
+  --warn-soft: #2b2414;
+  --bad: #f28b82;
+  --bad-soft: #31191a;
+  --info: #8ab4f8;
+  --info-soft: #172138;
+  --note: #27292d;
+  --note-fg: #f1f2f4;
+  --note-sub: #c5c8cd;
+  --note-link: #93d4ab;
+}
+
+/* Midnight: cool blue-grey; blue links and filled buttons; green only for paid and done. */
+:root:has(#app-colours[data-colours="midnight"]),
+[data-colours="midnight"][data-mode="light"] {
+  --bg: #f3f6fa;
+  --surface: #ffffff;
+  --surface-2: #edf1f7;
+  --surface-3: #e1e7f0;
+  --line: #dfe5ee;
+  --line-strong: #c9d2df;
+  --faint: #f8fafd;
+  --text: #101828;
+  --text-2: #344054;
+  --muted: #526079;
+  --primary: #1f57c3;
+  --primary-hover: #17449a;
+  --primary-soft: #e8effc;
+  --primary-line: #c8d8f5;
+  --primary-fg: #ffffff;
+  --primary-solid: #2563d1;
+  --primary-solid-hover: #1d4fae;
+  --action: #b04808;
+  --action-solid: #c2510a;
+  --action-solid-hover: #a8460a;
+  --action-soft: #fef0e6;
+  --bad-solid: #b42318;
+  --trust: #0b6a6e;
+  --trust-soft: #e2f3f3;
+  --money: #9a5b00;
+  --money-soft: #fcf3e2;
+  --ok: #1c6b35;
+  --ok-soft: #e4f3ea;
+  --warn: #8a4a05;
+  --warn-soft: #fef3df;
+  --bad: #a12020;
+  --bad-soft: #fdecec;
+  --info: #1f57c3;
+  --info-soft: #e8effc;
+  --note: #111a2b;
+  --note-fg: #ffffff;
+  --note-sub: #c3cde0;
+  --note-link: #9cc2ff;
+}
+
+/* Midnight, dark: deep blue-grey; blue links and filled buttons. */
+:root.dark:has(#app-colours[data-colours="midnight"]),
+[data-colours="midnight"][data-mode="dark"] {
+  --bg: #0b1018;
+  --surface: #121926;
+  --surface-2: #18202f;
+  --surface-3: #202a3b;
+  --line: #253043;
+  --line-strong: #344157;
+  --faint: #18202f;
+  --text: #e8eef7;
+  --text-2: #b4c0d2;
+  --muted: #8d9ab0;
+  --primary: #82b6ff;
+  --primary-hover: #a6cbff;
+  --primary-soft: #172540;
+  --primary-line: #2a3a5c;
+  --primary-fg: #ffffff;
+  --primary-solid: #2563d1;
+  --primary-solid-hover: #1d4fae;
+  --action: #f59a5f;
+  --action-solid: #c2510a;
+  --action-solid-hover: #a8460a;
+  --action-soft: #2c1d14;
+  --bad-solid: #c4321f;
+  --trust: #5ed6d9;
+  --trust-soft: #0f2a2b;
+  --money: #f5c451;
+  --money-soft: #2a2416;
+  --ok: #6fd197;
+  --ok-soft: #12281f;
+  --warn: #f4bd50;
+  --warn-soft: #2a2414;
+  --bad: #f58d86;
+  --bad-soft: #2f1a1f;
+  --info: #82b6ff;
+  --info-soft: #172540;
+  --note: #202a3b;
+  --note-fg: #e8eef7;
+  --note-sub: #b4c0d2;
+  --note-link: #82b6ff;
+}
+
+/* Warm: warm paper greys and copper links; the filled button stays green. */
+:root:has(#app-colours[data-colours="warm"]),
+[data-colours="warm"][data-mode="light"] {
+  --bg: #f7f5f1;
+  --surface: #ffffff;
+  --surface-2: #f3f0ea;
+  --surface-3: #e9e4db;
+  --line: #e7e2d9;
+  --line-strong: #d5cdc0;
+  --faint: #faf8f5;
+  --text: #1f1a15;
+  --text-2: #463e35;
+  --muted: #675d51;
+  --primary: #9a4614;
+  --primary-hover: #7a370f;
+  --primary-soft: #f6ebe1;
+  --primary-line: #ead3c0;
+  --primary-fg: #ffffff;
+  --primary-solid: #1e7b3c;
+  --primary-solid-hover: #17682f;
+  --action: #b04808;
+  --action-solid: #c2510a;
+  --action-solid-hover: #a8460a;
+  --action-soft: #fdefe4;
+  --bad-solid: #b42318;
+  --trust: #0b6a6e;
+  --trust-soft: #e5f2f0;
+  --money: #9a5b00;
+  --money-soft: #fbf2e1;
+  --ok: #1c6b35;
+  --ok-soft: #e6f2e7;
+  --warn: #8a4a05;
+  --warn-soft: #fcf1dc;
+  --bad: #a12020;
+  --bad-soft: #fbebe9;
+  --info: #1f57c3;
+  --info-soft: #e9eef9;
+  --note: #24201b;
+  --note-fg: #ffffff;
+  --note-sub: #d6cdbf;
+  --note-link: #f0b48a;
+}
+
+/* Warm, dark: warm charcoal with copper links. */
+:root.dark:has(#app-colours[data-colours="warm"]),
+[data-colours="warm"][data-mode="dark"] {
+  --bg: #131211;
+  --surface: #1c1a18;
+  --surface-2: #23211e;
+  --surface-3: #2c2925;
+  --line: #33302b;
+  --line-strong: #46413a;
+  --faint: #23211e;
+  --text: #f5f1ea;
+  --text-2: #d0c8bb;
+  --muted: #a89e90;
+  --primary: #eba777;
+  --primary-hover: #f3c09b;
+  --primary-soft: #33251b;
+  --primary-line: #4a3626;
+  --primary-fg: #ffffff;
+  --primary-solid: #1e7b3c;
+  --primary-solid-hover: #17682f;
+  --action: #f59a5f;
+  --action-solid: #c2510a;
+  --action-solid-hover: #a8460a;
+  --action-soft: #33221a;
+  --bad-solid: #c4321f;
+  --trust: #5ed6d9;
+  --trust-soft: #13292a;
+  --money: #f5c451;
+  --money-soft: #2d2615;
+  --ok: #8fcf9f;
+  --ok-soft: #1d2a20;
+  --warn: #f3c75e;
+  --warn-soft: #2d2614;
+  --bad: #f2908a;
+  --bad-soft: #331d1c;
+  --info: #9db9f2;
+  --info-soft: #1d2433;
+  --note: #2c2925;
+  --note-fg: #f5f1ea;
+  --note-sub: #d0c8bb;
+  --note-link: #eba777;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -142,6 +422,7 @@
   --color-surface-3: var(--surface-3);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-faint: var(--faint);
   --color-text: var(--text);
   --color-text-2: var(--text-2);
   --color-muted: var(--muted);
@@ -169,6 +450,10 @@
   --color-bad-soft: var(--bad-soft);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
+  --color-note: var(--note);
+  --color-note-fg: var(--note-fg);
+  --color-note-sub: var(--note-sub);
+  --color-note-link: var(--note-link);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);

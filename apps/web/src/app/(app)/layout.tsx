@@ -73,6 +73,9 @@ export default async function AppLayout({ children, window: win }: { children: R
 
   return (
     <CompanyTime style={timeStyleOf(me)}>
+      {/* The company's colours (Settings › Company › The app's colours): the page takes the set it names, from the
+          first paint and without a script (packages/ui/src/styles/theme.css). */}
+      <span id="app-colours" data-colours={settings.company.colours} hidden />
       <AppShell modules={modules} initialOpen={initialOpen} initialFold={initialFold} newItems={newItems} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
         {me.viaPlatform && (
           <form action={leaveCompanyAction} className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary-soft/60 px-3 py-2 text-sm">

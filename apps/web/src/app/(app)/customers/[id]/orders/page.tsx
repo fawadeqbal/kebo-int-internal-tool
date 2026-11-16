@@ -164,7 +164,7 @@ export default async function CustomerOrders({
                 </tbody>
                 <tfoot>
                   {sums.map((t) => (
-                    <tr key={t.cur} className="border-t-2 border-line bg-[#f8faf9] font-bold dark:bg-surface-2">
+                    <tr key={t.cur} className="border-t-2 border-line bg-faint font-bold">
                       <Td colSpan={3} />
                       <Td>Total{sums.length > 1 ? ` (${t.cur})` : ""}</Td>
                       <Td className="text-right whitespace-nowrap tabular">{whole(t.total, t.cur)}</Td>

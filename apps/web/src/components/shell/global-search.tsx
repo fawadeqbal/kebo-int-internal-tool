@@ -185,7 +185,7 @@ export function TopSearch() {
             } else box.current?.blur();
           }
         }}
-        className="h-9 w-full rounded-[10px] border border-line-strong bg-[#f8faf9] pr-10 pl-9 text-[13px] text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none dark:bg-surface-2 [&::-webkit-search-cancel-button]:hidden"
+        className="h-9 w-full rounded-[10px] border border-line-strong bg-faint pr-10 pl-9 text-[13px] text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
       />
       <span className="pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 lg:inline-flex">
         <Kbd>/</Kbd>
