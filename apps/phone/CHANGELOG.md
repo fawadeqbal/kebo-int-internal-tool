@@ -3,6 +3,13 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-beta.1 — 2026-11-16
+
+Step 9: push notifications, and the first beta: every part of the plan is in.
+
+- Push notifications: after you sign in, the phone asks once and registers with the server. Tapping a notification opens its page (an order, an inquiry, Alerts). One that arrives while the app is open updates the bell. Signing out removes the phone from the server.
+- Push turns on once this app is registered in Firebase (see the README); until then everything else works and push stays off.
+
 ## 3.0.0-alpha.8 — 2026-11-16
 
 Step 8: partners, search and files.

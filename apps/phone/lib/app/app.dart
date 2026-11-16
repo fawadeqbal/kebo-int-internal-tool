@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../design/design.dart';
+import 'push_wiring.dart';
 import 'router.dart';
 
 /// Light, dark, or follow the phone (the default).
@@ -19,6 +20,7 @@ class RfqDeskApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(pushWiringProvider);
     return MaterialApp.router(
       title: 'RFQ Desk',
       debugShowCheckedModeBanner: false,

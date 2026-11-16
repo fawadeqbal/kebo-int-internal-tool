@@ -7,17 +7,20 @@ same Android id (`dev.fawadiqbal.rfqdesk`), so it installs as an update when sig
 
 Built step by step; each step is a pull request, reviewed and approved before the next.
 
-| Step | What | Status |
+| Step | What | Version |
 |---|---|---|
-| 1 | Foundations: structure, Kestrel tokens, theme, feel (motion, haptics, moments), first components, versions and releases | this PR |
-| 2 | The rest of the components: inputs, lists, headers (AppHeader, RecordHeader), sheets, dialogs, toasts, steps, file field | next |
-| 3 | Core: API client, session and two-step sign-in, offline outbox, errors, push | |
-| 4 | Home and the shell (tabs, notifications, follow-ups) | |
-| 5 | Sales: inquiries, factory offers, quotations (internal and customer views) | |
-| 6 | Orders: steps, shipping, documents, delivery & SAT | |
-| 7 | Money: payments, verify, pay a factory, transfers, expenses | |
-| 8 | Partners, files and papers, reports, settings | |
-| 9 | Release 3.0.0 | |
+| 1 | Foundations: structure, Kestrel tokens, theme, feel, versions and releases | 3.0.0-alpha.1 |
+| 2 | Every Kestrel component | alpha.2 |
+| 3 | Core: API, sign-in (two-step, company), offline cache and outbox | alpha.3 |
+| 4 | Home, alerts, the five tabs, More | alpha.4 |
+| 5 | Sales: inquiries, quotation (Internal / Customer), new inquiry | alpha.5 |
+| 6 | Orders: where it stands, money, lines, papers, files, delivery and SAT | alpha.6 |
+| 7 | Money: to collect, payables, accounts, money received, expenses (with proof) | alpha.7 |
+| 8 | Customers and factories, search, file viewer | alpha.8 |
+| 9 | Push notifications | 3.0.0-beta.1 |
+
+Still on the web (the app opens them there): factory price requests and offers, the quotation editor,
+making papers, paying factories, transfers, approving submissions.
 
 ## How it is built
 
@@ -96,3 +99,17 @@ base64 -w0 release.jks     # paste into the secret ANDROID_KEYSTORE_BASE64
 
 Repository secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`rfqdesk`),
 `ANDROID_KEY_PASSWORD`. If app-v2 was already installed with a release key, use **that** key so v3 updates it.
+
+## Push notifications (once, by Fawad)
+
+The Firebase project behind push knows the old app id `com.keboint.rfqdesk`; this app is
+`dev.fawadiqbal.rfqdesk` (app-v2's id, so it updates app-v2). In the Firebase console, add an Android
+app with package `dev.fawadiqbal.rfqdesk` to the same project and put its `google-services.json` in
+`apps/phone/android/app/`. The build applies the Google services plugin only when that file is there,
+so without it the app builds and runs with push off. The server side (`POST/DELETE /api/me/devices`)
+is the one the old app already uses.
+
+## iPhone
+
+The `ios/` project is generated and builds; shipping needs an Apple developer account, a bundle id,
+signing, an APNs key in Firebase and `GoogleService-Info.plist`.
