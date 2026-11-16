@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
 import { AuthShell } from "../auth-shell";
+import { companyLook } from "@/lib/company-look";
 import { TwoStepForm } from "../forms";
 
-export const metadata = { title: "Two-step sign-in" };
+/** White label: the browser tab names the company at its own address, never the product. */
+export async function generateMetadata(): Promise<Metadata> {
+  const look = await companyLook();
+  return { title: look ? { absolute: `Two-step sign-in · ${look.name}` } : "Two-step sign-in" };
+}
 
 /**
  * Only for accounts with two-step sign-in on: the password was right and the API asks for the code
