@@ -3,6 +3,16 @@
 RFQ Desk phone app (`apps/phone`). Newest first. Each `## <version>` section is the text of that GitHub release.
 Versions and builds follow `tool/src/version.dart`; tags are `phone-v<version>`.
 
+## 3.0.0-beta.5 — 2026-11-16
+
+Factory prices on the phone.
+
+- On an inquiry, "Factory prices": how many factories were asked, how many answered and how many are late; each factory with its status (waiting N days, quoted, declined, no reply).
+- Ask factories for a price: choose them (recently asked first, with how many offers they gave before), how you asked (WeChat, email…), and when they should reply.
+- Mark a waiting factory as declined or no reply, or remove one asked by mistake.
+- Add a factory's offer: the factory, the day, the currency, a price for each requested item, lead time, payment terms and their reference. The offers are listed with their total, price basis and lead time.
+- Comparing offers and making the quotation stay on the web.
+
 ## 3.0.0-beta.4 — 2026-11-16
 
 Making papers on the phone.

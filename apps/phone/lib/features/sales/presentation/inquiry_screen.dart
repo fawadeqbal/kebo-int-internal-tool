@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api.dart';
@@ -315,6 +316,14 @@ class _Body extends ConsumerWidget {
                           ),
                   ),
                 ],
+              ),
+              const SizedBox(height: KSpace.s4),
+              KButton(
+                'Factory prices',
+                icon: KIcons.factory,
+                variant: KButtonVariant.secondary,
+                fullWidth: true,
+                onPressed: () => context.push('/sales/inquiry/${i.id}/prices'),
               ),
               const SizedBox(height: KSpace.s6),
               KSection(
