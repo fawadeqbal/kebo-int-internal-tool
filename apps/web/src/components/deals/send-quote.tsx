@@ -13,10 +13,30 @@ import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
+/** One of the deal's drafts ready to go (priced), as the send window lists it under Include. */
+export type SendItem = { id: string; refNo: string; letter: string; number: number; total: string; printHref: string; pdfHref: string };
+
+const nameOf = (x: SendItem) => `${x.refNo} R${x.number}`;
+
+/**
+ * "QUO-2026-0531-C, D and E" (with `revisions`: "QUO-2026-0531-C R1, D R1 and E R1"): the first in full, the
+ * others by their letter when they share its number.
+ */
+export function namesOf(items: SendItem[], revisions = false) {
+  const first = items[0];
+  if (!first) return "";
+  const base = first.refNo.endsWith(`-${first.letter}`) ? first.refNo.slice(0, -first.letter.length - 1) : first.refNo;
+  const same = items.every((x) => x.refNo === base || x.refNo === `${base}-${x.letter}`);
+  const parts = items.map((x, i) => `${i === 0 || !same ? x.refNo : x.letter}${revisions ? ` R${x.number}` : ""}`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]!;
+}
+
 /**
  * "Send R1 to <customer>": one window, two choices. Email it from here (to, copy, subject, message, the PDF
  * attached), or "I sent it myself" (how and when; nothing leaves the system). Each says what happens above
  * its button. A revision already sent has only the email ("Send again"): nothing about it changes.
+ * When the deal has other drafts ready, Include lists them, ticked (design "one way, any number"): they go in
+ * the same email, each with its PDF, or are marked sent with it; the subject follows what is included.
  */
 export function SendWindow({
   number,
@@ -31,11 +51,16 @@ export function SendWindow({
   printHref,
   pdfHref,
   today,
+  revisionId,
+  together = [],
+  subjectMany = "",
+  messageMany = "",
 }: {
   number: number;
   customer: string;
+  /** Sends this one, or (with others included) all of them in one email. */
   emailAction: Action;
-  /** Marks it sent without sending anything (null: it is sent already). */
+  /** Marks it sent (or all included) without sending anything (null: it is sent already). */
   markAction: Action | null;
   to: string;
   cc: string;
@@ -45,11 +70,55 @@ export function SendWindow({
   printHref: string;
   pdfHref: string;
   today: string;
+  /** This revision (one of `together`). */
+  revisionId?: string;
+  /** The deal's drafts ready to go, this one among them, in letter order (fewer than two: no Include). */
+  together?: SendItem[];
+  /** The subject when several go: "{names}" is where their numbers go. */
+  subjectMany?: string;
+  messageMany?: string;
 }) {
   const close = useClosePanel();
   const [by, setBy] = useState<"email" | "self">("email");
   const [how, setHow] = useState<SentVia>("whatsapp");
   const again = !markAction;
+  // Include: every ready draft, ticked; this one always goes.
+  const several = !again && together.length > 1 && together.some((x) => x.id === revisionId);
+  const [left, setLeft] = useState<string[]>([]);
+  const chosen = several ? together.filter((x) => x.id === revisionId || !left.includes(x.id)) : [];
+  const many = chosen.length > 1;
+  // The subject and message follow what is included until they are typed in.
+  const [subjectTyped, setSubjectTyped] = useState<string | null>(null);
+  const [messageTyped, setMessageTyped] = useState<string | null>(null);
+  const subjectNow = subjectTyped ?? (many ? subjectMany.replace("{names}", namesOf(chosen)) : subject);
+  const messageNow = messageTyped ?? (many ? messageMany : message);
+  const include = several ? (
+    <fieldset className="flex flex-col">
+      <legend className="mb-1.5 text-sm font-medium text-text">Include</legend>
+      <div className="flex flex-col divide-y divide-line rounded-xl border border-line">
+        {together.map((x) => {
+          const me = x.id === revisionId;
+          const on = me || !left.includes(x.id);
+          return (
+            <label key={x.id} className={cn("flex min-h-11 items-center gap-2.5 px-3.5 py-2 text-sm", !me && "cursor-pointer hover:bg-surface-2/60")}>
+              {me && <input type="hidden" name="include" value={x.id} />}
+              <input
+                type="checkbox"
+                name={me ? undefined : "include"}
+                value={x.id}
+                checked={on}
+                disabled={me}
+                onChange={(e) => setLeft((l) => (e.target.checked ? l.filter((id) => id !== x.id) : [...l, x.id]))}
+                className="size-[18px] shrink-0 accent-primary"
+              />
+              <span className="font-semibold">{nameOf(x)}</span>
+              <span className="ml-auto tabular whitespace-nowrap text-text-2">{x.total}</span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  ) : null;
   const choice = (value: "email" | "self", title: string, sub: string) => (
     <label
       className={cn(
@@ -64,20 +133,26 @@ export function SendWindow({
       </span>
     </label>
   );
-  const pdf = (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3.5 py-2.5 text-[13px]">
-      <span className="font-semibold">{fileName}</span>
+  const file = (name: string, print: string, download: string) => (
+    <div key={name} className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-[13px]">
+      <span className="font-semibold">{name}</span>
       <span className="flex gap-4">
-        <a href={printHref} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+        <a href={print} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline" aria-label={many ? `See how ${name} prints` : undefined}>
           See how it prints
         </a>
-        <a href={pdfHref} className="font-medium text-primary hover:underline">
+        <a href={download} className="font-medium text-primary hover:underline" aria-label={many ? `Download ${name}` : undefined}>
           Download
         </a>
       </span>
     </div>
   );
+  const pdf = (
+    <div className="flex flex-col divide-y divide-line rounded-xl border border-line">
+      {many ? chosen.map((x) => file(`${nameOf(x)}.pdf`, x.printHref, x.pdfHref)) : file(fileName, printHref, pdfHref)}
+    </div>
+  );
   const after = [`The inquiry becomes Quoted. “Do next” becomes “Record ${customer}’s answer”.`];
+  const names = namesOf(chosen, true);
   return (
     <PanelBody>
       {!again && (
@@ -100,21 +175,24 @@ export function SendWindow({
                 </Field>
               </div>
               <Field label="Subject" htmlFor="send-subject" error={s.errors?.subject}>
-                <Input id="send-subject" name="subject" maxLength={300} defaultValue={s.values?.subject ?? subject} />
+                <Input id="send-subject" name="subject" maxLength={300} value={subjectNow} onChange={(e) => setSubjectTyped(e.target.value)} />
               </Field>
+              {include}
               <Field label="Message" htmlFor="send-message" error={s.errors?.message}>
-                <Textarea id="send-message" name="message" rows={4} defaultValue={s.values?.message ?? message} />
+                <Textarea id="send-message" name="message" rows={4} value={messageNow} onChange={(e) => setMessageTyped(e.target.value)} />
               </Field>
               <label className="flex items-center gap-2.5 text-sm">
                 <input type="checkbox" name="attach" defaultChecked className="size-[18px] accent-primary" />
-                Attach the PDF
+                {many ? "Attach the PDFs" : "Attach the PDF"}
               </label>
               {pdf}
               <WhatHappens
                 lines={
                   again
                     ? ["The email goes out with the same PDF.", `R${number} does not change: it stays as it was sent.`]
-                    : ["The email goes out with the PDF.", `R${number} becomes Sent: by email, today. It is then kept exactly as sent.`, ...after]
+                    : many
+                      ? [`One email goes out with the ${chosen.length} PDFs.`, `${names} become Sent: by email, today. Each is then kept exactly as sent.`, ...after]
+                      : ["The email goes out with the PDF.", `R${number} becomes Sent: by email, today. It is then kept exactly as sent.`, ...after]
                 }
               />
               <PanelFooter>
@@ -122,7 +200,7 @@ export function SendWindow({
                   Cancel
                 </Button>
                 <SubmitButton pendingText="Sending…">
-                  <Mail aria-hidden /> Send email
+                  <Mail aria-hidden /> {many ? `Send ${chosen.length}` : "Send email"}
                 </SubmitButton>
               </PanelFooter>
             </>
@@ -149,14 +227,21 @@ export function SendWindow({
                   <Input id="sent-on" name="on" type="date" max={today} defaultValue={s.values?.on} />
                 </Field>
               </div>
+              {include}
               {pdf}
-              <WhatHappens lines={["Nothing is sent by the system.", `R${number} becomes Sent: ${SENT_VIA_TEXT[how]}. It is then kept exactly as sent.`, ...after]} />
+              <WhatHappens
+                lines={[
+                  "Nothing is sent by the system.",
+                  many ? `${names} become Sent: ${SENT_VIA_TEXT[how]}. Each is then kept exactly as sent.` : `R${number} becomes Sent: ${SENT_VIA_TEXT[how]}. It is then kept exactly as sent.`,
+                  ...after,
+                ]}
+              />
               <PanelFooter>
                 <Button type="button" variant="ghost" onClick={() => close()}>
                   Cancel
                 </Button>
                 <SubmitButton pendingText="Saving…">
-                  <Check aria-hidden /> Mark R{number} as sent
+                  <Check aria-hidden /> {many ? `Mark ${chosen.length} as sent` : `Mark R${number} as sent`}
                 </SubmitButton>
               </PanelFooter>
             </>
