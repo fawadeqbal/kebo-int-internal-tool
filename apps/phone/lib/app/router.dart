@@ -9,9 +9,14 @@ import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/gallery/gallery_screen.dart';
 import '../features/gallery/patterns_screen.dart';
 import '../features/home/presentation/home_screen.dart';
+import '../features/more/presentation/more_screen.dart';
+import '../features/notifications/presentation/alerts_screen.dart';
+import '../features/tabs/coming_tab.dart';
+import 'shell.dart';
 
-/// Every route of the app, in one place. Signed out, every route leads to sign-in; signed
-/// in, sign-in leads home. The design gallery stays reachable for review.
+/// Every route of the app, in one place: the five tabs (each with its own stack), and the
+/// pages above them. Signed out, every route leads to sign-in; signed in, sign-in leads home.
+/// The design gallery stays reachable for review.
 final routerProvider = Provider<GoRouter>((ref) {
   final session = ref.watch(sessionProvider.notifier);
   return GoRouter(
@@ -29,7 +34,58 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/starting', builder: (context, state) => const _Starting()),
       GoRoute(path: '/sign-in', builder: (context, state) => const SignInScreen()),
-      GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, shell) => AppShell(shell),
+        branches: [
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/home', builder: (context, state) => const HomeScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/sales',
+                builder: (context, state) => const ComingTab(
+                  title: 'Sales',
+                  icon: KIcons.chart,
+                  step: 5,
+                  what: 'Inquiries, factory offers and quotations, with the internal and customer views.',
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/orders',
+                builder: (context, state) => const ComingTab(
+                  title: 'Orders',
+                  icon: KIcons.box,
+                  step: 6,
+                  what: 'Every order with its steps, shipping, papers, delivery and SAT.',
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/money',
+                builder: (context, state) => const ComingTab(
+                  title: 'Money',
+                  icon: KIcons.wallet,
+                  step: 7,
+                  what: 'Payments in and out, verification, transfers and expenses.',
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/more', builder: (context, state) => const MoreScreen())],
+          ),
+        ],
+      ),
+      GoRoute(path: '/alerts', builder: (context, state) => const AlertsScreen()),
+      GoRoute(path: '/needs', builder: (context, state) => const NeedsScreen()),
       GoRoute(
         path: '/gallery',
         builder: (context, state) => const GalleryScreen(),

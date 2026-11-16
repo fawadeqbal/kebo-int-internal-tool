@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/legacy.dart';
 
 import 'api.dart';
+import 'bell.dart';
 import 'session.dart';
 
 /// The RFQ Desk server this build talks to. `--dart-define=KEBO_SERVER=https://…` points
@@ -13,4 +14,15 @@ final sessionProvider = ChangeNotifierProvider<Session>((ref) {
   final s = Session(Api(server: defaultServer));
   s.start();
   return s;
+});
+
+/// The bell's unread count; runs while someone is signed in.
+final bellProvider = ChangeNotifierProvider<Bell>((ref) {
+  final s = ref.watch(sessionProvider.notifier);
+  final bell = Bell(s.api);
+  void sync() => s.status == SessionStatus.signedIn ? bell.start() : bell.stop();
+  s.addListener(sync);
+  sync();
+  ref.onDispose(() => s.removeListener(sync));
+  return bell;
 });

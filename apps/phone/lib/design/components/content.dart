@@ -143,7 +143,7 @@ class KListItem extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: KType.bodyStrong.copyWith(color: c.ink),
                 ),
