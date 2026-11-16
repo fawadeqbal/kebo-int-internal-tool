@@ -16,7 +16,7 @@ import { SendForm, type PurchaseOrderView } from "@/components/orders/purchase-o
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { PanelButton } from "@/components/orders/step-view";
 import { SupplierPlanWindow } from "@/components/money/plan-editor";
-import { CustomerMoneyLine, howWePay, SupplierPlanTable, supplierPlanWords } from "@/components/order-sections/supplier-plan";
+import { CustomerMoneyLine, SupplierPlanTable, supplierPlanWords, theirInvoices } from "@/components/order-sections/supplier-plan";
 import { PaymentsList } from "@/components/order-sections/payments-list";
 import { ROW_LINK } from "@/components/order-sections/section-window";
 import { factoryPaymentAction, factoryPlanAction, removePaymentFileAction, voidFactoryPaymentAction } from "../../../money/actions";
@@ -141,7 +141,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           : r.by === "advance"
             ? "Worked out once the advance is paid"
             : "Worked out once we order";
-    const invoices = plan ? [...new Set(plan.rows.map((x) => x.supplierRef).filter(Boolean))] : [];
+    const invoices = plan ? theirInvoices(plan) : [];
     const from = po.offer ? (po.offer.reference ?? `their offer of ${date(po.offer.receivedOn)}`) : null;
     return (
       <Section
@@ -290,15 +290,6 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         agreedOf(po, (pos?.items.length ?? 0) > 1),
       ])}
       {pos && pos.items.length === 0 && <EmptySection title="Purchase order" text="No line of this order was quoted from a factory, so there is no purchase order." />}
-
-      {plans.length > 0 && (
-        <Section
-          title="How we pay them"
-          cols={4}
-          rows={howWePay(plans)}
-          actions={plans.length === 1 && editPlan(plans[0]!, "Change")}
-        />
-      )}
 
       {plans.map((plan, n) => {
         const owed = m.factories!.rows.find((r) => r.factory.id === plan.factory.id && r.currency === plan.currency);

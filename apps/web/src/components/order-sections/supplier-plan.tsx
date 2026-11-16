@@ -32,27 +32,8 @@ export function partWords(r: Row, currency: string) {
 export const supplierPlanWords = (plan: FactoryPlanView) =>
   plan.rows.map((r) => `${r.label} ${supplierRule(r) ?? (r.due ? `on ${date(r.due)}` : "on a date")}`).join(" · ");
 
-/**
- * "How we pay them" (Order › Factory order), as "How they pay" is for the customer: each factory, each
- * part of its plan with its share, when it falls due and its amount, and the invoices the factory sent.
- */
-export function howWePay(plans: FactoryPlanView[]): { label: string; value: ReactNode }[] {
-  return plans.flatMap((plan) => {
-    const invoices = plan.rows.filter((r) => r.supplierRef).map((r) => `${r.supplierRef} (${partName(r).toLowerCase()})`);
-    return [
-      {
-        label: "Factory",
-        value: (
-          <Link href={`/factories/${plan.factory.id}`} className="text-primary hover:underline">
-            {plan.factory.name}
-          </Link>
-        ),
-      },
-      ...plan.rows.map((r) => ({ label: partName(r), value: partWords(r, plan.currency) })),
-      { label: "Their invoices", value: invoices.length ? invoices.join(", ") : "None yet" },
-    ];
-  });
-}
+/** The invoices the factory sent, each with the part it is for: "JP-INV-301 (advance)". */
+export const theirInvoices = (plan: FactoryPlanView) => plan.rows.filter((r) => r.supplierRef).map((r) => `${r.supplierRef} (${partName(r).toLowerCase()})`);
 
 const TONE: Record<Row["status"], Tone> = { paid: "ok", part: "warn", due: "warn", late: "bad", later: "neutral" };
 

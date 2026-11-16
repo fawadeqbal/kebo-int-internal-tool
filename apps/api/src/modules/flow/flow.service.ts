@@ -643,8 +643,13 @@ export class FlowService {
       if (!Object.keys(data).length) return null;
       await tx.order.update({ where: { id }, data });
       const ordered = input.factoryOrderedOn !== undefined ? input.factoryOrderedOn : was.factoryOrderedOn;
-      // Ordered: each factory gets the payment plan (advance when we order, balance on the ready date).
-      if (input.factoryOrderedOn) await seedFactoryPlans(tx, id, (await this.settings.get()).sales.factoryAdvancePercent);
+      // Ordered: each factory gets the payment plan (advance when we order, balance on the ready date), and what
+      // was agreed with it is its offer's, kept on its purchase order from now on (design "terms that travel").
+      if (input.factoryOrderedOn) {
+        await seedFactoryPlans(tx, id, (await this.settings.get()).sales.factoryAdvancePercent);
+        for (const po of await tx.purchaseOrder.findMany({ where: { orderId: id, termsCopied: false }, select: { id: true, supplierId: true } }))
+          await tx.purchaseOrder.update({ where: { id: po.id }, data: copyOfOffer(await this.offerOf(tx, id, po.supplierId)) });
+      }
       const parts = [
         input.factoryOrderedOn !== undefined
           ? input.factoryOrderedOn
@@ -818,7 +823,9 @@ export class FlowService {
       if (!same(next.notes, was.notes)) now.push({ what: "notes", fromOffer: !!next.notes?.trim() });
       if (!now.length) return;
       const differs = now.filter((c) => c.fromOffer).map((c) => c.what);
-      const reason = po.sentOn && differs.length ? requireReason(input.reason, "factory_terms", `what was agreed with ${po.supplier.name} changes from their offer`) : input.reason;
+      // Sent: the purchase order's own day, or (before it was kept) the day the order went to the factory.
+      const sent = po.sentOn ?? o.factoryOrderedOn;
+      const reason = sent && differs.length ? requireReason(input.reason, "factory_terms", `what was agreed with ${po.supplier.name} changes from their offer`) : input.reason;
       await tx.purchaseOrder.update({
         where: { id: poId },
         data: {
