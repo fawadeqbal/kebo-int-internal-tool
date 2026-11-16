@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import Link from "next/link";
 import { Alert, Field, Input } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { loginAction, twoStepAction } from "./actions";
@@ -13,7 +12,7 @@ export interface DemoLogin {
   password: string;
 }
 
-export function LoginForm({ next, demo, forgotHref }: { next?: string; demo?: DemoLogin[]; forgotHref: string }) {
+export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] }) {
   const [state, action] = useActionState(loginAction, {});
   const [showPassword, setShowPassword] = useState(false);
   const form = useRef<HTMLFormElement>(null);
@@ -84,16 +83,11 @@ export function LoginForm({ next, demo, forgotHref }: { next?: string; demo?: De
           </button>
         </div>
       </Field>
-      <div className="flex items-center justify-between gap-3 text-[13px]">
-        <input type="hidden" name="keepAsked" value="1" />
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
-          <input type="checkbox" name="keep" defaultChecked className="size-[18px] accent-primary-solid" />
-          Keep me signed in
-        </label>
-        <Link href={forgotHref} className="font-semibold text-primary hover:underline">
-          Forgot password?
-        </Link>
-      </div>
+      <input type="hidden" name="keepAsked" value="1" />
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
+        <input type="checkbox" name="keep" defaultChecked className="size-[18px] accent-primary-solid" />
+        Keep me signed in
+      </label>
       <SubmitButton pendingText="Signing in…" className="h-11 w-full text-[15px]">
         Sign in
       </SubmitButton>

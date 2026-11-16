@@ -23,3 +23,39 @@ describe("the company's initials on the sign-in card", () => {
     expect(initialsOf("")).toBe("K");
   });
 });
+
+describe("white label: the company's welcome", () => {
+  it("shows once, then leaves the sign-in and remembers it on this device", async () => {
+    const { render, screen, act } = await import("@testing-library/react");
+    const { vi } = await import("vitest");
+    const { Splash } = await import("@/app/login/splash");
+    vi.useFakeTimers();
+    document.cookie = "kebo-welcomed=; max-age=0; path=/";
+    render(
+      <Splash footer="© 2026 Kebo International. All rights reserved.">
+        <p>Kebo International</p>
+      </Splash>,
+    );
+    expect(screen.getByText("Kebo International")).toBeTruthy();
+    expect(document.cookie).toContain("kebo-welcomed=1");
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.queryByText("Kebo International")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("is skipped by any key", async () => {
+    const { render, screen, act, fireEvent } = await import("@testing-library/react");
+    const { Splash } = await import("@/app/login/splash");
+    render(
+      <Splash footer="© 2026 Kebo International. All rights reserved.">
+        <p>Welcome mark</p>
+      </Splash>,
+    );
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "Escape" });
+    });
+    expect(screen.queryByText("Welcome mark")).toBeNull();
+  });
+});
