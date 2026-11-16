@@ -1,7 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
-  - "!apps/mobile"
 onlyBuiltDependencies:
   - "@prisma/engines"
   - "prisma"

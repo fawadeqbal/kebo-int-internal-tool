@@ -163,23 +163,6 @@ jobs:
       - name: The API tests on the upgraded database
         run: pnpm turbo run test --filter=@kebo/api
 
-  mobile:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/mobile
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: 3.47.8
-          cache: true
-      - run: flutter pub get
-      - run: flutter analyze
-      # The tests that call a running API are skipped here (no KEBO_API_URL); widget and unit tests run.
-      - run: flutter test
-
   phone:
     runs-on: ubuntu-latest
     defaults:
@@ -210,25 +193,3 @@ jobs:
           name: rfq-desk-test-apk
           path: apps/phone/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 14
-
-  app-v2:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/app-v2
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: 3.47.8
-          cache: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -r gen/requirements.txt
-      # The screens, models and tests come from spec/: they must match it.
-      - run: python3 -m gen --check
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test

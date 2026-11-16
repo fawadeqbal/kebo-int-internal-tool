@@ -11,7 +11,7 @@
 secrets
 backups
 storage
-apps/mobile
+apps/phone
 credentials.txt
 *firebase-adminsdk*.json
 kebo-rfq-*.json

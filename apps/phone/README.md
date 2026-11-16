@@ -2,7 +2,7 @@
 
 The new phone app for RFQ Desk, built from the start on **Kestrel**, the mobile design system
 (https://claude.ai/artifact/MiX4EaJ9nMFzhgqVfr8MMp) and its approved screens
-(https://claude.ai/artifact/4Hih2a8SkFWcH3jXAodL26). It will replace `apps/app-v2` and `apps/mobile`:
+(https://claude.ai/artifact/4Hih2a8SkFWcH3jXAodL26). It replaces the old phone apps (app-v2 and mobile, removed 16 Nov 2026):
 same Android id (`dev.fawadiqbal.rfqdesk`), so it installs as an update when signed with the same key.
 
 Built step by step; each step is a pull request, reviewed and approved before the next.
@@ -98,12 +98,12 @@ base64 -w0 release.jks     # paste into the secret ANDROID_KEYSTORE_BASE64
 ```
 
 Repository secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`rfqdesk`),
-`ANDROID_KEY_PASSWORD`. If app-v2 was already installed with a release key, use **that** key so v3 updates it.
+`ANDROID_KEY_PASSWORD`. If the old app was installed from a release-signed APK, use **that** key so v3 updates it.
 
 ## Push notifications (once, by Fawad)
 
 The Firebase project behind push knows the old app id `com.keboint.rfqdesk`; this app is
-`dev.fawadiqbal.rfqdesk` (app-v2's id, so it updates app-v2). In the Firebase console, add an Android
+`dev.fawadiqbal.rfqdesk` (the old app-v2's id, so it updates it). In the Firebase console, add an Android
 app with package `dev.fawadiqbal.rfqdesk` to the same project and put its `google-services.json` in
 `apps/phone/android/app/`. The build applies the Google services plugin only when that file is there,
 so without it the app builds and runs with push off. The server side (`POST/DELETE /api/me/devices`)

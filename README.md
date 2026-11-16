@@ -9,7 +9,7 @@ Made for **Shandong Kebo International Trade Co., Ltd.**, now for any trading co
 ```
 apps/
   api/        NestJS REST API — every business rule runs here (web and mobile are clients)
-  mobile/     Flutter app
+  phone/      Flutter phone app (RFQ Desk v3, Kestrel design)
 packages/
   config/     tsconfig and ESLint presets, typed environment loader
   database/   Prisma schema, migrations, client, seed, and the import of the previous app's data
