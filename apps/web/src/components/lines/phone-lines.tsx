@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
@@ -73,7 +73,13 @@ export function PhoneLineRow({
   busy,
   onOpen,
   menu,
+  pick,
+  dup,
 }: {
+  /** Select mode: a tick box; a tap ticks it (instead of opening the line). */
+  pick?: { on: boolean; toggle: () => void };
+  /** "Same as 1?": it looks like an earlier line. */
+  dup?: string | null;
   no: string;
   /** "Item", "Line" or "Part": read before the number. */
   kind: string;
@@ -90,7 +96,12 @@ export function PhoneLineRow({
 }) {
   const body = (
     <>
-      <span className="w-8 shrink-0 pt-0.5 text-[13px] font-semibold text-text-2 tabular">
+      {pick && (
+        <span aria-hidden className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border-[1.5px]", pick.on ? "border-primary-solid bg-primary-solid text-white" : "border-line-strong bg-surface")}>
+          {pick.on && <Check className="size-3.5" strokeWidth={3} />}
+        </span>
+      )}
+      <span className={cn("shrink-0 pt-0.5 text-[13px] font-semibold text-text-2 tabular", pick ? "w-7" : "w-8")}>
         <span className="sr-only">{kind} </span>
         {no}
       </span>
@@ -106,8 +117,9 @@ export function PhoneLineRow({
             ))}
           </span>
         )}
-        {(needs || parts > 0 || badge) && (
+        {(needs || parts > 0 || badge || dup) && (
           <span className="mt-1 flex flex-wrap items-center gap-1.5">
+            {dup && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">{dup}</span>}
             {needs && <span className="rounded-md bg-warn-soft px-1.5 py-0.5 text-xs font-semibold text-warn">{needs}</span>}
             {parts > 0 && (
               <span className="text-xs font-semibold text-primary">
@@ -122,15 +134,19 @@ export function PhoneLineRow({
     </>
   );
   return (
-    <li className={cn("flex items-stretch border-b border-line last:border-b-0", part && "bg-surface-2/50 pl-5")}>
-      {onOpen ? (
+    <li className={cn("flex items-stretch border-b border-line last:border-b-0", part && "bg-surface-2/50 pl-5", dup && !pick?.on && "bg-warn-soft/40", pick?.on && "bg-primary-soft/50")}>
+      {pick ? (
+        <button type="button" role="checkbox" aria-checked={pick.on} onClick={pick.toggle} className="flex min-h-16 min-w-0 flex-1 items-start gap-2 px-3 py-2.5 text-left active:bg-surface-2">
+          {body}
+        </button>
+      ) : onOpen ? (
         <button type="button" onClick={onOpen} className="flex min-h-16 min-w-0 flex-1 items-start gap-2 px-3 py-2.5 text-left active:bg-surface-2">
           {body}
         </button>
       ) : (
         <div className="flex min-h-16 min-w-0 flex-1 items-start gap-2 px-3 py-2.5">{body}</div>
       )}
-      {menu}
+      {!pick && menu}
     </li>
   );
 }
@@ -213,7 +229,10 @@ export function LineWindow({
   reason,
   onSave,
   onClose,
+  kind,
 }: {
+  /** A new line: Item or Part, and part of which (shown above its fields). */
+  kind?: ReactNode;
   title: string;
   sub?: string;
   /** How far through the lines (0–1): a thin bar under the title. */
@@ -247,10 +266,18 @@ export function LineWindow({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [asking, setAsking] = useState(false);
   const [seen, setSeen] = useState(resetKey);
+  // A new line turned from an item into a part (or back): what was not typed yet follows (the unit: pcs → sets).
+  const startKey = JSON.stringify(start);
+  const [seenStart, setSeenStart] = useState({ key: startKey, start });
   if (seen !== resetKey) {
     setSeen(resetKey);
+    setSeenStart({ key: startKey, start });
     setV(start);
     setErrors({});
+  } else if (seenStart.key !== startKey) {
+    const prev = seenStart.start;
+    setSeenStart({ key: startKey, start });
+    setV((cur) => Object.fromEntries([...new Set([...Object.keys(cur), ...Object.keys(start)])].map((k) => [k, (cur[k] ?? "") === (prev[k] ?? "") ? (start[k] ?? "") : (cur[k] ?? "")])));
   }
   const inputs = columns.filter((c) => c.input);
   const computed = columns.filter((c) => !c.input && c.format);
@@ -309,7 +336,7 @@ export function LineWindow({
     >
       <div className="flex min-h-14 items-center gap-1 border-b border-line py-1.5 pr-4 pl-1">
         <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={close} disabled={busy} className="size-11 rounded-full [&_svg]:size-[22px]">
-          <ArrowLeft aria-hidden />
+          <X aria-hidden />
         </Button>
         <div className="min-w-0 flex-1">
           <h2 id={`${id}-title`} ref={head} tabIndex={-1} className="truncate text-lg font-semibold tracking-tight outline-none">
@@ -329,6 +356,7 @@ export function LineWindow({
             {added}
           </p>
         )}
+        {kind}
         {inputs.map((c) => (
           <LineField key={c.key} c={c} id={`${id}-${c.key}`} value={v[c.key] ?? ""} set={(x) => setV((s) => ({ ...s, [c.key]: x }))} error={errors[c.key]} />
         ))}

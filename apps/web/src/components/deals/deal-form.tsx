@@ -297,7 +297,7 @@ export function DealForm({
                     ? [v.customer?.name, CHANNEL_LABEL[v.channel]].filter(Boolean).join(" · ") || undefined
                     : x.key === "items"
                       ? sheet.rows.length
-                        ? `${sheet.rows.length} item${sheet.rows.length === 1 ? "" : "s"}`
+                        ? itemsCount(sheet.rows)
                         : "none yet"
                       : x.key === "details"
                       ? [v.category, PRIORITY_LABEL[v.priority as keyof typeof PRIORITY_LABEL]].filter(Boolean).join(" · ") || undefined
@@ -445,7 +445,7 @@ export function DealForm({
                   noun="item"
                   sheet={{ name: "Customer items", upload: itemsUpload }}
                   error={itemErrors(s.errors).length ? undefined : s.errors?.items?.[0]}
-                  empty="No items yet: type the first one below, or paste the customer’s list from Excel."
+                  duplicates
                   {...sheet.handlers}
                 />
                 {itemErrors(s.errors).length > 0 && (
