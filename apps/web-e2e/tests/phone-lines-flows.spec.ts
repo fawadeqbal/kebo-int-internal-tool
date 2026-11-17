@@ -35,19 +35,24 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, �
   await expect(list.getByRole("button", { name: /^Item 1 Tablet press/ })).toContainText("1 set");
   expect(await accessibilityProblems(page), "the items list on a phone meets WCAG 2.2 AA").toEqual([]);
 
-  // Add & next: the window stays for the next one and says what was added.
+  // Add item (design 18 Nov): its own window, numbered; Add & next says what was added and opens the next one.
   await win.getByRole("button", { name: "Add item", exact: true }).click();
-  const line = page.getByRole("dialog", { name: "New item" });
-  await expect(line.getByLabel("Description")).toBeFocused();
-  await line.getByLabel("Description").fill("Blister packing machine");
-  await line.getByLabel("Qty").fill("2");
-  await line.getByRole("button", { name: "sets", exact: true }).click();
+  const two = page.getByRole("dialog", { name: "New item 2" });
+  await expect(two).toContainText("1 item so far");
+  await expect(two.getByLabel("Description")).toBeFocused();
+  await two.getByLabel("Description").fill("Blister packing machine");
+  await two.getByLabel("Qty").fill("2");
+  await two.getByRole("button", { name: "sets", exact: true }).click();
   expect(await accessibilityProblems(page), "a line's window meets WCAG 2.2 AA").toEqual([]);
-  await line.getByRole("button", { name: /Add & next/ }).click();
-  await expect(line.getByRole("status")).toContainText("Added “Blister packing machine”");
-  await expect(line.getByLabel("Description")).toHaveValue("");
-  await line.getByRole("button", { name: "Done" }).click();
-  await expect(line).toBeHidden();
+  await two.getByRole("button", { name: /Add & next/ }).click();
+  const three = page.getByRole("dialog", { name: "New item 3" });
+  await expect(three.getByRole("status")).toContainText("Added 2 · Blister packing machine");
+  await expect(three.getByLabel("Description")).toHaveValue("");
+  // Add with nothing typed says what to fill in; × closes (nothing typed, nothing asked).
+  await three.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(three.getByLabel("Description")).toBeFocused();
+  await three.getByRole("button", { name: "Close" }).click();
+  await expect(three).toBeHidden();
   await expect(list.getByRole("button", { name: /^Item 2 Blister packing machine/ })).toContainText("2 sets");
 
   // A saved line opens in its window; Save & next goes on to the next one.
@@ -56,25 +61,63 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, �
   await expect(one).toContainText("1 of 2");
   await one.getByLabel("Qty").fill("3");
   await one.getByRole("button", { name: "Save & next" }).click();
-  const two = page.getByRole("dialog", { name: "Item 2" });
-  await expect(two.getByLabel("Description")).toHaveValue("Blister packing machine");
-  await two.getByRole("button", { name: "Close" }).click();
+  const second = page.getByRole("dialog", { name: "Item 2" });
+  await expect(second.getByLabel("Description")).toHaveValue("Blister packing machine");
+  await second.getByRole("button", { name: "Close" }).click();
   await expect(list.getByRole("button", { name: /^Item 1 Tablet press/ })).toContainText("3 set");
 
-  // ⋯: what can be done to a line, as a sheet; Delete, then Undo puts it back.
+  // + Part on a line: the window opens already under it (nothing to pick); Add puts it there and it is lit.
+  await list.getByRole("button", { name: "Add a part to Item 1" }).click();
+  const part = page.getByRole("dialog", { name: "New part 1.1" });
+  await expect(part).toContainText("Part of 1");
+  await expect(part.getByRole("combobox")).toHaveCount(0);
+  await expect(part.getByRole("radiogroup")).toHaveCount(0);
+  await part.getByLabel("Description").fill("Upper punch, 12 mm round");
+  await part.getByLabel("Qty").fill("35");
+  expect(await accessibilityProblems(page), "a part's window meets WCAG 2.2 AA").toEqual([]);
+  await part.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(part).toBeHidden();
+  await expect(list.getByRole("button", { name: /^Part 1\.1 Upper punch/ })).toContainText("35");
+
+  // A part that should be an item: Make it an item turns the same window into the next item.
+  await list.getByRole("button", { name: "Add a part to Item 2" }).click();
+  const wrong = page.getByRole("dialog", { name: "New part 2.1" });
+  await wrong.getByRole("button", { name: "Make it an item" }).click();
+  await expect(page.getByRole("dialog", { name: "New item 3" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "New item 3" }).getByRole("button", { name: /Add & next$/ })).toBeVisible();
+  await page.getByRole("dialog", { name: "New item 3" }).getByRole("button", { name: "Close" }).click();
+
+  // ⋯: a sheet headed by the line, Add a part (with the number it gets) and Edit first; Delete, then Undo.
   await list.getByRole("button", { name: "More for Item 2" }).click();
-  await page.getByRole("menuitem", { name: "Delete" }).click();
+  const sheet = page.getByRole("menu", { name: "Item 2" });
+  await expect(sheet).toContainText("2 · Blister packing machine");
+  await expect(sheet.getByRole("menuitem", { name: /^Add a part/ })).toContainText("2.1");
+  await expect(sheet.getByRole("menuitem", { name: "Edit" })).toBeVisible();
+  expect(await accessibilityProblems(page), "a line's sheet meets WCAG 2.2 AA").toEqual([]);
+  await sheet.getByRole("menuitem", { name: "Delete" }).click();
   await expect(list.getByRole("button", { name: /^Item 2/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(list.getByRole("button", { name: /^Item 2 Blister packing machine/ })).toBeVisible();
 
-  // Saved with the inquiry: two changes, and why first (asked in the window).
+  // ⋯ beside Add item: the other ways in. Paste rows opens the paste box.
+  await win.getByRole("button", { name: "More ways to add" }).click();
+  const ways = page.getByRole("menu", { name: "More ways to add" });
+  await expect(ways.getByRole("menuitem", { name: /^Import Excel/ })).toBeVisible();
+  await ways.getByRole("menuitem", { name: /^Paste rows/ }).click();
+  await expect(ways).toBeHidden();
+  const paste = win.getByRole("region", { name: "Paste rows" });
+  await expect(paste).toBeVisible();
+  await paste.getByRole("button", { name: "Close" }).click();
+
+  // Saved with the inquiry: why first (asked in the window), then every change.
   await win.getByRole("radiogroup", { name: "Why these changes?" }).getByRole("radio", { name: "Customer changed the list" }).click();
-  await win.getByRole("button", { name: "Save 2 changes" }).click();
+  await win.getByRole("button", { name: /^Save \d+ changes$/ }).click();
   await expect(win).toBeHidden();
   const saved = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
-  expect(saved.items.map((i: { description: string; quantity: string; unit: string }) => [i.description, Number(i.quantity), i.unit])).toEqual([
+  const desc = (i: { description: string; quantity: string; unit: string }) => [i.description, Number(i.quantity), i.unit];
+  expect(saved.items.map(desc)).toEqual([
     ["Tablet press", 3, "set"],
+    ["Upper punch, 12 mm round", 35, "sets"],
     ["Blister packing machine", 2, "sets"],
   ]);
   expect(errors).toEqual([]);

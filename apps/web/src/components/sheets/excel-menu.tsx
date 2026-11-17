@@ -40,6 +40,40 @@ export async function readSheetFile(file: File): Promise<{ ok: true; sheet: Read
   }
 }
 
+/**
+ * Picking a filled Excel file without the Excel button (a phone's "More ways to add" sheet): `input` goes
+ * on the page, `pick()` opens the file picker, and the rows read come to `onUpload`.
+ */
+export function useSheetPicker(onUpload: ((sheet: ReadSheet, fileName: string) => void) | undefined) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const read = async (file: File | undefined) => {
+    if (!file || !onUpload) return;
+    setBusy(true);
+    setError(null);
+    const r = await readSheetFile(file);
+    setBusy(false);
+    if (r.ok) onUpload(r.sheet, file.name);
+    else setError(r.message);
+  };
+  const input = onUpload ? (
+    <input
+      ref={picker}
+      type="file"
+      accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+      className="sr-only"
+      tabIndex={-1}
+      aria-hidden
+      onChange={(e) => {
+        void read(e.target.files?.[0]);
+        e.target.value = "";
+      }}
+    />
+  ) : null;
+  return { input, pick: () => picker.current?.click(), busy, error };
+}
+
 const itemClass = "flex items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-2 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted";
 
 function Item({ icon, title, hint, onClick, href }: { icon: React.ReactNode; title: string; hint?: string; onClick: () => void; href?: string }) {
@@ -88,29 +122,21 @@ export function ExcelMenu({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const picker = useRef<HTMLInputElement>(null);
+  const picker = useSheetPicker(onUpload);
   const allowed = useExcelAllowed();
   if (!allowed || (!template && !onUpload && !exportSheet && !exportHref)) return null;
+  const busy = downloading || picker.busy;
+  const error = downloadError ?? picker.error;
 
   const download = async (make: () => SheetSpec) => {
     setOpen(false);
-    setBusy(true);
-    setError(null);
-    setError(await downloadSheet(make()));
-    setBusy(false);
-  };
-
-  const pick = async (file: File | undefined) => {
-    if (!file || !onUpload) return;
-    setBusy(true);
-    setError(null);
-    const r = await readSheetFile(file);
-    setBusy(false);
-    if (r.ok) onUpload(r.sheet, file.name);
-    else setError(r.message);
+    setDownloading(true);
+    setDownloadError(null);
+    setDownloadError(await downloadSheet(make()));
+    setDownloading(false);
   };
 
   return (
@@ -118,20 +144,7 @@ export function ExcelMenu({
       <Button ref={button} size="sm" variant="secondary" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} disabled={busy}>
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : <FileSpreadsheet aria-hidden />} Excel <ChevronDown aria-hidden />
       </Button>
-      {onUpload && (
-        <input
-          ref={picker}
-          type="file"
-          accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-          className="sr-only"
-          tabIndex={-1}
-          aria-hidden
-          onChange={(e) => {
-            void pick(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-      )}
+      {picker.input}
       {error && (
         <span role="alert" className="text-xs text-bad">
           {error}
@@ -148,7 +161,7 @@ export function ExcelMenu({
               title="Upload a filled file"
               onClick={() => {
                 setOpen(false);
-                picker.current?.click();
+                picker.pick();
               }}
             />
           )}
