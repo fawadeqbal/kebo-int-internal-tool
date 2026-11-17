@@ -39,7 +39,7 @@ export function FieldsWindow({
   action: Action;
   save?: string;
   whats?: ReactNode[];
-  files?: { orderId: string; section: OrderSection; hint: string };
+  files?: { orderId: string; section: OrderSection; hint?: string };
   size?: "sm" | "md" | "lg";
   /** Never asks why (nothing was saved before). */
   plain?: boolean;

@@ -226,7 +226,6 @@ export function CurrenciesControl({
                 inputMode="decimal"
                 className="w-32 tabular"
                 value={rates[c] ?? ""}
-                placeholder="Enter the rate"
                 aria-invalid={!rates[c]}
                 onChange={(e) => setRates((r) => ({ ...r, [c]: e.target.value }))}
               />

@@ -181,7 +181,7 @@ export function ReceivedFields({
           <input type="hidden" name="amount" value={fromMinor(Math.max(partMinor, 0))} />
           <input type="hidden" name="method" value={method} />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-3">
-            <Field label="What was paid" htmlFor="r-amount" hint="the amount as it arrived" error={s.errors?.receivedAmount ?? s.errors?.amount}>
+            <Field label="What was paid" htmlFor="r-amount" error={s.errors?.receivedAmount ?? s.errors?.amount}>
               <div className="flex flex-col gap-2">
                 <CurrencySelect short aria-label="Currency it arrived in" value={a.received} onChange={(e) => a.setReceived(e.target.value)} className="w-28" />
                 <MoneyInput id="r-amount" name="receivedAmount" currency={a.received} value={a.amount} onChange={(e) => a.setAmount(e.target.value)} placeholder="0.00" />
@@ -200,11 +200,11 @@ export function ReceivedFields({
                 ))}
               </Select>
             </Field>
-            <Field label="Paid by" htmlFor="r-paidBy" optional hint="when someone pays for the customer" error={s.errors?.paidByName}>
+            <Field label="Paid by" htmlFor="r-paidBy" optional error={s.errors?.paidByName}>
               <Input id="r-paidBy" name="paidByName" maxLength={120} defaultValue={s.values?.paidByName ?? ""} placeholder={customer} />
             </Field>
             {!a.same && (
-              <Field label="Rate" htmlFor="r-rate" hint={a.settingsRate ? "from Settings · change it to the rate you agreed" : "no rate in Settings: type the rate you agreed"} error={s.errors?.rate}>
+              <Field label="Rate" htmlFor="r-rate" hint={a.settingsRate ? undefined : "No rate in Settings: type the rate you agreed"} error={s.errors?.rate}>
                 <div className="flex items-center gap-2 text-sm text-text-2">
                   <span className="shrink-0">1 {currency} =</span>
                   <Input id="r-rate" name="rate" inputMode="decimal" className="w-28 tabular" value={a.rate} onChange={(e) => a.setRate(e.target.value)} />
@@ -212,11 +212,11 @@ export function ReceivedFields({
                 </div>
               </Field>
             )}
-            <Field label="Reference" htmlFor="r-reference" optional hint="T/T or SWIFT reference, receipt no." error={s.errors?.reference}>
+            <Field label="Reference" htmlFor="r-reference" optional error={s.errors?.reference}>
               <Input id="r-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
             </Field>
             {method === "bank_transfer" && (
-              <Field label="Bank charges" htmlFor="r-charges" optional hint="kept by the banks; counts as paid" error={s.errors?.bankCharges}>
+              <Field label="Bank charges" htmlFor="r-charges" optional error={s.errors?.bankCharges}>
                 <MoneyInput id="r-charges" name="bankCharges" currency={currency} value={charges} onChange={(e) => setCharges(e.target.value)} placeholder="0.00" />
               </Field>
             )}
@@ -431,7 +431,7 @@ function ReceiptFields({
           <input type="hidden" name="method" value={method} />
           <input type="hidden" name="parts" value={JSON.stringify(parts)} />
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Received" htmlFor="rc-amount" hint="the amount as it arrived" error={s.errors?.receivedAmount}>
+            <Field label="Received" htmlFor="rc-amount" error={s.errors?.receivedAmount}>
               <div className="flex flex-col gap-2">
                 <CurrencySelect short aria-label="Currency it arrived in" value={a.received} onChange={(e) => a.setReceived(e.target.value)} className="w-28" />
                 <MoneyInput id="rc-amount" name="receivedAmount" currency={a.received} value={a.amount} onChange={(e) => a.setAmount(e.target.value)} placeholder="0.00" />
@@ -453,7 +453,7 @@ function ReceiptFields({
             <Field label="Reference" htmlFor="rc-ref" optional error={s.errors?.reference}>
               <Input id="rc-ref" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
             </Field>
-            <Field label="Paid by" htmlFor="rc-by" optional hint="when someone pays for the customer">
+            <Field label="Paid by" htmlFor="rc-by" optional>
               <Input id="rc-by" name="paidByName" maxLength={120} defaultValue={s.values?.paidByName ?? ""} />
             </Field>
             {currencies.length > 1 && (
@@ -466,7 +466,7 @@ function ReceiptFields({
               </Field>
             )}
             {!a.same && (
-              <Field label="Rate" htmlFor="rc-rate" hint="from Settings · change it to the rate you agreed" error={s.errors?.rate}>
+              <Field label="Rate" htmlFor="rc-rate" error={s.errors?.rate}>
                 <div className="flex items-center gap-2 text-sm text-text-2">
                   <span className="shrink-0">1 {currency} =</span>
                   <Input id="rc-rate" name="rate" inputMode="decimal" className="w-28 tabular" value={a.rate} onChange={(e) => a.setRate(e.target.value)} />
@@ -735,7 +735,7 @@ export function RemoveEntry({ action, label = "Remove" }: { action: Action; labe
       {(s) => (
         <>
           <Field label="Why?" htmlFor="re-reason" error={s.errors?.reason} className="min-w-0 flex-1">
-            <Input id="re-reason" name="reason" placeholder="e.g. recorded twice" />
+            <Input id="re-reason" name="reason" />
           </Field>
           <SubmitButton size="sm" variant="danger" pendingText="Removing…">
             Remove

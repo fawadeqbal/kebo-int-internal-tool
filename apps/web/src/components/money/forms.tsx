@@ -36,13 +36,12 @@ export function VoidForm({ action, label, button = "Remove" }: { action: Action;
     <ActionForm action={action} onDone={() => setOpen(false)} className={`${framed} mt-2 w-full`}>
       {(s) => (
         <>
-          <Field label="Why remove it?" htmlFor={`void-${label}`} error={s.errors?.reason} hint="It stays listed, crossed out">
+          <Field label="Why remove it?" htmlFor={`void-${label}`} error={s.errors?.reason}>
             <Textarea
               id={`void-${label}`}
               name="reason"
               rows={2}
               className="min-h-0"
-              placeholder="e.g. recorded twice"
               defaultValue={s.values?.reason}
             />
           </Field>
@@ -64,7 +63,7 @@ export function VoidForm({ action, label, button = "Remove" }: { action: Action;
 function WhyField({ id, error, value }: { id: string; error?: string[]; value?: string }) {
   return (
     <Field label="Why it changes" htmlFor={id} error={error}>
-      <Textarea id={id} name="reason" rows={2} className="min-h-0" maxLength={500} placeholder="e.g. the bank advice shows a different amount" defaultValue={value} />
+      <Textarea id={id} name="reason" rows={2} className="min-h-0" maxLength={500} defaultValue={value} />
     </Field>
   );
 }
@@ -153,7 +152,7 @@ export function EditCustomerPayment({
       {(s) => (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="What for" htmlFor="ep-kind" hint={onClose ? undefined : "Worked out from what the money pays; choose “Other” only for money that is not for the plan"}>
+            <Field label="What for" htmlFor="ep-kind" >
               <Choice
                 id="ep-kind"
                 name="kind"
@@ -445,7 +444,7 @@ export function FactoryPaymentForm({
           </div>
           {!payment && (
             <div className="grid gap-3 sm:grid-cols-3">
-              <FilePicker id="fp-file" label="Proof of payment" hint="Bank slip or the factory's receipt (photo or PDF)" file={file} onChange={setFile} className="sm:col-span-2" />
+              <FilePicker id="fp-file" label="Proof of payment" file={file} onChange={setFile} className="sm:col-span-2" />
             </div>
           )}
           <Field label="Note" htmlFor="fp-note" optional>

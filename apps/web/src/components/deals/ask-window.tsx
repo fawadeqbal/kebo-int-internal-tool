@@ -162,7 +162,7 @@ export function AskWindow({
                   </span>
                 }
               >
-                <Textarea id="ask-note" name="note" rows={3} maxLength={500} placeholder="What you sent them: the written need, photos, the customer’s drawing…" />
+                <Textarea id="ask-note" name="note" rows={3} maxLength={500} />
               </Field>
             </div>
           </div>

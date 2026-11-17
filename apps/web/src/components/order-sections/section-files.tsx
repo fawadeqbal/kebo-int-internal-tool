@@ -66,7 +66,7 @@ export function SectionFiles({ orderId, section, canAdd }: { orderId: string; se
  * and a box to drop or choose more. A file is kept the moment it is added;
  * it does not wait for Save.
  */
-export function WindowFiles({ orderId, section, hint }: { orderId: string; section: OrderSection; /** What goes here: "the booking copy". */ hint: string }) {
+export function WindowFiles({ orderId, section }: { orderId: string; section: OrderSection; /** (Unused: the drop zone says "a file", nothing more; white label, 17 Nov.) */ hint?: string }) {
   const files = useSectionFiles(section);
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -99,7 +99,7 @@ export function WindowFiles({ orderId, section, hint }: { orderId: string; secti
           over && "border-primary bg-primary-soft text-text",
         )}
       >
-        {busy ? "Sending…" : `Drop or choose: ${hint}`}
+        {busy ? "Sending…" : "Drop or choose a file"}
       </button>
       {error && (
         <span role="alert" className="text-xs text-bad">

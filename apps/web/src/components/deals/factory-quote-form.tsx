@@ -59,7 +59,7 @@ export function PortPicker({ id, value, onChange, exw }: { id: string; value: st
         autoComplete="off"
         value={value}
         maxLength={60}
-        placeholder={exw ? "The factory's town" : "e.g. Qingdao"}
+        
         className={cn(controlClass, "h-9 pr-9")}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
@@ -696,7 +696,6 @@ export function OfferHeaderForm({
                 value={s.reference}
                 onChange={(e) => set("reference", e.target.value)}
                 maxLength={80}
-                placeholder="Their quote no."
               />
             </Field>
             <Field label="Received on" htmlFor="receivedOn" required error={st.errors?.receivedOn}>
@@ -741,7 +740,7 @@ export function OfferHeaderForm({
               label="Delivery basis (Incoterm)"
               htmlFor="basis"
               error={st.errors?.basis}
-              hint={s.basis ? BASIS_HINT[s.basis] : undefined}
+              
             >
               <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")}>
                 <option value="">Not said</option>
@@ -814,7 +813,6 @@ export function OfferHeaderForm({
                 value={s.paymentTerms}
                 onChange={(e) => set("paymentTerms", e.target.value)}
                 maxLength={2000}
-                placeholder="e.g. By T/T, bank charges outside China for us"
               />
             </Field>
           </PanelSection>
@@ -837,7 +835,7 @@ export function OfferHeaderForm({
           <PanelSection title="Conditions and their quotation">
             <div className="flex flex-col gap-3.5">
               <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq}>
-                <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} placeholder="e.g. 1 set" />
+                <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} />
               </Field>
               <Field label="Notes" htmlFor="fq-notes" optional error={st.errors?.notes}>
                 <Textarea
@@ -846,7 +844,6 @@ export function OfferHeaderForm({
                   className="min-h-0"
                   value={s.notes}
                   onChange={(e) => set("notes", e.target.value)}
-                  placeholder="Packing, samples, anything to remember about this offer"
                 />
               </Field>
             </div>

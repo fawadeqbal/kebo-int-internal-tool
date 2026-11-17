@@ -42,13 +42,13 @@ export async function readSheetFile(file: File): Promise<{ ok: true; sheet: Read
 
 const itemClass = "flex items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-2 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted";
 
-function Item({ icon, title, hint, onClick, href }: { icon: React.ReactNode; title: string; hint: string; onClick: () => void; href?: string }) {
+function Item({ icon, title, hint, onClick, href }: { icon: React.ReactNode; title: string; hint?: string; onClick: () => void; href?: string }) {
   const body = (
     <>
       {icon}
       <span className="min-w-0">
         <span className="block font-medium">{title}</span>
-        <span className="block text-xs text-muted">{hint}</span>
+        {hint && <span className="block text-xs text-muted">{hint}</span>}
       </span>
     </>
   );
@@ -73,7 +73,7 @@ export function ExcelMenu({
   onUpload,
   exportSheet,
   exportHref,
-  noun = "rows",
+  noun: _noun = "rows",
   className,
 }: {
   /** The template to download; none: no template or upload. */
@@ -140,22 +140,21 @@ export function ExcelMenu({
       {open && (
         <FloatingMenu anchor={() => button.current} onClose={() => setOpen(false)} label="Excel" width={290} align="start">
           {template && (
-            <Item icon={<Download aria-hidden />} title="Download a template" hint={`An Excel file with the right columns, to fill in the ${noun}.`} onClick={() => void download(template)} />
+            <Item icon={<Download aria-hidden />} title="Download a template" onClick={() => void download(template)} />
           )}
           {onUpload && (
             <Item
               icon={<FileUp aria-hidden />}
               title="Upload a filled file"
-              hint="Shown here to check first; nothing is saved until you add it."
               onClick={() => {
                 setOpen(false);
                 picker.current?.click();
               }}
             />
           )}
-          {exportSheet && <Item icon={<Table2 aria-hidden />} title="Export to Excel" hint={`The ${noun} as they are now.`} onClick={() => void download(exportSheet)} />}
+          {exportSheet && <Item icon={<Table2 aria-hidden />} title="Export to Excel" onClick={() => void download(exportSheet)} />}
           {!exportSheet && exportHref && (
-            <Item icon={<Table2 aria-hidden />} title="Export to Excel" hint={`Every one of the ${noun} shown, with the filters on.`} href={exportHref} onClick={() => setOpen(false)} />
+            <Item icon={<Table2 aria-hidden />} title="Export to Excel" href={exportHref} onClick={() => setOpen(false)} />
           )}
         </FloatingMenu>
       )}

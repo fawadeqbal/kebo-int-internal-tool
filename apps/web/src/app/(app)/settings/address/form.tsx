@@ -64,7 +64,7 @@ export function AddressForm({ view, disabled, onSaved }: { view: AddressView; di
         onSaved?.();
       }}
     >
-      <Field label="New address" htmlFor="slug" hint="3 to 30 characters: small letters, numbers and dashes.">
+      <Field label="New address" htmlFor="slug">
         <div className="flex items-center gap-2">
           <Input
             id="slug"

@@ -352,7 +352,6 @@ function OfferWindow({
       ))}
       <FileZone
         label="The factory’s own quotation"
-        hint="Their PDF, Excel or screenshots · seen only by people who see factory prices"
         onFiles={(list) => setFiles((x) => [...x, ...list])}
       >
         {files.length > 0 &&
@@ -512,7 +511,7 @@ function OfferWindow({
               <WhatHappens lines={["The file leaves this offer. Nothing else changes."]} />
             )}
             {asking === "offer" && used && (
-              <Field label="Why" htmlFor="remove-offer-why" hint="Kept in History: a quotation is priced from this offer">
+              <Field label="Why" htmlFor="remove-offer-why">
                 <Textarea id="remove-offer-why" rows={2} value={why} onChange={(e) => setWhy(e.target.value)} maxLength={500} />
               </Field>
             )}

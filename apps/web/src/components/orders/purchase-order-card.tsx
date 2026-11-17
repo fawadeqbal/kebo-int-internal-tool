@@ -71,7 +71,7 @@ export function SendForm({ action, deposit, today, supplierRef }: { action: Acti
               <Field label="Sent on" htmlFor="po-sent" required error={s.errors?.sentOn}>
                 <Input id="po-sent" name="sentOn" type="date" max={today} defaultValue={s.values?.sentOn ?? today} />
               </Field>
-              <Field label="Their order no." htmlFor="po-ref" hint="if the factory gives one" error={s.errors?.supplierRef}>
+              <Field label="Their order no." htmlFor="po-ref" error={s.errors?.supplierRef}>
                 <Input id="po-ref" name="supplierRef" maxLength={60} defaultValue={s.values?.supplierRef ?? supplierRef ?? ""} />
               </Field>
               <Field label="Send by" htmlFor="po-how">
@@ -89,7 +89,6 @@ export function SendForm({ action, deposit, today, supplierRef }: { action: Acti
                 label="Why send it before the deposit is verified?"
                 htmlFor="po-reason"
                 required
-                hint="The reason is kept on the purchase order and in the audit log."
                 error={s.errors?.reason}
               >
                 <Textarea id="po-reason" name="reason" rows={3} maxLength={300} defaultValue={s.values?.reason ?? ""} />

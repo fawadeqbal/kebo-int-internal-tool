@@ -76,7 +76,7 @@ export function AddFilesCard({ dealId }: { dealId: string }) {
             ))}
         </FileZone>
         <Field label="Note" htmlFor="file-note">
-          <Input id="file-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="What is it? e.g. “room size”" />
+          <Input id="file-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} />
         </Field>
       </CardBody>
     </Card>

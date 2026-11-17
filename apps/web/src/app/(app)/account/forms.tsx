@@ -62,7 +62,7 @@ export function PasswordForm({ action, onSaved }: { action: Action; onSaved?: ()
               label="New password"
               htmlFor="next"
               error={s.errors?.next}
-              hint="At least 10 characters, with letters and at least one number. A short sentence is easy to remember."
+              hint="At least 10 characters, with letters and a number"
             >
               <Input id="next" name="next" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.next} />
             </Field>
@@ -91,7 +91,6 @@ function CodeField({ id, error, label = "Code from your app" }: { id: string; er
         name="code"
         inputMode="numeric"
         autoComplete="one-time-code"
-        placeholder="123456"
         className="max-w-40 font-mono tracking-widest"
         aria-invalid={!!error}
       />
@@ -374,11 +373,11 @@ export function ProfileForm({
           <Field label="Name" required htmlFor="profile-name" error={s.errors?.name} className="sm:col-span-2">
             <Input id="profile-name" name="name" maxLength={120} required autoComplete="name" defaultValue={s.values?.name ?? name} />
           </Field>
-          <Field label="Email" required htmlFor="profile-email" hint="A Super Admin changes it.">
+          <Field label="Email" required htmlFor="profile-email">
             <Input id="profile-email" type="email" value={email} readOnly className="bg-surface-2 text-text-2" />
           </Field>
           <Field label="Phone" htmlFor="profile-phone" error={s.errors?.phone}>
-            <Input id="profile-phone" name="phone" type="tel" maxLength={40} autoComplete="tel" placeholder="+92 300 1234567" defaultValue={s.values?.phone ?? phone ?? ""} />
+            <Input id="profile-phone" name="phone" type="tel" maxLength={40} autoComplete="tel" defaultValue={s.values?.phone ?? phone ?? ""} />
           </Field>
           <div className="flex items-center gap-2 border-t border-line pt-4 sm:col-span-3">
             <SubmitButton pendingText="Saving…">

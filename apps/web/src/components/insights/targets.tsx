@@ -25,8 +25,8 @@ export function TargetEditor({ month, current, currency }: { month: string; curr
             <Field label="Month" htmlFor="tg-month" error={s.errors?.month}>
               <Input id="tg-month" name="month" type="month" defaultValue={s.values?.month ?? month} />
             </Field>
-            <Field label={`Sales target (${currency})`} htmlFor="tg-amount" hint="Orders won that month. Empty removes it." error={s.errors?.amount}>
-              <MoneyInput id="tg-amount" name="amount" currency={currency} defaultValue={s.values?.amount ?? current ?? ""} placeholder="e.g. 100,000" />
+            <Field label={`Sales target (${currency})`} htmlFor="tg-amount" error={s.errors?.amount}>
+              <MoneyInput id="tg-amount" name="amount" currency={currency} defaultValue={s.values?.amount ?? current ?? ""} />
             </Field>
           </div>
           <div className="flex gap-2">

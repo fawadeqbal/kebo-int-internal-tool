@@ -869,10 +869,8 @@ export function LineTable({
               placeholder={
                 c.input === "textarea"
                   ? entryAt.parentKey
-                    ? `A part of ${noun} ${parentLabel(entryAt.parentKey)} — Enter adds it`
-                    : rows.length
-                      ? `New ${noun}: type, Enter adds it`
-                      : `First ${noun}: type, or paste rows from Excel`
+                    ? `A part of ${noun} ${parentLabel(entryAt.parentKey)}`
+                    : `New ${noun}`
                   : c.placeholder
               }
             />
@@ -1759,7 +1757,6 @@ function ReasonBox({ pending, onCancel }: { pending: Pending; onCancel: () => vo
               if (value.trim()) void go();
             }
           }}
-          placeholder="Choose above or write the reason"
           className="min-w-0 flex-1 basis-56"
         />
         <Button size="sm" variant="primary" onClick={() => void go()} disabled={!value.trim() || busy}>
@@ -1794,16 +1791,12 @@ function PastePanel({
       <label htmlFor="paste-lines" className="text-sm font-medium">
         Paste a list
       </label>
-      <p className="text-xs text-muted">
-        From Excel, WhatsApp or an email: one {noun} per line. A quantity at the end (&ldquo;× 200 pcs&rdquo;) is picked up; indented,
-        bulleted or &ldquo;2.1&rdquo; lines become parts of the {noun} above.
-      </p>
+      <p className="text-xs text-muted">One {noun} per line.</p>
       <Textarea
         id="paste-lines"
         rows={6}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={'Gate valve DN100 PN16 x 200 pcs\nBall valve 2" – 50 pcs\n  - handle, stainless'}
       />
       {items.length > 0 && (
         <ol className="max-h-48 overflow-auto rounded-md border border-line bg-surface text-sm">

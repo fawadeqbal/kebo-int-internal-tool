@@ -36,7 +36,6 @@ export function ContactForm({ action, contact }: { action: Action; contact?: Con
               id={`${id}-position`}
               name="position"
               maxLength={80}
-              placeholder="Purchasing manager"
               defaultValue={s.values?.position ?? f("position")}
             />
           </Field>

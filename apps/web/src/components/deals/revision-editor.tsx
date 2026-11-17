@@ -848,7 +848,6 @@ export function RevisionEditor({
                   id={`place-${number}`}
                   value={s.incotermPlace}
                   maxLength={80}
-                  placeholder="e.g. Qingdao"
                   onChange={(e) => set("incotermPlace", e.target.value)}
                 />
               </Field>
@@ -862,7 +861,6 @@ export function RevisionEditor({
                   id={`pod-${number}`}
                   value={s.portOfDischarge}
                   maxLength={80}
-                  placeholder="e.g. Karachi"
                   onChange={(e) => set("portOfDischarge", e.target.value)}
                 />
               </Field>
@@ -940,7 +938,6 @@ export function RevisionEditor({
                   id={`del-terms-${number}`}
                   rows={2}
                   className="min-h-0"
-                  placeholder="e.g. Export wooden cases; inspection before shipment"
                   value={s.deliveryTerms}
                   onChange={(e) => set("deliveryTerms", e.target.value)}
                 />
@@ -970,14 +967,12 @@ export function RevisionEditor({
                 htmlFor={`pay-terms-${number}`}
                 optional
                 error={st.errors?.paymentTerms}
-                hint="The parts print by themselves; this is printed after them"
                 className="sm:col-span-2 md:col-span-3"
               >
                 <Textarea
                   id={`pay-terms-${number}`}
                   rows={2}
                   className="min-h-0"
-                  placeholder="e.g. Bank charges outside China are for the buyer"
                   value={s.paymentTerms}
                   onChange={(e) => set("paymentTerms", e.target.value)}
                 />
@@ -1011,7 +1006,6 @@ export function RevisionEditor({
                   id={`notes-${number}`}
                   rows={3}
                   className="min-h-0"
-                  placeholder="Prices include export wooden cases and loading at the port…"
                   value={s.notes}
                   onChange={(e) => set("notes", e.target.value)}
                 />
@@ -1202,7 +1196,6 @@ export function BasisCosts({
                       aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} note`}
                       className="h-8"
                       maxLength={200}
-                      placeholder="Note, e.g. forwarder's quote"
                       value={c.note}
                       onChange={(e) => onChange(step, { note: e.target.value })}
                     />

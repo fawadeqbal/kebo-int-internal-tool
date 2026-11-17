@@ -10,7 +10,7 @@ import { rowKey } from "./form-bits";
 
 /** The customer's items as the line table shows them (the inquiry's Items step, and its read-only views). */
 export const ITEM_COLUMNS: LineColumn[] = [
-  { key: "description", label: "Description", width: "minmax(0,1fr)", input: "textarea", required: "Each item needs a description", placeholder: "What it is: size, material, standard…" },
+  { key: "description", label: "Description", width: "minmax(0,1fr)", input: "textarea", required: "Each item needs a description" },
   { key: "model", label: "Model / part no.", width: "8rem", input: "text", maxLength: 120, placeholder: "Model" },
   { key: "quantity", label: "Qty", width: "5rem", input: "number", align: "right", required: "Enter a quantity", placeholder: "Qty" },
   { key: "unit", label: "Unit", width: "5.5rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },

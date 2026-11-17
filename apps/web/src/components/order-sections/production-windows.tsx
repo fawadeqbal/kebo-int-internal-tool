@@ -26,7 +26,7 @@ export function AllReceivedWindow({ sub, action, today, place, lines }: { sub: s
             <Input id="gr-on" name="receivedOn" type="date" max={today} defaultValue={s.values?.receivedOn ?? today} />
           </Field>
           <Field label="Received at" htmlFor="gr-at" optional error={s.errors?.goodsReceivedAt}>
-            <Input id="gr-at" name="goodsReceivedAt" maxLength={160} placeholder="e.g. the forwarder’s warehouse" defaultValue={s.values?.goodsReceivedAt ?? place ?? ""} />
+            <Input id="gr-at" name="goodsReceivedAt" maxLength={160} defaultValue={s.values?.goodsReceivedAt ?? place ?? ""} />
           </Field>
         </FieldRow>
       )}

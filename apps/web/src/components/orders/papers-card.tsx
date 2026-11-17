@@ -109,14 +109,13 @@ export function RecordForm({
           <Input id={`${id}-file`} type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="pt-1.5" />
         </Field>
       ) : (
-        <Field label="Where is it" htmlFor={`${id}-where`} hint="So anyone can find it: a shelf, a person, a bank, an email">
+        <Field label="Where is it" htmlFor={`${id}-where`}>
           <Input
             id={`${id}-where`}
             name="keptWhere"
             maxLength={200}
             required
             defaultValue={r.doc?.keptWhere ?? ""}
-            placeholder="e.g. Original B/L with Habib Bank, Lahore"
           />
         </Field>
       )}

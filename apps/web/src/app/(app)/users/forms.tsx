@@ -87,13 +87,13 @@ export function NewUserPanel({ action, roles }: { action: Action; roles: RoleRow
               <Field label="Name" htmlFor="name" error={s.errors?.name}>
                 <Input id="name" name="name" autoComplete="off" defaultValue={s.values?.name} {...invalid(s.errors?.name)} />
               </Field>
-              <Field label="Email" htmlFor="email" error={s.errors?.email} hint="They sign in with this">
+              <Field label="Email" htmlFor="email" error={s.errors?.email}>
                 <Input id="email" name="email" type="email" autoComplete="off" defaultValue={s.values?.email} {...invalid(s.errors?.email)} />
               </Field>
             </PanelSection>
             <PanelSection title="Access">
               <RoleField value={s.values?.role ?? start} roles={roles} error={s.errors?.role} />
-              <Field label="First password" htmlFor="password" error={s.errors?.password} hint={`${PASSWORD_HINT} Give it to them privately; they can change it under My account.`}>
+              <Field label="First password" htmlFor="password" error={s.errors?.password} hint={PASSWORD_HINT}>
                 <Input id="password" name="password" type="text" autoComplete="new-password" spellCheck={false} defaultValue={s.values?.password} {...invalid(s.errors?.password)} />
               </Field>
             </PanelSection>
@@ -123,7 +123,7 @@ export function EditUserPanel({ action, user, roles, isMe }: { action: Action; u
               <Field label="Name" htmlFor="name" error={s.errors?.name}>
                 <Input id="name" name="name" defaultValue={s.values?.name ?? user.name} {...invalid(s.errors?.name)} />
               </Field>
-              <Field label="Email" htmlFor="email" error={s.errors?.email} hint="They sign in with this">
+              <Field label="Email" htmlFor="email" error={s.errors?.email}>
                 <Input id="email" name="email" type="email" defaultValue={s.values?.email ?? user.email} {...invalid(s.errors?.email)} />
               </Field>
             </PanelSection>

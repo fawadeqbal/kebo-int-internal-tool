@@ -86,7 +86,6 @@ function SendBackDialog({ action, what, onClose }: { action: Action; what: strin
                   maxLength={500}
                   required
                   autoFocus
-                  placeholder="e.g. the slip shows USD 900, not 1,000"
                   defaultValue={s.values?.reason}
                 />
               </Field>

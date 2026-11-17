@@ -691,7 +691,7 @@ function ChargesTable({
               <td className="px-3 py-1.5 align-middle">{unitSelect(c, k, `Charge ${k + 1} unit`)}</td>
               {showCosts && (
                 <td className="px-3 py-1.5 align-middle">
-                  <PriceInput aria-label={`Charge ${k + 1} our cost`} value={c.unitCost} placeholder="Cost" onChange={(v) => onChange(k, { unitCost: v })} />
+                  <PriceInput aria-label={`Charge ${k + 1} our cost`} value={c.unitCost} onChange={(v) => onChange(k, { unitCost: v })} />
                 </td>
               )}
               <td className="px-3 py-1.5 align-middle">
@@ -709,7 +709,7 @@ function ChargesTable({
           <tr>
             <td className="px-3 py-2 align-middle text-xs text-muted tabular">{charges.length + 1}</td>
             <td className="px-3 py-2 align-middle" colSpan={showCosts ? 6 : 5}>
-              <input aria-label="Add a charge" className={cn(CELL_BOX, "max-w-xl")} value="" placeholder="Add a charge: freight, inspection, insurance…" onChange={(e) => e.target.value && onStart(e.target.value)} />
+              <input aria-label="Add a charge" className={cn(CELL_BOX, "max-w-xl")} value="" onChange={(e) => e.target.value && onStart(e.target.value)} />
             </td>
             <td />
           </tr>
@@ -730,7 +730,7 @@ function ChargesTable({
               {unitSelect(c, k, `Charge ${k + 1} unit`)}
               <input aria-label={`Charge ${k + 1} price`} inputMode="decimal" className={PRICE_BOX} value={c.unitPrice} placeholder="Price" onChange={(e) => onChange(k, { unitPrice: e.target.value })} />
               {showCosts && (
-                <input aria-label={`Charge ${k + 1} our cost`} inputMode="decimal" className={cn(CELL_BOX, "col-span-3 text-right tabular")} value={c.unitCost} placeholder="Our cost (internal)" onChange={(e) => onChange(k, { unitCost: e.target.value })} />
+                <input aria-label={`Charge ${k + 1} our cost`} inputMode="decimal" className={cn(CELL_BOX, "col-span-3 text-right tabular")} value={c.unitCost} onChange={(e) => onChange(k, { unitCost: e.target.value })} />
               )}
             </div>
           </li>

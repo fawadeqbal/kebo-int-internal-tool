@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Clock } from "lucide-react";
 import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from "@kebo/shared";
 import { Button, Field, Select, Textarea } from "@kebo/ui";
@@ -74,7 +75,7 @@ function HoldForm({ onHold, action }: { onHold: boolean; action: Action }) {
       <ActionForm action={action} onDone={close} className={PANEL_FORM}>
         <input type="hidden" name="onHold" value={onHold ? "false" : "true"} />
         <Field label={onHold ? "Note" : "What are we waiting for?"} optional={onHold} htmlFor="hold-note">
-          <Textarea id="hold-note" name="note" rows={3} className="min-h-0" placeholder={onHold ? "" : "e.g. new drawings from the customer"} />
+          <Textarea id="hold-note" name="note" rows={3} className="min-h-0" />
         </Field>
         <Buttons save={onHold ? "Resume" : "Put on hold"} />
       </ActionForm>
@@ -84,7 +85,8 @@ function HoldForm({ onHold, action }: { onHold: boolean; action: Action }) {
 
 /**
  * The decisions in the header's ⋯ (design 17 Nov: put on hold / resume, mark lost, start, reopen): each opens
- * its window from the address (?panel=hold-inquiry, ?panel=move-inquiry&id=lost), on any tab.
+ * its window from the address (?panel=hold-inquiry, ?panel=move-inquiry&id=lost), on any tab. Closing takes the
+ * window out of the address for good (not Back), so an Undo after it cannot bring the window back.
  */
 export function DecisionWindows({
   refNo,
@@ -106,13 +108,20 @@ export function DecisionWindows({
   const hold = useSidePanel("hold-inquiry");
   const move = useSidePanel("move-inquiry");
   const m = MANUAL_MOVES[stage].filter((x) => !x.reopen || canReopen).find((x) => x.to === move.id);
+  // A move saved changes the stage, and the window goes with it before its form can close it: the address
+  // lets go of it too, so an Undo (the stage as it was) does not open it again.
+  const gone = move.open && !m;
+  const { close: moveClose } = move;
+  useEffect(() => {
+    if (gone) moveClose({});
+  }, [gone, moveClose]);
   return (
     <>
       {hold.open && canHold && (
         <SidePanel
           title={onHold ? "Resume the inquiry" : "Put the inquiry on hold"}
           description={onHold ? "It goes back to the lists as active." : "It stays where it is, marked on hold, until resumed."}
-          onClose={() => hold.close()}
+          onClose={() => hold.close({})}
           className="md:w-[560px]"
         >
           <HoldForm onHold={onHold} action={holdAction} />
@@ -122,7 +131,7 @@ export function DecisionWindows({
         <SidePanel
           title={m.to === "lost" ? `Mark ${refNo} as lost` : m.label}
           description={m.to === "lost" ? "The reason shows on reports. A manager can reopen it." : undefined}
-          onClose={() => move.close()}
+          onClose={() => move.close({})}
           className="md:w-[560px]"
         >
           <StageForm to={m.to} action={stageAction} />

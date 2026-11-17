@@ -53,7 +53,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               title="Ready date"
               sub={sub}
               action={readyDateAction.bind(null, o.id, fid, r.readyOn)}
-              files={d.canFiles ? { orderId: o.id, section: "ready_date", hint: "their message or schedule" } : undefined}
+              files={d.canFiles ? { orderId: o.id, section: "ready_date" } : undefined}
               fields={[
                 { name: "readyOn", label: "Factory says ready on", type: "date", value: r.readyOn, hint: defaults.leadTime ? `Lead time on the quote: ${defaults.leadTime.text}` : undefined },
                 { name: "readyToldOn", label: "Told on", type: "date", value: r.readyToldOn, max: now },
@@ -70,7 +70,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               sub={sub}
               plain
               action={factoryTestAction.bind(null, o.id, fid)}
-              files={d.canFiles ? { orderId: o.id, section: "fat", hint: "the video, the signed report" } : undefined}
+              files={d.canFiles ? { orderId: o.id, section: "fat" } : undefined}
               fields={[
                 { name: "fatPlannedOn", label: "Planned on", type: "date", value: r.fat.plannedOn },
                 { name: "fatAttendedById", label: "Attended by", type: "select", value: r.fat.attendedBy?.id ?? "", options: [{ value: "", label: "Nobody of ours" }, ...(people ?? []).map((p) => ({ value: p.id, label: p.name }))] },
@@ -153,7 +153,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
                     sub={`${o.refNo} · where they were received`}
                     plain
                     action={goodsReceivedAction.bind(null, o.id, first, false)}
-                    fields={[{ name: "goodsReceivedAt", label: "Received at", value: place, wide: true, placeholder: "e.g. the forwarder’s warehouse" }]}
+                    fields={[{ name: "goodsReceivedAt", label: "Received at", value: place, wide: true }]}
                   />
                 )}
               </>

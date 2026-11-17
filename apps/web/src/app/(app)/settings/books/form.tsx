@@ -29,8 +29,8 @@ export function CloseBooksForm({ view, months }: { view: BooksView; months: { va
             </Select>
           </Field>
           {opening && (
-            <Field label="Why open it again" htmlFor="books-reason" error={s.errors?.reason} hint="Its figures may change once it is open: say why (it is kept in the audit log).">
-              <Input id="books-reason" name="reason" required maxLength={500} defaultValue={s.values?.reason ?? ""} placeholder="e.g. A late supplier invoice for October" />
+            <Field label="Why open it again" htmlFor="books-reason" error={s.errors?.reason}>
+              <Input id="books-reason" name="reason" required maxLength={500} defaultValue={s.values?.reason ?? ""} />
             </Field>
           )}
           <div>

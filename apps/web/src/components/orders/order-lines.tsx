@@ -146,7 +146,6 @@ function columnsOf(set: LineSet): LineColumn[] {
           width: "6.75rem",
           input: "text",
           maxLength: 20,
-          placeholder: "e.g. 02 Nov 2026",
           phoneHidden: true,
           format: (v) => (Number(v.receivedQty) > 0 && v.receivedOn ? v.receivedOn : dash),
         },
@@ -167,7 +166,7 @@ function columnsOf(set: LineSet): LineColumn[] {
     case "packing":
       return [
         ...base,
-        { key: "packageType", label: "Packed in", width: "6.75rem", input: "text", maxLength: 40, placeholder: "Carton", phoneHidden: true },
+        { key: "packageType", label: "Packed in", width: "6.75rem", input: "text", maxLength: 40, phoneHidden: true },
         { ...number("packages", "Packages", "4.75rem", 0), format: (v) => (v.packages ? n(v.packages, 0) : dash) },
         number("grossWeightKg", "Gross kg", "5rem"),
         number("netWeightKg", "Net kg", "5rem", 2, true),
@@ -192,7 +191,7 @@ function columnsOf(set: LineSet): LineColumn[] {
               dash
             ),
         },
-        { key: "note", label: "Note", width: "8.5rem", input: "text", maxLength: 200, placeholder: "e.g. one case dented", phoneHidden: true },
+        { key: "note", label: "Note", width: "8.5rem", input: "text", maxLength: 200, phoneHidden: true },
       ];
   }
 }

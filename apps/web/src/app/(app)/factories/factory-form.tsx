@@ -72,7 +72,6 @@ function FactoryForm({
                   id="bankDetails"
                   name="bankDetails"
                   rows={3}
-                  placeholder="Bank, account no., SWIFT — printed on the purchase order"
                   defaultValue={val("bankDetails")}
                 />
               </Field>

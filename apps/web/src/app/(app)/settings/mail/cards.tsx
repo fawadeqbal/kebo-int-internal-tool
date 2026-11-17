@@ -60,17 +60,17 @@ export function MailCards({ view, me, saveAction, removeAction, testAction }: { 
                 </fieldset>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="From address" htmlFor="mail-from" required error={st.errors?.fromEmail} hint={provider === "gmail" ? "The Gmail address the emails come from" : provider === "resend" ? "On the domain you verified in Resend" : undefined}>
-                    <Input id="mail-from" name="fromEmail" type="email" autoComplete="off" defaultValue={st.values?.fromEmail ?? view.fromEmail} placeholder="sales@yourcompany.com" />
+                    <Input id="mail-from" name="fromEmail" type="email" autoComplete="off" defaultValue={st.values?.fromEmail ?? view.fromEmail} />
                   </Field>
-                  <Field label="From name" htmlFor="mail-name" optional error={st.errors?.fromName} hint="Shown before the address">
-                    <Input id="mail-name" name="fromName" maxLength={80} autoComplete="off" defaultValue={st.values?.fromName ?? view.fromName} placeholder="Your company's name" />
+                  <Field label="From name" htmlFor="mail-name" optional error={st.errors?.fromName}>
+                    <Input id="mail-name" name="fromName" maxLength={80} autoComplete="off" defaultValue={st.values?.fromName ?? view.fromName} />
                   </Field>
                   {provider === "smtp" && (
                     <>
                       <Field label="Mail server" htmlFor="mail-host" required error={st.errors?.host}>
-                        <Input id="mail-host" name="host" autoComplete="off" defaultValue={st.values?.host ?? view.host} placeholder="smtp.yourcompany.com" />
+                        <Input id="mail-host" name="host" autoComplete="off" defaultValue={st.values?.host ?? view.host} />
                       </Field>
-                      <Field label="Port" htmlFor="mail-port" required error={st.errors?.port} hint="465 is the usual secure port; 587 the other common one">
+                      <Field label="Port" htmlFor="mail-port" required error={st.errors?.port}>
                         <Select id="mail-port" name="port" defaultValue={st.values?.port ?? String(view.port ?? 465)}>
                           {SMTP_PORTS.map((n) => (
                             <option key={n} value={n}>

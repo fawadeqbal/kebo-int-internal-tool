@@ -84,8 +84,8 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             action={fieldsAction.bind(null, o.id, "order")}
             fields={[
               { name: "consignee", label: "Consignee", type: "textarea", value: o.consignee ?? null, placeholder: o.customer.name, wide: true },
-              { name: "notifyParty", label: "Notify party", type: "textarea", value: o.notifyParty ?? null, placeholder: "Same as the consignee", wide: true },
-              { name: "deliveryAddress", label: "Deliver to", type: "textarea", value: o.deliveryAddress ?? null, placeholder: "Where the goods go after the port", wide: true },
+              { name: "notifyParty", label: "Notify party", type: "textarea", value: o.notifyParty ?? null, wide: true },
+              { name: "deliveryAddress", label: "Deliver to", type: "textarea", value: o.deliveryAddress ?? null, wide: true },
             ]}
           />
         )
@@ -162,22 +162,22 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           { name: "forwarderContact", label: "Contact", value: s.forwarderContact },
           { name: "forwarderPhone", label: "Phone", value: s.forwarderPhone },
           { name: "bookingNo", label: "Booking no.", value: s.bookingNo },
-          ...(air ? [] : [{ name: "containerType", label: "Container type", value: s.containerType, placeholder: "e.g. 1 × 40 HQ" }]),
-          { name: "portOfLoading", label: "From", value: s.portOfLoading, placeholder: air ? "e.g. Shanghai PVG" : "e.g. Ningbo" },
-          { name: "portOfDischarge", label: "To", value: s.portOfDischarge, placeholder: air ? "e.g. Lahore LHE" : "e.g. Karachi" },
+          ...(air ? [] : [{ name: "containerType", label: "Container type", value: s.containerType }]),
+          { name: "portOfLoading", label: "From", value: s.portOfLoading },
+          { name: "portOfDischarge", label: "To", value: s.portOfDischarge },
           { name: "etd", label: "ETD", type: "date", value: s.etd },
           { name: "eta", label: "ETA", type: "date", value: s.eta },
         ];
         const container: DetailField[] = air
           ? [{ name: "loadedOn", label: "Handed over on", type: "date", value: s.loadedOn, max: now }]
           : [
-              { name: "containerNo", label: "Container no.", value: s.containerNo, wide: true, placeholder: "e.g. MSKU 7741203" },
+              { name: "containerNo", label: "Container no.", value: s.containerNo, wide: true },
               { name: "sealNo", label: "Seal no.", value: s.sealNo, wide: true },
               { name: "loadedOn", label: "Loaded on", type: "date", value: s.loadedOn, max: now },
               { name: "vgmKg", label: "Gross weight (VGM), kg", type: "number", value: s.vgmKg },
             ];
         const vessel: DetailField[] = [
-          ...(air ? [] : [{ name: "vessel", label: "Vessel", value: s.vessel, placeholder: "e.g. MSC Aurora" }]),
+          ...(air ? [] : [{ name: "vessel", label: "Vessel", value: s.vessel }]),
           { name: "blNo", label: air ? "AWB no." : "B/L no.", value: s.blNo },
           { name: "departedOn", label: air ? "Flown on" : "Sailed on", type: "date", value: s.departedOn, max: now },
           { name: "trackingNo", label: "Tracking no.", value: s.trackingNo },
@@ -185,13 +185,13 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         ];
         const freight: DetailField[] = [
           { name: "freightAmount", label: "Freight", type: "number", value: s.freightAmount },
-          { name: "freightCurrency", label: "Currency", value: s.freightCurrency ?? (s.freightAmount ? null : o.currency), placeholder: "e.g. USD" },
+          { name: "freightCurrency", label: "Currency", value: s.freightCurrency ?? (s.freightAmount ? null : o.currency) },
           { name: "freightTerms", label: "Paid", type: "select", value: s.freightTerms ?? "", options: [{ value: "", label: "Not said" }, ...FREIGHT_TERMS.map((t) => ({ value: t, label: FREIGHT_TERMS_LABEL[t] }))] },
           { name: "insurer", label: "Insured with", value: s.insurer },
           { name: "insurancePolicyNo", label: "Policy no.", value: s.insurancePolicyNo },
           { name: "insuredValue", label: `Insured value, ${o.currency}`, type: "number", value: s.insuredValue },
           { name: "insurancePremium", label: "Premium", type: "number", value: s.insurancePremium },
-          { name: "insuranceCurrency", label: "Premium currency", value: s.insuranceCurrency ?? (s.insurancePremium ? null : o.currency), placeholder: "e.g. USD" },
+          { name: "insuranceCurrency", label: "Premium currency", value: s.insuranceCurrency ?? (s.insurancePremium ? null : o.currency) },
         ];
         const arrival: DetailField[] = [
           { name: "arrivedOn", label: "Arrived on", type: "date", value: s.arrivedOn, max: now },

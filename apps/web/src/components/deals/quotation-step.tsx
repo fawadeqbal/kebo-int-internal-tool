@@ -307,7 +307,7 @@ export function ExpiredForm({ action, today, number }: { action: Action; today: 
             <Field label="Why" htmlFor="exp-reason" error={s.errors?.reason}>
               <Textarea id="exp-reason" name="reason" rows={2} className="min-h-0" defaultValue={s.values?.reason ?? "No answer before the validity passed"} />
             </Field>
-            <Field label="Expired on" htmlFor="exp-on" optional hint="Today when empty" error={s.errors?.on}>
+            <Field label="Expired on" htmlFor="exp-on" optional error={s.errors?.on}>
               <Input id="exp-on" name="on" type="date" max={today} className="w-44" defaultValue={s.values?.on} />
             </Field>
             <WhatHappens lines={[<>R{number} is marked <strong>Expired</strong>.</>, "The inquiry stays open.", `“Do next” becomes “Start R${number + 1} from R${number}”.`]} />

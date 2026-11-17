@@ -156,7 +156,7 @@ function LineField({ c, id, value, set, error }: { c: LineColumn; id: string; va
               </button>
             ))}
           </span>
-          <Input id={id} value={value} onChange={(e) => set(e.target.value)} maxLength={c.maxLength ?? 20} placeholder="Or type another unit" className={big} />
+          <Input id={id} value={value} onChange={(e) => set(e.target.value)} maxLength={c.maxLength ?? 20} className={big} />
         </span>
       </Field>
     );

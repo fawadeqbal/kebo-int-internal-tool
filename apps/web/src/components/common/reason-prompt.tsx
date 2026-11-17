@@ -59,7 +59,6 @@ export function ReasonPrompt({ state }: { state: ActionState }) {
           maxLength={500}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Choose above or write the reason"
           className="min-w-0 flex-1 basis-56"
         />
         {/* A warning the person already went ahead with stays accepted. */}

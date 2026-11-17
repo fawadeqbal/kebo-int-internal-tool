@@ -102,7 +102,6 @@ function CheckRow({
               type={fix.type}
               value={v}
               onChange={(e) => setV(e.target.value)}
-              placeholder="Add it here"
               className="h-8 w-36 min-w-0 rounded-md border-[1.5px] border-primary/60 bg-surface px-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
             />
             {v.trim() && (
@@ -147,7 +146,6 @@ function CheckRow({
                   id={`${id}-${l.id}`}
                   value={hs[l.id] ?? ""}
                   onChange={(e) => setHs((x) => ({ ...x, [l.id]: e.target.value }))}
-                  placeholder="e.g. 8422.40"
                   inputMode="decimal"
                   className="h-7 w-28 rounded-md border border-line-strong bg-surface px-2 text-xs focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
                 />
@@ -225,7 +223,6 @@ function RefreshBuyer({
             maxLength={300}
             autoFocus
             onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g. The customer moved to a new address"
           />
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" size="sm" variant="ghost" onClick={onClose}>

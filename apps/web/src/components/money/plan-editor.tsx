@@ -283,7 +283,6 @@ export function PlanEditor({
                         value={p.label}
                         maxLength={80}
                         disabled={p.locked}
-                        placeholder="e.g. Second part"
                         onChange={(e) => set(p.key, { label: e.target.value })}
                       />
                     </Field>
@@ -384,7 +383,6 @@ export function PlanEditor({
                             id={fid(p, "invoice")}
                             maxLength={60}
                             value={p.invoice}
-                            placeholder="If they sent one"
                             onChange={(e) => set(p.key, { invoice: e.target.value })}
                           />
                         </Field>

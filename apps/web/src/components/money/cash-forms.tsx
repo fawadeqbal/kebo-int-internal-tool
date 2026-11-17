@@ -32,7 +32,7 @@ export function AccountForm({ account, today, onClose }: { account?: AccountRow;
           <p className="text-sm font-medium">{account ? `Change ${account.name}` : "New account"}</p>
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Name" htmlFor="ac-name" error={s.errors?.name} className="sm:col-span-2">
-              <Input id="ac-name" name="name" maxLength={80} defaultValue={s.values?.name ?? account?.name ?? ""} placeholder="e.g. Meezan Bank USD, Office cash" />
+              <Input id="ac-name" name="name" maxLength={80} defaultValue={s.values?.name ?? account?.name ?? ""} />
             </Field>
             <Field label="Kind" htmlFor="ac-kind">
               <Select id="ac-kind" name="kind" defaultValue={(s.values?.kind as MoneyAccountKind) ?? account?.kind ?? "bank"}>
@@ -43,7 +43,7 @@ export function AccountForm({ account, today, onClose }: { account?: AccountRow;
                 ))}
               </Select>
             </Field>
-            <Field label="Currency" htmlFor="ac-currency" hint="One currency per account">
+            <Field label="Currency" htmlFor="ac-currency">
               <Select id="ac-currency" name="currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                 {CURRENCIES.map((c) => (
                   <option key={c} value={c}>
@@ -52,20 +52,20 @@ export function AccountForm({ account, today, onClose }: { account?: AccountRow;
                 ))}
               </Select>
             </Field>
-            <Field label="Balance on the day" htmlFor="ac-opening" error={s.errors?.openingBalance} hint="What was in it on the day below">
+            <Field label="Balance on the day" htmlFor="ac-opening" error={s.errors?.openingBalance}>
               <MoneyInput id="ac-opening" name="openingBalance" currency={currency} defaultValue={s.values?.openingBalance ?? account?.openingBalance ?? ""} placeholder="0.00" />
             </Field>
-            <Field label="On" htmlFor="ac-on" error={s.errors?.openingOn} hint="Money recorded from this day on is added">
+            <Field label="On" htmlFor="ac-on" error={s.errors?.openingOn}>
               <Input id="ac-on" name="openingOn" type="date" max={today} defaultValue={s.values?.openingOn ?? account?.openingOn ?? today} />
             </Field>
             {s.code === "rate_needed" && (
               // Settings has no rate for this currency yet: asked here, kept in Settings for every total.
               <Field label={`Exchange rate: ${currency} per 1 of the main currency`} htmlFor="ac-rate" error={s.errors?.rate} className="sm:col-span-3">
-                <Input id="ac-rate" name="rate" inputMode="decimal" required autoFocus defaultValue={s.values?.rate ?? ""} placeholder="e.g. 3.6725" className="max-w-56" />
+                <Input id="ac-rate" name="rate" inputMode="decimal" required autoFocus defaultValue={s.values?.rate ?? ""} className="max-w-56" />
               </Field>
             )}
             <Field label="Note" htmlFor="ac-note" optional className="sm:col-span-3">
-              <Textarea id="ac-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? account?.note ?? ""} placeholder="e.g. account number ending 4471" />
+              <Textarea id="ac-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? account?.note ?? ""} />
             </Field>
           </div>
           {account && (
@@ -159,11 +159,11 @@ export function MoveMoney({ accounts, today, startOpen = false }: { accounts: Ac
                 <MoneyInput id="tr-out" name="amountOut" currency={a?.currency ?? ""} defaultValue={s.values?.amountOut ?? ""} placeholder="0.00" />
               </Field>
               {differ ? (
-                <Field label={`Amount that arrived (${b?.currency})`} htmlFor="tr-in" error={s.errors?.amountIn} hint="After the exchange and any fees">
+                <Field label={`Amount that arrived (${b?.currency})`} htmlFor="tr-in" error={s.errors?.amountIn}>
                   <MoneyInput id="tr-in" name="amountIn" currency={b?.currency ?? ""} defaultValue={s.values?.amountIn ?? ""} placeholder="0.00" />
                 </Field>
               ) : (
-                <Field label="Amount that arrived" htmlFor="tr-in" optional hint="Empty: the same amount">
+                <Field label="Amount that arrived" htmlFor="tr-in" optional>
                   <MoneyInput id="tr-in" name="amountIn" currency={b?.currency ?? ""} defaultValue={s.values?.amountIn ?? ""} placeholder="0.00" />
                 </Field>
               )}
@@ -174,7 +174,7 @@ export function MoveMoney({ accounts, today, startOpen = false }: { accounts: Ac
                 <Input id="tr-ref" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
               </Field>
               <Field label="Note" htmlFor="tr-note" optional className="sm:col-span-2">
-                <Input id="tr-note" name="note" maxLength={500} defaultValue={s.values?.note ?? ""} placeholder="e.g. Changed at 281.40" />
+                <Input id="tr-note" name="note" maxLength={500} defaultValue={s.values?.note ?? ""} />
               </Field>
             </div>
             <div className="flex gap-2">

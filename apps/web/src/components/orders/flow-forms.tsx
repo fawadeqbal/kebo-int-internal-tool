@@ -210,10 +210,10 @@ export function BankContractForm({ action, contract, lc, currency, onDone }: { a
                   <MoneyInput id="bc-amount" name="amount" currency={v("currency", currency)} defaultValue={v("amount")} />
                 </div>
               </Field>
-              <Field label="Customer's bank" htmlFor="bc-cbank" optional hint="Where the documents go" error={s.errors?.customerBank}>
+              <Field label="Customer's bank" htmlFor="bc-cbank" optional error={s.errors?.customerBank}>
                 <Input id="bc-cbank" name="customerBank" maxLength={160} defaultValue={v("customerBank")} />
               </Field>
-              <Field label="Our bank" htmlFor="bc-obank" optional hint="Where they start" error={s.errors?.ourBank}>
+              <Field label="Our bank" htmlFor="bc-obank" optional error={s.errors?.ourBank}>
                 <Input id="bc-obank" name="ourBank" maxLength={160} defaultValue={v("ourBank")} />
               </Field>
               <Field label="Opened on" htmlFor="bc-opened" optional error={s.errors?.openedOn}>
@@ -354,7 +354,7 @@ export function ClaimForm({ action, today, onDone }: { action: Action; today: st
         <>
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
             <Field label="What is wrong" htmlFor="cl-title" error={s.errors?.title}>
-              <Input id="cl-title" name="title" maxLength={160} defaultValue={s.values?.title ?? ""} placeholder="e.g. Dented guard door" />
+              <Input id="cl-title" name="title" maxLength={160} defaultValue={s.values?.title ?? ""} />
             </Field>
             <Field label="Reported on" htmlFor="cl-on" error={s.errors?.openedOn}>
               <Input id="cl-on" name="openedOn" type="date" max={today} defaultValue={s.values?.openedOn ?? today} />
@@ -365,7 +365,7 @@ export function ClaimForm({ action, today, onDone }: { action: Action; today: st
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Amount" htmlFor="cl-amount" optional error={s.errors?.amount}>
-              <Input id="cl-amount" name="amount" inputMode="decimal" defaultValue={s.values?.amount ?? ""} placeholder="in the order’s currency" />
+              <Input id="cl-amount" name="amount" inputMode="decimal" defaultValue={s.values?.amount ?? ""} />
             </Field>
             <Field label="Who pays" htmlFor="cl-bearer" optional error={s.errors?.bearer}>
               <Select id="cl-bearer" name="bearer" defaultValue={s.values?.bearer ?? ""}>
@@ -403,7 +403,7 @@ export function ClaimUpdateForm({ action, claim, onDone }: { action: Action; cla
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Amount" htmlFor={`ca-${claim.id}`} optional error={s.errors?.amount}>
-              <Input id={`ca-${claim.id}`} name="amount" inputMode="decimal" defaultValue={s.values?.amount ?? claim.amount ?? ""} placeholder="in the order’s currency" />
+              <Input id={`ca-${claim.id}`} name="amount" inputMode="decimal" defaultValue={s.values?.amount ?? claim.amount ?? ""} />
             </Field>
             <Field label="Who pays" htmlFor={`cb-${claim.id}`} optional error={s.errors?.bearer}>
               <Select id={`cb-${claim.id}`} name="bearer" defaultValue={s.values?.bearer ?? claim.bearer ?? ""}>
@@ -418,7 +418,7 @@ export function ClaimUpdateForm({ action, claim, onDone }: { action: Action; cla
           </div>
           {closing && (
             <Field label="How it was settled" htmlFor={`cr-${claim.id}`} error={s.errors?.resolution}>
-              <Textarea id={`cr-${claim.id}`} name="resolution" rows={2} className="min-h-0" defaultValue={s.values?.resolution ?? claim.resolution ?? ""} placeholder="e.g. Factory sent a new door by air; fitted on site." />
+              <Textarea id={`cr-${claim.id}`} name="resolution" rows={2} className="min-h-0" defaultValue={s.values?.resolution ?? claim.resolution ?? ""} />
             </Field>
           )}
           <Actions save="Save" pending="Saving…" onCancel={onDone} />
