@@ -117,3 +117,61 @@ test("offer lines on a phone: what a line still needs is marked and can be shown
   expect(saved.lines.map((l: { unitPrice: string }) => Number(l.unitPrice))).toEqual([98000, 4500]);
   expect(errors).toEqual([]);
 });
+
+test.describe("a narrow phone (320 px, WCAG reflow)", () => {
+  test.use({ viewport: { width: 320, height: 720 }, hasTouch: true });
+
+  test("the offer's steps fit the screen, each meets WCAG 2.2 AA, Next takes the cursor to the step's title; buttons are thumb-sized", async ({ page }) => {
+    test.setTimeout(120_000);
+    const errors = watchErrors(page);
+    const t = tag();
+    const deal = await newInquiry(page, t);
+    const offer = await post(page, `/inquiries/${deal.id}/factory-quotes`, {
+      newFactoryName: `Zhejiang Wanshida Pharmaceutical Machinery ${t}`,
+      reference: "WSD-2026-11-0042-REV3",
+      receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
+      currency: "CNY",
+      basis: "FOB",
+      basisPlace: "Shanghai",
+      leadDays: 45,
+      lines: [{ description: "Fully automatic capsule filling machine with dust extraction and vacuum pump, 120,000 capsules/hour", model: "NJP-2000C-EXTRA", quantity: 2, unit: "sets", unitPrice: 1286000 }],
+    });
+    await page.goto(`/inquiries/${deal.id}/offers/${offer.id}`);
+    // The page: nothing wider than the screen; the lines stack (no table to scroll sideways).
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+    const win = page.getByRole("dialog", { name: /Edit · Zhejiang Wanshida/ });
+    const body = win.locator("[data-step-body]");
+    for (const [n, step] of ["Lines", "Delivery", "Payment", "Warranty & conditions"].entries()) {
+      if (n > 0) {
+        await win.getByRole("button", { name: /^Next/ }).click();
+        await expect(win.getByRole("heading", { name: `${step}, step ${n + 1} of 4` })).toBeFocused();
+      }
+      // Nothing in the step is wider than the screen, at its top or at its bottom.
+      for (const end of [0, 1]) {
+        await body.evaluate((el, e) => (el.scrollTop = e ? el.scrollHeight : 0), end);
+        const wide = await page.evaluate(() => {
+          const vw = document.documentElement.clientWidth;
+          return [...document.querySelectorAll("[role=dialog] *")]
+            .filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.width > 0 && r.right > vw + 1 && !el.closest(".sr-only");
+            })
+            .map((el) => `${el.tagName} ${(el.textContent ?? "").slice(0, 40)}`)
+            .slice(0, 3);
+        });
+        expect(wide, `${step}: nothing past the screen's edge`).toEqual([]);
+      }
+      expect(await accessibilityProblems(page), `${step} meets WCAG 2.2 AA at 320 px`).toEqual([]);
+    }
+    // On a touch screen every button in the window is at least 44 px each way.
+    const small = await win.getByRole("button").evaluateAll((all) =>
+      all
+        .filter((b) => b.getClientRects().length && !b.closest(".sr-only"))
+        .map((b) => ({ name: b.getAttribute("aria-label") ?? b.textContent?.trim(), w: b.getBoundingClientRect().width, h: b.getBoundingClientRect().height }))
+        .filter((b) => b.w < 44 || b.h < 44),
+    );
+    expect(small, "buttons smaller than 44 px").toEqual([]);
+    expect(errors).toEqual([]);
+  });
+});

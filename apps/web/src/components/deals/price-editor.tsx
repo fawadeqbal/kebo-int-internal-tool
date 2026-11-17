@@ -332,7 +332,7 @@ export function PriceSheet({
                   <PriceInput
                     aria-label={`Unit price for ${l.no}`}
                     data-price-m={`${at}:${i}`}
-                    className="w-28 shrink-0"
+                    className="h-11 w-32 shrink-0 text-base"
                     value={price}
                     placeholder="0.00"
                     onChange={(v) => setPrice(l.id, v)}

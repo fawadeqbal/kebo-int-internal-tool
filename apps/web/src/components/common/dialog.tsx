@@ -250,11 +250,11 @@ export function WindowHead({
     // On a phone (the form fills the screen) the way out is ← at the top left, as on a record; elsewhere ✕ on the right.
     <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 max-md:min-h-14 max-md:items-center max-md:justify-start max-md:gap-1 max-md:py-1.5 max-md:pr-4 max-md:pl-1 sm:px-6">
       <div className="min-w-0 max-md:order-2 max-md:flex-1">
-        <h2 id={`${id}-title`} ref={headRef} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none">
+        <h2 id={`${id}-title`} ref={headRef} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none max-md:line-clamp-2 max-md:text-base max-md:leading-snug">
           {title}
         </h2>
         {description && (
-          <p id={`${id}-desc`} className="mt-0.5 text-[13px] text-text-2">
+          <p id={`${id}-desc`} className="mt-0.5 text-[13px] text-text-2 max-md:line-clamp-2">
             {description}
           </p>
         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
@@ -39,10 +39,21 @@ export function StepsFrame<K extends string>({
   const i = Math.max(0, steps.findIndex((s) => s.key === at));
   const current = steps[i]!;
   const next = steps[i + 1];
+  // Another step: it starts at its top, and the cursor goes to its title, so a screen reader says where it is
+  // ("Delivery, step 2 of 4") and Tab goes on into its fields (not on the first step shown).
+  const head = useRef<HTMLHeadingElement>(null);
+  const shown = useRef(at);
+  useEffect(() => {
+    if (shown.current === at) return;
+    shown.current = at;
+    head.current?.closest("[data-step-body]")?.scrollTo?.({ top: 0 });
+    head.current?.focus({ preventScroll: true });
+  }, [at]);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Phone: a thin bar of the steps, the step's name with where it is, and what comes next. */}
-      <div className="border-b border-line px-4 pt-2.5 pb-3 md:hidden">
+      {/* Phone: a thin bar of the steps, the step's name with where it is, and what comes next (a screen reader
+          hears the same from the step's title). */}
+      <div aria-hidden className="border-b border-line px-4 pt-2.5 pb-3 md:hidden">
         <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }} aria-hidden>
           {steps.map((s, k) => (
             <span key={s.key} className={cn("h-[3px] rounded-full", k < i ? "bg-text-2/70" : k === i ? "bg-text" : "bg-line")} />
@@ -103,7 +114,9 @@ export function StepsFrame<K extends string>({
         <div data-step-body className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto px-6 pt-5 pb-6 *:shrink-0 max-md:px-4">
           {/* On a phone the bar above says the step: its heading is for screen readers only, and takes no room. */}
           <div className={cn("flex min-h-7 items-center gap-3", !heading && "max-md:contents")}>
-            <h3 className="text-lg leading-7 font-bold max-md:sr-only">{current.label}</h3>
+            <h3 ref={head} tabIndex={-1} aria-label={`${current.label}, step ${i + 1} of ${steps.length}`} className="text-lg leading-7 font-bold outline-none max-md:sr-only">
+              {current.label}
+            </h3>
             {heading && <span className="ml-auto">{heading}</span>}
           </div>
           {children}

@@ -120,8 +120,43 @@ function OptionTable({ o, currency, title }: { o: OptionView; currency: string; 
   return (
     <div className="flex flex-col gap-2">
       {title && <p className="text-[13px] font-semibold">{title}</p>}
+      {/* A phone: one line per row, nothing wider than the screen. */}
+      <ul aria-label={title ?? "Lines"} className="flex flex-col divide-y divide-line rounded-xl border border-line bg-surface sm:hidden">
+        {o.lines.map((l) => {
+          const part = l.no.includes(".");
+          const m = costs ? marginOf(l.unitPrice, l.unitCost) : null;
+          return (
+            <li key={l.id} className={cn("flex flex-col gap-1 px-3 py-2.5 text-[13px]", part && "pl-6")}>
+              <span className="flex gap-2">
+                <span className="w-7 shrink-0 text-text-2 tabular">{l.no}</span>
+                <span className="min-w-0 flex-1">
+                  <span className={cn("block whitespace-pre-line text-text [overflow-wrap:anywhere]", !part && "font-semibold")}>{l.description}</span>
+                  {(l.model || l.type !== "goods") && (
+                    <span className="flex flex-wrap items-center gap-1.5 text-xs text-text-2">
+                      {l.type !== "goods" && <Badge tone="outline">{LINE_TYPE_LABEL[l.type]}</Badge>}
+                      {l.model}
+                    </span>
+                  )}
+                </span>
+              </span>
+              <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-9 text-text-2 tabular">
+                <span>
+                  {qty(l.quantity)} {l.unit} × {two(l.unitPrice)}
+                </span>
+                <span className="font-semibold text-text">{two(l.lineTotal)}</span>
+              </span>
+              {costs && (
+                <span className="pl-9 text-xs text-text-2 tabular">
+                  cost {l.unitCost ? two(l.unitCost) : "—"}
+                  {m !== null && <span className={cn(m < 0 ? "text-bad" : m < 5 ? "text-warn" : undefined)}> · margin {m.toFixed(1)}%</span>}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
       {/* It can scroll sideways, so Tab stops on it. */}
-      <div tabIndex={0} role="region" aria-label={title ?? "Lines"} className="overflow-x-auto rounded-xl border border-line bg-surface focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none">
+      <div tabIndex={0} role="region" aria-label={title ?? "Lines"} className="overflow-x-auto rounded-xl border border-line bg-surface focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none max-sm:hidden">
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="bg-surface-2 text-left text-xs text-text-2">

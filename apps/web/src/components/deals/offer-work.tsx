@@ -426,8 +426,8 @@ function OfferWindow({
         }
         footerStart={
           q && removeAction ? (
-            <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline">
-              <Trash2 className="size-4" aria-hidden /> Remove this offer
+            <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} aria-label="Remove this offer" className="inline-flex min-h-9 items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline max-sm:min-w-11 max-sm:justify-center pointer-coarse:min-h-11">
+              <Trash2 className="size-4 max-sm:size-5" aria-hidden /> <span className="max-sm:sr-only">Remove this offer</span>
             </button>
           ) : undefined
         }
@@ -856,16 +856,18 @@ export function OfferLines({
         q.lines.length ? (
           <ul className="flex flex-col divide-y divide-line text-sm">
             {q.lines.map((l) => (
-              <li key={l.id} className={cn("flex justify-between gap-3 py-2", l.parentId && "pl-4")}>
-                <span className="min-w-0">
-                  <span className="mr-1.5 text-xs text-muted tabular">{l.no}</span>
-                  {l.description.split("\n")[0]}
-                  <span className="block text-xs text-muted tabular">
-                    {Number(l.quantity).toLocaleString("en-US")} {l.unit}
-                  </span>
+              <li key={l.id} className={cn("flex flex-col gap-1 py-2.5", l.parentId && "pl-4")}>
+                <span className="flex gap-2">
+                  <span className="w-6 shrink-0 text-xs text-muted tabular">{l.no}</span>
+                  <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{l.description.split("\n")[0]}</span>
                 </span>
-                <span className="shrink-0 tabular">
-                  {Number(l.unitPrice) ? formatMinor(Math.round(toMinor(l.unitPrice) * Number(l.quantity)), q.currency) : "—"}
+                {/* Its quantity and price, then the total: on their own line, so a long name never squeezes them. */}
+                <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-8 text-xs text-text-2 tabular">
+                  <span>
+                    {Number(l.quantity).toLocaleString("en-US")} {l.unit}
+                    {Number(l.unitPrice) ? <> × {Number(l.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</> : " · no price yet"}
+                  </span>
+                  {Number(l.unitPrice) > 0 && <span className="text-sm font-semibold text-text">{formatMinor(Math.round(toMinor(l.unitPrice) * Number(l.quantity)), q.currency)}</span>}
                 </span>
               </li>
             ))}

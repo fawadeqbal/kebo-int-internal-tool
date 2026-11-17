@@ -25,14 +25,15 @@ const buttonVariants: Record<ButtonVariant, string> = {
   trust: "bg-trust text-white shadow-card hover:opacity-90 dark:text-bg",
   link: "h-auto px-0 text-primary underline-offset-4 hover:underline",
 };
+/** On a touch screen (a phone, a tablet) every button is at least 44 px each way, as fingers need (WCAG 2.5.5). */
 const buttonSizes: Record<ButtonSize, string> = {
-  xs: "h-7 rounded-lg px-2 text-xs [&_svg]:size-3.5",
-  sm: "h-9 px-3 text-[13px]",
-  md: "h-10 px-3.5",
+  xs: "h-7 rounded-lg px-2 text-xs [&_svg]:size-3.5 pointer-coarse:h-11 pointer-coarse:min-w-11 pointer-coarse:px-3 pointer-coarse:text-[13px]",
+  sm: "h-9 px-3 text-[13px] pointer-coarse:h-11 pointer-coarse:min-w-11",
+  md: "h-10 px-3.5 pointer-coarse:h-11 pointer-coarse:min-w-11",
   lg: "h-11 px-5",
-  icon: "size-10",
-  "icon-sm": "size-9",
-  "icon-xs": "size-7 rounded-md [&_svg]:size-3.5",
+  icon: "size-10 pointer-coarse:size-11",
+  "icon-sm": "size-9 pointer-coarse:size-11",
+  "icon-xs": "size-7 rounded-md [&_svg]:size-3.5 pointer-coarse:size-11",
 };
 
 export function buttonClass(variant: ButtonVariant = "secondary", size: ButtonSize = "md", className?: string) {
