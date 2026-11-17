@@ -58,6 +58,13 @@ test("a new offer: the lines in its Lines step, saved with it in one go; a wrong
   await expect(win.getByText(/Factory total/)).toContainText("120,000.00");
   // The rail says what the step has.
   await expect(rail.getByRole("button", { name: /Lines/ })).toContainText("2 lines");
+  // The thin "+ Add line" under the sheet takes the cursor to the new line.
+  await win.getByRole("button", { name: "Add line", exact: true }).click();
+  await expect(win.getByRole("textbox", { name: /^New line: Description/ })).toBeFocused();
+  // Tax: its % and one tick for "included in their prices".
+  await win.getByLabel("Tax %", { exact: true }).fill("13");
+  await win.getByLabel("Tax included in their prices").check();
+  await expect(win.getByText("The price already has the tax in it")).toBeVisible();
   expect(await accessibilityProblems(page), "the offer's Lines step meets WCAG 2.2 AA").toEqual([]);
 
   // A wrong line: the quantity of line 2 is not a number. Nothing is saved; the window says which line.
@@ -85,6 +92,8 @@ test("a new offer: the lines in its Lines step, saved with it in one go; a wrong
   await expect(page.locator("main")).toContainText("Capsule filling machine");
   await expect(page.locator("main")).toContainText("Change parts");
   await expect(page.locator("main")).toContainText("120,000.00");
+  const saved = (await (await page.request.get(`/api/inquiries/${deal.id}/sourcing`)).json()).quotes[0];
+  expect([saved.taxIncluded, Number(saved.taxRate)]).toEqual([true, 13]);
   expect(errors).toEqual([]);
 });
 
