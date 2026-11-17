@@ -33,6 +33,19 @@
 }
 
 /*
+ * A screen reader's hidden words never widen the page. Left where it stands, such a word in a wide table that
+ * scrolls inside its box sits past the screen's edge (its box clips what it holds, not what is placed against
+ * the page), the page grows wider than the phone and the phone zooms out. At its container's left edge it is
+ * still read in the same place.
+ */
+@layer base {
+  /* (A base rule: a "left-*" class on the same element still wins, as for a skip link shown on focus.) */
+  [class*="sr-only"] {
+    left: 0;
+  }
+}
+
+/*
  * A small link or button on a touch screen: its hit area grows to at least 44 × 44 px, centred on it, without
  * moving anything (the breadcrumbs, "+ Add a file", Edit in a card's header). Opt in with the class "tap"; not
  * on an element that already draws something with ::after.
