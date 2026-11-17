@@ -4,13 +4,24 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, Pencil, Sparkles, Trash2 } from "lucide-react";
-import { ATTACHMENT_KIND_LABEL, CHANNEL_LABEL, INQUIRY_CHANNELS, PARTY_TYPE_LABEL, PARTY_TYPES, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type AttachmentKind } from "@kebo/shared";
+import {
+  ATTACHMENT_KIND_LABEL,
+  CHANNEL_LABEL,
+  INQUIRY_CHANNELS,
+  PARTY_TYPE_LABEL,
+  PARTY_TYPES,
+  PRIORITIES,
+  PRIORITY_LABEL,
+  REASON_CHOICES,
+  UNKNOWN_COUNTRY,
+  type AttachmentKind,
+} from "@kebo/shared";
 import { Alert, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
-import { OnePartFooter, StepsFrame } from "@/components/common/steps-frame";
+import { StepsFrame } from "@/components/common/steps-frame";
 import { CountrySelect } from "@/components/people/country-select";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { countryName } from "@/lib/countries";
@@ -23,7 +34,7 @@ import { ChoiceChips } from "@/components/common/choice-chips";
 import { send, type Staged } from "./documents-panel";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
 import { LineTable } from "@/components/lines/line-table";
-import { ReasonDialog } from "@/components/edits/edits";
+import { ReasonChips } from "@/components/edits/reason-chips";
 import { recordEditAction } from "@/lib/edit-actions";
 import type { DealItem } from "@/lib/types";
 import type { LineRow } from "@/components/lines/line-table";
@@ -90,6 +101,7 @@ export function DealForm({
   only = false,
   onAllSteps,
   onSaved,
+  lastChanged,
 }: {
   /** Saves and answers { data: { id, refNo } }; the window then sends the files and says it is saved. */
   action: Action;
@@ -121,6 +133,8 @@ export function DealForm({
   /** Only that step (Edit on one part, design 17 Nov): no rail, Cancel and Save, and "All steps". */
   only?: boolean;
   onAllSteps?: () => void;
+  /** Edit: "18 Nov 2026 16:05", in the bottom bar. */
+  lastChanged?: string;
   /** Saved (and the files are up). */
   onSaved: (r: { id: string; refNo?: string; title?: string; customer?: string; files?: number }) => void;
 }) {
@@ -149,19 +163,16 @@ export function DealForm({
   const [step, setStep] = useState<RequestStep>(startStep);
   // The items on a copy; changing a saved list asks why before the save (kept with the edit).
   const sheet = useItemRows(items);
+  // Why (an edit with a change): picked in the window's "Why the change?" box, sent with the save.
   const [why, setWhy] = useState<string | null>(null);
-  const [askingWhy, setAskingWhy] = useState(false);
-  const sendAfterWhy = useRef(false);
-  const anchor = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (!sendAfterWhy.current) return;
-    sendAfterWhy.current = false;
-    anchor.current?.form?.requestSubmit();
-  }, [why]);
   const create = mode === "create";
   // A new inquiry ends on Review (design rules 18 Nov): the whole request in its page's boxes, then Confirm and save.
-  const STEPS = create ? REQUEST_STEPS : REQUEST_STEPS.filter((x) => x.key !== "review");
-  const at = Math.max(0, STEPS.findIndex((x) => x.key === step));
+  // An edit of all parts ends on Changes instead: what changed, old → new, each with Undo, and why.
+  const STEPS = REQUEST_STEPS.filter((x) => x.key !== (create ? "changes" : "review"));
+  const at = Math.max(
+    0,
+    STEPS.findIndex((x) => x.key === step),
+  );
   const last = at === STEPS.length - 1;
   const go = (k: number) => setStep(STEPS[Math.min(Math.max(k, 0), STEPS.length - 1)]!.key);
 
@@ -181,11 +192,11 @@ export function DealForm({
     if (!r.ok) return r;
     const { id, refNo } = r.data as { id: string; refNo?: string };
     // A changed list of items is kept as an edit of the items, with its reason ("Edited n×").
-    if (!create && sheet.dirty && itemsEdit && (why || !itemsEdit.card?.first))
+    if (!create && sheet.dirty && itemsEdit && (why?.trim() || !itemsEdit.card?.first))
       await recordEditAction({
         ...itemsEdit.edit,
-        kind: why ? "edit" : "first",
-        reason: why ?? undefined,
+        kind: why?.trim() ? "edit" : "first",
+        reason: why?.trim() || undefined,
         changes: sheet.diff.changes.slice(0, 60),
         keys: sheet.diff.keys.slice(0, 500),
       }).catch(() => undefined);
@@ -229,10 +240,61 @@ export function DealForm({
   const reportLost = useReportLost();
   const reportDirty = useReportDirty();
   const lost = useMemo(
-    () => lostLines(initial, v, { contacts, people, meId, items: sheet.rows, itemsDirty: sheet.dirty, itemChanges: sheet.diff.changes.length, staged: staged.length, create }),
+    () =>
+      lostLines(initial, v, {
+        contacts,
+        people,
+        meId,
+        items: sheet.rows,
+        itemsDirty: sheet.dirty,
+        itemChanges: sheet.diff.changes.length,
+        staged: staged.length,
+        create,
+      }),
     [initial, v, contacts, people, meId, sheet.rows, sheet.dirty, sheet.diff.changes.length, staged.length, create],
   );
   const lostKey = lost.join("\n");
+  // An edit (design rules 18 Nov): each change, the save that counts them, and why — asked only when something changed.
+  const fieldChanges = useMemo(
+    () => (create ? [] : changeList(initial, v, { contacts, people, meId })),
+    [create, initial, v, contacts, people, meId],
+  );
+  const changedOf = (k: keyof DealFormValues) => fieldChanges.find((c) => c.key === k);
+  const itemChanges = !create && sheet.dirty ? sheet.diff.changes : [];
+  const total = fieldChanges.length + itemChanges.length + staged.length;
+  const saveLabel = total ? `Save ${total} change${total === 1 ? "" : "s"}` : "No changes";
+  const reasonChoices = REASONS(
+    fieldChanges.some((c) => c.key === "customer"),
+    itemChanges.length > 0,
+  );
+  const needWhy = !create && total > 0;
+  const canSave = create || (total > 0 && !!why?.trim());
+  const undo = (k: Change["key"]) => {
+    if (k === "customer") {
+      set("customer", initial.customer);
+      set("contactId", initial.contactId);
+      setContacts(initialContacts);
+    } else set(k, initial[k]);
+  };
+  const changedNote = (k: keyof DealFormValues) => {
+    const c = changedOf(k);
+    return c ? (
+      <span className="flex items-center gap-1.5 text-xs font-semibold text-action">
+        <span aria-hidden className="size-1.5 rounded-full bg-action-solid" />
+        Changed · was {c.from}
+      </span>
+    ) : null;
+  };
+  const changedField = (k: keyof DealFormValues) =>
+    changedOf(k) ? "[&_:is(input,select,textarea)]:border-action/70 [&_[aria-checked=true]]:border-action" : undefined;
+  const reasonBox = needWhy ? (
+    <ReasonChips
+      choices={reasonChoices}
+      value={why ?? ""}
+      onChange={(r) => setWhy(r)}
+      title={total === 1 ? "Why the change?" : "Why these changes?"}
+    />
+  ) : null;
   useEffect(() => {
     reportLost(
       lost.length
@@ -270,15 +332,13 @@ export function DealForm({
         showSuccess={false}
         className={cn(PANEL_FORM, "min-h-0 gap-0")}
         beforeSend={() => {
-          // A new inquiry is saved from Review only: Enter (or Ctrl+Enter) on a step goes on to the next one.
-          if (create && step !== "review") {
+          // Saved from Review (new) or Changes (all parts) only: Enter (or Ctrl+Enter) on a step goes on to the next one.
+          if (!only && step !== (create ? "review" : "changes")) {
             go(at + 1);
             return false;
           }
-          // A saved list changed: why, first (then it sends itself).
-          if (create || !sheet.dirty || !sheet.askWhy || why !== null) return true;
-          setAskingWhy(true);
-          return false;
+          // Nothing changed: nothing to save; something changed: why, first (the box is in the window).
+          return canSave;
         }}
         banner={(st) =>
           st.message && st.ok === false ? (
@@ -290,8 +350,8 @@ export function DealForm({
       >
         {(s) => (
           <>
-            <input ref={anchor} type="hidden" name="payload" value={JSON.stringify(body)} />
-            {why && <input type="hidden" name="reason" value={why} />}
+            <input type="hidden" name="payload" value={JSON.stringify(body)} />
+            {needWhy && why?.trim() && <input type="hidden" name="reason" value={why.trim()} />}
             <StepsFrame
               steps={STEPS.map((x, k) => ({
                 key: x.key,
@@ -304,12 +364,14 @@ export function DealForm({
                         ? itemsCount(sheet.rows)
                         : "none yet"
                       : x.key === "details"
-                      ? [v.category, PRIORITY_LABEL[v.priority as keyof typeof PRIORITY_LABEL]].filter(Boolean).join(" · ") || undefined
-                      : x.key === "review"
-                      ? undefined
-                      : files.length + staged.length
-                        ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
-                        : undefined,
+                        ? [v.category, PRIORITY_LABEL[v.priority as keyof typeof PRIORITY_LABEL]].filter(Boolean).join(" · ") || undefined
+                        : x.key === "review" || x.key === "changes"
+                          ? x.key === "changes" && total
+                            ? `${total} change${total === 1 ? "" : "s"}`
+                            : undefined
+                          : files.length + staged.length
+                            ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
+                            : undefined,
                 done: !create || k < at,
               }))}
               at={step}
@@ -322,318 +384,569 @@ export function DealForm({
                       <ChevronLeft aria-hidden /> Back to search
                     </Button>
                     <span className="flex-1" />
-                    <Button type="button" variant="strong" size="lg" disabled={addingBusy} onClick={() => newCustomer.current?.save()} className="max-md:h-11">
+                    <Button
+                      type="button"
+                      variant="strong"
+                      size="lg"
+                      disabled={addingBusy}
+                      onClick={() => newCustomer.current?.save()}
+                      className="max-md:h-11"
+                    >
                       <Check aria-hidden /> {addingBusy ? "Adding…" : "Add and use"}
                     </Button>
                   </div>
-                ) : only ? (
-                  <OnePartFooter onAllSteps={onAllSteps} saveLabel="Save changes" />
-                ) : (
-                <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
-                  {/* One strong button (design rules 18 Nov): Next is soft, Back and Review are words; ✕ closes, there is no Cancel. */}
-                  {at > 0 ? (
-                    <Button type="button" variant="ghost" onClick={() => go(at - 1)} aria-label="Back" className="max-md:size-11 max-md:px-0">
-                      <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
-                    </Button>
-                  ) : null}
-                  <span className="flex-1 max-md:hidden" />
-                  {create && step === "review" ? (
-                    <SubmitButton variant="strong" size="lg" pendingText={uploading ? "Uploading files…" : "Saving…"} className="max-md:flex-1">
-                      <Check aria-hidden /> Confirm and save
-                    </SubmitButton>
-                  ) : (
-                    <>
-                      <span className="flex-1 md:hidden" />
-                      {create && at < STEPS.length - 2 && (
-                        <Button type="button" variant="ghost" onClick={() => setStep("review")}>
-                          Review
-                        </Button>
-                      )}
-                      {!create && (
-                        <SubmitButton variant="strong" pendingText={uploading ? "Uploading files…" : "Saving…"}>
-                          <Check aria-hidden /> Save changes
-                        </SubmitButton>
-                      )}
-                      {!last && (
+                ) : !create ? (
+                  <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
+                    {!only && at > 0 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => go(at - 1)}
+                        aria-label="Back"
+                        className="max-md:size-11 max-md:px-0"
+                      >
+                        <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
+                      </Button>
+                    ) : (
+                      lastChanged && <span className="text-xs text-text-2 max-md:hidden">Last changed {lastChanged}</span>
+                    )}
+                    <span className="flex-1" />
+                    {only || step === "changes" ? (
+                      <SubmitButton
+                        variant="strong"
+                        size="lg"
+                        disabled={!canSave}
+                        pendingText={uploading ? "Uploading files…" : "Saving…"}
+                        className="max-md:flex-1"
+                      >
+                        <Check aria-hidden /> {saveLabel}
+                      </SubmitButton>
+                    ) : (
+                      <>
+                        {at < STEPS.length - 2 && (
+                          <Button type="button" variant="ghost" onClick={() => setStep("changes")}>
+                            Changes{total ? ` · ${total}` : ""}
+                          </Button>
+                        )}
                         <Button type="button" variant="soft" onClick={() => go(at + 1)}>
                           Next <ChevronRight aria-hidden />
                         </Button>
-                      )}
-                    </>
-                  )}
-                </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
+                    {/* One strong button (design rules 18 Nov): Next is soft, Back and Review are words; ✕ closes, there is no Cancel. */}
+                    {at > 0 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => go(at - 1)}
+                        aria-label="Back"
+                        className="max-md:size-11 max-md:px-0"
+                      >
+                        <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
+                      </Button>
+                    ) : null}
+                    <span className="flex-1 max-md:hidden" />
+                    {create && step === "review" ? (
+                      <SubmitButton
+                        variant="strong"
+                        size="lg"
+                        pendingText={uploading ? "Uploading files…" : "Saving…"}
+                        className="max-md:flex-1"
+                      >
+                        <Check aria-hidden /> Confirm and save
+                      </SubmitButton>
+                    ) : (
+                      <>
+                        <span className="flex-1 md:hidden" />
+                        {create && at < STEPS.length - 2 && (
+                          <Button type="button" variant="ghost" onClick={() => setStep("review")}>
+                            Review
+                          </Button>
+                        )}
+                        {!last && (
+                          <Button type="button" variant="soft" onClick={() => go(at + 1)}>
+                            Next <ChevronRight aria-hidden />
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )
               }
             >
-            {/* A refused field on another part: every step, at that one. */}
-            <JumpToStep
-              st={s}
-              onJump={(k) => {
-                setStep(k);
-                if (only && k !== step) onAllSteps?.();
-              }}
-            />
-            {step === "customer" &&
-              (adding !== null && addCustomer ? (
-                <NewCustomerForm
-                  initialName={adding}
-                  add={addCustomer}
-                  search={searchCustomers}
-                  onReady={(api) => {
-                    newCustomer.current = api;
-                  }}
-                  onBusy={setAddingBusy}
-                  onUse={(c, list) => {
-                    setAdding(null);
-                    void chooseCustomer(c, list);
-                  }}
-                />
-              ) : (
-              <PanelSection quiet title="Who asked" first className="md:grid-cols-3">
-                <Field label="Customer" htmlFor="customer" required error={s.errors?.customerId} className="md:col-span-2">
-                  <CustomerPicker
-                    value={v.customer}
-                    onChange={(c) => void chooseCustomer(c)}
-                    search={searchCustomers}
-                    recent={recentCustomers}
-                    onNew={canAddCustomer && addCustomer && !customerLocked ? (typed) => setAdding(typed) : undefined}
-                    error={s.errors?.customerId}
-                    disabled={!!customerLocked}
-                    disabledReason={customerLocked}
-                  />
-                </Field>
-                <Field
-                  label={
-                    <>
-                      Contact
-                      {/* The main contact is chosen for you, and says so. */}
-                      {mainContact && <span className="rounded-full bg-primary-soft px-2 py-px text-[11.5px] font-semibold text-primary">Main contact</span>}
-                    </>
-                  }
-                  htmlFor="contactId"
-                  error={s.errors?.contactId}
-                >
-                  <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
-                    <option value="">{v.customer ? "None" : "Choose a customer first"}</option>
-                    {contacts.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {contactLine(c)}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Came by" htmlFor="channel" required error={s.errors?.channel} className="md:col-span-3">
-                  <ChoiceChips id="channel" label="Came by" value={v.channel} options={INQUIRY_CHANNELS} labels={CHANNEL_LABEL} onChange={(c) => set("channel", c)} invalid={!!s.errors?.channel} />
-                </Field>
-                <Field label="Needed by" htmlFor="requiredBy" optional error={s.errors?.requiredBy}>
-                  <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
-                </Field>
-                <Field label="Responsible person" htmlFor="assigneeId" error={s.errors?.assigneeId}>
-                  <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)} disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}>
-                    {assignable.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.id === meId ? `${p.name} (me)` : p.name}
-                      </option>
-                    ))}
-                    <option value="">Nobody yet</option>
-                  </Select>
-                </Field>
-              </PanelSection>
-              ))}
-
-            {step === "items" && (
-              <PanelSection quiet title="Items they asked for" first className="sm:grid-cols-1">
-                <LineTable
-                  rows={sheet.rows}
-                  columns={ITEM_COLUMNS}
-                  noun="item"
-                  sheet={{ name: "Customer items", upload: itemsUpload }}
-                  error={itemErrors(s.errors).length ? undefined : s.errors?.items?.[0]}
-                  duplicates
-                  {...sheet.handlers}
-                />
-                {itemErrors(s.errors).length > 0 && (
-                  <div role="alert" className="flex flex-col gap-0.5 rounded-xl border border-bad/30 bg-bad-soft px-3 py-2.5 text-sm text-bad">
-                    <span className="font-semibold">Fix {itemErrors(s.errors).length === 1 ? "this item" : "these items"}, then save again:</span>
-                    {itemErrors(s.errors).map((e) => (
-                      <span key={e}>{e}</span>
-                    ))}
-                  </div>
-                )}
-                {!create && sheet.dirty && (
-                  <p className="text-[13px] text-text-2">
-                    {`${sheet.diff.changes.length} change${sheet.diff.changes.length === 1 ? "" : "s"} to the items, saved with the rest${sheet.askWhy ? " · Save asks why" : ""}.`}
-                  </p>
-                )}
-              </PanelSection>
-            )}
-
-            {step === "details" && (
-            <PanelSection quiet title="What they need" first className="md:grid-cols-3">
-              <Field label="Inquiry title" htmlFor="title" error={s.errors?.title} className="md:col-span-2">
-                <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} />
-                {/* A title from the items, offered (never typed in for you); left empty, the inquiry is named this way. */}
-                {!v.title.trim() && suggestedTitle && (
-                  <button
-                    type="button"
-                    onClick={() => set("title", suggestedTitle)}
-                    className="inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-full border border-dashed border-primary bg-primary-soft/50 px-2.5 py-1 text-[12.5px] font-semibold text-primary hover:bg-primary-soft"
-                  >
-                    <Sparkles aria-hidden className="size-3.5 shrink-0" />
-                    <span className="truncate">Use “{suggestedTitle}”</span>
-                  </button>
-                )}
-              </Field>
-              <Field label="Category" htmlFor="category" required error={s.errors?.category}>
-                <Select
-                  id="category"
-                  value={otherCategory ? OTHER : v.category}
-                  aria-invalid={!!s.errors?.category || undefined}
-                  onChange={(e) => {
-                    if (e.target.value === OTHER) {
-                      setOtherCategory(true);
-                      set("category", "");
-                    } else {
-                      setOtherCategory(false);
-                      set("category", e.target.value);
-                    }
-                  }}
-                >
-                  <option value="" disabled>
-                    Choose…
-                  </option>
-                  {/* One "Other": the settings' own "Other" is the same choice as typing one. */}
-                  {categories
-                    .filter((c) => c.trim().toLowerCase() !== "other")
-                    .map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  <option value={OTHER}>Other…</option>
-                </Select>
-                {otherCategory && (
-                  <Input aria-label="Category name" value={v.category} onChange={(e) => set("category", e.target.value)} maxLength={120} autoFocus />
-                )}
-              </Field>
-              <Field label="Priority" htmlFor="priority" error={s.errors?.priority} className="md:col-span-3">
-                <ChoiceChips id="priority" label="Priority" value={v.priority as (typeof PRIORITIES)[number]} options={PRIORITIES} labels={PRIORITY_LABEL} onChange={(p) => set("priority", p)} />
-              </Field>
-              <Field label="What they need" htmlFor="requirements" required={required} error={s.errors?.requirements} className="md:col-span-3">
-                <Textarea id="requirements" rows={7} value={v.requirements} onChange={(e) => set("requirements", e.target.value)} className="min-h-40" />
-              </Field>
-            </PanelSection>
-            )}
-
-            {step === "files" && (
-            <PanelSection quiet title="Files from the customer" first className="sm:grid-cols-1">
-              <FileZone
-                label="Add files"
-                big
-                disabled={uploading}
-                onFiles={(list) => setStaged((x) => [...x, ...list.map((file) => ({ key: rowKey(), file, kind: kindNext, note: "", progress: null, error: null }))])}
-                kind={
-                  <Select aria-label="What kind of file" value={kindNext} onChange={(e) => setKindNext(e.target.value as AttachmentKind)} className="h-[34px] w-auto text-[13px]">
-                    {NEW_KINDS.map((k) => (
-                      <option key={k} value={k}>
-                        {KIND_WORD[k]}
-                      </option>
-                    ))}
-                  </Select>
-                }
-              >
-                {(files.length > 0 || staged.length > 0) && (
-                  <>
-                    {files.map((f) => (
-                      <FileRow
-                        key={f.id}
-                        name={f.fileName}
-                        meta={f.meta}
-                        actions={
-                          <>
-                            <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className={buttonClass("ghost", "icon-xs")} aria-label={`View ${f.fileName}`}>
-                              <Eye aria-hidden />
-                            </a>
-                            {f.remove && (
-                              <Button size="icon-xs" variant="ghost" onClick={() => setAsking(f)} aria-label={`Remove ${f.fileName}`} className="text-bad hover:text-bad">
-                                <Trash2 aria-hidden />
-                              </Button>
-                            )}
-                          </>
-                        }
-                      />
-                    ))}
-                    {staged.map((f) => (
-                      <FileRow
-                        key={f.key}
-                        name={f.file.name}
-                        meta={
-                          f.error ? (
-                            <span className="text-bad">{f.error}</span>
-                          ) : (
-                            `${fileSize(f.file.size)}${f.progress === null ? "" : ` · uploading ${f.progress}%`}`
-                          )
-                        }
-                        tag={<KindSelect f={f} disabled={uploading} onChange={(kind) => setStaged((x) => x.map((y) => (y.key === f.key ? { ...y, kind } : y)))} className="max-sm:hidden" />}
-                        actions={
-                          <>
-                            <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, false)} aria-label={`View ${f.file.name}`}>
-                              <Eye aria-hidden />
-                            </Button>
-                            <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, true)} aria-label={`Download ${f.file.name}`}>
-                              <Download aria-hidden />
-                            </Button>
-                            <Button size="icon-xs" variant="ghost" disabled={uploading} onClick={() => setStaged((x) => x.filter((y) => y.key !== f.key))} aria-label={`Remove ${f.file.name}`} className="text-bad hover:text-bad">
-                              <Trash2 aria-hidden />
-                            </Button>
-                          </>
-                        }
-                      >
-                        {/* A phone has no room beside the name: the kind goes under it. */}
-                        <KindSelect f={f} disabled={uploading} onChange={(kind) => setStaged((x) => x.map((y) => (y.key === f.key ? { ...y, kind } : y)))} className="sm:hidden" />
-                        {f.progress !== null && f.progress < 100 && !f.error && (
-                          <span aria-hidden className="block h-1 overflow-hidden rounded-full bg-line">
-                            <span className="block h-1 bg-primary-solid transition-[width]" style={{ width: `${f.progress}%` }} />
-                          </span>
-                        )}
-                      </FileRow>
-                    ))}
-                  </>
-                )}
-              </FileZone>
-            </PanelSection>
-            )}
-
-
-            {step === "review" && (
-              <ReviewBoxes
-                v={v}
-                contacts={contacts}
-                people={people}
-                meId={meId}
-                rows={sheet.rows}
-                files={[...files.map((f) => ({ key: f.id, name: f.fileName, meta: f.meta })), ...staged.map((f) => ({ key: f.key, name: f.file.name, meta: ATTACHMENT_KIND_LABEL[f.kind] }))]}
-                onEdit={(k) => setStep(k)}
+              {/* A refused field on another part: every step, at that one. */}
+              <JumpToStep
+                st={s}
+                onJump={(k) => {
+                  setStep(k);
+                  if (only && k !== step) onAllSteps?.();
+                }}
               />
-            )}
+              {step === "customer" &&
+                (adding !== null && addCustomer ? (
+                  <NewCustomerForm
+                    initialName={adding}
+                    add={addCustomer}
+                    search={searchCustomers}
+                    onReady={(api) => {
+                      newCustomer.current = api;
+                    }}
+                    onBusy={setAddingBusy}
+                    onUse={(c, list) => {
+                      setAdding(null);
+                      void chooseCustomer(c, list);
+                    }}
+                  />
+                ) : (
+                  <PanelSection quiet title="Who asked" first className="md:grid-cols-3">
+                    <Field
+                      label="Customer"
+                      htmlFor="customer"
+                      required
+                      error={s.errors?.customerId}
+                      className={cn("md:col-span-2", changedField("customer"))}
+                    >
+                      <CustomerPicker
+                        value={v.customer}
+                        onChange={(c) => void chooseCustomer(c)}
+                        search={searchCustomers}
+                        recent={recentCustomers}
+                        onNew={canAddCustomer && addCustomer && !customerLocked ? (typed) => setAdding(typed) : undefined}
+                        error={s.errors?.customerId}
+                        disabled={!!customerLocked}
+                        disabledReason={customerLocked}
+                      />
+                      {changedNote("customer")}
+                    </Field>
+                    <Field
+                      label={
+                        <>
+                          Contact
+                          {/* The main contact is chosen for you, and says so. */}
+                          {mainContact && (
+                            <span
+                              className={cn(
+                                "rounded-full bg-primary-soft px-2 py-px text-[11.5px] font-semibold text-primary",
+                                changedField("contactId"),
+                              )}
+                            >
+                              Main contact
+                            </span>
+                          )}
+                        </>
+                      }
+                      htmlFor="contactId"
+                      error={s.errors?.contactId}
+                    >
+                      <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
+                        <option value="">{v.customer ? "None" : "Choose a customer first"}</option>
+                        {contacts.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {contactLine(c)}
+                          </option>
+                        ))}
+                      </Select>
+                      {changedNote("contactId")}
+                    </Field>
+                    <Field
+                      label="Came by"
+                      htmlFor="channel"
+                      required
+                      error={s.errors?.channel}
+                      className={cn("md:col-span-3", changedField("channel"))}
+                    >
+                      <ChoiceChips
+                        id="channel"
+                        label="Came by"
+                        value={v.channel}
+                        options={INQUIRY_CHANNELS}
+                        labels={CHANNEL_LABEL}
+                        onChange={(c) => set("channel", c)}
+                        invalid={!!s.errors?.channel}
+                      />
+                      {changedNote("channel")}
+                    </Field>
+                    <Field
+                      label="Needed by"
+                      htmlFor="requiredBy"
+                      optional
+                      error={s.errors?.requiredBy}
+                      className={changedField("requiredBy")}
+                    >
+                      <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
+                      {changedNote("requiredBy")}
+                    </Field>
+                    <Field
+                      label="Responsible person"
+                      htmlFor="assigneeId"
+                      error={s.errors?.assigneeId}
+                      className={changedField("assigneeId")}
+                    >
+                      <Select
+                        id="assigneeId"
+                        value={v.assigneeId}
+                        onChange={(e) => set("assigneeId", e.target.value)}
+                        disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}
+                      >
+                        {assignable.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.id === meId ? `${p.name} (me)` : p.name}
+                          </option>
+                        ))}
+                        <option value="">Nobody yet</option>
+                      </Select>
+                      {changedNote("assigneeId")}
+                    </Field>
+                  </PanelSection>
+                ))}
+
+              {step === "items" && (
+                <PanelSection quiet title="Items they asked for" first className="sm:grid-cols-1">
+                  <LineTable
+                    rows={sheet.rows}
+                    columns={ITEM_COLUMNS}
+                    noun="item"
+                    sheet={{ name: "Customer items", upload: itemsUpload }}
+                    error={itemErrors(s.errors).length ? undefined : s.errors?.items?.[0]}
+                    duplicates
+                    {...sheet.handlers}
+                  />
+                  {itemErrors(s.errors).length > 0 && (
+                    <div
+                      role="alert"
+                      className="flex flex-col gap-0.5 rounded-xl border border-bad/30 bg-bad-soft px-3 py-2.5 text-sm text-bad"
+                    >
+                      <span className="font-semibold">
+                        Fix {itemErrors(s.errors).length === 1 ? "this item" : "these items"}, then save again:
+                      </span>
+                      {itemErrors(s.errors).map((e) => (
+                        <span key={e}>{e}</span>
+                      ))}
+                    </div>
+                  )}
+                </PanelSection>
+              )}
+
+              {step === "details" && (
+                <PanelSection quiet title="What they need" first className="md:grid-cols-3">
+                  <Field
+                    label="Inquiry title"
+                    htmlFor="title"
+                    error={s.errors?.title}
+                    className={cn("md:col-span-2", changedField("title"))}
+                  >
+                    <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} />
+                    {/* A title from the items, offered (never typed in for you); left empty, the inquiry is named this way. */}
+                    {!v.title.trim() && suggestedTitle && (
+                      <button
+                        type="button"
+                        onClick={() => set("title", suggestedTitle)}
+                        className="inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-full border border-dashed border-primary bg-primary-soft/50 px-2.5 py-1 text-[12.5px] font-semibold text-primary hover:bg-primary-soft"
+                      >
+                        <Sparkles aria-hidden className="size-3.5 shrink-0" />
+                        <span className="truncate">Use “{suggestedTitle}”</span>
+                      </button>
+                    )}
+                    {changedNote("title")}
+                  </Field>
+                  <Field label="Category" htmlFor="category" required error={s.errors?.category} className={changedField("category")}>
+                    <Select
+                      id="category"
+                      value={otherCategory ? OTHER : v.category}
+                      aria-invalid={!!s.errors?.category || undefined}
+                      onChange={(e) => {
+                        if (e.target.value === OTHER) {
+                          setOtherCategory(true);
+                          set("category", "");
+                        } else {
+                          setOtherCategory(false);
+                          set("category", e.target.value);
+                        }
+                      }}
+                    >
+                      <option value="" disabled>
+                        Choose…
+                      </option>
+                      {/* One "Other": the settings' own "Other" is the same choice as typing one. */}
+                      {categories
+                        .filter((c) => c.trim().toLowerCase() !== "other")
+                        .map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      <option value={OTHER}>Other…</option>
+                    </Select>
+                    {otherCategory && (
+                      <Input
+                        aria-label="Category name"
+                        value={v.category}
+                        onChange={(e) => set("category", e.target.value)}
+                        maxLength={120}
+                        autoFocus
+                      />
+                    )}
+                    {changedNote("category")}
+                  </Field>
+                  <Field
+                    label="Priority"
+                    htmlFor="priority"
+                    error={s.errors?.priority}
+                    className={cn("md:col-span-3", changedField("priority"))}
+                  >
+                    <ChoiceChips
+                      id="priority"
+                      label="Priority"
+                      value={v.priority as (typeof PRIORITIES)[number]}
+                      options={PRIORITIES}
+                      labels={PRIORITY_LABEL}
+                      onChange={(p) => set("priority", p)}
+                    />
+                    {changedNote("priority")}
+                  </Field>
+                  <Field
+                    label="What they need"
+                    htmlFor="requirements"
+                    required={required}
+                    error={s.errors?.requirements}
+                    className={cn("md:col-span-3", changedField("requirements"))}
+                  >
+                    <Textarea
+                      id="requirements"
+                      rows={7}
+                      value={v.requirements}
+                      onChange={(e) => set("requirements", e.target.value)}
+                      className="min-h-40"
+                    />
+                    {changedNote("requirements")}
+                  </Field>
+                </PanelSection>
+              )}
+
+              {step === "files" && (
+                <PanelSection quiet title="Files from the customer" first className="sm:grid-cols-1">
+                  <FileZone
+                    label="Add files"
+                    big
+                    disabled={uploading}
+                    onFiles={(list) =>
+                      setStaged((x) => [
+                        ...x,
+                        ...list.map((file) => ({ key: rowKey(), file, kind: kindNext, note: "", progress: null, error: null })),
+                      ])
+                    }
+                    kind={
+                      <Select
+                        aria-label="What kind of file"
+                        value={kindNext}
+                        onChange={(e) => setKindNext(e.target.value as AttachmentKind)}
+                        className="h-[34px] w-auto text-[13px]"
+                      >
+                        {NEW_KINDS.map((k) => (
+                          <option key={k} value={k}>
+                            {KIND_WORD[k]}
+                          </option>
+                        ))}
+                      </Select>
+                    }
+                  >
+                    {(files.length > 0 || staged.length > 0) && (
+                      <>
+                        {files.map((f) => (
+                          <FileRow
+                            key={f.id}
+                            name={f.fileName}
+                            meta={f.meta}
+                            actions={
+                              <>
+                                <a
+                                  href={`/files/${f.id}?view=1`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={buttonClass("ghost", "icon-xs")}
+                                  aria-label={`View ${f.fileName}`}
+                                >
+                                  <Eye aria-hidden />
+                                </a>
+                                {f.remove && (
+                                  <Button
+                                    size="icon-xs"
+                                    variant="ghost"
+                                    onClick={() => setAsking(f)}
+                                    aria-label={`Remove ${f.fileName}`}
+                                    className="text-bad hover:text-bad"
+                                  >
+                                    <Trash2 aria-hidden />
+                                  </Button>
+                                )}
+                              </>
+                            }
+                          />
+                        ))}
+                        {staged.map((f) => (
+                          <FileRow
+                            key={f.key}
+                            name={f.file.name}
+                            meta={
+                              f.error ? (
+                                <span className="text-bad">{f.error}</span>
+                              ) : (
+                                `${fileSize(f.file.size)}${f.progress === null ? "" : ` · uploading ${f.progress}%`}`
+                              )
+                            }
+                            tag={
+                              <KindSelect
+                                f={f}
+                                disabled={uploading}
+                                onChange={(kind) => setStaged((x) => x.map((y) => (y.key === f.key ? { ...y, kind } : y)))}
+                                className="max-sm:hidden"
+                              />
+                            }
+                            actions={
+                              <>
+                                <Button
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  onClick={() => open(f.file, false)}
+                                  aria-label={`View ${f.file.name}`}
+                                >
+                                  <Eye aria-hidden />
+                                </Button>
+                                <Button
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  onClick={() => open(f.file, true)}
+                                  aria-label={`Download ${f.file.name}`}
+                                >
+                                  <Download aria-hidden />
+                                </Button>
+                                <Button
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  disabled={uploading}
+                                  onClick={() => setStaged((x) => x.filter((y) => y.key !== f.key))}
+                                  aria-label={`Remove ${f.file.name}`}
+                                  className="text-bad hover:text-bad"
+                                >
+                                  <Trash2 aria-hidden />
+                                </Button>
+                              </>
+                            }
+                          >
+                            {/* A phone has no room beside the name: the kind goes under it. */}
+                            <KindSelect
+                              f={f}
+                              disabled={uploading}
+                              onChange={(kind) => setStaged((x) => x.map((y) => (y.key === f.key ? { ...y, kind } : y)))}
+                              className="sm:hidden"
+                            />
+                            {f.progress !== null && f.progress < 100 && !f.error && (
+                              <span aria-hidden className="block h-1 overflow-hidden rounded-full bg-line">
+                                <span className="block h-1 bg-primary-solid transition-[width]" style={{ width: `${f.progress}%` }} />
+                              </span>
+                            )}
+                          </FileRow>
+                        ))}
+                      </>
+                    )}
+                  </FileZone>
+                </PanelSection>
+              )}
+
+              {only && reasonBox}
+              {step === "changes" && (
+                <div className="flex flex-col gap-3.5">
+                  {total ? (
+                    <ul aria-label="What changed" className="overflow-hidden rounded-xl border border-line text-[13.5px]">
+                      {fieldChanges.map((c) => (
+                        <li
+                          key={c.key}
+                          className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-baseline gap-3 border-t border-line px-4 py-2.5 first:border-t-0 max-sm:grid-cols-[minmax(0,1fr)_auto]"
+                        >
+                          <span className="text-text-2 max-sm:hidden">{PART_OF[c.key]}</span>
+                          <span className="min-w-0">
+                            <span className="text-text-2">{c.label}: </span>
+                            <s className="text-muted">{c.from}</s> → <b className="font-semibold">{c.to}</b>
+                          </span>
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => undo(c.key)}
+                            className="text-primary hover:text-primary"
+                            aria-label={`Undo: ${c.label}`}
+                          >
+                            Undo
+                          </Button>
+                        </li>
+                      ))}
+                      {itemChanges.length > 0 && (
+                        <li className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-baseline gap-3 border-t border-line px-4 py-2.5 first:border-t-0 max-sm:grid-cols-[minmax(0,1fr)_auto]">
+                          <span className="text-text-2 max-sm:hidden">Items</span>
+                          <span className="flex min-w-0 flex-col gap-0.5">
+                            {itemChanges.slice(0, 8).map((x) => (
+                              <span key={x}>{x}</span>
+                            ))}
+                            {itemChanges.length > 8 && <span className="text-text-2">and {itemChanges.length - 8} more</span>}
+                          </span>
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => sheet.reset()}
+                            className="text-primary hover:text-primary"
+                            aria-label="Undo the changes to the items"
+                          >
+                            Undo
+                          </Button>
+                        </li>
+                      )}
+                      {staged.length > 0 && (
+                        <li className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-baseline gap-3 border-t border-line px-4 py-2.5 first:border-t-0 max-sm:grid-cols-[minmax(0,1fr)_auto]">
+                          <span className="text-text-2 max-sm:hidden">Files</span>
+                          <span>
+                            {staged.length} to add: {staged.map((f) => f.file.name).join(", ")}
+                          </span>
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => setStaged([])}
+                            className="text-primary hover:text-primary"
+                            aria-label="Undo the files to add"
+                          >
+                            Undo
+                          </Button>
+                        </li>
+                      )}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-text-2">Nothing changed.</p>
+                  )}
+                  {reasonBox}
+                </div>
+              )}
+              {step === "review" && (
+                <ReviewBoxes
+                  v={v}
+                  contacts={contacts}
+                  people={people}
+                  meId={meId}
+                  rows={sheet.rows}
+                  files={[
+                    ...files.map((f) => ({ key: f.id, name: f.fileName, meta: f.meta })),
+                    ...staged.map((f) => ({ key: f.key, name: f.file.name, meta: ATTACHMENT_KIND_LABEL[f.kind] })),
+                  ]}
+                  onEdit={(k) => setStep(k)}
+                />
+              )}
             </StepsFrame>
           </>
         )}
       </ActionForm>
-      {askingWhy && (
-        <ReasonDialog
-          n={(itemsEdit?.card?.count ?? 0) + 1}
-          title="Why are you changing the items?"
-          changes={sheet.diff.changes}
-          saveLabel="Save changes"
-          onCancel={() => setAskingWhy(false)}
-          onSave={(reason) => {
-            setAskingWhy(false);
-            sendAfterWhy.current = true;
-            setWhy(reason);
-          }}
-        />
-      )}
       {asking && (
         <ConfirmDialog
           title={`Remove ${asking.fileName}?`}
@@ -660,12 +973,34 @@ export function DealForm({
 
 /** The kinds of file a customer sends, in the order the select lists them. */
 const NEW_KINDS: AttachmentKind[] = ["urs", "drawing", "photo", "specification", "other"];
-const KIND_WORD: Partial<Record<AttachmentKind, string>> = { urs: "URS (requirements)", drawing: "Drawing", photo: "Photo", specification: "Specification", other: "Other" };
+const KIND_WORD: Partial<Record<AttachmentKind, string>> = {
+  urs: "URS (requirements)",
+  drawing: "Drawing",
+  photo: "Photo",
+  specification: "Specification",
+  other: "Other",
+};
 
 /** What kind a file about to go up is (URS, drawing, photo…), changeable until it is saved. */
-function KindSelect({ f, disabled, onChange, className }: { f: Staged; disabled?: boolean; onChange: (k: AttachmentKind) => void; className?: string }) {
+function KindSelect({
+  f,
+  disabled,
+  onChange,
+  className,
+}: {
+  f: Staged;
+  disabled?: boolean;
+  onChange: (k: AttachmentKind) => void;
+  className?: string;
+}) {
   return (
-    <Select aria-label={`What kind of file is ${f.file.name}`} value={f.kind} disabled={disabled} onChange={(e) => onChange(e.target.value as AttachmentKind)} className={cn("h-8 w-auto text-[13px]", className)}>
+    <Select
+      aria-label={`What kind of file is ${f.file.name}`}
+      value={f.kind}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value as AttachmentKind)}
+      className={cn("h-8 w-auto text-[13px]", className)}
+    >
       {NEW_KINDS.map((k) => (
         <option key={k} value={k}>
           {KIND_WORD[k]}
@@ -722,7 +1057,20 @@ function NewCustomerForm({
   onReady: (api: { save: () => void }) => void;
   onBusy: (busy: boolean) => void;
 }) {
-  const [q, setQ] = useState<QuickCustomer>({ type: "company", name: initialName, country: UNKNOWN_COUNTRY, contact: "", position: "", email: "", phone: "", whatsapp: "", address: "", taxNo: "", defaultCurrency: "USD", initials: "" });
+  const [q, setQ] = useState<QuickCustomer>({
+    type: "company",
+    name: initialName,
+    country: UNKNOWN_COUNTRY,
+    contact: "",
+    position: "",
+    email: "",
+    phone: "",
+    whatsapp: "",
+    address: "",
+    taxNo: "",
+    defaultCurrency: "USD",
+    initials: "",
+  });
   const [sameWhatsapp, setSameWhatsapp] = useState(true);
   const [more, setMore] = useState(false);
   const [result, setResult] = useState<Extract<QuickCustomerResult, { ok: false }> | null>(null);
@@ -738,7 +1086,10 @@ function NewCustomerForm({
     let live = true;
     const t = setTimeout(async () => {
       const list = await search(name);
-      const words = name.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+      const words = name
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 2);
       if (live) setFound({ name, list: list.filter((c) => words.some((w) => c.name.toLowerCase().includes(w))).slice(0, 2) });
     }, 300);
     return () => {
@@ -750,7 +1101,12 @@ function NewCustomerForm({
 
   const save = async (allowDuplicate = false) => {
     onBusy(true);
-    const r = await add({ ...q, contact: q.contact.trim() || (q.type === "individual" ? q.name : ""), whatsapp: sameWhatsapp ? "" : q.whatsapp, allowDuplicate });
+    const r = await add({
+      ...q,
+      contact: q.contact.trim() || (q.type === "individual" ? q.name : ""),
+      whatsapp: sameWhatsapp ? "" : q.whatsapp,
+      allowDuplicate,
+    });
     onBusy(false);
     if (r.ok) onUse(r.customer, r.contacts);
     else setResult(r);
@@ -767,7 +1123,13 @@ function NewCustomerForm({
     const found = (await search(m.label)).find((c) => c.id === m.id);
     onUse(found ?? { id: m.id, name: m.label, country: UNKNOWN_COUNTRY, primaryContact: null });
   };
-  const matches = result?.matches?.length ? result.matches.map((m) => ({ id: m.id, label: m.label, detail: m.detail ?? "" })) : similar.map((c) => ({ id: c.id, label: c.name, detail: [countryName(c.country), c.primaryContact?.name].filter(Boolean).join(" · ") }));
+  const matches = result?.matches?.length
+    ? result.matches.map((m) => ({ id: m.id, label: m.label, detail: m.detail ?? "" }))
+    : similar.map((c) => ({
+        id: c.id,
+        label: c.name,
+        detail: [countryName(c.country), c.primaryContact?.name].filter(Boolean).join(" · "),
+      }));
 
   return (
     <section aria-label="New customer" className="flex flex-col gap-4" onKeyDown={noSubmit}>
@@ -794,8 +1156,16 @@ function NewCustomerForm({
           ) : null}
         </div>
       )}
-      {result && !result.matches?.length && !Object.keys(result.errors ?? {}).length && <p className="text-sm text-bad">{result.message}</p>}
-      <ChoiceChips label="Type" value={q.type ?? "company"} options={PARTY_TYPES} labels={PARTY_TYPE_LABEL} onChange={(t) => set("type", t)} />
+      {result && !result.matches?.length && !Object.keys(result.errors ?? {}).length && (
+        <p className="text-sm text-bad">{result.message}</p>
+      )}
+      <ChoiceChips
+        label="Type"
+        value={q.type ?? "company"}
+        options={PARTY_TYPES}
+        labels={PARTY_TYPE_LABEL}
+        onChange={(t) => set("type", t)}
+      />
       <div className="grid gap-x-4 gap-y-3.5 md:grid-cols-3">
         <Field label="Name" htmlFor="qc-name" required error={err("name")} className="md:col-span-2">
           <Input id="qc-name" value={q.name} onChange={(e) => set("name", e.target.value)} maxLength={200} autoFocus />
@@ -821,8 +1191,18 @@ function NewCustomerForm({
         <Field label="WhatsApp" htmlFor="qc-whatsapp" error={contactErr("whatsapp")}>
           {sameWhatsapp ? (
             <label className="flex h-10 cursor-pointer items-center gap-2.5 rounded-[10px] border border-line-strong bg-surface px-3 text-sm max-sm:h-11">
-              <input id="qc-whatsapp" type="checkbox" role="switch" checked onChange={() => setSameWhatsapp(false)} className="peer sr-only" />
-              <span aria-hidden className="relative h-5 w-9 rounded-full bg-primary-solid peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-text after:absolute after:top-0.5 after:right-0.5 after:size-4 after:rounded-full after:bg-white" />
+              <input
+                id="qc-whatsapp"
+                type="checkbox"
+                role="switch"
+                checked
+                onChange={() => setSameWhatsapp(false)}
+                className="peer sr-only"
+              />
+              <span
+                aria-hidden
+                className="relative h-5 w-9 rounded-full bg-primary-solid peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-text after:absolute after:top-0.5 after:right-0.5 after:size-4 after:rounded-full after:bg-white"
+              />
               Same as phone
             </label>
           ) : (
@@ -830,8 +1210,14 @@ function NewCustomerForm({
           )}
         </Field>
       </div>
-      <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex items-center gap-1.5 self-start text-sm font-semibold text-primary hover:underline">
-        <ChevronRight aria-hidden className={cn("size-4 transition-transform", more && "rotate-90")} /> More: address, tax no., currency, initials
+      <button
+        type="button"
+        aria-expanded={more}
+        onClick={() => setMore((m) => !m)}
+        className="flex items-center gap-1.5 self-start text-sm font-semibold text-primary hover:underline"
+      >
+        <ChevronRight aria-hidden className={cn("size-4 transition-transform", more && "rotate-90")} /> More: address, tax no., currency,
+        initials
       </button>
       {more && (
         <div className="grid gap-x-4 gap-y-3.5 md:grid-cols-3">
@@ -854,13 +1240,14 @@ function NewCustomerForm({
 }
 
 /** The inquiry's window in steps (design 17 Nov): who asked, their items, the details, their files, then Review (a new one). */
-export type RequestStep = "customer" | "items" | "details" | "files" | "review";
+export type RequestStep = "customer" | "items" | "details" | "files" | "review" | "changes";
 const REQUEST_STEPS: { key: RequestStep; label: string }[] = [
   { key: "customer", label: "Customer" },
   { key: "items", label: "Items" },
   { key: "details", label: "Details" },
   { key: "files", label: "Files" },
   { key: "review", label: "Review" },
+  { key: "changes", label: "Changes" },
 ];
 
 /** "3 items, 2 parts": the lines of a list, its parts counted apart. */
@@ -886,7 +1273,70 @@ export function numbered<T extends Pick<LineRow, "key" | "parentKey">>(rows: T[]
   });
 }
 
-const personName = (people: PersonWithRole[], id: string, meId: string) => (id ? `${people.find((p) => p.id === id)?.name ?? "Someone"}${id === meId ? " (me)" : ""}` : "Nobody yet");
+const personName = (people: PersonWithRole[], id: string, meId: string) =>
+  id ? `${people.find((p) => p.id === id)?.name ?? "Someone"}${id === meId ? " (me)" : ""}` : "Nobody yet";
+
+/** One change in an edit: which field, its name, and old → new in words. */
+type Change = { key: keyof DealFormValues; label: string; from: string; to: string };
+const PART_OF: Record<keyof DealFormValues, string> = {
+  customer: "Customer",
+  contactId: "Customer",
+  channel: "Customer",
+  requiredBy: "Customer",
+  assigneeId: "Customer",
+  title: "Details",
+  category: "Details",
+  priority: "Details",
+  requirements: "Details",
+};
+/** The quick reasons offered: for another customer, for the items, else for a value changed (shared reasons list). */
+const REASONS = (customer: boolean, items: boolean): string[] =>
+  customer
+    ? [...REASON_CHOICES.customer, "Mistake fixed"]
+    : items
+      ? ["Customer changed the list", "Customer changed the quantity", "Typed wrong", "Mistake fixed"]
+      : ["Customer asked for it", "Typed wrong", "Mistake fixed"];
+
+/** Each field of the request that differs from how it was saved, old → new in words. */
+function changeList(
+  a: DealFormValues,
+  b: DealFormValues,
+  o: { contacts: ContactOption[]; people: PersonWithRole[]; meId: string },
+): Change[] {
+  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "none");
+  const pr = (p: string) => PRIORITY_LABEL[p as keyof typeof PRIORITY_LABEL] ?? p;
+  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "none");
+  const all: Change[] = [
+    { key: "customer", label: "Customer", from: a.customer?.name ?? "none", to: b.customer?.name ?? "none" },
+    { key: "contactId", label: "Contact", from: a.customer?.id === b.customer?.id ? contact(a.contactId) : "", to: contact(b.contactId) },
+    { key: "channel", label: "Came by", from: CHANNEL_LABEL[a.channel], to: CHANNEL_LABEL[b.channel] },
+    {
+      key: "requiredBy",
+      label: "Needed by",
+      from: a.requiredBy ? date(a.requiredBy) : "none",
+      to: b.requiredBy ? date(b.requiredBy) : "none",
+    },
+    {
+      key: "assigneeId",
+      label: "Responsible person",
+      from: personName(o.people, a.assigneeId, o.meId),
+      to: personName(o.people, b.assigneeId, o.meId),
+    },
+    { key: "title", label: "Inquiry title", from: short(a.title), to: short(b.title) },
+    { key: "category", label: "Category", from: a.category.trim() || "none", to: b.category.trim() || "none" },
+    { key: "priority", label: "Priority", from: pr(a.priority), to: pr(b.priority) },
+    { key: "requirements", label: "What they need", from: short(a.requirements), to: short(b.requirements) },
+  ];
+  return all.filter((c) =>
+    c.key === "customer"
+      ? a.customer?.id !== b.customer?.id
+      : c.key === "contactId"
+        ? a.customer?.id === b.customer?.id && a.contactId !== b.contactId
+        : c.key === "title" || c.key === "requirements" || c.key === "category"
+          ? a[c.key].trim() !== b[c.key].trim()
+          : a[c.key] !== b[c.key],
+  );
+}
 
 /**
  * What closing the window now would lose, a line each: a new inquiry lists what was filled in
@@ -895,7 +1345,16 @@ const personName = (people: PersonWithRole[], id: string, meId: string) => (id ?
 function lostLines(
   a: DealFormValues,
   b: DealFormValues,
-  o: { contacts: ContactOption[]; people: PersonWithRole[]; meId: string; items: LineRow[]; itemsDirty: boolean; itemChanges: number; staged: number; create: boolean },
+  o: {
+    contacts: ContactOption[];
+    people: PersonWithRole[];
+    meId: string;
+    items: LineRow[];
+    itemsDirty: boolean;
+    itemChanges: number;
+    staged: number;
+    create: boolean;
+  },
 ): string[] {
   const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "none");
   const fields: [string, string, string][] = [
@@ -906,11 +1365,25 @@ function lostLines(
     ["Responsible person", personName(o.people, a.assigneeId, o.meId), personName(o.people, b.assigneeId, o.meId)],
     ["Inquiry title", a.title.trim() || "none", b.title.trim() || "none"],
     ["Category", a.category.trim() || "none", b.category.trim() || "none"],
-    ["Priority", PRIORITY_LABEL[a.priority as keyof typeof PRIORITY_LABEL] ?? a.priority, PRIORITY_LABEL[b.priority as keyof typeof PRIORITY_LABEL] ?? b.priority],
-    ["What they need", a.requirements.trim() ? "written" : "none", b.requirements.trim() ? (a.requirements.trim() ? "changed" : "written") : "none"],
+    [
+      "Priority",
+      PRIORITY_LABEL[a.priority as keyof typeof PRIORITY_LABEL] ?? a.priority,
+      PRIORITY_LABEL[b.priority as keyof typeof PRIORITY_LABEL] ?? b.priority,
+    ],
+    [
+      "What they need",
+      a.requirements.trim() ? "written" : "none",
+      b.requirements.trim() ? (a.requirements.trim() ? "changed" : "written") : "none",
+    ],
   ];
   const out = fields
-    .filter(([label, x, y], k) => (k === 1 && a.customer?.id !== b.customer?.id ? false : label === "What they need" ? a.requirements.trim() !== b.requirements.trim() : x !== y))
+    .filter(([label, x, y], k) =>
+      k === 1 && a.customer?.id !== b.customer?.id
+        ? false
+        : label === "What they need"
+          ? a.requirements.trim() !== b.requirements.trim()
+          : x !== y,
+    )
     .map(([label, x, y]) => (o.create ? `${label}: ${y}` : `${label}: ${x} → ${y}`));
   if (o.create ? o.items.length > 0 : o.itemsDirty)
     out.push(o.create ? `Items: ${itemsCount(o.items)}` : `Items: ${o.itemChanges} change${o.itemChanges === 1 ? "" : "s"}`);
@@ -959,7 +1432,16 @@ function ReviewBoxes({
               ["Inquiry title", v.title.trim() || "—"],
               ["Category", v.category.trim() || missing("Not chosen yet")],
               ["Priority", PRIORITY_LABEL[v.priority as keyof typeof PRIORITY_LABEL] ?? v.priority],
-              ["What they need", v.requirements.trim() ? <span className="line-clamp-3 whitespace-pre-line">{v.requirements.trim()}</span> : rows.length ? "—" : missing("Write it, or add items")],
+              [
+                "What they need",
+                v.requirements.trim() ? (
+                  <span className="line-clamp-3 whitespace-pre-line">{v.requirements.trim()}</span>
+                ) : rows.length ? (
+                  "—"
+                ) : (
+                  missing("Write it, or add items")
+                ),
+              ],
             ]}
           />
         </ReviewBox>
@@ -968,15 +1450,16 @@ function ReviewBoxes({
         {lines.length ? (
           <ul className="text-[13.5px]">
             {lines.map((r) => (
-              <li key={r.key} className={cn("flex items-baseline gap-3 border-t border-line px-4 py-2 first:border-t-0", r.parentKey && "pl-9")}>
+              <li
+                key={r.key}
+                className={cn("flex items-baseline gap-3 border-t border-line px-4 py-2 first:border-t-0", r.parentKey && "pl-9")}
+              >
                 <span className="w-7 shrink-0 text-text-2 tabular">{r.no}</span>
                 <span className="min-w-0 flex-1">
                   <span className={r.parentKey ? "" : "font-semibold"}>{r.values.description || "—"}</span>
                   {r.values.model && <span className="text-text-2"> · {r.values.model}</span>}
                 </span>
-                <span className="shrink-0 text-text-2 tabular">
-                  {[r.values.quantity, r.values.unit].filter(Boolean).join(" ")}
-                </span>
+                <span className="shrink-0 text-text-2 tabular">{[r.values.quantity, r.values.unit].filter(Boolean).join(" ")}</span>
               </li>
             ))}
           </ul>
@@ -988,7 +1471,10 @@ function ReviewBoxes({
         {files.length ? (
           <div className="flex flex-wrap gap-2 px-4 py-3">
             {files.map((f) => (
-              <span key={f.key} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-[13px]">
+              <span
+                key={f.key}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-[13px]"
+              >
                 <FileText aria-hidden className="size-3.5 shrink-0 text-text-2" />
                 <span className="truncate">{f.name}</span>
                 <span className="shrink-0 text-xs text-text-2">{f.meta.split(" · ")[0]}</span>

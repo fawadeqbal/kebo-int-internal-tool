@@ -85,6 +85,8 @@ export function useItemRows(items: DealItem[]) {
     list,
     rows,
     handlers,
+    /** Back to the saved list (Undo on the window's Changes step). */
+    reset: () => setList(stateOf(items)),
     diff,
     dirty: diff.changes.length > 0,
     askWhy: items.length > 0 && (diff.filledChanged || diff.added),
