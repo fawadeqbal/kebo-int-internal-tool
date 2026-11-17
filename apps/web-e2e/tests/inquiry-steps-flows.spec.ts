@@ -28,19 +28,19 @@ async function newInquiry(page: Page) {
   return { id: inquiry.id as string, refNo: inquiry.refNo as string };
 }
 
-test("the Items card's Edit opens the inquiry's window on Items; a changed list asks why, a wrong item says which, then all is saved together", async ({ page }) => {
+test("the Items card's Edit opens only the items; a changed list asks why, a wrong item says which, then it is saved", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   const deal = await newInquiry(page);
   await page.goto(`/inquiries/${deal.id}`);
   await page.locator("#items").getByRole("link", { name: "Edit items" }).click();
-  const win = page.getByRole("dialog", { name: "Edit the request" });
-  const rail = win.getByRole("navigation", { name: "Steps" });
-  await expect(rail.getByRole("button", { name: /: Items/ })).toHaveAttribute("aria-current", "step");
-  await expect(rail.getByRole("button", { name: /: Items/ })).toContainText("2 items");
+  // Only the items (design 17 Nov): no steps; All steps is there for the rest of the request.
+  const win = page.getByRole("dialog", { name: `Items · ${deal.refNo}` });
+  await expect(win.getByRole("navigation", { name: "Steps" })).toHaveCount(0);
+  await expect(win.getByRole("button", { name: "All steps" })).toBeVisible();
   const sheet = win.getByRole("grid");
   await expect(sheet.getByRole("row", { name: "Item 2" })).toContainText("Punches and dies");
-  expect(await accessibilityProblems(page), "the inquiry's Items step meets WCAG 2.2 AA").toEqual([]);
+  expect(await accessibilityProblems(page), "the inquiry's items, on their own, meet WCAG 2.2 AA").toEqual([]);
 
   // A wrong quantity: Save asks why (a saved list changed), then the save is refused and says which item.
   await sheet.getByRole("row", { name: "Item 2" }).getByRole("gridcell").nth(2).click();

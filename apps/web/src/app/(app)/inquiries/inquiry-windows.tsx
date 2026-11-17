@@ -48,7 +48,7 @@ export async function NewInquiryWindow({ customerId }: { customerId?: string }) 
 
 /**
  * "Edit the request": the same window, filled (?panel=edit-request on the inquiry's Overview); `step`
- * (?id=items) opens it on that step, as the Items card's Edit does.
+ * (?id=items, the Items card's Edit) opens only that part, with "All steps" to see the rest.
  */
 export async function EditRequestWindow({ d, step }: { d: DealDetail; step?: string }) {
   if (!d.allowed.edit) return null;
@@ -83,6 +83,7 @@ export async function EditRequestWindow({ d, step }: { d: DealDetail; step?: str
       searchCustomers={searchCustomersAction}
       loadContacts={customerContactsAction}
       startStep={startStep}
+      only={!!startStep}
       items={d.items}
       itemsUpload={!sent}
       itemsEdit={{ edit: { type: "inquiry", id: d.id, card: "needs" }, card: edits.cards.needs }}

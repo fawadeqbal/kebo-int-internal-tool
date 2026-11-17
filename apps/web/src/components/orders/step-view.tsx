@@ -427,9 +427,12 @@ export function LinesCard({
   panelDescription,
   edits,
   editPanel,
+  window: ownWindow,
 }: {
   /** Edit opens a window of the page instead (?panel=…&id=…), e.g. the inquiry's window on its Items step. */
   editPanel?: { panel: string; id?: string };
+  /** Edit opens this window instead of the edit panel: its own SidePanel (the offer's, on its lines only). */
+  window?: (close: () => void) => ReactNode;
   title: ReactNode;
   description?: ReactNode;
   canEdit: boolean;
@@ -449,7 +452,7 @@ export function LinesCard({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const editable = canEdit && !!edit;
+  const editable = canEdit && (!!edit || !!ownWindow);
   useEffect(() => {
     if (!editable) return;
     const check = () => {
@@ -498,7 +501,8 @@ export function LinesCard({
           )}
         </div>
       </ViewCard>
-      {open && editable && (
+      {open && editable && ownWindow && ownWindow(close)}
+      {open && editable && !ownWindow && (
         <SidePanel
           title={panelTitle ?? `Edit ${name.toLowerCase().startsWith("lines") ? name.toLowerCase() : name}`}
           description={panelDescription ?? "Change, add, remove or move lines here. Nothing is saved until Save changes."}

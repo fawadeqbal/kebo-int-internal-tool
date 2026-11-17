@@ -79,14 +79,38 @@ export type OfferKit = {
   linesCard?: EditCard | null;
 };
 
+/** A part's name in its window's title ("Delivery · Techtribe’s offer"). */
+const PART_TITLE: Record<OfferStep, string> = { lines: "Lines", delivery: "Delivery", payment: "Payment", warranty: "Warranty & conditions" };
+
 /**
- * Edit with its word (never a pencil alone): opens the offer's steps window on `step` (Lines · Delivery ·
- * Payment · Warranty & conditions). `what` finishes its name for screen readers ("Edit delivery").
+ * The offer's window (design 17 Nov, edit one part): `only` opens just the part asked for, with Cancel and
+ * Save, sized to it; "All steps" turns it into the whole steps window at that part. Without `only`: the steps.
+ */
+export function OfferPanel({ kit, q, step, only = false, onClose }: { kit: OfferKit; q: FactoryQuoteView; step: OfferStep; only?: boolean; onClose: () => void }) {
+  const [one, setOne] = useState(only);
+  const width = !one || step === "lines" ? "md:w-[1180px]" : step === "payment" ? "md:w-[760px]" : "md:w-[680px]";
+  return (
+    <SidePanel
+      title={one ? `${PART_TITLE[step]} · ${q.factory.name}’s offer` : `Edit · ${q.factory.name}’s offer`}
+      description="Internal, never shown to the customer."
+      onClose={onClose}
+      className={width}
+    >
+      <OfferWindow {...kit} q={q} startStep={step} only={one} onAllSteps={() => setOne(false)} />
+    </SidePanel>
+  );
+}
+
+/**
+ * Edit with its word (never a pencil alone): opens the offer's window on `step` (Lines · Delivery ·
+ * Payment · Warranty & conditions), only that part when `only`. `what` finishes its name for screen
+ * readers ("Edit delivery").
  */
 export function OfferEdit({
   kit,
   q,
   step,
+  only = false,
   what,
   words,
   size = "xs",
@@ -95,6 +119,7 @@ export function OfferEdit({
   kit: OfferKit;
   q: FactoryQuoteView;
   step: OfferStep;
+  only?: boolean;
   what?: string;
   words?: string;
   size?: "xs" | "sm";
@@ -111,11 +136,7 @@ export function OfferEdit({
           </>
         )}
       </Button>
-      {open && (
-        <SidePanel title={`Edit · ${q.factory.name}’s offer`} description="Internal, never shown to the customer." onClose={() => setOpen(false)} className="md:w-[1180px]">
-          <OfferWindow {...kit} q={q} startStep={step} />
-        </SidePanel>
-      )}
+      {open && <OfferPanel kit={kit} q={q} step={step} only={only} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -135,7 +156,7 @@ function TermGroup({ title, edit, children }: { title: string; edit?: ReactNode;
 
 /** The offer's terms in three groups, each with Edit opening its step: Delivery · Payment · Warranty & conditions. */
 export function OfferTerms({ q, kit }: { q: FactoryQuoteView; /** Given when the offer can be edited. */ kit?: OfferKit }) {
-  const edit = (step: OfferStep, what: string) => (kit ? <OfferEdit kit={kit} q={q} step={step} what={what} /> : undefined);
+  const edit = (step: OfferStep, what: string) => (kit ? <OfferEdit kit={kit} q={q} step={step} what={what} only /> : undefined);
   const none = <span className="text-muted">Not said</span>;
   return (
     <div className="grid overflow-hidden rounded-xl border border-line bg-surface md:grid-cols-3">
@@ -179,7 +200,12 @@ function OfferWindow({
   lineActions,
   linesCard,
   startStep,
+  only = false,
+  onAllSteps,
 }: {
+  /** Only the step it opens on (Edit on one part); "All steps" calls onAllSteps. */
+  only?: boolean;
+  onAllSteps?: () => void;
   /** The customer's items (a new offer can start from them; a line says which it answers). */
   items: Items;
   /** The inquiry's other offers with lines (their lines can be copied). */
@@ -351,6 +377,8 @@ function OfferWindow({
       <OfferHeaderForm
         step={step}
         onStep={setStep}
+        only={only}
+        onAllSteps={onAllSteps}
         linesSummary={batch.rows.length ? `${batch.rows.length} line${batch.rows.length === 1 ? "" : "s"}` : "no lines yet"}
         lines={(h) => {
           const columns = offerColumns(q?.lines ?? [], items, h.currency || mainCurrency, h.taxRate);
@@ -875,9 +903,7 @@ export function OfferLines({
         ) : undefined
       }
       edits={edits}
-      panelTitle={`Edit · ${q.factory.name}’s offer`}
-      panelDescription="Internal, never shown to the customer."
-      edit={<OfferWindow {...kit} q={q} startStep="lines" />}
+      window={(close) => <OfferPanel kit={kit} q={q} step="lines" only onClose={close} />}
     />
   );
 }

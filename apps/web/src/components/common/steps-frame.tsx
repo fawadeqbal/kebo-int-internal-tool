@@ -27,7 +27,10 @@ export function StepsFrame<K extends string>({
   heading,
   children,
   footer,
+  single = false,
 }: {
+  /** One part on its own (Edit on that part, design 17 Nov): no rail and no bar, only its fields and the buttons. */
+  single?: boolean;
   steps: StepInfo<K>[];
   at: K;
   onGo: (k: K) => void;
@@ -49,6 +52,22 @@ export function StepsFrame<K extends string>({
     head.current?.closest("[data-step-body]")?.scrollTo?.({ top: 0 });
     head.current?.focus({ preventScroll: true });
   }, [at]);
+  // "All steps" from one part: its button is gone, so the cursor goes to the step's title (Escape still closes).
+  const wasSingle = useRef(single);
+  useEffect(() => {
+    if (wasSingle.current && !single) head.current?.focus({ preventScroll: true });
+    wasSingle.current = single;
+  }, [single]);
+  if (single)
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div data-step-body className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-5 pb-6 *:shrink-0 max-md:px-4">
+          {heading && <div className="flex justify-end">{heading}</div>}
+          {children}
+        </div>
+        {footer}
+      </div>
+    );
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Phone: a thin bar of the steps, the step's name with where it is, and what comes next (a screen reader
@@ -168,6 +187,41 @@ export function StepsFooter({
           Next <ChevronRight aria-hidden />
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * The buttons of one part on its own: "All steps" (the same window with every step, at this part) on the
+ * left; Cancel and Save on the right.
+ */
+export function OnePartFooter({
+  onAllSteps,
+  onCancel,
+  canSave = true,
+  saveLabel = "Save",
+}: {
+  onAllSteps?: () => void;
+  onCancel?: () => void;
+  canSave?: boolean;
+  saveLabel?: string;
+}) {
+  return (
+    <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
+      {onAllSteps && (
+        <Button type="button" variant="ghost" onClick={onAllSteps} className="px-2 text-primary hover:text-primary">
+          All steps <ChevronRight aria-hidden />
+        </Button>
+      )}
+      <span className="flex-1" />
+      {onCancel && (
+        <Button type="button" variant="ghost" onClick={onCancel} className="max-md:hidden">
+          Cancel
+        </Button>
+      )}
+      <SubmitButton variant="primary" pendingText="Saving…" disabled={!canSave}>
+        <Check aria-hidden /> {saveLabel}
+      </SubmitButton>
     </div>
   );
 }

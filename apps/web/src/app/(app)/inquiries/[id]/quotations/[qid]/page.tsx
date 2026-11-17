@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment, type ReactNode } from "react";
-import { AlertTriangle, ChevronRight, Download, Eye, Pencil, Send } from "lucide-react";
+import { AlertTriangle, ChevronRight, Download, Eye, Send } from "lucide-react";
 import { BASIS_STEP_LABEL, can, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, type BasisStep } from "@kebo/shared";
 import { buttonClass, cn, PageHeader, RevisionBadge, StatusBadge } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
@@ -12,7 +12,7 @@ import { companyToday, date, money } from "@/lib/format";
 import { dealOf, quotationOf } from "@/lib/deal-data";
 import type { QuotationOfDeal, QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
 import { StartRevision } from "@/components/deals/quotation-panels";
-import { QuoteStepsPanel } from "@/components/deals/quotation-step";
+import { QuoteEdit } from "@/components/deals/quotation-step";
 import type { QuoteStep } from "@/components/deals/revision-editor";
 import { AnswerButton } from "@/components/deals/quotation-tab";
 import { checksOf, optionOf, QuoteLines, QuoteTerms } from "@/components/deals/quote-view";
@@ -102,23 +102,20 @@ export default async function QuotationOwnPage({
       />
     ) : null;
 
-  // Edit, with its word (never a pencil alone): it opens the draft's steps on the step of the part it is on.
+  // Edit, with its word (never a pencil alone): on a part it opens only that part (design 17 Nov); at the top, the steps.
+  const editor = edit ? { quoteRef, number: r.number, initial: draftValues!, offers: offers!, loadOffers, showCosts, action: updateRevisionAction.bind(null, d.id, r.id) } : null;
   const editButton = (step: QuoteStep, what: string, words?: string) =>
-    edit ? (
-      <PanelButton
-        variant="secondary"
-        size="xs"
+    editor ? (
+      <QuoteEdit
+        {...editor}
+        step={step}
+        only
         className="tracking-normal normal-case"
-        icon={<Pencil aria-hidden />}
         label={words ?? (
           <>
             Edit<span className="sr-only"> {what}</span>
           </>
         )}
-        title={`Edit · ${quoteRef}`}
-        description="Draft"
-        panelClassName="md:w-[1180px]"
-        body={<QuoteStepsPanel number={r.number} initial={draftValues!} offers={offers!} loadOffers={loadOffers} showCosts={showCosts} action={updateRevisionAction.bind(null, d.id, r.id)} step={step} />}
       />
     ) : undefined;
 
@@ -194,18 +191,7 @@ export default async function QuotationOwnPage({
         }
         actions={
           <>
-            {edit && (
-              <PanelButton
-                variant="secondary"
-                size="sm"
-                icon={<Pencil aria-hidden />}
-                label="Edit"
-                title={`Edit · ${quoteRef}`}
-                description="Draft"
-                panelClassName="md:w-[1180px]"
-                body={<QuoteStepsPanel number={r.number} initial={draftValues!} offers={offers!} loadOffers={loadOffers} showCosts={showCosts} action={updateRevisionAction.bind(null, d.id, r.id)} step="lines" />}
-              />
-            )}
+            {editor && <QuoteEdit {...editor} step="lines" size="sm" label="Edit" />}
             {r.status === "sent" && send && (
               <PanelButton variant="secondary" size="sm" icon={<Send aria-hidden />} label="Send again" title={`Send ${quoteRef} again`} description="The same PDF, by email" panelClassName="md:w-[620px]" body={send} />
             )}

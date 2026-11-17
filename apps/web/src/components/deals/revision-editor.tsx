@@ -46,7 +46,7 @@ import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { PANEL_FORM, PanelFooter, PanelSection } from "@/components/common/panel";
-import { StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
+import { OnePartFooter, StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
 import { PriceSheet, PriceTotals } from "./price-editor";
 import { shortName } from "./offer-facts";
 import {
@@ -441,9 +441,14 @@ export function RevisionEditor({
   tickAll = false,
   footNote,
   stepsAt,
+  only = false,
+  onAllSteps,
 }: {
   /** In the steps window (design "one way, any number"): the step it opens on; one Save sends every step. */
   stepsAt?: QuoteStep;
+  /** Only the step it opens on (Edit on one part, design 17 Nov): no rail, Cancel and Save, and "All steps". */
+  only?: boolean;
+  onAllSteps?: () => void;
   /** The window of a first revision: every factory offer that has lines starts ticked. */
   tickAll?: boolean;
   /** The window's footer, on the left ("Once sent, a change needs a new revision."). */
@@ -666,6 +671,7 @@ export function RevisionEditor({
         if (!partsBad) return true;
         setPartsTried(true);
         if (step) setStep("payment");
+        if (only && step !== "payment") onAllSteps?.();
         document.getElementById(`parts-${number}`)?.scrollIntoView?.({ block: "center" });
         return false;
       }}
@@ -1027,7 +1033,11 @@ export function RevisionEditor({
                 at={step}
                 onGo={setStep}
                 heading={stepCheck(step)}
+                single={only}
                 footer={
+                  only ? (
+                    <OnePartFooter onAllSteps={onAllSteps} onCancel={onCancel} canSave={!requireChanges || dirty} />
+                  ) : (
                   <StepsFooter
                     first={stepAt === 0}
                     last={stepAt === QUOTE_STEPS.length - 1}
@@ -1035,6 +1045,7 @@ export function RevisionEditor({
                     onNext={() => setStep(QUOTE_STEPS[Math.min(QUOTE_STEPS.length - 1, stepAt + 1)]!.key)}
                     canSave={!requireChanges || dirty}
                   />
+                  )
                 }
               >
                 {sections}

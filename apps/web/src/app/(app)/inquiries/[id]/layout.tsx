@@ -6,7 +6,7 @@ import { companyToday } from "@/lib/format";
 import { requireUser, hasFeature } from "@/lib/session";
 import { dealOf } from "@/lib/deal-data";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
-import { InquiryNext, InquiryTabs, type InquiryTab } from "@/components/deals/inquiry-nav";
+import { InquiryNextButton, InquiryTabs, type InquiryTab } from "@/components/deals/inquiry-nav";
 import { DealBody, DealChrome } from "@/components/deals/deal-chrome";
 import { offerFactsOf } from "./facts";
 import { inquiryNext, quotationStatus, statusWords } from "./steps";
@@ -17,7 +17,7 @@ const TONE = { action: "text-action", ok: "text-ok", bad: "text-bad", mute: "tex
  * Every page of an inquiry shares one top, the same shape as an order's: its title, then one line that
  * starts with its status in words ("Sourcing · 2 of 3 offers in") and goes on with its number, the
  * customer, the category and who handles it; ⋯ more; one row of tabs (Overview · Factory offers ·
- * Quotations · Costs · History · Order); and "Do next", the one thing it needs now.
+ * Quotations · Costs · History · Order); the next thing it needs is the header's orange button.
  */
 export default async function DealLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -82,6 +82,8 @@ export default async function DealLayout({ children, params }: { children: React
               <ButtonLink href={`/orders/${order.id}`} variant="primary">
                 Go to the order <ArrowRight aria-hidden />
               </ButtonLink>
+            ) : next?.href && next.label ? (
+              <InquiryNextButton base={base} tab={next.tab} href={next.href} label={next.label} />
             ) : undefined
           }
           more={<MoreMenu label={`More for ${d.refNo}`} items={more} />}
@@ -96,7 +98,6 @@ export default async function DealLayout({ children, params }: { children: React
           </Banner>
         )}
         <InquiryTabs base={base} tabs={tabs} order={order && d.stage === "won" ? { href: `/orders/${order.id}`, refNo: order.refNo } : null} />
-        {next && <InquiryNext base={base} tab={next.tab} title={next.title} meta={next.meta} href={next.href} label={next.label} />}
       </DealChrome>
       <DealBody>{children}</DealBody>
     </div>
