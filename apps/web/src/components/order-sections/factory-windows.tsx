@@ -35,7 +35,7 @@ export function FactoryOrderWindow({
   canFiles: boolean;
 }) {
   return (
-    <SectionWindow button={{ label: "Edit" }} title="Purchase order" sub={sub} action={action} files={canFiles ? { orderId, section: "purchase_order", hint: "their proforma, our signed PO" } : undefined}>
+    <SectionWindow button={{ label: "Edit" }} title="Purchase order" sub={sub} action={action} files={canFiles ? { orderId, section: "purchase_order" } : undefined}>
       {(s) => (
         <FieldRow>
           <Field label="Their order no." htmlFor="fo-no" optional error={s.errors?.factoryOrderNo}>
@@ -177,16 +177,16 @@ function FactoryAgreedFields({ state, values, payment, sent }: { state: ActionSt
             ))}
           </Select>
         </Field>
-        <Field label="Place" htmlFor="fac-place" optional error={e.basisPlace} hint="Where they hand the goods over">
-          <Input id="fac-place" name="basisPlace" maxLength={60} placeholder="e.g. Qingdao" defaultValue={v("basisPlace")} />
+        <Field label="Place" htmlFor="fac-place" optional error={e.basisPlace}>
+          <Input id="fac-place" name="basisPlace" maxLength={60} defaultValue={v("basisPlace")} />
         </Field>
         <LeadField id="fac-lead" side="factory" days={leadDays} from={leadFrom} onDays={setLeadDays} onFrom={setLeadFrom} error={e.leadDays ?? e.leadFrom} className="sm:col-span-2" />
       </PanelSection>
 
       <PanelSection title="Payment" sub="its parts are its plan's" className="sm:grid-cols-1">
         <div className="rounded-md border border-line bg-surface-2/40 px-3 py-2 text-[13px]">{payment}</div>
-        <Field label="Payment note" htmlFor="fac-note" optional error={e.paymentNote} hint="Printed after the parts">
-          <Textarea id="fac-note" name="paymentNote" rows={2} className="min-h-0" maxLength={2000} placeholder="e.g. By T/T to their account in Jinan" defaultValue={v("paymentNote")} />
+        <Field label="Payment note" htmlFor="fac-note" optional error={e.paymentNote}>
+          <Textarea id="fac-note" name="paymentNote" rows={2} className="min-h-0" maxLength={2000} defaultValue={v("paymentNote")} />
         </Field>
       </PanelSection>
 
@@ -205,9 +205,9 @@ function FactoryAgreedFields({ state, values, payment, sent }: { state: ActionSt
 
       <PanelSection title="Conditions" className="sm:grid-cols-1">
         <Field label="Minimum order" htmlFor="fac-moq" optional error={e.moq}>
-          <Input id="fac-moq" name="moq" maxLength={60} placeholder="e.g. 1 set" defaultValue={v("moq")} />
+          <Input id="fac-moq" name="moq" maxLength={60} defaultValue={v("moq")} />
         </Field>
-        <Field label="Notes to the factory" htmlFor="fac-notes" optional error={e.notes} hint="Printed last on the purchase order">
+        <Field label="Notes to the factory" htmlFor="fac-notes" optional error={e.notes}>
           <Textarea id="fac-notes" name="notes" rows={3} className="min-h-0" maxLength={5000} defaultValue={v("notes")} />
         </Field>
       </PanelSection>

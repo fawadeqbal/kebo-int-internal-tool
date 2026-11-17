@@ -27,7 +27,7 @@ export function OrderWindow({
   values: Record<"customerRef" | "customerPoOn", string | null>;
 }) {
   return (
-    <SectionWindow button={{ label: "Edit" }} title="Their order" sub={sub} action={action} files={canFiles ? { orderId, section: "order", hint: "the customer’s PO" } : undefined}>
+    <SectionWindow button={{ label: "Edit" }} title="Their order" sub={sub} action={action} files={canFiles ? { orderId, section: "order" } : undefined}>
       {(s) => {
         const v = (k: keyof typeof values) => s.values?.[k] ?? values[k] ?? "";
         return (
@@ -94,14 +94,14 @@ function AgreedFields({ state, values, shipHint, payment, paymentHref }: { state
       <input type="hidden" name="warranty" value={covers} />
 
       <PanelSection title="Delivery" sub="where we hand the goods over, and when" className="md:grid-cols-3" first>
-        <Field label="Delivery basis (Incoterm)" htmlFor="agr-incoterm" hint="As quoted: the price was worked out on it">
+        <Field label="Delivery basis (Incoterm)" htmlFor="agr-incoterm">
           <Input id="agr-incoterm" value={values.incoterm} readOnly className="bg-surface-2 font-semibold" />
         </Field>
-        <Field label="Place" htmlFor="agr-place" optional error={e.incotermPlace} hint="The port or place for the Incoterm">
+        <Field label="Place" htmlFor="agr-place" optional error={e.incotermPlace}>
           <Input id="agr-place" name="incotermPlace" maxLength={80} defaultValue={v("incotermPlace")} />
         </Field>
         <Field label="Port of discharge" htmlFor="agr-pod" optional error={e.portOfDischarge}>
-          <Input id="agr-pod" name="portOfDischarge" maxLength={120} placeholder="e.g. Karachi" defaultValue={v("portOfDischarge")} />
+          <Input id="agr-pod" name="portOfDischarge" maxLength={120} defaultValue={v("portOfDischarge")} />
         </Field>
         <LeadField
           id="agr-lead"
@@ -116,7 +116,7 @@ function AgreedFields({ state, values, shipHint, payment, paymentHref }: { state
         <Field label="Ship by" htmlFor="agr-shipBy" optional error={e.shipBy} hint={shipHint}>
           <Input id="agr-shipBy" name="shipBy" type="date" defaultValue={v("shipBy")} />
         </Field>
-        <Field label="Delivery conditions" htmlFor="agr-delivery" optional error={e.deliveryConditions} hint="Printed under the delivery time" className="sm:col-span-2 md:col-span-3">
+        <Field label="Delivery conditions" htmlFor="agr-delivery" optional error={e.deliveryConditions} className="sm:col-span-2 md:col-span-3">
           <Textarea id="agr-delivery" name="deliveryConditions" rows={2} className="min-h-0" maxLength={5000} defaultValue={v("deliveryConditions")} />
         </Field>
       </PanelSection>
@@ -128,7 +128,7 @@ function AgreedFields({ state, values, shipHint, payment, paymentHref }: { state
             Open the payment plan
           </ButtonLink>
         </div>
-        <Field label="Payment conditions" htmlFor="agr-payment" optional error={e.paymentConditions} hint="The parts print by themselves; this is printed after them">
+        <Field label="Payment conditions" htmlFor="agr-payment" optional error={e.paymentConditions}>
           <Textarea id="agr-payment" name="paymentConditions" rows={2} className="min-h-0" maxLength={5000} defaultValue={v("paymentConditions")} />
         </Field>
       </PanelSection>
@@ -147,7 +147,7 @@ function AgreedFields({ state, values, shipHint, payment, paymentHref }: { state
       </PanelSection>
 
       <PanelSection title="Conditions" className="sm:grid-cols-1">
-        <Field label="Notes" htmlFor="agr-notes" optional error={e.notes} hint="Printed last">
+        <Field label="Notes" htmlFor="agr-notes" optional error={e.notes}>
           <Textarea id="agr-notes" name="notes" rows={3} className="min-h-0" maxLength={5000} defaultValue={v("notes")} />
         </Field>
       </PanelSection>

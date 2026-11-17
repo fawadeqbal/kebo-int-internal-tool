@@ -344,7 +344,6 @@ export function CustomerForm({
             form={DRAFT}
             id="notes"
             rows={3}
-            placeholder="How they pay, who decides…"
             value={draft.notes}
             onChange={(e) => set("notes", e.target.value)}
           />

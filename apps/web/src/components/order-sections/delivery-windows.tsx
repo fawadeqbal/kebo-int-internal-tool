@@ -46,7 +46,7 @@ export function SatSignWindow({ sub, action, today, signedBy, points }: { sub: s
       {(s) => (
         <FieldRow>
           <Field label="Signed for the customer by" htmlFor="sat-by" error={s.errors?.satSignedBy}>
-            <Input id="sat-by" name="satSignedBy" maxLength={120} required placeholder="e.g. Mr. Imran, QA head" defaultValue={s.values?.satSignedBy ?? signedBy ?? ""} />
+            <Input id="sat-by" name="satSignedBy" maxLength={120} required defaultValue={s.values?.satSignedBy ?? signedBy ?? ""} />
           </Field>
           <Field label="Passed on" htmlFor="sat-on" error={s.errors?.satDoneOn}>
             <Input id="sat-on" name="satDoneOn" type="date" max={today} defaultValue={s.values?.satDoneOn ?? today} />

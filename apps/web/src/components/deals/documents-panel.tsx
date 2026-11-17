@@ -341,7 +341,6 @@ export function FileDrop({
                   </Select>
                   <Input
                     aria-label={`Note for ${s.file.name}`}
-                    placeholder="Note (optional), e.g. Rev B from the customer"
                     maxLength={300}
                     value={s.note}
                     onChange={(e) => patch(s.key, { note: e.target.value })}

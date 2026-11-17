@@ -43,7 +43,6 @@ function ConnectForm({ ours, onSaved }: { ours: string; onSaved: () => void }) {
               name="domain"
               value={domain}
               onChange={(e) => setDomain(e.target.value.toLowerCase().replace(/\s/g, ""))}
-              placeholder="erp.yourcompany.com"
               maxLength={253}
               autoComplete="off"
               autoCapitalize="none"

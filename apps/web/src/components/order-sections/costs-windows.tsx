@@ -37,7 +37,7 @@ export function PayCostWindow({
       action={repayAction.bind(null, orderId, [id])}
       submit="Pay"
       whats={["The cost shows the day it was paid.", "It leaves “to pay” and shows under Payments."]}
-      files={canFiles && orderId ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
+      files={canFiles && orderId ? { orderId, section: "expenses" } : undefined}
     >
       {(s) => (
         <>
@@ -89,7 +89,7 @@ export function RepayWindow({
       action={repayAction.bind(null, orderId, ids)}
       submit="Repay"
       whats={[ids.length === 1 ? "The expense shows the day it was repaid." : `The ${ids.length} expenses show the day they were repaid.`]}
-      files={canFiles && orderId ? { orderId, section: "expenses", hint: "the transfer slip" } : undefined}
+      files={canFiles && orderId ? { orderId, section: "expenses" } : undefined}
     >
       {(s) => (
         <>

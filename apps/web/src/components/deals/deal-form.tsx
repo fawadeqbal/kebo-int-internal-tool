@@ -363,7 +363,7 @@ export function DealForm({
                   ))}
                 </Select>
               </Field>
-              <Field label="Handles it" htmlFor="assigneeId" hint={create ? "Can be set later" : undefined} error={s.errors?.assigneeId}>
+              <Field label="Handles it" htmlFor="assigneeId" error={s.errors?.assigneeId}>
                 <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)} disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}>
                   {assignable.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -395,20 +395,18 @@ export function DealForm({
                     ))}
                   </div>
                 )}
-                <p className="text-[13px] text-text-2">
-                  {create
-                    ? "Optional: the items can also come from the first factory offer."
-                    : sheet.dirty
-                      ? `${sheet.diff.changes.length} change${sheet.diff.changes.length === 1 ? "" : "s"} to the items, saved with the rest${sheet.askWhy ? " · Save asks why" : ""}.`
-                      : null}
-                </p>
+                {!create && sheet.dirty && (
+                  <p className="text-[13px] text-text-2">
+                    {`${sheet.diff.changes.length} change${sheet.diff.changes.length === 1 ? "" : "s"} to the items, saved with the rest${sheet.askWhy ? " · Save asks why" : ""}.`}
+                  </p>
+                )}
               </PanelSection>
             )}
 
             {step === "details" && (
             <PanelSection quiet title="What they need" first className="md:grid-cols-3">
               <Field label="Title" htmlFor="title" error={s.errors?.title}>
-                <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} placeholder="Short name, e.g. “Tablet press”" />
+                <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} />
               </Field>
               <Field label="Category" htmlFor="category" required error={s.errors?.category}>
                 <Select
@@ -436,7 +434,7 @@ export function DealForm({
                   <option value={OTHER}>Other…</option>
                 </Select>
                 {otherCategory && (
-                  <Input aria-label="Category name" placeholder="Type the category" value={v.category} onChange={(e) => set("category", e.target.value)} maxLength={120} autoFocus />
+                  <Input aria-label="Category name" value={v.category} onChange={(e) => set("category", e.target.value)} maxLength={120} autoFocus />
                 )}
               </Field>
               <Field label="Priority" htmlFor="priority" error={s.errors?.priority}>
@@ -457,7 +455,7 @@ export function DealForm({
                   id="requirements"
                   rows={4}
                   value={v.requirements}
-                  placeholder={required ? "Write it as the customer said it." : "Optional: the items are listed"}
+                  
                   onChange={(e) => set("requirements", e.target.value)}
                 />
               </Field>
@@ -483,7 +481,6 @@ export function DealForm({
               ))}
               <FileZone
                 label="Add files"
-                hint="Their URS, drawings, photos of the old machine… PDF, images, Excel, Word · up to 25 MB each"
                 disabled={uploading}
                 onFiles={(list) => setStaged((x) => [...x, ...list.map((file) => ({ key: rowKey(), file, kind: kindNext, note: "", progress: null, error: null }))])}
                 kind={
@@ -645,7 +642,7 @@ function QuickCustomerForm({
         <Field label="Country" htmlFor="qc-country" error={err("country")}>
           <CountrySelect id="qc-country" value={q.country} onChange={(e) => set("country", e.target.value)} />
         </Field>
-        <Field label="Contact person" htmlFor="qc-contact" optional hint="The company name is used if left empty" error={err("name")}>
+        <Field label="Contact person" htmlFor="qc-contact" optional error={err("name")}>
           <Input id="qc-contact" value={q.contact} onChange={(e) => set("contact", e.target.value)} maxLength={120} />
         </Field>
         <Field label="Email" htmlFor="qc-email" optional error={err("email")}>

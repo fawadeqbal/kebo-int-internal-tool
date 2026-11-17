@@ -188,7 +188,7 @@ function QuickAccount({ currency, onClose, onAdded }: { currency: string; onClos
       <div className="flex flex-wrap gap-2">
         <Input
           aria-label={`Name of the new ${currency} account`}
-          placeholder={`Name, for example Bank of China ${currency}`}
+          
           value={name}
           maxLength={80}
           onChange={(e) => setName(e.target.value)}

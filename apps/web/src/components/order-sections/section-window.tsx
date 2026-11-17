@@ -62,7 +62,7 @@ export function SectionWindow({
   /** A quiet line or link at the left of the buttons. */
   note?: ReactNode;
   /** The section's files, added and opened inside the window. */
-  files?: { orderId: string; section: OrderSection; hint: string };
+  files?: { orderId: string; section: OrderSection; hint?: string };
   /** sm 460px (a few fields), md 600px (a short table), lg 720px (a wide table). */
   size?: "sm" | "md" | "lg";
   children?: ReactNode | ((state: ActionState) => ReactNode);

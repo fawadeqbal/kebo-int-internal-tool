@@ -485,11 +485,6 @@ function PaperLine({
               const res = await uploadToOrder(orderId, f, { step: r.step });
               return { id: res.sourceId, error: res.error };
             }}
-            hint={
-              open === "upload"
-                ? `${r.docKind === "bill_of_lading" ? "B/L no. and date come from the shipment. " : ""}The file goes to the order's files too.`
-                : undefined
-            }
           />
         </div>
       )}

@@ -221,7 +221,7 @@ export function SendWindow({
                     ))}
                   </Select>
                 </Field>
-                <Field label="Sent on" htmlFor="sent-on" optional hint="Today when empty" error={s.errors?.on}>
+                <Field label="Sent on" htmlFor="sent-on" optional error={s.errors?.on}>
                   <Input id="sent-on" name="on" type="date" max={today} defaultValue={s.values?.on} />
                 </Field>
               </div>

@@ -214,9 +214,9 @@ export function FileMenu({
         </div>
       }
     >
-      {file.viewHref && <MenuItem label="View" hint="opens here" onClick={run(() => tools.view(file, set))} />}
+      {file.viewHref && <MenuItem label="View" onClick={run(() => tools.view(file, set))} />}
       <MenuItem label="Download" onClick={run(() => downloadHref(file.href))} />
-      <MenuItem label="Share…" hint="WhatsApp, email" onClick={run(() => tools.open({ kind: "share", files: [file], papers: [] }))} />
+      <MenuItem label="Share…" onClick={run(() => tools.open({ kind: "share", files: [file], papers: [] }))} />
       {(file.can.rename || file.can.describe || file.can.attach || file.can.replace) && <Sep />}
       {file.can.rename && <MenuItem label="Rename" onClick={run(() => tools.open({ kind: "rename", file }))} />}
       {file.can.describe && (
@@ -227,12 +227,12 @@ export function FileMenu({
         />
       )}
       {file.can.attach && (
-        <MenuItem label="Attach to…" hint="a paper, a stage" onClick={run(() => tools.open({ kind: "attach", file }))} />
+        <MenuItem label="Attach to…" onClick={run(() => tools.open({ kind: "attach", file }))} />
       )}
       {file.can.replace && (
         <MenuItem
           label="Replace with a newer one"
-          hint={file.source === "attachment" ? "keeps the old" : undefined}
+          
           onClick={run(() => tools.open({ kind: "replace", file }))}
         />
       )}
@@ -775,7 +775,7 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
               ))}
             </Select>
           </Field>
-          <Field label="What it is" htmlFor={`${id}-w`} optional hint="e.g. B/L copy, loading photo, URS rev B">
+          <Field label="What it is" htmlFor={`${id}-w`} optional>
             <Input id={`${id}-w`} name="note" maxLength={300} defaultValue={f.note ?? ""} />
           </Field>
           <Buttons pending={pending} save="Save" onClose={onClose} />

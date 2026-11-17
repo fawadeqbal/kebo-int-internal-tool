@@ -69,10 +69,10 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
         title="Delivery"
         sub={sub}
         action={action}
-        files={d.canFiles ? { orderId: o.id, section: "delivery", hint: "the signed delivery note, photos" } : undefined}
+        files={d.canFiles ? { orderId: o.id, section: "delivery" } : undefined}
         fields={[
           { name: "deliveredOn", label: "Delivered on", type: "date", value: dv.deliveredOn, max: now },
-          { name: "deliveryReceivedBy", label: "Received by", value: dv.receivedBy, placeholder: "e.g. Mr. Imran, stores" },
+          { name: "deliveryReceivedBy", label: "Received by", value: dv.receivedBy },
           { name: "deliveryNote", label: "Note on the delivery", type: "textarea", value: dv.note, wide: true },
         ]}
       />
@@ -98,7 +98,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
         title="Installation and SAT"
         sub={sub}
         action={action}
-        files={d.canFiles ? { orderId: o.id, section: "sat", hint: "the signed SAT" } : undefined}
+        files={d.canFiles ? { orderId: o.id, section: "sat" } : undefined}
         fields={[
           { name: "satEngineerId", label: "Our engineer", type: "select", value: dv.satEngineer?.id ?? "", options: [{ value: "", label: "Nobody yet" }, ...(people ?? []).map((p) => ({ value: p.id, label: p.name }))] },
           { name: "satPlannedOn", label: "SAT planned on", type: "date", value: dv.satPlannedOn },
@@ -238,7 +238,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
             ]}
             actions={
               canEdit && (
-                <FieldsWindow button={{ label: "Edit" }} title="Warranty" sub={sub} action={action} fields={[{ name: "warrantyMonths", label: "Months", type: "number", value: String(dv.warrantyMonths), hint: "It starts on the SAT day; without a SAT, on the delivery day." }]} />
+                <FieldsWindow button={{ label: "Edit" }} title="Warranty" sub={sub} action={action} fields={[{ name: "warrantyMonths", label: "Months", type: "number", value: String(dv.warrantyMonths) }]} />
               )
             }
           />

@@ -96,7 +96,7 @@ export default async function OrderDocuments({ params, searchParams }: { params:
         files={d.canFiles ? { orderId: o.id, section: originals ? "originals" : "bank_steps", hint: originals ? "the courier slip" : "the slip or the bank’s message" } : undefined}
         fields={[
           { name: "doneOn", label: originals ? "Sent on" : "Done on", type: "date", value: b.doneOn, max: now },
-          ...(originals || b.step === "couriered_to_customer_bank" ? [{ name: "courier", label: "Courier", value: b.courier, placeholder: "e.g. DHL" }] : []),
+          ...(originals || b.step === "couriered_to_customer_bank" ? [{ name: "courier", label: "Courier", value: b.courier }] : []),
           { name: "reference", label: originals || b.step === "couriered_to_customer_bank" ? "Tracking no." : "Reference", value: b.reference },
           { name: "note", label: "Note", type: "textarea" as const, value: b.note, wide: true },
         ]}
@@ -152,7 +152,7 @@ export default async function OrderDocuments({ params, searchParams }: { params:
             action={papersPrintAction.bind(null, o.id)}
             whats={["Papers made final keep what they said; the next ones use what is set here."]}
             fields={[
-              { name: "documentTitle", label: "Heading over the items", value: o.documentTitle, placeholder: o.inquiry.title, wide: true, hint: "Empty: the inquiry’s title." },
+              { name: "documentTitle", label: "Heading over the items", value: o.documentTitle, placeholder: o.inquiry.title, wide: true },
               ...(pp?.conditionsChoice
                 ? [
                     {

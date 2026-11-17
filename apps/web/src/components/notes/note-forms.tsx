@@ -70,7 +70,6 @@ export function NoteAddForm({ action, contacts }: { action: Action; contacts?: {
               rows={2}
               maxLength={4000}
               className="min-h-0"
-              placeholder="e.g. Ali says the bank will pay the balance on Thursday."
               defaultValue={s.values?.body}
               aria-describedby={s.errors?.body ? `${id}-body-error` : undefined}
             />
@@ -88,7 +87,7 @@ export function NoteAddForm({ action, contacts }: { action: Action; contacts?: {
                 </Select>
               </Field>
             )}
-            <Field label="When" optional htmlFor={`${id}-at`} hint="Empty: now" error={s.errors?.at}>
+            <Field label="When" optional htmlFor={`${id}-at`} error={s.errors?.at}>
               <Input id={`${id}-at`} name="at" type="datetime-local" defaultValue={s.values?.at} />
             </Field>
           </div>
@@ -139,7 +138,6 @@ export function FollowUpForm({
                   name="title"
                   maxLength={200}
                   required
-                  placeholder="e.g. Call Ali about the LC balance"
                   defaultValue={s.values?.title}
                 />
               </Field>
@@ -164,11 +162,11 @@ export function FollowUpForm({
               <Field label="When" htmlFor={`${id}-on`} error={s.errors?.dueOn}>
                 <Input id={`${id}-on`} name="dueOn" type="date" required defaultValue={s.values?.dueOn ?? today} />
               </Field>
-              <Field label="At" optional htmlFor={`${id}-at`} error={s.errors?.dueAt} hint="A reminder comes 30 minutes before">
+              <Field label="At" optional htmlFor={`${id}-at`} error={s.errors?.dueAt}>
                 <Input id={`${id}-at`} name="dueAt" type="time" defaultValue={s.values?.dueAt} />
               </Field>
               <Field label="Where" optional htmlFor={`${id}-place`} error={s.errors?.place} className="sm:col-span-2">
-                <Input id={`${id}-place`} name="place" maxLength={160} placeholder="e.g. Wenzhou" defaultValue={s.values?.place} />
+                <Input id={`${id}-place`} name="place" maxLength={160} defaultValue={s.values?.place} />
               </Field>
               <Field label="Note" optional htmlFor={`${id}-note`} error={s.errors?.note} className="sm:col-span-2">
                 <Textarea id={`${id}-note`} name="note" rows={3} maxLength={2000} className="min-h-0" defaultValue={s.values?.note} />
@@ -264,7 +262,7 @@ export function FollowUpDoneNext({ action, title, what, inquiryHref, as = "butto
             {(s) => (
               <>
                 <Field label="What happened" htmlFor={`${id}-note`} optional error={s.errors?.note}>
-                  <Input id={`${id}-note`} name="note" maxLength={2000} defaultValue={s.values?.note} placeholder="e.g. called, no answer" />
+                  <Input id={`${id}-note`} name="note" maxLength={2000} defaultValue={s.values?.note} />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
                   <Field label="Next follow-up on" htmlFor={`${id}-on`} required error={s.errors?.["next.dueOn"] ?? s.errors?.next}>
@@ -350,7 +348,6 @@ export function FollowUpFields({
               name="title"
               maxLength={200}
               required
-              placeholder="Call Ahmad about the deposit"
               defaultValue={s.values?.title ?? initial?.title}
             />
           </Field>
@@ -374,7 +371,6 @@ export function FollowUpFields({
               id={`${id}-place`}
               name="place"
               maxLength={160}
-              placeholder="Phone, office, Wenzhou…"
               defaultValue={s.values?.place ?? initial?.place ?? undefined}
             />
           </Field>
@@ -501,7 +497,6 @@ export function NoteCardForm({ action, contacts, today }: { action: Action; cont
               rows={3}
               maxLength={5000}
               required
-              placeholder="What was said or agreed"
               defaultValue={s.values?.body}
             />
           </Field>

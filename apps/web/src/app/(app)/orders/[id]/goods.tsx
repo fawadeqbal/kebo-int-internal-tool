@@ -387,7 +387,7 @@ function PackingMarks({
             action={action}
             edit={edit}
             card={card}
-            fields={[{ name: "shippingMarks", label: "Shipping marks", value: shippingMarks, type: "textarea", wide: true, hint: "As printed on the cartons" }]}
+            fields={[{ name: "shippingMarks", label: "Shipping marks", value: shippingMarks, type: "textarea", wide: true }]}
           />
         </SidePanel>
       )}

@@ -98,12 +98,12 @@ export function RoleForm({
                   ? "The Super Admin role keeps its name."
                   : locked
                     ? "Renaming roles is part of custom roles."
-                    : "What people will see, e.g. Accounts or Sales (China)."
+                    : undefined
               }
             >
               <Input id="name" name="name" defaultValue={s.values?.name ?? role?.name} readOnly={fixed} aria-invalid={!!s.errors?.name} />
             </Field>
-            <Field label="What it is for" htmlFor="description" error={s.errors?.description} hint="Shown when someone is given the role.">
+            <Field label="What it is for" htmlFor="description" error={s.errors?.description}>
               <Textarea
                 id="description"
                 name="description"

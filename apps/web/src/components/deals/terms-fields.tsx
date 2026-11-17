@@ -215,7 +215,6 @@ export function PartsField({
                     id={fid(r, "label")}
                     value={r.label}
                     maxLength={80}
-                    placeholder="e.g. Deposit"
                     onChange={(e) => set(r.key, { label: e.target.value })}
                   />
                 </Field>
@@ -475,7 +474,6 @@ export function WarrantyFields({
           inputMode="numeric"
           className="tabular"
           value={months}
-          placeholder="e.g. 12"
           onChange={(e) => onMonths(e.target.value)}
         />
       </Field>
@@ -500,7 +498,6 @@ export function WarrantyFields({
           id={`${idPrefix}-warranty`}
           maxLength={300}
           value={covers}
-          placeholder="e.g. Parts and service"
           onChange={(e) => onCovers(e.target.value)}
         />
       </Field>

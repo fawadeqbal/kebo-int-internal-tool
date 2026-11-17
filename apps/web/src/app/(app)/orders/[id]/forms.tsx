@@ -78,7 +78,7 @@ export function StageActions({
               <input type="hidden" name="to" value={next.to} />
               {asks && <p className="text-sm font-medium">{next.label}</p>}
               {next.to === "in_production" && (
-                <Field label="When will the goods be ready?" htmlFor="move-readyOn" optional hint="The factory's expected ready date, if you know it" error={s.errors?.readyOn}>
+                <Field label="When will the goods be ready?" htmlFor="move-readyOn" optional error={s.errors?.readyOn}>
                   <Input id="move-readyOn" name="readyOn" type="date" className="w-44" defaultValue={s.values?.readyOn ?? readyOn ?? ""} />
                 </Field>
               )}
@@ -87,7 +87,7 @@ export function StageActions({
                   <Field label="Shipped on" htmlFor="move-shippedOn" error={s.errors?.shippedOn}>
                     <Input id="move-shippedOn" name="shippedOn" type="date" max={today} defaultValue={s.values?.shippedOn ?? shippedOn ?? today} />
                   </Field>
-                  <Field label="B/L number" htmlFor="move-blNo" optional hint="Bill of lading, if you have it" error={s.errors?.blNo}>
+                  <Field label="B/L number" htmlFor="move-blNo" optional error={s.errors?.blNo}>
                     <Input id="move-blNo" name="blNo" maxLength={60} defaultValue={s.values?.blNo ?? blNo ?? ""} />
                   </Field>
                 </div>
@@ -102,7 +102,7 @@ export function StageActions({
                     </div>
                   </div>
                   <input type="hidden" name="confirm" value="true" />
-                  <Field label="Note" htmlFor="move-note" optional hint="Why you are going ahead; it is kept in the order's history" error={s.errors?.note}>
+                  <Field label="Note" htmlFor="move-note" optional error={s.errors?.note}>
                     <Textarea id="move-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
                   </Field>
                 </div>
@@ -282,13 +282,13 @@ export function DetailsCard({
                     <Input id="d-poOn" name="customerPoOn" type="date" max={today} defaultValue={s.values?.customerPoOn ?? values.customerPoOn ?? ""} />
                   </Field>
                 </div>
-                <Field label="Consignee" htmlFor="d-consignee" optional hint="Who the goods are consigned to, as it should print. Empty: the customer." error={s.errors?.consignee}>
+                <Field label="Consignee" htmlFor="d-consignee" optional error={s.errors?.consignee}>
                   <Textarea id="d-consignee" name="consignee" rows={2} className="min-h-0" maxLength={500} defaultValue={s.values?.consignee ?? values.consignee ?? ""} />
                 </Field>
-                <Field label="Notify party" htmlFor="d-notify" optional hint="Who the carrier tells on arrival. Empty: same as the consignee." error={s.errors?.notifyParty}>
+                <Field label="Notify party" htmlFor="d-notify" optional error={s.errors?.notifyParty}>
                   <Textarea id="d-notify" name="notifyParty" rows={2} className="min-h-0" maxLength={500} defaultValue={s.values?.notifyParty ?? values.notifyParty ?? ""} />
                 </Field>
-                <Field label="Deliver to" htmlFor="d-deliver" optional hint="The address the goods go to after the port" error={s.errors?.deliveryAddress}>
+                <Field label="Deliver to" htmlFor="d-deliver" optional error={s.errors?.deliveryAddress}>
                   <Textarea id="d-deliver" name="deliveryAddress" rows={2} className="min-h-0" maxLength={500} defaultValue={s.values?.deliveryAddress ?? values.deliveryAddress ?? ""} />
                 </Field>
                 <Field
@@ -300,7 +300,7 @@ export function DetailsCard({
                       ? `Promised to the customer · the LC's latest shipment is ${lc.latest}`
                       : !values.shipBy && suggestShipBy
                         ? `Promised to the customer · suggested: the customer wanted it by ${suggestShipBy.shown}`
-                        : "Promised to the customer"
+                        : undefined
                   }
                   error={s.errors?.shipBy}
                 >
@@ -315,7 +315,7 @@ export function DetailsCard({
                     .
                   </p>
                 ) : (
-                  <Field label="Ready on" htmlFor="d-readyOn" optional hint="When the factory expects the goods ready" error={s.errors?.readyOn}>
+                  <Field label="Ready on" htmlFor="d-readyOn" optional error={s.errors?.readyOn}>
                     <Input id="d-readyOn" name="readyOn" type="date" defaultValue={s.values?.readyOn ?? values.readyOn ?? ""} />
                   </Field>
                 )}
@@ -340,10 +340,10 @@ export function DetailsCard({
                     </Field>
                   </>
                 )}
-                <Field label="Port of discharge" htmlFor="d-pod" optional hint="The contract destination: printed on the proforma, the default for a new shipment" error={s.errors?.portOfDischarge}>
+                <Field label="Port of discharge" htmlFor="d-pod" optional error={s.errors?.portOfDischarge}>
                   <Input id="d-pod" name="portOfDischarge" maxLength={120} defaultValue={s.values?.portOfDischarge ?? values.portOfDischarge ?? ""} />
                 </Field>
-                <Field label="Heading on documents" htmlFor="d-title" optional hint="Over the items, e.g. Complete automatic liquid syrup filling line" error={s.errors?.documentTitle}>
+                <Field label="Heading on documents" htmlFor="d-title" optional error={s.errors?.documentTitle}>
                   <Input id="d-title" name="documentTitle" maxLength={200} defaultValue={s.values?.documentTitle ?? values.documentTitle ?? ""} />
                 </Field>
                 <div className="flex gap-2">

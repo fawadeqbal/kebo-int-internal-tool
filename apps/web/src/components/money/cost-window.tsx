@@ -111,25 +111,6 @@ const DEFAULT_KIND: Record<CostPlace, ExpenseCategory> = { company: "rent", cust
 const VISITS: readonly ExpenseCategory[] = ["travel", "hotel", "meals", "inspection"];
 
 
-const PLACEHOLDER: Partial<Record<ExpenseCategory, string>> = {
-  freight: "e.g. Sea freight Ningbo → Karachi",
-  inland_transport: "e.g. Truck Wenzhou → Ningbo port",
-  inspection: "e.g. Pre-shipment inspection, SGS",
-  customs: "e.g. Export clearance",
-  insurance: "e.g. Cargo insurance",
-  bank_charges: "e.g. LC advising fee",
-  travel: "e.g. Train Jinan → Wenzhou, factory visit",
-  hotel: "e.g. 1 night Wenzhou, factory visit",
-  meals: "e.g. Dinner with the buyers",
-  gifts: "e.g. Tea gift set",
-  samples: "e.g. Samples by courier",
-  courier: "e.g. DHL · drawings to the factory",
-  commission: "e.g. Agent's commission",
-  rent: "e.g. Office rent, October",
-  salaries: "e.g. Salaries, October",
-  utilities: "e.g. Electricity bill",
-  office: "e.g. Printer paper and ink",
-};
 
 const PLACE_HINT: Record<CostPlace, string> = {
   company: "Rent, salaries, bills and other costs of running the company.",
@@ -437,7 +418,7 @@ export function CostForm({
                     </Field>
                   )}
                   {place === "deal" && (
-                    <Field label="Inquiry" htmlFor="cost-deal" error={st.errors?.inquiryId} hint={choices && deals.length === 0 ? "No inquiry for this customer" : "Won, lost or still open"}>
+                    <Field label="Inquiry" htmlFor="cost-deal" error={st.errors?.inquiryId} hint={choices && deals.length === 0 ? "No inquiry for this customer" : undefined}>
                       <Select
                         id="cost-deal"
                         value={dealId}
@@ -518,12 +499,12 @@ export function CostForm({
                 name="description"
                 maxLength={200}
                 defaultValue={st.values?.description ?? from?.description ?? month?.description ?? ""}
-                placeholder={PLACEHOLDER[category] ?? "Say what it was for"}
+                
               />
             </Field>
             {!send && (
               <Field label="Who we owe" htmlFor="cost-payee" optional error={st.errors?.payee}>
-                <Input id="cost-payee" name="payee" maxLength={120} defaultValue={st.values?.payee ?? from?.payee ?? ""} placeholder="e.g. the forwarder, the hotel" />
+                <Input id="cost-payee" name="payee" maxLength={120} defaultValue={st.values?.payee ?? from?.payee ?? ""} />
               </Field>
             )}
           </div>
@@ -546,7 +527,7 @@ export function CostForm({
                 label={`Rate (${currency} per 1 ${s0.mainCurrency})`}
                 htmlFor="cost-rate"
                 error={st.errors?.rate}
-                hint={settingsRate(currency) ? "From Settings; change it if the bank used another" : `No rate for ${currency} in Settings: enter it`}
+                hint={settingsRate(currency) ? undefined : `No rate for ${currency} in Settings: enter it`}
               >
                 <Input
                   id="cost-rate"
@@ -582,7 +563,7 @@ export function CostForm({
                 {send ? (
                   <input type="hidden" name="paidById" value="" />
                 ) : (
-                  <Field label="Who paid" htmlFor="cost-paidBy" optional error={st.errors?.paidById} hint={paidBy && paidBy === meId ? "Starts with the person recording it" : undefined}>
+                  <Field label="Who paid" htmlFor="cost-paidBy" optional error={st.errors?.paidById} >
                     <Select id="cost-paidBy" name="paidById" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
                       <option value="">Not said</option>
                       {s0.people.map((p) => (
@@ -633,7 +614,7 @@ export function CostForm({
                   htmlFor="cost-factory"
                   optional={bearer !== "factory"}
                   error={st.errors?.factoryId}
-                  hint={bearer === "factory" ? undefined : "For trips, hotels, meals and checks"}
+                  
                 >
                   <Select id="cost-factory" name="factoryId" value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
                     <option value="">{bearer === "factory" ? "Choose the factory…" : "None"}</option>
@@ -682,7 +663,7 @@ export function CostForm({
           )}
 
           {place === "company" && !expense && !month && !send && (
-            <Field label="Repeats" htmlFor="cost-repeats" hint={repeats ? "Next month's is proposed on Company costs, to confirm or skip" : undefined}>
+            <Field label="Repeats" htmlFor="cost-repeats" >
               <Select id="cost-repeats" value={repeats ? "on" : "off"} onChange={(e) => setRepeats(e.target.value === "on")}>
                 <option value="off">Does not repeat</option>
                 <option value="on">Every month, on this day</option>
@@ -913,7 +894,7 @@ export function ChangeCost({
           <div className="flex flex-col gap-3">
             <WhatHappens lines={[`${expense.description}, ${money(expense.amount, expense.currency)}, stops counting.`, "It stays listed, crossed out, with your reason."]} />
             <Field label="Why remove it?" htmlFor="cost-remove-why" error={error ?? undefined}>
-              <Textarea id="cost-remove-why" rows={2} className="min-h-0" value={why} onChange={(e) => setWhy(e.target.value)} maxLength={500} placeholder="e.g. recorded twice" />
+              <Textarea id="cost-remove-why" rows={2} className="min-h-0" value={why} onChange={(e) => setWhy(e.target.value)} maxLength={500} />
             </Field>
           </div>
         </ConfirmDialog>
