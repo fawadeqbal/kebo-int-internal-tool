@@ -78,11 +78,15 @@ test("the Overview is the client's request in its window's parts, each part's Ed
   const errors = watchErrors(page);
   const deal = await newInquiry(page);
   await page.goto(`/inquiries/${deal.id}`);
-  // The request in the parts of Edit the request (design "the record page"); no "Where it stands" list.
+  // The request in the boxes of its steps (design rules 18 Nov): Customer · Details, Items, Files; each fact once.
   await expect(page.getByRole("heading", { name: "Where it stands" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Who asked" })).toContainText("Omar");
+  await expect(page.getByRole("region", { name: "Customer" })).toContainText("Omar");
+  await expect(page.getByRole("region", { name: "Customer" })).toContainText("Came by");
   await expect(page.getByRole("region", { name: "Details" })).toContainText("Machinery");
   await expect(page.locator("#items")).toContainText("Punches and dies");
+  await expect(page.getByRole("region", { name: "Files" })).toContainText("Drop files here");
+  // The header: status · customer · country (the category is in Details only).
+  await expect(page.locator("header, [data-page-header]").first()).not.toContainText("Machinery");
   expect(await accessibilityProblems(page), "the Overview meets WCAG 2.2 AA").toEqual([]);
 
   // Details' Edit: only the details, saved on their own.

@@ -1,5 +1,6 @@
 import { ArrowRight, MessageSquareText } from "lucide-react";
 import Link from "next/link";
+import { countryName } from "@/lib/countries";
 import { can, MANUAL_MOVES } from "@kebo/shared";
 import { Banner, ButtonLink, cn, PageHeader, PriorityBadge } from "@kebo/ui";
 import { companyToday } from "@/lib/format";
@@ -39,7 +40,8 @@ export default async function DealLayout({ children, params }: { children: React
     <Link key="c" href={`/customers/${d.customer.id}`} className="text-primary underline underline-offset-2 hover:opacity-80">
       {d.customer.name}
     </Link>,
-    d.category && <span key="cat">{d.category}</span>,
+    // Each fact once (design rules 18 Nov): the category is in the Details box; the country says where they are.
+    d.customer.country !== "ZZ" && <span key="country">{countryName(d.customer.country)}</span>,
     d.priority !== "normal" && <PriorityBadge key="p" priority={d.priority} />,
     // (The number is in the path above and the phone's top bar; who handles it, beside: each said once.)
   ].filter(Boolean);
