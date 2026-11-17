@@ -105,15 +105,32 @@ export async function describeFileAction(dealId: string, fileId: string, _prev: 
 }
 
 /** Customer picker on the inquiry form: search as you type (name, contact, email, phone). */
+type CustomerRow = { id: string; name: string; country: string; primaryContact: { id: string; name: string; email: string | null; phone: string | null; whatsapp: string | null } | null };
+const customerOption = (c: CustomerRow): CustomerOption => ({
+  id: c.id,
+  name: c.name,
+  country: c.country,
+  primaryContact: c.primaryContact && { id: c.primaryContact.id, name: c.primaryContact.name, detail: c.primaryContact.email ?? c.primaryContact.whatsapp ?? c.primaryContact.phone },
+});
+
 export async function searchCustomersAction(q: string): Promise<CustomerOption[]> {
   try {
-    const res = await api.get<Paged<CustomerOption>>("/customers", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 });
-    return res.rows.map((c) => ({
-      id: c.id,
-      name: c.name,
-      country: c.country,
-      primaryContact: c.primaryContact && { id: c.primaryContact.id, name: c.primaryContact.name },
-    }));
+    const res = await api.get<Paged<CustomerRow>>("/customers", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 });
+    return res.rows.map(customerOption);
+  } catch {
+    return [];
+  }
+}
+
+/** The customers of the latest inquiries, newest first (the picker's "Recent", before anything is typed). */
+export async function recentCustomersAction(): Promise<CustomerOption[]> {
+  try {
+    const inq = await api.get<Paged<{ customer: { id: string } | null }>>("/inquiries", { pageSize: 30 });
+    const ids = [...new Set(inq.rows.map((r) => r.customer?.id).filter((x): x is string => !!x))].slice(0, 5);
+    if (!ids.length) return [];
+    const res = await api.get<Paged<CustomerRow>>("/customers", { ids: ids.join(","), pageSize: 5 });
+    const by = new Map(res.rows.map((c) => [c.id, customerOption(c)]));
+    return ids.map((id) => by.get(id)).filter((x): x is CustomerOption => !!x);
   } catch {
     return [];
   }
@@ -146,7 +163,22 @@ export async function createDealAction(_prev: ActionState, form: FormData): Prom
   return { ok: true, data: { id, refNo } };
 }
 
-export type QuickCustomer = { name: string; country: string; contact: string; email: string; phone: string; allowDuplicate?: boolean };
+export type QuickCustomer = {
+  type?: "company" | "individual";
+  name: string;
+  country: string;
+  contact: string;
+  position?: string;
+  email: string;
+  phone: string;
+  /** Empty: the phone number is their WhatsApp too. */
+  whatsapp?: string;
+  address?: string;
+  taxNo?: string;
+  defaultCurrency?: string;
+  initials?: string;
+  allowDuplicate?: boolean;
+};
 export type QuickCustomerResult =
   | { ok: true; customer: CustomerOption; contacts: ContactOption[] }
   | { ok: false; message: string; errors?: Record<string, string[] | undefined>; matches?: { id: string; label: string; detail?: string }[] };
@@ -155,9 +187,23 @@ export type QuickCustomerResult =
 export async function quickCustomerAction(v: QuickCustomer): Promise<QuickCustomerResult> {
   const r = await attempt(null, () =>
     api.post<{ id: string; name: string; country: string; contacts: (ContactOption & { isPrimary: boolean })[] }>("/customers", {
+      type: v.type ?? "company",
       name: v.name,
       country: v.country,
-      contacts: [{ name: v.contact.trim() || v.name, email: v.email.trim() || null, phone: v.phone.trim() || null, whatsapp: v.phone.trim() || null, isPrimary: true }],
+      address: v.address?.trim() || null,
+      taxNo: v.taxNo?.trim() || null,
+      ...(v.defaultCurrency ? { defaultCurrency: v.defaultCurrency } : {}),
+      initials: v.initials?.trim() || null,
+      contacts: [
+        {
+          name: v.contact.trim() || v.name,
+          position: v.position?.trim() || null,
+          email: v.email.trim() || null,
+          phone: v.phone.trim() || null,
+          whatsapp: (v.whatsapp ?? "").trim() || v.phone.trim() || null,
+          isPrimary: true,
+        },
+      ],
       allowDuplicate: !!v.allowDuplicate,
     }),
   );
@@ -166,7 +212,7 @@ export async function quickCustomerAction(v: QuickCustomer): Promise<QuickCustom
   const contacts = c.contacts.map((x) => ({ id: x.id, name: x.name, email: x.email, phone: x.phone, whatsapp: x.whatsapp, isPrimary: x.isPrimary }));
   const primary = contacts.find((x) => x.isPrimary) ?? contacts[0] ?? null;
   revalidatePath("/customers");
-  return { ok: true, customer: { id: c.id, name: c.name, country: c.country, primaryContact: primary && { id: primary.id, name: primary.name } }, contacts };
+  return { ok: true, customer: { id: c.id, name: c.name, country: c.country, primaryContact: primary && { id: primary.id, name: primary.name, detail: primary.email ?? primary.whatsapp ?? primary.phone } }, contacts };
 }
 
 /**

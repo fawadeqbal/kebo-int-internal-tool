@@ -9,7 +9,7 @@ import type { ContactOption, CustomerOption } from "@/lib/types-deals";
 import { editsOf } from "@/lib/edit-data";
 import type { RequestStep } from "@/components/deals/deal-form";
 import { InquiryPanel } from "./inquiry-panel";
-import { createDealAction, customerContactsAction, quickCustomerAction, removeRequestFileAction, saveRequestAction, searchCustomersAction } from "./actions";
+import { createDealAction, customerContactsAction, quickCustomerAction, recentCustomersAction, removeRequestFileAction, saveRequestAction, searchCustomersAction } from "./actions";
 
 /** The link that opens "New inquiry" over the Inquiries list (from anywhere), for a customer when one is given. */
 export const newInquiryHref = (customerId?: string) => `/inquiries?panel=new-inquiry${customerId ? `&for=${customerId}` : ""}`;
@@ -26,13 +26,16 @@ export async function NewInquiryWindow({ customerId }: { customerId?: string }) 
       : Promise.resolve(null),
   ]);
   const primary = preset?.contacts.find((c) => c.isPrimary) ?? preset?.contacts[0] ?? null;
-  const customer: CustomerOption | null = preset ? { id: preset.id, name: preset.name, country: preset.country, primaryContact: primary && { id: primary.id, name: primary.name } } : null;
+  const customer: CustomerOption | null = preset
+    ? { id: preset.id, name: preset.name, country: preset.country, primaryContact: primary && { id: primary.id, name: primary.name, detail: primary.email ?? primary.whatsapp ?? primary.phone } }
+    : null;
   return (
     <InquiryPanel
       mode="create"
       numberHint={counterKey("inquiry", new Date().getFullYear())}
       action={createDealAction}
-      initial={{ customer, contactId: primary?.id ?? "", channel: "email", category: "", title: "", requirements: "", priority: "normal", requiredBy: "", assigneeId: "" }}
+      // The one making it is the responsible person until someone else is chosen (design rules 18 Nov: sensible defaults).
+      initial={{ customer, contactId: primary?.id ?? "", channel: "email", category: "", title: "", requirements: "", priority: "normal", requiredBy: "", assigneeId: me.id }}
       initialContacts={preset?.contacts ?? []}
       categories={settings.sales.categories}
       people={people}
@@ -41,6 +44,7 @@ export async function NewInquiryWindow({ customerId }: { customerId?: string }) 
       canAddCustomer={can(me, "customers.manage")}
       addCustomer={quickCustomerAction}
       searchCustomers={searchCustomersAction}
+      recentCustomers={recentCustomersAction}
       loadContacts={customerContactsAction}
     />
   );
@@ -64,7 +68,7 @@ export async function EditRequestWindow({ d, step }: { d: DealDetail; step?: str
       customerName={d.customer.name}
       action={saveRequestAction.bind(null, d.id, d.updatedAt)}
       initial={{
-        customer: { id: d.customer.id, name: d.customer.name, country: d.customer.country, primaryContact: primary && { id: primary.id, name: primary.name } },
+        customer: { id: d.customer.id, name: d.customer.name, country: d.customer.country, primaryContact: primary && { id: primary.id, name: primary.name, detail: primary.email ?? primary.whatsapp ?? primary.phone } },
         contactId: d.contactId ?? "",
         channel: d.channel,
         category: d.category,
@@ -81,6 +85,7 @@ export async function EditRequestWindow({ d, step }: { d: DealDetail; step?: str
       canAssignOthers={can(me, "inquiries.assign")}
       customerLocked={sent ? "Already quoted: the customer cannot change" : undefined}
       searchCustomers={searchCustomersAction}
+      recentCustomers={recentCustomersAction}
       loadContacts={customerContactsAction}
       startStep={startStep}
       only={!!startStep}

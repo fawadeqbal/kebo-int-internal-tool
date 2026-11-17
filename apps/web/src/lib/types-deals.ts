@@ -31,7 +31,8 @@ export interface CustomerOption {
   id: string;
   name: string;
   country: string;
-  primaryContact: { id: string; name: string } | null;
+  /** `detail`: how to reach them, for the picker's line ("ahmad@techtribe.pk"). */
+  primaryContact: { id: string; name: string; detail?: string | null } | null;
 }
 
 export interface ContactOption {

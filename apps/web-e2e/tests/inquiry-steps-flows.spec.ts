@@ -85,14 +85,14 @@ test("the Overview is the client's request in its window's parts, each part's Ed
   await expect(page.locator("#items")).toContainText("Punches and dies");
   expect(await accessibilityProblems(page), "the Overview meets WCAG 2.2 AA").toEqual([]);
 
-  // Details' Edit: only the details (Needed by is one of them now), saved on their own.
+  // Details' Edit: only the details, saved on their own.
   await page.getByRole("link", { name: "Edit the details" }).click();
   const win = page.getByRole("dialog", { name: `Details · ${deal.refNo}` });
   await expect(win.getByRole("navigation", { name: "Steps" })).toHaveCount(0);
-  await win.locator("#requiredBy").fill("2026-12-24");
+  await win.locator("#title").fill("Tablet press line");
   await win.getByRole("button", { name: "Save changes" }).click();
   await expect(win).toBeHidden();
-  await expect(page.getByRole("region", { name: "Details" })).toContainText("24 Dec 2026");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Tablet press line");
 
   // The same panel beside every tab: who handles it, the next follow-up, the notes.
   for (const tab of ["", "/quotation", "/history"]) {
@@ -113,5 +113,40 @@ test("the Overview is the client's request in its window's parts, each part's Ed
   await expect(sheet).toBeHidden();
   // Nothing past the screen's edge.
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+});
+
+test("the Customer step: recent customers, Came by as buttons, and a customer not in the list added right there", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  const tag = Date.now().toString(36);
+  await page.goto("/inquiries?panel=new-inquiry");
+  const win = page.getByRole("dialog", { name: "New inquiry" });
+  // Before anything is typed: the recent customers, each with its contact and country.
+  await win.locator("#customer").click();
+  const list = win.getByRole("listbox", { name: "Customers" });
+  await expect(list.getByText("Recent")).toBeVisible();
+  // Not found: "+ New customer" carries what was typed.
+  await win.locator("#customer").fill(`Medipharm ${tag}`);
+  await expect(list.getByText(`No customer matches “Medipharm ${tag}”`)).toBeVisible();
+  await list.getByRole("option", { name: `New customer “Medipharm ${tag}”` }).click();
+  const form = win.getByRole("region", { name: "New customer" });
+  await expect(form.locator("#qc-name")).toHaveValue(`Medipharm ${tag}`);
+  await form.locator("#qc-country").selectOption("KE");
+  await form.locator("#qc-contact").fill("Joseph Mwangi");
+  await form.locator("#qc-phone").fill(`+2547${String(Date.now()).slice(-8)}`);
+  await win.getByRole("button", { name: "Add and use" }).click();
+  // Added and chosen: its card, the main contact filled in and tagged.
+  await expect(win.getByText(`Medipharm ${tag}`, { exact: true })).toBeVisible();
+  await expect(win.locator("#contactId")).toContainText("Joseph Mwangi");
+  await expect(win.getByText("Main contact", { exact: true })).toBeVisible();
+  // Came by: buttons, one chosen.
+  const came = win.getByRole("radiogroup", { name: "Came by" });
+  await came.getByRole("radio", { name: "WhatsApp" }).click();
+  await expect(came.getByRole("radio", { name: "WhatsApp" })).toHaveAttribute("aria-checked", "true");
+  await expect(came.getByRole("radio", { name: "Email" })).toHaveAttribute("aria-checked", "false");
+  // The one making it is the responsible person until someone else is chosen.
+  await expect(win.locator("#assigneeId")).not.toHaveValue("");
+  expect(await accessibilityProblems(page), "the Customer step meets WCAG 2.2 AA").toEqual([]);
   expect(errors).toEqual([]);
 });
