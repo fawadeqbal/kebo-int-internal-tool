@@ -15,8 +15,35 @@ export function watchErrors(page: Page, { allow = [] }: { allow?: RegExp[] } = {
   return errors;
 }
 
+/**
+ * Waits (3 s at most) until nothing on the page is fading or sliding: axe reads a colour half way through a
+ * fade as too faint (the sign-in page's welcome failed "color-contrast" now and then while it faded out).
+ * The page counts as still when nothing moved twice running; endless animations (a spinner) are not waited for.
+ */
+async function settled(page: Page) {
+  // The sign-in page's welcome (the first visit) shows for 1.2 s and then fades out: the page is the form under it.
+  await page.waitForFunction(() => !document.querySelector("[data-splash]"), null, { timeout: 4000 }).catch(() => undefined);
+  await page
+    .evaluate(async () => {
+      const until = Date.now() + 3000;
+      let quiet = 0;
+      while (quiet < 2 && Date.now() < until) {
+        const moving = document.getAnimations().filter((a) => a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity);
+        if (moving.length) {
+          quiet = 0;
+          await Promise.race([Promise.all(moving.map((a) => a.finished.catch(() => undefined))), new Promise((done) => setTimeout(done, 1000))]);
+        } else {
+          quiet += 1;
+          await new Promise((done) => setTimeout(done, 120));
+        }
+      }
+    })
+    .catch(() => undefined);
+}
+
 /** One line per rule broken: "color-contrast (serious) ×3 at .badge: <span class=…>". */
 export async function accessibilityProblems(page: Page): Promise<string[]> {
+  await settled(page);
   const result = await new AxeBuilder({ page }).withTags(WCAG).analyze();
   return result.violations.map((v) => {
     const first = v.nodes[0];
