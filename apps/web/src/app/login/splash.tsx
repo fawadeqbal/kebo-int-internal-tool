@@ -30,6 +30,7 @@ export function Splash({ children, footer }: { children: ReactNode; footer: stri
   return (
     <div
       aria-hidden
+      data-splash
       onClick={() => setPhase("gone")}
       className={`fixed inset-0 z-50 flex cursor-pointer flex-col border-t-[3px] border-primary-solid bg-bg transition-opacity ease-out ${phase === "fade" ? "opacity-0" : "opacity-100"}`}
       style={{ transitionDuration: `${FADE_MS}ms` }}
