@@ -28,6 +28,8 @@ export const editInput = z.object({
   changes: z.array(z.string().trim().max(300)).max(300).default([]),
   /** The lines (or fields) changed, so each can say "edited 2×". */
   keys: z.array(z.string().trim().max(80)).max(1000).default([]),
+  /** What changed on each line (or field), by its key: its own history ("Qty 2 → 3"). */
+  lines: z.record(z.string().trim().max(80), z.array(z.string().trim().max(300)).max(20)).optional(),
 });
 export type EditInput = z.infer<typeof editInput>;
 const editQuery = z.object({ type: z.enum(EDIT_TYPES), id: z.uuid("Unknown record") });
@@ -90,7 +92,7 @@ export class EditsService {
           input.kind === "edit"
             ? `${editCardLabel(input.card)} edited (edit ${n})${input.changes.length ? `: ${input.changes[0]}${input.changes.length > 1 ? `, and ${input.changes.length - 1} more` : ""}` : ""}`
             : `${editCardLabel(input.card)} first saved`,
-        newValues: { card: input.card, n, changes: input.changes, keys: input.keys },
+        newValues: { card: input.card, n, changes: input.changes, keys: input.keys, ...(input.lines ? { lines: input.lines } : {}) },
         reason: input.reason,
       });
       return { card: input.card, n };
@@ -110,12 +112,12 @@ export class EditsService {
       {
         count: number;
         first: { by: string | null; at: string } | null;
-        edits: { n: number; by: string | null; at: string; reason: string | null; changes: string[] }[];
+        edits: { n: number; by: string | null; at: string; reason: string | null; changes: string[]; keys: string[]; lines: Record<string, string[]> }[];
         keys: Record<string, number>;
       }
     > = {};
     for (const r of rows) {
-      const v = (r.newValues ?? {}) as { card?: string; n?: number; changes?: string[]; keys?: string[] };
+      const v = (r.newValues ?? {}) as { card?: string; n?: number; changes?: string[]; keys?: string[]; lines?: Record<string, string[]> };
       if (!v.card) continue;
       const c = (cards[v.card] ??= { count: 0, first: null, edits: [], keys: {} });
       if (r.action === FIRST) {
@@ -123,7 +125,7 @@ export class EditsService {
         continue;
       }
       c.count += 1;
-      c.edits.push({ n: v.n ?? c.count, by: r.user?.name ?? null, at: r.createdAt.toISOString(), reason: r.reason, changes: v.changes ?? [] });
+      c.edits.push({ n: v.n ?? c.count, by: r.user?.name ?? null, at: r.createdAt.toISOString(), reason: r.reason, changes: v.changes ?? [], keys: v.keys ?? [], lines: v.lines ?? {} });
       for (const k of v.keys ?? []) c.keys[k] = (c.keys[k] ?? 0) + 1;
     }
     return { cards };

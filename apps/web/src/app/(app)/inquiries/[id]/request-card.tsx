@@ -3,8 +3,10 @@ import { Mail, MessageCircle, Pencil, Phone } from "lucide-react";
 import { CHANNEL_LABEL, PRIORITY_LABEL } from "@kebo/shared";
 import { buttonClass, Card, cn } from "@kebo/ui";
 import { OpenPanelButton } from "@/components/common/panel";
-import { date } from "@/lib/format";
+import { date, dateTime } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
+import type { EditsView } from "@/lib/types-edits";
+import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
 import { FilesBox } from "./files-box";
 
 /**
@@ -18,6 +20,7 @@ export function RecordBox({
   what,
   canEdit,
   className,
+  history,
   children,
 }: {
   title: string;
@@ -26,15 +29,18 @@ export function RecordBox({
   what: string;
   canEdit: boolean;
   className?: string;
+  /** The clock (optional, design rules 18 Nov): the box's own changes. */
+  history?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <Card className={cn("overflow-clip", className)}>
+    <Card className={cn("overflow-visible", className)}>
       <section aria-label={title}>
         <div className="flex min-h-12 items-center gap-2 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4">
           <h2 className="text-[15px] font-bold text-text">{title}</h2>
           {count && <span className="text-xs text-text-2">{count}</span>}
           <span className="flex-1" />
+          {history}
           {canEdit && (
             <OpenPanelButton panel="edit-request" id={step} variant="ghost" size="xs" label={`Edit ${what}`} className="text-primary hover:text-primary">
               <Pencil aria-hidden /> Edit
@@ -65,14 +71,22 @@ function Facts({ rows }: { rows: [string, ReactNode][] }) {
  * (their own card) and Files — the boxes and names of the inquiry's steps, each fact once (the customer's name and
  * country are in the header; the responsible person in the panel).
  */
-export function RequestBoxes({ d }: { d: DealDetail }) {
+export function RequestBoxes({ d, edits }: { d: DealDetail; edits?: EditsView }) {
   const canEdit = d.allowed.edit;
+  // Each box's own changes (who, when, old → new, why), then where it started.
+  const history = (card: string, title: string) => {
+    const entries: HistoryEntry[] = [
+      ...(edits?.cards[card]?.edits ?? []).map((e) => ({ lines: e.changes, reason: e.reason, by: e.by, at: dateTime(e.at) })),
+      { lines: ["Added with the inquiry"], reason: null, by: d.createdBy.name, at: dateTime(d.createdAt), start: true },
+    ];
+    return <HistoryButton title={title} entries={entries} allHref={`/inquiries/${d.id}/history`} />;
+  };
   const contact = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
   const phone = contact?.whatsapp ?? contact?.phone ?? null;
   const way = buttonClass("secondary", "xs");
   return (
     <div className="grid items-start gap-4 lg:grid-cols-2">
-      <RecordBox title="Customer" step="customer" what="who asked" canEdit={canEdit}>
+      <RecordBox title="Customer" step="customer" what="who asked" canEdit={canEdit} history={history("request.customer", "Customer")}>
         {contact ? (
           <div className="flex flex-col gap-1 px-5 pt-4 max-sm:px-4">
             <span className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-text">
@@ -108,7 +122,7 @@ export function RequestBoxes({ d }: { d: DealDetail }) {
           ]}
         />
       </RecordBox>
-      <RecordBox title="Details" step="details" what="the details" canEdit={canEdit}>
+      <RecordBox title="Details" step="details" what="the details" canEdit={canEdit} history={history("request.details", "Details")}>
         <Facts
           rows={[
             ["Category", d.category || null],
@@ -127,7 +141,24 @@ export function RequestBoxes({ d }: { d: DealDetail }) {
 /** Files, under the items: what they sent (kind, when), each to open or download, and a drop area to add more. */
 export function FilesCard({ d }: { d: DealDetail }) {
   return (
-    <RecordBox title="Files" count={d.attachments.length ? String(d.attachments.length) : undefined} step="files" what="their files" canEdit={d.allowed.edit}>
+    <RecordBox
+      title="Files"
+      count={d.attachments.length ? String(d.attachments.length) : undefined}
+      step="files"
+      what="their files"
+      canEdit={d.allowed.edit}
+      history={
+        d.attachments.length ? (
+          <HistoryButton
+            title="Files"
+            allHref={`/inquiries/${d.id}/history`}
+            entries={[...d.attachments]
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .map((f) => ({ lines: [`Added ${f.fileName}`], reason: null, by: null, at: dateTime(f.createdAt), start: true }))}
+          />
+        ) : undefined
+      }
+    >
       <FilesBox
         dealId={d.id}
         canAdd={d.allowed.edit}
