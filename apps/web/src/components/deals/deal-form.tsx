@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
-import { ATTACHMENT_KIND_LABEL, CHANNEL_LABEL, INQUIRY_CHANNELS, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type AttachmentKind, type InquiryChannel } from "@kebo/shared";
+import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, Pencil, Trash2 } from "lucide-react";
+import { ATTACHMENT_KIND_LABEL, CHANNEL_LABEL, INQUIRY_CHANNELS, PARTY_TYPE_LABEL, PARTY_TYPES, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type AttachmentKind } from "@kebo/shared";
 import { Alert, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
@@ -12,12 +12,14 @@ import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, Wha
 import { ActionForm } from "@/components/common/action-form";
 import { OnePartFooter, StepsFrame } from "@/components/common/steps-frame";
 import { CountrySelect } from "@/components/people/country-select";
+import { CurrencySelect } from "@/components/common/currency-select";
 import { countryName } from "@/lib/countries";
 import { date } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
 import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole } from "@/lib/types-deals";
 import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/inquiries/actions";
 import { CustomerPicker } from "./customer-picker";
+import { ChoiceChips } from "@/components/common/choice-chips";
 import { send, type Staged } from "./documents-panel";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
 import { LineTable } from "@/components/lines/line-table";
@@ -76,6 +78,7 @@ export function DealForm({
   canAddCustomer = false,
   customerLocked,
   searchCustomers,
+  recentCustomers,
   loadContacts,
   addCustomer,
   mode,
@@ -100,6 +103,8 @@ export function DealForm({
   canAddCustomer?: boolean;
   customerLocked?: string;
   searchCustomers: (q: string) => Promise<CustomerOption[]>;
+  /** The picker's "Recent", before anything is typed. */
+  recentCustomers?: () => Promise<CustomerOption[]>;
   loadContacts: (customerId: string) => Promise<ContactOption[]>;
   addCustomer?: (v: QuickCustomer) => Promise<QuickCustomerResult>;
   mode: "create" | "edit";
@@ -125,7 +130,10 @@ export function DealForm({
   const [otherCategory, setOtherCategory] = useState(
     () => !!initial.category && !categories.some((c) => c.toLowerCase() === initial.category.toLowerCase()),
   );
-  const [adding, setAdding] = useState(false);
+  // "+ New customer" (with what was typed in the search): the Customer step becomes its form until added.
+  const [adding, setAdding] = useState<string | null>(null);
+  const [addingBusy, setAddingBusy] = useState(false);
+  const newCustomer = useRef<{ save: () => void } | null>(null);
   const [staged, setStaged] = useState<Staged[]>([]);
   const [uploading, setUploading] = useState(false);
   const [kindNext, setKindNext] = useState<AttachmentKind>("urs");
@@ -202,6 +210,7 @@ export function DealForm({
   };
 
   const contactLine = (c: ContactOption) => [c.name, c.email ?? c.whatsapp ?? c.phone].filter(Boolean).join(" · ");
+  const mainContact = !!contacts.find((c) => c.id === v.contactId)?.isPrimary;
   const assignable = canAssignOthers ? people : people.filter((p) => p.id === meId || p.id === initial.assigneeId);
   const required = sheet.rows.length === 0;
   // The items go with the save: a new inquiry's always, an edit's when they changed.
@@ -303,7 +312,17 @@ export function DealForm({
               onGo={setStep}
               single={only}
               footer={
-                only ? (
+                step === "customer" && adding !== null ? (
+                  <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
+                    <Button type="button" variant="ghost" onClick={() => setAdding(null)}>
+                      <ChevronLeft aria-hidden /> Back to search
+                    </Button>
+                    <span className="flex-1" />
+                    <Button type="button" variant="strong" size="lg" disabled={addingBusy} onClick={() => newCustomer.current?.save()} className="max-md:h-11">
+                      <Check aria-hidden /> {addingBusy ? "Adding…" : "Add and use"}
+                    </Button>
+                  </div>
+                ) : only ? (
                   <OnePartFooter onAllSteps={onAllSteps} saveLabel="Save changes" />
                 ) : (
                 <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
@@ -350,76 +369,73 @@ export function DealForm({
                 if (only && k !== step) onAllSteps?.();
               }}
             />
-            {step === "customer" && (
-            <PanelSection quiet title="Who asked" first className="md:grid-cols-3">
-              <Field label="Customer" htmlFor="customer" required error={s.errors?.customerId} className="md:col-span-2">
-                {adding && addCustomer ? (
-                  <QuickCustomerForm
-                    add={addCustomer}
+            {step === "customer" &&
+              (adding !== null && addCustomer ? (
+                <NewCustomerForm
+                  initialName={adding}
+                  add={addCustomer}
+                  search={searchCustomers}
+                  onReady={(api) => {
+                    newCustomer.current = api;
+                  }}
+                  onBusy={setAddingBusy}
+                  onUse={(c, list) => {
+                    setAdding(null);
+                    void chooseCustomer(c, list);
+                  }}
+                />
+              ) : (
+              <PanelSection quiet title="Who asked" first className="md:grid-cols-3">
+                <Field label="Customer" htmlFor="customer" required error={s.errors?.customerId} className="md:col-span-2">
+                  <CustomerPicker
+                    value={v.customer}
+                    onChange={(c) => void chooseCustomer(c)}
                     search={searchCustomers}
-                    onCancel={() => setAdding(false)}
-                    onUse={(c, list) => {
-                      setAdding(false);
-                      void chooseCustomer(c, list);
-                    }}
+                    recent={recentCustomers}
+                    onNew={canAddCustomer && addCustomer && !customerLocked ? (typed) => setAdding(typed) : undefined}
+                    error={s.errors?.customerId}
+                    disabled={!!customerLocked}
+                    disabledReason={customerLocked}
                   />
-                ) : (
-                  <div className="flex flex-wrap items-start gap-2">
-                    <div className="min-w-56 flex-1">
-                      <CustomerPicker
-                        value={v.customer}
-                        onChange={(c) => void chooseCustomer(c)}
-                        search={searchCustomers}
-                        error={s.errors?.customerId}
-                        disabled={!!customerLocked}
-                        disabledReason={customerLocked}
-                      />
-                    </div>
-                    {canAddCustomer && addCustomer && !customerLocked && (
-                      <Button variant="secondary" onClick={() => setAdding(true)}>
-                        <Plus aria-hidden /> New customer
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </Field>
-              <Field
-                label="Contact"
-                htmlFor="contactId"
-                error={s.errors?.contactId}
-                hint={v.customer && !contacts.length ? "This customer has no contacts yet." : undefined}
-              >
-                <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
-                  <option value="">{v.customer ? "Not specified" : "Choose the customer first"}</option>
-                  {contacts.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {contactLine(c)}
-                      {c.isPrimary ? " (main)" : ""}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Came by" htmlFor="channel" required error={s.errors?.channel}>
-                <Select id="channel" value={v.channel} onChange={(e) => set("channel", e.target.value as InquiryChannel)}>
-                  {INQUIRY_CHANNELS.map((c) => (
-                    <option key={c} value={c}>
-                      {CHANNEL_LABEL[c]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Responsible person" htmlFor="assigneeId" error={s.errors?.assigneeId}>
-                <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)} disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}>
-                  {assignable.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.id === meId ? `${p.name} (me)` : p.name}
-                    </option>
-                  ))}
-                  <option value="">Nobody yet</option>
-                </Select>
-              </Field>
-            </PanelSection>
-            )}
+                </Field>
+                <Field
+                  label={
+                    <>
+                      Contact
+                      {/* The main contact is chosen for you, and says so. */}
+                      {mainContact && <span className="rounded-full bg-primary-soft px-2 py-px text-[11.5px] font-semibold text-primary">Main contact</span>}
+                    </>
+                  }
+                  htmlFor="contactId"
+                  error={s.errors?.contactId}
+                >
+                  <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
+                    <option value="">{v.customer ? "None" : "Choose a customer first"}</option>
+                    {contacts.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {contactLine(c)}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Came by" htmlFor="channel" required error={s.errors?.channel} className="md:col-span-3">
+                  <ChoiceChips id="channel" label="Came by" value={v.channel} options={INQUIRY_CHANNELS} labels={CHANNEL_LABEL} onChange={(c) => set("channel", c)} invalid={!!s.errors?.channel} />
+                </Field>
+                <Field label="Needed by" htmlFor="requiredBy" optional error={s.errors?.requiredBy}>
+                  <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
+                </Field>
+                <Field label="Responsible person" htmlFor="assigneeId" error={s.errors?.assigneeId}>
+                  <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)} disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}>
+                    {assignable.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.id === meId ? `${p.name} (me)` : p.name}
+                      </option>
+                    ))}
+                    <option value="">Nobody yet</option>
+                  </Select>
+                </Field>
+              </PanelSection>
+              ))}
 
             {step === "items" && (
               <PanelSection quiet title="Items they asked for" first className="sm:grid-cols-1">
@@ -490,10 +506,6 @@ export function DealForm({
                     </option>
                   ))}
                 </Select>
-              </Field>
-              {/* When they need it is a detail of the request (the Overview shows it under Details). */}
-              <Field label="Needed by" htmlFor="requiredBy" error={s.errors?.requiredBy}>
-                <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
               </Field>
               <Field label="What they need" htmlFor="requirements" required={required} error={s.errors?.requirements} className="md:col-span-3">
                 <Textarea
@@ -654,99 +666,154 @@ const noSubmit = (e: KeyboardEvent) => {
 };
 
 /**
- * Add a customer without leaving the inquiry: a name, country and one contact.
- * Address, tax number and more contacts are filled in on the customer page later.
+ * "+ New customer" from the picker (design rules 18 Nov): the Customer step becomes this form, with what was typed
+ * as the name. Company or individual, name and country, the main contact; More holds the rest. A customer with a
+ * similar name shows above it with Use this one. The window's bottom bar has Back to search and Add and use.
  */
-function QuickCustomerForm({
+function NewCustomerForm({
+  initialName,
   add,
   search,
   onUse,
-  onCancel,
+  onReady,
+  onBusy,
 }: {
+  initialName: string;
   add: (v: QuickCustomer) => Promise<QuickCustomerResult>;
   search: (q: string) => Promise<CustomerOption[]>;
   onUse: (c: CustomerOption, contacts?: ContactOption[]) => void;
-  onCancel: () => void;
+  /** Gives the window's Add and use its way in. */
+  onReady: (api: { save: () => void }) => void;
+  onBusy: (busy: boolean) => void;
 }) {
-  const [q, setQ] = useState<QuickCustomer>({ name: "", country: UNKNOWN_COUNTRY, contact: "", email: "", phone: "" });
-  const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState<QuickCustomer>({ type: "company", name: initialName, country: UNKNOWN_COUNTRY, contact: "", position: "", email: "", phone: "", whatsapp: "", address: "", taxNo: "", defaultCurrency: "USD", initials: "" });
+  const [sameWhatsapp, setSameWhatsapp] = useState(true);
+  const [more, setMore] = useState(false);
   const [result, setResult] = useState<Extract<QuickCustomerResult, { ok: false }> | null>(null);
+  const [found, setFound] = useState<{ name: string; list: CustomerOption[] }>({ name: "", list: [] });
   const set = (k: keyof QuickCustomer, value: string) => setQ((s) => ({ ...s, [k]: value }));
-  const err = (k: string) =>
-    result?.errors?.[k]?.[0] ?? Object.entries(result?.errors ?? {}).find(([key]) => key.startsWith(`contacts.0.${k}`))?.[1]?.[0];
+  const err = (k: string) => result?.errors?.[k]?.[0];
+  const contactErr = (k: string) => result?.errors?.[`contacts.0.${k}`]?.[0] ?? (k === "name" ? result?.errors?.contacts?.[0] : undefined);
+
+  // A customer with a similar name is shown while typing (nothing is stopped: a new one can still be added).
+  const name = q.name.trim();
+  useEffect(() => {
+    if (name.length < 3) return;
+    let live = true;
+    const t = setTimeout(async () => {
+      const list = await search(name);
+      const words = name.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+      if (live) setFound({ name, list: list.filter((c) => words.some((w) => c.name.toLowerCase().includes(w))).slice(0, 2) });
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [name, search]);
+  const similar = name.length >= 3 && found.name === name ? found.list : [];
 
   const save = async (allowDuplicate = false) => {
-    setBusy(true);
-    const r = await add({ ...q, allowDuplicate });
-    setBusy(false);
+    onBusy(true);
+    const r = await add({ ...q, contact: q.contact.trim() || (q.type === "individual" ? q.name : ""), whatsapp: sameWhatsapp ? "" : q.whatsapp, allowDuplicate });
+    onBusy(false);
     if (r.ok) onUse(r.customer, r.contacts);
     else setResult(r);
   };
+  const saveNow = useRef(save);
+  useEffect(() => {
+    saveNow.current = save;
+  });
+  useEffect(() => {
+    onReady({ save: () => void saveNow.current() });
+  }, [onReady]);
+
+  const use = async (m: { id: string; label: string }) => {
+    const found = (await search(m.label)).find((c) => c.id === m.id);
+    onUse(found ?? { id: m.id, name: m.label, country: UNKNOWN_COUNTRY, primaryContact: null });
+  };
+  const matches = result?.matches?.length ? result.matches.map((m) => ({ id: m.id, label: m.label, detail: m.detail ?? "" })) : similar.map((c) => ({ id: c.id, label: c.name, detail: [countryName(c.country), c.primaryContact?.name].filter(Boolean).join(" · ") }));
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2/50 p-3" onKeyDown={noSubmit}>
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">New customer</p>
-        <Button size="icon-xs" variant="ghost" onClick={onCancel} aria-label="Back to choosing a customer">
-          <X aria-hidden />
-        </Button>
+    <section aria-label="New customer" className="flex flex-col gap-4" onKeyDown={noSubmit}>
+      <div className="-mb-1 flex items-center gap-2">
+        <h4 className="text-base font-bold">New customer</h4>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Company or person" htmlFor="qc-name" error={err("name")}>
+      {matches.length > 0 && (
+        <div role="status" className="flex flex-col gap-2 rounded-xl border border-warn/30 bg-warn-soft px-3 py-2.5 text-[13.5px]">
+          {matches.map((m) => (
+            <div key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="min-w-0 flex-1">
+                Already a customer? <b className="font-semibold">{m.label}</b>
+                {m.detail && <span className="text-text-2"> · {m.detail}</span>}
+              </span>
+              <Button size="sm" onClick={() => void use(m)}>
+                Use this one
+              </Button>
+            </div>
+          ))}
+          {result?.matches?.length ? (
+            <Button size="xs" variant="ghost" className="self-start" onClick={() => void save(true)}>
+              It’s a different customer: add it anyway
+            </Button>
+          ) : null}
+        </div>
+      )}
+      {result && !result.matches?.length && !Object.keys(result.errors ?? {}).length && <p className="text-sm text-bad">{result.message}</p>}
+      <ChoiceChips label="Type" value={q.type ?? "company"} options={PARTY_TYPES} labels={PARTY_TYPE_LABEL} onChange={(t) => set("type", t)} />
+      <div className="grid gap-x-4 gap-y-3.5 md:grid-cols-3">
+        <Field label="Name" htmlFor="qc-name" required error={err("name")} className="md:col-span-2">
           <Input id="qc-name" value={q.name} onChange={(e) => set("name", e.target.value)} maxLength={200} autoFocus />
         </Field>
-        <Field label="Country" htmlFor="qc-country" error={err("country")}>
+        <Field label="Country" htmlFor="qc-country" required error={err("country")}>
           <CountrySelect id="qc-country" value={q.country} onChange={(e) => set("country", e.target.value)} />
         </Field>
-        <Field label="Contact person" htmlFor="qc-contact" optional error={err("name")}>
+      </div>
+      <p className="-mb-1 text-xs font-semibold tracking-wide text-text-2 uppercase">Main contact</p>
+      <div className="grid gap-x-4 gap-y-3.5 md:grid-cols-3">
+        <Field label="Name" htmlFor="qc-contact" required={q.type !== "individual"} error={contactErr("name")}>
           <Input id="qc-contact" value={q.contact} onChange={(e) => set("contact", e.target.value)} maxLength={120} />
         </Field>
-        <Field label="Email" htmlFor="qc-email" optional error={err("email")}>
+        <Field label="Position" htmlFor="qc-position" optional error={contactErr("position")}>
+          <Input id="qc-position" value={q.position} onChange={(e) => set("position", e.target.value)} maxLength={80} />
+        </Field>
+        <Field label="Email" htmlFor="qc-email" error={contactErr("email")}>
           <Input id="qc-email" type="email" value={q.email} onChange={(e) => set("email", e.target.value)} />
         </Field>
-        <Field label="Phone / WhatsApp" htmlFor="qc-phone" optional hint="Email or phone: at least one" error={err("phone")}>
+        <Field label="Phone" htmlFor="qc-phone" error={contactErr("phone")}>
           <Input id="qc-phone" type="tel" value={q.phone} onChange={(e) => set("phone", e.target.value)} />
         </Field>
+        <Field label="WhatsApp" htmlFor="qc-whatsapp" error={contactErr("whatsapp")}>
+          {sameWhatsapp ? (
+            <label className="flex h-10 cursor-pointer items-center gap-2.5 rounded-[10px] border border-line-strong bg-surface px-3 text-sm max-sm:h-11">
+              <input id="qc-whatsapp" type="checkbox" role="switch" checked onChange={() => setSameWhatsapp(false)} className="peer sr-only" />
+              <span aria-hidden className="relative h-5 w-9 rounded-full bg-primary-solid peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-text after:absolute after:top-0.5 after:right-0.5 after:size-4 after:rounded-full after:bg-white" />
+              Same as phone
+            </label>
+          ) : (
+            <Input id="qc-whatsapp" type="tel" value={q.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} autoFocus />
+          )}
+        </Field>
       </div>
-      {result && !result.matches?.length && !Object.keys(result.errors ?? {}).length && (
-        <p className="text-sm text-bad">{result.message}</p>
-      )}
-      {result?.matches?.length ? (
-        <div className="rounded-md bg-warn-soft p-3 text-sm">
-          <p>{result.message}</p>
-          <ul className="mt-2 flex flex-col gap-1">
-            {result.matches.map((m) => (
-              <li key={m.id} className="flex items-center justify-between gap-2">
-                <span>
-                  {m.label}
-                  {m.detail && <span className="text-muted"> · {m.detail}</span>}
-                </span>
-                <Button
-                  size="xs"
-                  onClick={async () => {
-                    const found = (await search(m.label)).find((c) => c.id === m.id);
-                    onUse(found ?? { id: m.id, name: m.label, country: UNKNOWN_COUNTRY, primaryContact: null });
-                  }}
-                >
-                  Use this one
-                </Button>
-              </li>
-            ))}
-          </ul>
-          <Button size="xs" variant="ghost" className="mt-2" onClick={() => void save(true)} disabled={busy}>
-            It is a different customer — add it anyway
-          </Button>
+      <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex items-center gap-1.5 self-start text-sm font-semibold text-primary hover:underline">
+        <ChevronRight aria-hidden className={cn("size-4 transition-transform", more && "rotate-90")} /> More: address, tax no., currency, initials
+      </button>
+      {more && (
+        <div className="grid gap-x-4 gap-y-3.5 md:grid-cols-3">
+          <Field label="Address" htmlFor="qc-address" optional error={err("address")} className="md:col-span-3">
+            <Input id="qc-address" value={q.address} onChange={(e) => set("address", e.target.value)} maxLength={500} />
+          </Field>
+          <Field label="Tax no." htmlFor="qc-tax" optional error={err("taxNo")}>
+            <Input id="qc-tax" value={q.taxNo} onChange={(e) => set("taxNo", e.target.value)} maxLength={60} />
+          </Field>
+          <Field label="Currency" htmlFor="qc-currency" error={err("defaultCurrency")}>
+            <CurrencySelect id="qc-currency" value={q.defaultCurrency ?? "USD"} onChange={(e) => set("defaultCurrency", e.target.value)} />
+          </Field>
+          <Field label="Initials on papers" htmlFor="qc-initials" optional error={err("initials")}>
+            <Input id="qc-initials" value={q.initials} onChange={(e) => set("initials", e.target.value.toUpperCase())} maxLength={6} />
+          </Field>
         </div>
-      ) : null}
-      <div className="flex gap-2">
-        <Button size="sm" variant="primary" onClick={() => void save()} disabled={busy || !q.name.trim()}>
-          {busy ? "Adding…" : "Add and use this customer"}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }
 
@@ -930,7 +997,7 @@ function Facts({ rows }: { rows: [string, ReactNode][] }) {
     </dl>
   );
 }
-const DETAIL_FIELDS = new Set(["title", "category", "priority", "requiredBy", "requirements"]);
+const DETAIL_FIELDS = new Set(["title", "category", "priority", "requirements"]);
 
 /** A save refused for a field on another step opens that step, so the field and its message are in view. */
 function JumpToStep({ st, onJump }: { st: ActionState; onJump: (step: RequestStep) => void }) {
