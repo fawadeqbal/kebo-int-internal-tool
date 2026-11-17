@@ -1584,7 +1584,7 @@ function ReviewBoxes({
 }
 
 /** One box of the Review step: its name (and count), Edit, then what it holds. */
-function ReviewBox({ title, count, onEdit, children }: { title: string; count?: string; onEdit: () => void; children: ReactNode }) {
+export function ReviewBox({ title, count, onEdit, children }: { title: string; count?: string; onEdit: () => void; children: ReactNode }) {
   return (
     <section aria-label={title} className="min-w-0 overflow-hidden rounded-xl border border-line bg-surface">
       <header className="flex items-center gap-2 border-b border-line py-1.5 pr-1.5 pl-4">
@@ -1601,7 +1601,7 @@ function ReviewBox({ title, count, onEdit, children }: { title: string; count?: 
 }
 
 /** Label · value rows, the label quiet. */
-function Facts({ rows }: { rows: [string, ReactNode][] }) {
+export function Facts({ rows }: { rows: [string, ReactNode][] }) {
   return (
     <dl className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-4 py-3 text-[13.5px]">
       {rows.map(([k, val]) => (

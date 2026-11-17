@@ -1,70 +1,13 @@
-import type { ReactNode } from "react";
-import { Mail, MessageCircle, Pencil, Phone } from "lucide-react";
+import { Mail, MessageCircle, Phone } from "lucide-react";
 import { CHANNEL_LABEL, PRIORITY_LABEL } from "@kebo/shared";
-import { buttonClass, Card, cn } from "@kebo/ui";
-import { OpenPanelButton } from "@/components/common/panel";
+import { buttonClass } from "@kebo/ui";
 import { date, dateTime } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import type { EditsView } from "@/lib/types-edits";
 import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
+import { BoxFacts as Facts, RecordBox } from "@/components/common/record-box";
 import { FilesBox } from "./files-box";
 
-/**
- * One box of the Overview (design rules 18 Nov): named like the step that fills it, its count, and its own Edit
- * (that part only). The same boxes as the new inquiry's Review step.
- */
-export function RecordBox({
-  title,
-  count,
-  step,
-  what,
-  canEdit,
-  className,
-  history,
-  children,
-}: {
-  title: string;
-  count?: string;
-  step: string;
-  what: string;
-  canEdit: boolean;
-  className?: string;
-  /** The clock (optional, design rules 18 Nov): the box's own changes. */
-  history?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <Card className={cn("overflow-visible", className)}>
-      <section aria-label={title}>
-        <div className="flex min-h-12 items-center gap-2 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4">
-          <h2 className="text-[15px] font-bold text-text">{title}</h2>
-          {count && <span className="text-xs text-text-2">{count}</span>}
-          <span className="flex-1" />
-          {history}
-          {canEdit && (
-            <OpenPanelButton panel="edit-request" id={step} variant="ghost" size="xs" label={`Edit ${what}`} className="text-primary hover:text-primary">
-              <Pencil aria-hidden /> Edit
-            </OpenPanelButton>
-          )}
-        </div>
-        {children}
-      </section>
-    </Card>
-  );
-}
-
-function Facts({ rows }: { rows: [string, ReactNode][] }) {
-  return (
-    <dl className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 px-5 py-4 text-sm max-sm:px-4">
-      {rows.map(([k, v]) => (
-        <div key={k} className="contents">
-          <dt className="text-text-2">{k}</dt>
-          <dd className="min-w-0 font-medium break-words">{v ?? <span className="font-normal text-muted">—</span>}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 
 /**
  * The client's request on the Overview (design rules 18 Nov): Customer and Details side by side, then the Items

@@ -21,18 +21,19 @@ describe("a new factory offer starts fresh", () => {
         onDone={() => {}}
         defaults={{ taxIncluded: false, taxRate: 0, advancePercent: 30 }}
         files={null}
-        footer={() => null}
+        lines={() => null}
       />,
     );
   const value = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
 
   it("choosing a factory fills nothing from its last offer", async () => {
     show();
-    // The window is in steps (design 17 Nov): Lines · Delivery · Payment · Warranty & conditions.
-    const step = (name: RegExp) => fireEvent.click(screen.getByRole("navigation", { name: "Steps" }).querySelectorAll("button")[["Lines", "Delivery", "Payment", "Warranty"].findIndex((n) => name.test(n))]!);
+    // The window is in steps (design 18 Nov): Factory · Prices · Delivery & payment · Conditions · Review.
+    const step = (name: RegExp) =>
+      fireEvent.click(screen.getByRole("navigation", { name: "Steps" }).querySelectorAll("button")[["Factory", "Prices", "Delivery & payment", "Conditions", "Review"].findIndex((n) => name.test(n))]!);
     step(/Delivery/);
     fireEvent.change(document.getElementById("leadDays") as HTMLInputElement, { target: { value: "40" } });
-    step(/Lines/);
+    step(/Factory/);
     fireEvent.focus(screen.getByPlaceholderText(/search factories/i));
     fireEvent.mouseDown(await screen.findByText("Jiangsu Filling Machinery"));
     await waitFor(() => expect(screen.getAllByText("Jiangsu Filling Machinery").length).toBeGreaterThan(0));
@@ -40,9 +41,8 @@ describe("a new factory offer starts fresh", () => {
     step(/Delivery/);
     expect(value("basis")).toBe("");
     expect(value("basisPlace")).toBe("");
-    // What was typed stays.
+    // What was typed stays; the payment is in the same step as the delivery.
     expect(value("leadDays")).toBe("40");
-    step(/Payment/);
     expect(value("paymentTerms")).toBe("");
     // The payment starts from the company's usual advance.
     expect(screen.getAllByLabelText("Share").map((x) => (x as HTMLInputElement).value)).toEqual(["30", "70"]);

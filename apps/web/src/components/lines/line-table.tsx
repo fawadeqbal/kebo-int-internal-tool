@@ -118,6 +118,8 @@ export interface LineTableProps {
    * tools above and the column names staying on top; on a phone Add and the count stay on top as the window scrolls.
    */
   fill?: boolean;
+  /** "+ Part" on each line (on by default); off, adding a part is in the line's ⋯ menu (a narrow table, design 18 Nov). */
+  partButton?: boolean;
 }
 
 /* ---------------------------------------------------------------- helpers */
@@ -230,6 +232,7 @@ export function LineTable({
   sheet,
   duplicates = false,
   fill = false,
+  partButton = true,
 }: LineTableProps) {
   const numbers = useMemo(() => lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey }))), [rows]);
   const dupOf = useMemo(() => (duplicates ? sameAs(rows, numbers) : new Map<string, string>()), [duplicates, rows, numbers]);
@@ -1031,7 +1034,7 @@ export function LineTable({
             >
               <Check aria-hidden /> Add
               {/* The key, drawn (not text): the button's name stays "Add the item". */}
-              {!inline && !flat && <kbd aria-hidden className="rounded bg-white/20 px-1.5 font-sans text-[11px] leading-5 font-semibold before:content-['Enter']" />}
+              {!inline && !flat && partButton && <kbd aria-hidden className="rounded bg-white/20 px-1.5 font-sans text-[11px] leading-5 font-semibold before:content-['Enter']" />}
             </Button>
             {inline && (
               <Button size="icon-xs" variant="ghost" onClick={() => setEntryAt({ afterKey: null, parentKey: null })} aria-label="Stop adding here" title="Esc">
@@ -1278,7 +1281,7 @@ export function LineTable({
               {columns.map((c) => (
                 <col key={c.key} style={{ width: widthOf(c.width) }} />
               ))}
-              {!readOnly && <col style={{ width: flat ? "6rem" : "7.75rem" }} />}
+              {!readOnly && <col style={{ width: flat || !partButton ? "6rem" : "7.75rem" }} />}
             </colgroup>
             <thead>
               <tr>
@@ -1484,7 +1487,7 @@ export function LineTable({
                           <Loader2 className="mx-auto size-4 animate-spin text-muted" aria-label="Saving" />
                         ) : (
                           <span className="flex items-center justify-end gap-0.5">
-                          {!flat && !r.parentKey && (
+                          {!flat && !r.parentKey && partButton && (
                             <Button size="xs" variant="ghost" onClick={() => act("part", r)} aria-label={`Add a part to ${label}`} className="px-1.5 text-primary hover:text-primary">
                               <Plus aria-hidden /> Part
                             </Button>

@@ -509,6 +509,11 @@ export const EDIT_CARDS: Record<string, { label: string; step?: FlowStep }> = {
   "request.customer": { label: "Customer" },
   "request.details": { label: "Details" },
   lines: { label: "Offer lines" },
+  /** A factory offer's boxes (design 18 Nov): what changed in each part, with its reason. */
+  "offer.factory": { label: "Factory" },
+  "offer.prices": { label: "Prices" },
+  "offer.terms": { label: "Delivery & payment" },
+  "offer.conditions": { label: "Conditions" },
   factory: { label: "Factory order", step: "factory" },
   production: { label: "Production", step: "production" },
   "lines.received": { label: "Lines from the factory", step: "production" },

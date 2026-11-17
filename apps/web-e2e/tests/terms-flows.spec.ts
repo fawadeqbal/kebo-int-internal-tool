@@ -41,30 +41,29 @@ test("the offer and the quotation in four groups; the quotation checked against 
   // (The old link to the offer on the Factory offers tab opens the offer's own page.)
   await page.goto(`/inquiries/${deal.id}/sourcing?offer=${deal.offer}#offer`);
   await expect(page).toHaveURL(new RegExp(`/inquiries/${deal.id}/offers/${deal.offer}`));
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
-  const offer = page.getByRole("dialog");
-  // The offer in steps (design 17 Nov): Lines · Delivery · Payment · Warranty & conditions, the rail beside them;
-  // the Lines step has who and when, the price and the lines sheet together.
+  await page.getByRole("button", { name: "Edit offer" }).click();
+  const offer = page.getByRole("dialog", { name: "Edit offer" });
+  // The offer in steps (design 18 Nov): Factory · Prices · Delivery & payment · Conditions, then Changes.
   const rail = offer.getByRole("navigation", { name: "Steps" });
-  for (const step of ["Lines", "Delivery", "Payment", "Warranty & conditions"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
-  await expect(rail.getByRole("button", { name: /Lines/ })).toHaveAttribute("aria-current", "step");
-  await expect(offer.locator("legend", { hasText: "Who and when" }).first()).toBeVisible();
+  for (const step of ["Factory", "Prices", "Delivery & payment", "Conditions", "Changes"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
+  await expect(rail.getByRole("button", { name: /Factory/ })).toHaveAttribute("aria-current", "step");
+  await rail.getByRole("button", { name: /Prices/ }).click();
   await expect(offer.getByRole("grid")).toContainText("DPP-260");
   await offer.getByRole("button", { name: /^Next/ }).click();
-  await offer.getByLabel("Lead time").fill("30");
-  await offer.getByRole("button", { name: /^Next/ }).click();
+  await offer.getByLabel("Ready in").fill("30");
   await offer.getByRole("button", { name: "50 / 50" }).click();
   await expect(offer.getByText("Adds up: 100%")).toBeVisible();
-  await rail.getByRole("button", { name: /Warranty & conditions/ }).click();
+  await offer.getByRole("button", { name: /^Next/ }).click();
   await offer.getByLabel("Months").fill("12");
-  await expect(offer.locator("legend", { hasText: "Conditions and their quotation" }).first()).toBeVisible();
   expect(await accessibilityProblems(page), "the offer's form meets WCAG 2.2 AA").toEqual([]);
-  await offer.getByRole("button", { name: /^Save/ }).click();
+  await offer.getByRole("button", { name: /^Next/ }).click();
+  await offer.getByRole("radiogroup", { name: /Why these changes/ }).getByRole("radio", { name: "Factory changed its terms" }).click();
+  await offer.getByRole("button", { name: /^Save \d+ changes/ }).click();
   await expect(offer).toBeHidden();
-  // The offer's page, its terms in the same groups.
-  await expect(page.getByRole("region", { name: "Delivery", exact: true })).toContainText("30 days after the advance");
-  await expect(page.getByRole("region", { name: "Payment", exact: true })).toContainText("50% when we order · 50% when ready");
-  await expect(page.getByRole("region", { name: "Warranty & conditions", exact: true })).toContainText("12 months from shipment");
+  // The offer's page: a box per part, the same as its steps.
+  await expect(page.getByRole("region", { name: "Delivery & payment", exact: true })).toContainText("30 days after the advance");
+  await expect(page.getByRole("region", { name: "Delivery & payment", exact: true })).toContainText("50% when we order · 50% when ready");
+  await expect(page.getByRole("region", { name: "Conditions", exact: true })).toContainText("12 months from shipment");
 
   // The quotation: New quotations makes its draft from the offer; a pencil opens the draft's steps window on its
   // step, where the factory's lead time is beside ours, a usual payment is one tap, and the warranty is checked.

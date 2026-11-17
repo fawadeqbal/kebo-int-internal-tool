@@ -1,28 +1,35 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Factory, Loader2, Plus } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Factory, History, Loader2, Plus, Search, ShieldCheck, Tag, Truck } from "lucide-react";
 import { fxRate } from "@kebo/money";
 import {
+  basisText,
   INCOTERMS,
   leadWords,
   offerPartsFrom,
   parseLead,
   parseWarranty,
+  REASON_CHOICES,
+  WARRANTY_FROM_LABEL,
   type Incoterm,
   type LeadFrom,
   type WarrantyFrom,
 } from "@kebo/shared";
 import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
+import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
-import { PANEL_FORM, PanelSection } from "@/components/common/panel";
-import { StepsFrame, type StepInfo } from "@/components/common/steps-frame";
-import { money } from "@/lib/format";
+import { PANEL_FORM, PanelSection, useReportDirty, useReportLost } from "@/components/common/panel";
+import { StepsFrame } from "@/components/common/steps-frame";
+import { ChoiceChips } from "@/components/common/choice-chips";
+import { ReasonChips } from "@/components/edits/reason-chips";
+import { date, money } from "@/lib/format";
+import { Facts, ReviewBox } from "./deal-form";
 import {
   LeadField,
   PartsField,
@@ -338,16 +345,32 @@ const OFFER_PRESETS: PartsPreset[] = [
   { label: "All after shipping", parts: [{ name: "Payment after shipping", share: 100, rule: "after_shipping", days: 30 }] },
 ];
 
-/** Choose a known factory, or type a new one's name (it is added to the factory list on save). */
+/** A factory asked for this inquiry (offered first in the picker): how it stands ("asked 15 Nov · no offer yet"). */
+export type AskedFactory = FactoryOption & { note?: string };
+
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+
+/**
+ * Choose a known factory, or type a new one's name (it is added to the factory list on save). The factories asked
+ * for this inquiry come first (design 18 Nov); typing searches them all.
+ */
 export function FactoryPicker({
   value,
   onChange,
   search,
+  asked = [],
   error,
 }: {
   value: QuoteState["factory"];
   onChange: (f: QuoteState["factory"], known?: FactoryOption) => void;
   search: (q: string) => Promise<FactoryOption[]>;
+  asked?: AskedFactory[];
   error?: string[];
 }) {
   const id = useId();
@@ -378,24 +401,56 @@ export function FactoryPicker({
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  if (value)
+  if (value) {
+    const known = asked.find((a) => a.id === value.id);
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
+      <div className={cn("flex min-h-12 items-center gap-3 rounded-[10px] border border-line bg-surface-2/60 px-3 py-2", error && "border-bad")}>
         <Factory className="size-4 shrink-0 text-muted" aria-hidden />
-        <p className="min-w-0 flex-1 truncate text-sm font-medium">
-          {value.name}
-          {!value.id && <span className="ml-2 text-xs font-normal text-primary">new factory — added when you save</span>}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{value.name}</p>
+          <p className="truncate text-xs text-text-2">{!value.id ? "New factory — added when you save" : (known?.note ?? known?.contactPerson ?? "")}</p>
+        </div>
         <Button size="xs" variant="ghost" onClick={() => onChange(null)}>
           Change
         </Button>
       </div>
     );
+  }
 
   const typed = q.trim();
-  const exact = rows.some((r) => r.name.toLowerCase() === typed.toLowerCase());
+  const low = typed.toLowerCase();
+  const askedShown = asked.filter((a) => !low || a.name.toLowerCase().includes(low));
+  const others = rows.filter((r) => !asked.some((a) => a.id === r.id));
+  const exact = [...asked, ...rows].some((r) => r.name.toLowerCase() === low);
+  const pick = (f: FactoryOption) => onChange({ id: f.id, name: f.name }, f);
+  const option = (f: AskedFactory, note?: string) => (
+    <li
+      key={f.id}
+      role="option"
+      aria-selected={false}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        pick(f);
+      }}
+      className="grid cursor-pointer grid-cols-[2rem_minmax(0,1fr)] items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-surface-2"
+    >
+      <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-surface-3 text-xs font-bold text-text-2">
+        {initialsOf(f.name)}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold">{f.name}</span>
+        {(note ?? f.contactPerson) && <span className="block truncate text-xs text-text-2">{note ?? f.contactPerson}</span>}
+      </span>
+    </li>
+  );
+  const group = (title: string) => (
+    <li role="presentation" className="px-2.5 pt-1.5 pb-1 text-[11.5px] font-semibold tracking-wide text-text-2 uppercase">
+      {title}
+    </li>
+  );
   return (
     <div ref={box} className="relative">
+      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
       <input
         id="factory"
         role="combobox"
@@ -404,8 +459,8 @@ export function FactoryPicker({
         aria-invalid={!!error || undefined}
         autoComplete="off"
         value={q}
-        placeholder="Search factories or type a new name…"
-        className={cn(controlClass, "h-9 pr-9")}
+        placeholder="Search factories"
+        className={cn(controlClass, "h-10 pr-9 pl-9 max-sm:h-11 max-sm:text-base")}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
           setQ(e.target.value);
@@ -414,7 +469,8 @@ export function FactoryPicker({
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            if (rows[0] && rows[0].name.toLowerCase() === typed.toLowerCase()) onChange({ id: rows[0].id, name: rows[0].name }, rows[0]);
+            const hit = [...askedShown, ...others].find((r) => r.name.toLowerCase() === low);
+            if (hit) pick(hit);
             else if (typed) onChange({ id: null, name: typed });
           } else if (e.key === "Escape") setOpen(false);
         }}
@@ -425,23 +481,12 @@ export function FactoryPicker({
           id={`${id}-list`}
           role="listbox"
           aria-label="Factories"
-          className="absolute top-full right-0 left-0 z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-pop"
+          className="absolute top-full right-0 left-0 z-30 mt-1 max-h-80 overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-pop"
         >
-          {rows.map((f) => (
-            <li
-              key={f.id}
-              role="option"
-              aria-selected={false}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onChange({ id: f.id, name: f.name }, f);
-              }}
-              className="cursor-pointer rounded-lg px-2.5 py-2 hover:bg-surface-2"
-            >
-              <p className="truncate text-sm font-medium">{f.name}</p>
-              {f.contactPerson && <p className="truncate text-xs text-muted">{f.contactPerson}</p>}
-            </li>
-          ))}
+          {askedShown.length > 0 && group("Asked for this inquiry")}
+          {askedShown.map((f) => option(f, f.note))}
+          {others.length > 0 && group(typed ? `Results for “${typed}”` : "Other factories")}
+          {others.map((f) => option(f))}
           {typed && !exact && (
             <li
               role="option"
@@ -450,83 +495,162 @@ export function FactoryPicker({
                 e.preventDefault();
                 onChange({ id: null, name: typed });
               }}
-              className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-primary hover:bg-surface-2"
+              className="mt-1 grid cursor-pointer grid-cols-[2rem_minmax(0,1fr)] items-center gap-2.5 rounded-lg border-t border-line px-2.5 py-2 font-semibold text-primary hover:bg-surface-2"
             >
-              <Plus className="size-4" aria-hidden /> Add “{typed}” as a new factory
+              <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-primary-soft">
+                <Plus className="size-4" />
+              </span>
+              <span className="truncate text-sm">New factory “{typed}”</span>
             </li>
           )}
-          {!loading && !rows.length && !typed && (
-            <li className="px-2.5 py-3 text-sm text-muted">No factories yet: type the name of the first one.</li>
-          )}
+          {!loading && !askedShown.length && !others.length && !typed && <li className="px-2.5 py-3 text-sm text-muted">No factories yet: type the name of the first one.</li>}
         </ul>
       )}
     </div>
   );
 }
 
+/* ---------------------------------------------------------------- the offer's window, in steps (design 18 Nov) */
+
 /**
- * The offer's window, the same for "Enter factory offer" and "Edit the offer", in the groups every offer,
- * quotation, order and purchase order uses (design "terms that travel"): Who and when · Price · Delivery ·
- * Payment · Warranty · Conditions and their quotation. The price basis is under Delivery (where they hand the
- * goods over); the lead time is days from a moment; the payment is parts, like their plan on an order. Its
- * lines are not here: they have their own editor. `files` sits in the last section; `footer` is the window's
- * buttons (inside the form).
+ * The offer's steps (design 18 Nov, the inquiry's rules): Factory (who sent it, when, and their paper) · Prices (the
+ * currency and tax above the lines) · Delivery & payment · Conditions, then Review (a new offer) or Changes (an edit).
+ */
+export type OfferStep = "factory" | "prices" | "terms" | "conditions" | "review" | "changes";
+/** The offer's parts: the steps that hold its fields, and its page's boxes. */
+export type OfferPart = Exclude<OfferStep, "review" | "changes">;
+export const OFFER_PART_LABEL: Record<OfferPart, string> = { factory: "Factory", prices: "Prices", terms: "Delivery & payment", conditions: "Conditions" };
+const STEP_ICON: Record<OfferStep, typeof Factory> = {
+  factory: Factory,
+  prices: Tag,
+  terms: Truck,
+  conditions: ShieldCheck,
+  review: CircleCheck,
+  changes: History,
+};
+
+/** One change in an edit: which field, its words, old → new, and the part it is in. */
+export type OfferChange = { key: string; label: string; from: string; to: string; part: OfferPart };
+
+/** What changed between how the window opened and now, in words, part by part. */
+export function offerChanges(a: QuoteState, b: QuoteState): OfferChange[] {
+  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "none");
+  const day = (d: string) => (d ? date(d) : "none");
+  const tax = (x: QuoteState) => {
+    const r = Number(x.taxRate || 0);
+    return r > 0 ? `${r}% ${x.taxIncluded ? "included" : "added"}` : "no tax";
+  };
+  const lead = (x: QuoteState) => (x.leadDays.trim() ? leadWords(Number(x.leadDays) || 0, x.leadFrom, "factory") : x.leadTime.trim() || "none");
+  const plan = (x: QuoteState) => (x.parts.length ? x.parts.map((p) => `${p.share}%`).join(" / ") : "none");
+  const warranty = (x: QuoteState) => (x.warrantyMonths.trim() ? `${x.warrantyMonths.trim()} months from ${WARRANTY_FROM_LABEL[x.warrantyFrom]}` : "none");
+  const all: (OfferChange & { same: boolean })[] = [
+    { key: "factory", label: "Factory", from: a.factory?.name ?? "none", to: b.factory?.name ?? "none", part: "factory", same: (a.factory?.id ?? a.factory?.name) === (b.factory?.id ?? b.factory?.name) },
+    { key: "receivedOn", label: "Received on", from: day(a.receivedOn), to: day(b.receivedOn), part: "factory", same: a.receivedOn === b.receivedOn },
+    { key: "validUntil", label: "Valid until", from: day(a.validUntil), to: day(b.validUntil), part: "factory", same: a.validUntil === b.validUntil },
+    { key: "reference", label: "Their reference", from: short(a.reference), to: short(b.reference), part: "factory", same: a.reference.trim() === b.reference.trim() },
+    { key: "currency", label: "Currency", from: a.currency.toUpperCase(), to: b.currency.toUpperCase(), part: "prices", same: a.currency.trim().toUpperCase() === b.currency.trim().toUpperCase() },
+    { key: "tax", label: "Tax", from: tax(a), to: tax(b), part: "prices", same: tax(a) === tax(b) },
+    { key: "basis", label: "Delivery basis", from: a.basis || "none", to: b.basis || "none", part: "terms", same: a.basis === b.basis },
+    { key: "basisPlace", label: b.basis === "EXW" ? "Town" : "Port", from: short(a.basisPlace), to: short(b.basisPlace), part: "terms", same: a.basisPlace.trim() === b.basisPlace.trim() },
+    { key: "lead", label: "Ready in", from: lead(a), to: lead(b), part: "terms", same: lead(a) === lead(b) },
+    { key: "parts", label: "Payment", from: plan(a), to: plan(b), part: "terms", same: JSON.stringify(partsPayload(a.parts, "factory")) === JSON.stringify(partsPayload(b.parts, "factory")) },
+    { key: "paymentTerms", label: "Payment note", from: short(a.paymentTerms), to: short(b.paymentTerms), part: "terms", same: a.paymentTerms.trim() === b.paymentTerms.trim() },
+    { key: "warrantyMonths", label: "Warranty", from: warranty(a), to: warranty(b), part: "conditions", same: warranty(a) === warranty(b) },
+    { key: "warranty", label: "What it covers", from: short(a.warranty), to: short(b.warranty), part: "conditions", same: a.warranty.trim() === b.warranty.trim() },
+    { key: "moq", label: "Minimum order", from: short(a.moq), to: short(b.moq), part: "conditions", same: a.moq.trim() === b.moq.trim() },
+    { key: "notes", label: "Notes", from: short(a.notes), to: short(b.notes), part: "conditions", same: a.notes.trim() === b.notes.trim() },
+  ];
+  return all.filter((c) => !c.same).map(({ same: _, ...c }) => c);
+}
+
+/** The quick reasons for changing an offer (design rules 18 Nov: Why? is asked only when something changed). */
+const OFFER_REASONS = [...REASON_CHOICES.factoryPrice.slice(0, 2), "Typed wrong", "Mistake fixed"];
+
+/** A row of the Changes table: Part · What · Was · Now · Undo on fixed columns; on a phone, What and Undo. */
+const CHANGE_ROW =
+  "grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-t border-line px-4 py-2 sm:grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,9rem)_minmax(0,9rem)_4rem]";
+
+/** What the window saved, for its owner: the reason given and what changed (each box keeps its own history). */
+export type OfferSaved = { reason?: string; changes: OfferChange[] };
+
+/**
+ * The offer's window, the same for a new offer and an edit (design 18 Nov, the inquiry's rules): the steps on the
+ * left, two even columns of fields, one strong button. A new offer ends with Review and Confirm and save; an edit
+ * marks each change, counts them on its parts and its Save, ends with Changes, and asks why once. `only`: one part
+ * in a smaller window. The lines (`lines`) and the factory's files (`files`) are the owner's; their changes are
+ * counted here (`linesChanges`, `filesAdded`) so the counts, Undo and the leave guard cover them too.
  */
 export function OfferHeaderForm({
   action,
   quote,
   today,
-  mainCurrency,
-  rates,
-  searchFactories,
-  onDone,
   defaults,
+  searchFactories,
+  asked,
+  onDone,
   files,
+  filesAdded = [],
+  onUndoFiles,
+  lines,
+  linesReview,
+  linesCount,
+  linesChanges = [],
+  onUndoLines,
+  extra,
   note,
-  footer,
   footerStart,
-  startStep = "lines",
+  onAnother,
+  startStep,
   step: stepAsked,
   onStep,
   only = false,
-  onAllSteps,
-  lines,
-  linesSummary,
-  extra,
+  mainCurrency,
+  rates,
 }: {
-  /** Where the window opens (design 17 Nov: the offer in steps). */
-  startStep?: OfferStep;
-  /** The step, when the window keeps it (it opens the Lines step after a refused save of the lines). */
-  step?: OfferStep;
-  onStep?: (step: OfferStep) => void;
-  /** The Lines step's sheet, under the offer's own fields; it is told the currency and tax being typed. */
-  lines?: (h: { currency: string; taxRate: number; taxIncluded: boolean; errors: string[] }) => ReactNode;
-  /** More of the saved body (a new offer's lines go in the same save). */
-  extra?: Record<string, unknown>;
-  /** "7 lines", for the rail. */
-  linesSummary?: string;
-  /** Left of the buttons on the first step (Remove this offer). */
-  footerStart?: ReactNode;
-  /** Only the step it opens on (Edit on one part, design 17 Nov): no rail, Cancel and Save, and "All steps". */
-  only?: boolean;
-  /** "All steps": the same window with every step, at this one. */
-  onAllSteps?: () => void;
   action: Action;
+  /** The offer being edited; null: a new one. */
   quote: FactoryQuoteView | null;
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
-  searchFactories: (q: string) => Promise<FactoryOption[]>;
-  onDone: (state: ActionState) => void;
   /** A new offer's tax and advance: the company's defaults (Settings). */
   defaults?: { taxIncluded: boolean; taxRate: number; advancePercent?: number };
-  /** The factory's own quotation files: the ones it has, and the place to add more. */
+  searchFactories: (q: string) => Promise<FactoryOption[]>;
+  /** The factories asked for this inquiry, offered first (design 18 Nov). */
+  asked?: AskedFactory[];
+  /** Saved: the answer, the reason given and what changed. */
+  onDone: (state: ActionState, saved: OfferSaved) => void;
+  /** Their quotation: the files it has, and the place to add more (in the Factory step). */
   files: ReactNode;
-  /** Said above the buttons (a new offer: its lines come next). */
+  /** Files added but not sent yet (an edit counts them as changes). */
+  filesAdded?: string[];
+  onUndoFiles?: () => void;
+  /** The Prices step's lines, told the currency and tax being typed. */
+  lines: (h: { currency: string; taxRate: number; taxIncluded: boolean; errors: string[] }) => ReactNode;
+  /** The lines in Review (a new offer). */
+  linesReview?: (h: { currency: string; taxRate: number; taxIncluded: boolean }) => ReactNode;
+  /** "4 lines, 2 parts". */
+  linesCount?: string;
+  /** What changed in the lines (an edit), and Undo for them. */
+  linesChanges?: string[];
+  onUndoLines?: () => void;
+  /** More of the saved body (a new offer's lines go in the same save). */
+  extra?: Record<string, unknown>;
+  /** Said above the buttons (what did not go up). */
   note?: ReactNode;
-  /** Cancel and the save buttons; `last`: the last step, where saving is the main button. */
-  footer: (last: boolean) => ReactNode;
+  /** Left of the buttons on the first step (Remove this offer). */
+  footerStart?: ReactNode;
+  /** A new offer: "Save and add another" beside Confirm and save. */
+  onAnother?: () => void;
+  /** Where the window opens. */
+  startStep?: OfferStep;
+  /** The step, when the window keeps it (it opens Prices after a refused save of the lines). */
+  step?: OfferStep;
+  onStep?: (step: OfferStep) => void;
+  /** One part in a smaller window (Edit on that box). */
+  only?: boolean;
 }) {
+  const create = !quote;
   // How the window opens: a fresh start, with the company's usual tax and advance (Settings).
   const [start] = useState<QuoteState>(() => ({
     ...initialState(quote, today, defaults?.advancePercent ?? 30),
@@ -534,15 +658,19 @@ export function OfferHeaderForm({
   }));
   const [s, setS] = useState<QuoteState>(start);
   const set = <K extends keyof QuoteState>(k: K, v: QuoteState[K]) => setS((st) => ({ ...st, [k]: v }));
-  const [stepOwn, setStepOwn] = useState<OfferStep>(startStep);
+  const STEPS = OFFER_STEPS.filter((x) => x.key !== (create ? "changes" : "review"));
+  const [stepOwn, setStepOwn] = useState<OfferStep>(startStep ?? (create ? "factory" : "prices"));
   const step = stepAsked ?? stepOwn;
   const setStep = onStep ?? setStepOwn;
-  const at = OFFER_STEPS.findIndex((x) => x.key === step);
-  // Every new offer starts fresh (nothing is filled from the factory's last offer: decided 16 Nov 2026).
-  const pickFactory = (f: QuoteState["factory"]) => set("factory", f);
+  const at = Math.max(0, STEPS.findIndex((x) => x.key === step));
+  const last = at === STEPS.length - 1;
+  const go = (k: number) => setStep(STEPS[Math.max(0, Math.min(STEPS.length - 1, k))]!.key);
   const currency = s.currency.trim().toUpperCase();
   const fx = { main: mainCurrency, rates };
   const rate = fxRate(currency, mainCurrency, mainCurrency, rates);
+  const taxRate = Number(s.taxRate || 0);
+  const taxIncluded = s.taxIncluded ?? false;
+
   // Changing the currency of an offer that has prices: convert them, or keep the numbers.
   const priced = (quote?.lines ?? []).filter((l) => Number(l.unitPrice) > 0);
   const recurrency = !!quote && currency !== quote.currency && priced.length > 0;
@@ -550,308 +678,506 @@ export function OfferHeaderForm({
   const sample = recurrency ? priced[0]! : null;
   const sampleTo = sample && canConvert ? convertText(String(sample.unitPrice), quote!.currency, currency, fx) : null;
 
-  const recurrencyBox = (st: ActionState) =>
-    recurrency && (
-      <fieldset className="flex flex-col gap-2 rounded-lg border border-warn/30 bg-warn-soft/40 p-3 sm:col-span-2 md:col-span-3">
-        <legend className="sr-only">What to do with the prices</legend>
-        <p className="text-sm font-medium">
-          Its {priced.length} price{priced.length === 1 ? " is" : "s are"} in {quote!.currency}. What should happen to{" "}
-          {priced.length === 1 ? "it" : "them"}?
-        </p>
-        <label className={cn("flex items-start gap-2 text-sm", !canConvert && "text-muted")}>
-          <input
-            type="radio"
-            name="fq-convert"
-            className="mt-1"
-            checked={canConvert && s.convertPrices}
-            disabled={!canConvert}
-            onChange={() => set("convertPrices", true)}
-          />
-          <span>
-            Convert them to {currency}
-            {canConvert ? (
-              <span className="block text-xs text-text-2">
-                At {rateSentence(fx, quote!.currency, currency)}: {sample!.description.split("\n")[0]} {quote!.currency}{" "}
-                {Number(sample!.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })} → {currency}{" "}
-                {Number(sampleTo).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
-            ) : (
-              <span className="block text-xs">Add the exchange rate in Settings first.</span>
-            )}
-          </span>
-        </label>
-        <label className="flex items-start gap-2 text-sm">
-          <input
-            type="radio"
-            name="fq-convert"
-            className="mt-1"
-            checked={!canConvert || !s.convertPrices}
-            onChange={() => set("convertPrices", false)}
-          />
-          <span>
-            Keep the numbers
-            <span className="block text-xs text-text-2">They were typed in {currency} already; only the currency was wrong.</span>
-          </span>
-        </label>
-        {st.errors?.convertPrices && <span className="text-xs text-bad">{st.errors.convertPrices[0]}</span>}
-      </fieldset>
+  // An edit (design rules 18 Nov): each change, the save that counts them, and why — asked only when something changed.
+  const fieldChanges = useMemo(() => (create ? [] : offerChanges(start, s)), [create, start, s]);
+  const changedOf = (k: string) => fieldChanges.find((c) => c.key === k);
+  const total = fieldChanges.length + linesChanges.length + filesAdded.length;
+  const changesIn = (k: OfferStep) =>
+    k === "changes"
+      ? total
+      : fieldChanges.filter((c) => c.part === k).length + (k === "prices" ? linesChanges.length : 0) + (k === "factory" ? filesAdded.length : 0);
+  const [why, setWhy] = useState("");
+  const needWhy = !create && total > 0;
+  const canSave = create || (total > 0 && !!why.trim());
+  const saveLabel = total ? `Save ${total} change${total === 1 ? "" : "s"}` : "No changes";
+  const changedNote = (k: string) => {
+    const c = changedOf(k);
+    return c ? (
+      <span className="flex items-center gap-1.5 text-xs font-semibold text-action">
+        <span aria-hidden className="size-1.5 rounded-full bg-action-solid" />
+        Changed · was {c.from}
+      </span>
+    ) : null;
+  };
+  const changedField = (k: string) =>
+    changedOf(k) ? "[&_:is(input,select,textarea)]:border-action/70 [&_[aria-checked=true]]:border-action" : undefined;
+  const reasonBox = needWhy ? (
+    <ReasonChips choices={OFFER_REASONS} value={why} onChange={setWhy} title={total === 1 ? "Why the change?" : "Why these changes?"} />
+  ) : null;
+  const undo = (k: string) => {
+    const back: Partial<QuoteState> =
+      k === "tax"
+        ? { taxIncluded: start.taxIncluded, taxRate: start.taxRate }
+        : k === "lead"
+          ? { leadDays: start.leadDays, leadFrom: start.leadFrom, leadTime: start.leadTime }
+          : k === "warrantyMonths"
+            ? { warrantyMonths: start.warrantyMonths, warrantyFrom: start.warrantyFrom }
+            : { [k]: start[k as keyof QuoteState] };
+    setS((x) => ({ ...x, ...back }));
+  };
+
+  // Leaving without saving (design rules 18 Nov): nothing changed → it just closes; else what would be lost.
+  const reportDirty = useReportDirty();
+  const reportLost = useReportLost();
+  const lost = create
+    ? [
+        s.factory ? `Factory: ${s.factory.name}` : null,
+        linesCount && linesCount !== "no lines yet" ? `Lines: ${linesCount}` : null,
+        filesAdded.length ? `Files: ${filesAdded.join(", ")}` : null,
+      ].filter((x): x is string => !!x)
+    : [...fieldChanges.map((c) => `${c.label}: ${c.from} → ${c.to}`), ...linesChanges.slice(0, 4), ...filesAdded.map((f) => `File to add: ${f}`)];
+  const lostKey = lost.join("\n");
+  useEffect(() => {
+    reportLost(
+      lost.length ? (create ? { title: "Close without saving?", text: "This new offer isn’t saved yet. These will be lost:", lines: lost } : { lines: lost.slice(0, 6) }) : null,
     );
+    reportDirty(lost.length ? true : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the words, not the list's identity
+  }, [lostKey, create, reportLost, reportDirty]);
 
   // The payment's parts: what 100% is when the offer has lines, and what stops a save.
-  const total = quote && Number(quote.factoryTotal) > 0 ? money(quote.factoryTotal, quote.currency) : null;
+  const totalText = quote && Number(quote.factoryTotal) > 0 ? money(quote.factoryTotal, quote.currency) : null;
   const [partsTried, setPartsTried] = useState(false);
   const partsBad = partsProblem(s.parts);
   const daysTyped = s.leadDays.trim() !== "";
   // An older offer's words the form read its days or months from, said under the field.
   const leadWordsWere = quote && quote.leadDays === null && quote.leadTime && !s.leadTime ? quote.leadTime : null;
-  const warrantyWordsWere =
-    quote && quote.warrantyMonths === null && quote.warranty && parseWarranty(quote.warranty) ? quote.warranty : null;
+  const warrantyWordsWere = quote && quote.warrantyMonths === null && quote.warranty && parseWarranty(quote.warranty) ? quote.warranty : null;
+
+  const bar = "sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4";
+  const back =
+    !only && at > 0 ? (
+      <Button type="button" variant="ghost" onClick={() => go(at - 1)} aria-label="Back" className="max-md:size-11 max-md:px-0">
+        <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
+      </Button>
+    ) : (
+      footerStart
+    );
+  const footer = create ? (
+    // One strong button (design rules 18 Nov): Next is soft, Back and Review are words; ✕ closes, there is no Cancel.
+    <div className={bar}>
+      {back}
+      <span className="flex-1" />
+      {step === "review" ? (
+        <>
+          {onAnother && (
+            <SubmitButton variant="ghost" pendingText="Saving…" onClick={() => onAnother()} className="max-md:hidden">
+              Save and add another
+            </SubmitButton>
+          )}
+          <SubmitButton variant="strong" size="lg" pendingText="Saving…" className="max-md:flex-1">
+            <Check aria-hidden /> Confirm and save
+          </SubmitButton>
+        </>
+      ) : (
+        <>
+          {at < STEPS.length - 2 && (
+            <Button type="button" variant="ghost" onClick={() => setStep("review")}>
+              Review
+            </Button>
+          )}
+          <Button type="button" variant="soft" onClick={() => go(at + 1)}>
+            Next <ChevronRight aria-hidden />
+          </Button>
+        </>
+      )}
+    </div>
+  ) : (
+    <>
+      {/* Under a long list, Why? is a strip right above Save (design 18 Nov). */}
+      {only && step === "prices" && needWhy && (
+        <ReasonChips strip choices={OFFER_REASONS} value={why} onChange={setWhy} title={total === 1 ? "Why the change?" : "Why these changes?"} />
+      )}
+      <div className={bar}>
+        {back}
+        <span className="flex-1" />
+        {only || step === "changes" ? (
+          <SubmitButton variant="strong" size="lg" disabled={!canSave} pendingText="Saving…" className="max-md:flex-1">
+            <Check aria-hidden /> {saveLabel}
+          </SubmitButton>
+        ) : (
+          <>
+            {at < STEPS.length - 2 && (
+              <Button type="button" variant="ghost" onClick={() => setStep("changes")}>
+                Changes{total ? ` · ${total}` : ""}
+              </Button>
+            )}
+            <Button type="button" variant="soft" onClick={() => go(at + 1)}>
+              Next <ChevronRight aria-hidden />
+            </Button>
+          </>
+        )}
+      </div>
+    </>
+  );
+
+  const h = { currency: currency || mainCurrency, taxRate, taxIncluded };
+  const grid = "md:grid-cols-2 md:gap-x-5 md:gap-y-4";
+  const day = (d: string) => (d ? date(d) : "—");
 
   return (
     <ActionForm
       action={action}
-      onDone={onDone}
+      onDone={(st) => onDone(st, { reason: why.trim() || undefined, changes: fieldChanges })}
       className={cn(PANEL_FORM, "min-h-0 gap-0")}
       keepFields
       showSuccess={false}
       beforeSend={() => {
-        if (!partsBad) return true;
-        setPartsTried(true);
-        setStep("payment");
-        if (only && step !== "payment") onAllSteps?.();
-        document.getElementById("fq-parts")?.scrollIntoView?.({ block: "center" });
-        return false;
+        // Saved from Review (new) or Changes (all parts) only: Enter on a step goes on to the next one.
+        if (!only && !last) {
+          go(at + 1);
+          return false;
+        }
+        if (partsBad) {
+          setPartsTried(true);
+          setStep("terms");
+          document.getElementById("fq-parts")?.scrollIntoView?.({ block: "center" });
+          return false;
+        }
+        // Nothing changed: nothing to save; something changed: why, first.
+        return canSave;
       }}
     >
       {(st) => (
         <>
           <input type="hidden" name="payload" value={JSON.stringify({ ...payload(s, canConvert), ...extra })} />
+          {needWhy && why.trim() && <input type="hidden" name="reason" value={why.trim()} />}
           {/* The factory's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
           <input type="hidden" name="factoryLabel" value={s.factory?.name ?? ""} />
           <StepsFrame
-            steps={offerStepsInfo(s, at, !!quote, linesSummary)}
+            steps={STEPS.map((x, k) => ({
+              key: x.key,
+              label: x.label,
+              icon: STEP_ICON[x.key],
+              done: create && k < at,
+              count: create ? undefined : changesIn(x.key) || undefined,
+              apart: x.key === "review" || x.key === "changes",
+            }))}
             at={step}
             onGo={setStep}
             single={only}
-            footer={
-              only ? (
-                <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
-                  {onAllSteps && (
-                    <Button type="button" variant="ghost" onClick={onAllSteps} className="px-2 text-primary hover:text-primary">
-                      All steps <ChevronRight aria-hidden />
-                    </Button>
-                  )}
-                  <span className="flex-1" />
-                  {footer(true)}
-                </div>
-              ) : (
-              <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
-                {at > 0 ? (
-                  <Button type="button" variant="secondary" onClick={() => setStep(OFFER_STEPS[at - 1]!.key)}>
-                    <ChevronLeft aria-hidden /> Back
-                  </Button>
-                ) : (
-                  footerStart
-                )}
-                <span className="flex-1" />
-                {footer(at === OFFER_STEPS.length - 1)}
-                {at < OFFER_STEPS.length - 1 && (
-                  <Button type="button" variant="primary" onClick={() => setStep(OFFER_STEPS[at + 1]!.key)}>
-                    Next <ChevronRight aria-hidden />
-                  </Button>
-                )}
-              </div>
-              )
-            }
+            fill={step === "prices"}
+            footer={footer}
           >
-          {/* A refused field on another part: every step, at that one. */}
-          <JumpToError
-            st={st}
-            onJump={(k) => {
-              setStep(k);
-              if (only && k !== step) onAllSteps?.();
-            }}
-          />
-          {step === "lines" && (
-          <>
-          {!only && (
-          <PanelSection title="Who and when" first className="md:grid-cols-3">
-            <Field
-              label="Factory"
-              htmlFor="factory"
-              required
-              error={st.errors?.factoryId ?? st.errors?.newFactoryName}
-              className="md:col-span-2"
-            >
-              <FactoryPicker
-                value={s.factory}
-                search={searchFactories}
-                error={st.errors?.factoryId}
-                onChange={(f) => void pickFactory(f)}
-              />
-            </Field>
-            <Field label="Their reference" htmlFor="reference" optional error={st.errors?.reference}>
-              <Input
-                id="reference"
-                value={s.reference}
-                onChange={(e) => set("reference", e.target.value)}
-                maxLength={80}
-              />
-            </Field>
-            <Field label="Received on" htmlFor="receivedOn" required error={st.errors?.receivedOn}>
-              <Input id="receivedOn" type="date" value={s.receivedOn} max={today} onChange={(e) => set("receivedOn", e.target.value)} />
-            </Field>
-            <Field label="Valid until" htmlFor="validUntil" optional error={st.errors?.validUntil}>
-              <Input id="validUntil" type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
-            </Field>
-          </PanelSection>
-          )}
-          <PanelSection title="Price" first={only} className="md:grid-cols-3">
-            <Field
-              label="Currency"
-              htmlFor="currency"
-              error={st.errors?.currency}
-              hint={rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined)}
-            >
-              <CurrencySelect id="currency" value={s.currency} onChange={(e) => set("currency", e.target.value)} />
-            </Field>
-            {recurrencyBox(st)}
-            <TaxBox
-              idPrefix="fq"
-              className="sm:col-span-2"
-              included={s.taxIncluded ?? false}
-              rate={s.taxRate}
-              onIncluded={(v) => set("taxIncluded", v)}
-              onRate={(v) => set("taxRate", v)}
-              error={st.errors?.taxRate ?? st.errors?.taxIncluded}
-              note={quote ? taxRateNote(quote.lines, quote.taxRate, s.taxRate) : undefined}
-            />
-          </PanelSection>
-          {lines && (
-            <PanelSection title="Lines" className="sm:grid-cols-1">
-              {lines({ currency, taxRate: Number(s.taxRate || 0), taxIncluded: s.taxIncluded ?? false, errors: lineErrors(st.errors) })}
-            </PanelSection>
-          )}
-          </>
-          )}
-          {step === "delivery" && (
-          <PanelSection quiet first title="Delivery" className="md:grid-cols-4">
-            <Field
-              label="Delivery basis (Incoterm)"
-              htmlFor="basis"
-              error={st.errors?.basis}
-              
-            >
-              <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")}>
-                <option value="">Not said</option>
-                {INCOTERMS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                    {BASIS_WORDS[t] ? ` · ${BASIS_WORDS[t]}` : ""}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field
-              label={s.basis === "EXW" ? "Town" : "Port"}
-              htmlFor="basisPlace"
-              optional
-              error={st.errors?.basisPlace}
-            >
-              <PortPicker id="basisPlace" value={s.basisPlace} onChange={(v) => set("basisPlace", v)} exw={s.basis === "EXW"} />
-            </Field>
-            <LeadField
-              id="leadDays"
-              className="sm:col-span-2"
-              side="factory"
-              days={s.leadDays}
-              from={s.leadFrom}
-              onDays={(v) => set("leadDays", v)}
-              onFrom={(v) => set("leadFrom", v)}
-              error={st.errors?.leadDays ?? st.errors?.leadFrom ?? st.errors?.leadTime}
-              hint={
-                daysTyped ? (
-                  <>
-                    Printed as “{leadWords(Number(s.leadDays) || 0, s.leadFrom, "factory")}”
-                    {leadWordsWere ? `, worked out from their words “${leadWordsWere}”` : ""}
-                  </>
-                ) : s.leadTime ? (
-                  <>
-                    Their words: “{s.leadTime}”, kept until you type the days.{" "}
-                    <button type="button" className="font-medium text-primary hover:underline" onClick={() => set("leadTime", "")}>
-                      Clear
-                    </button>
-                  </>
+            {/* A refused field on another part: every step, at that one. */}
+            <JumpToError st={st} onJump={setStep} />
+
+            {step === "factory" && (
+              <PanelSection quiet title="Who sent it, and when" first className={grid}>
+                <Field
+                  label="Factory"
+                  htmlFor="factory"
+                  required
+                  error={st.errors?.factoryId ?? st.errors?.newFactoryName}
+                  className={cn("md:col-span-2", changedField("factory"))}
+                >
+                  <FactoryPicker value={s.factory} search={searchFactories} asked={asked} error={st.errors?.factoryId} onChange={(f) => set("factory", f)} />
+                  {changedNote("factory")}
+                </Field>
+                <Field label="Received on" htmlFor="receivedOn" required error={st.errors?.receivedOn} className={changedField("receivedOn")}>
+                  <Input id="receivedOn" type="date" value={s.receivedOn} max={today} onChange={(e) => set("receivedOn", e.target.value)} />
+                  {changedNote("receivedOn")}
+                </Field>
+                <Field label="Valid until" htmlFor="validUntil" optional error={st.errors?.validUntil} className={changedField("validUntil")}>
+                  <Input id="validUntil" type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
+                  {changedNote("validUntil")}
+                </Field>
+                <Field label="Their reference" htmlFor="reference" optional error={st.errors?.reference} className={changedField("reference")}>
+                  <Input id="reference" value={s.reference} onChange={(e) => set("reference", e.target.value)} maxLength={80} />
+                  {changedNote("reference")}
+                </Field>
+                <div className="min-w-0 md:col-span-2">{files}</div>
+              </PanelSection>
+            )}
+
+            {step === "prices" && (
+              <>
+                <PanelSection quiet title="Currency and tax" first className={grid}>
+                  <Field
+                    label="Currency"
+                    htmlFor="currency"
+                    error={st.errors?.currency}
+                    hint={rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined)}
+                    className={changedField("currency")}
+                  >
+                    <CurrencySelect id="currency" value={s.currency} onChange={(e) => set("currency", e.target.value)} />
+                    {changedNote("currency")}
+                  </Field>
+                  <Field label="Tax" htmlFor="fq-tax" error={st.errors?.taxRate ?? st.errors?.taxIncluded} className={changedField("tax")}>
+                    <TaxChoice
+                      id="fq-tax"
+                      included={taxIncluded}
+                      rate={s.taxRate}
+                      onChange={(inc, r) => setS((x) => ({ ...x, taxIncluded: inc, taxRate: r }))}
+                    />
+                    {quote && taxRateNote(quote.lines, quote.taxRate, s.taxRate) && <span className="text-xs text-text-2">{taxRateNote(quote.lines, quote.taxRate, s.taxRate)}</span>}
+                    {changedNote("tax")}
+                  </Field>
+                  {recurrency && (
+                    <fieldset className="flex flex-col gap-2 rounded-lg border border-warn/30 bg-warn-soft/40 p-3 md:col-span-2">
+                      <legend className="sr-only">What to do with the prices</legend>
+                      <p className="text-sm font-medium">
+                        Its {priced.length} price{priced.length === 1 ? " is" : "s are"} in {quote!.currency}. What should happen to {priced.length === 1 ? "it" : "them"}?
+                      </p>
+                      <label className={cn("flex items-start gap-2 text-sm", !canConvert && "text-muted")}>
+                        <input type="radio" name="fq-convert" className="mt-1" checked={canConvert && s.convertPrices} disabled={!canConvert} onChange={() => set("convertPrices", true)} />
+                        <span>
+                          Convert them to {currency}
+                          {canConvert ? (
+                            <span className="block text-xs text-text-2">
+                              At {rateSentence(fx, quote!.currency, currency)}: {sample!.description.split("\n")[0]} {quote!.currency}{" "}
+                              {Number(sample!.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })} → {currency}{" "}
+                              {Number(sampleTo).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="block text-xs">Add the exchange rate in Settings first.</span>
+                          )}
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-2 text-sm">
+                        <input type="radio" name="fq-convert" className="mt-1" checked={!canConvert || !s.convertPrices} onChange={() => set("convertPrices", false)} />
+                        <span>
+                          Keep the numbers
+                          <span className="block text-xs text-text-2">They were typed in {currency} already; only the currency was wrong.</span>
+                        </span>
+                      </label>
+                      {st.errors?.convertPrices && <span className="text-xs text-bad">{st.errors.convertPrices[0]}</span>}
+                    </fieldset>
+                  )}
+                </PanelSection>
+                <PanelSection quiet title="Lines" fill className="sm:grid-cols-1">
+                  {lines({ ...h, errors: lineErrors(st.errors) })}
+                </PanelSection>
+              </>
+            )}
+
+            {step === "terms" && (
+              <>
+                <PanelSection title="Delivery" first className={grid}>
+                  <Field label="Delivery basis" htmlFor="basis" error={st.errors?.basis} className={changedField("basis")}>
+                    <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")}>
+                      <option value="">Not said</option>
+                      {INCOTERMS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                          {BASIS_WORDS[t] ? ` · ${BASIS_WORDS[t]}` : ""}
+                        </option>
+                      ))}
+                    </Select>
+                    {changedNote("basis")}
+                  </Field>
+                  <Field label={s.basis === "EXW" ? "Town" : "Port"} htmlFor="basisPlace" optional error={st.errors?.basisPlace} className={changedField("basisPlace")}>
+                    <PortPicker id="basisPlace" value={s.basisPlace} onChange={(v) => set("basisPlace", v)} exw={s.basis === "EXW"} />
+                    {changedNote("basisPlace")}
+                  </Field>
+                  <LeadField
+                    id="leadDays"
+                    label="Ready in"
+                    className={cn("md:col-span-2", changedField("lead"))}
+                    side="factory"
+                    days={s.leadDays}
+                    from={s.leadFrom}
+                    onDays={(v) => set("leadDays", v)}
+                    onFrom={(v) => set("leadFrom", v)}
+                    error={st.errors?.leadDays ?? st.errors?.leadFrom ?? st.errors?.leadTime}
+                    hint={
+                      changedOf("lead") ? (
+                        changedNote("lead")
+                      ) : !daysTyped && s.leadTime ? (
+                        <>
+                          Their words: “{s.leadTime}”, kept until you type the days.{" "}
+                          <button type="button" className="font-medium text-primary hover:underline" onClick={() => set("leadTime", "")}>
+                            Clear
+                          </button>
+                        </>
+                      ) : leadWordsWere && daysTyped ? (
+                        `Worked out from their words “${leadWordsWere}”`
+                      ) : undefined
+                    }
+                  />
+                </PanelSection>
+                <PanelSection title="Payment" className={grid}>
+                  <div className={cn("min-w-0 md:col-span-2", changedField("parts"))}>
+                    <PartsField
+                      id="fq-parts"
+                      idPrefix="fq-part"
+                      side="factory"
+                      rows={s.parts}
+                      onChange={(rows) => set("parts", rows)}
+                      presets={OFFER_PRESETS}
+                      amounts={totalText}
+                      error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts}
+                    />
+                    {changedNote("parts")}
+                  </div>
+                  <Field label="Payment note" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms} className={cn("md:col-span-2", changedField("paymentTerms"))}>
+                    <Input id="paymentTerms" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} />
+                    {changedNote("paymentTerms")}
+                  </Field>
+                </PanelSection>
+              </>
+            )}
+
+            {step === "conditions" && (
+              <PanelSection quiet first title="Conditions" className={grid}>
+                <div className={cn("contents", changedField("warrantyMonths"))}>
+                  <WarrantyFields
+                    idPrefix="fq"
+                    months={s.warrantyMonths}
+                    from={s.warrantyFrom}
+                    covers={s.warranty}
+                    onMonths={(v) => set("warrantyMonths", v)}
+                    onFrom={(v) => set("warrantyFrom", v)}
+                    onCovers={(v) => set("warranty", v)}
+                    errors={{ months: st.errors?.warrantyMonths, from: st.errors?.warrantyFrom, covers: st.errors?.warranty }}
+                    coversHint={warrantyWordsWere ? `Worked out from their words “${warrantyWordsWere}”` : undefined}
+                  />
+                </div>
+                {(changedOf("warrantyMonths") || changedOf("warranty")) && (
+                  <div className="flex flex-col gap-1 md:col-span-2">
+                    {changedNote("warrantyMonths")}
+                    {changedNote("warranty")}
+                  </div>
+                )}
+                <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq} className={changedField("moq")}>
+                  <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} />
+                  {changedNote("moq")}
+                </Field>
+                <Field label="Notes" htmlFor="fq-notes" optional error={st.errors?.notes} className={cn("md:col-span-2", changedField("notes"))}>
+                  <Textarea id="fq-notes" rows={4} value={s.notes} onChange={(e) => set("notes", e.target.value)} />
+                  {changedNote("notes")}
+                </Field>
+              </PanelSection>
+            )}
+
+            {only && step !== "prices" && reasonBox}
+
+            {step === "review" && (
+              <div className="flex flex-col gap-3.5">
+                <div className="grid gap-3.5 md:grid-cols-2 md:items-start">
+                  <ReviewBox title="Factory" onEdit={() => setStep("factory")}>
+                    <Facts
+                      rows={[
+                        ["Factory", s.factory?.name ?? <span className="font-semibold text-bad">Not chosen yet</span>],
+                        ["Received on", day(s.receivedOn)],
+                        ["Valid until", day(s.validUntil)],
+                        ["Their reference", s.reference.trim() || "—"],
+                        ["Their quotation", filesAdded.length ? filesAdded.join(", ") : "—"],
+                      ]}
+                    />
+                  </ReviewBox>
+                  <ReviewBox title="Delivery & payment" onEdit={() => setStep("terms")}>
+                    <Facts
+                      rows={[
+                        ["Delivery", s.basis ? basisText(s.basis, s.basisPlace) : "—"],
+                        ["Ready in", daysTyped ? leadWords(Number(s.leadDays) || 0, s.leadFrom, "factory") : s.leadTime || "—"],
+                        ["Payment", s.parts.length ? s.parts.map((p) => `${p.share}%`).join(" / ") : "—"],
+                        ["Payment note", s.paymentTerms.trim() || "—"],
+                      ]}
+                    />
+                  </ReviewBox>
+                </div>
+                <ReviewBox title="Prices" count={[linesCount, currency, taxRate > 0 ? `tax ${taxRate}% ${taxIncluded ? "included" : "added"}` : "no tax"].filter(Boolean).join(" · ")} onEdit={() => setStep("prices")}>
+                  {linesReview?.(h)}
+                </ReviewBox>
+                <div className="grid gap-3.5 md:grid-cols-2 md:items-start">
+                  <ReviewBox title="Conditions" onEdit={() => setStep("conditions")}>
+                    <Facts
+                      rows={[
+                        ["Warranty", s.warrantyMonths.trim() ? `${s.warrantyMonths.trim()} months from ${WARRANTY_FROM_LABEL[s.warrantyFrom]}` : "—"],
+                        ["Covers", s.warranty.trim() || "—"],
+                        ["Minimum order", s.moq.trim() || "—"],
+                        ["Notes", s.notes.trim() || "—"],
+                      ]}
+                    />
+                  </ReviewBox>
+                </div>
+              </div>
+            )}
+
+            {step === "changes" && (
+              <div className="flex flex-col gap-3.5">
+                {total ? (
+                  <div role="table" aria-label="What changed" className="overflow-hidden rounded-xl border border-line text-[13.5px] max-sm:[&>[role=row]:nth-child(2)]:border-t-0">
+                    <div role="row" className={cn(CHANGE_ROW, "h-9 border-t-0 bg-surface-2 py-0 text-xs font-semibold text-text-2 max-sm:hidden")}>
+                      <span role="columnheader">Part</span>
+                      <span role="columnheader">What</span>
+                      <span role="columnheader">Was</span>
+                      <span role="columnheader">Now</span>
+                      <span role="columnheader">
+                        <span className="sr-only">Undo</span>
+                      </span>
+                    </div>
+                    {fieldChanges.map((c) => (
+                      <div role="row" key={c.key} className={CHANGE_ROW}>
+                        <span role="cell" className="text-text-2 max-sm:hidden">
+                          {OFFER_PART_LABEL[c.part]}
+                        </span>
+                        <span role="cell" className="min-w-0">
+                          <span className="text-text-2 sm:text-text">
+                            <span className="sm:hidden">{OFFER_PART_LABEL[c.part]} · </span>
+                            {c.label}
+                          </span>
+                          <span className="block sm:hidden">
+                            <s className="text-muted">{c.from}</s> → <b className="font-semibold">{c.to}</b>
+                          </span>
+                        </span>
+                        <span role="cell" title={c.from} className="min-w-0 truncate max-sm:hidden">
+                          <s className="text-muted">{c.from}</s>
+                        </span>
+                        <span role="cell" title={c.to} className="min-w-0 truncate font-semibold max-sm:hidden">
+                          {c.to}
+                        </span>
+                        <span role="cell" className="text-right">
+                          <Button type="button" size="xs" variant="ghost" onClick={() => undo(c.key)} className="text-primary hover:text-primary" aria-label={`Undo: ${c.label}`}>
+                            Undo
+                          </Button>
+                        </span>
+                      </div>
+                    ))}
+                    {linesChanges.length > 0 && (
+                      <div role="row" className={CHANGE_ROW}>
+                        <span role="cell" className="text-text-2 max-sm:hidden">
+                          Prices
+                        </span>
+                        <span role="cell" className="flex min-w-0 flex-col gap-0.5 sm:col-span-3">
+                          <span className="text-text-2 sm:hidden">Prices</span>
+                          {linesChanges.slice(0, 8).map((x) => (
+                            <span key={x}>{x}</span>
+                          ))}
+                          {linesChanges.length > 8 && <span className="text-text-2">and {linesChanges.length - 8} more</span>}
+                        </span>
+                        <span role="cell" className="text-right">
+                          <Button type="button" size="xs" variant="ghost" onClick={() => onUndoLines?.()} className="text-primary hover:text-primary" aria-label="Undo the changes to the lines">
+                            Undo
+                          </Button>
+                        </span>
+                      </div>
+                    )}
+                    {filesAdded.length > 0 && (
+                      <div role="row" className={CHANGE_ROW}>
+                        <span role="cell" className="text-text-2 max-sm:hidden">
+                          Factory
+                        </span>
+                        <span role="cell" className="min-w-0 sm:col-span-3">
+                          <span className="text-text-2 sm:hidden">Factory · </span>
+                          {filesAdded.length} to add: {filesAdded.join(", ")}
+                        </span>
+                        <span role="cell" className="text-right">
+                          <Button type="button" size="xs" variant="ghost" onClick={() => onUndoFiles?.()} className="text-primary hover:text-primary" aria-label="Undo the files to add">
+                            Undo
+                          </Button>
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  "So a ready date can be worked out"
-                )
-              }
-            />
-          </PanelSection>
-          )}
-          {step === "payment" && (
-          <PanelSection quiet first title="Payment" className="md:grid-cols-3">
-            <PartsField
-              id="fq-parts"
-              idPrefix="fq-part"
-              side="factory"
-              rows={s.parts}
-              onChange={(rows) => set("parts", rows)}
-              presets={OFFER_PRESETS}
-              amounts={total}
-              error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts}
-            />
-            <Field
-              label="Payment note"
-              htmlFor="paymentTerms"
-              optional
-              error={st.errors?.paymentTerms}
-              className="sm:col-span-2 md:col-span-3"
-            >
-              <Input
-                id="paymentTerms"
-                value={s.paymentTerms}
-                onChange={(e) => set("paymentTerms", e.target.value)}
-                maxLength={2000}
-              />
-            </Field>
-          </PanelSection>
-          )}
-          {step === "warranty" && (
-          <>
-          <PanelSection quiet first title="Warranty" className="md:grid-cols-3">
-            <WarrantyFields
-              idPrefix="fq"
-              months={s.warrantyMonths}
-              from={s.warrantyFrom}
-              covers={s.warranty}
-              onMonths={(v) => set("warrantyMonths", v)}
-              onFrom={(v) => set("warrantyFrom", v)}
-              onCovers={(v) => set("warranty", v)}
-              errors={{ months: st.errors?.warrantyMonths, from: st.errors?.warrantyFrom, covers: st.errors?.warranty }}
-              coversHint={warrantyWordsWere ? `Worked out from their words “${warrantyWordsWere}”` : undefined}
-            />
-          </PanelSection>
-          <PanelSection title="Conditions and their quotation">
-            <div className="flex flex-col gap-3.5">
-              <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq}>
-                <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} />
-              </Field>
-              <Field label="Notes" htmlFor="fq-notes" optional error={st.errors?.notes}>
-                <Textarea
-                  id="fq-notes"
-                  rows={3}
-                  className="min-h-0"
-                  value={s.notes}
-                  onChange={(e) => set("notes", e.target.value)}
-                />
-              </Field>
-            </div>
-            <div className="min-w-0">{files}</div>
-          </PanelSection>
-          </>
-          )}
-          {note}
+                  <p className="text-sm text-text-2">Nothing changed.</p>
+                )}
+                {reasonBox}
+              </div>
+            )}
+            {note}
           </StepsFrame>
         </>
       )}
@@ -859,45 +1185,77 @@ export function OfferHeaderForm({
   );
 }
 
-/** The offer's steps (design 17 Nov): its lines (with who, when, the currency and the tax above them), then its terms. */
-export type OfferStep = "lines" | "delivery" | "payment" | "warranty";
-const OFFER_STEPS: { key: OfferStep; label: string }[] = [
-  { key: "lines", label: "Lines" },
-  { key: "delivery", label: "Delivery" },
-  { key: "payment", label: "Payment" },
-  { key: "warranty", label: "Warranty & conditions" },
-];
-
-/** Each step with what it holds now ("Shenjing · CNY · tax 13% incl."). */
-function offerStepsInfo(s: QuoteState, at: number, saved: boolean, lines?: string): StepInfo<OfferStep>[] {
-  const rate = Number(s.taxRate || 0);
-  const summary: Record<OfferStep, string> = {
-    lines: [s.factory?.name, lines, s.currency.trim().toUpperCase(), rate > 0 ? `tax ${rate}%${s.taxIncluded ? " incl." : ""}` : "no tax"].filter(Boolean).join(" · "),
-    delivery: [s.basis ? `${s.basis}${s.basisPlace ? ` ${s.basisPlace}` : ""}` : null, s.leadDays.trim() ? `${s.leadDays.trim()} days` : s.leadTime || null].filter(Boolean).join(" · "),
-    payment: s.parts.map((p) => `${p.share}%`).join(" · "),
-    warranty: [s.warrantyMonths.trim() ? `${s.warrantyMonths.trim()} months` : null, s.moq.trim() ? `MOQ ${s.moq.trim()}` : null].filter(Boolean).join(" · "),
-  };
-  return OFFER_STEPS.map((x, k) => ({ key: x.key, label: x.label, summary: summary[x.key] || undefined, done: saved || k < at }));
+/** The offer's tax (design 18 Nov): included in their prices, added on top, or none — and its %. */
+function TaxChoice({ id, included, rate, onChange }: { id: string; included: boolean; rate: string; onChange: (included: boolean, rate: string) => void }) {
+  const none = Number(rate || 0) === 0;
+  const kind = none ? "none" : included ? "included" : "added";
+  const [lastRate, setLastRate] = useState(none ? "13" : rate);
+  return (
+    <span className="flex flex-wrap items-center gap-2.5">
+      <ChoiceChips
+        id={id}
+        label="Tax"
+        value={kind}
+        options={["included", "added", "none"] as const}
+        labels={{ included: "Included", added: "Added", none: "No tax" }}
+        onChange={(k) => {
+          if (k === "none") {
+            if (!none) setLastRate(rate);
+            onChange(included, "0");
+          } else onChange(k === "included", none ? lastRate || "13" : rate);
+        }}
+      />
+      {!none && (
+        <span className="flex items-center gap-1.5">
+          <Input
+            aria-label="Tax %"
+            inputMode="decimal"
+            className="w-20 text-right tabular"
+            value={rate}
+            onChange={(e) => onChange(included, e.target.value.replace(/[^\d.]/g, ""))}
+          />
+          <span className="text-sm text-muted">%</span>
+        </span>
+      )}
+    </span>
+  );
 }
+
+const OFFER_STEPS: { key: OfferStep; label: string }[] = [
+  { key: "factory", label: "Factory" },
+  { key: "prices", label: "Prices" },
+  { key: "terms", label: "Delivery & payment" },
+  { key: "conditions", label: "Conditions" },
+  { key: "review", label: "Review" },
+  { key: "changes", label: "Changes" },
+];
 
 /** Where each field the API can refuse is typed. */
 const FIELD_STEP: Record<string, OfferStep> = {
-  basis: "delivery",
-  basisPlace: "delivery",
-  leadDays: "delivery",
-  leadFrom: "delivery",
-  leadTime: "delivery",
-  paymentParts: "payment",
-  paymentTerms: "payment",
-  advancePercent: "payment",
-  warranty: "warranty",
-  warrantyMonths: "warranty",
-  warrantyFrom: "warranty",
-  moq: "warranty",
-  notes: "warranty",
+  factoryId: "factory",
+  newFactoryName: "factory",
+  reference: "factory",
+  receivedOn: "factory",
+  validUntil: "factory",
+  currency: "prices",
+  convertPrices: "prices",
+  taxRate: "prices",
+  taxIncluded: "prices",
+  basis: "terms",
+  basisPlace: "terms",
+  leadDays: "terms",
+  leadFrom: "terms",
+  leadTime: "terms",
+  paymentParts: "terms",
+  paymentTerms: "terms",
+  advancePercent: "terms",
+  warranty: "conditions",
+  warrantyMonths: "conditions",
+  warrantyFrom: "conditions",
+  moq: "conditions",
+  notes: "conditions",
 };
 
-/** A save refused for a field on another step opens that step, so the field and its message are in view. */
 /** What the API said about the lines of a new offer ("lines.2.unitPrice") as "Line 3: Enter the factory's price". */
 function lineErrors(errors: ActionState["errors"]): string[] {
   const out: string[] = [];
@@ -910,6 +1268,7 @@ function lineErrors(errors: ActionState["errors"]): string[] {
   return out;
 }
 
+/** A save refused for a field on another step opens that step, so the field and its message are in view. */
 function JumpToError({ st, onJump }: { st: ActionState; onJump: (step: OfferStep) => void }) {
   // Once per answer: a later step change by hand is not undone.
   const jump = useRef(onJump);
@@ -918,7 +1277,7 @@ function JumpToError({ st, onJump }: { st: ActionState; onJump: (step: OfferStep
   });
   useEffect(() => {
     const first = Object.keys(st.errors ?? {}).find((k) => st.errors?.[k]?.length);
-    if (first) jump.current(FIELD_STEP[first] ?? "lines");
+    if (first) jump.current(FIELD_STEP[first] ?? "prices");
   }, [st]);
   return null;
 }

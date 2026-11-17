@@ -2,28 +2,29 @@
 
 import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, Info, ListPlus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { formatMinor, toMinor } from "@kebo/money";
-import { ATTACHMENT_KIND_LABEL, basisText, partsWords, warrantyLine, type AttachmentKind } from "@kebo/shared";
+import { ATTACHMENT_KIND_LABEL, basisText, lineNumbers, offerTaxText, partsWords, warrantyLine, type AttachmentKind } from "@kebo/shared";
 import { Button, cn, Field, Select, Textarea } from "@kebo/ui";
-import { SubmitButton, toast } from "@kebo/ui/client";
+import { toast } from "@kebo/ui/client";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
-import { LinesCard } from "@/components/orders/step-view";
 import { PanelBody, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { BoxFacts, RecordBox } from "@/components/common/record-box";
+import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
+import { recordEditAction } from "@/lib/edit-actions";
 import { ConfirmDialog } from "@/components/common/dialog";
 import type { ActionState } from "@/lib/actions";
-import { date as dateText, money as amount } from "@/lib/format";
+import { date as dateText, dateTime, money as amount } from "@/lib/format";
 import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import { send, type Staged } from "./documents-panel";
 import { FileRow, FileZone } from "@/components/common/file-zone";
-import { fileSize, plural } from "@/lib/format";
-import { OfferHeaderForm, type OfferStep } from "./factory-quote-form";
+import { fileSize } from "@/lib/format";
+import { OFFER_PART_LABEL, OfferHeaderForm, type AskedFactory, type OfferPart, type OfferSaved, type OfferStep } from "./factory-quote-form";
 import { LinesExcel, LinesView } from "./lines-view";
 import { useBatchLines, type LineHandlers } from "@/components/edits/batch-lines";
-import { useEditSave } from "@/components/edits/use-edit-save";
 import { editedMark } from "@/components/edits/edits";
-import type { EditCard } from "@/lib/types-edits";
+import type { EditCard, EditsView } from "@/lib/types-edits";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 type Items = SourcingView["items"];
@@ -77,34 +78,33 @@ export type OfferKit = {
   others: FactoryQuoteView[];
   lineActions: OfferLineActions;
   linesCard?: EditCard | null;
+  /** The inquiry's number, under the window's title ("Shenjing Machinery · RFQ-2026-0007"). */
+  refNo?: string;
 };
 
-/** A part's name in its window's title ("Delivery · Techtribe’s offer"). */
-const PART_TITLE: Record<OfferStep, string> = { lines: "Lines", delivery: "Delivery", payment: "Payment", warranty: "Warranty & conditions" };
-
 /**
- * The offer's window (design 17 Nov, edit one part): `only` opens just the part asked for, with Cancel and
- * Save, sized to it; "All steps" turns it into the whole steps window at that part. Without `only`: the steps.
+ * The offer's window (design rules 18 Nov): `only` opens just the part asked for — "Edit delivery & payment", 640 px
+ * (the prices wide) — the rest "Edit offer", every part.
  */
 export function OfferPanel({ kit, q, step, only = false, onClose }: { kit: OfferKit; q: FactoryQuoteView; step: OfferStep; only?: boolean; onClose: () => void }) {
-  const [one, setOne] = useState(only);
-  const width = !one || step === "lines" ? "md:w-[1180px]" : step === "payment" ? "md:w-[760px]" : "md:w-[680px]";
+  const one = only;
+  const part = step === "review" || step === "changes" ? null : step;
   return (
     <SidePanel
-      title={one ? `${PART_TITLE[step]} · ${q.factory.name}’s offer` : `Edit · ${q.factory.name}’s offer`}
-      description="Internal, never shown to the customer."
+      title={one && part ? `Edit ${OFFER_PART_LABEL[part].toLowerCase()}` : "Edit offer"}
+      description={[q.factory.name, kit.refNo].filter(Boolean).join(" · ")}
       onClose={onClose}
-      className={width}
+      // The payment's parts need a little more room than 640.
+      className={!one || part === "prices" ? "md:w-[1180px]" : part === "terms" ? "md:w-[720px]" : "md:w-[640px]"}
     >
-      <OfferWindow {...kit} q={q} startStep={step} only={one} onAllSteps={() => setOne(false)} />
+      <OfferWindow {...kit} q={q} startStep={step} only={one} />
     </SidePanel>
   );
 }
 
 /**
- * Edit with its word (never a pencil alone): opens the offer's window on `step` (Lines · Delivery ·
- * Payment · Warranty & conditions), only that part when `only`. `what` finishes its name for screen
- * readers ("Edit delivery").
+ * Edit with its word (never a pencil alone): opens the offer's window on `step` (Factory · Prices · Delivery &
+ * payment · Conditions), only that part when `only`. `what` finishes its name for screen readers ("Edit prices").
  */
 export function OfferEdit({
   kit,
@@ -123,12 +123,12 @@ export function OfferEdit({
   what?: string;
   words?: string;
   size?: "xs" | "sm";
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "ghost";
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size={size} variant={variant} onClick={() => setOpen(true)} className="tracking-normal normal-case">
+      <Button size={size} variant={variant} onClick={() => setOpen(true)} className={cn("tracking-normal normal-case", variant === "ghost" && "text-primary hover:text-primary")}>
         <Pencil aria-hidden />
         {words ?? (
           <>
@@ -141,47 +141,11 @@ export function OfferEdit({
   );
 }
 
-/** One of the offer's terms (design 17 Nov): its title and Edit, then what it says. */
-function TermGroup({ title, edit, children }: { title: string; edit?: ReactNode; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="flex min-w-0 flex-col gap-1 px-4 py-3 text-[13px] leading-relaxed text-text-2 max-md:border-b max-md:border-line max-md:last:border-b-0 md:border-l md:border-line md:first:border-l-0">
-      <h3 className="flex min-h-8 items-center justify-between gap-2 text-xs font-bold tracking-wide text-text uppercase">
-        {title}
-        {edit}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
-/** The offer's terms in three groups, each with Edit opening its step: Delivery · Payment · Warranty & conditions. */
-export function OfferTerms({ q, kit }: { q: FactoryQuoteView; /** Given when the offer can be edited. */ kit?: OfferKit }) {
-  const edit = (step: OfferStep, what: string) => (kit ? <OfferEdit kit={kit} q={q} step={step} what={what} only /> : undefined);
-  const none = <span className="text-muted">Not said</span>;
-  return (
-    <div className="grid overflow-hidden rounded-xl border border-line bg-surface md:grid-cols-3">
-      <TermGroup title="Delivery" edit={edit("delivery", "delivery")}>
-        <span className="font-medium text-text">{q.basis ? basisText(q.basis, q.basisPlace) : "Delivery basis not said"}</span>
-        {q.leadTime ? <span>{q.leadTime}</span> : <span className="text-muted">Lead time not said</span>}
-      </TermGroup>
-      <TermGroup title="Payment" edit={edit("payment", "payment")}>
-        {q.paymentParts.length ? <span className="font-medium text-text">{partsWords(q.paymentParts, "factory")}</span> : none}
-        {q.paymentTerms && <span className="line-clamp-3 whitespace-pre-line">{q.paymentTerms}</span>}
-      </TermGroup>
-      <TermGroup title="Warranty & conditions" edit={edit("warranty", "warranty and conditions")}>
-        <span className="font-medium text-text">{warrantyLine(q)?.replace(/\.$/, "") ?? "No warranty said"}</span>
-        {q.moq && <span>Minimum order {q.moq}</span>}
-        {q.notes && <span className="line-clamp-4 whitespace-pre-line">{q.notes}</span>}
-      </TermGroup>
-    </div>
-  );
-}
-
 /**
- * The offer's window, the same for "Enter factory offer" (no offer yet) and "Edit the offer": the four
- * sections of OfferHeaderForm, the factory's own files, and the buttons. A new offer saved shows on the
- * page, opened ("Save offer"), or empties the window ("Save & enter another"); an edit closes. Removing
- * the offer, or one of its files, asks first and says what happens.
+ * The offer's window, the same for a new offer and an edit (design 18 Nov, the inquiry's rules): the steps of
+ * OfferHeaderForm, the factory's own files in the Factory step and the lines in Prices — all saved by the one Save.
+ * A new offer saved opens its page (or the window starts again: Save and add another); an edit closes. Each part's
+ * changes are kept with the reason, for its box's history. Removing the offer, or one of its files, asks first.
  */
 function OfferWindow({
   dealId,
@@ -199,26 +163,26 @@ function OfferWindow({
   others,
   lineActions,
   linesCard,
+  asked,
   startStep,
   only = false,
-  onAllSteps,
 }: {
-  /** Only the step it opens on (Edit on one part); "All steps" calls onAllSteps. */
+  /** Only the step it opens on (Edit on one part). */
   only?: boolean;
-  onAllSteps?: () => void;
-  /** The customer's items (a new offer can start from them; a line says which it answers). */
+  /** The customer's items (a new offer's lines can be copied from them; a line keeps which it answers). */
   items: Items;
   /** The inquiry's other offers with lines (their lines can be copied). */
   others: FactoryQuoteView[];
   lineActions: OfferLineActions;
   /** The lines' saved edits ("Edited n×"). */
   linesCard?: EditCard | null;
-  /** The step it opens on (Edit lines: Lines; a group's Edit: its step). */
+  /** The factories asked for this inquiry, first in the picker. */
+  asked?: AskedFactory[];
+  /** The step it opens on. */
   startStep?: OfferStep;
   dealId: string;
   /** The offer being edited; null: a new one. */
   q: FactoryQuoteView | null;
-  /** A new offer: how many items the customer listed (its lines can start from them). */
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
@@ -227,7 +191,7 @@ function OfferWindow({
   removeAction?: Action;
   removeFile?: OfferLineActions["removeFile"];
   taxDefault?: { included: boolean; rate: number; advance?: number };
-  /** "Save & enter another": the window starts again, empty. */
+  /** "Save and add another": the window starts again, empty. */
   onAnother?: () => void;
 }) {
   const router = useRouter();
@@ -240,13 +204,12 @@ function OfferWindow({
   const [busy, start] = useTransition();
   const another = useRef(false);
   const used = q?.lines.some((l) => l.used) ?? false;
-  // The Lines step (design 17 Nov): the offer's lines on a copy, saved with the offer by the window's one Save.
-  const [step, setStep] = useState<OfferStep>(startStep ?? "lines");
+  // The lines (design 18 Nov): a copy, saved with the offer by the window's one Save.
+  const [step, setStep] = useState<OfferStep>(startStep ?? (q ? "prices" : "factory"));
   const savedRows = useMemo(() => offerRows(q?.lines ?? []), [q]);
-  const baseColumns = useMemo(() => offerColumns(q?.lines ?? [], items, q?.currency ?? mainCurrency, q?.taxRate ?? taxDefault?.rate ?? 0), [q, items, mainCurrency, taxDefault]);
-  const batch = useBatchLines({ rows: savedRows, columns: baseColumns, plain: !used });
-  const linesSave = useEditSave({ edit: q ? { type: "factory_quote", id: q.id, card: "lines" } : undefined, card: linesCard });
-  const [copyFrom, setCopyFrom] = useState(others[0]?.id ?? "");
+  const baseColumns = useMemo(() => offerColumns(q?.lines ?? [], q?.currency ?? mainCurrency, q?.taxRate ?? taxDefault?.rate ?? 0), [q, mainCurrency, taxDefault]);
+  const batch = useBatchLines({ rows: savedRows, columns: baseColumns, plain: !used, report: false });
+  const [copyFrom, setCopyFrom] = useState("");
 
   // The factory's files, sent once the offer is saved; what did not go up, said.
   const upload = async (id: string) => {
@@ -271,9 +234,9 @@ function OfferWindow({
     return st;
   };
 
-  // Saved: a new offer's window closes (or starts again: Save & enter another); an offer's new files go up,
-  // then its changed lines, then the window closes.
-  const done = async (st: ActionState) => {
+  // Saved: a new offer's window closes (or starts again); an edit's new files go up, then its changed lines,
+  // then each part keeps what changed with the reason (its box's history), and the window closes.
+  const done = async (st: ActionState, saved: OfferSaved) => {
     if (!q) {
       if (another.current) {
         another.current = false;
@@ -284,27 +247,48 @@ function OfferWindow({
     const id = q.id;
     setError(null);
     const problems = await upload(id);
-    router.refresh();
     if (problems.length) {
+      router.refresh();
       setFiles([]);
       setError(`The offer was saved, but: ${problems.join(" ")}`);
       return;
     }
-    // Then an offer's changed lines (the Lines step), in the order they were changed; a refused one opens
-    // the Lines step. (A new offer's lines went in the same save.)
     if (batch.dirty) {
-      await linesSave.save({
-        changes: batch.diff.changes,
-        keys: batch.diff.keys,
-        askWhy: batch.askWhy,
-        run: async (reason) => {
-          const r = await batch.run(offerLineHandlers(id, q, lineActions), reason);
-          if (!r.ok) setStep("lines");
-          return r;
-        },
-      });
-      return;
+      const r = await batch.run(offerLineHandlers(id, q, lineActions), saved.reason);
+      if (!r.ok) {
+        router.refresh();
+        setStep("prices");
+        setError(`The offer was saved, but its lines were not: ${r.message} Save again to send the rest.`);
+        return;
+      }
+      if (saved.reason || !linesCard?.first)
+        await recordEditAction({
+          type: "factory_quote",
+          id,
+          card: "lines",
+          kind: saved.reason ? "edit" : "first",
+          reason: saved.reason,
+          changes: batch.diff.changes.slice(0, 60),
+          keys: batch.diff.keys.slice(0, 500),
+          lines: Object.fromEntries(Object.entries(batch.diff.byKey).slice(0, 200)),
+        }).catch(() => undefined);
     }
+    if (saved.reason)
+      for (const part of ["factory", "prices", "terms", "conditions"] as OfferPart[]) {
+        const list = saved.changes.filter((c) => c.part === part);
+        const added = part === "factory" ? files.map((f) => `Added ${f.name}`) : [];
+        if (!list.length && !added.length) continue;
+        await recordEditAction({
+          type: "factory_quote",
+          id,
+          card: `offer.${part}`,
+          kind: "edit",
+          reason: saved.reason,
+          changes: [...list.map((c) => `${c.label}: ${c.from} → ${c.to}`), ...added],
+          keys: list.map((c) => c.key),
+        }).catch(() => undefined);
+      }
+    router.refresh();
     // Saved: close without asking "Discard your change?".
     close(st);
   };
@@ -330,6 +314,7 @@ function OfferWindow({
       }
     });
 
+  // Their quotation (design 18 Nov): with who sent it and when, in the Factory step.
   const fileRows = (
     <div className="flex flex-col gap-2">
       {(q?.files ?? []).map((f) => (
@@ -350,16 +335,13 @@ function OfferWindow({
           )}
         </div>
       ))}
-      <FileZone
-        label="The factory’s own quotation"
-        onFiles={(list) => setFiles((x) => [...x, ...list])}
-      >
+      <FileZone label="Their quotation" compact onFiles={(list) => setFiles((x) => [...x, ...list])}>
         {files.length > 0 &&
           files.map((file, n) => (
             <FileRow
               key={`${file.name}-${n}`}
               name={file.name}
-              meta={`${ATTACHMENT_KIND_LABEL[guessOfferKind(file.name, file.type)]} · ${fileSize(file.size)} · goes up when you save`}
+              meta={`${ATTACHMENT_KIND_LABEL[guessOfferKind(file.name, file.type)]} · ${fileSize(file.size)}`}
               actions={
                 <Button size="icon-xs" variant="ghost" onClick={() => setFiles((x) => x.filter((_, k) => k !== n))} aria-label={`Remove ${file.name}`}>
                   <Trash2 aria-hidden />
@@ -371,71 +353,110 @@ function OfferWindow({
     </div>
   );
 
+  const fromItems = (taxRate: number) =>
+    items.map((it) => ({
+      id: it.id,
+      parentId: it.parentId,
+      values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(taxRate) },
+    }));
+  const count = batch.rows.length ? linesCount(batch.rows) : "no lines yet";
+
   return (
     <PanelBody fill>
       <OfferHeaderForm
         step={step}
         onStep={setStep}
         only={only}
-        onAllSteps={onAllSteps}
-        linesSummary={batch.rows.length ? `${batch.rows.length} line${batch.rows.length === 1 ? "" : "s"}` : "no lines yet"}
+        startStep={startStep}
+        asked={asked}
+        linesCount={count}
+        linesChanges={q && batch.dirty ? batch.diff.changes : []}
+        onUndoLines={batch.reset}
+        filesAdded={files.map((f) => f.name)}
+        onUndoFiles={() => setFiles([])}
         lines={(h) => {
-          const columns = offerColumns(q?.lines ?? [], items, h.currency || mainCurrency, h.taxRate);
-          const fromItems = () =>
-            items.map((it) => ({ id: it.id, parentId: it.parentId, values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(h.taxRate) } }));
+          const columns = offerColumns(q?.lines ?? [], h.currency || mainCurrency, h.taxRate, q?.taxRate ?? h.taxRate);
+          const empty = batch.rows.length === 0;
           return (
-            <div className="flex flex-col gap-3">
+            <div className="flex min-h-0 flex-col gap-3 md:flex-1">
               {used && (
-                <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
+                <p className="flex shrink-0 items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
                   <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
-                  <span>A quotation is priced from this offer. Saving changes to its lines asks why; the quotation keeps its own copy.</span>
+                  <span>A quotation is priced from this offer. Its own copy of the lines and prices stays as it was.</span>
                 </p>
-              )}
-              {batch.rows.length === 0 && (items.length > 0 || others.length > 0) && (
-                <LinesStart
-                  items={items.length}
-                  others={others}
-                  copyFrom={copyFrom}
-                  setCopyFrom={setCopyFrom}
-                  onItems={() => batch.add(newLinesOf(fromItems()))}
-                  onCopy={(o) => batch.add(newLinesOf(o.lines.filter((l) => !l.alternativeOfId).map((l) => ({ id: l.id, parentId: l.parentId, values: { description: l.description, model: l.model ?? "", requestedItemId: l.requestedItemId ?? "", quantity: l.quantity, unit: l.unit, unitPrice: "", taxRate: String(h.taxRate) } }))))}
-                />
               )}
               <LineTable
                 rows={batch.rows}
                 columns={columns}
                 noun="line"
+                fill
+                partButton={false}
                 sheet={{
                   name: `Prices from ${q?.factory.name ?? "the factory"}`,
                   upload: !used,
                   templateRows: items.map((it) => ({ no: it.no, values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(h.taxRate) } })),
                 }}
+                // Copying the customer's items (design 18 Nov): with the other ways in, never inside the table.
+                tools={
+                  <>
+                    {items.length > 0 && (
+                      <Button size="sm" variant={empty ? "soft" : "secondary"} onClick={() => batch.add(newLinesOf(fromItems(h.taxRate)))}>
+                        <Copy aria-hidden /> Copy customer’s items{empty ? ` · ${linesCount(items.map((it) => ({ key: it.id, parentKey: it.parentId, values: {} })))}` : ""}
+                      </Button>
+                    )}
+                    {empty && others.length > 0 && (
+                      <Select
+                        compact
+                        aria-label="Copy another offer’s lines"
+                        value={copyFrom}
+                        onChange={(e) => {
+                          const o = others.find((x) => x.id === e.target.value);
+                          setCopyFrom("");
+                          if (o)
+                            batch.add(
+                              newLinesOf(
+                                o.lines
+                                  .filter((l) => !l.alternativeOfId)
+                                  .map((l) => ({ id: l.id, parentId: l.parentId, values: { description: l.description, model: l.model ?? "", requestedItemId: l.requestedItemId ?? "", quantity: l.quantity, unit: l.unit, unitPrice: "", taxRate: String(h.taxRate) } })),
+                              ),
+                            );
+                        }}
+                        className="h-8 w-auto max-w-56"
+                      >
+                        <option value="">Copy another offer…</option>
+                        {others.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.factory.name} ({o.lines.length})
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                  </>
+                }
                 {...batch.local}
                 footer={
                   batch.rows.length ? (
-                    <div className="flex flex-wrap items-center justify-end gap-x-1.5 px-3 py-2 text-sm text-muted">
-                      Factory total <span className="font-semibold text-text tabular">{formatMinor(linesTotal(batch.rows), h.currency || mainCurrency)}</span>
-                      {h.taxIncluded ? `tax ${h.taxRate}% included` : h.taxRate > 0 ? `+ ${h.taxRate}% tax` : "no tax"}
+                    <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 px-3 py-2.5 text-sm text-text-2">
+                      <span>
+                        Total <span className="font-semibold text-text tabular">{formatMinor(linesTotal(batch.rows), h.currency || mainCurrency)}</span>
+                      </span>
+                      <span>{h.taxIncluded ? `tax ${h.taxRate}% included` : h.taxRate > 0 ? `+ ${h.taxRate}% tax` : "no tax"}</span>
                     </div>
                   ) : null
                 }
               />
               {h.errors.length > 0 && (
-                <div role="alert" className="flex flex-col gap-0.5 rounded-xl border border-bad/30 bg-bad-soft px-3 py-2.5 text-sm text-bad">
+                <div role="alert" className="flex shrink-0 flex-col gap-0.5 rounded-xl border border-bad/30 bg-bad-soft px-3 py-2.5 text-sm text-bad">
                   <span className="font-semibold">Nothing was saved yet: fix {h.errors.length === 1 ? "this line" : "these lines"} first.</span>
                   {h.errors.map((e) => (
                     <span key={e}>{e}</span>
                   ))}
                 </div>
               )}
-              {linesSave.error && (
-                <p role="alert" className="text-sm text-bad">
-                  The offer was saved, but its lines were not: {linesSave.error} Save again to send the rest.
-                </p>
-              )}
             </div>
           );
         }}
+        linesReview={(h) => <LinesReview rows={batch.rows} currency={h.currency || mainCurrency} />}
         action={q ? saveAction : create}
         extra={!q && batch.rows.length ? { lines: newOfferLines(batch.rows) } : undefined}
         quote={q}
@@ -443,47 +464,17 @@ function OfferWindow({
         mainCurrency={mainCurrency}
         rates={rates}
         searchFactories={searchFactories}
-        onDone={(st) => void done(st)}
+        onDone={(st, saved) => void done(st, saved)}
         defaults={taxDefault ? { taxIncluded: taxDefault.included, taxRate: taxDefault.rate, advancePercent: taxDefault.advance } : undefined}
         files={fileRows}
-        note={
-          <>
-            {error && <p className="text-sm text-bad">{error}</p>}
-          </>
-        }
+        note={error && <p role="alert" className="text-sm text-bad">{error}</p>}
+        onAnother={onAnother ? () => (another.current = true) : undefined}
         footerStart={
-          q && removeAction ? (
+          q && removeAction && !only ? (
             <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} aria-label="Remove this offer" className="inline-flex min-h-9 items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline max-sm:min-w-9 max-sm:justify-center pointer-coarse:min-h-8">
               <Trash2 className="size-4 max-sm:size-5" aria-hidden /> <span className="max-sm:sr-only">Remove this offer</span>
             </button>
           ) : undefined
-        }
-        footer={(last) =>
-          q ? (
-            <>
-              <Button type="button" variant="ghost" onClick={() => close()} className="max-md:hidden">
-                Cancel
-              </Button>
-              <SubmitButton variant={last ? "primary" : "secondary"} pendingText="Saving…">
-                <Check aria-hidden /> Save
-              </SubmitButton>
-            </>
-          ) : (
-            <>
-              <Button type="button" variant="ghost" onClick={() => close()} className="max-md:hidden">
-                Cancel
-              </Button>
-              {last && (
-                <SubmitButton variant="secondary" pendingText="Saving…" onClick={() => (another.current = true)}>
-                  <Plus aria-hidden /> <span className="max-sm:sr-only">Save &amp; enter another</span>
-                  <span aria-hidden className="sm:hidden">Another</span>
-                </SubmitButton>
-              )}
-              <SubmitButton variant={last ? "primary" : "secondary"} pendingText="Saving…" onClick={() => (another.current = false)}>
-                <Check aria-hidden /> Save<span className="max-sm:sr-only"> offer</span>
-              </SubmitButton>
-            </>
-          )
         }
       />
       {asking && q && (
@@ -519,8 +510,45 @@ function OfferWindow({
           </div>
         </ConfirmDialog>
       )}
-      {linesSave.dialog}
     </PanelBody>
+  );
+}
+
+/** "4 lines, 2 parts". */
+function linesCount(rows: { parentKey: string | null }[]) {
+  const parts = rows.filter((r) => r.parentKey).length;
+  const lines = rows.length - parts;
+  return [`${lines} line${lines === 1 ? "" : "s"}`, parts ? `${parts} part${parts === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
+}
+
+/** The lines in Review (a new offer): number, what, how many, the line's total. */
+function LinesReview({ rows, currency }: { rows: LineRow[]; currency: string }) {
+  if (!rows.length) return <p className="px-4 py-3 text-sm text-text-2">No lines yet.</p>;
+  const numbers = lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey })));
+  return (
+    <>
+      <table className="w-full text-[13.5px]">
+        <tbody>
+          {rows.map((r, i) => {
+            const p = Number((r.values.unitPrice ?? "").replace(/,/g, ""));
+            const n = Number((r.values.quantity ?? "").replace(/,/g, ""));
+            return (
+              <tr key={r.key} className="border-t border-line first:border-t-0">
+                <td className="w-12 px-4 py-2 text-text-2 tabular">{numbers[i]}</td>
+                <td className={cn("py-2", r.parentKey && "pl-4")}>{(r.values.description ?? "").split("\n")[0]}</td>
+                <td className="w-24 px-3 py-2 text-right tabular">
+                  {r.values.quantity} {r.values.unit}
+                </td>
+                <td className="w-32 px-4 py-2 text-right font-semibold tabular">{p && Number.isFinite(p * n) ? formatMinor(Math.round(toMinor(p) * n), currency) : <span className="font-normal text-muted">—</span>}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="flex justify-end gap-2 border-t border-line bg-surface-2/50 px-4 py-2.5 text-sm text-text-2">
+        Total <span className="font-semibold text-text tabular">{formatMinor(linesTotal(rows), currency)}</span>
+      </div>
+    </>
   );
 }
 
@@ -590,73 +618,11 @@ function linesTotal(list: LineRow[]) {
   return t;
 }
 
-/** An offer with no lines yet: start from the customer's list, or copy another factory's lines (prices empty). */
-function LinesStart({
-  items,
-  others,
-  copyFrom,
-  setCopyFrom,
-  onItems,
-  onCopy,
-}: {
-  items: number;
-  others: FactoryQuoteView[];
-  copyFrom: string;
-  setCopyFrom: (id: string) => void;
-  onItems: () => void;
-  onCopy: (o: FactoryQuoteView) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border-[1.5px] border-dashed border-primary/40 bg-primary-soft/20 p-3 sm:p-4">
-      <p className="text-sm font-semibold">Start the lines</p>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {items > 0 && (
-          <button type="button" onClick={onItems} className="flex items-start gap-2.5 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-left text-sm hover:border-primary">
-            <ListPlus className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-            <span>
-              <span className="block font-medium">From the customer&apos;s list ({items})</span>
-              <span className="block text-xs text-text-2">Then change the models and add their prices</span>
-            </span>
-          </button>
-        )}
-        {others.length > 0 && (
-          <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-sm">
-            <span className="flex items-start gap-2.5">
-              <Copy className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              <span>
-                <span className="block font-medium">Copy another factory&apos;s lines</span>
-                <span className="block text-xs text-text-2">Same lines, prices left empty</span>
-              </span>
-            </span>
-            <span className="flex flex-wrap items-center gap-1.5">
-              <Select compact aria-label="Offer to copy lines from" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-8 min-w-0 flex-1">
-                {others.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.factory.name} ({o.lines.length})
-                  </option>
-                ))}
-              </Select>
-              <Button
-                size="xs"
-                variant="secondary"
-                onClick={() => {
-                  const o = others.find((x) => x.id === copyFrom);
-                  if (o) onCopy(o);
-                }}
-              >
-                Copy
-              </Button>
-            </span>
-          </div>
-        )}
-      </div>
-      <p className="text-xs text-muted">Or type the first line in the table below, or paste their list.</p>
-    </div>
-  );
-}
-
-/** The offer's line columns (the view and the steps window's sheet): its currency in the price, its tax % for new lines. */
-export function offerColumns(lines: FactoryQuoteView["lines"], items: Items, currency: string, taxRate: number): LineColumn[] {
+/**
+ * The offer's line columns (the view and the steps window's sheet): its currency in the price, its tax % for new lines.
+ * Which item a line answers is kept on the line, not shown (design 18 Nov): copied lines keep it.
+ */
+export function offerColumns(lines: FactoryQuoteView["lines"], currency: string, taxRate: number, savedRate = taxRate): LineColumn[] {
   // Lines another spec can point at: the offer's main lines (not parts, not specs themselves).
   const mains = lines.filter((l) => !l.parentId && !l.alternativeOfId);
   const numberOf = (id: string) => lines.find((l) => l.id === id)?.no ?? "";
@@ -672,28 +638,12 @@ export function offerColumns(lines: FactoryQuoteView["lines"], items: Items, cur
   const columns: LineColumn[] = [
     {
       key: "description",
-      label: "Description (as the factory wrote it)",
+      label: "Description",
       width: "minmax(0,1fr)",
       input: "textarea",
       required: "Each line needs a description",
     },
     { key: "model", label: "Model", width: "7rem", input: "text", maxLength: 120, placeholder: "Model" },
-    ...(items.length
-      ? [
-          {
-            key: "requestedItemId",
-            label: "For item",
-            width: "4.5rem",
-            input: "select" as const,
-            options: [
-              { value: "", label: "— extra" },
-              ...items.map((it) => ({ value: it.id, label: `${it.no} ${it.description.split("\n")[0]!.slice(0, 40)}` })),
-            ],
-            sheetChoices: [{ value: "", text: "extra" }, ...items.map((it) => ({ value: it.id, text: it.no }))],
-            format: (v: LineValues) => items.find((it) => it.id === v.requestedItemId)?.no ?? <span className="text-muted">extra</span>,
-          },
-        ]
-      : []),
     { key: "quantity", label: "Qty", width: "4.5rem", input: "number", align: "right", initial: "1", required: "Enter a quantity" },
     { key: "unit", label: "Unit", width: "5.5rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
     {
@@ -710,15 +660,10 @@ export function offerColumns(lines: FactoryQuoteView["lines"], items: Items, cur
           <span className="text-muted">—</span>
         ),
     },
-    {
-      key: "taxRate",
-      label: "Tax %",
-      width: "3.5rem",
-      input: "number",
-      align: "right",
-      initial: String(taxRate),
-      phoneHidden: true,
-    },
+    // A line's own tax % only when one has its own (design 18 Nov: the offer's tax is said once, above the lines).
+    ...(lines.some((l) => Number(l.taxRate) !== Number(savedRate))
+      ? [{ key: "taxRate", label: "Tax %", width: "3.5rem", input: "number" as const, align: "right" as const, initial: String(taxRate), phoneHidden: true }]
+      : []),
     ...(mains.length > 1 || lines.some((l) => l.alternativeOfId)
       ? [
           {
@@ -740,176 +685,162 @@ export function offerColumns(lines: FactoryQuoteView["lines"], items: Items, cur
           },
         ]
       : []),
-    { key: "total", label: "Total", width: "9.5rem", align: "right", format: lineTotal },
+    { key: "total", label: "Total", width: "8.5rem", align: "right", format: lineTotal },
   ];
   return columns;
 }
 
-/* ---------------------------------------------------------------- the offer's lines */
+/* ---------------------------------------------------------------- the offer's page: a box per part */
 
 /**
- * "<factory> · lines": read only (Excel in the table's menu), Edit lines for
- * today's line table — typed, pasted, uploaded or copied from another
- * factory's offer, saved as they are made, a reason asked once a quotation is
- * priced from it.
+ * The offer's page (design 18 Nov, the inquiry's rules): the same boxes as its steps — Factory and Delivery &
+ * payment side by side, then Prices, then Conditions — each with its own history clock and Edit (that part only),
+ * each fact once.
  */
-export function OfferLines({
+export function OfferBoxes({
   q,
-  items,
-  canEdit,
-  mainCurrency,
-  edits,
   kit,
+  canEdit,
+  edits,
+  mainCurrency,
+  historyHref,
 }: {
-  /** The offer's window: Edit lines opens it on the Lines step. */
-  kit: OfferKit;
   q: FactoryQuoteView;
-  items: Items;
+  kit: OfferKit;
   canEdit: boolean;
+  /** This offer's saved edits, by card. */
+  edits?: EditsView;
   mainCurrency: string;
-  /** This offer's saved edits to its lines ("Edited n×"). */
-  edits?: EditCard | null;
+  /** "All history". */
+  historyHref?: string;
 }) {
-  const used = q.lines.some((l) => l.used);
-  const rows: LineRow[] = q.lines.map((l) => ({
-    key: l.id,
-    parentKey: l.parentId,
-    values: {
-      description: l.description,
-      model: l.model ?? "",
-      requestedItemId: l.requestedItemId ?? "",
-      quantity: l.quantity,
-      unit: l.unit,
-      unitPrice: l.unitPrice,
-      taxRate: String(l.taxRate),
-      alternativeOfId: l.alternativeOfId ?? "",
-    },
-  }));
-  // The view marks lines changed since they were first saved ("edited 2×"); the editor shows them plain.
-  const viewRows: LineRow[] = rows.map((r) => ({ ...r, badge: editedMark(edits, r.key) }));
-  const columns = offerColumns(q.lines, items, q.currency, q.taxRate);
-
-  // Read only, narrower: the model only when a line has one, no room kept for typing.
-  const narrow: Record<string, string> = {
-    requestedItemId: "4rem",
-    quantity: "4rem",
-    unit: "4rem",
-    unitPrice: "6rem",
-    taxRate: "3.5rem",
-    total: "7rem",
+  // Each box's own changes (who, when, old → new, why), newest first, then when the offer came.
+  const history = (cards: string[], title: string) => {
+    const entries: HistoryEntry[] = [
+      ...cards
+        .flatMap((c) => edits?.cards[c]?.edits ?? [])
+        .sort((a, b) => b.at.localeCompare(a.at))
+        .map((e) => ({ lines: e.changes, reason: e.reason, by: e.by, at: dateTime(e.at) })),
+      { lines: ["Offer received"], reason: null, by: q.factory.name, at: dateText(q.receivedOn), start: true },
+    ];
+    return <HistoryButton title={title} entries={entries} allHref={historyHref} />;
   };
+  const edit = (part: OfferPart, what: string) => <OfferEdit kit={kit} q={q} step={part} what={what} only variant="ghost" />;
+
+  const rows: LineRow[] = offerRows(q.lines).map((r) => ({ ...r, badge: editedMark(edits?.cards.lines, r.key) }));
+  const numbers = q.lines.map((l) => l.no);
+  const columns = offerColumns(q.lines, q.currency, q.taxRate);
+  // Read only, narrower: the model only when a line has one.
+  const narrow: Record<string, string> = { quantity: "4rem", unit: "4rem", unitPrice: "6.5rem", taxRate: "3.5rem", total: "7.5rem" };
   const viewColumns = columns
     .filter((c) => c.key !== "model" || q.lines.some((l) => l.model))
-    .map((c) => (narrow[c.key] ? { ...c, width: narrow[c.key]! } : c))
-    .map((c) =>
-      c.key === "total"
-        ? {
-            ...c,
-            format: (v: LineValues) => {
-              const p = Number((v.unitPrice ?? "").replace(/,/g, ""));
-              const n = Number((v.quantity ?? "").replace(/,/g, ""));
-              const t = (p * n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              return p && Number.isFinite(p * n) ? (
-                v.alternativeOfId ? <span className="text-muted" title="Another spec: not in the total">({t})</span> : t
-              ) : (
-                <span className="text-muted">—</span>
-              );
-            },
-          }
-        : c,
-    );
-
-  // One % for every line: said in the footer ("Tax 13%"); lines with their own %: "Tax".
-  const rates = [...new Set(q.lines.map((l) => Number(l.taxRate)))];
-  const ratePart = rates.length === 1 ? ` ${rates[0]}%` : "";
+    .map((c) => (narrow[c.key] ? { ...c, width: narrow[c.key]! } : c));
   const strong = (v: ReactNode) => <span className="font-semibold text-text tabular">{v}</span>;
   const footer =
     q.lines.length > 0 ? (
-      <div className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 px-3 py-2 text-sm text-muted">
+      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 px-3 py-2.5 text-sm text-text-2">
+        <span>Total {strong(formatMinor(toMinor(q.factoryTotal), q.currency))}</span>
         <span>
-          Factory total {strong(formatMinor(toMinor(q.factoryTotal), q.currency))} {q.taxIncluded ? "tax included" : "without tax"}
+          {q.taxIncluded ? "tax included" : "without tax"} · {q.taxIncluded ? "of which tax" : "tax"} {strong(formatMinor(toMinor(q.taxTotal), q.currency))}
         </span>
-        <span aria-hidden>·</span>
-        <span>
-          {q.taxIncluded ? `of which tax${ratePart}` : `Tax${ratePart}`} {strong(formatMinor(toMinor(q.taxTotal), q.currency))}
-        </span>
-        {q.totalCost && (
-          <>
-            <span aria-hidden>·</span>
-            <span>Our cost {strong(amount(q.totalCost, mainCurrency))}</span>
-          </>
-        )}
+        {q.totalCost && <span>our cost {strong(amount(q.totalCost, mainCurrency))}</span>}
       </div>
     ) : undefined;
 
-  const sheet = {
-    name: `Prices from ${q.factory.name}`,
-    // Lines from a file go into an offer no quotation is priced from yet.
-    upload: !used,
-    templateRows: items.map((it) => ({
-      no: it.no,
-      values: {
-        description: it.description,
-        model: it.model ?? "",
-        requestedItemId: it.id,
-        quantity: it.quantity,
-        unit: it.unit,
-        unitPrice: "",
-        taxRate: String(q.taxRate),
-      },
-    })),
-  };
-
   return (
-    <LinesCard
-      // The page is the factory's: the card is its lines; the tax is said in their total, under them.
-      title="Lines"
-      description={q.lines.length ? plural(q.lines.length, "line") : undefined}
-      canEdit={canEdit}
-      editLabel={q.lines.length ? "Edit lines" : "Add lines"}
-      actions={<LinesExcel name={sheet.name} rows={rows} columns={columns} numbers={q.lines.map((l) => l.no)} />}
-      view={
-        q.lines.length ? (
-          <LinesView label={`${q.factory.name} · lines`} rows={viewRows} columns={viewColumns} numbers={q.lines.map((l) => l.no)} footer={footer} />
-        ) : (
-          <p className="text-sm text-muted">No lines yet.</p>
-        )
-      }
-      phone={
-        q.lines.length ? (
-          <ul className="flex flex-col divide-y divide-line text-sm">
-            {q.lines.map((l) => (
-              <li key={l.id} className={cn("flex flex-col gap-1 py-2.5", l.parentId && "pl-4")}>
-                <span className="flex gap-2">
-                  <span className="w-6 shrink-0 text-xs text-muted tabular">{l.no}</span>
-                  <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{l.description.split("\n")[0]}</span>
-                </span>
-                {/* Its quantity and price, then the total: on their own line, so a long name never squeezes them. */}
-                <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-8 text-xs text-text-2 tabular">
-                  <span>
-                    {Number(l.quantity).toLocaleString("en-US")} {l.unit}
-                    {Number(l.unitPrice) ? <> × {Number(l.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</> : " · no price yet"}
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <RecordBox title="Factory" what="the factory" canEdit={canEdit} edit={edit("factory", "the factory")} history={history(["offer.factory"], "Factory")}>
+          <BoxFacts
+            rows={[
+              ["Factory", q.factory.name],
+              ["Received on", dateText(q.receivedOn)],
+              ["Valid until", q.validUntil ? dateText(q.validUntil) : null],
+              ["Their reference", q.reference || null],
+              [
+                "Their quotation",
+                q.files.length ? (
+                  <span className="flex flex-col gap-1">
+                    {q.files.map((f) => (
+                      <a key={f.id} href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="font-semibold text-primary underline underline-offset-2 [overflow-wrap:anywhere]">
+                        {f.fileName}
+                      </a>
+                    ))}
                   </span>
-                  {Number(l.unitPrice) > 0 && <span className="text-sm font-semibold text-text">{formatMinor(Math.round(toMinor(l.unitPrice) * Number(l.quantity)), q.currency)}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : undefined
-      }
-      edits={edits}
-      window={(close) => <OfferPanel kit={kit} q={q} step="lines" only onClose={close} />}
-    />
+                ) : null,
+              ],
+            ]}
+          />
+        </RecordBox>
+        <RecordBox title="Delivery & payment" what="delivery and payment" canEdit={canEdit} edit={edit("terms", "delivery and payment")} history={history(["offer.terms"], "Delivery & payment")}>
+          <BoxFacts
+            rows={[
+              ["Delivery", q.basis ? basisText(q.basis, q.basisPlace) : null],
+              ["Ready in", q.leadTime || null],
+              ["Payment", q.paymentParts.length ? partsWords(q.paymentParts, "factory") : null],
+              ["Payment note", q.paymentTerms ? <span className="line-clamp-3 whitespace-pre-line">{q.paymentTerms}</span> : null],
+            ]}
+          />
+        </RecordBox>
+      </div>
+      <RecordBox
+        title="Prices"
+        count={[q.lines.length ? linesCount(offerRows(q.lines)) : null, q.currency, Number(q.taxRate) > 0 ? offerTaxText(q.taxRate, q.taxIncluded) : "no tax"].filter(Boolean).join(" · ")}
+        what="prices"
+        canEdit={canEdit}
+        edit={<OfferEdit kit={kit} q={q} step="prices" what="prices" words={q.lines.length ? undefined : "Add lines"} only variant="ghost" />}
+        tools={<LinesExcel name={`Prices from ${q.factory.name}`} rows={rows} columns={columns} numbers={numbers} />}
+        history={history(["lines", "offer.prices"], "Prices")}
+      >
+        {q.lines.length ? (
+          <>
+            <div className="p-3 max-sm:hidden">
+              <LinesView label={`${q.factory.name} · prices`} rows={rows} columns={viewColumns} numbers={numbers} footer={footer} />
+            </div>
+            {/* A phone: one line per row, its quantity and price under its name, the total on the right. */}
+            <ul aria-label={`${q.factory.name} · prices`} className="flex flex-col divide-y divide-line px-4 text-sm sm:hidden">
+              {q.lines.map((l) => (
+                <li key={l.id} className={cn("flex flex-col gap-1 py-2.5", l.parentId && "pl-4")}>
+                  <span className="flex gap-2">
+                    <span className="w-6 shrink-0 text-xs text-muted tabular">{l.no}</span>
+                    <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{l.description.split("\n")[0]}</span>
+                  </span>
+                  <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-8 text-xs text-text-2 tabular">
+                    <span>
+                      {Number(l.quantity).toLocaleString("en-US")} {l.unit}
+                      {Number(l.unitPrice) ? <> × {Number(l.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</> : " · no price yet"}
+                    </span>
+                    {Number(l.unitPrice) > 0 && <span className="text-sm font-semibold text-text">{formatMinor(Math.round(toMinor(l.unitPrice) * Number(l.quantity)), q.currency)}</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="border-t border-line sm:hidden">{footer}</div>
+          </>
+        ) : (
+          <p className="px-5 py-4 text-sm text-muted max-sm:px-4">No lines yet.</p>
+        )}
+      </RecordBox>
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <RecordBox title="Conditions" what="the conditions" canEdit={canEdit} edit={edit("conditions", "the conditions")} history={history(["offer.conditions"], "Conditions")}>
+          <BoxFacts
+            rows={[
+              ["Warranty", warrantyLine(q)?.replace(/\.$/, "") ?? null],
+              ["Minimum order", q.moq || null],
+              ["Notes", q.notes ? <span className="line-clamp-4 whitespace-pre-line">{q.notes}</span> : null],
+            ]}
+          />
+        </RecordBox>
+      </div>
+    </div>
   );
 }
-
 
 /* ---------------------------------------------------------------- add an offer */
 
 /**
- * "Enter an offer": a short window for the offer itself (the factory, its reference, dates, currency, price
- * basis, tax, lead time and terms, notes, their files). Its lines are not entered here: saving shows the
- * offer on the page, and "Add lines" there opens its lines editor.
+ * "Enter an offer": the New factory offer window (design 18 Nov): Factory · Prices · Delivery & payment · Conditions,
+ * then Review and Confirm and save. The factories asked for this inquiry come first in its picker.
  */
 export function AddOfferButton({
   dealId,
@@ -927,7 +858,13 @@ export function AddOfferButton({
   items,
   others,
   lineActions,
+  asked,
+  inquiryTitle,
 }: {
+  /** The factories asked for this inquiry (first in the picker). */
+  asked?: AskedFactory[];
+  /** The inquiry's title, under the window's title ("For RFQ-2026-0007 · Tablet press machine"). */
+  inquiryTitle?: string;
   /** The customer's items and the other offers (a new offer's lines can start from them), and the line calls. */
   items: Items;
   others: FactoryQuoteView[];
@@ -949,7 +886,7 @@ export function AddOfferButton({
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  // "Save & enter another": the window starts again, empty.
+  // "Save and add another": the window starts again, empty.
   const [round, setRound] = useState(0);
   return (
     <>
@@ -959,8 +896,8 @@ export function AddOfferButton({
       {open && (
         <SidePanel
           key={round}
-          title="Enter factory offer"
-          description={`${refNo ? `${refNo} · ` : ""}The factory and its terms. Internal, never shown to the customer.`}
+          title="New factory offer"
+          description={refNo ? `For ${[refNo, inquiryTitle].filter(Boolean).join(" · ")}` : "Internal, never shown to the customer."}
           className="md:w-[1180px]"
           onClose={() => setOpen(false)}
         >
@@ -977,6 +914,7 @@ export function AddOfferButton({
             items={items}
             others={others}
             lineActions={lineActions}
+            asked={asked}
           />
         </SidePanel>
       )}

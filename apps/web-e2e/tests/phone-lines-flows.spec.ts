@@ -95,8 +95,8 @@ test("offer lines on a phone: what a line still needs is marked and can be shown
     ],
   });
   await page.goto(`/inquiries/${deal.id}/offers/${offer.id}`);
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
-  const win = page.getByRole("dialog", { name: /Edit · Phone Works .*’s offer/ });
+  await page.getByRole("button", { name: "Edit prices" }).click();
+  const win = page.getByRole("dialog", { name: "Edit prices" });
   const list = win.getByRole("list", { name: "Lines" });
   await expect(list.getByRole("button", { name: /^Line 2 Punches and dies/ })).toContainText("No price");
   await win.getByRole("button", { name: /Needs something/ }).click();
@@ -109,7 +109,9 @@ test("offer lines on a phone: what a line still needs is marked and can be shown
   // Nothing needs anything now: the filter goes, every line shows.
   await expect(win.getByRole("button", { name: /Needs something/ })).toHaveCount(0);
   await expect(list.getByRole("button", { name: /^Line 2 Punches and dies/ })).toContainText(/4,?500/);
-  await win.getByRole("button", { name: "Save", exact: true }).click();
+  // A change asks why (design rules 18 Nov), then the save counts it.
+  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Factory changed its price" }).click();
+  await win.getByRole("button", { name: "Save 1 change" }).click();
   await expect(win).toBeHidden();
   const saved = (await (await page.request.get(`/api/inquiries/${deal.id}/sourcing`)).json()).quotes.find((q: { id: string }) => q.id === offer.id);
   expect(saved.lines.map((l: { unitPrice: string }) => Number(l.unitPrice))).toEqual([98000, 4500]);
@@ -137,13 +139,13 @@ test.describe("a narrow phone (320 px, WCAG reflow)", () => {
     await page.goto(`/inquiries/${deal.id}/offers/${offer.id}`);
     // The page: nothing wider than the screen; the lines stack (no table to scroll sideways).
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
-    await page.getByRole("button", { name: "Edit", exact: true }).first().click();
-    const win = page.getByRole("dialog", { name: /Edit · Zhejiang Wanshida/ });
+    await page.getByRole("button", { name: "Edit offer" }).click();
+    const win = page.getByRole("dialog", { name: "Edit offer" });
     const body = win.locator("[data-step-body]");
-    for (const [n, step] of ["Lines", "Delivery", "Payment", "Warranty & conditions"].entries()) {
+    for (const [n, step] of ["Factory", "Prices", "Delivery & payment", "Conditions", "Changes"].entries()) {
       if (n > 0) {
         await win.getByRole("button", { name: /^Next/ }).click();
-        await expect(win.getByRole("heading", { name: `${step}, step ${n + 1} of 4` })).toBeFocused();
+        await expect(win.getByRole("heading", { name: `${step}, step ${n + 1} of 5` })).toBeFocused();
       }
       // Nothing in the step is wider than the screen, at its top or at its bottom.
       for (const end of [0, 1]) {

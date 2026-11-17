@@ -95,7 +95,20 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
  * when saving, so a new record's id can be known by then). A steps window keeps them with its other fields
  * and saves them with its own Save.
  */
-export function useBatchLines({ rows: saved, columns, plain, askOnAdd = true }: { rows: LineRow[]; columns: LineColumn[]; plain?: boolean; askOnAdd?: boolean }) {
+export function useBatchLines({
+  rows: saved,
+  columns,
+  plain,
+  askOnAdd = true,
+  report = true,
+}: {
+  rows: LineRow[];
+  columns: LineColumn[];
+  plain?: boolean;
+  askOnAdd?: boolean;
+  /** Tell the window it has unsaved changes (off when the window's own form says what would be lost). */
+  report?: boolean;
+}) {
   const reportDirty = useReportDirty();
   const [rows, setRows] = useState<LineRow[]>(saved);
   const [ops, setOps] = useState<Op[]>([]);
@@ -106,9 +119,10 @@ export function useBatchLines({ rows: saved, columns, plain, askOnAdd = true }: 
   const diff = useMemo(() => linesDiff(saved, rows, columns), [saved, rows, columns]);
   const dirty = ops.length > 0 && diff.changes.length > 0;
   useEffect(() => {
+    if (!report) return;
     reportDirty(dirty);
     return () => reportDirty(null);
-  }, [dirty, reportDirty]);
+  }, [dirty, reportDirty, report]);
 
   const push = (op: Op) =>
     setOps((cur) => {
@@ -180,7 +194,13 @@ export function useBatchLines({ rows: saved, columns, plain, askOnAdd = true }: 
 
   const askWhy = !plain && saved.length > 0 && (diff.filledChanged || (askOnAdd && diff.added));
   const add = (lines: NewLine[]) => void local.onAdd(lines, { afterKey: null, parentKey: null });
-  return { rows, local, diff, dirty, run, askWhy, add };
+  /** Back to the lines as they were saved (Undo on the Changes step). */
+  const reset = () => {
+    setRows(saved);
+    setOps([]);
+    progress.current = { done: 0, keys: new Map(), seen: new Set(savedKeys) };
+  };
+  return { rows, local, diff, dirty, run, askWhy, add, reset };
 }
 
 /**
