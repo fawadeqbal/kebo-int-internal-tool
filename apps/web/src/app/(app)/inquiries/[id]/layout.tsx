@@ -1,6 +1,6 @@
 import { ArrowRight, MessageSquareText } from "lucide-react";
 import Link from "next/link";
-import { can } from "@kebo/shared";
+import { can, MANUAL_MOVES } from "@kebo/shared";
 import { Banner, ButtonLink, cn, PageHeader, PriorityBadge } from "@kebo/ui";
 import { companyToday } from "@/lib/format";
 import { requireUser, hasFeature } from "@/lib/session";
@@ -8,16 +8,18 @@ import { dealOf } from "@/lib/deal-data";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { InquiryNextButton, InquiryTabs, type InquiryTab } from "@/components/deals/inquiry-nav";
 import { DealBody, DealChrome } from "@/components/deals/deal-chrome";
+import { holdAction, moveStageAction } from "../actions";
 import { offerFactsOf } from "./facts";
+import { DecisionWindows } from "./panels";
 import { inquiryNext, quotationStatus, statusWords } from "./steps";
 
 const TONE = { action: "text-action", ok: "text-ok", bad: "text-bad", mute: "text-text-2" } as const;
 
 /**
- * Every page of an inquiry shares one top, the same shape as an order's: its title, then one line that
- * starts with its status in words ("Sourcing · 2 of 3 offers in") and goes on with its number, the
- * customer, the category and who handles it; ⋯ more; one row of tabs (Overview · Factory offers ·
- * Quotations · Costs · History · Order); the next thing it needs is the header's orange button.
+ * Every page of an inquiry shares one top (design "the record page", 17 Nov): its title, then one line with
+ * its status in words ("Sourcing · 2 of 3 offers in"), the customer and the category; the next thing it
+ * needs is the header's orange button, and everything else is in ⋯ (edit, hold, lost, files, link); one
+ * row of tabs (Overview · Factory offers · Quotations · Costs · History · Order).
  */
 export default async function DealLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,7 +33,7 @@ export default async function DealLayout({ children, params }: { children: React
   const status = statusWords(d, facts, companyToday());
   const next = inquiryNext(d, facts);
   const meta = [
-    <span key="st" className={cn("font-semibold whitespace-nowrap", TONE[status.tone])}>
+    <span key="st" className={cn("font-semibold sm:whitespace-nowrap", TONE[status.tone])}>
       {status.text}
     </span>,
     <Link key="c" href={`/customers/${d.customer.id}`} className="text-primary underline underline-offset-2 hover:opacity-80">
@@ -48,11 +50,17 @@ export default async function DealLayout({ children, params }: { children: React
     ...(managers ? [{ href: `${base}/costs`, label: "Costs" }] : []),
     { href: `${base}/history`, label: "History" },
   ];
+  // The decisions (hold, lost, start, reopen) are in ⋯; each opens its window on the tab it is on.
+  const canHold = d.canWork && d.allowed.hold;
+  const moves = d.canWork ? MANUAL_MOVES[d.stage].filter((m) => !m.reopen || d.allowed.reopen) : [];
   const more: MenuEntry[] = [
     ...(d.allowed.edit ? [{ label: "Edit the request", href: `${base}?panel=edit-request` }] : []),
+    ...(canHold ? [{ label: d.onHold ? "Take off hold" : "Put on hold", panel: "hold-inquiry" }] : []),
+    ...moves.filter((m) => m.to !== "lost").map((m) => ({ label: m.label, panel: "move-inquiry", id: m.to })),
     { label: "All files", href: `${base}/files` },
     { label: `Open the customer ${d.customer.name}`, href: `/customers/${d.customer.id}` },
     { label: "Copy link to this inquiry", copy: base },
+    ...(moves.some((m) => m.to === "lost") ? ([{ separator: true }, { label: "Mark lost…", panel: "move-inquiry", id: "lost", danger: true }] satisfies MenuEntry[]) : []),
   ];
 
   return (
@@ -100,6 +108,15 @@ export default async function DealLayout({ children, params }: { children: React
         <InquiryTabs base={base} tabs={tabs} order={order && d.stage === "won" ? { href: `/orders/${order.id}`, refNo: order.refNo } : null} />
       </DealChrome>
       <DealBody>{children}</DealBody>
+      <DecisionWindows
+        refNo={d.refNo}
+        stage={d.stage}
+        onHold={d.onHold}
+        canHold={canHold}
+        canReopen={d.allowed.reopen}
+        stageAction={moveStageAction.bind(null, d.id)}
+        holdAction={holdAction.bind(null, d.id)}
+      />
     </div>
   );
 }

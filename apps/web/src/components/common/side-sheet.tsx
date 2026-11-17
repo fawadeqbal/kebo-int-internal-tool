@@ -1,0 +1,83 @@
+"use client";
+
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronRight, X } from "lucide-react";
+import { Button, cn } from "@kebo/ui";
+
+/**
+ * A record's side panel (design "the record page", 17 Nov). On a laptop it is the panel itself, beside every
+ * tab. On a phone or tablet it folds into one bar ("Inquiry · Manager · follow-up tomorrow · 2 notes") that
+ * opens the same panel as a sheet over the page, so the page starts with its work. The panel is drawn once:
+ * the bar only shows or hides it.
+ */
+export function SideSheet({ title, summary, children }: { title: string; summary: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const bar = useRef<HTMLButtonElement>(null);
+  const shut = useRef<HTMLButtonElement>(null);
+  const close = () => {
+    setOpen(false);
+    bar.current?.focus({ preventScroll: true });
+  };
+  useEffect(() => {
+    if (!open) return;
+    shut.current?.focus({ preventScroll: true });
+    // The page under the sheet stays still.
+    const was = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    // A wider window shows the panel beside the page: the sheet is put away.
+    const wide = window.matchMedia("(min-width: 1024px)");
+    const onWide = () => wide.matches && setOpen(false);
+    wide.addEventListener("change", onWide);
+    return () => {
+      document.body.style.overflow = was;
+      wide.removeEventListener("change", onWide);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={bar}
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-left shadow-card hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text lg:hidden"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-text">{title}</span>
+          <span className="block truncate text-[13px] text-text-2">{summary}</span>
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-text-2" aria-hidden />
+      </button>
+      <div className={cn("max-lg:hidden", open && "max-lg:fixed max-lg:inset-0 max-lg:z-[70] max-lg:block")}>
+        {open && <div aria-hidden className="absolute inset-0 animate-in bg-black/40 lg:hidden" onClick={close} />}
+        <div
+          role={open ? "dialog" : undefined}
+          aria-modal={open || undefined}
+          aria-label={open ? title : undefined}
+          onKeyDown={(e) => {
+            if (open && e.key === "Escape" && !(e.target as HTMLElement).closest("[role=menu],[role=listbox],[role=alertdialog]")) {
+              e.preventDefault();
+              close();
+            }
+          }}
+          className={cn(open && "max-lg:absolute max-lg:inset-x-0 max-lg:top-14 max-lg:bottom-0 max-lg:flex max-lg:flex-col max-lg:overflow-hidden max-lg:rounded-t-2xl max-lg:bg-surface max-lg:shadow-pop")}
+        >
+          {open && (
+            <div className="flex items-center justify-between gap-3 border-b border-line py-1.5 pr-1.5 pl-4 lg:hidden">
+              <h2 className="text-[17px] font-bold">{title}</h2>
+              <Button ref={shut} type="button" size="icon" variant="ghost" onClick={close} aria-label="Close">
+                <X aria-hidden />
+              </Button>
+            </div>
+          )}
+          <div className={cn(open && "max-lg:min-h-0 max-lg:flex-1 max-lg:overflow-y-auto max-lg:pb-[env(safe-area-inset-bottom)] max-lg:[&>section]:rounded-none max-lg:[&>section]:border-0 max-lg:[&>section]:shadow-none max-lg:[&>section>section:first-child_h3]:sr-only")}>
+            {/* (In the sheet its first section's title is the sheet's own, above: hidden, still read out.) */}
+            {children}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

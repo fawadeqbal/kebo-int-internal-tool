@@ -66,7 +66,8 @@ export function CustomerPicker({
 
   if (value)
     return (
-      <div className={cn("flex items-center gap-3 rounded-lg border border-line bg-surface-2/50 px-3 py-2", error && "border-bad")}>
+      // A phone puts why it is locked under the name, so the name is never cut short.
+      <div className={cn("flex items-center gap-3 rounded-lg border border-line bg-surface-2/50 px-3 py-2", disabled && disabledReason && "max-sm:flex-wrap", error && "border-bad")}>
         <Building2 className="size-4 shrink-0 text-muted" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{value.name}</p>
@@ -76,7 +77,7 @@ export function CustomerPicker({
           </p>
         </div>
         {disabled ? (
-          disabledReason && <span className="max-w-56 text-right text-xs text-muted">{disabledReason}</span>
+          disabledReason && <span className="max-w-56 text-right text-xs text-muted max-sm:w-full max-sm:max-w-none max-sm:pl-7 max-sm:text-left">{disabledReason}</span>
         ) : (
           <Button
             size="xs"

@@ -476,11 +476,12 @@ function OfferWindow({
               </Button>
               {last && (
                 <SubmitButton variant="secondary" pendingText="Saving…" onClick={() => (another.current = true)}>
-                  <Plus aria-hidden /> Save &amp; enter another
+                  <Plus aria-hidden /> <span className="max-sm:sr-only">Save &amp; enter another</span>
+                  <span aria-hidden className="sm:hidden">Another</span>
                 </SubmitButton>
               )}
               <SubmitButton variant={last ? "primary" : "secondary"} pendingText="Saving…" onClick={() => (another.current = false)}>
-                <Check aria-hidden /> Save offer
+                <Check aria-hidden /> Save<span className="max-sm:sr-only"> offer</span>
               </SubmitButton>
             </>
           )

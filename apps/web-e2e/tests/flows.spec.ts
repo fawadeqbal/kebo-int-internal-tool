@@ -239,7 +239,10 @@ test("Mark as lost has Undo: the note takes it back, the inquiry is as it was", 
   const row = page.locator("tr[data-href]").first();
   const href = (await row.getAttribute("data-href"))!;
   await page.goto(href);
-  await page.getByRole("button", { name: "Mark lost…" }).click();
+  // The decisions are in the header's ⋯ (design "the record page").
+  const more = page.getByRole("button", { name: /^More for RFQ-/ });
+  await more.click();
+  await page.getByRole("menuitem", { name: "Mark lost…" }).click();
   const form = page.getByRole("dialog", { name: /as lost$/ });
   await form.getByRole("radio", { name: "No reply from customer" }).check();
   await form.getByRole("button", { name: "Mark lost" }).click();
@@ -249,7 +252,9 @@ test("Mark as lost has Undo: the note takes it back, the inquiry is as it was", 
   await note.getByRole("button", { name: "Undo" }).click();
   await expect(page.locator("[data-note]")).toContainText("Undone");
   // Back to its stage: open again, with Mark lost offered again.
-  await expect(page.getByRole("button", { name: "Mark lost…" })).toBeVisible();
+  await expect(form).toBeHidden();
+  await more.click();
+  await expect(page.getByRole("menuitem", { name: "Mark lost…" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

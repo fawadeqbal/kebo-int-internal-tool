@@ -9,6 +9,7 @@ import { FilterCard } from "@/components/common/filter-card";
 import { HistoryTable, historyText } from "@/components/common/history-list";
 import { FollowUpsCard } from "@/components/notes/cards";
 import { inquiryTitle } from "@/lib/titles";
+import { WithSide } from "../side";
 
 export const generateMetadata = inquiryTitle("History");
 
@@ -27,7 +28,9 @@ export default async function DealHistory({ params, searchParams }: { params: Pr
   const q = sp.q?.trim().toLowerCase() ?? "";
   const shown = entries.filter((e) => (!q || historyText(e).includes(q)) && (!sp.who || (e.by?.id ?? "system") === sp.who));
   return (
-    <div>
+    // The same panel as every tab of the inquiry, beside its history.
+    <WithSide id={id}>
+      <div>
       <FilterCard search="Search history…" value={sp.q} clearHref={sp.who ? `?who=${sp.who}` : "?"} selects={[{ name: "who", label: "Who", value: sp.who, options: people }]} />
       <Card>
         <HistoryTable entries={shown} showArea empty={q || sp.who ? "Nothing matches. Clear the search or choose everyone." : "Nothing has changed yet."} />
@@ -37,6 +40,7 @@ export default async function DealHistory({ params, searchParams }: { params: Pr
           <FollowUpsCard on={{ key: "inquiryId", id }} label={`${d.refNo} · ${d.customer.name}`} rows={followUps.rows} people={staff} meId={me.id} />
         </div>
       )}
-    </div>
+      </div>
+    </WithSide>
   );
 }

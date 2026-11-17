@@ -1,35 +1,33 @@
 import Link from "next/link";
 import { EditRequestWindow } from "../inquiry-windows";
-import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, PRIORITY_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
-import { Badge, Card, CardBody, CardHeader, cn, RefCode } from "@kebo/ui";
-import { DetailsCard } from "@/components/common/record";
+import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
+import { Badge, Card, CardBody, CardHeader, RefCode } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
-import { dealHistoryOf, dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
+import { dealHistoryOf, dealOf, quotationOf } from "@/lib/deal-data";
 import { optional } from "@/components/print/data";
 import { shortName } from "@/components/deals/offer-facts";
 import { holdAction, moveStageAction } from "../actions";
 import { DecisionButtons } from "./panels";
-import { offerFactsOf } from "./facts";
 import { ItemsCard } from "./items-card";
+import { RequestCard } from "./request-card";
 import { WithSide } from "./side";
-import { revisionsOf } from "./steps";
 import { inquiryTitle } from "@/lib/titles";
 
 export const generateMetadata = inquiryTitle();
 
 /**
- * The inquiry's Overview: where it stands in three lines (the factory offers, the quotation, the sales
- * order: each a link to its tab), the request as the customer made it, and the items they asked for. Once
- * won: the deal that was made. Beside it, the panel every tab has.
+ * The inquiry's Overview (design "the record page", 17 Nov): the client's request as its Edit window has it
+ * (who asked, the details, their files, what they need; each part with its own Edit), then its items. On
+ * hold or lost: why, first; once won: the deal that was made. Beside it, the panel every tab has. (How far it
+ * has got is in the header and the tabs: Factory offers 2 · Quotations R1 sent.)
  */
 export default async function DealOverview({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ panel?: string; id?: string }> }) {
   const { id } = await params;
   const me = await requireUser();
   const d = await dealOf(id);
   const sourcing = can(me, "sourcing.manage");
-  const [history, facts, s] = await Promise.all([d.onHold ? optional(() => dealHistoryOf(id)) : null, sourcing ? offerFactsOf(id) : null, sourcing ? sourcingOf(id).catch(() => null) : null]);
-  const base = `/inquiries/${d.id}`;
+  const history = d.onHold ? await optional(() => dealHistoryOf(id)) : null;
 
   // On hold, or lost: what holds it or why it was lost, with the way back.
   const lastHold = d.onHold ? (history ?? []).find((e) => /hold/i.test(e.summary ?? e.action)) : null;
@@ -58,66 +56,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
     </section>
   ) : null;
 
-  // Where it stands: one line per document, each the way to its tab.
-  const latest = revisionsOf(d)[0];
   const order = d.orders.find((o) => o.status !== "cancelled");
-  const offerFact = s?.quotes.length
-    ? [...s.quotes.map((q) => `${shortName(q.factory.name)} ${money(q.factoryTotal, q.currency)}`), ...(facts?.waiting ?? []).map((w) => `${shortName(w.name)} not answered`)].join(" · ")
-    : facts?.waiting.length
-      ? `Asked: ${facts.waiting.map((w) => shortName(w.name)).join(", ")}`
-      : "Nobody asked yet";
-  const offerStatus = !facts
-    ? null
-    : facts.waiting.length
-      ? { text: facts.waiting.length === 1 ? "Waiting for one" : `Waiting for ${facts.waiting.length}`, tone: "text-action" }
-      : facts.offers
-        ? { text: "All in", tone: "text-ok" }
-        : { text: "Not started", tone: "text-text-2" };
-  const lines: { kind: string; number: React.ReactNode; status: string; tone: string; fact?: string; amount?: string }[] = [
-    ...(facts && offerStatus
-      ? [
-          {
-            kind: "Factory offers",
-            number: (
-              <Link href={`${base}/sourcing`} className="inline-block min-w-6 py-1 font-semibold text-primary hover:underline">
-                {facts.asked > facts.offers ? `${facts.answered} of ${facts.asked} in` : facts.offers ? `${facts.offers} in` : "Open"}
-              </Link>
-            ),
-            status: offerStatus.text,
-            tone: offerStatus.tone,
-            fact: offerFact,
-          },
-        ]
-      : []),
-    {
-      kind: "Quotation",
-      number: d.quotation ? (
-        <Link href={`${base}/quotation`} className="font-semibold text-primary hover:underline">
-          {d.quotation.refNo}
-        </Link>
-      ) : (
-        <span className="text-muted">—</span>
-      ),
-      status: latest ? `R${latest.number} ${REVISION_STATUS_LABEL[latest.status].toLowerCase()}` : "Not made",
-      tone: !latest ? "text-text-2" : latest.status === "accepted" ? "text-ok" : latest.status === "draft" || latest.status === "sent" ? "text-action" : "text-text-2",
-      fact: latest ? `valid until ${date(latest.validUntil)}${latest.sentOn ? ` · sent ${date(latest.sentOn)}` : ""}` : undefined,
-      amount: latest ? `${latest.totalUpTo ? "from " : ""}${money(latest.total, latest.currency)}` : undefined,
-    },
-    {
-      kind: "Sales order",
-      number: order ? (
-        <Link href={`/orders/${order.id}`} className="font-semibold text-primary hover:underline">
-          {order.refNo}
-        </Link>
-      ) : (
-        <span className="text-muted">—</span>
-      ),
-      status: order ? `Made ${date(order.orderedOn)}` : "Not yet",
-      tone: order ? "text-ok" : "text-text-2",
-      fact: order?.customerRef ? `Customer ref. ${order.customerRef}` : undefined,
-      amount: order ? money(order.total, order.currency) : undefined,
-    },
-  ];
 
   // Won: the deal that was made (sale, planned cost and profit) and what was made from it.
   const q = order && d.stage === "won" ? await optional(() => quotationOf(id)) : null;
@@ -135,21 +74,6 @@ export default async function DealOverview({ params, searchParams }: { params: P
   return (
     <WithSide id={id}>
       {state}
-      <Card className="overflow-clip">
-        <CardHeader title="Where it stands" />
-        <ul className="flex flex-col">
-          {lines.map((l) => (
-            <li key={l.kind} className="grid grid-cols-[110px_minmax(0,1fr)] items-baseline gap-x-4 gap-y-0.5 border-t border-line px-5 py-3 text-sm first:border-t-0 sm:grid-cols-[110px_150px_150px_minmax(0,1fr)_auto]">
-              <span className="text-text-2">{l.kind}</span>
-              <span className="tabular">{l.number}</span>
-              <span className={cn("font-semibold max-sm:col-start-2", l.tone)}>{l.status}</span>
-              <span className="text-text-2 max-sm:col-start-2">{l.fact}</span>
-              <span className="text-right font-semibold whitespace-nowrap tabular max-sm:col-start-2 max-sm:text-left">{l.amount ?? ""}</span>
-            </li>
-          ))}
-        </ul>
-      </Card>
-
       {order && d.stage === "won" && (
         <div className="grid items-start gap-4 md:grid-cols-2">
           <Card>
@@ -189,14 +113,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
         </div>
       )}
 
-      <DetailsCard
-        title="The request"
-        items={[
-          { label: "Priority", value: PRIORITY_LABEL[d.priority] },
-          { label: "What they need", value: d.requirements && <span className="whitespace-pre-line">{d.requirements}</span>, wide: true },
-        ]}
-        edit={d.allowed.edit ? { panel: "edit-request", label: "Edit the request" } : null}
-      />
+      <RequestCard d={d} />
 
       <ItemsCard id={id} />
       {(await searchParams).panel === "edit-request" && <EditRequestWindow d={d} step={(await searchParams).id} />}

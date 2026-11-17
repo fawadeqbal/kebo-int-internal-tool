@@ -278,16 +278,15 @@ export function DealForm({
                     <Button type="button" variant="secondary" onClick={() => setStep(REQUEST_STEPS[at - 1]!.key)}>
                       <ChevronLeft aria-hidden /> Back
                     </Button>
-                  ) : (
-                    !create && <span className="min-w-0 text-[12.5px] text-text-2">Each changed value is kept in History.</span>
-                  )}
+                  ) : null}
                   <span className="flex-1" />
                   {/* A phone closes the window with its ← at the top: three buttons fit on one row. */}
                   <Button type="button" variant="ghost" onClick={() => close()} className="max-md:hidden">
                     Cancel
                   </Button>
                   <SubmitButton variant={at === REQUEST_STEPS.length - 1 ? "primary" : "secondary"} pendingText={uploading ? "Uploading files…" : "Saving…"}>
-                    <Check aria-hidden /> {create ? "Save inquiry" : "Save changes"}
+                    {/* On a phone the word alone ("Save"), so Back, Save and Next stay on one row; its full name is read out. */}
+                    <Check aria-hidden /> Save<span className="max-sm:sr-only"> {create ? "inquiry" : "changes"}</span>
                   </SubmitButton>
                   {at < REQUEST_STEPS.length - 1 && (
                     <Button type="button" variant="primary" onClick={() => setStep(REQUEST_STEPS[at + 1]!.key)}>
@@ -363,9 +362,6 @@ export function DealForm({
                     </option>
                   ))}
                 </Select>
-              </Field>
-              <Field label="Needed by" htmlFor="requiredBy" hint="If they gave a date" error={s.errors?.requiredBy}>
-                <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
               </Field>
               <Field label="Handles it" htmlFor="assigneeId" hint={create ? "Can be set later" : undefined} error={s.errors?.assigneeId}>
                 <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)} disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}>
@@ -451,6 +447,10 @@ export function DealForm({
                     </option>
                   ))}
                 </Select>
+              </Field>
+              {/* When they need it is a detail of the request (the Overview shows it under Details). */}
+              <Field label="Needed by" htmlFor="requiredBy" error={s.errors?.requiredBy}>
+                <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
               </Field>
               <Field label="What they need" htmlFor="requirements" required={required} error={s.errors?.requirements} className="md:col-span-3">
                 <Textarea
@@ -705,7 +705,7 @@ const REQUEST_STEPS: { key: RequestStep; label: string }[] = [
   { key: "details", label: "Details" },
   { key: "files", label: "Files" },
 ];
-const DETAIL_FIELDS = new Set(["title", "category", "priority", "requirements"]);
+const DETAIL_FIELDS = new Set(["title", "category", "priority", "requiredBy", "requirements"]);
 
 /** A save refused for a field on another step opens that step, so the field and its message are in view. */
 function JumpToStep({ st, onJump }: { st: ActionState; onJump: (step: RequestStep) => void }) {

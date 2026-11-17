@@ -10,7 +10,7 @@ import { ItemsExcel, ItemsView } from "@/components/deals/needs-cards";
 import { itemsLine } from "./steps";
 
 /**
- * "Items they asked for" on the Overview (it was the Needs tab): the items — numbered, parts under their
+ * "Items" on the Overview, under the client's request (it was the Needs tab): the items — numbered, parts under their
  * item, model, quantity, unit, target price and how many factory offers answer each — read only, with
  * Edit items opening the inquiry's window on its Items step, and "Edited n×" for its history.
  */
@@ -68,7 +68,7 @@ export async function ItemsCard({ id }: { id: string }) {
   return (
     <div id="items" className="scroll-mt-24">
       <LinesCard
-        title="Items they asked for"
+        title="Items"
         description={d.items.length ? itemsLine(d) : "none yet"}
         canEdit={d.allowed.edit}
         editLabel={d.items.length ? "Edit items" : "Add items"}

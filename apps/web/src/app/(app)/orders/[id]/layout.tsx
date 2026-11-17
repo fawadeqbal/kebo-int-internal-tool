@@ -51,7 +51,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const statusText = (
     <span
       className={cn(
-        "font-semibold whitespace-nowrap",
+        "font-semibold sm:whitespace-nowrap",
         tone === "bad" ? "text-bad" : tone === "ok" ? "text-ok" : tone === "neutral" ? "text-text-2" : tone === "info" ? "text-info" : "text-action",
       )}
     >
