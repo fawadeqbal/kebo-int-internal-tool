@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Copy, Info, ListPlus, Pencil, Plus, Trash2 } from "lucide-react";
 import { formatMinor, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, basisText, partsWords, warrantyLine, type AttachmentKind } from "@kebo/shared";
-import { Badge, Button, cn, Field, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { LinesCard } from "@/components/orders/step-view";
@@ -961,8 +961,3 @@ export function AddOfferButton({
   );
 }
 
-/** A small badge for the offers table's "Covers" column. */
-export function CoverBadge({ cover }: { cover: { all: boolean; n: number; of: number } | null }) {
-  if (!cover) return <span className="text-muted">—</span>;
-  return <Badge tone={cover.all ? "ok" : "warn"}>{cover.all ? `All ${cover.of} items` : `${cover.n} of ${cover.of} items`}</Badge>;
-}

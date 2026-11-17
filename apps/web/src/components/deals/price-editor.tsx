@@ -1,23 +1,18 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardPaste, Lock, Plus, X } from "lucide-react";
 import { convertMinor, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import { basisText, BASIS_STEP_LABEL, leadWords, optionLetter } from "@kebo/shared";
 import { Badge, Button, Card, cn, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
 import { EditButton } from "@/components/common/edit-button";
-import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, useClosePanel, useReportDirty } from "@/components/common/panel";
 import { UNITS } from "@/components/lines/line-table";
-import type { ActionState } from "@/lib/actions";
-import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
+import type { QuoteOffers } from "@/lib/types-deals";
 import type { Fx } from "@/lib/fx";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { shortName } from "./offer-facts";
-import { asLineOf, BasisCosts, Fig, fromDraft, gapOf, marginOf, optionTotals, payload, pricedAll, startMargin, STEP_LINE, valid, type ChargeState, type EditorState, type OptionState } from "./revision-editor";
+import { asLineOf, BasisCosts, Fig, gapOf, marginOf, optionTotals, pricedAll, startMargin, STEP_LINE, valid, type ChargeState, type EditorState, type OptionState } from "./revision-editor";
 
-type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /** A price box: right-aligned figures, the whole value selected on focus. */
 const PRICE_BOX =
@@ -36,62 +31,6 @@ const amount2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits
  * Only prices are changed here. Which offers are quoted, and the terms, are in the quotation's window (Edit).
  * The whole revision is saved, as before.
  */
-/** The option the lines window opens on (0 = A): the one shown on the card it was opened from. */
-export const OptionAt = createContext(0);
-
-/**
- * "Edit lines" of a draft quotation, in the same window as an offer's lines editor: the price sheet, and at the
- * bottom Save changes and Cancel with the totals, cost, profit and margin. Only prices are changed here; which
- * offers are quoted, and the terms, are in the quotation's window. The whole revision is saved, as before.
- */
-export function PriceEditor({
-  action,
-  initial,
-  offers,
-  showCosts,
-}: {
-  action: Action;
-  initial: RevisionDraft;
-  offers: QuoteOffers;
-  showCosts: boolean;
-}) {
-  const initialOption = useContext(OptionAt);
-  const close = useClosePanel();
-  const reportDirty = useReportDirty();
-  const [s, setS] = useState<EditorState>(() => fromDraft(initial));
-  const [saved] = useState(() => JSON.stringify(fromDraft(initial)));
-  const [active, setActive] = useState(Math.min(Math.max(0, initialOption), initial.options.length - 1));
-  const dirty = JSON.stringify(s) !== saved;
-  // The window asks "Throw away your changes?" only when a price really changed.
-  useEffect(() => {
-    reportDirty(dirty);
-    return () => reportDirty(null);
-  }, [dirty, reportDirty]);
-  return (
-    <PanelBody>
-    <ActionForm action={action} onDone={(state) => close(state)} className={PANEL_FORM}>
-      {(st) => (
-        <>
-          <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
-          <PriceSheet s={s} setS={setS} offers={offers} showCosts={showCosts} active={active} setActive={setActive} errors={st.errors} />
-          {/* Always in view: Save changes and Cancel as in every lines editor, then the option's money. */}
-          <PanelActions>
-            <SubmitButton size="sm" pendingText="Saving…" disabled={!dirty}>
-              Save changes
-            </SubmitButton>
-            <Button size="sm" variant="ghost" onClick={() => close()}>
-              Cancel
-            </Button>
-            <span className="text-xs text-muted max-lg:hidden">{dirty ? "Changes not saved yet" : "Nothing changed yet"}</span>
-            <PriceTotals s={s} setS={setS} offers={offers} showCosts={showCosts} active={active} />
-          </PanelActions>
-        </>
-      )}
-    </ActionForm>
-    </PanelBody>
-  );
-}
-
 /**
  * The price sheet of a draft quotation, shared by "Edit lines" and the steps window's Lines step: the options as
  * tabs; the open option's lines with a price box in each row (Enter goes to the next line, a column pasted from
