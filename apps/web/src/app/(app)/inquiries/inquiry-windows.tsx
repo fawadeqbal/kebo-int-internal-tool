@@ -6,6 +6,8 @@ import { requireUser } from "@/lib/session";
 import { date } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import type { ContactOption, CustomerOption } from "@/lib/types-deals";
+import { editsOf } from "@/lib/edit-data";
+import type { RequestStep } from "@/components/deals/deal-form";
 import { InquiryPanel } from "./inquiry-panel";
 import { createDealAction, customerContactsAction, quickCustomerAction, removeRequestFileAction, saveRequestAction, searchCustomersAction } from "./actions";
 
@@ -44,10 +46,15 @@ export async function NewInquiryWindow({ customerId }: { customerId?: string }) 
   );
 }
 
-/** "Edit the request": the same window, filled (?panel=edit-request on the inquiry's Overview). */
-export async function EditRequestWindow({ d }: { d: DealDetail }) {
+/**
+ * "Edit the request": the same window, filled (?panel=edit-request on the inquiry's Overview); `step`
+ * (?id=items) opens it on that step, as the Items card's Edit does.
+ */
+export async function EditRequestWindow({ d, step }: { d: DealDetail; step?: string }) {
   if (!d.allowed.edit) return null;
-  const [me, settings, people] = await Promise.all([requireUser(), getSettings(), getPeople()]);
+  const [me, settings, people, edits] = await Promise.all([requireUser(), getSettings(), getPeople(), editsOf("inquiry", d.id)]);
+  // (The steps are named here: a client file's values cannot be read on the server.)
+  const startStep = (["customer", "items", "details", "files"] as RequestStep[]).find((x) => x === step);
   const primary = d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0] ?? null;
   const sent = d.quotations.some((q) => q.revisions.some((r) => r.status !== "draft"));
   return (
@@ -75,7 +82,10 @@ export async function EditRequestWindow({ d }: { d: DealDetail }) {
       customerLocked={sent ? "Already quoted: the customer cannot change" : undefined}
       searchCustomers={searchCustomersAction}
       loadContacts={customerContactsAction}
-      hasItems={d.items.length > 0}
+      startStep={startStep}
+      items={d.items}
+      itemsUpload={!sent}
+      itemsEdit={{ edit: { type: "inquiry", id: d.id, card: "needs" }, card: edits.cards.needs }}
       files={d.attachments.map((f) => ({
         id: f.id,
         fileName: f.fileName,

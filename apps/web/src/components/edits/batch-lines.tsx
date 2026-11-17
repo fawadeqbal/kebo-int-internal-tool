@@ -87,52 +87,16 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
 }
 
 /**
- * Lines changed in the edit panel (wide), on a copy: nothing is saved until
- * Save changes, which sends every change at once (in the order they were made)
- * through the lines' own handlers. Cancel with changes asks first. The first
- * save of a card is plain; changing what was saved asks why (`plain`: never,
- * e.g. a draft), and the save is kept for the card's "Edited n×".
+ * The lines being changed, on a copy (what BatchLines draws): the rows as they are now, the table's handlers
+ * that change the copy, what changed, and `run`, which sends the changes in order through `handlers` (given
+ * when saving, so a new record's id can be known by then). A steps window keeps them with its other fields
+ * and saves them with its own Save.
  */
-export function BatchLines({
-  rows: saved,
-  columns,
-  handlers,
-  edit,
-  card,
-  plain,
-  askOnAdd = true,
-  footer,
-  above,
-  below,
-  saveLabel = "Save changes",
-  note,
-  ...table
-}: {
-  rows: LineRow[];
-  columns: LineColumn[];
-  handlers: LineHandlers;
-  /** Where the edit is kept (record and card); none: not counted. */
-  edit?: EditRef;
-  card?: EditCard | null;
-  /** Saves without asking why (a draft, lines nothing uses yet). */
-  plain?: boolean;
-  /** Adding lines to a list that was saved counts as an edit (asks why); false: only changing saved values does. */
-  askOnAdd?: boolean;
-  /** Totals for the lines as they are being edited. */
-  footer?: (rows: LineRow[]) => ReactNode;
-  /** Above / below the table, inside the panel (a note, the start options: `add` puts lines in the copy). */
-  above?: ReactNode | ((api: { rows: LineRow[]; add: (lines: NewLine[]) => void }) => ReactNode);
-  below?: ReactNode;
-  saveLabel?: string;
-  /** Beside the buttons (e.g. "The quotation keeps its own copy"). */
-  note?: ReactNode;
-} & Omit<LineTableProps, "rows" | "columns" | "onAdd" | "onEdit" | "onRemove" | "onMove" | "footer" | "readOnly">) {
-  const close = useClosePanel();
+export function useBatchLines({ rows: saved, columns, plain, askOnAdd = true }: { rows: LineRow[]; columns: LineColumn[]; plain?: boolean; askOnAdd?: boolean }) {
   const reportDirty = useReportDirty();
   const [rows, setRows] = useState<LineRow[]>(saved);
   const [ops, setOps] = useState<Op[]>([]);
   const savedKeys = useMemo(() => new Set(saved.map((r) => r.key)), [saved]);
-  const { save, dialog, busy, error, setError } = useEditSave({ edit, card });
   // How far an interrupted save got: the changes already sent, and the new lines' saved keys.
   const progress = useRef<{ done: number; keys: Map<string, string>; seen: Set<string> }>({ done: 0, keys: new Map(), seen: new Set(savedKeys) });
 
@@ -189,7 +153,7 @@ export function BatchLines({
   };
 
   /** Sends the changes not sent yet, in order; stops at the first that fails (Save again goes on from there). */
-  const run = async (reason?: string): Promise<SaveResult> => {
+  const run = async (handlers: LineHandlers, reason?: string): Promise<SaveResult> => {
     const p = progress.current;
     const m = (k: string | null) => (k ? (p.keys.get(k) ?? k) : null);
     for (let i = p.done; i < ops.length; i++) {
@@ -212,11 +176,61 @@ export function BatchLines({
   };
 
   const askWhy = !plain && saved.length > 0 && (diff.filledChanged || (askOnAdd && diff.added));
+  const add = (lines: NewLine[]) => void local.onAdd(lines, { afterKey: null, parentKey: null });
+  return { rows, local, diff, dirty, run, askWhy, add };
+}
+
+/**
+ * Lines changed in the edit panel (wide), on a copy: nothing is saved until
+ * Save changes, which sends every change at once (in the order they were made)
+ * through the lines' own handlers. Cancel with changes asks first. The first
+ * save of a card is plain; changing what was saved asks why (`plain`: never,
+ * e.g. a draft), and the save is kept for the card's "Edited n×".
+ */
+export function BatchLines({
+  rows: saved,
+  columns,
+  handlers,
+  edit,
+  card,
+  plain,
+  askOnAdd = true,
+  footer,
+  above,
+  below,
+  saveLabel = "Save changes",
+  note,
+  ...table
+}: {
+  rows: LineRow[];
+  columns: LineColumn[];
+  handlers: LineHandlers;
+  /** Where the edit is kept (record and card); none: not counted. */
+  edit?: EditRef;
+  card?: EditCard | null;
+  /** Saves without asking why (a draft, lines nothing uses yet). */
+  plain?: boolean;
+  /** Adding lines to a list that was saved counts as an edit (asks why); false: only changing saved values does. */
+  askOnAdd?: boolean;
+  /** Totals for the lines as they are being edited. */
+  footer?: (rows: LineRow[]) => ReactNode;
+  /** Above / below the table, inside the panel (a note, the start options: `add` puts lines in the copy). */
+  above?: ReactNode | ((api: { rows: LineRow[]; add: (lines: NewLine[]) => void }) => ReactNode);
+  below?: ReactNode;
+  saveLabel?: string;
+  /** Beside the buttons (e.g. "The quotation keeps its own copy"). */
+  note?: ReactNode;
+} & Omit<LineTableProps, "rows" | "columns" | "onAdd" | "onEdit" | "onRemove" | "onMove" | "footer" | "readOnly">) {
+  const close = useClosePanel();
+  const { save, dialog, busy, error, setError } = useEditSave({ edit, card });
+  const { rows, local, diff, dirty, run: send, askWhy, add } = useBatchLines({ rows: saved, columns, plain, askOnAdd });
+  const run = (reason?: string) => send(handlers, reason);
+
   const count = diff.changes.length;
 
   return (
     <PanelBody className="gap-3">
-      {typeof above === "function" ? above({ rows, add: (lines) => void local.onAdd(lines, { afterKey: null, parentKey: null }) }) : above}
+      {typeof above === "function" ? above({ rows, add }) : above}
       <LineTable rows={rows} columns={columns} {...table} {...local} footer={footer?.(rows)} />
       {below}
       {error && <Alert tone="error">{error}</Alert>}

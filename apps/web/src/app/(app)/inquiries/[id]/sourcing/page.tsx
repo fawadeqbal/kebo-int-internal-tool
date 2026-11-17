@@ -17,7 +17,8 @@ import { WithSide } from "../side";
 import { inquiryNext } from "../steps";
 import { RequestMore } from "@/components/deals/ask-window";
 import { factoryRequestStatusAction, removeFactoryRequestAction } from "../../factory-request-actions";
-import { saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
+import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, moveOfferLineAction, removeOfferLineAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
+import { removeFileAction } from "../../actions";
 import { getSettings } from "@/lib/loaders";
 import { inquiryTitle } from "@/lib/titles";
 
@@ -71,6 +72,16 @@ export default async function SourcingPage({
         rates={settings.sales.exchangeRates}
         searchFactories={searchFactoriesAction}
         createAction={saveFactoryQuoteAction.bind(null, d.id, null)}
+        items={s.items}
+        others={s.quotes.filter((o) => o.lines.length)}
+        lineActions={{
+          add: addOfferLinesAction.bind(null, d.id),
+          edit: editOfferLineAction.bind(null, d.id),
+          move: moveOfferLineAction.bind(null, d.id),
+          remove: removeOfferLineAction.bind(null, d.id),
+          copy: copyOfferLinesAction.bind(null, d.id),
+          removeFile: removeFileAction.bind(null, d.id),
+        }}
         taxDefault={{ included: settings.sales.factoryTaxIncluded ?? false, rate: settings.sales.factoryTaxRate ?? 0, advance: settings.sales.factoryAdvancePercent ?? 30 }}
         variant={props.variant}
         size={props.size}

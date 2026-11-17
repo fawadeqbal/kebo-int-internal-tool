@@ -926,10 +926,10 @@ export function LineTable({
                   onClick={() => act(a.key, selRow)}
                   disabled={a.disabled || busy === selRow.key}
                   title={a.hint ? `${a.label} (${a.hint})` : a.label}
-                  aria-label={a.label}
                 >
                   {a.icon}
-                  <span className="hidden sm:inline">{a.short}</span>
+                  {/* Its name is the words it shows (on a phone, only to a screen reader); the title says it in full. */}
+                  <span className="max-sm:sr-only">{a.short}</span>
                 </Button>
               ))}
             </>

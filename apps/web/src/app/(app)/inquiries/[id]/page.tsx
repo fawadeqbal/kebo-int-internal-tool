@@ -24,7 +24,7 @@ export const generateMetadata = inquiryTitle();
  * order: each a link to its tab), the request as the customer made it, and the items they asked for. Once
  * won: the deal that was made. Beside it, the panel every tab has.
  */
-export default async function DealOverview({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ panel?: string }> }) {
+export default async function DealOverview({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ panel?: string; id?: string }> }) {
   const { id } = await params;
   const me = await requireUser();
   const d = await dealOf(id);
@@ -233,7 +233,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
       />
 
       <ItemsCard id={id} />
-      {(await searchParams).panel === "edit-request" && <EditRequestWindow d={d} />}
+      {(await searchParams).panel === "edit-request" && <EditRequestWindow d={d} step={(await searchParams).id} />}
     </WithSide>
   );
 }

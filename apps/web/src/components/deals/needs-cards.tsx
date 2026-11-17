@@ -1,24 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL } from "@kebo/shared";
-import { Alert, Badge, Button, cn } from "@kebo/ui";
-import { LineTable, type LineRow } from "@/components/lines/line-table";
-import { localLineHandlers } from "@/components/lines/local-lines";
-import { PanelActions, PanelBody, SidePanel, useClosePanel, useReportDirty } from "@/components/common/panel";
-import { linesDiff } from "@/components/edits/batch-lines";
-import { useEditSave } from "@/components/edits/use-edit-save";
-import type { EditCard, EditRef } from "@/lib/types-edits";
-import type { ActionState } from "@/lib/actions";
+import { cn } from "@kebo/ui";
+import { PanelBody, SidePanel } from "@/components/common/panel";
 import type { DealItem } from "@/lib/types";
-import { ITEM_COLUMNS } from "./deal-form";
+import { ITEM_COLUMNS } from "./items-sheet";
 import { DocumentsPanel, type DocumentRow } from "./documents-panel";
-import { rowKey } from "./form-bits";
 import { LinesExcel, LinesView } from "./lines-view";
 import { addChipClass, FileChips } from "./inquiry-side";
-
-type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 const rowsOf = (items: DealItem[]) =>
   items.map((it) => ({
@@ -56,146 +47,6 @@ export function ItemsView({ items, requirements, phone = false }: { items: DealI
       {requirements && <p className="rounded-lg bg-surface-2 p-3 text-sm whitespace-pre-line">{requirements}</p>}
       {!items.length && !requirements && <p className="text-sm text-muted">Nothing written yet.</p>}
     </div>
-  );
-}
-
-interface ItemState {
-  id: string | null;
-  key: string;
-  parentKey: string | null;
-  description: string;
-  model: string;
-  quantity: string;
-  unit: string;
-  targetPrice: string;
-  priced: boolean;
-}
-
-/**
- * Edit items (board "View first, edit on purpose"): the customer's items in
- * the line table (type, paste a list, Excel) and the written requirement, in
- * the edit panel, on a copy; Save changes saves them together. Items keep
- * their ids, so factory prices stay linked. The first list saves plainly;
- * changing a saved one asks why (Edit n), and a priced item always does.
- */
-export function ItemsEditor({
-  items,
-  action,
-  upload,
-  edit,
-  card,
-}: {
-  items: DealItem[];
-  action: Action;
-  upload: boolean;
-  edit?: EditRef;
-  card?: EditCard | null;
-}) {
-  const close = useClosePanel();
-  const reportDirty = useReportDirty();
-  const start = (): ItemState[] =>
-    items.map((it) => ({
-      id: it.id,
-      key: it.id,
-      parentKey: it.parentId,
-      description: it.description,
-      model: it.model ?? "",
-      quantity: it.quantity,
-      unit: it.unit,
-      targetPrice: it.targetPrice ?? "",
-      priced: it.priced,
-    }));
-  const [rows, setRows] = useState<ItemState[]>(start);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const saver = useEditSave({ edit, card });
-  const handlers = localLineHandlers(
-    rows,
-    (fn) => setRows((r) => fn(r)),
-    (values, parentKey) => ({
-      id: null,
-      key: rowKey(),
-      parentKey,
-      description: values.description ?? "",
-      model: values.model ?? "",
-      quantity: values.quantity ?? "",
-      unit: values.unit || (parentKey ? "sets" : "pcs"),
-      targetPrice: values.targetPrice ?? "",
-      priced: false,
-    }),
-    (row, values) => ({ ...row, ...values }),
-  );
-  const asRows = (list: ItemState[]): LineRow[] =>
-    list.map((it) => ({
-      key: it.key,
-      parentKey: it.parentKey,
-      values: { description: it.description, model: it.model, quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice },
-      badge: it.priced ? (
-        <span className="ml-1 align-middle" title="A factory has priced this: changing it will ask why">
-          <Badge tone="info">Priced</Badge>
-        </span>
-      ) : undefined,
-    }));
-  const savedRows = useMemo(() => asRows(start()), [items]); // eslint-disable-line react-hooks/exhaustive-deps
-  const diff = useMemo(() => linesDiff(savedRows, asRows(rows), ITEM_COLUMNS), [savedRows, rows]);
-  // Only the items: what the customer wrote is part of the request (Edit the request).
-  const changes = diff.changes;
-  const dirty = changes.length > 0;
-  useEffect(() => {
-    reportDirty(dirty);
-    return () => reportDirty(null);
-  }, [dirty, reportDirty]);
-  const askWhy = items.length > 0 && (diff.filledChanged || diff.added);
-
-  const save = () =>
-    saver.save({
-      changes,
-      keys: diff.keys,
-      askWhy,
-      run: async (reason) => {
-        const form = new FormData();
-        form.set("items", JSON.stringify(rows));
-        if (reason) form.set("reason", reason);
-        const st = await action({}, form);
-        if (st.ok) return { ok: true };
-        const errs: Record<string, string> = {};
-        for (const [k, v] of Object.entries(st.errors ?? {})) if (v?.[0]) errs[k] = v[0];
-        setErrors(errs);
-        return {
-          ok: false,
-          message: st.message ?? "Something went wrong. Please try again.",
-          reasonChoices: st.code === "reason_needed" ? (st.choices ?? []) : undefined,
-        };
-      },
-    });
-
-  return (
-    <PanelBody className="gap-4">
-      {saver.error && <Alert tone="error">{saver.error}</Alert>}
-      <LineTable
-        rows={asRows(rows)}
-        columns={ITEM_COLUMNS}
-        noun="item"
-        sheet={{ name: "Customer items", upload }}
-        error={errors.items}
-        empty="No items yet: type the first one below, or paste the customer’s list from Excel."
-        {...handlers}
-      />
-      {errors.requirements && <p className="text-sm text-bad">{errors.requirements}</p>}
-      <PanelActions>
-        <Button size="sm" onClick={() => void save()} disabled={!dirty || saver.busy}>
-          {saver.busy ? "Saving…" : "Save changes"}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => close()} disabled={saver.busy}>
-          Cancel
-        </Button>
-        <span className="text-xs text-muted">
-          {changes.length
-            ? `${changes.length} change${changes.length === 1 ? "" : "s"} not saved yet${askWhy ? " · Save asks why" : ""}`
-            : "Nothing changed yet"}
-        </span>
-      </PanelActions>
-      {saver.dialog}
-    </PanelBody>
   );
 }
 

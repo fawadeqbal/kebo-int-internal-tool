@@ -1,13 +1,31 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { LOST_REASON_LABEL } from "@kebo/shared";
+import { LOST_REASON_LABEL, requestedItemInput } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail, Paged } from "@/lib/types";
 import type { ContactOption, CustomerOption } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
+
+/**
+ * The API names a wrong item only as "items": point it at the item and its field ("items.1.quantity"), so the
+ * window's Items step says which one. The API has already decided; this only locates.
+ */
+function locateItemErrors(items: unknown, r: ActionState): ActionState {
+  if (r.ok || !r.errors?.items || !Array.isArray(items)) return r;
+  const errors = { ...r.errors };
+  items.forEach((it, n) => {
+    const parsed = requestedItemInput.safeParse(it);
+    if (parsed.success) return;
+    for (const issue of parsed.error.issues) {
+      const key = ["items", n, ...issue.path].join(".");
+      errors[key] = [...(errors[key] ?? []), issue.message];
+    }
+  });
+  return { ...r, errors };
+}
 
 /** The inquiry's number from what the API answers (its detail), to name it in the note. */
 const numberOf = (r: ActionState) => (r.data as { refNo?: string } | undefined)?.refNo;
@@ -120,7 +138,8 @@ export async function customerContactsAction(customerId: string): Promise<Contac
 
 /** A new inquiry, without leaving the page: the form then uploads the URS and documents and opens the deal. */
 export async function createDealAction(_prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.post<{ id: string; refNo: string }>("/inquiries", formBody(form)));
+  const body = formBody(form);
+  const r = locateItemErrors(body.items, await attempt(form, () => api.post<{ id: string; refNo: string }>("/inquiries", body)));
   if (!r.ok) return r;
   const { id, refNo } = r.data as { id: string; refNo: string };
   refresh(id);
@@ -152,18 +171,20 @@ export async function quickCustomerAction(v: QuickCustomer): Promise<QuickCustom
 
 /**
  * "Edit the request": the request's own values (customer, contact, how it came, category, title, what they
- * need, priority, needed by) and who handles it. The items are left as they are: they have their own editor.
+ * need, priority, needed by), its items when they changed (one save, so a refused one saves nothing) and who
+ * handles it.
  * Answers { id, refNo } so the window can send its new files, as a new inquiry does.
  */
 /** `version`: the inquiry's updatedAt when the window opened (a save over someone else's change is refused). */
 export async function saveRequestAction(id: string, version: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const { assigneeId, reason, items: given, ...fields } = formBody(form) as { assigneeId?: string | null; reason?: string; items?: unknown[] } & Record<string, unknown>;
   const r = await attempt(
     form,
     async () => {
-      const { assigneeId, reason, ...fields } = formBody(form) as { assigneeId?: string | null; reason?: string } & Record<string, unknown>;
       const d = await api.get<DealDetail>(`/inquiries/${id}`);
       const at = new Map(d.items.map((it, n) => [it.id, n]));
-      const items = d.items.map((it) => ({
+      // The items as the window sent them when they changed (Items step), else as they are.
+      const items = Array.isArray(given) ? given : d.items.map((it) => ({
         id: it.id,
         partOf: it.parentId ? (at.get(it.parentId) ?? null) : null,
         description: it.description,
@@ -179,63 +200,6 @@ export async function saveRequestAction(id: string, version: string | null, _pre
     "Saved.",
   );
   if (r.ok) refresh(id);
-  return r;
+  return locateItemErrors(given, r);
 }
 
-/** The fields the inquiry's own cards change one at a time (Needs: "+ Add" in place, Edit, Edit lines). */
-const DEAL_FIELDS = ["contactId", "channel", "category", "title", "requirements", "priority", "requiredBy"] as const;
-
-/**
- * Save some of the inquiry's fields, or its items, without the whole form: the
- * inquiry as it is now (GET), with what was sent put in, saved with the same
- * PUT /inquiries/:id as the edit form. Items keep their ids, so factory prices
- * stay linked; a priced item asks why, as on the form. Items come as JSON in
- * `items` ({ id, key, parentKey, description, model, quantity, unit, targetPrice }).
- */
-export async function dealFieldsAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const r = await attempt(
-    form,
-    async () => {
-      const d = await api.get<DealDetail>(`/inquiries/${id}`);
-      const at = new Map(d.items.map((it, n) => [it.id, n]));
-      let items: object[] = d.items.map((it) => ({
-        id: it.id,
-        partOf: it.parentId ? (at.get(it.parentId) ?? null) : null,
-        description: it.description,
-        model: it.model,
-        quantity: it.quantity,
-        unit: it.unit,
-        targetPrice: it.targetPrice,
-      }));
-      if (v.items) {
-        type Row = { id: string | null; key: string; parentKey: string | null; description: string; model: string; quantity: string; unit: string; targetPrice: string };
-        const rows = JSON.parse(v.items) as Row[];
-        const pos = new Map(rows.map((it, n) => [it.key, n]));
-        items = rows.map((it) => ({
-          id: it.id,
-          partOf: it.parentKey ? (pos.get(it.parentKey) ?? null) : null,
-          description: it.description,
-          model: it.model.trim() || null,
-          quantity: it.quantity.replace(/,/g, "").trim(),
-          unit: it.unit.trim() || "pcs",
-          targetPrice: it.targetPrice.replace(/,/g, "").trim() || null,
-        }));
-      }
-      const now: Record<string, unknown> = {
-        contactId: d.contactId,
-        channel: d.channel,
-        category: d.category,
-        title: d.title || null,
-        requirements: d.requirements,
-        priority: d.priority,
-        requiredBy: d.requiredBy,
-      };
-      for (const k of DEAL_FIELDS) if (k in v) now[k] = v[k]!.trim() === "" ? null : v[k];
-      return api.put(`/inquiries/${id}`, { customerId: d.customer.id, ...now, items, reason: reasonOf(form) });
-    },
-    "Saved.",
-  );
-  if (r.ok) refresh(id);
-  return r;
-}

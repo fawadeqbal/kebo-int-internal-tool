@@ -18,23 +18,21 @@ import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/inquiries/a
 import { CustomerPicker } from "./customer-picker";
 import { send, type Staged } from "./documents-panel";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
-import type { LineColumn } from "@/components/lines/line-table";
+import { LineTable } from "@/components/lines/line-table";
+import { ReasonDialog } from "@/components/edits/edits";
+import { recordEditAction } from "@/lib/edit-actions";
+import type { DealItem } from "@/lib/types";
+import type { EditCard, EditRef } from "@/lib/types-edits";
+import { ITEM_COLUMNS, itemsBody, useItemRows } from "./items-sheet";
 import { rowKey } from "./form-bits";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 const OTHER = "__other__";
 
-/** The customer's items as the line table shows them (the form, and Needs → What they need). */
-export const ITEM_COLUMNS: LineColumn[] = [
-  { key: "description", label: "Description", width: "minmax(0,1fr)", input: "textarea", required: "Each item needs a description", placeholder: "What it is: size, material, standard…" },
-  { key: "model", label: "Model / part no.", width: "8rem", input: "text", maxLength: 120, placeholder: "Model" },
-  { key: "quantity", label: "Qty", width: "5rem", input: "number", align: "right", required: "Enter a quantity", placeholder: "Qty" },
-  { key: "unit", label: "Unit", width: "5.5rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
-  { key: "targetPrice", label: "Target price", width: "6.5rem", input: "number", align: "right", placeholder: "Target", phoneHidden: true },
-];
+export { ITEM_COLUMNS } from "./items-sheet";
 
-/** What the window sends: the request's own values (its items are saved by their own editor). */
+/** What the window sends: the request's own values (the items go with them, see the Items step). */
 function payload(v: DealFormValues) {
   return {
     customerId: v.customer?.id ?? "",
@@ -60,9 +58,9 @@ export interface RequestFile {
 }
 
 /**
- * The inquiry's window, the same for "New inquiry" and "Edit the request": who asked, what they need, and
- * the customer's files, in that order. The items are not here: they have their own editor on the inquiry
- * (Add items / Edit items). Files go up once the inquiry is saved.
+ * The inquiry's window, the same for "New inquiry" and "Edit the request", in steps (design 17 Nov):
+ * Customer · Items · Details · Files. The items are typed in a sheet (paste a list, Excel) and saved with
+ * the rest in one save; changing a saved list asks why first. Files go up once the inquiry is saved.
  */
 export function DealForm({
   action,
@@ -79,7 +77,10 @@ export function DealForm({
   addCustomer,
   mode,
   files = [],
-  hasItems = false,
+  items = [],
+  itemsUpload = true,
+  itemsEdit,
+  startStep = "customer",
   onSaved,
 }: {
   /** Saves and answers { data: { id, refNo } }; the window then sends the files and says it is saved. */
@@ -99,8 +100,14 @@ export function DealForm({
   mode: "create" | "edit";
   /** Edit: the files it already has. */
   files?: RequestFile[];
-  /** Edit: it has an item list, so "What they need" may be empty. */
-  hasItems?: boolean;
+  /** Edit: the items it has (with items, "What they need" may be empty). */
+  items?: DealItem[];
+  /** The sheet takes an Excel file (not once a quotation went out). */
+  itemsUpload?: boolean;
+  /** Edit: where a change to the items is kept ("Edited n×" on the items). */
+  itemsEdit?: { edit: EditRef; card?: EditCard | null };
+  /** The step it opens on (the Items card's Edit: Items). */
+  startStep?: RequestStep;
   /** Saved (and the files are up). */
   onSaved: (r: { id: string; refNo?: string; title?: string; customer?: string; files?: number }) => void;
 }) {
@@ -123,8 +130,19 @@ export function DealForm({
   const [asking, setAsking] = useState<RequestFile | null>(null);
   const [removing, startRemove] = useTransition();
   const set = <K extends keyof DealFormValues>(k: K, value: DealFormValues[K]) => setV((s) => ({ ...s, [k]: value }));
-  // The window in steps (design 17 Nov): Customer · Details · Files.
-  const [step, setStep] = useState<RequestStep>("customer");
+  // The window in steps (design 17 Nov): Customer · Items · Details · Files.
+  const [step, setStep] = useState<RequestStep>(startStep);
+  // The items on a copy; changing a saved list asks why before the save (kept with the edit).
+  const sheet = useItemRows(items);
+  const [why, setWhy] = useState<string | null>(null);
+  const [askingWhy, setAskingWhy] = useState(false);
+  const sendAfterWhy = useRef(false);
+  const anchor = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!sendAfterWhy.current) return;
+    sendAfterWhy.current = false;
+    anchor.current?.form?.requestSubmit();
+  }, [why]);
   const at = REQUEST_STEPS.findIndex((x) => x.key === step);
 
   const chooseCustomer = async (c: CustomerOption | null, known?: ContactOption[]) => {
@@ -142,6 +160,15 @@ export function DealForm({
     const r = await action(prev, form);
     if (!r.ok) return r;
     const { id, refNo } = r.data as { id: string; refNo?: string };
+    // A changed list of items is kept as an edit of the items, with its reason ("Edited n×").
+    if (!create && sheet.dirty && itemsEdit && (why || !itemsEdit.card?.first))
+      await recordEditAction({
+        ...itemsEdit.edit,
+        kind: why ? "edit" : "first",
+        reason: why ?? undefined,
+        changes: sheet.diff.changes.slice(0, 60),
+        keys: sheet.diff.keys.slice(0, 500),
+      }).catch(() => undefined);
     const list = stagedNow.current;
     if (list.length) {
       setUploading(true);
@@ -165,7 +192,14 @@ export function DealForm({
   const contactLine = (c: ContactOption) => [c.name, c.email ?? c.whatsapp ?? c.phone].filter(Boolean).join(" · ");
   const assignable = canAssignOthers ? people : people.filter((p) => p.id === meId || p.id === initial.assigneeId);
   const create = mode === "create";
-  const required = !hasItems;
+  const required = sheet.rows.length === 0;
+  // The items go with the save: a new inquiry's always, an edit's when they changed.
+  const body = { ...payload(v), ...(create || sheet.dirty ? { items: itemsBody(sheet.list) } : {}) };
+  const itemErrors = (errors: ActionState["errors"]) =>
+    Object.entries(errors ?? {})
+      .filter(([k, list]) => list?.length && k.startsWith("items."))
+      .map(([k, list]) => `Item ${Number(k.split(".")[1]) + 1}: ${list![0]}`)
+      .filter((x, n, all) => all.indexOf(x) === n);
 
   if (created)
     return (
@@ -191,6 +225,12 @@ export function DealForm({
         keepFields
         showSuccess={false}
         className={cn(PANEL_FORM, "min-h-0 gap-0")}
+        beforeSend={() => {
+          // A saved list changed: why, first (then it sends itself).
+          if (create || !sheet.dirty || !sheet.askWhy || why !== null) return true;
+          setAskingWhy(true);
+          return false;
+        }}
         banner={(st) =>
           st.message && st.ok === false ? (
             <Alert tone="error">
@@ -201,7 +241,8 @@ export function DealForm({
       >
         {(s) => (
           <>
-            <input type="hidden" name="payload" value={JSON.stringify(payload(v))} />
+            <input ref={anchor} type="hidden" name="payload" value={JSON.stringify(body)} />
+            {why && <input type="hidden" name="reason" value={why} />}
             <StepsFrame
               steps={REQUEST_STEPS.map((x, k) => ({
                 key: x.key,
@@ -209,7 +250,11 @@ export function DealForm({
                 summary:
                   x.key === "customer"
                     ? [v.customer?.name, CHANNEL_LABEL[v.channel]].filter(Boolean).join(" · ") || undefined
-                    : x.key === "details"
+                    : x.key === "items"
+                      ? sheet.rows.length
+                        ? `${sheet.rows.length} item${sheet.rows.length === 1 ? "" : "s"}`
+                        : "none yet"
+                      : x.key === "details"
                       ? [v.title.trim(), v.category].filter(Boolean).join(" · ") || undefined
                       : files.length + staged.length
                         ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
@@ -316,6 +361,35 @@ export function DealForm({
                 </Select>
               </Field>
             </PanelSection>
+            )}
+
+            {step === "items" && (
+              <PanelSection quiet title="Items they asked for" first className="sm:grid-cols-1">
+                <LineTable
+                  rows={sheet.rows}
+                  columns={ITEM_COLUMNS}
+                  noun="item"
+                  sheet={{ name: "Customer items", upload: itemsUpload }}
+                  error={itemErrors(s.errors).length ? undefined : s.errors?.items?.[0]}
+                  empty="No items yet: type the first one below, or paste the customer’s list from Excel."
+                  {...sheet.handlers}
+                />
+                {itemErrors(s.errors).length > 0 && (
+                  <div role="alert" className="flex flex-col gap-0.5 rounded-xl border border-bad/30 bg-bad-soft px-3 py-2.5 text-sm text-bad">
+                    <span className="font-semibold">Fix {itemErrors(s.errors).length === 1 ? "this item" : "these items"}, then save again:</span>
+                    {itemErrors(s.errors).map((e) => (
+                      <span key={e}>{e}</span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[13px] text-text-2">
+                  {create
+                    ? "No list? Leave it empty: write what they need under Details, or take the items from the first factory offer."
+                    : sheet.dirty
+                      ? `${sheet.diff.changes.length} change${sheet.diff.changes.length === 1 ? "" : "s"} to the items, saved with the rest${sheet.askWhy ? " · Save asks why" : ""}.`
+                      : "Change, add, remove or move items here; they are saved with the rest."}
+                </p>
+              </PanelSection>
             )}
 
             {step === "details" && (
@@ -436,17 +510,25 @@ export function DealForm({
             </PanelSection>
             )}
 
-            {create && step === "files" && (
-              <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">
-                The items come next. On the inquiry, <strong className="text-text">Add items</strong> opens the items editor: type them, paste them from Excel, or leave it
-                empty and take them from the first factory offer.
-              </p>
-            )}
 
             </StepsFrame>
           </>
         )}
       </ActionForm>
+      {askingWhy && (
+        <ReasonDialog
+          n={(itemsEdit?.card?.count ?? 0) + 1}
+          title="Why are you changing the items?"
+          changes={sheet.diff.changes}
+          saveLabel="Save changes"
+          onCancel={() => setAskingWhy(false)}
+          onSave={(reason) => {
+            setAskingWhy(false);
+            sendAfterWhy.current = true;
+            setWhy(reason);
+          }}
+        />
+      )}
       {asking && (
         <ConfirmDialog
           title={`Remove ${asking.fileName}?`}
@@ -598,10 +680,11 @@ function QuickCustomerForm({
   );
 }
 
-/** The inquiry's window in steps (design 17 Nov). Its items have their own sheet on the inquiry (Add items / Edit items). */
-type RequestStep = "customer" | "details" | "files";
+/** The inquiry's window in steps (design 17 Nov): who asked, their items, the details, their files. */
+export type RequestStep = "customer" | "items" | "details" | "files";
 const REQUEST_STEPS: { key: RequestStep; label: string }[] = [
   { key: "customer", label: "Customer" },
+  { key: "items", label: "Items" },
   { key: "details", label: "Details" },
   { key: "files", label: "Files" },
 ];
@@ -611,7 +694,7 @@ const DETAIL_FIELDS = new Set(["title", "category", "priority", "requirements"])
 function JumpToStep({ st, onJump }: { st: ActionState; onJump: (step: RequestStep) => void }) {
   useEffect(() => {
     const first = Object.keys(st.errors ?? {}).find((k) => st.errors?.[k]?.length);
-    if (first) onJump(DETAIL_FIELDS.has(first) ? "details" : "customer");
+    if (first) onJump(first === "items" || first.startsWith("items.") ? "items" : DETAIL_FIELDS.has(first) ? "details" : "customer");
   }, [st, onJump]);
   return null;
 }
