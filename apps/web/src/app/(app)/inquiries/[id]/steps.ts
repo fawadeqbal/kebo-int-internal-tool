@@ -103,7 +103,7 @@ export function inquiryNext(d: DealDetail, f: OfferFacts | null): { tab: NextTab
       href: `${base}/quotation`,
       label: "Open the quotation",
     };
-  if (!d.assignee) return { tab: "overview", title: "Assign someone", meta: "Nobody handles this inquiry yet. Choose who under Handles it, so the prices can be asked for." };
+  if (!d.assignee) return { tab: "overview", title: "Assign someone", meta: "Nobody handles this inquiry yet. Choose the Responsible person, so the prices can be asked for." };
   if (!f) return { tab: "quotation", title: "Make the quotation", meta: "Once the factory prices are in.", href: `${base}/quotation`, label: "Open Quotations" };
   if (f.offers > 0)
     return {

@@ -9,7 +9,7 @@ import { DealForm, type RequestStep } from "@/components/deals/deal-form";
 type FormProps = Omit<ComponentProps<typeof DealForm>, "onSaved" | "onAllSteps">;
 
 /** A part's name in its window's title ("Items · RFQ-2611-0004"). */
-const PART_TITLE: Record<RequestStep, string> = { customer: "Customer", items: "Items", details: "Details", files: "Files" };
+const PART_TITLE: Record<RequestStep, string> = { customer: "Customer", items: "Items", details: "Details", files: "Files", review: "Review" };
 
 /**
  * The inquiry's one window, in the side panel over the page it was opened from: "New inquiry"

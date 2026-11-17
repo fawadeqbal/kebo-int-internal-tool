@@ -305,7 +305,7 @@ function OfferWindow({
       });
       return;
     }
-    // Saved: close without asking "Throw away your changes?".
+    // Saved: close without asking "Discard your change?".
     close(st);
   };
 

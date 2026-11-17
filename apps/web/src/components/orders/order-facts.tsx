@@ -63,7 +63,7 @@ export function OrderPeople({ o, flow, first }: { o: OrderView; flow: OrderFlow 
   const rows: { role: string; name: string; sub?: string | null; href?: string }[] = [
     // The customer is named in the header: here, who to talk to there.
     ...(o.contactName ? [{ role: "Contact", name: o.contactName, href: `/customers/${o.customer.id}` }] : []),
-    ...(o.inquiry.assignee ? [{ role: "Handles it", name: o.inquiry.assignee.name }] : []),
+    ...(o.inquiry.assignee ? [{ role: "Responsible person", name: o.inquiry.assignee.name }] : []),
     ...factories.map((x) => ({ role: "Factory", name: x.name, sub: flow?.factory.orderNo ? `their order ${flow.factory.orderNo}` : null, href: `/factories/${x.id}` })),
     ...(ship?.forwarder
       ? [{ role: "Forwarder", name: ship.forwarder, sub: [ship.forwarderContact, ship.forwarderPhone].filter(Boolean).join(" · ") || (ship.bookingNo ? `booking ${ship.bookingNo}` : null) }]

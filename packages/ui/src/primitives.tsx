@@ -8,7 +8,7 @@ import { Filter, House, Info, Package, Settings, ShieldCheck, ShoppingCart, Tren
 import { cn } from "./cn";
 
 /* ---------------------------------------------------------------- Button */
-export type ButtonVariant = "primary" | "brand" | "secondary" | "ghost" | "danger" | "danger-ghost" | "trust" | "link";
+export type ButtonVariant = "primary" | "strong" | "soft" | "brand" | "secondary" | "ghost" | "danger" | "danger-ghost" | "danger-line" | "trust" | "link";
 export type ButtonSize = "xs" | "sm" | "md" | "lg" | "icon" | "icon-sm" | "icon-xs";
 
 const buttonBase =
@@ -16,12 +16,18 @@ const buttonBase =
 const buttonVariants: Record<ButtonVariant, string> = {
   /* The page's one main action: orange. */
   primary: "bg-action-solid text-white shadow-card hover:bg-action-solid-hover",
+  /* The one button that finishes the job (design rules 18 Nov): orange, bold, a light glow. One per screen. */
+  strong: "bg-action-solid font-bold text-white shadow-[0_6px_16px_rgba(194,81,10,0.28)] hover:bg-action-solid-hover",
+  /* A step forward that is not the finish (Next): light orange, so the strong button stays the one that stands out. */
+  soft: "border border-action/20 bg-action-soft text-action hover:border-action/45",
   /* Green: the brand, for a second positive action beside the orange one (Save draft). */
   brand: "bg-primary-solid text-primary-fg shadow-card hover:bg-primary-solid-hover",
   secondary: "border border-line-strong bg-surface text-text shadow-card hover:bg-surface-2",
   ghost: "text-text-2 hover:bg-surface-2 hover:text-text",
   danger: "bg-bad-solid text-white shadow-card hover:opacity-90",
   "danger-ghost": "text-bad hover:bg-bad-soft",
+  /* Discard, Delete beside a strong button: red words in a white box. */
+  "danger-line": "border border-bad/30 bg-surface text-bad hover:bg-bad-soft",
   trust: "bg-trust text-white shadow-card hover:opacity-90 dark:text-bg",
   link: "h-auto px-0 text-primary underline-offset-4 hover:underline",
 };

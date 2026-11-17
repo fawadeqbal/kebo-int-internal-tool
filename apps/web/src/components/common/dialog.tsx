@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { Button } from "@kebo/ui";
 import { lockScroll } from "@/lib/scroll-lock";
 import { useChanges, watchChanges } from "./changes";
@@ -154,21 +154,78 @@ export function ConfirmDialog({
   );
 }
 
+/** What would be lost by closing a window now: its own question and the changes in a few words (design rules 18 Nov). */
+export interface LostInfo {
+  /** "Close without saving?" for a new record; "Discard your change?" by default. */
+  title?: string;
+  /** "This new inquiry isn’t saved yet." */
+  text?: string;
+  /** "Came by: Email → WhatsApp", "Items: 3 items, 2 parts". */
+  lines?: string[];
+}
+
 /**
- * Asked when a form with something typed in it is closed: what was typed would be lost. One wording for
- * every form: "Throw away your changes?", Keep editing (focused, so Enter never loses anything) or Throw away.
+ * Asked when a window with something unsaved is closed (✕, Esc, Back, a click beside it): what would be lost,
+ * then Keep editing — the strong button, focused, so Enter never loses anything — or Discard. On a phone it
+ * comes up from the bottom, Keep editing wide on top. Nothing changed: it is never asked.
  */
-export function ThrowAwayConfirm({ what, onKeep, onThrow }: { what?: ReactNode; onKeep: () => void; onThrow: () => void }) {
-  return (
-    <ConfirmDialog title="Throw away your changes?" confirmLabel="Throw away" cancelLabel="Keep editing" danger onCancel={onKeep} onConfirm={onThrow}>
-      {what ? (
-        <>
-          What you typed in &ldquo;{what}&rdquo; is not saved yet.
-        </>
-      ) : (
-        "What you typed here is not saved yet."
-      )}
-    </ConfirmDialog>
+export function ThrowAwayConfirm({ what, lost, onKeep, onThrow }: { what?: ReactNode; lost?: LostInfo | null; onKeep: () => void; onThrow: () => void }) {
+  const id = useId();
+  const box = useRef<HTMLDivElement>(null);
+  const keep = useRef<HTMLButtonElement>(null);
+  const mounted = useMounted();
+  useFocusTrap(box, mounted);
+  useEffect(() => {
+    if (mounted) keep.current?.focus();
+  }, [mounted]);
+  if (!mounted) return null;
+  const lines = lost?.lines?.filter(Boolean) ?? [];
+  const title = lost?.title ?? (lines.length > 1 ? "Discard your changes?" : "Discard your change?");
+  const text = lost?.text ?? (what ? <>What you changed in &ldquo;{what}&rdquo; isn’t saved yet.</> : "It isn’t saved yet.");
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-center p-4 max-sm:items-end max-sm:p-0" data-layer>
+      <div aria-hidden className="absolute inset-0 bg-black/40" onClick={onKeep} />
+      <div
+        ref={box}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={`${id}-t`}
+        aria-describedby={`${id}-d`}
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") return;
+          e.stopPropagation();
+          onKeep();
+        }}
+        className="relative w-full max-w-[440px] animate-in rounded-2xl border border-line bg-surface p-5 shadow-pop max-sm:max-w-none max-sm:rounded-b-none max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+      >
+        <span aria-hidden className="mx-auto -mt-2 mb-3 block h-1 w-10 rounded-full bg-line sm:hidden" />
+        <h2 id={`${id}-t`} className="text-[17px] font-bold">
+          {title}
+        </h2>
+        <div id={`${id}-d`} className="mt-1 text-sm text-text-2">
+          <p>{text}</p>
+          {lines.length > 0 && (
+            <ul className="mt-3 overflow-hidden rounded-xl border border-line text-[13.5px] text-text">
+              {lines.slice(0, 6).map((l) => (
+                <li key={l} className="border-t border-line px-3 py-2 first:border-t-0">
+                  {l}
+                </li>
+              ))}
+              {lines.length > 6 && <li className="border-t border-line px-3 py-2 text-text-2">and {lines.length - 6} more</li>}
+            </ul>
+          )}
+        </div>
+        <div className="mt-5 flex justify-end gap-2 max-sm:flex-col-reverse">
+          <Button variant="danger-line" onClick={onThrow} className="max-sm:h-11 max-sm:w-full">
+            <Trash2 aria-hidden /> Discard
+          </Button>
+          <Button ref={keep} variant="strong" onClick={onKeep} className="max-sm:h-12 max-sm:w-full">
+            Keep editing
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -200,7 +257,7 @@ function onNavigate(e: Event) {
 /**
  * The browser's Back (a phone's back button or swipe) while a form is open goes to the form, not the page
  * under it, when `wants` says so: a form that is not in the address closes; one with something typed asks
- * "Throw away your changes?" first. Where the browser cannot hold Back (no Navigation API), it leaves as before.
+ * "Discard your change?" first. Where the browser cannot hold Back (no Navigation API), it leaves as before.
  */
 export function useBackGuard(handle: () => void, wants: () => boolean) {
   const latest = useRef({ handle, wants });
@@ -247,7 +304,7 @@ export function WindowHead({
   headRef?: RefObject<HTMLHeadingElement | null>;
 }) {
   return (
-    // On a phone (the form fills the screen) the way out is ← at the top left, as on a record; elsewhere ✕ on the right.
+    // A window closes with ✕ (design rules 18 Nov): on the right on a laptop, at the top left on a phone (the form fills the screen).
     <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 max-md:min-h-14 max-md:items-center max-md:justify-start max-md:gap-1 max-md:py-1.5 max-md:pr-4 max-md:pl-1 sm:px-6">
       <div className="min-w-0 max-md:order-2 max-md:flex-1">
         <h2 id={`${id}-title`} ref={headRef} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none max-md:line-clamp-2 max-md:text-base max-md:leading-snug">
@@ -260,8 +317,7 @@ export function WindowHead({
         )}
       </div>
       <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled} className="max-md:order-1 max-md:size-11 max-md:rounded-full max-md:[&_svg]:size-[22px]">
-        <ArrowLeft className="md:hidden" aria-hidden />
-        <X className="max-md:hidden" aria-hidden />
+        <X aria-hidden />
       </Button>
     </div>
   );
@@ -276,7 +332,7 @@ const MODAL_WIDTH = { md: "md:w-[600px]", lg: "md:w-[760px]" } as const;
 /**
  * A window over the page (cancel an order, a file, a request): the same frame as every other window.
  * Escape, ✕ (← on a phone), the phone's Back or a click beside it closes it (unless busy): at once when nothing
- * in it was changed, after "Throw away your changes?" when something was. Focus stays inside while it is open.
+ * in it was changed, after "Discard your change?" when something was. Focus stays inside while it is open.
  */
 export function Modal({
   title,

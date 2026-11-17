@@ -93,14 +93,14 @@ describe("SidePanel", () => {
     expect(document.activeElement).toBe(opener);
   });
 
-  it('asks "Throw away your changes?" when something was typed; Keep editing stays, Throw away closes', () => {
+  it('asks "Discard your change?" when something was typed; Keep editing stays, Discard closes', () => {
     const onClose = vi.fn();
     render(<Harness onClose={onClose} />);
     openPanel();
     fireEvent.input(screen.getByLabelText("Name"), { target: { value: "Lahore Pharma" } });
     fireEvent.keyDown(screen.getByLabelText("Name"), { key: "Escape" });
     expect(onClose).not.toHaveBeenCalled();
-    const confirm = screen.getByRole("alertdialog", { name: "Throw away your changes?" });
+    const confirm = screen.getByRole("alertdialog", { name: /^Discard your change/ });
     // The safe way is focused first.
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keep editing" }));
     expect(confirm).toBeTruthy();
@@ -111,7 +111,7 @@ describe("SidePanel", () => {
 
     // Cancel asks too.
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Throw away" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -203,7 +203,7 @@ describe("SidePanel", () => {
       fireEvent.input(el, { target: { value } });
     };
     const close = () => fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    const asks = () => screen.queryByRole("alertdialog", { name: "Throw away your changes?" }) !== null;
+    const asks = () => screen.queryByRole("alertdialog", { name: /^Discard your change/ }) !== null;
 
     it("opened and closed with nothing touched: closes at once (a field that announces itself is not a change)", () => {
       const onClose = show();
@@ -266,12 +266,12 @@ describe("SidePanel", () => {
       // Untouched: Escape closes it.
       fireEvent.keyDown(screen.getByLabelText("Reason"), { key: "Escape" });
       expect(onClose).toHaveBeenCalledTimes(1);
-      // Something typed: it asks; Throw away closes.
+      // Something typed: it asks; Discard closes.
       type(screen.getByLabelText("Reason"), "Customer changed their mind");
       fireEvent.click(screen.getByRole("button", { name: "Close" }));
       expect(asks()).toBe(true);
       expect(onClose).toHaveBeenCalledTimes(1);
-      fireEvent.click(screen.getByRole("button", { name: "Throw away" }));
+      fireEvent.click(screen.getByRole("button", { name: "Discard" }));
       expect(onClose).toHaveBeenCalledTimes(2);
     });
   });
