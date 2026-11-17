@@ -1791,7 +1791,7 @@ function PastePanel({
       <label htmlFor="paste-lines" className="text-sm font-medium">
         Paste a list
       </label>
-      <p className="text-xs text-muted">One {noun} per line.</p>
+      <p className="text-xs text-muted">One per line.</p>
       <Textarea
         id="paste-lines"
         rows={6}
