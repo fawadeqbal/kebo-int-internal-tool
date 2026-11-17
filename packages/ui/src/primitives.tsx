@@ -364,8 +364,10 @@ export function PageHeader({
       )}
       <header className="mb-4" data-page-label={name}>
         {trail && <Breadcrumb items={trail} className={up ? "max-md:hidden" : undefined} />}
-        <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap", phoneStack && "max-sm:flex-col")}>
-          <div className={cn("flex min-w-0 items-start gap-3", framed ? "flex-1 sm:flex-[1_1_18rem]" : "flex-[1_1_18rem]")}>
+        {/* phoneStack: one column on a phone, each row the screen's width. (Not a wrapping column: some phone
+            browsers then size the title to its text, so a long line runs past the screen and the page zooms out.) */}
+        <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap", phoneStack && "max-sm:flex-col max-sm:flex-nowrap max-sm:items-stretch")}>
+          <div className={cn("flex min-w-0 items-start gap-3", framed ? "flex-1 sm:flex-[1_1_18rem]" : "flex-[1_1_18rem]", phoneStack && "max-sm:w-full max-sm:flex-none")}>
             {up ? (
               <BackArrow up={up.href} label={up.label} root={up.root} className="max-md:hidden" />
             ) : (

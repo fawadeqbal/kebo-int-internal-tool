@@ -12,6 +12,7 @@ import { checksOf, CheckChip, optionOf, termsFacts } from "@/components/deals/qu
 import { shortName } from "@/components/deals/offer-facts";
 import { newQuotationsAction, offersAction } from "./actions";
 import { inquiryTitle } from "@/lib/titles";
+import { WithSide } from "../side";
 
 export const generateMetadata = inquiryTitle("Quotation");
 
@@ -78,9 +79,11 @@ export default async function QuotationPage({
     if (c.status === "draft" && before) return <StatusBadge meaning="neutral">Draft R{c.number}</StatusBadge>;
     return <RevisionBadge status={c.status} />;
   };
-  const COLS = "md:grid-cols-[minmax(0,1.5fr)_130px_minmax(0,1.1fr)_96px_20px] xl:grid-cols-[minmax(0,1.5fr)_130px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.1fr)_96px_20px]";
+  const COLS = "md:grid-cols-[minmax(0,1.5fr)_130px_minmax(0,1.1fr)_96px_20px] roomy:grid-cols-[minmax(0,1.5fr)_130px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.1fr)_96px_20px]";
 
   return (
+    // The same panel as every tab of the inquiry, beside its quotations.
+    <WithSide id={id}>
     <div className="flex flex-col gap-4">
       {accepted && order && (
         <section aria-label="Order created" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok-soft p-4">
@@ -127,8 +130,8 @@ export default async function QuotationPage({
             <span>Quotation</span>
             <span className="text-right">Total</span>
             <span>Delivery</span>
-            <span className="max-xl:hidden">Payment</span>
-            <span className="max-xl:hidden">Warranty</span>
+            <span className="hidden roomy:block">Payment</span>
+            <span className="hidden roomy:block">Warranty</span>
             <span>Status</span>
             <span />
           </div>
@@ -159,8 +162,8 @@ export default async function QuotationPage({
                       <span className="block">{facts.delivery}</span>
                       {facts.lead && <span className="block truncate text-xs text-text-2">{facts.lead}</span>}
                     </span>
-                    <span className="min-w-0 max-xl:hidden">{facts.payment || "—"}</span>
-                    <span className="min-w-0 max-xl:hidden">
+                    <span className="hidden min-w-0 roomy:block">{facts.payment || "—"}</span>
+                    <span className="hidden min-w-0 roomy:block">
                       <span className="block">{facts.warranty ?? "—"}</span>
                       {problem ? <CheckChip check={problem} /> : checks.length > 0 ? <CheckChip check={{ ...checks[0]!, word: "OK" }} /> : null}
                     </span>
@@ -174,5 +177,6 @@ export default async function QuotationPage({
         </Card>
       )}
     </div>
+    </WithSide>
   );
 }

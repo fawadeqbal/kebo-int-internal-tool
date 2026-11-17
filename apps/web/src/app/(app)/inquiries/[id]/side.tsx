@@ -1,19 +1,20 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { can, CHANNEL_LABEL, isOpen } from "@kebo/shared";
+import { can, isOpen } from "@kebo/shared";
 import { cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { date } from "@/lib/format";
-import { dealOf, sourcingOf } from "@/lib/deal-data";
+import { dealOf } from "@/lib/deal-data";
 import { getPeople } from "@/lib/loaders";
 import type { FollowUpList } from "@/lib/types-notes";
 import { dueText } from "@/components/notes/kinds";
 import { PanelButton } from "@/components/orders/step-view";
 import { SIDE_COLUMNS } from "@/components/common/side-columns";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
-import { assignAction, holdAction, moveStageAction, noteAction } from "../actions";
-import { AssignForm, AssignSelect, DecisionButtons, NoteForm } from "./panels";
+import { SideSheet } from "@/components/common/side-sheet";
+import { assignAction, noteAction } from "../actions";
+import { AssignForm, AssignSelect, NoteForm } from "./panels";
 
 const quiet = "text-[13px] font-medium text-primary hover:underline";
 
@@ -28,176 +29,108 @@ function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
 }
 
 /**
- * The one panel beside every tab of an inquiry, the same sections in the same order: Inquiry (who handles it,
- * needed by, the next follow-up, how it came; hold and lost), Contact (the ways to reach them), Files and Notes.
- * What the header says (status, customer, number) and "Where it stands" (quotation, order) is not said again.
+ * The one panel beside every tab of an inquiry (design "the record page", 17 Nov): the work around it — who
+ * handles it and the next follow-up — then its notes. What the client sent (who asked, the details, their
+ * files) is on the Overview, and the decisions (hold, lost) are in the header's ⋯. On a phone it folds into
+ * one bar that opens it as a sheet.
  */
 export async function InquirySide({ id }: { id: string }) {
   const me = await requireUser();
   const d = await dealOf(id);
-  const sourcing = can(me, "sourcing.manage");
-  const [people, s, followUps] = await Promise.all([
+  const [people, followUps] = await Promise.all([
     getPeople().catch(() => []),
-    sourcing ? sourcingOf(id).catch(() => null) : null,
     api.get<FollowUpList>("/follow-ups", { inquiryId: id, open: "true" }).catch(() => null),
   ]);
   // The next follow-up: the earliest one still open. An open inquiry is never meant to be without one.
   const nextUp = [...(followUps?.rows ?? [])].sort((a, b) => `${a.dueOn}${a.dueAt ?? ""}`.localeCompare(`${b.dueOn}${b.dueAt ?? ""}`))[0];
   const base = `/inquiries/${d.id}`;
-  const contact = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
-  const phone = contact?.whatsapp ?? contact?.phone ?? null;
   const name = (uid: string | null) => (uid ? (d.people[uid] ?? "Someone") : "Website form");
-  const files = [
-    ...d.attachments.map((f) => ({ id: f.id, name: f.fileName, from: `${name(f.uploadedById)} · ${date(f.createdAt)}` })),
-    ...(s?.quotes ?? []).flatMap((q) => q.files.map((f) => ({ id: f.id, name: f.fileName, from: `${q.factory.name} · factory offer` }))),
-  ];
   const mayAssign = d.allowed.assign && can(me, "inquiries.assign");
+  const followUp = nextUp ? `${dueText(nextUp.dueOn, nextUp.dueAt)}${nextUp.late ? " · missed" : ""}` : null;
+  const summary = [
+    d.assignee?.name ?? "Nobody handles it",
+    followUp ? `follow-up ${followUp}` : null,
+    d.notes.length ? `${d.notes.length} note${d.notes.length === 1 ? "" : "s"}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <SidePanelCard>
-      <SideSection
-        title="Inquiry"
-        footer={
-          <>
-            {mayAssign && (
+    <SideSheet title="Inquiry" summary={summary}>
+      <SidePanelCard>
+        <SideSection
+          title="Inquiry"
+          footer={
+            mayAssign ? (
               <div className="mt-2">
                 <AssignSelect action={assignAction.bind(null, d.id)} people={people} current={d.assignee?.id ?? null} />
               </div>
-            )}
-            {d.canWork && (
-              <div className="mt-3">
-                <DecisionButtons
-                  refNo={d.refNo}
-                  stage={d.stage}
-                  onHold={d.onHold}
-                  canHold={d.allowed.hold}
-                  canReopen={d.allowed.reopen}
-                  stageAction={moveStageAction.bind(null, d.id)}
-                  holdAction={holdAction.bind(null, d.id)}
-                />
-              </div>
-            )}
-          </>
-        }
-      >
-        {!mayAssign && (
-          <Row label="Handles it">
-            {d.assignee?.name ?? "Nobody yet"}
-            {d.allowed.assign && !d.assignee && (
-              <span className="ml-2">
-                <PanelButton
-                  variant="secondary"
-                  size="sm"
-                  label="Take it"
-                  title="Who handles this inquiry"
-                  description="They get its notifications and the work on its steps."
-                  body={<AssignForm action={assignAction.bind(null, d.id)} people={people} current={null} canAssignOthers={false} meId={me.id} />}
-                />
-              </span>
-            )}
-          </Row>
-        )}
-        <Row label="Needed by">{d.requiredBy ? date(d.requiredBy) : <span className="font-normal text-muted">Not said</span>}</Row>
-        {(nextUp || (followUps && isOpen(d.stage))) && (
-          <Row label="Next follow-up">
-            <Link href={`${base}/history#follow-ups`} className={cn("hover:underline", !nextUp || nextUp.late ? "text-bad" : "text-primary")}>
-              {nextUp ? `${dueText(nextUp.dueOn, nextUp.dueAt)}${nextUp.late ? " · missed" : ""}` : "None · set one"}
+            ) : undefined
+          }
+        >
+          {!mayAssign && (
+            <Row label="Handles it">
+              {d.assignee?.name ?? "Nobody yet"}
+              {d.allowed.assign && !d.assignee && (
+                <span className="ml-2">
+                  <PanelButton
+                    variant="secondary"
+                    size="sm"
+                    label="Take it"
+                    title="Who handles this inquiry"
+                    description="They get its notifications and the work on its steps."
+                    body={<AssignForm action={assignAction.bind(null, d.id)} people={people} current={null} canAssignOthers={false} meId={me.id} />}
+                  />
+                </span>
+              )}
+            </Row>
+          )}
+          {(nextUp || (followUps && isOpen(d.stage))) && (
+            <Row label="Next follow-up">
+              <Link href={`${base}/history#follow-ups`} className={cn("hover:underline", !nextUp || nextUp.late ? "text-bad" : "text-primary")}>
+                {followUp ?? "None · set one"}
+              </Link>
+            </Row>
+          )}
+        </SideSection>
+
+        <SideSection
+          title="Notes"
+          count={d.notes.length || undefined}
+          action={
+            <Link href={`${base}/history`} className={quiet}>
+              All history
             </Link>
-          </Row>
-        )}
-        <Row label="Came by">
-          {CHANNEL_LABEL[d.channel]} · {date(d.createdAt)}
-        </Row>
-      </SideSection>
-
-      {/* The customer is named in the header; here, who to reach there. */}
-      <SideSection title="Contact">
-        {contact ? (
-          <Row label={contact.name}>
-            <span className="flex flex-wrap justify-end gap-x-3">
-              {phone && (
-                <a href={`tel:${phone.replace(/[^+\d]/g, "")}`} className={quiet}>
-                  Call
-                </a>
-              )}
-              {phone && (
-                <a href={`https://wa.me/${phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className={quiet}>
-                  WhatsApp
-                </a>
-              )}
-              {contact.email && (
-                <a href={`mailto:${contact.email}`} className={quiet}>
-                  Email
-                </a>
-              )}
-              {!phone && !contact.email && <span className="font-normal text-muted">No phone or email</span>}
-            </span>
-          </Row>
-        ) : (
-          <Row label="Contact">
-            <span className="font-normal text-muted">Nobody named</span>
-          </Row>
-        )}
-      </SideSection>
-
-      <SideSection
-        title="Files"
-        count={files.length || undefined}
-        action={
-          <Link href={`${base}/files`} className={cn("tap", quiet)}>
-            {d.canWork ? "Add a file" : "All files"}
-          </Link>
-        }
-        empty="No files yet."
-      >
-        {files.map((f) => (
-          <li key={f.id} className="flex flex-col py-1.5">
-            <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-primary [overflow-wrap:anywhere] hover:underline">
-              {f.name}
-            </a>
-            <span className="text-xs text-text-2">{f.from}</span>
-          </li>
-        ))}
-      </SideSection>
-
-      <SideSection
-        title="Notes"
-        action={
-          <Link href={`${base}/history`} className={quiet}>
-            All history
-          </Link>
-        }
-        footer={
-          <div className="mt-2">
-            <NoteForm action={noteAction.bind(null, d.id)} />
-          </div>
-        }
-        empty="No notes yet."
-      >
-        {d.notes.slice(0, 4).map((n) => (
-          <li key={n.id} className="flex flex-col py-1.5">
-            <span className="line-clamp-3 text-sm whitespace-pre-line">{n.body}</span>
-            <span className="text-xs text-text-2">
-              {name(n.authorId)} · {date(n.createdAt)}
-            </span>
-          </li>
-        ))}
-      </SideSection>
-    </SidePanelCard>
+          }
+          footer={
+            <div className="mt-2">
+              <NoteForm action={noteAction.bind(null, d.id)} />
+            </div>
+          }
+          empty="No notes yet."
+        >
+          {d.notes.slice(0, 4).map((n) => (
+            <li key={n.id} className="flex flex-col py-1.5">
+              <span className="line-clamp-3 text-sm whitespace-pre-line">{n.body}</span>
+              <span className="text-xs text-text-2">
+                {name(n.authorId)} · {date(n.createdAt)}
+              </span>
+            </li>
+          ))}
+        </SideSection>
+      </SidePanelCard>
+    </SideSheet>
   );
 }
 
-/**
- * A tab of the inquiry with the side panel beside it: `top` spans both (the tab's own "Do next"), then
- * the tab's cards on the left and the one panel on the right (under them on a phone).
- */
 export function WithSide({ id, top, children }: { id: string; top?: ReactNode; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-4">
       {top}
       <div className={cn("grid items-start gap-4", SIDE_COLUMNS)}>
         <div className="flex min-w-0 flex-col gap-4">{children}</div>
-        <aside aria-label="Beside the inquiry" className="flex min-w-0 flex-col gap-4">
+        {/* On a phone its bar comes first, under the tabs; the panel opens from it. */}
+        <aside aria-label="Beside the inquiry" className="flex min-w-0 flex-col gap-4 max-lg:order-first">
           <InquirySide id={id} />
         </aside>
       </div>

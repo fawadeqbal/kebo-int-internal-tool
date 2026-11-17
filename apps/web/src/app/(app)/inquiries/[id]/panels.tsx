@@ -6,7 +6,7 @@ import { Button, Field, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelButton } from "@/components/orders/step-view";
-import { PANEL_FORM, PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -82,7 +82,57 @@ function HoldForm({ onHold, action }: { onHold: boolean; action: Action }) {
   );
 }
 
-/** The quiet decisions under the side cards: put on hold / resume, mark as lost, start, reopen. */
+/**
+ * The decisions in the header's ⋯ (design 17 Nov: put on hold / resume, mark lost, start, reopen): each opens
+ * its window from the address (?panel=hold-inquiry, ?panel=move-inquiry&id=lost), on any tab.
+ */
+export function DecisionWindows({
+  refNo,
+  stage,
+  onHold,
+  canHold,
+  canReopen,
+  stageAction,
+  holdAction,
+}: {
+  refNo: string;
+  stage: InquiryStage;
+  onHold: boolean;
+  canHold: boolean;
+  canReopen: boolean;
+  stageAction: Action;
+  holdAction: Action;
+}) {
+  const hold = useSidePanel("hold-inquiry");
+  const move = useSidePanel("move-inquiry");
+  const m = MANUAL_MOVES[stage].filter((x) => !x.reopen || canReopen).find((x) => x.to === move.id);
+  return (
+    <>
+      {hold.open && canHold && (
+        <SidePanel
+          title={onHold ? "Resume the inquiry" : "Put the inquiry on hold"}
+          description={onHold ? "It goes back to the lists as active." : "It stays where it is, marked on hold, until resumed."}
+          onClose={() => hold.close()}
+          className="md:w-[560px]"
+        >
+          <HoldForm onHold={onHold} action={holdAction} />
+        </SidePanel>
+      )}
+      {move.open && m && (
+        <SidePanel
+          title={m.to === "lost" ? `Mark ${refNo} as lost` : m.label}
+          description={m.to === "lost" ? "The reason shows on reports. A manager can reopen it." : undefined}
+          onClose={() => move.close()}
+          className="md:w-[560px]"
+        >
+          <StageForm to={m.to} action={stageAction} />
+        </SidePanel>
+      )}
+    </>
+  );
+}
+
+/** Resume or reopen, on the on-hold and lost notes of the Overview. */
 export function DecisionButtons({
   stage,
   onHold,

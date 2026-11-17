@@ -59,7 +59,9 @@ export function ScrollFade({
     };
   }, [scrollLabel]);
   return (
-    <Tag ref={ref as never} className={cn("scroll-fade", scrollLabel && "focus-visible:-outline-offset-2", className)} {...props}>
+    // relative: what is placed inside it (a screen reader's hidden words) stays inside it, so a wide table scrolls
+    // in its box and never widens the page (a phone would zoom out).
+    <Tag ref={ref as never} className={cn("scroll-fade relative", scrollLabel && "focus-visible:-outline-offset-2", className)} {...props}>
       {children}
     </Tag>
   );

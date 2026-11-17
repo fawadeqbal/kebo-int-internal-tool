@@ -66,7 +66,7 @@ export async function OrderSide({ id }: { id: string }) {
  */
 export function OrderPage({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex min-w-0 flex-col gap-4">{children}</div>
       <OrderSide id={id} />
     </div>
