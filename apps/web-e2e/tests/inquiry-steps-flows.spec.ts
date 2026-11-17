@@ -150,3 +150,46 @@ test("the Customer step: recent customers, Came by as buttons, and a customer no
   expect(await accessibilityProblems(page), "the Customer step meets WCAG 2.2 AA").toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test("the Items step: Add item first, + Part under a line, a possible duplicate tagged, ticked lines acted on together", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  await page.goto("/inquiries?panel=new-inquiry");
+  const win = page.getByRole("dialog", { name: "New inquiry" });
+  await win.locator("#customer").fill("Al-Shifa");
+  await win.getByText(/^Al-Shifa Pharma Ltd/).first().click();
+  await win.getByRole("button", { name: /^Next/ }).click();
+  const desc = win.getByRole("textbox", { name: "New item: Description" });
+  const model = win.getByRole("textbox", { name: "New item: Model / part no." });
+  const qty = win.getByRole("textbox", { name: "New item: Qty" });
+  await expect(win.getByRole("button", { name: "Add item", exact: true })).toBeVisible();
+  await desc.fill("Tablet press machine");
+  await model.fill("ZP-35D");
+  await qty.fill("1");
+  await qty.press("Enter");
+  await desc.fill("Punches and dies");
+  await qty.fill("2");
+  await qty.press("Enter");
+  // + Part on line 2: the line being typed says "Part of 2" and becomes 2.1.
+  await win.getByRole("button", { name: "Add a part to Item 2" }).click();
+  await expect(win.getByRole("combobox", { name: "New item: Item or part" })).toHaveValue(/.+/);
+  await desc.fill("Upper punch, 12 mm round");
+  await qty.fill("35");
+  await qty.press("Enter");
+  await expect(win.getByRole("row", { name: "Part 2.1" })).toContainText("Upper punch");
+  // Back to items: the same machine again is tagged, not removed.
+  await win.getByRole("combobox", { name: "New item: Item or part" }).selectOption("");
+  await desc.fill("Tablet press machine");
+  await qty.fill("1");
+  await qty.press("Enter");
+  await expect(win.getByRole("row", { name: "Item 3" })).toContainText("Same as 1?");
+  // Tick 3 and delete it with the bar (asked first); the rest stays.
+  await win.getByRole("checkbox", { name: "Select Item 3" }).check();
+  const bar = win.getByRole("toolbar", { name: "1 selected" });
+  await bar.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("alertdialog", { name: "Delete 1 item?" }).getByRole("button", { name: "Delete" }).click();
+  await expect(win.getByRole("row", { name: "Item 3" })).toHaveCount(0);
+  await expect(win.getByRole("navigation", { name: "Steps" }).getByRole("button", { name: /: Items/ })).toContainText("2 items, 1 part");
+  expect(await accessibilityProblems(page), "the Items step meets WCAG 2.2 AA").toEqual([]);
+  expect(errors).toEqual([]);
+});
