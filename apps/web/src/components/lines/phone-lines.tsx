@@ -34,7 +34,8 @@ export function lineNeeds(values: LineValues, columns: LineColumn[]): string | n
  * rest (what it answers, another spec of…) by name. Empty values and 0 are left out.
  */
 export function lineSummary(row: LineRow, columns: LineColumn[], values: LineValues): ReactNode[] {
-  const rank = (c: LineColumn) => (c.key === "quantity" ? 0 : c.key === "model" ? 1 : c.input === "number" ? 2 : !c.input ? 3 : 4);
+  // The quantity first, then the price (what a line is for), the model, the totals, then the rest.
+  const rank = (c: LineColumn) => (c.key === "quantity" ? 0 : c.input === "number" ? 1 : c.key === "model" ? 2 : !c.input ? 3 : 4);
   const out: ReactNode[] = [];
   for (const c of [...columns.slice(1)].sort((a, b) => rank(a) - rank(b))) {
     if (c.key === "unit") continue;
@@ -96,7 +97,7 @@ export function PhoneLineRow({
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={cn("truncate text-[15px] leading-snug", part ? "font-medium" : "font-semibold")}>{name || <span className="text-muted">No description yet</span>}</span>
         {summary.length > 0 && (
-          <span className="truncate text-[13px] text-text-2">
+          <span className="line-clamp-2 text-[13px] text-text-2 [overflow-wrap:anywhere]">
             {summary.map((s, n) => (
               <Fragment key={n}>
                 {n > 0 && " · "}

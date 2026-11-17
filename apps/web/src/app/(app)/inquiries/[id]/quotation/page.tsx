@@ -151,10 +151,8 @@ export default async function QuotationPage({
                   >
                     <span className="min-w-0">
                       <span className="block font-semibold text-text">{x.refNo}</span>
-                      <span className="block truncate text-xs text-text-2">
-                        {[from, `R${c.number}`].filter(Boolean).join(" · ")}
-                        <span className="md:hidden"> · {totalText(c)}</span>
-                      </span>
+                      <span className="block truncate text-xs text-text-2">{[from, `R${c.number}`].filter(Boolean).join(" · ")}</span>
+                      <span className="block text-xs font-semibold tabular md:hidden">{totalText(c)}</span>
                     </span>
                     <span className="text-right font-semibold whitespace-nowrap tabular max-md:hidden">{totalText(c)}</span>
                     <span className="min-w-0 max-md:hidden">

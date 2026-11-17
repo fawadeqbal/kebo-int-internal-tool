@@ -197,7 +197,7 @@ export function PanelSection({
       {title && (
         <legend className={quiet ? "sr-only" : "float-left mb-1 w-full text-sm font-bold text-text"}>
           {title}
-          {sub && <span className="ml-2 text-xs font-normal text-muted">{sub}</span>}
+          {sub && <span className="text-xs font-normal text-muted max-sm:block sm:ml-2">{sub}</span>}
         </legend>
       )}
       <div className={cn("grid grid-cols-1 gap-x-3 gap-y-3.5 sm:grid-cols-2", className)}>{children}</div>

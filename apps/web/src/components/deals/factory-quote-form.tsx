@@ -80,7 +80,7 @@ export function PortPicker({ id, value, onChange, exw }: { id: string; value: st
           type="button"
           tabIndex={-1}
           aria-label="Show the usual ports"
-          className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted hover:text-text"
+          className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded text-muted hover:text-text pointer-coarse:size-10"
           onClick={() => setOpen((o) => !o)}
         >
           <ChevronDown className="size-4" aria-hidden />

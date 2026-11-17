@@ -23,7 +23,7 @@ const quiet = "text-[13px] font-medium text-primary hover:underline";
 function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <li className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
-      <span className="shrink-0 text-text-2">{label}</span>
+      <span className="max-w-[60%] shrink-0 text-text-2 [overflow-wrap:anywhere]">{label}</span>
       <span className="min-w-0 text-right font-medium [overflow-wrap:anywhere]">{children}</span>
     </li>
   );
