@@ -41,14 +41,19 @@ describe("the note", () => {
     expect(note()).toBeNull();
   });
 
-  it("waits while held, gives Undo eight seconds, and says what was undone", async () => {
+  it("waits while held, goes on with the time it had left, and says what was undone", async () => {
     const undo = vi.fn(async () => {});
     render(<Toaster />);
     act(() => toast({ message: "Follow-up done: Call Ali about the price", undo }));
-    act(() => vi.advanceTimersByTime(NOTE_MS.plain + 10));
+    act(() => vi.advanceTimersByTime(NOTE_MS.undo - 1000));
     expect(note()).not.toBeNull();
+    // Its time line runs out with it.
+    expect(note()!.querySelector("[data-note-time]")).not.toBeNull();
     fireEvent.mouseEnter(note()!);
     act(() => vi.advanceTimersByTime(NOTE_MS.undo * 2));
+    expect(note()).not.toBeNull();
+    fireEvent.mouseLeave(note()!);
+    act(() => vi.advanceTimersByTime(500));
     expect(note()).not.toBeNull();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Undo" }));
@@ -58,13 +63,16 @@ describe("the note", () => {
     expect(note()?.textContent).toContain("Call Ali about the price");
   });
 
-  it("bad news is said at once and stays longer", () => {
+  it("bad news is said at once, and goes after five seconds too", () => {
     render(<Toaster />);
     act(() => toast({ kind: "fail", message: "Not saved: no connection" }));
     expect(note()?.getAttribute("role")).toBe("alert");
     expect(note()?.textContent).toContain("Not done: ");
-    act(() => vi.advanceTimersByTime(NOTE_MS.plain + 10));
+    act(() => vi.advanceTimersByTime(NOTE_MS.fail - 100));
     expect(note()).not.toBeNull();
+    act(() => vi.advanceTimersByTime(200));
+    expect(note()).toBeNull();
+    expect(NOTE_MS.fail).toBe(5000);
   });
 
   it("waiting for someone is blue and says so", () => {

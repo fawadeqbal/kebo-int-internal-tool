@@ -315,9 +315,10 @@ async function PaperPrint({ id, kind, sp }: { id: string; kind: PaperKind; sp: P
           title={`${p.label} ${p.doc.number}${p.paper && p.versions.length > 1 ? ` · version ${p.paper.version}` : ""}${p.final || p.live ? "" : p.kept ? (kind === "payment-request" ? " (not sent)" : "") : " (draft)"}`}
           backHref={backTo(
             sp.back,
-            // Kept as sent: no Make page to go back to. A request goes back to its own page, a receipt to the Payment step.
+            // Kept as sent: no Make page to go back to. A request (a row of the payment plan now) and a receipt go
+            // back to the Payment step.
             kind === "payment-request" && sp.ref && UUID.test(sp.ref)
-              ? `/orders/${id}/requests/${sp.ref}`
+              ? `/orders/${id}/payment`
               : p.kept
                 ? `/orders/${id}/payment`
                 : `/orders/${id}/papers/${kind}${sp.ref ? `?ref=${encodeURIComponent(sp.ref)}` : ""}`,

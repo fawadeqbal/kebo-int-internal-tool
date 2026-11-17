@@ -46,9 +46,14 @@ test("a new inquiry: New › Inquiry, the customer, what they need, saved", asyn
     .getByText(/^Al-Shifa Pharma Ltd/)
     .first()
     .click();
+  // In steps (design 17 Nov): Customer · Details · Files, the rail beside them.
+  await expect(window.getByRole("navigation", { name: "Steps" }).getByRole("button", { name: /Customer/ })).toHaveAttribute("aria-current", "step");
+  await window.getByRole("button", { name: /^Next/ }).click();
   await window.locator("#category").selectOption({ index: 1 });
   await window.locator("#title").fill(title);
   await window.locator("#requirements").fill("A filling line, 2,000 bottles an hour.");
+  await window.getByRole("button", { name: /^Next/ }).click();
+  await expect(window.getByText("Add files")).toBeVisible();
   await window.getByRole("button", { name: "Save inquiry" }).click();
 
   await expect(page).toHaveURL(/\/inquiries\/[0-9a-f-]{36}$/);

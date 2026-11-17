@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Factory, Loader2, Plus } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Factory, Loader2, Plus } from "lucide-react";
 import { fxRate } from "@kebo/money";
 import {
   INCOTERMS,
@@ -21,6 +21,7 @@ import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
 import { PANEL_FORM, PanelSection } from "@/components/common/panel";
+import { StepsFrame, type StepInfo } from "@/components/common/steps-frame";
 import { money } from "@/lib/format";
 import {
   LeadField,
@@ -508,7 +509,13 @@ export function OfferHeaderForm({
   files,
   note,
   footer,
+  footerStart,
+  startStep = "offer",
 }: {
+  /** Where the window opens (design 17 Nov: the offer in steps). */
+  startStep?: OfferStep;
+  /** Left of the buttons on the first step (Remove this offer). */
+  footerStart?: ReactNode;
   action: Action;
   quote: FactoryQuoteView | null;
   today: string;
@@ -522,7 +529,8 @@ export function OfferHeaderForm({
   files: ReactNode;
   /** Said above the buttons (a new offer: its lines come next). */
   note?: ReactNode;
-  footer: ReactNode;
+  /** Cancel and the save buttons; `last`: the last step, where saving is the main button. */
+  footer: (last: boolean) => ReactNode;
 }) {
   // How the window opens: a fresh start, with the company's usual tax and advance (Settings).
   const [start] = useState<QuoteState>(() => ({
@@ -531,6 +539,8 @@ export function OfferHeaderForm({
   }));
   const [s, setS] = useState<QuoteState>(start);
   const set = <K extends keyof QuoteState>(k: K, v: QuoteState[K]) => setS((st) => ({ ...st, [k]: v }));
+  const [step, setStep] = useState<OfferStep>(startStep);
+  const at = OFFER_STEPS.findIndex((x) => x.key === step);
   // Every new offer starts fresh (nothing is filled from the factory's last offer: decided 16 Nov 2026).
   const pickFactory = (f: QuoteState["factory"]) => set("factory", f);
   const currency = s.currency.trim().toUpperCase();
@@ -604,12 +614,13 @@ export function OfferHeaderForm({
     <ActionForm
       action={action}
       onDone={onDone}
-      className={PANEL_FORM}
+      className={cn(PANEL_FORM, "min-h-0 gap-0")}
       keepFields
       showSuccess={false}
       beforeSend={() => {
         if (!partsBad) return true;
         setPartsTried(true);
+        setStep("payment");
         document.getElementById("fq-parts")?.scrollIntoView?.({ block: "center" });
         return false;
       }}
@@ -619,6 +630,32 @@ export function OfferHeaderForm({
           <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
           {/* The factory's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
           <input type="hidden" name="factoryLabel" value={s.factory?.name ?? ""} />
+          <StepsFrame
+            steps={offerStepsInfo(s, at, !!quote)}
+            at={step}
+            onGo={setStep}
+            footer={
+              <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
+                {at > 0 ? (
+                  <Button type="button" variant="secondary" onClick={() => setStep(OFFER_STEPS[at - 1]!.key)}>
+                    <ChevronLeft aria-hidden /> Back
+                  </Button>
+                ) : (
+                  footerStart
+                )}
+                <span className="flex-1" />
+                {footer(at === OFFER_STEPS.length - 1)}
+                {at < OFFER_STEPS.length - 1 && (
+                  <Button type="button" variant="primary" onClick={() => setStep(OFFER_STEPS[at + 1]!.key)}>
+                    Next <ChevronRight aria-hidden />
+                  </Button>
+                )}
+              </div>
+            }
+          >
+          <JumpToError st={st} onJump={setStep} />
+          {step === "offer" && (
+          <>
           <PanelSection title="Who and when" first className="md:grid-cols-3">
             <Field
               label="Factory"
@@ -671,7 +708,10 @@ export function OfferHeaderForm({
               note={quote ? taxRateNote(quote.lines, quote.taxRate, s.taxRate) : undefined}
             />
           </PanelSection>
-          <PanelSection title="Delivery" sub="where they hand the goods over, and how long they need" className="md:grid-cols-4">
+          </>
+          )}
+          {step === "delivery" && (
+          <PanelSection quiet first title="Delivery" className="md:grid-cols-4">
             <Field
               label="Delivery basis (Incoterm)"
               htmlFor="basis"
@@ -724,7 +764,9 @@ export function OfferHeaderForm({
               }
             />
           </PanelSection>
-          <PanelSection title="Payment" sub="the parts, as in their payment plan on an order" className="md:grid-cols-3">
+          )}
+          {step === "payment" && (
+          <PanelSection quiet first title="Payment" className="md:grid-cols-3">
             <PartsField
               id="fq-parts"
               idPrefix="fq-part"
@@ -751,7 +793,10 @@ export function OfferHeaderForm({
               />
             </Field>
           </PanelSection>
-          <PanelSection title="Warranty" className="md:grid-cols-3">
+          )}
+          {step === "warranty" && (
+          <>
+          <PanelSection quiet first title="Warranty" className="md:grid-cols-3">
             <WarrantyFields
               idPrefix="fq"
               months={s.warrantyMonths}
@@ -782,10 +827,59 @@ export function OfferHeaderForm({
             </div>
             <div className="min-w-0">{files}</div>
           </PanelSection>
+          </>
+          )}
           {note}
-          {footer}
+          </StepsFrame>
         </>
       )}
     </ActionForm>
   );
+}
+
+/** The offer's steps (design 17 Nov): who and when with its price and tax, then its terms. Its lines have their own sheet (Edit lines). */
+export type OfferStep = "offer" | "delivery" | "payment" | "warranty";
+const OFFER_STEPS: { key: OfferStep; label: string }[] = [
+  { key: "offer", label: "Offer" },
+  { key: "delivery", label: "Delivery" },
+  { key: "payment", label: "Payment" },
+  { key: "warranty", label: "Warranty & conditions" },
+];
+
+/** Each step with what it holds now ("Shenjing · CNY · tax 13% incl."). */
+function offerStepsInfo(s: QuoteState, at: number, saved: boolean): StepInfo<OfferStep>[] {
+  const rate = Number(s.taxRate || 0);
+  const summary: Record<OfferStep, string> = {
+    offer: [s.factory?.name, s.currency.trim().toUpperCase(), rate > 0 ? `tax ${rate}%${s.taxIncluded ? " incl." : ""}` : "no tax"].filter(Boolean).join(" · "),
+    delivery: [s.basis ? `${s.basis}${s.basisPlace ? ` ${s.basisPlace}` : ""}` : null, s.leadDays.trim() ? `${s.leadDays.trim()} days` : s.leadTime || null].filter(Boolean).join(" · "),
+    payment: s.parts.map((p) => `${p.share}%`).join(" · "),
+    warranty: [s.warrantyMonths.trim() ? `${s.warrantyMonths.trim()} months` : null, s.moq.trim() ? `MOQ ${s.moq.trim()}` : null].filter(Boolean).join(" · "),
+  };
+  return OFFER_STEPS.map((x, k) => ({ key: x.key, label: x.label, summary: summary[x.key] || undefined, done: saved || k < at }));
+}
+
+/** Where each field the API can refuse is typed. */
+const FIELD_STEP: Record<string, OfferStep> = {
+  basis: "delivery",
+  basisPlace: "delivery",
+  leadDays: "delivery",
+  leadFrom: "delivery",
+  leadTime: "delivery",
+  paymentParts: "payment",
+  paymentTerms: "payment",
+  advancePercent: "payment",
+  warranty: "warranty",
+  warrantyMonths: "warranty",
+  warrantyFrom: "warranty",
+  moq: "warranty",
+  notes: "warranty",
+};
+
+/** A save refused for a field on another step opens that step, so the field and its message are in view. */
+function JumpToError({ st, onJump }: { st: ActionState; onJump: (step: OfferStep) => void }) {
+  useEffect(() => {
+    const first = Object.keys(st.errors ?? {}).find((k) => st.errors?.[k]?.length);
+    if (first) onJump(FIELD_STEP[first] ?? "offer");
+  }, [st, onJump]);
+  return null;
 }

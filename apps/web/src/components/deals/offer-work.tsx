@@ -10,7 +10,7 @@ import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
-import { PanelBody, PanelFooter, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PanelBody, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
 import { ConfirmDialog } from "@/components/common/dialog";
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, money as amount } from "@/lib/format";
@@ -184,7 +184,7 @@ export function OfferDetails({
       canEdit={canEdit}
       panelTitle={`Edit ${q.factory.name}’s offer`}
       panelDescription="The factory and its terms. Internal, never shown to the customer. Its lines are changed with Edit lines."
-      panelClassName="md:w-[860px]"
+      panelClassName="md:w-[1040px]"
       panelBody={
         <OfferWindow
           dealId={dealId}
@@ -278,7 +278,7 @@ function OfferWindow({
     // Saved: close without asking "Throw away your changes?".
     close(st);
     // One button, one action: the offer opens on the page; its lines editor waits for "Add lines".
-    if (!q) router.push(`/inquiries/${dealId}/sourcing?offer=${id}`);
+    if (!q) router.push(`/inquiries/${dealId}/offers/${id}`);
   };
 
   const confirm = () =>
@@ -345,7 +345,7 @@ function OfferWindow({
   );
 
   return (
-    <PanelBody>
+    <PanelBody fill>
       <OfferHeaderForm
         action={saveAction}
         quote={q}
@@ -369,36 +369,37 @@ function OfferWindow({
             {error && <p className="text-sm text-bad">{error}</p>}
           </>
         }
-        footer={
+        footerStart={
+          q && removeAction ? (
+            <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline">
+              <Trash2 className="size-4" aria-hidden /> Remove this offer
+            </button>
+          ) : undefined
+        }
+        footer={(last) =>
           q ? (
-            <PanelFooter
-              start={
-                removeAction ? (
-                  <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline">
-                    <Trash2 className="size-4" aria-hidden /> Remove this offer
-                  </button>
-                ) : undefined
-              }
-            >
-              <Button type="button" variant="ghost" onClick={() => close()}>
+            <>
+              <Button type="button" variant="ghost" onClick={() => close()} className="max-md:hidden">
                 Cancel
               </Button>
-              <SubmitButton pendingText="Saving…">
-                <Check aria-hidden /> Save the details
+              <SubmitButton variant={last ? "primary" : "secondary"} pendingText="Saving…">
+                <Check aria-hidden /> Save
               </SubmitButton>
-            </PanelFooter>
+            </>
           ) : (
-            <PanelFooter>
-              <Button type="button" variant="ghost" onClick={() => close()}>
+            <>
+              <Button type="button" variant="ghost" onClick={() => close()} className="max-md:hidden">
                 Cancel
               </Button>
-              <SubmitButton variant="secondary" pendingText="Saving…" onClick={() => (another.current = true)}>
-                <Plus aria-hidden /> Save &amp; enter another
-              </SubmitButton>
-              <SubmitButton pendingText="Saving…" onClick={() => (another.current = false)}>
+              {last && (
+                <SubmitButton variant="secondary" pendingText="Saving…" onClick={() => (another.current = true)}>
+                  <Plus aria-hidden /> Save &amp; enter another
+                </SubmitButton>
+              )}
+              <SubmitButton variant={last ? "primary" : "secondary"} pendingText="Saving…" onClick={() => (another.current = false)}>
                 <Check aria-hidden /> Save offer
               </SubmitButton>
-            </PanelFooter>
+            </>
           )
         }
       />
@@ -989,7 +990,7 @@ export function AddOfferButton({
           key={round}
           title="Enter factory offer"
           description={`${refNo ? `${refNo} · ` : ""}The factory and its terms. Internal, never shown to the customer.`}
-          className="md:w-[860px]"
+          className="md:w-[1040px]"
           onClose={() => setOpen(false)}
         >
           <OfferWindow

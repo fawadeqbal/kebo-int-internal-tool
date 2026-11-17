@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type KeyboardEvent } from "react";
-import { Check, Download, Eye, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Eye, Plus, Trash2, X } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, CHANNEL_LABEL, INQUIRY_CHANNELS, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type AttachmentKind, type InquiryChannel } from "@kebo/shared";
-import { Alert, Button, buttonClass, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Alert, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { PANEL_FORM, PanelBody, PanelFooter, PanelSection, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelSection, useClosePanel, WhatHappens } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
+import { StepsFrame } from "@/components/common/steps-frame";
 import { CountrySelect } from "@/components/people/country-select";
 import type { ActionState } from "@/lib/actions";
 import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole } from "@/lib/types-deals";
@@ -122,6 +123,9 @@ export function DealForm({
   const [asking, setAsking] = useState<RequestFile | null>(null);
   const [removing, startRemove] = useTransition();
   const set = <K extends keyof DealFormValues>(k: K, value: DealFormValues[K]) => setV((s) => ({ ...s, [k]: value }));
+  // The window in steps (design 17 Nov): Customer · Details · Files.
+  const [step, setStep] = useState<RequestStep>("customer");
+  const at = REQUEST_STEPS.findIndex((x) => x.key === step);
 
   const chooseCustomer = async (c: CustomerOption | null, known?: ContactOption[]) => {
     set("customer", c);
@@ -181,12 +185,12 @@ export function DealForm({
     );
 
   return (
-    <PanelBody>
+    <PanelBody fill>
       <ActionForm
         action={submit}
         keepFields
         showSuccess={false}
-        className={PANEL_FORM}
+        className={cn(PANEL_FORM, "min-h-0 gap-0")}
         banner={(st) =>
           st.message && st.ok === false ? (
             <Alert tone="error">
@@ -198,7 +202,50 @@ export function DealForm({
         {(s) => (
           <>
             <input type="hidden" name="payload" value={JSON.stringify(payload(v))} />
-            <PanelSection title="Who asked" first className="md:grid-cols-3">
+            <StepsFrame
+              steps={REQUEST_STEPS.map((x, k) => ({
+                key: x.key,
+                label: x.label,
+                summary:
+                  x.key === "customer"
+                    ? [v.customer?.name, CHANNEL_LABEL[v.channel]].filter(Boolean).join(" · ") || undefined
+                    : x.key === "details"
+                      ? [v.title.trim(), v.category].filter(Boolean).join(" · ") || undefined
+                      : files.length + staged.length
+                        ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
+                        : undefined,
+                done: !create || k < at,
+              }))}
+              at={step}
+              onGo={setStep}
+              footer={
+                <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
+                  {at > 0 ? (
+                    <Button type="button" variant="secondary" onClick={() => setStep(REQUEST_STEPS[at - 1]!.key)}>
+                      <ChevronLeft aria-hidden /> Back
+                    </Button>
+                  ) : (
+                    !create && <span className="min-w-0 text-[12.5px] text-text-2">Each changed value is kept in History.</span>
+                  )}
+                  <span className="flex-1" />
+                  {/* A phone closes the window with its ← at the top: three buttons fit on one row. */}
+                  <Button type="button" variant="ghost" onClick={() => close()} className="max-md:hidden">
+                    Cancel
+                  </Button>
+                  <SubmitButton variant={at === REQUEST_STEPS.length - 1 ? "primary" : "secondary"} pendingText={uploading ? "Uploading files…" : "Saving…"}>
+                    <Check aria-hidden /> {create ? "Save inquiry" : "Save changes"}
+                  </SubmitButton>
+                  {at < REQUEST_STEPS.length - 1 && (
+                    <Button type="button" variant="primary" onClick={() => setStep(REQUEST_STEPS[at + 1]!.key)}>
+                      Next <ChevronRight aria-hidden />
+                    </Button>
+                  )}
+                </div>
+              }
+            >
+            <JumpToStep st={s} onJump={setStep} />
+            {step === "customer" && (
+            <PanelSection quiet title="Who asked" first className="md:grid-cols-3">
               <Field label="Customer" htmlFor="customer" required error={s.errors?.customerId} className="md:col-span-2">
                 {adding && addCustomer ? (
                   <QuickCustomerForm
@@ -269,8 +316,10 @@ export function DealForm({
                 </Select>
               </Field>
             </PanelSection>
+            )}
 
-            <PanelSection title="What they need" className="md:grid-cols-3">
+            {step === "details" && (
+            <PanelSection quiet title="What they need" first className="md:grid-cols-3">
               <Field label="Title" htmlFor="title" error={s.errors?.title}>
                 <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} placeholder="Short name, e.g. “Tablet press”" />
               </Field>
@@ -322,8 +371,10 @@ export function DealForm({
                 />
               </Field>
             </PanelSection>
+            )}
 
-            <PanelSection title="Files from the customer" className="sm:grid-cols-1">
+            {step === "files" && (
+            <PanelSection quiet title="Files from the customer" first className="sm:grid-cols-1">
               {files.map((f) => (
                 <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-[13px]">
                   <span className="min-w-0 truncate">
@@ -383,22 +434,16 @@ export function DealForm({
                   ))}
               </FileZone>
             </PanelSection>
+            )}
 
-            {create && (
+            {create && step === "files" && (
               <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">
                 The items come next. On the inquiry, <strong className="text-text">Add items</strong> opens the items editor: type them, paste them from Excel, or leave it
                 empty and take them from the first factory offer.
               </p>
             )}
 
-            <PanelFooter start={create ? undefined : "Each changed value is kept in History."}>
-              <Button type="button" variant="ghost" onClick={() => close()}>
-                Cancel
-              </Button>
-              <SubmitButton pendingText={uploading ? "Uploading files…" : "Saving…"}>
-                <Check aria-hidden /> {create ? "Save inquiry" : "Save changes"}
-              </SubmitButton>
-            </PanelFooter>
+            </StepsFrame>
           </>
         )}
       </ActionForm>
@@ -551,4 +596,22 @@ function QuickCustomerForm({
       </div>
     </div>
   );
+}
+
+/** The inquiry's window in steps (design 17 Nov). Its items have their own sheet on the inquiry (Add items / Edit items). */
+type RequestStep = "customer" | "details" | "files";
+const REQUEST_STEPS: { key: RequestStep; label: string }[] = [
+  { key: "customer", label: "Customer" },
+  { key: "details", label: "Details" },
+  { key: "files", label: "Files" },
+];
+const DETAIL_FIELDS = new Set(["title", "category", "priority", "requirements"]);
+
+/** A save refused for a field on another step opens that step, so the field and its message are in view. */
+function JumpToStep({ st, onJump }: { st: ActionState; onJump: (step: RequestStep) => void }) {
+  useEffect(() => {
+    const first = Object.keys(st.errors ?? {}).find((k) => st.errors?.[k]?.length);
+    if (first) onJump(DETAIL_FIELDS.has(first) ? "details" : "customer");
+  }, [st, onJump]);
+  return null;
 }
