@@ -153,11 +153,18 @@ export function SidePanel({
  * A panel's scrolling body. A form inside takes its height (`PANEL_FORM`), so
  * its PanelActions stay at the bottom of the panel however short it is.
  */
-export function PanelBody({ children, className }: { children: ReactNode; className?: string }) {
+export function PanelBody({ children, className, fill }: { children: ReactNode; className?: string; fill?: boolean }) {
   // The form's message after a save (what to fix, no connection) at the top, inside the form, in view.
   const notice = useFormNotice();
   return (
-    <div data-panel-body className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto p-5 *:shrink-0 sm:px-6", className)}>
+    <div
+      data-panel-body
+      className={cn(
+        // `fill`: a steps window fills the panel and scrolls inside itself (its rail and buttons stay put).
+        fill ? "flex min-h-0 flex-1 flex-col overflow-hidden *:min-h-0" : "flex min-h-0 flex-1 flex-col overflow-y-auto p-5 *:shrink-0 sm:px-6",
+        className,
+      )}
+    >
       {notice}
       {children}
     </div>

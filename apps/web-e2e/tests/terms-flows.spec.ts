@@ -41,14 +41,20 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await page.goto(`/inquiries/${deal.id}/sourcing?offer=${deal.offer}#offer`);
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   const offer = page.getByRole("dialog");
-  for (const group of ["Who and when", "Price", "Delivery", "Payment", "Warranty", "Conditions and their quotation"])
-    await expect(offer.locator("legend", { hasText: group }).first()).toBeVisible();
+  // The offer in steps (design 17 Nov): Offer · Delivery · Payment · Warranty & conditions, the rail beside them.
+  const rail = offer.getByRole("navigation", { name: "Steps" });
+  for (const step of ["Offer", "Delivery", "Payment", "Warranty & conditions"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
+  await expect(offer.locator("legend", { hasText: "Who and when" }).first()).toBeVisible();
+  await offer.getByRole("button", { name: /^Next/ }).click();
   await offer.getByLabel("Lead time").fill("30");
+  await offer.getByRole("button", { name: /^Next/ }).click();
   await offer.getByRole("button", { name: "50 / 50" }).click();
   await expect(offer.getByText("Adds up: 100%")).toBeVisible();
+  await rail.getByRole("button", { name: /Warranty & conditions/ }).click();
   await offer.getByLabel("Months").fill("12");
+  await expect(offer.locator("legend", { hasText: "Conditions and their quotation" }).first()).toBeVisible();
   expect(await accessibilityProblems(page), "the offer's form meets WCAG 2.2 AA").toEqual([]);
-  await offer.getByRole("button", { name: /Save/ }).click();
+  await offer.getByRole("button", { name: /^Save/ }).click();
   await expect(offer).toBeHidden();
   // The offer's card, in the same groups.
   await expect(page.locator("dd", { hasText: "30 days after the advance" })).toBeVisible();

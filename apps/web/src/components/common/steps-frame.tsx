@@ -58,8 +58,9 @@ export function StepsFrame<K extends string>({
           {next && <span className="truncate text-xs text-text-2">Next: {next.label}</span>}
         </p>
       </div>
-      <div className="grid min-h-0 flex-1 md:grid-cols-[232px_minmax(0,1fr)]">
-        <nav aria-label="Steps" className="border-r border-line bg-surface p-3 max-md:hidden">
+      {/* The rail stays put; only the step's own fields scroll (asked 17 Nov). */}
+      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] md:min-h-[min(520px,calc(100dvh-12rem))] md:grid-cols-[232px_minmax(0,1fr)]">
+        <nav aria-label="Steps" className="min-h-0 overflow-y-auto border-r border-line bg-surface p-3 max-md:hidden">
           <ol className="flex flex-col gap-0.5">
             {steps.map((s, k) => {
               const on = s.key === at;
@@ -99,7 +100,7 @@ export function StepsFrame<K extends string>({
             })}
           </ol>
         </nav>
-        <div className="flex min-w-0 flex-col gap-4 px-6 pt-5 pb-6 max-md:px-4">
+        <div data-step-body className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto px-6 pt-5 pb-6 *:shrink-0 max-md:px-4">
           <div className="flex min-h-7 items-center gap-3">
             <h3 className="text-lg leading-7 font-bold max-md:sr-only">{current.label}</h3>
             {heading && <span className="ml-auto">{heading}</span>}

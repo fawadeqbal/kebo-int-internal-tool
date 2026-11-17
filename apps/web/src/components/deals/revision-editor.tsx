@@ -669,7 +669,7 @@ export function RevisionEditor({
         document.getElementById(`parts-${number}`)?.scrollIntoView?.({ block: "center" });
         return false;
       }}
-      className={PANEL_FORM}
+      className={cn(PANEL_FORM, step && "min-h-0 gap-0")}
     >
       {(st) => {
         const sections = (

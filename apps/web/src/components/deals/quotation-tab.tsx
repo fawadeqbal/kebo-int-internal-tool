@@ -34,7 +34,13 @@ export function NewQuotationsButton({
   label = "New quotations",
   variant = "secondary",
   defaultOpen = false,
+  base,
+  only = null,
 }: {
+  /** The inquiry's address: after making them, the first new quotation's own page opens. */
+  base: string;
+  /** "Quote this offer" (an offer's own page): that offer alone starts ticked. */
+  only?: string | null;
   action: Action;
   offers: QuoteOffers | null;
   loadOffers: (currency: string) => Promise<QuoteOffers | null>;
@@ -62,7 +68,7 @@ export function NewQuotationsButton({
       </Button>
       {open && (
         <SidePanel title="New quotations" description="Each offer ticked becomes its own draft." onClose={close} className="md:w-[860px]">
-          <NewQuotationsForm action={action} first={first} loadOffers={loadOffers} defaults={defaults} usedIn={usedIn} letters={letters} />
+          <NewQuotationsForm action={action} first={first} loadOffers={loadOffers} defaults={defaults} usedIn={usedIn} letters={letters} base={base} only={only} />
         </SidePanel>
       )}
     </>
@@ -76,21 +82,26 @@ function NewQuotationsForm({
   defaults,
   usedIn,
   letters,
+  base,
+  only,
 }: {
+  only: string | null;
   action: Action;
   first: QuoteOffers | null;
   loadOffers: (currency: string) => Promise<QuoteOffers | null>;
   defaults: { currency: string; validUntil: string; margin: number };
   usedIn: Record<string, string[]>;
   letters: string[];
+  base: string;
 }) {
   const close = useClosePanel();
   const router = useRouter();
   const [offers, setOffers] = useState(first);
   const [currency, setCurrency] = useState(defaults.currency);
   const [margin, setMargin] = useState(String(defaults.margin));
-  // Offers not quoted yet start ticked; own prices when there is no offer at all.
+  // Offers not quoted yet start ticked; own prices when there is no offer at all; "Quote this offer": that one.
   const [ticked, setTicked] = useState<string[]>(() => {
+    if (only && first?.offers.some((o) => o.factoryQuoteId === only)) return [only];
     const fresh = (first?.offers ?? []).filter((o) => !usedIn[o.factoryQuoteId]?.length).map((o) => o.factoryQuoteId);
     return fresh.length ? fresh : first?.offers.length ? [] : ["own"];
   });
@@ -125,7 +136,7 @@ function NewQuotationsForm({
         onDone={(s) => {
           close(s);
           const id = (s.data as { first?: string | null } | undefined)?.first;
-          if (id) router.push(`?q=${id}#q-${id}`, { scroll: false });
+          if (id) router.push(`${base}/quotations/${id}`);
         }}
       >
         {(s) => (

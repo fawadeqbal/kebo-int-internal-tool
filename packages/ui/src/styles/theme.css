@@ -496,7 +496,7 @@
   }
 }
 
-/* A note's time running out (with Undo): the line under it empties. */
+/* A note's time running out: the line under it empties. */
 @keyframes note-time {
   to {
     transform: scaleX(0);

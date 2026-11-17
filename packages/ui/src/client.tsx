@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -96,8 +96,11 @@ const subscribeToast = (l: () => void) => {
   return () => toastListeners.delete(l);
 };
 
-/** How long a note stays: 5 seconds, 8 with Undo (time to reach it), longer when it is bad news; never while held. */
-export const NOTE_MS = { plain: 5000, undo: 8000, fail: 10000 } as const;
+/**
+ * How long a note stays: 5 seconds, every kind (asked 17 Nov), with a line under it running out; never while
+ * held (the pointer or the keyboard on it), and the time left carries on after.
+ */
+export const NOTE_MS = { plain: 5000, undo: 5000, fail: 5000 } as const;
 
 const KINDS: Record<NoteKind, { icon: ReactNode; className: string; said: string }> = {
   done: { icon: <Check className="size-3.5" strokeWidth={3} aria-hidden />, className: "bg-[#2e8b57]", said: "Done" },
@@ -117,10 +120,19 @@ export function Toaster() {
   const [busy, setBusy] = useState(false);
   const kind = t?.kind ?? "done";
   const ms = !t ? 0 : t.undo ? NOTE_MS.undo : kind === "fail" ? NOTE_MS.fail : NOTE_MS.plain;
+  // The time it has left: a new note starts with all of it; holding it stops the clock.
+  const left = useRef(ms);
+  useEffect(() => {
+    left.current = ms;
+  }, [t?.id, ms]);
   useEffect(() => {
     if (!t || held || busy) return;
-    const timer = setTimeout(() => dismissToast(t.id), ms);
-    return () => clearTimeout(timer);
+    const started = Date.now();
+    const timer = setTimeout(() => dismissToast(t.id), left.current);
+    return () => {
+      clearTimeout(timer);
+      left.current = Math.max(0, left.current - (Date.now() - started));
+    };
   }, [t, held, busy, ms]);
   if (!t) return null;
   const undo = async () => {
@@ -188,12 +200,15 @@ export function Toaster() {
       <button onClick={() => dismissToast(t.id)} className="grid size-6 shrink-0 place-items-center rounded text-note-sub hover:text-note-fg" aria-label="Dismiss">
         <X className="size-4" aria-hidden />
       </button>
-      {/* How long it has left (with Undo): a thin line that runs out, still while held. */}
-      {t.undo && !held && !busy && (
-        <span aria-hidden className="absolute inset-x-3.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-note-fg/15">
-          <span key={t.id} className="block h-full origin-left rounded-full bg-note-link" style={{ animation: `note-time ${ms}ms linear forwards` }} />
-        </span>
-      )}
+      {/* How long it has left: a thin line that runs out in the 5 seconds, standing still while held. */}
+      <span aria-hidden className="absolute inset-x-3.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-note-fg/15">
+        <span
+          key={t.id}
+          data-note-time=""
+          className="block h-full origin-left rounded-full bg-note-link"
+          style={{ animation: `note-time ${ms}ms linear forwards`, animationPlayState: held || busy ? "paused" : "running" }}
+        />
+      </span>
     </div>
   );
 }

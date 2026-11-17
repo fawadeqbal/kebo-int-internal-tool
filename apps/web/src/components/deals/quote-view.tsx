@@ -58,10 +58,10 @@ export function termsFacts(r: RevisionView) {
 function Group({ title, edit, children }: { title: string; edit?: ReactNode; children: ReactNode }) {
   return (
     <section aria-label={title} className="flex min-w-0 flex-col gap-1 px-4 py-3 text-[13px] leading-relaxed text-text-2 max-md:border-b max-md:border-line max-md:last:border-b-0 md:border-l md:border-line md:first:border-l-0">
-      <h4 className="flex min-h-7 items-center justify-between gap-2 text-xs font-bold tracking-wide text-text uppercase">
+      <h3 className="flex min-h-8 items-center justify-between gap-2 text-xs font-bold tracking-wide text-text uppercase">
         {title}
         {edit}
-      </h4>
+      </h3>
       {children}
     </section>
   );

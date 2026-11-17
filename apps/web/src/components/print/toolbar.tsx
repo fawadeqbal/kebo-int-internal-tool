@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowLeft, Download, FileSpreadsheet, Loader2, Printer } from "lucide-react";
 import { Button, buttonClass } from "@kebo/ui";
@@ -25,11 +26,23 @@ export function PrintToolbar({
   copies?: { current: "customer" | "internal"; customer: string; internal: string };
 }) {
   const [busy, setBusy] = useState(false);
+  const router = useRouter();
   return (
     <div className="no-print sticky top-0 z-20 mb-6 border-b border-[#d0d7e2] bg-white/90 backdrop-blur">
       <div className="mx-auto flex w-[210mm] max-w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-[#16151c]">
         <div className="flex min-w-0 items-center gap-2">
-          <Link href={backHref} className={buttonClass("ghost", "sm", "text-[#4a4857] hover:bg-[#f2f2f5] hover:text-[#16151c]")}>
+          <Link
+            href={backHref}
+            onClick={(e) => {
+              // Opened from a page of the app in this tab: Back goes to exactly that page (as the browser's Back does);
+              // opened in a new tab or from outside, to the paper's own page.
+              if (window.history.length > 1 && document.referrer && new URL(document.referrer).origin === window.location.origin) {
+                e.preventDefault();
+                router.back();
+              }
+            }}
+            className={buttonClass("ghost", "sm", "text-[#4a4857] hover:bg-[#f2f2f5] hover:text-[#16151c]")}
+          >
             <ArrowLeft aria-hidden /> Back
           </Link>
           <span className="truncate text-sm font-medium">{title}</span>

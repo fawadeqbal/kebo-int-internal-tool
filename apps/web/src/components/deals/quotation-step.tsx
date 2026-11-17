@@ -101,7 +101,7 @@ export function QuoteStepsPanel({
 }) {
   const close = useClosePanel();
   return (
-    <PanelBody className="p-0 sm:px-0">
+    <PanelBody fill>
       <RevisionEditor
         action={action}
         number={number}

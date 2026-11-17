@@ -1,13 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { api, SESSION_COOKIE } from "@/lib/api";
 import { withChromium } from "@/app/pdf/render";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail } from "@/lib/types";
 import { LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
-import type { NewQuotationsResult, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
+import type { NewQuotationsResult, QuotationView, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
@@ -63,6 +64,18 @@ export async function updateRevisionAction(dealId: string, revisionId: string, _
   const r = await attempt(form, () => api.put(`/revisions/${revisionId}`, formBody(form)), "Draft saved.");
   if (r.ok) refresh(dealId);
   return r;
+}
+
+/**
+ * "Delete draft" on a quotation's own page: the draft goes, then the page shows the quotation's revision before it,
+ * or (when it was its only one) the inquiry's list of quotations.
+ */
+export async function deleteDraftAction(dealId: string, quotationId: string, revisionId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
+  const r = await attempt(null, () => api.delete(`/revisions/${revisionId}`), "Draft deleted.");
+  if (!r.ok) return r;
+  refresh(dealId);
+  const left = await api.get<QuotationView>(`/inquiries/${dealId}/quotation`).catch(() => null);
+  redirect(left?.quotations.some((q) => q.id === quotationId) ? `/inquiries/${dealId}/quotations/${quotationId}` : `/inquiries/${dealId}/quotation`);
 }
 
 export async function deleteRevisionAction(dealId: string, revisionId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {

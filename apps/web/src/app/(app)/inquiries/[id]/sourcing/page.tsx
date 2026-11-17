@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, ChevronRight, Factory, FileText } from "lucide-react";
-import { basisText, REQUEST_CHANNEL_LABEL } from "@kebo/shared";
+import { redirect } from "next/navigation";
+import { ArrowLeft, ChevronRight, Factory, FileText } from "lucide-react";
+import { basisText, offerTaxTag, REQUEST_CHANNEL_LABEL } from "@kebo/shared";
 import { Alert, Badge, buttonClass, ButtonLink, Card, CardHeader, cn, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { date, money, plural, qty, companyToday } from "@/lib/format";
@@ -8,8 +9,7 @@ import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 import { optional } from "@/components/print/data";
 import { cheapestComplete, coverOf } from "@/components/deals/offer-facts";
-import { AddOfferButton, OfferDetails, OfferLines } from "@/components/deals/offer-work";
-import { removeFileAction } from "../../actions";
+import { AddOfferButton } from "@/components/deals/offer-work";
 import { askFactories } from "../ask";
 import { NextCard } from "@/components/deals/inquiry-nav";
 import { offerFactsOf, requestsOf } from "../facts";
@@ -17,9 +17,8 @@ import { WithSide } from "../side";
 import { inquiryNext } from "../steps";
 import { RequestMore } from "@/components/deals/ask-window";
 import { factoryRequestStatusAction, removeFactoryRequestAction } from "../../factory-request-actions";
-import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, moveOfferLineAction, offerFieldsAction, removeFactoryQuoteAction, removeOfferLineAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
+import { saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
 import { getSettings } from "@/lib/loaders";
-import { editsOf } from "@/lib/edit-data";
 import { inquiryTitle } from "@/lib/titles";
 
 export const generateMetadata = inquiryTitle("Factory offers");
@@ -40,6 +39,8 @@ export default async function SourcingPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
+  // Links from before each offer had its own page (…/sourcing?offer=<id>) open that page.
+  if (sp.offer) redirect(`/inquiries/${id}/offers/${sp.offer}`);
   const me = await requirePermission("sourcing.manage");
   const [d, s, settings, q] = await Promise.all([
     dealOf(id),
@@ -54,17 +55,12 @@ export default async function SourcingPage({
   const compare = sp.view === "compare";
   const cheapest = cheapestComplete(s.quotes);
   // Which quotation option each offer is, on the newest revision (a draft when one is open).
-  const revs = [...(q?.revisions ?? [])].sort((a, b) => b.number - a.number);
-  const current = revs[0] ?? null;
-  const letterOf = new Map((current?.options ?? []).filter((o) => o.factoryQuoteId).map((o) => [o.factoryQuoteId!, o.letter]));
-  const lines = {
-    add: addOfferLinesAction.bind(null, d.id),
-    edit: editOfferLineAction.bind(null, d.id),
-    move: moveOfferLineAction.bind(null, d.id),
-    remove: removeOfferLineAction.bind(null, d.id),
-    copy: copyOfferLinesAction.bind(null, d.id),
-    removeFile: removeFileAction.bind(null, d.id),
-  };
+  // Which quotations each offer is quoted in (their newest revision, a draft when one is open): A, B…
+  const usedIn = new Map<string, string[]>();
+  for (const y of q?.quotations ?? []) {
+    const c = y.revisions.find((r) => r.status === "draft") ?? y.revisions[0];
+    for (const o of c?.options ?? []) if (o.factoryQuoteId) usedIn.set(o.factoryQuoteId, [...(usedIn.get(o.factoryQuoteId) ?? []), y.letter]);
+  }
   const addOffer = (props: { variant?: "primary" | "secondary" | "ghost"; size?: "xs" | "sm" | "md"; label?: string; open?: boolean }) =>
     canEdit ? (
       <AddOfferButton
@@ -85,8 +81,6 @@ export default async function SourcingPage({
 
   const requests = await requestsOf(d.id);
   const waiting = (requests?.items ?? []).filter((r) => !r.factoryQuoteId && r.status === "sent");
-  const editing = s.quotes.find((x) => x.id === sp.offer) ?? null;
-  const offerEdits = editing ? await editsOf("factory_quote", editing.id) : null;
 
   const notice = !canEdit && (
     <Alert tone="info">
@@ -136,7 +130,6 @@ export default async function SourcingPage({
   ) : null;
 
   // One line per factory: its offer once it is in, or that it was asked and has not answered. Others asked and closed (declined, no reply) come last.
-  const askedOf = new Map((requests?.items ?? []).filter((r) => r.factoryQuoteId).map((r) => [r.factoryQuoteId!, r]));
   const others = (requests?.items ?? []).filter((r) => !r.factoryQuoteId);
   const answered = s.quotes.length;
   const asked = answered + others.length;
@@ -177,25 +170,26 @@ export default async function SourcingPage({
               <span>Status</span>
             </div>
             {s.quotes.map((x) => {
-              const open = editing?.id === x.id;
               const cover = coverOf(x, s.items);
-              const letter = letterOf.get(x.id);
+              const letters = usedIn.get(x.id) ?? [];
+              const tax = offerTaxTag(x.taxRate, x.taxIncluded) ?? (x.lines.length ? "no tax" : null);
               return (
-                <div key={x.id} id={open ? "offer" : undefined} className="scroll-mt-24 border-b border-line last:border-b-0">
+                <div key={x.id} className="border-b border-line last:border-b-0">
                   <Link
-                    href={open ? base : `${base}?offer=${x.id}#offer`}
-                    scroll={false}
-                    aria-expanded={open}
-                    className={cn("grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 text-sm hover:bg-surface-2/60", COLS, open && "bg-primary-soft/40")}
+                    href={`/inquiries/${d.id}/offers/${x.id}`}
+                    className={cn("grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 text-sm hover:bg-surface-2/60", COLS)}
                   >
-                    {open ? <ChevronDown className="size-4 text-text-2" aria-hidden /> : <ChevronRight className="size-4 text-text-2" aria-hidden />}
+                    <ChevronRight className="size-4 text-text-2" aria-hidden />
                     <span className="min-w-0">
                       <span className="line-clamp-2 font-semibold">{x.factory.name}</span>
                       <span className="block text-xs text-text-2 md:hidden">
-                        {[!x.lines.length ? "No lines yet" : cover ? (cover.all ? `All ${cover.of} items` : `${cover.n} of ${cover.of} items`) : null, x.leadTime, letter ? `Option ${letter}` : null].filter(Boolean).join(" · ")}
+                        {[!x.lines.length ? "No lines yet" : cover ? (cover.all ? `All ${cover.of} items` : `${cover.n} of ${cover.of} items`) : null, tax, x.leadTime, letters.length ? `In ${letters.join(", ")}` : null].filter(Boolean).join(" · ")}
                       </span>
                     </span>
-                    <span className="text-right font-semibold whitespace-nowrap tabular">{x.lines.length ? money(x.factoryTotal, x.currency) : dash}</span>
+                    <span className="text-right whitespace-nowrap tabular">
+                      <span className="block font-semibold">{x.lines.length ? money(x.factoryTotal, x.currency) : dash}</span>
+                      {tax && <span className="block text-xs text-text-2 max-md:hidden">{tax}</span>}
+                    </span>
                     <span className="max-md:hidden">
                       {!x.lines.length ? (
                         <span className="text-warn">No lines yet</span>
@@ -212,46 +206,12 @@ export default async function SourcingPage({
                     </span>
                     <span className="max-md:hidden">{x.leadTime ?? dash}</span>
                     <span className="max-md:hidden">{x.validUntil ? date(x.validUntil) : dash}</span>
-                    <span className="max-md:hidden">{letter ? <Badge tone="ok">Option {letter}</Badge> : dash}</span>
+                    <span className="flex flex-wrap gap-1 max-md:hidden">{letters.length ? letters.map((l) => <Badge key={l} tone="ok">{l}</Badge>) : dash}</span>
                     <span className="max-md:hidden">
                       <span className="font-semibold text-ok">Offer in</span>
                       {cheapest?.id === x.id && s.quotes.length > 1 && <span className="block text-xs text-text-2">cheapest complete</span>}
                     </span>
                   </Link>
-                  {open && (
-                    <div className="flex flex-col gap-4 border-t border-line bg-surface-2/40 p-2 sm:p-4 md:pl-12">
-                      {askedOf.get(x.id) && (
-                        <p className="text-xs text-text-2">
-                          Asked {date(askedOf.get(x.id)!.sentOn)}
-                          {askedOf.get(x.id)!.channel ? ` by ${REQUEST_CHANNEL_LABEL[askedOf.get(x.id)!.channel!].toLowerCase()}` : ""} · offer received {date(x.receivedOn)}
-                        </p>
-                      )}
-                      <OfferLines
-                        key={`l-${x.id}`}
-                        q={x}
-                        others={s.quotes.filter((o) => o.id !== x.id && o.lines.length)}
-                        items={s.items}
-                        canEdit={canEdit}
-                        mainCurrency={s.currency}
-                        lines={lines}
-                        edits={offerEdits?.cards.lines}
-                      />
-                      <OfferDetails
-                        key={`d-${x.id}`}
-                        dealId={d.id}
-                        q={x}
-                        canEdit={canEdit}
-                        today={today}
-                        mainCurrency={s.currency}
-                        rates={settings.sales.exchangeRates}
-                        searchFactories={searchFactoriesAction}
-                        saveAction={saveFactoryQuoteAction.bind(null, d.id, x.id)}
-                        fieldsAction={offerFieldsAction.bind(null, d.id, x.id)}
-                        removeAction={removeFactoryQuoteAction.bind(null, d.id, x.id)}
-                        removeFile={lines.removeFile}
-                      />
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -296,7 +256,7 @@ export default async function SourcingPage({
       </Card>
       {s.quotes.length > 0 && (
         <p className="text-xs text-muted">
-          Our cost = their price to our basis, plus tax unless it is included, in {s.currency}. Click a line to open the offer: its lines and its details, each with its own Edit.
+          Our cost = their price to our basis, plus tax unless it is included, in {s.currency}. A click on a line opens the offer’s own page: its lines and its details, each with its own Edit.
         </p>
       )}
     </WithSide>
