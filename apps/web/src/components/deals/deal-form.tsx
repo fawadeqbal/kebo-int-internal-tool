@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition, type KeyboardEvent } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Eye, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
+import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, CHANNEL_LABEL, INQUIRY_CHANNELS, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type AttachmentKind, type InquiryChannel } from "@kebo/shared";
 import { Alert, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { PANEL_FORM, PanelBody, PanelSection, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
 import { OnePartFooter, StepsFrame } from "@/components/common/steps-frame";
 import { CountrySelect } from "@/components/people/country-select";
+import { countryName } from "@/lib/countries";
+import { date } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
 import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole } from "@/lib/types-deals";
 import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/inquiries/actions";
@@ -22,6 +24,7 @@ import { LineTable } from "@/components/lines/line-table";
 import { ReasonDialog } from "@/components/edits/edits";
 import { recordEditAction } from "@/lib/edit-actions";
 import type { DealItem } from "@/lib/types";
+import type { LineRow } from "@/components/lines/line-table";
 import type { EditCard, EditRef } from "@/lib/types-edits";
 import { ITEM_COLUMNS, itemsBody, useItemRows } from "./items-sheet";
 import { rowKey } from "./form-bits";
@@ -117,7 +120,6 @@ export function DealForm({
   onSaved: (r: { id: string; refNo?: string; title?: string; customer?: string; files?: number }) => void;
 }) {
   const router = useRouter();
-  const close = useClosePanel();
   const [v, setV] = useState<DealFormValues>(initial);
   const [contacts, setContacts] = useState<ContactOption[]>(initialContacts);
   const [otherCategory, setOtherCategory] = useState(
@@ -148,7 +150,12 @@ export function DealForm({
     sendAfterWhy.current = false;
     anchor.current?.form?.requestSubmit();
   }, [why]);
-  const at = REQUEST_STEPS.findIndex((x) => x.key === step);
+  const create = mode === "create";
+  // A new inquiry ends on Review (design rules 18 Nov): the whole request in its page's boxes, then Confirm and save.
+  const STEPS = create ? REQUEST_STEPS : REQUEST_STEPS.filter((x) => x.key !== "review");
+  const at = Math.max(0, STEPS.findIndex((x) => x.key === step));
+  const last = at === STEPS.length - 1;
+  const go = (k: number) => setStep(STEPS[Math.min(Math.max(k, 0), STEPS.length - 1)]!.key);
 
   const chooseCustomer = async (c: CustomerOption | null, known?: ContactOption[]) => {
     set("customer", c);
@@ -196,7 +203,6 @@ export function DealForm({
 
   const contactLine = (c: ContactOption) => [c.name, c.email ?? c.whatsapp ?? c.phone].filter(Boolean).join(" · ");
   const assignable = canAssignOthers ? people : people.filter((p) => p.id === meId || p.id === initial.assigneeId);
-  const create = mode === "create";
   const required = sheet.rows.length === 0;
   // The items go with the save: a new inquiry's always, an edit's when they changed.
   const body = { ...payload(v), ...(create || sheet.dirty ? { items: itemsBody(sheet.list) } : {}) };
@@ -205,6 +211,26 @@ export function DealForm({
       .filter(([k, list]) => list?.length && k.startsWith("items."))
       .map(([k, list]) => `Item ${Number(k.split(".")[1]) + 1}: ${list![0]}`)
       .filter((x, n, all) => all.indexOf(x) === n);
+
+  // What closing now would lose, in a few words, for "Discard your change?" (design rules 18 Nov).
+  const reportLost = useReportLost();
+  const reportDirty = useReportDirty();
+  const lost = useMemo(
+    () => lostLines(initial, v, { contacts, people, meId, items: sheet.rows, itemsDirty: sheet.dirty, itemChanges: sheet.diff.changes.length, staged: staged.length, create }),
+    [initial, v, contacts, people, meId, sheet.rows, sheet.dirty, sheet.diff.changes.length, staged.length, create],
+  );
+  const lostKey = lost.join("\n");
+  useEffect(() => {
+    reportLost(
+      lost.length
+        ? create
+          ? { title: "Close without saving?", text: "This new inquiry isn’t saved yet. These will be lost:", lines: lost }
+          : { lines: lost }
+        : null,
+    );
+    reportDirty(lost.length ? true : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the words, not the list's identity
+  }, [lostKey, create, reportLost, reportDirty]);
 
   if (created)
     return (
@@ -231,6 +257,11 @@ export function DealForm({
         showSuccess={false}
         className={cn(PANEL_FORM, "min-h-0 gap-0")}
         beforeSend={() => {
+          // A new inquiry is saved from Review only: Enter (or Ctrl+Enter) on a step goes on to the next one.
+          if (create && step !== "review") {
+            go(at + 1);
+            return false;
+          }
           // A saved list changed: why, first (then it sends itself).
           if (create || !sheet.dirty || !sheet.askWhy || why !== null) return true;
           setAskingWhy(true);
@@ -249,7 +280,7 @@ export function DealForm({
             <input ref={anchor} type="hidden" name="payload" value={JSON.stringify(body)} />
             {why && <input type="hidden" name="reason" value={why} />}
             <StepsFrame
-              steps={REQUEST_STEPS.map((x, k) => ({
+              steps={STEPS.map((x, k) => ({
                 key: x.key,
                 label: x.label,
                 summary:
@@ -260,7 +291,9 @@ export function DealForm({
                         ? `${sheet.rows.length} item${sheet.rows.length === 1 ? "" : "s"}`
                         : "none yet"
                       : x.key === "details"
-                      ? [v.title.trim(), v.category].filter(Boolean).join(" · ") || undefined
+                      ? [v.category, PRIORITY_LABEL[v.priority as keyof typeof PRIORITY_LABEL]].filter(Boolean).join(" · ") || undefined
+                      : x.key === "review"
+                      ? undefined
                       : files.length + staged.length
                         ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
                         : undefined,
@@ -271,27 +304,39 @@ export function DealForm({
               single={only}
               footer={
                 only ? (
-                  <OnePartFooter onAllSteps={onAllSteps} onCancel={() => close()} saveLabel="Save changes" />
+                  <OnePartFooter onAllSteps={onAllSteps} saveLabel="Save changes" />
                 ) : (
-                <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
+                <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
+                  {/* One strong button (design rules 18 Nov): Next is soft, Back and Review are words; ✕ closes, there is no Cancel. */}
                   {at > 0 ? (
-                    <Button type="button" variant="secondary" onClick={() => setStep(REQUEST_STEPS[at - 1]!.key)}>
-                      <ChevronLeft aria-hidden /> Back
+                    <Button type="button" variant="ghost" onClick={() => go(at - 1)} aria-label="Back" className="max-md:size-11 max-md:px-0">
+                      <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
                     </Button>
                   ) : null}
-                  <span className="flex-1" />
-                  {/* A phone closes the window with its ← at the top: three buttons fit on one row. */}
-                  <Button type="button" variant="ghost" onClick={() => close()} className="max-md:hidden">
-                    Cancel
-                  </Button>
-                  <SubmitButton variant={at === REQUEST_STEPS.length - 1 ? "primary" : "secondary"} pendingText={uploading ? "Uploading files…" : "Saving…"}>
-                    {/* On a phone the word alone ("Save"), so Back, Save and Next stay on one row; its full name is read out. */}
-                    <Check aria-hidden /> Save<span className="max-sm:sr-only"> {create ? "inquiry" : "changes"}</span>
-                  </SubmitButton>
-                  {at < REQUEST_STEPS.length - 1 && (
-                    <Button type="button" variant="primary" onClick={() => setStep(REQUEST_STEPS[at + 1]!.key)}>
-                      Next <ChevronRight aria-hidden />
-                    </Button>
+                  <span className="flex-1 max-md:hidden" />
+                  {create && step === "review" ? (
+                    <SubmitButton variant="strong" size="lg" pendingText={uploading ? "Uploading files…" : "Saving…"} className="max-md:flex-1">
+                      <Check aria-hidden /> Confirm and save
+                    </SubmitButton>
+                  ) : (
+                    <>
+                      <span className="flex-1 md:hidden" />
+                      {create && at < STEPS.length - 2 && (
+                        <Button type="button" variant="ghost" onClick={() => setStep("review")}>
+                          Review
+                        </Button>
+                      )}
+                      {!create && (
+                        <SubmitButton variant="strong" pendingText={uploading ? "Uploading files…" : "Saving…"}>
+                          <Check aria-hidden /> Save changes
+                        </SubmitButton>
+                      )}
+                      {!last && (
+                        <Button type="button" variant="soft" onClick={() => go(at + 1)}>
+                          Next <ChevronRight aria-hidden />
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
                 )
@@ -363,7 +408,7 @@ export function DealForm({
                   ))}
                 </Select>
               </Field>
-              <Field label="Handles it" htmlFor="assigneeId" error={s.errors?.assigneeId}>
+              <Field label="Responsible person" htmlFor="assigneeId" error={s.errors?.assigneeId}>
                 <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)} disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}>
                   {assignable.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -405,7 +450,7 @@ export function DealForm({
 
             {step === "details" && (
             <PanelSection quiet title="What they need" first className="md:grid-cols-3">
-              <Field label="Title" htmlFor="title" error={s.errors?.title}>
+              <Field label="Inquiry title" htmlFor="title" error={s.errors?.title}>
                 <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} />
               </Field>
               <Field label="Category" htmlFor="category" required error={s.errors?.category}>
@@ -525,6 +570,17 @@ export function DealForm({
             )}
 
 
+            {step === "review" && (
+              <ReviewBoxes
+                v={v}
+                contacts={contacts}
+                people={people}
+                meId={meId}
+                rows={sheet.rows}
+                files={[...files.map((f) => ({ key: f.id, name: f.fileName, meta: f.meta })), ...staged.map((f) => ({ key: f.key, name: f.file.name, meta: ATTACHMENT_KIND_LABEL[f.kind] }))]}
+                onEdit={(k) => setStep(k)}
+              />
+            )}
             </StepsFrame>
           </>
         )}
@@ -694,14 +750,186 @@ function QuickCustomerForm({
   );
 }
 
-/** The inquiry's window in steps (design 17 Nov): who asked, their items, the details, their files. */
-export type RequestStep = "customer" | "items" | "details" | "files";
+/** The inquiry's window in steps (design 17 Nov): who asked, their items, the details, their files, then Review (a new one). */
+export type RequestStep = "customer" | "items" | "details" | "files" | "review";
 const REQUEST_STEPS: { key: RequestStep; label: string }[] = [
   { key: "customer", label: "Customer" },
   { key: "items", label: "Items" },
   { key: "details", label: "Details" },
   { key: "files", label: "Files" },
+  { key: "review", label: "Review" },
 ];
+
+/** "3 items, 2 parts": the lines of a list, its parts counted apart. */
+export function itemsCount(rows: Pick<LineRow, "parentKey">[]) {
+  const parts = rows.filter((r) => r.parentKey).length;
+  const items = rows.length - parts;
+  return [`${items} item${items === 1 ? "" : "s"}`, parts ? `${parts} part${parts === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
+}
+
+/** The lines numbered as the page shows them: 1, 2, 2.1, 2.2, 3. */
+export function numbered<T extends Pick<LineRow, "key" | "parentKey">>(rows: T[]): (T & { no: string })[] {
+  const top = new Map<string, number>();
+  const parts = new Map<string, number>();
+  let n = 0;
+  return rows.map((r) => {
+    if (!r.parentKey) {
+      top.set(r.key, ++n);
+      return { ...r, no: String(n) };
+    }
+    const k = (parts.get(r.parentKey) ?? 0) + 1;
+    parts.set(r.parentKey, k);
+    return { ...r, no: `${top.get(r.parentKey) ?? "?"}.${k}` };
+  });
+}
+
+const personName = (people: PersonWithRole[], id: string, meId: string) => (id ? `${people.find((p) => p.id === id)?.name ?? "Someone"}${id === meId ? " (me)" : ""}` : "Nobody yet");
+
+/**
+ * What closing the window now would lose, a line each: a new inquiry lists what was filled in
+ * ("Customer: Techtribe"); an edit lists each change, old → new ("Came by: Email → WhatsApp").
+ */
+function lostLines(
+  a: DealFormValues,
+  b: DealFormValues,
+  o: { contacts: ContactOption[]; people: PersonWithRole[]; meId: string; items: LineRow[]; itemsDirty: boolean; itemChanges: number; staged: number; create: boolean },
+): string[] {
+  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "none");
+  const fields: [string, string, string][] = [
+    ["Customer", a.customer?.name ?? "none", b.customer?.name ?? "none"],
+    ["Contact", contact(a.contactId), contact(b.contactId)],
+    ["Came by", CHANNEL_LABEL[a.channel], CHANNEL_LABEL[b.channel]],
+    ["Needed by", a.requiredBy ? date(a.requiredBy) : "none", b.requiredBy ? date(b.requiredBy) : "none"],
+    ["Responsible person", personName(o.people, a.assigneeId, o.meId), personName(o.people, b.assigneeId, o.meId)],
+    ["Inquiry title", a.title.trim() || "none", b.title.trim() || "none"],
+    ["Category", a.category.trim() || "none", b.category.trim() || "none"],
+    ["Priority", PRIORITY_LABEL[a.priority as keyof typeof PRIORITY_LABEL] ?? a.priority, PRIORITY_LABEL[b.priority as keyof typeof PRIORITY_LABEL] ?? b.priority],
+    ["What they need", a.requirements.trim() ? "written" : "none", b.requirements.trim() ? (a.requirements.trim() ? "changed" : "written") : "none"],
+  ];
+  const out = fields
+    .filter(([label, x, y], k) => (k === 1 && a.customer?.id !== b.customer?.id ? false : label === "What they need" ? a.requirements.trim() !== b.requirements.trim() : x !== y))
+    .map(([label, x, y]) => (o.create ? `${label}: ${y}` : `${label}: ${x} → ${y}`));
+  if (o.create ? o.items.length > 0 : o.itemsDirty)
+    out.push(o.create ? `Items: ${itemsCount(o.items)}` : `Items: ${o.itemChanges} change${o.itemChanges === 1 ? "" : "s"}`);
+  if (o.staged) out.push(`Files: ${o.staged} to add`);
+  return out;
+}
+
+/** The inquiry as its page will show it (design rules 18 Nov): the same boxes, each with Edit back to its step. */
+function ReviewBoxes({
+  v,
+  contacts,
+  people,
+  meId,
+  rows,
+  files,
+  onEdit,
+}: {
+  v: DealFormValues;
+  contacts: ContactOption[];
+  people: PersonWithRole[];
+  meId: string;
+  rows: LineRow[];
+  files: { key: string; name: string; meta: string }[];
+  onEdit: (step: RequestStep) => void;
+}) {
+  const contact = contacts.find((c) => c.id === v.contactId);
+  const missing = (what: string) => <span className="font-semibold text-bad">{what}</span>;
+  const lines = numbered(rows);
+  return (
+    <div className="flex flex-col gap-3.5">
+      <div className="grid gap-3.5 md:grid-cols-2 md:items-start">
+        <ReviewBox title="Customer" onEdit={() => onEdit("customer")}>
+          <Facts
+            rows={[
+              ["Customer", v.customer ? [v.customer.name, countryName(v.customer.country)].join(" · ") : missing("Not chosen yet")],
+              ["Contact", contact ? [contact.name, contact.email ?? contact.whatsapp ?? contact.phone].filter(Boolean).join(" · ") : "—"],
+              ["Came by", CHANNEL_LABEL[v.channel]],
+              ["Needed by", v.requiredBy ? date(v.requiredBy) : "—"],
+              ["Responsible", personName(people, v.assigneeId, meId)],
+            ]}
+          />
+        </ReviewBox>
+        <ReviewBox title="Details" onEdit={() => onEdit("details")}>
+          <Facts
+            rows={[
+              ["Inquiry title", v.title.trim() || "—"],
+              ["Category", v.category.trim() || missing("Not chosen yet")],
+              ["Priority", PRIORITY_LABEL[v.priority as keyof typeof PRIORITY_LABEL] ?? v.priority],
+              ["What they need", v.requirements.trim() ? <span className="line-clamp-3 whitespace-pre-line">{v.requirements.trim()}</span> : rows.length ? "—" : missing("Write it, or add items")],
+            ]}
+          />
+        </ReviewBox>
+      </div>
+      <ReviewBox title="Items" count={rows.length ? itemsCount(rows) : undefined} onEdit={() => onEdit("items")}>
+        {lines.length ? (
+          <ul className="text-[13.5px]">
+            {lines.map((r) => (
+              <li key={r.key} className={cn("flex items-baseline gap-3 border-t border-line px-4 py-2 first:border-t-0", r.parentKey && "pl-9")}>
+                <span className="w-7 shrink-0 text-text-2 tabular">{r.no}</span>
+                <span className="min-w-0 flex-1">
+                  <span className={r.parentKey ? "" : "font-semibold"}>{r.values.description || "—"}</span>
+                  {r.values.model && <span className="text-text-2"> · {r.values.model}</span>}
+                </span>
+                <span className="shrink-0 text-text-2 tabular">
+                  {[r.values.quantity, r.values.unit].filter(Boolean).join(" ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="px-4 py-3 text-sm text-text-2">None yet</p>
+        )}
+      </ReviewBox>
+      <ReviewBox title="Files" count={files.length ? String(files.length) : undefined} onEdit={() => onEdit("files")}>
+        {files.length ? (
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {files.map((f) => (
+              <span key={f.key} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-[13px]">
+                <FileText aria-hidden className="size-3.5 shrink-0 text-text-2" />
+                <span className="truncate">{f.name}</span>
+                <span className="shrink-0 text-xs text-text-2">{f.meta.split(" · ")[0]}</span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="px-4 py-3 text-sm text-text-2">None</p>
+        )}
+      </ReviewBox>
+    </div>
+  );
+}
+
+/** One box of the Review step: its name (and count), Edit, then what it holds. */
+function ReviewBox({ title, count, onEdit, children }: { title: string; count?: string; onEdit: () => void; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="min-w-0 overflow-hidden rounded-xl border border-line bg-surface">
+      <header className="flex items-center gap-2 border-b border-line py-1.5 pr-1.5 pl-4">
+        <h4 className="text-sm font-bold">{title}</h4>
+        {count && <span className="text-xs text-text-2">{count}</span>}
+        <span className="flex-1" />
+        <Button type="button" size="xs" variant="ghost" onClick={onEdit} className="text-primary hover:text-primary">
+          <Pencil aria-hidden /> Edit<span className="sr-only"> {title.toLowerCase()}</span>
+        </Button>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/** Label · value rows, the label quiet. */
+function Facts({ rows }: { rows: [string, ReactNode][] }) {
+  return (
+    <dl className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-4 py-3 text-[13.5px]">
+      {rows.map(([k, val]) => (
+        <div key={k} className="contents">
+          <dt className="text-text-2">{k}</dt>
+          <dd className="min-w-0 font-medium break-words">{val}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 const DETAIL_FIELDS = new Set(["title", "category", "priority", "requiredBy", "requirements"]);
 
 /** A save refused for a field on another step opens that step, so the field and its message are in view. */

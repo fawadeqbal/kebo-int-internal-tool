@@ -312,7 +312,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 [
                   ["Factory", po.supplier.name],
                   ["Customer", o.customer.name],
-                  ["Handles it", o.inquiry.assignee?.name ?? "—"],
+                  ["Responsible person", o.inquiry.assignee?.name ?? "—"],
                 ] as [string, string][]
               ).map(([k, v]) => (
                 <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-[13px]">

@@ -239,12 +239,12 @@ export function AssignForm({
   );
 }
 
-/** "Handles it" (board): a list that saves as soon as another person is chosen. */
+/** "Responsible person" (board): a list that saves as soon as another person is chosen. */
 export function AssignSelect({ action, people, current }: { action: Action; people: { id: string; name: string }[]; current: string | null }) {
   return (
     // Saved as soon as it is chosen: the note says who handles it now.
     <ActionForm action={action} showSuccess={false} onDone={(s) => s.message && toast({ message: s.message })}>
-      <Field label="Handles it" htmlFor="handles-it">
+      <Field label="Responsible person" htmlFor="handles-it">
         <Select id="handles-it" name="assigneeId" defaultValue={current ?? ""} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
           <option value="">Nobody yet</option>
           {people.map((p) => (

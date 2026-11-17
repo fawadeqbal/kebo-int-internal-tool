@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
 // A phone's Back while a form is open goes to the form, not the page under it: a form that is not in the
-// address closes; one with something typed asks "Throw away your changes?" first. (The browser's Navigation
+// address closes; one with something typed asks "Discard your change?" first. (The browser's Navigation
 // API is drawn here: jsdom has none.)
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
@@ -40,7 +40,7 @@ const type = (text: string) => {
   fireEvent.pointerDown(field);
   fireEvent.input(field, { target: { value: text } });
 };
-const asks = () => screen.queryByRole("alertdialog", { name: "Throw away your changes?" }) !== null;
+const asks = () => screen.queryByRole("alertdialog", { name: /^Discard your change/ }) !== null;
 
 function form() {
   return (
@@ -76,7 +76,7 @@ describe("the phone's Back on a form", () => {
     fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
     expect((screen.getByLabelText("Reason") as HTMLInputElement).value).toBe("Customer changed their mind");
     expect(press(2)).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Throw away" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     expect(kept).toHaveBeenCalledTimes(1);
   });
 
@@ -107,7 +107,7 @@ describe("the phone's Back on a form", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("on a phone the way out is ← at the top left: the same Close", () => {
+  it("on a phone the way out is ✕ at the top left: the same Close", () => {
     render(
       <Modal title="Cancel the order" onClose={vi.fn()}>
         {form()}
@@ -115,6 +115,6 @@ describe("the phone's Back on a form", () => {
     );
     const close = screen.getByRole("button", { name: "Close" });
     expect(close.className).toContain("max-md:order-1");
-    expect(close.querySelectorAll("svg")).toHaveLength(2);
+    expect(close.querySelectorAll("svg")).toHaveLength(1);
   });
 });

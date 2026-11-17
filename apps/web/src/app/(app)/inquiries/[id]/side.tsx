@@ -69,7 +69,7 @@ export async function InquirySide({ id }: { id: string }) {
           }
         >
           {!mayAssign && (
-            <Row label="Handles it">
+            <Row label="Responsible person">
               {d.assignee?.name ?? "Nobody yet"}
               {d.allowed.assign && !d.assignee && (
                 <span className="ml-2">

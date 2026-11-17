@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buttonClass, cn, type ButtonSize, type ButtonVariant } from "@kebo/ui";
 import { useChanges, watchChanges } from "./changes";
 import { useFormNotice } from "./form-notice";
-import { focusables, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
+import { focusables, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead, type LostInfo } from "./dialog";
 
 /* ---------------------------------------------------------------- closing */
 
@@ -17,7 +17,7 @@ const PanelClose = createContext<(arg?: CloseArg) => void>(() => {});
 
 /**
  * Inside a side panel: closes it. Pass it as a form's `onDone` (a saved form
- * closes it straight away) or as Cancel's onClick (it asks "Throw away your
+ * closes it straight away) or as Cancel's onClick (it asks "Discard your
  * changes?" first, only when something was really changed).
  */
 export const useClosePanel = () => useContext(PanelClose);
@@ -30,6 +30,13 @@ const PanelDirty = createContext<(dirty: boolean | null) => void>(() => {});
  * of lines kept in the page). `null` goes back to the panel comparing its fields with how they started.
  */
 export const useReportDirty = () => useContext(PanelDirty);
+
+const PanelLost = createContext<(lost: LostInfo | null) => void>(() => {});
+/**
+ * Inside a side panel: what closing it now would lose, in a few words ("Came by: Email → WhatsApp"), for its
+ * "Discard your change?" question. A window that says nothing gets the plain question.
+ */
+export const useReportLost = () => useContext(PanelLost);
 
 const saved = (arg: CloseArg) => !!arg && typeof arg === "object" && "ok" in arg && (arg as { ok?: boolean }).ok === true;
 
@@ -45,7 +52,7 @@ const saved = (arg: CloseArg) => !!arg && typeof arg === "object" && "ok" in arg
  * For everyone: role=dialog, aria-modal, named by its title; focus starts on
  * the first field, stays inside while it is open and goes back to the button
  * that opened it. Escape, ✕ (← on a phone), Cancel, Back or a click beside it
- * closes it at once when nothing was changed, and after "Throw away your
+ * closes it at once when nothing was changed, and after "Discard your
  * changes?" when something was (typed and put back as it was is not a
  * change); Ctrl+Enter (⌘+Enter) saves.
  *
@@ -74,6 +81,7 @@ export function SidePanel({
   const mounted = useMounted();
   const [asking, setAsking] = useState(false);
   const [reported, setReported] = useState<boolean | null>(null);
+  const [lost, setLost] = useState<LostInfo | null>(null);
   const changes = useChanges(box);
   useFocusTrap(box, mounted);
 
@@ -131,12 +139,15 @@ export function SidePanel({
       >
         <WindowHead id={id} title={title} description={description} onClose={() => request()} headRef={head} />
         <PanelClose.Provider value={request}>
-          <PanelDirty.Provider value={setReported}>{children}</PanelDirty.Provider>
+          <PanelDirty.Provider value={setReported}>
+            <PanelLost.Provider value={setLost}>{children}</PanelLost.Provider>
+          </PanelDirty.Provider>
         </PanelClose.Provider>
       </div>
       {asking && (
         <ThrowAwayConfirm
           what={title}
+          lost={lost}
           onKeep={() => setAsking(false)}
           onThrow={() => {
             setAsking(false);

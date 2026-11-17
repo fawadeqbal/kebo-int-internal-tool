@@ -461,7 +461,7 @@ export function RevisionEditor({
   loadOffers?: (currency: string) => Promise<QuoteOffers | null>;
   showCosts: boolean;
   submitLabel: string;
-  /** Saved: given the answer, so a window can close without asking "Throw away your changes?". */
+  /** Saved: given the answer, so a window can close without asking "Discard your change?". */
   onDone?: (state: ActionState) => void;
   /** Saving needs a change (editing an existing draft). */
   requireChanges?: boolean;
