@@ -352,10 +352,10 @@ export function LineWindow({
       <div className="flex items-center gap-2 border-t border-line bg-surface px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {!isNew && (
           <>
-            <Button variant="secondary" aria-label="Previous" onClick={() => save("prev")} disabled={!hasPrev || busy} className="size-11 px-0">
+            <Button variant="secondary" aria-label="Previous" onClick={() => save("prev")} disabled={!hasPrev || busy} className="size-10 px-0">
               <ChevronLeft aria-hidden />
             </Button>
-            <Button variant="secondary" aria-label="Next" onClick={() => save("next")} disabled={!hasNext || busy} className="size-11 px-0">
+            <Button variant="secondary" aria-label="Next" onClick={() => save("next")} disabled={!hasNext || busy} className="size-10 px-0">
               <ChevronRight aria-hidden />
             </Button>
           </>
@@ -363,20 +363,20 @@ export function LineWindow({
         <span className="flex-1" />
         {isNew ? (
           <>
-            <Button variant="secondary" onClick={() => save("close")} disabled={busy} className="h-11">
+            <Button variant="secondary" onClick={() => save("close")} disabled={busy} className="h-10">
               Done
             </Button>
-            <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-11">
+            <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-10">
               {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />} {busy ? "Adding…" : "Add & next"}
             </Button>
           </>
         ) : (
           <>
-            <Button variant={hasNext ? "secondary" : "primary"} onClick={() => save("close")} disabled={busy} className="h-11">
+            <Button variant={hasNext ? "secondary" : "primary"} onClick={() => save("close")} disabled={busy} className="h-10">
               {busy ? "Saving…" : "Save"}
             </Button>
             {hasNext && (
-              <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-11">
+              <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-10">
                 Save &amp; next
               </Button>
             )}

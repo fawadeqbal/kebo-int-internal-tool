@@ -801,9 +801,7 @@ export function RevisionEditor({
                     <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span>
                   ) : fromCustomer ? (
                     `${initial.from?.customer ?? "The customer"} is quoted in ${initial.currency} (from the customer)`
-                  ) : (
-                    "Changing it converts the prices"
-                  )
+                  ) : undefined
                 }
               >
                 <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
@@ -843,7 +841,7 @@ export function RevisionEditor({
                 hint={
                   fromLast && initial.incotermPlace && s.incotermPlace === initial.incotermPlace
                     ? lastWords
-                    : (sharedPlace ?? "The port or place for the Incoterm")
+                    : sharedPlace
                 }
               >
                 <Input
@@ -859,7 +857,6 @@ export function RevisionEditor({
                 htmlFor={`pod-${number}`}
                 optional
                 error={st.errors?.portOfDischarge}
-                hint="Where the goods go; printed on the quotation"
               >
                 <Input
                   id={`pod-${number}`}
@@ -908,7 +905,7 @@ export function RevisionEditor({
                                 ? `Printed as “${leadWords(Number(o.leadDays) || 0, o.leadFrom, "customer")}”${was ? `, worked out from “${was}”` : ""}`
                                 : o.leadTime
                                   ? `Its words: “${o.leadTime}”, kept until you type the days.`
-                                  : "So the ship-by date can be worked out"}
+                                  : null}
                             </p>
                             {check && (
                               <CheckNote ok={check.ok} className="mt-1.5 md:hidden">
@@ -937,7 +934,6 @@ export function RevisionEditor({
                 htmlFor={`del-terms-${number}`}
                 optional
                 error={st.errors?.deliveryTerms}
-                hint="Printed under the delivery time"
                 className="sm:col-span-2 md:col-span-3"
               >
                 <Textarea
@@ -1010,7 +1006,7 @@ export function RevisionEditor({
             )}
             {show("conditions") && (
             <PanelSection quiet={!!step} title="Conditions" className="sm:grid-cols-1">
-              <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last">
+              <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes}>
                 <Textarea
                   id={`notes-${number}`}
                   rows={3}

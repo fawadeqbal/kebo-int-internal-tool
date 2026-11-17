@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Package, XCircle } from "lucide-react";
-import { can, dayMonth, ORDER_TABS, ORDER_WORD_TONE, PAYMENT_ROUTE_LABEL, type FlowStep, type OrderTab } from "@kebo/shared";
-import { cn, PageHeader, RefCode } from "@kebo/ui";
+import { can, dayMonth, ORDER_TABS, ORDER_WORD_TONE, type FlowStep, type OrderTab } from "@kebo/shared";
+import { cn, PageHeader } from "@kebo/ui";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderOf, orderSectionsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
-import { date, whole } from "@/lib/format";
+import { date } from "@/lib/format";
 import { today } from "@/components/orders/today";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { ScrolledBar } from "@/components/orders/scrolled-bar";
@@ -61,8 +61,6 @@ export default async function OrderLayout({ children, params }: { children: Reac
   );
   const ship = flow?.shipping?.shipments[0];
   const base = `/orders/${o.id}`;
-  // The payment route said as one: "Payment: informal (cash, Alipay, WeChat, personal account)", never a bare "Informal".
-  const route = flow?.payment.route ? `Payment: ${PAYMENT_ROUTE_LABEL[flow.payment.route].replace(/^\w/, (c) => c.toLowerCase())}` : null;
   const proforma = o.documents.find((d) => d.kind === "proforma");
   const pdf = proforma ? docHref(o, proforma) : null;
   // On a phone the paper buttons fold into ⋯ (design system: page header).
@@ -81,30 +79,15 @@ export default async function OrderLayout({ children, params }: { children: Reac
     ...(canCancel ? ([{ separator: true }, { label: "Cancel the order…", panel: "cancel-order", danger: true }] satisfies MenuEntry[]) : []),
   ];
 
-  // Board: SO · customer · from RFQ · QUO R2 · CPT Kabul · USD 52,400 (route and who handles it after).
+  // The status and the customer. Each other fact is said once, where it belongs: the number in the path
+  // (and the phone's top bar), the quotation and their PO in Their order, the terms in Agreed with the
+  // customer, the money in Money and who handles it in People; the inquiry is in ⋯.
   const meta = [
     <span key="st">{statusText}</span>,
-    <RefCode key="no">{o.refNo}</RefCode>,
     <Link key="c" href={`/customers/${o.customer.id}`} className="text-primary underline underline-offset-2 hover:opacity-80">
       {o.customer.name}
     </Link>,
-    <Link key="i" href={`/inquiries/${o.inquiry.id}`} className="hover:opacity-80">
-      from <RefCode>{o.inquiry.refNo}</RefCode>
-    </Link>,
-    o.quotation && (
-      <Link key="q" href={`/inquiries/${o.inquiry.id}/quotation`} className="hover:opacity-80">
-        <RefCode>
-          {o.quotation.refNo} R{o.quotation.number}
-        </RefCode>
-      </Link>
-    ),
-    <span key="t" className="tabular">
-      {o.incoterm}
-      {o.incotermPlace ? ` ${o.incotermPlace}` : ""} · {whole(o.total, o.currency)}
-    </span>,
-    route && <span key="r">{route}</span>,
-    o.inquiry.assignee && <span key="a">{o.inquiry.assignee.name}</span>,
-  ].filter(Boolean);
+  ];
 
   return (
     <div>
@@ -119,6 +102,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
         }
       >
         <PageHeader
+          phoneStack
           crumbs={[{ label: "Sales" }, { label: "Orders", href: "/orders" }, { label: o.refNo }]}
           icon={Package}
           title={o.inquiry.title || <span className="tabular">{o.refNo}</span>}

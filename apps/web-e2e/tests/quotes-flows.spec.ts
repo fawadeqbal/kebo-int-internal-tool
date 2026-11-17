@@ -106,7 +106,8 @@ test("each quotation and each offer has its own page: the lists open them, ‹ �
   // Its offer has its own page too: the tax, and the quotations made from it.
   await page.getByRole("region", { name: "From the offer" }).getByRole("link", { name: /Open the offer/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: /Shenjing/ })).toBeVisible();
-  await expect(page.getByText(/tax 13% · included in the prices/)).toBeVisible();
+  // Its tax, said once: in Details beside the lines.
+  await expect(page.getByRole("region", { name: "Details" })).toContainText(/13% · included in the prices/);
   await expect(page.getByRole("region", { name: "Quoted in" }).getByRole("link", { name: new RegExp(b!.refNo) })).toBeVisible();
   expect(await accessibilityProblems(page), "an offer's page meets WCAG 2.2 AA").toEqual([]);
   // The offers tab shows each offer's tax, and opens its page.

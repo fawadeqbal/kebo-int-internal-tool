@@ -88,7 +88,7 @@ function FilterButton({ s, onPick }: { s: FilterSelect; onPick: (name: string, v
   return (
     <span
       className={cn(
-        "inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border text-[13px] font-semibold max-sm:h-11",
+        "inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border text-[13px] font-semibold",
         chosen ? "border-primary-line bg-primary-soft text-primary max-sm:-order-1" : "border-line-strong bg-surface text-text-2 hover:border-text-2/40",
       )}
     >
@@ -170,7 +170,7 @@ function MonthStep({ m, onPick }: { m: FilterMonth; onPick: (name: string, value
   const next = month && month < m.thisMonth ? step(month, 1) : null;
   const arrow = "grid w-9 place-items-center text-text-2 outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-35";
   return (
-    <span className="inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border border-line-strong bg-surface text-[13px] font-semibold max-sm:h-11">
+    <span className="inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border border-line-strong bg-surface text-[13px] font-semibold">
       <button type="button" aria-label="The month before" disabled={!prev} onClick={() => prev && go(prev)} className={arrow}>
         <ChevronLeft className="size-4" aria-hidden />
       </button>
@@ -338,7 +338,7 @@ export function FilterCard({
           ))}
           {month && <MonthStep m={month} onPick={pick} />}
           {anyOn && (
-            <button type="button" onClick={clear} className="h-10 shrink-0 rounded-md px-1.5 text-[13px] font-semibold whitespace-nowrap text-primary hover:underline max-sm:h-11">
+            <button type="button" onClick={clear} className="h-10 shrink-0 rounded-md px-1.5 text-[13px] font-semibold whitespace-nowrap text-primary hover:underline">
               Clear all
             </button>
           )}

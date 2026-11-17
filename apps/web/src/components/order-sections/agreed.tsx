@@ -81,7 +81,7 @@ function partState(i: OrderMoney["plan"]["items"][number], currency: string): st
  * Payment (how they pay and the plan's parts, changed on the Payment tab), Warranty and Conditions — the order's
  * own copy, taken when the quotation was accepted (an older order: its quotation's).
  */
-export function AgreedGroups({ o, m, base, satTab }: { o: OrderView; m: OrderMoney | null; base: string; satTab: boolean }) {
+export function AgreedGroups({ o, m, base }: { o: OrderView; m: OrderMoney | null; base: string; satTab: boolean }) {
   const a = o.agreed!;
   const note = shipByNote(a, o.shipBy);
   const from = isWarrantyFrom(a.warrantyFrom) ? a.warrantyFrom : "shipment";
@@ -113,15 +113,12 @@ export function AgreedGroups({ o, m, base, satTab }: { o: OrderView; m: OrderMon
         )}
         <Printed text={a.paymentConditions} />
         <Link href={`${base}/payment`} className="mt-0.5 inline-flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline">
-          Changed on the Payment tab <ArrowRight className="size-3" aria-hidden />
+          Payment tab <ArrowRight className="size-3" aria-hidden />
         </Link>
       </Group>
       <Group title="Warranty" big={a.warrantyMonths !== null ? plural(a.warrantyMonths, "month") : a.warranty ? "As agreed" : "None agreed"}>
         {a.warrantyMonths !== null && <p className="text-text-2">from {WARRANTY_FROM_LABEL[from]}</p>}
         {a.warranty && <p className="text-text-2">{cap(a.warranty)}</p>}
-        {a.warrantyMonths !== null && satTab && from !== "shipment" && (
-          <p className="text-xs text-muted">Counted on Delivery &amp; SAT from {from === "sat" ? "the day the test is signed" : "the day it is delivered"}</p>
-        )}
       </Group>
       <Group title="Conditions" big={a.notes?.trim() ? "Notes" : "None"}>
         <Printed text={a.notes} />

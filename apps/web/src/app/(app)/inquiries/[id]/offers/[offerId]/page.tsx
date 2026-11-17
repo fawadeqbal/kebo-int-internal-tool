@@ -78,12 +78,9 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
   };
   const prev = at > 0 ? s.quotes[at - 1]! : null;
   const next = at < s.quotes.length - 1 ? s.quotes[at + 1]! : null;
+  // What it covers; its reference, dates, currency and tax are in Details beside (each said once).
   const summary = [
-    x.reference ? `their ref. ${x.reference}` : null,
-    `received ${date(x.receivedOn)}`,
-    x.validUntil ? `valid until ${date(x.validUntil)}` : null,
-    `tax ${offerTaxText(x.taxRate, x.taxIncluded)}`,
-    !x.lines.length ? "no lines yet" : cover ? (cover.all ? `covers all ${cover.of} items` : `covers ${cover.n} of ${cover.of} items`) : null,
+    !x.lines.length ? "no lines yet" : cover ? (cover.all ? (cover.of === 1 ? "covers the 1 item" : `covers all ${cover.of} items`) : `covers ${cover.n} of ${cover.of} items`) : null,
   ].filter(Boolean);
 
   return (
@@ -101,7 +98,7 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
         crumbs={[{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo, href: base }, { label: x.factory.name }]}
         back={{ href: `${base}/sourcing`, label: `${d.refNo} · Factory offers` }}
         title={x.factory.name}
-        summary={<p className="min-w-0">{summary.join(" · ")}</p>}
+        summary={summary.length ? <p className="min-w-0">{summary.join(" · ")}</p> : undefined}
         actions={canEdit ? <OfferEdit kit={kit} q={x} step="lines" words="Edit" size="sm" /> : undefined}
         primary={
           d.allowed.quote && x.lines.length > 0 ? (
@@ -167,16 +164,11 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
                 ))}
               </ul>
             ) : (
-              <p className="text-[13px] text-text-2">None yet: add them under Warranty &amp; conditions (Edit).</p>
+              <p className="text-[13px] text-text-2">None yet.</p>
             )}
           </Side>
-          <Side title="Who and when" id="o-who" last>
+          <Side title="Details" id="o-who" last>
             <dl className="flex flex-col gap-1.5">
-              <Row label="Factory">
-                <Link href={`/factories/${x.factory.id}`} className="text-primary underline underline-offset-2">
-                  {x.factory.name}
-                </Link>
-              </Row>
               {asked && <Row label="Asked">{`${date(asked.sentOn)}${asked.channel ? ` by ${REQUEST_CHANNEL_LABEL[asked.channel].toLowerCase()}` : ""}`}</Row>}
               {x.reference && <Row label="Their ref.">{x.reference}</Row>}
               <Row label="Received">{date(x.receivedOn)}</Row>

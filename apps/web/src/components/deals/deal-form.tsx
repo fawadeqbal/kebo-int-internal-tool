@@ -401,10 +401,10 @@ export function DealForm({
                 )}
                 <p className="text-[13px] text-text-2">
                   {create
-                    ? "No list? Leave it empty: write what they need under Details, or take the items from the first factory offer."
+                    ? "Optional: the items can also come from the first factory offer."
                     : sheet.dirty
                       ? `${sheet.diff.changes.length} change${sheet.diff.changes.length === 1 ? "" : "s"} to the items, saved with the rest${sheet.askWhy ? " · Save asks why" : ""}.`
-                      : "Change, add, remove or move items here; they are saved with the rest."}
+                      : null}
                 </p>
               </PanelSection>
             )}

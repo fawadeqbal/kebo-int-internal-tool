@@ -957,7 +957,7 @@ export function LineTable({
                         aria-label={`More for ${rowLabel(i)}`}
                         aria-haspopup="menu"
                         aria-expanded={menu === r.key}
-                        className="size-11"
+                        className="size-9"
                       >
                         <MoreHorizontal aria-hidden />
                       </Button>
@@ -1091,9 +1091,15 @@ export function LineTable({
                 </Button>
               ))}
             </>
-          ) : (
-            <span className="px-1 text-xs text-muted">Select a row (click its number) or right-click it to insert, make a part, move, duplicate or delete.</span>
-          )}
+          ) : rows.length ? (
+            // No row picked: the same tools, greyed, in the same place (no words to read around the data).
+            actionsFor(rows[0]!).map((a) => (
+              <Button key={a.key} size="xs" variant="ghost" disabled title={`${a.label}: pick a row first`}>
+                {a.icon}
+                <span className="max-sm:sr-only">{a.short}</span>
+              </Button>
+            ))
+          ) : null}
         </div>
       )}
 
@@ -1432,15 +1438,16 @@ export function LineTable({
         </div>
       )}
       {!readOnly && !phone && (
+        // How the sheet works, folded away: the lines are what the window is for.
         <div className="text-xs text-muted">
-          <p>
-            Works like a sheet: click a cell and type, <Kbd>Enter</Kbd> saves and goes down, paste rows from Excel into the last row.
-            {flat ? "" : <> A number like 1.1 is a part of line 1: <Kbd>Tab</Kbd> on an empty new row (or a click on its number) makes it one.</>}
-          </p>
-          <details className="mt-1">
+          <details>
             <summary className="inline-flex cursor-pointer items-center gap-1 rounded hover:text-text">
-              <Keyboard className="size-3.5" aria-hidden /> Keyboard
+              <Keyboard className="size-3.5" aria-hidden /> How the sheet works
             </summary>
+            <p className="mt-1">
+              Click a cell and type, <Kbd>Enter</Kbd> saves and goes down, paste rows from Excel into the last row.
+              {flat ? "" : <> A number like 1.1 is a part of line 1: <Kbd>Tab</Kbd> on an empty new row (or a click on its number) makes it one.</>}
+            </p>
             <ul className="mt-1 grid gap-x-6 gap-y-1 sm:grid-cols-2">
               <li><Kbd>Enter</Kbd> or <Kbd>F2</Kbd> change the cell · <Kbd>Esc</Kbd> cancel</li>
               <li><Kbd>Tab</Kbd> and arrows move · <Kbd>Delete</Kbd> clears the cell</li>

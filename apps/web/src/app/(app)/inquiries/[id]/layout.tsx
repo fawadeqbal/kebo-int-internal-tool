@@ -1,7 +1,7 @@
 import { ArrowRight, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Banner, ButtonLink, cn, PageHeader, PriorityBadge, RefCode } from "@kebo/ui";
+import { Banner, ButtonLink, cn, PageHeader, PriorityBadge } from "@kebo/ui";
 import { companyToday } from "@/lib/format";
 import { requireUser, hasFeature } from "@/lib/session";
 import { dealOf } from "@/lib/deal-data";
@@ -34,13 +34,12 @@ export default async function DealLayout({ children, params }: { children: React
     <span key="st" className={cn("font-semibold whitespace-nowrap", TONE[status.tone])}>
       {status.text}
     </span>,
-    <RefCode key="r">{d.refNo}</RefCode>,
     <Link key="c" href={`/customers/${d.customer.id}`} className="text-primary underline underline-offset-2 hover:opacity-80">
       {d.customer.name}
     </Link>,
     d.category && <span key="cat">{d.category}</span>,
     d.priority !== "normal" && <PriorityBadge key="p" priority={d.priority} />,
-    <span key="a">{d.assignee ? `${d.assignee.name} handles it` : "nobody handles it yet"}</span>,
+    // (The number is in the path above and the phone's top bar; who handles it, beside: each said once.)
   ].filter(Boolean);
   const tabs: InquiryTab[] = [
     { href: base, label: "Overview" },
@@ -60,6 +59,7 @@ export default async function DealLayout({ children, params }: { children: React
     <div>
       <DealChrome>
         <PageHeader
+          phoneStack
           crumbs={[{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }]}
           icon={MessageSquareText}
           title={d.title ? d.title : <span className="tabular">{d.refNo}</span>}

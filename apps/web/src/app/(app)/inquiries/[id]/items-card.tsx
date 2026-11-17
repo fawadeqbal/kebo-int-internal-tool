@@ -24,7 +24,6 @@ export async function ItemsCard({ id }: { id: string }) {
   const parentNo = new Map(d.items.map((i) => [i.id, i.no]));
   const edits = await editsOf("inquiry", id);
   const needs = edits.cards.needs;
-  const fromOffer = (sourcing?.quotes.length ?? 0) > 0 && d.items.length > 0;
 
   const table = (
     <ScrollFade scrollLabel="Items they asked for" className="overflow-x-auto">
@@ -70,7 +69,7 @@ export async function ItemsCard({ id }: { id: string }) {
     <div id="items" className="scroll-mt-24">
       <LinesCard
         title="Items they asked for"
-        description={d.items.length ? (fromOffer ? "made from the first offer" : itemsLine(d)) : "none yet"}
+        description={d.items.length ? itemsLine(d) : "none yet"}
         canEdit={d.allowed.edit}
         editLabel={d.items.length ? "Edit items" : "Add items"}
         actions={d.items.length ? <ItemsExcel items={d.items} /> : undefined}

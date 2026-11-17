@@ -292,7 +292,8 @@ export function ViewCard({
           <h3 className="text-sm font-semibold text-text">{title}</h3>
           {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+        {/* Never wider than the card; on a phone, under the title they start at its left edge. */}
+        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 max-sm:justify-start">
           {meter && meter.of > 0 && <FilledMeter {...meter} />}
           {actions}
           {canEdit && panel && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
@@ -505,7 +506,7 @@ export function LinesCard({
       {open && editable && !ownWindow && (
         <SidePanel
           title={panelTitle ?? `Edit ${name.toLowerCase().startsWith("lines") ? name.toLowerCase() : name}`}
-          description={panelDescription ?? "Change, add, remove or move lines here. Nothing is saved until Save changes."}
+          description={panelDescription}
           onClose={close}
           className="md:w-[1180px]"
         >

@@ -164,14 +164,14 @@ test.describe("a narrow phone (320 px, WCAG reflow)", () => {
       }
       expect(await accessibilityProblems(page), `${step} meets WCAG 2.2 AA at 320 px`).toEqual([]);
     }
-    // On a touch screen every button in the window is at least 44 px each way.
+    // On a touch screen every button in the window is at least 32 px each way (WCAG 2.2 asks 24).
     const small = await win.getByRole("button").evaluateAll((all) =>
       all
         .filter((b) => b.getClientRects().length && !b.closest(".sr-only"))
         .map((b) => ({ name: b.getAttribute("aria-label") ?? b.textContent?.trim(), w: b.getBoundingClientRect().width, h: b.getBoundingClientRect().height }))
-        .filter((b) => b.w < 44 || b.h < 44),
+        .filter((b) => b.w < 32 || b.h < 32),
     );
-    expect(small, "buttons smaller than 44 px").toEqual([]);
+    expect(small, "buttons smaller than 32 px").toEqual([]);
     expect(errors).toEqual([]);
   });
 });

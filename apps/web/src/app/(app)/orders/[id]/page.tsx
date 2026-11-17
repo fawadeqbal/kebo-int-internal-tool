@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { can, ROUTE_NAME } from "@kebo/shared";
-import { Badge, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderMoneyOf, orderOf, orderSectionsOf } from "@/lib/order-data";
 import { date, dayMonth, money } from "@/lib/format";
@@ -110,18 +110,6 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
         title="Their order"
         cols={4}
         rows={[
-          {
-            label: "Customer",
-            value: (
-              <>
-                {/* A link with words beside it is underlined: told apart without its colour. */}
-                <Link href={`/customers/${o.customer.id}`} className={cn("text-primary hover:underline", o.contactName && "underline underline-offset-2")}>
-                  {o.customer.name}
-                </Link>
-                {o.contactName && <span className="font-normal"> · {o.contactName}</span>}
-              </>
-            ),
-          },
           { label: "Their PO no.", value: o.customerRef },
           { label: "PO date", value: o.customerPoOn ? date(o.customerPoOn) : null },
           {
@@ -162,15 +150,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
           title="Agreed with the customer"
           actions={
             <>
-              {from && (
-                <span className="text-xs text-text-2 max-sm:hidden">
-                  From{" "}
-                  <Link href={`/inquiries/${o.inquiry.id}/quotation`} className="font-medium text-primary hover:underline">
-                    {from}
-                  </Link>
-                  {q?.acceptedOn ? `, accepted ${dayMonth(q.acceptedOn)}` : ""}
-                </span>
-              )}
+              {/* (The quotation it came from is in Their order, above: said once.) */}
               {a.changes > 0 && (
                 <Link href={`${base}/history?q=${encodeURIComponent("agreed with the customer")}`} className="text-xs font-medium text-primary hover:underline">
                   Changed {a.changes}×
@@ -297,7 +277,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
             ))}
           </ul>
         ) : (
-          <p className="px-[18px] pb-3.5 text-[12.5px] text-text-2">No file yet. A file is added in its own section.</p>
+          <p className="px-[18px] pb-3.5 text-[12.5px] text-text-2">No file yet.</p>
         )}
       </Section>
     </OrderPage>

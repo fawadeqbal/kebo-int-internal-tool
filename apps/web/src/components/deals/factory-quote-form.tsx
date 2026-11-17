@@ -166,7 +166,7 @@ export function TaxBox({
   return (
     <fieldset className={cn("grid gap-x-3 gap-y-2 sm:grid-cols-2", className)}>
       <legend className="sr-only">Tax</legend>
-      <Field label="Tax %" htmlFor={`${idPrefix}-tax-rate`} error={error} hint="0 unless the factory charges tax, e.g. 13% VAT in China">
+      <Field label="Tax %" htmlFor={`${idPrefix}-tax-rate`} error={error}>
         <span className="flex items-center gap-2">
           <Input
             id={`${idPrefix}-tax-rate`}
@@ -181,12 +181,9 @@ export function TaxBox({
       </Field>
       <label htmlFor={`${idPrefix}-tax-included`} className="flex min-h-11 cursor-pointer items-start gap-2.5 text-sm sm:mt-[26px]">
         <Checkbox id={`${idPrefix}-tax-included`} checked={included} onChange={(e) => onIncluded(e.target.checked)} className="mt-0.5 size-[18px]" />
-        <span>
-          <span className="block font-medium">Tax included in their prices</span>
-          <span className="block text-xs text-text-2">{included ? "The price already has the tax in it" : "Not ticked: the tax is added on top"}</span>
-        </span>
+        <span className="font-medium">Tax included in their prices</span>
       </label>
-      <p className="text-xs text-text-2 sm:col-span-2">{note ?? "Applies to every line; a line can still have its own %."}</p>
+      {note && <p className="text-xs text-text-2 sm:col-span-2">{note}</p>}
     </fieldset>
   );
 }
@@ -744,7 +741,7 @@ export function OfferHeaderForm({
               label="Delivery basis (Incoterm)"
               htmlFor="basis"
               error={st.errors?.basis}
-              hint={s.basis ? BASIS_HINT[s.basis] : "What their prices already pay for: needed to work out freight and the like"}
+              hint={s.basis ? BASIS_HINT[s.basis] : undefined}
             >
               <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")}>
                 <option value="">Not said</option>

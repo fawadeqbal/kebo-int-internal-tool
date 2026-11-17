@@ -17,7 +17,7 @@ import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import { send, type Staged } from "./documents-panel";
 import { FileRow, FileZone } from "@/components/common/file-zone";
-import { fileSize } from "@/lib/format";
+import { fileSize, plural } from "@/lib/format";
 import { OfferHeaderForm, type OfferStep } from "./factory-quote-form";
 import { LinesExcel, LinesView } from "./lines-view";
 import { useBatchLines, type LineHandlers } from "@/components/edits/batch-lines";
@@ -454,7 +454,7 @@ function OfferWindow({
         }
         footerStart={
           q && removeAction ? (
-            <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} aria-label="Remove this offer" className="inline-flex min-h-9 items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline max-sm:min-w-11 max-sm:justify-center pointer-coarse:min-h-11">
+            <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} aria-label="Remove this offer" className="inline-flex min-h-9 items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline max-sm:min-w-9 max-sm:justify-center pointer-coarse:min-h-8">
               <Trash2 className="size-4 max-sm:size-5" aria-hidden /> <span className="max-sm:sr-only">Remove this offer</span>
             </button>
           ) : undefined
@@ -862,14 +862,9 @@ export function OfferLines({
 
   return (
     <LinesCard
-      title={`${q.factory.name} · lines`}
-      description={
-        q.lines.length
-          ? q.taxIncluded
-            ? `Tax included · ${q.taxRate}%: the tax inside the price is shown, not added again`
-            : `Without tax · ${q.taxRate}%: ${q.taxRate > 0 ? "the tax is added on top for our cost" : "our cost is the factory's price"}`
-          : "No lines yet: Add lines to type, paste or upload them, or start from the customer’s list."
-      }
+      // The page is the factory's: the card is its lines; the tax is said in their total, under them.
+      title="Lines"
+      description={q.lines.length ? plural(q.lines.length, "line") : undefined}
       canEdit={canEdit}
       editLabel={q.lines.length ? "Edit lines" : "Add lines"}
       actions={<LinesExcel name={sheet.name} rows={rows} columns={columns} numbers={q.lines.map((l) => l.no)} />}
