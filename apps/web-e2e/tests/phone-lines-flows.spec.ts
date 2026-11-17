@@ -30,7 +30,7 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   const errors = watchErrors(page);
   const deal = await newInquiry(page, tag());
   await page.goto(`/inquiries/${deal.id}?panel=edit-request&id=items`);
-  const win = page.getByRole("dialog", { name: `Items Â· ${deal.refNo}` });
+  const win = page.getByRole("dialog", { name: "Edit items" });
   const list = win.getByRole("list", { name: "Items" });
   await expect(list.getByRole("button", { name: /^Item 1 Tablet press/ })).toContainText("1 set");
   expect(await accessibilityProblems(page), "the items list on a phone meets WCAG 2.2 AA").toEqual([]);
@@ -68,11 +68,9 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(list.getByRole("button", { name: /^Item 2 Blister packing machine/ })).toBeVisible();
 
-  // Saved with the inquiry (a saved list changed: it asks why first).
-  await win.getByRole("button", { name: "Save changes" }).click();
-  const why = page.getByRole("dialog", { name: "Why are you changing the items?" });
-  await why.getByRole("textbox").first().fill("The customer sent two more");
-  await why.getByRole("button", { name: "Save changes" }).click();
+  // Saved with the inquiry: two changes, and why first (asked in the window).
+  await win.getByRole("radiogroup", { name: "Why these changes?" }).getByRole("radio", { name: "Customer changed the list" }).click();
+  await win.getByRole("button", { name: "Save 2 changes" }).click();
   await expect(win).toBeHidden();
   const saved = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
   expect(saved.items.map((i: { description: string; quantity: string; unit: string }) => [i.description, Number(i.quantity), i.unit])).toEqual([

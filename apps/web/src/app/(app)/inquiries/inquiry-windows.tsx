@@ -3,7 +3,7 @@ import { counterKey } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { requireUser } from "@/lib/session";
-import { date } from "@/lib/format";
+import { date, dateTime } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import type { ContactOption, CustomerOption } from "@/lib/types-deals";
 import { editsOf } from "@/lib/edit-data";
@@ -66,6 +66,8 @@ export async function EditRequestWindow({ d, step }: { d: DealDetail; step?: str
       mode="edit"
       refNo={d.refNo}
       customerName={d.customer.name}
+      inquiryTitle={d.title}
+      lastChanged={dateTime(d.updatedAt)}
       action={saveRequestAction.bind(null, d.id, d.updatedAt)}
       initial={{
         customer: { id: d.customer.id, name: d.customer.name, country: d.customer.country, primaryContact: primary && { id: primary.id, name: primary.name, detail: primary.email ?? primary.whatsapp ?? primary.phone } },

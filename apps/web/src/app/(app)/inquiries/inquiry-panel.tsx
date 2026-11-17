@@ -9,14 +9,14 @@ import { DealForm, type RequestStep } from "@/components/deals/deal-form";
 type FormProps = Omit<ComponentProps<typeof DealForm>, "onSaved" | "onAllSteps">;
 
 /** A part's name in its window's title ("Items · RFQ-2611-0004"). */
-const PART_TITLE: Record<RequestStep, string> = { customer: "Customer", items: "Items", details: "Details", files: "Files", review: "Review" };
+const PART_TITLE: Record<RequestStep, string> = { customer: "customer", items: "items", details: "details", files: "files", review: "review", changes: "changes" };
 
 /**
  * The inquiry's one window, in the side panel over the page it was opened from: "New inquiry"
  * (?panel=new-inquiry) and, the same window filled, "Edit the request" (?panel=edit-request).
  * A new one saved opens the inquiry; an edit closes it.
  */
-export function InquiryPanel({ refNo, customerName, numberHint, ...form }: FormProps & { refNo?: string; customerName?: string; numberHint?: string }) {
+export function InquiryPanel({ refNo, customerName, inquiryTitle, numberHint, ...form }: FormProps & { refNo?: string; customerName?: string; inquiryTitle?: string; numberHint?: string }) {
   const router = useRouter();
   const edit = form.mode === "edit";
   const panel = useSidePanel(edit ? "edit-request" : "new-inquiry");
@@ -24,10 +24,11 @@ export function InquiryPanel({ refNo, customerName, numberHint, ...form }: FormP
   const [one, setOne] = useState(edit && !!form.only);
   return (
     <SidePanel
-      title={one ? `${PART_TITLE[form.startStep ?? "customer"]} · ${refNo ?? "the request"}` : edit ? "Edit the request" : "New inquiry"}
-      description={one ? customerName : edit ? [refNo, customerName].filter(Boolean).join(" · ") : `The number is given on save · ${numberHint ?? "RFQ"}-…`}
+      // Design rules 18 Nov: "Edit customer" (one part, a smaller window but for the items), "Edit inquiry" (all parts).
+      title={one ? `Edit ${PART_TITLE[form.startStep ?? "customer"]}` : edit ? "Edit inquiry" : "New inquiry"}
+      description={edit ? [refNo, inquiryTitle ?? customerName].filter(Boolean).join(" · ") : `The number is given on save · ${numberHint ?? "RFQ"}-…`}
       onClose={() => panel.close()}
-      className="md:w-[1180px]"
+      className={one && form.startStep !== "items" ? "md:w-[880px]" : "md:w-[1180px]"}
     >
       <DealForm
         {...form}

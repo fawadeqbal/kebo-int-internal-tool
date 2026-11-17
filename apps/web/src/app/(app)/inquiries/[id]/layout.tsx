@@ -56,7 +56,7 @@ export default async function DealLayout({ children, params }: { children: React
   const canHold = d.canWork && d.allowed.hold;
   const moves = d.canWork ? MANUAL_MOVES[d.stage].filter((m) => !m.reopen || d.allowed.reopen) : [];
   const more: MenuEntry[] = [
-    ...(d.allowed.edit ? [{ label: "Edit the request", href: `${base}?panel=edit-request` }] : []),
+    ...(d.allowed.edit ? [{ label: "Edit inquiry", href: `${base}?panel=edit-request` }] : []),
     ...(canHold ? [{ label: d.onHold ? "Take off hold" : "Put on hold", panel: "hold-inquiry" }] : []),
     ...moves.filter((m) => m.to !== "lost").map((m) => ({ label: m.label, panel: "move-inquiry", id: m.to })),
     { label: "All files", href: `${base}/files` },
