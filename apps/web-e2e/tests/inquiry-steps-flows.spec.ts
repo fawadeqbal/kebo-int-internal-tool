@@ -177,25 +177,35 @@ test("the Items step: Add item first, + Part under a line, a possible duplicate 
   await desc.fill("Punches and dies");
   await qty.fill("2");
   await qty.press("Enter");
-  // + Part on line 2: the line being typed says "Part of 2" and becomes 2.1.
+  // + Part on line 2: the line being typed goes under it (no Item/Part label to pick) and becomes 2.1.
   await win.getByRole("button", { name: "Add a part to Item 2" }).click();
-  await expect(win.getByRole("combobox", { name: "New item: Item or part" })).toHaveValue(/.+/);
+  await expect(win.getByRole("row", { name: /^New part of/ })).toBeVisible();
+  await expect(win.getByRole("combobox", { name: "New item: Item or part" })).toHaveCount(0);
   await desc.fill("Upper punch, 12 mm round");
   await qty.fill("35");
   await qty.press("Enter");
   await expect(win.getByRole("row", { name: "Part 2.1" })).toContainText("Upper punch");
-  // Back to items: the same machine again is tagged, not removed.
-  await win.getByRole("combobox", { name: "New item: Item or part" }).selectOption("");
+  // Back to items (its number turns it back): the same machine again is tagged, not removed.
+  await win.getByRole("button", { name: /make it an item of its own/ }).click();
   await desc.fill("Tablet press machine");
   await qty.fill("1");
   await qty.press("Enter");
   await expect(win.getByRole("row", { name: "Item 3" })).toContainText("Same as 1?");
-  // Tick 3 and delete it with the bar (asked first); the rest stays.
+  // A clean table: no tick boxes until Select; tick 3 and delete it with the bar (asked first); the rest stays.
+  await expect(win.getByRole("checkbox", { name: "Select Item 3" })).toHaveCount(0);
+  await win.getByRole("button", { name: "Select", exact: true }).click();
+  await expect(win.getByRole("toolbar", { name: "Select lines" })).toContainText("Tick the items to work on");
   await win.getByRole("checkbox", { name: "Select Item 3" }).check();
   const bar = win.getByRole("toolbar", { name: "1 selected" });
   await bar.getByRole("button", { name: "Delete" }).click();
   await page.getByRole("alertdialog", { name: "Delete 1 item?" }).getByRole("button", { name: "Delete" }).click();
   await expect(win.getByRole("row", { name: "Item 3" })).toHaveCount(0);
+  // After the delete the tick boxes go; Select again, then Done, turns them off too.
+  await expect(win.getByRole("checkbox", { name: "Select Item 1" })).toHaveCount(0);
+  await win.getByRole("button", { name: "Select", exact: true }).click();
+  await expect(win.getByRole("checkbox", { name: "Select Item 1" })).toBeVisible();
+  await win.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(win.getByRole("checkbox", { name: "Select Item 1" })).toHaveCount(0);
   await expect(win.getByRole("navigation", { name: "Steps" }).getByRole("button", { name: /: Items/ })).toContainText("2 items, 1 part");
   expect(await accessibilityProblems(page), "the Items step meets WCAG 2.2 AA").toEqual([]);
   expect(errors).toEqual([]);
@@ -246,9 +256,15 @@ test("Edit inquiry (⋯): every part, then Changes — old → new with Undo —
   await rail.getByRole("button", { name: /: Details/ }).click();
   await win.getByRole("radiogroup", { name: "Priority" }).getByRole("radio", { name: "High" }).click();
   await win.getByRole("button", { name: /^Changes/ }).click();
-  const list = win.getByRole("list", { name: "What changed" });
-  await expect(list).toContainText("Came by: Email → WhatsApp");
-  await expect(list).toContainText("Priority: Normal → High");
+  // A table on fixed columns: Part · What · Was · Now · Undo.
+  const list = win.getByRole("table", { name: "What changed" });
+  const cameBy = list.getByRole("row").filter({ hasText: "Came by" });
+  await expect(cameBy.getByRole("cell").nth(0)).toHaveText("Customer");
+  await expect(cameBy.getByRole("cell").nth(2)).toHaveText("Email");
+  await expect(cameBy.getByRole("cell").nth(3)).toHaveText("WhatsApp");
+  await expect(list.getByRole("row").filter({ hasText: "Priority" }).getByRole("cell").nth(3)).toHaveText("High");
+  // The side bar counts them per part.
+  await expect(rail.getByRole("button", { name: /: Customer/ })).toContainText("1 change");
   // Undo one: it is as it was, and the count follows.
   await list.getByRole("button", { name: "Undo: Priority" }).click();
   await expect(list).not.toContainText("Priority");

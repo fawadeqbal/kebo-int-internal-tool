@@ -28,7 +28,7 @@ export function InquiryPanel({ refNo, customerName, inquiryTitle, numberHint, ..
       title={one ? `Edit ${PART_TITLE[form.startStep ?? "customer"]}` : edit ? "Edit inquiry" : "New inquiry"}
       description={edit ? [refNo, inquiryTitle ?? customerName].filter(Boolean).join(" · ") : `The number is given on save · ${numberHint ?? "RFQ"}-…`}
       onClose={() => panel.close()}
-      className={one && form.startStep !== "items" ? "md:w-[880px]" : "md:w-[1180px]"}
+      className={one && form.startStep !== "items" ? "md:w-[640px]" : "md:w-[1180px]"}
     >
       <DealForm
         {...form}
