@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, Pencil, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, CHANNEL_LABEL, INQUIRY_CHANNELS, PARTY_TYPE_LABEL, PARTY_TYPES, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type AttachmentKind } from "@kebo/shared";
 import { Alert, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
@@ -211,6 +211,10 @@ export function DealForm({
 
   const contactLine = (c: ContactOption) => [c.name, c.email ?? c.whatsapp ?? c.phone].filter(Boolean).join(" · ");
   const mainContact = !!contacts.find((c) => c.id === v.contactId)?.isPrimary;
+  // "Tablet press machine + 2 more": the first item and how many more (as the inquiry is named when no title is given).
+  const tops = sheet.rows.filter((r) => !r.parentKey);
+  const firstItem = (tops[0]?.values.description ?? "").split("\n")[0]!.trim();
+  const suggestedTitle = firstItem ? `${firstItem.slice(0, 160)}${tops.length > 1 ? ` + ${tops.length - 1} more` : ""}` : "";
   const assignable = canAssignOthers ? people : people.filter((p) => p.id === meId || p.id === initial.assigneeId);
   const required = sheet.rows.length === 0;
   // The items go with the save: a new inquiry's always, an edit's when they changed.
@@ -466,8 +470,19 @@ export function DealForm({
 
             {step === "details" && (
             <PanelSection quiet title="What they need" first className="md:grid-cols-3">
-              <Field label="Inquiry title" htmlFor="title" error={s.errors?.title}>
+              <Field label="Inquiry title" htmlFor="title" error={s.errors?.title} className="md:col-span-2">
                 <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} />
+                {/* A title from the items, offered (never typed in for you); left empty, the inquiry is named this way. */}
+                {!v.title.trim() && suggestedTitle && (
+                  <button
+                    type="button"
+                    onClick={() => set("title", suggestedTitle)}
+                    className="inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-full border border-dashed border-primary bg-primary-soft/50 px-2.5 py-1 text-[12.5px] font-semibold text-primary hover:bg-primary-soft"
+                  >
+                    <Sparkles aria-hidden className="size-3.5 shrink-0" />
+                    <span className="truncate">Use “{suggestedTitle}”</span>
+                  </button>
+                )}
               </Field>
               <Field label="Category" htmlFor="category" required error={s.errors?.category}>
                 <Select
@@ -487,57 +502,34 @@ export function DealForm({
                   <option value="" disabled>
                     Choose…
                   </option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
+                  {/* One "Other": the settings' own "Other" is the same choice as typing one. */}
+                  {categories
+                    .filter((c) => c.trim().toLowerCase() !== "other")
+                    .map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
                   <option value={OTHER}>Other…</option>
                 </Select>
                 {otherCategory && (
                   <Input aria-label="Category name" value={v.category} onChange={(e) => set("category", e.target.value)} maxLength={120} autoFocus />
                 )}
               </Field>
-              <Field label="Priority" htmlFor="priority" error={s.errors?.priority}>
-                <Select id="priority" value={v.priority} onChange={(e) => set("priority", e.target.value)}>
-                  {PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      {PRIORITY_LABEL[p]}
-                    </option>
-                  ))}
-                </Select>
+              <Field label="Priority" htmlFor="priority" error={s.errors?.priority} className="md:col-span-3">
+                <ChoiceChips id="priority" label="Priority" value={v.priority as (typeof PRIORITIES)[number]} options={PRIORITIES} labels={PRIORITY_LABEL} onChange={(p) => set("priority", p)} />
               </Field>
               <Field label="What they need" htmlFor="requirements" required={required} error={s.errors?.requirements} className="md:col-span-3">
-                <Textarea
-                  id="requirements"
-                  rows={4}
-                  value={v.requirements}
-                  
-                  onChange={(e) => set("requirements", e.target.value)}
-                />
+                <Textarea id="requirements" rows={7} value={v.requirements} onChange={(e) => set("requirements", e.target.value)} className="min-h-40" />
               </Field>
             </PanelSection>
             )}
 
             {step === "files" && (
             <PanelSection quiet title="Files from the customer" first className="sm:grid-cols-1">
-              {files.map((f) => (
-                <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-[13px]">
-                  <span className="min-w-0 truncate">
-                    <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
-                      {f.fileName}
-                    </a>
-                    <span className="text-text-2"> · {f.meta}</span>
-                  </span>
-                  {f.remove && (
-                    <button type="button" onClick={() => setAsking(f)} className="shrink-0 font-semibold text-bad hover:underline">
-                      Remove
-                    </button>
-                  )}
-                </div>
-              ))}
               <FileZone
                 label="Add files"
+                big
                 disabled={uploading}
                 onFiles={(list) => setStaged((x) => [...x, ...list.map((file) => ({ key: rowKey(), file, kind: kindNext, note: "", progress: null, error: null }))])}
                 kind={
@@ -550,33 +542,64 @@ export function DealForm({
                   </Select>
                 }
               >
-                {staged.length > 0 &&
-                  staged.map((f) => (
-                    <FileRow
-                      key={f.key}
-                      name={f.file.name}
-                      meta={
-                        f.error ? (
-                          <span className="text-bad">{f.error}</span>
-                        ) : (
-                          `${ATTACHMENT_KIND_LABEL[f.kind]} · ${fileSize(f.file.size)} · ${f.progress === null ? "goes up when you save" : `uploading ${f.progress}%`}`
-                        )
-                      }
-                      actions={
-                        <>
-                          <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, false)} aria-label={`View ${f.file.name}`}>
-                            <Eye aria-hidden />
-                          </Button>
-                          <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, true)} aria-label={`Download ${f.file.name}`}>
-                            <Download aria-hidden />
-                          </Button>
-                          <Button size="icon-xs" variant="ghost" disabled={uploading} onClick={() => setStaged((x) => x.filter((y) => y.key !== f.key))} aria-label={`Remove ${f.file.name}`}>
-                            <Trash2 aria-hidden />
-                          </Button>
-                        </>
-                      }
-                    />
-                  ))}
+                {(files.length > 0 || staged.length > 0) && (
+                  <>
+                    {files.map((f) => (
+                      <FileRow
+                        key={f.id}
+                        name={f.fileName}
+                        meta={f.meta}
+                        actions={
+                          <>
+                            <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className={buttonClass("ghost", "icon-xs")} aria-label={`View ${f.fileName}`}>
+                              <Eye aria-hidden />
+                            </a>
+                            {f.remove && (
+                              <Button size="icon-xs" variant="ghost" onClick={() => setAsking(f)} aria-label={`Remove ${f.fileName}`} className="text-bad hover:text-bad">
+                                <Trash2 aria-hidden />
+                              </Button>
+                            )}
+                          </>
+                        }
+                      />
+                    ))}
+                    {staged.map((f) => (
+                      <FileRow
+                        key={f.key}
+                        name={f.file.name}
+                        meta={
+                          f.error ? (
+                            <span className="text-bad">{f.error}</span>
+                          ) : (
+                            `${fileSize(f.file.size)}${f.progress === null ? "" : ` · uploading ${f.progress}%`}`
+                          )
+                        }
+                        tag={<KindSelect f={f} disabled={uploading} onChange={(kind) => setStaged((x) => x.map((y) => (y.key === f.key ? { ...y, kind } : y)))} className="max-sm:hidden" />}
+                        actions={
+                          <>
+                            <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, false)} aria-label={`View ${f.file.name}`}>
+                              <Eye aria-hidden />
+                            </Button>
+                            <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, true)} aria-label={`Download ${f.file.name}`}>
+                              <Download aria-hidden />
+                            </Button>
+                            <Button size="icon-xs" variant="ghost" disabled={uploading} onClick={() => setStaged((x) => x.filter((y) => y.key !== f.key))} aria-label={`Remove ${f.file.name}`} className="text-bad hover:text-bad">
+                              <Trash2 aria-hidden />
+                            </Button>
+                          </>
+                        }
+                      >
+                        {/* A phone has no room beside the name: the kind goes under it. */}
+                        <KindSelect f={f} disabled={uploading} onChange={(kind) => setStaged((x) => x.map((y) => (y.key === f.key ? { ...y, kind } : y)))} className="sm:hidden" />
+                        {f.progress !== null && f.progress < 100 && !f.error && (
+                          <span aria-hidden className="block h-1 overflow-hidden rounded-full bg-line">
+                            <span className="block h-1 bg-primary-solid transition-[width]" style={{ width: `${f.progress}%` }} />
+                          </span>
+                        )}
+                      </FileRow>
+                    ))}
+                  </>
+                )}
               </FileZone>
             </PanelSection>
             )}
@@ -638,6 +661,19 @@ export function DealForm({
 /** The kinds of file a customer sends, in the order the select lists them. */
 const NEW_KINDS: AttachmentKind[] = ["urs", "drawing", "photo", "specification", "other"];
 const KIND_WORD: Partial<Record<AttachmentKind, string>> = { urs: "URS (requirements)", drawing: "Drawing", photo: "Photo", specification: "Specification", other: "Other" };
+
+/** What kind a file about to go up is (URS, drawing, photo…), changeable until it is saved. */
+function KindSelect({ f, disabled, onChange, className }: { f: Staged; disabled?: boolean; onChange: (k: AttachmentKind) => void; className?: string }) {
+  return (
+    <Select aria-label={`What kind of file is ${f.file.name}`} value={f.kind} disabled={disabled} onChange={(e) => onChange(e.target.value as AttachmentKind)} className={cn("h-8 w-auto text-[13px]", className)}>
+      {NEW_KINDS.map((k) => (
+        <option key={k} value={k}>
+          {KIND_WORD[k]}
+        </option>
+      ))}
+    </Select>
+  );
+}
 
 /** Shows (or downloads) a file that is not uploaded yet. */
 function open(file: File, download: boolean) {

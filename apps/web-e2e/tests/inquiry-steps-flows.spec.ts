@@ -193,3 +193,34 @@ test("the Items step: Add item first, + Part under a line, a possible duplicate 
   expect(await accessibilityProblems(page), "the Items step meets WCAG 2.2 AA").toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test("the Details step: a title offered from the items, Priority as buttons, one Other; Files: a big drop area", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  await page.goto("/inquiries?panel=new-inquiry");
+  const win = page.getByRole("dialog", { name: "New inquiry" });
+  await win.locator("#customer").fill("Al-Shifa");
+  await win.getByText(/^Al-Shifa Pharma Ltd/).first().click();
+  await win.getByRole("button", { name: /^Next/ }).click();
+  const desc = win.getByRole("textbox", { name: "New item: Description" });
+  const qty = win.getByRole("textbox", { name: "New item: Qty" });
+  for (const x of ["Tablet press machine", "Punches and dies", "Dust extractor"]) {
+    await desc.fill(x);
+    await qty.fill("1");
+    await qty.press("Enter");
+    await expect(win.getByRole("row", { name: /^Item \d/ }).filter({ hasText: x })).toBeVisible();
+  }
+  await win.getByRole("button", { name: /^Next/ }).click();
+  // Offered, never typed in for you.
+  await expect(win.locator("#title")).toHaveValue("");
+  await win.getByRole("button", { name: "Use “Tablet press machine + 2 more”" }).click();
+  await expect(win.locator("#title")).toHaveValue("Tablet press machine + 2 more");
+  const priority = win.getByRole("radiogroup", { name: "Priority" });
+  await priority.getByRole("radio", { name: "High" }).click();
+  await expect(priority.getByRole("radio", { name: "High" })).toHaveAttribute("aria-checked", "true");
+  await expect(win.locator("#category option").filter({ hasText: /^Other/ })).toHaveCount(1);
+  await win.getByRole("button", { name: /^Next/ }).click();
+  await expect(win.getByText("Drop files here")).toBeVisible();
+  expect(await accessibilityProblems(page), "Details and Files meet WCAG 2.2 AA").toEqual([]);
+  expect(errors).toEqual([]);
+});

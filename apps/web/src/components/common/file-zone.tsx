@@ -39,8 +39,11 @@ export function FileZone({
   disabled,
   one,
   compact,
+  big,
   children,
 }: {
+  /** A large drop area (design rules 18 Nov: the Files step), the words under a round icon. */
+  big?: boolean;
   label: ReactNode;
   optional?: boolean;
   hint?: ReactNode;
@@ -84,18 +87,35 @@ export function FileZone({
         onDrop={drop}
         className={cn(
           "relative flex cursor-pointer flex-wrap items-center justify-center gap-2.5 rounded-xl border-2 border-dashed border-primary-line bg-primary-soft/40 text-center text-[13px] transition-colors",
-          compact ? "px-3.5 py-3" : "p-5",
+          big ? "flex-col gap-2 px-5 py-8" : compact ? "px-3.5 py-3" : "p-5",
           over && "border-primary bg-primary-soft",
           disabled && "cursor-not-allowed opacity-60",
         )}
       >
-        <ArrowUpToLine className="size-[18px] text-primary" aria-hidden />
-        <span>
-          <strong>
-            {one ? "Drop the file here or" : "Drop files here or"} <span className="text-primary underline">choose</span>
-          </strong>
-          <span className="block text-xs text-muted">{hint}</span>
-        </span>
+        {big ? (
+          <>
+            <span aria-hidden className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary">
+              <ArrowUpToLine className="size-5" />
+            </span>
+            <span>
+              <strong className="block text-[15px]">{one ? "Drop the file here" : "Drop files here"}</strong>
+              <span className="text-text-2">
+                or <span className="font-semibold text-primary underline">choose {one ? "a file" : "files"}</span>
+              </span>
+              <span className="mt-1 block text-xs text-muted">{hint}</span>
+            </span>
+          </>
+        ) : (
+          <>
+            <ArrowUpToLine className="size-[18px] text-primary" aria-hidden />
+            <span>
+              <strong>
+                {one ? "Drop the file here or" : "Drop files here or"} <span className="text-primary underline">choose</span>
+              </strong>
+              <span className="block text-xs text-muted">{hint}</span>
+            </span>
+          </>
+        )}
         <input
           ref={input}
           type="file"
