@@ -175,3 +175,35 @@ test.describe("a narrow phone (320 px, WCAG reflow)", () => {
     expect(errors).toEqual([]);
   });
 });
+
+test("Quote this offer on a phone: the New quotations window fits the screen (nothing to scroll sideways) and meets WCAG 2.2 AA", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  const t = tag();
+  const deal = await newInquiry(page, t);
+  const offer = await post(page, `/inquiries/${deal.id}/factory-quotes`, {
+    newFactoryName: `Zhejiang Wanshida Pharmaceutical Machinery ${t}`,
+    receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
+    currency: "USD",
+    basis: "FOB",
+    basisPlace: "Shanghai",
+    leadDays: 30,
+    lines: [{ description: "Tablet press", quantity: 1, unit: "set", unitPrice: 68400 }],
+  });
+  await page.goto(`/inquiries/${deal.id}/offers/${offer.id}`);
+  await page.getByRole("link", { name: /Quote this offer/ }).click();
+  const win = page.getByRole("dialog", { name: "New quotations" });
+  await expect(win.getByRole("checkbox", { name: /Zhejiang Wanshida/ })).toBeChecked();
+  // Nothing in the window is wider than the screen, and no box in it scrolls sideways.
+  const wide = await win.evaluate((el) => {
+    const vw = document.documentElement.clientWidth;
+    return [...el.querySelectorAll("*")]
+      .filter((e) => e.getBoundingClientRect().right > vw + 1 || (e.scrollWidth > e.clientWidth + 1 && /(auto|scroll)/.test(getComputedStyle(e).overflowX)))
+      .map((e) => `${e.tagName} ${(e.textContent ?? "").slice(0, 30)}`)
+      .slice(0, 3);
+  });
+  expect(wide, "the window fits the phone").toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  expect(await accessibilityProblems(page), "New quotations on a phone meets WCAG 2.2 AA").toEqual([]);
+  expect(errors).toEqual([]);
+});

@@ -146,11 +146,12 @@ function NewQuotationsForm({
             ))}
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-2 text-[13px] font-semibold">Offers</legend>
-              <div className="overflow-x-auto rounded-xl border border-line">
-                <table className="w-full border-collapse text-[13px]">
+              {/* Made to fit a phone (data-fit): the tick, the offer and its cost; where it is quoted goes under its name. */}
+              <div className="relative overflow-x-auto rounded-xl border border-line">
+                <table data-fit className="w-full border-collapse text-[13px]">
                   <thead>
                     <tr className="bg-surface-2 text-left text-xs text-text-2">
-                      <th scope="col" className="w-10 border-b border-line px-3 py-2">
+                      <th scope="col" className="w-10 border-b border-line px-3 py-2 max-sm:w-9 max-sm:px-2.5">
                         <span className="sr-only">Quote it</span>
                       </th>
                       <th scope="col" className="border-b border-line px-3 py-2 font-medium">
@@ -159,7 +160,7 @@ function NewQuotationsForm({
                       <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium">
                         Cost
                       </th>
-                      <th scope="col" className="border-b border-line px-3 py-2 font-medium">
+                      <th scope="col" className="border-b border-line px-3 py-2 font-medium max-sm:hidden">
                         <span className="sr-only">Quoted in</span>
                       </th>
                     </tr>
@@ -170,19 +171,20 @@ function NewQuotationsForm({
                       const box = `offer-${o.factoryQuoteId}`;
                       return (
                         <tr key={o.factoryQuoteId} className={cn(on && "bg-surface-2/60")}>
-                          <td className="border-b border-line px-3 py-2.5 align-top">
+                          <td className="border-b border-line px-3 py-2.5 align-top max-sm:px-2.5">
                             <input id={box} type="checkbox" checked={on} onChange={() => toggle(o.factoryQuoteId)} className="size-4 accent-[var(--color-primary)]" />
                           </td>
-                          <td className="border-b border-line px-3 py-2.5">
-                            <label htmlFor={box} className="block cursor-pointer font-semibold">
+                          <td className="border-b border-line px-3 py-2.5 max-sm:pr-1">
+                            <label htmlFor={box} className="block cursor-pointer font-semibold [overflow-wrap:anywhere]">
                               {o.factory.name}
                             </label>
                             <span className="block text-xs text-text-2">
                               {[date(o.receivedOn), o.basis ? `${o.basis}${o.basisPlace ? ` ${o.basisPlace}` : ""}` : null, o.leadTime].filter(Boolean).join(" · ")}
                             </span>
+                            {usedIn[o.factoryQuoteId]?.length ? <span className="mt-1 block text-xs font-semibold text-text-2 sm:hidden">In {usedIn[o.factoryQuoteId]!.join(" · ")}</span> : null}
                           </td>
-                          <td className="border-b border-line px-3 py-2.5 text-right whitespace-nowrap tabular">{o.totalCost === null ? "—" : money(o.totalCost, currency)}</td>
-                          <td className="border-b border-line px-3 py-2.5">
+                          <td className="border-b border-line px-3 py-2.5 text-right align-top whitespace-nowrap tabular max-sm:pl-1">{o.totalCost === null ? "—" : money(o.totalCost, currency)}</td>
+                          <td className="border-b border-line px-3 py-2.5 max-sm:hidden">
                             {usedIn[o.factoryQuoteId]?.length ? (
                               <span className="inline-flex rounded-md border border-line px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap text-text-2">
                                 In {usedIn[o.factoryQuoteId]!.join(" · ")}
@@ -193,7 +195,7 @@ function NewQuotationsForm({
                       );
                     })}
                     <tr className={cn(ticked.includes("own") && "bg-surface-2/60")}>
-                      <td className="px-3 py-2.5 align-top">
+                      <td className="px-3 py-2.5 align-top max-sm:px-2.5">
                         <input id="offer-own" type="checkbox" checked={ticked.includes("own")} onChange={() => toggle("own")} className="size-4 accent-[var(--color-primary)]" />
                       </td>
                       <td className="px-3 py-2.5" colSpan={3}>
@@ -229,8 +231,8 @@ function NewQuotationsForm({
                 </Field>
               </div>
               {rows.length > 0 && (
-                <div className="overflow-x-auto rounded-xl border border-line">
-                  <table className="w-full border-collapse text-[13px]">
+                <div className="relative overflow-x-auto rounded-xl border border-line">
+                  <table data-fit className="w-full border-collapse text-[13px]">
                     <thead>
                       <tr className="bg-surface-2 text-left text-xs text-text-2">
                         <th scope="col" className="border-b border-line px-3 py-2 font-medium">

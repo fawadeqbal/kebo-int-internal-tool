@@ -72,8 +72,9 @@ export function SideSheet({ title, summary, children }: { title: string; summary
               </Button>
             </div>
           )}
-          <div className={cn(open && "max-lg:min-h-0 max-lg:flex-1 max-lg:overflow-y-auto max-lg:pb-[env(safe-area-inset-bottom)] max-lg:[&>section]:rounded-none max-lg:[&>section]:border-0 max-lg:[&>section]:shadow-none max-lg:[&>section>section:first-child_h3]:sr-only")}>
-            {/* (In the sheet its first section's title is the sheet's own, above: hidden, still read out.) */}
+          <div className={cn(open && "max-lg:min-h-0 max-lg:flex-1 max-lg:overflow-y-auto max-lg:pb-[env(safe-area-inset-bottom)] max-lg:[&>section]:rounded-none max-lg:[&>section]:border-0 max-lg:[&>section]:shadow-none max-lg:[&>section>section:first-child>div:first-child]:sr-only")}>
+            {/* (In the sheet the first section's title row is the sheet's own title, above: hidden, still read out;
+                so that section has no buttons on its title row.) */}
             {children}
           </div>
         </div>
