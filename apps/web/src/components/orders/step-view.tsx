@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Pencil } from "lucide-react";
 import { Alert, Button, Card, cn, Field, Input, Select, Textarea } from "@kebo/ui";
-import { PanelActions, PanelBody, PanelSection, SidePanel, useClosePanel } from "@/components/common/panel";
+import { OpenPanelButton, PanelActions, PanelBody, PanelSection, SidePanel, useClosePanel } from "@/components/common/panel";
 import { EditButton } from "@/components/common/edit-button";
 import { EditsChip, editedMark } from "@/components/edits/edits";
 import { useEditSave } from "@/components/edits/use-edit-save";
@@ -425,7 +426,10 @@ export function LinesCard({
   panelTitle,
   panelDescription,
   edits,
+  editPanel,
 }: {
+  /** Edit opens a window of the page instead (?panel=…&id=…), e.g. the inquiry's window on its Items step. */
+  editPanel?: { panel: string; id?: string };
   title: ReactNode;
   description?: ReactNode;
   canEdit: boolean;
@@ -475,6 +479,11 @@ export function LinesCard({
             <EditsChip card={edits} title={name} />
             {actions}
             {editable && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
+            {canEdit && editPanel && (
+              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="secondary" size="sm" className="h-8 px-2.5 text-[13px] [&_svg]:size-3.5">
+                <Pencil aria-hidden /> {editLabel}
+              </OpenPanelButton>
+            )}
           </>
         }
       >

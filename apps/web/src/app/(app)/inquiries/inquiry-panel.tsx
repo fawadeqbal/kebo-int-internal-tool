@@ -22,7 +22,7 @@ export function InquiryPanel({ refNo, customerName, numberHint, ...form }: FormP
       title={edit ? "Edit the request" : "New inquiry"}
       description={edit ? [refNo, customerName].filter(Boolean).join(" · ") : `The number is given on save · ${numberHint ?? "RFQ"}-…`}
       onClose={() => panel.close()}
-      className="md:w-[1040px]"
+      className="md:w-[1180px]"
     >
       <DealForm
         {...form}

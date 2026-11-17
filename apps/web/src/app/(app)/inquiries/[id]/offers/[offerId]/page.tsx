@@ -10,7 +10,7 @@ import { companyToday, date } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import { optional } from "@/components/print/data";
 import { coverOf } from "@/components/deals/offer-facts";
-import { OfferDetails, OfferLines } from "@/components/deals/offer-work";
+import { OfferEdit, OfferLines, OfferTerms, type OfferKit } from "@/components/deals/offer-work";
 import { OwnPagerTop, OwnPagerUnder } from "@/components/deals/own-pager";
 import { getSettings } from "@/lib/loaders";
 import { editsOf } from "@/lib/edit-data";
@@ -22,7 +22,6 @@ import {
   copyOfferLinesAction,
   editOfferLineAction,
   moveOfferLineAction,
-  offerFieldsAction,
   removeFactoryQuoteAction,
   removeOfferLineAction,
   saveFactoryQuoteAction,
@@ -62,6 +61,21 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
     const c = y.revisions.find((r) => r.status === "draft") ?? y.revisions[0];
     return c && c.options.some((o) => o.factoryQuoteId === x.id) ? [{ id: y.id, refNo: y.refNo, number: c.number, status: c.status }] : [];
   });
+  // Every Edit on the page opens the offer's steps window on its step (Lines · Delivery · Payment · Warranty & conditions).
+  const kit: OfferKit = {
+    dealId: d.id,
+    today,
+    mainCurrency: s.currency,
+    rates: settings.sales.exchangeRates,
+    searchFactories: searchFactoriesAction,
+    saveAction: saveFactoryQuoteAction.bind(null, d.id, x.id),
+    removeAction: removeFactoryQuoteAction.bind(null, d.id, x.id),
+    removeFile: lines.removeFile,
+    items: s.items,
+    others: s.quotes.filter((o) => o.id !== x.id && o.lines.length),
+    lineActions: lines,
+    linesCard: edits?.cards.lines,
+  };
   const prev = at > 0 ? s.quotes[at - 1]! : null;
   const next = at < s.quotes.length - 1 ? s.quotes[at + 1]! : null;
   const summary = [
@@ -88,6 +102,7 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
         back={{ href: `${base}/sourcing`, label: `${d.refNo} · Factory offers` }}
         title={x.factory.name}
         summary={<p className="min-w-0">{summary.join(" · ")}</p>}
+        actions={canEdit ? <OfferEdit kit={kit} q={x} step="lines" words="Edit" size="sm" /> : undefined}
         primary={
           d.allowed.quote && x.lines.length > 0 ? (
             <ButtonLink href={`${base}/quotation?start=1&offer=${x.id}`} variant="primary" size="sm">
@@ -117,20 +132,13 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
       </PageHeader>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <OfferLines q={x} others={s.quotes.filter((o) => o.id !== x.id && o.lines.length)} items={s.items} canEdit={canEdit} mainCurrency={s.currency} lines={lines} edits={edits?.cards.lines} />
-          <OfferDetails
-            dealId={d.id}
-            q={x}
-            canEdit={canEdit}
-            today={today}
-            mainCurrency={s.currency}
-            rates={settings.sales.exchangeRates}
-            searchFactories={searchFactoriesAction}
-            saveAction={saveFactoryQuoteAction.bind(null, d.id, x.id)}
-            fieldsAction={offerFieldsAction.bind(null, d.id, x.id)}
-            removeAction={removeFactoryQuoteAction.bind(null, d.id, x.id)}
-            removeFile={lines.removeFile}
-          />
+          <OfferLines kit={kit} q={x} items={s.items} canEdit={canEdit} mainCurrency={s.currency} edits={edits?.cards.lines} />
+          <section aria-labelledby="o-terms" className="flex flex-col gap-2">
+            <h2 id="o-terms" className="text-[15px] font-semibold">
+              Terms
+            </h2>
+            <OfferTerms q={x} kit={canEdit ? kit : undefined} />
+          </section>
         </div>
         <aside aria-label="About this offer" className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
           <Side title="Quoted in" id="o-quoted">
@@ -147,6 +155,21 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
               <p className="text-[13px] text-text-2">Not quoted yet.</p>
             )}
           </Side>
+          <Side title="Their files" id="o-files">
+            {x.files.length ? (
+              <ul className="flex flex-col gap-1">
+                {x.files.map((f) => (
+                  <li key={f.id}>
+                    <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="text-[13px] font-semibold text-primary underline underline-offset-2">
+                      {f.fileName}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[13px] text-text-2">None yet: add them under Warranty &amp; conditions (Edit).</p>
+            )}
+          </Side>
           <Side title="Who and when" id="o-who" last>
             <dl className="flex flex-col gap-1.5">
               <Row label="Factory">
@@ -155,6 +178,7 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
                 </Link>
               </Row>
               {asked && <Row label="Asked">{`${date(asked.sentOn)}${asked.channel ? ` by ${REQUEST_CHANNEL_LABEL[asked.channel].toLowerCase()}` : ""}`}</Row>}
+              {x.reference && <Row label="Their ref.">{x.reference}</Row>}
               <Row label="Received">{date(x.receivedOn)}</Row>
               {x.validUntil && <Row label="Valid until">{date(x.validUntil)}</Row>}
               <Row label="Currency">{x.currency}</Row>

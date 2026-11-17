@@ -6,21 +6,18 @@ import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { LinesCard } from "@/components/orders/step-view";
 import { EditedMark } from "@/components/edits/edits";
 import { editsOf } from "@/lib/edit-data";
-import { ItemsEditor, ItemsExcel, ItemsView } from "@/components/deals/needs-cards";
-import { dealFieldsAction } from "../actions";
+import { ItemsExcel, ItemsView } from "@/components/deals/needs-cards";
 import { itemsLine } from "./steps";
 
 /**
  * "Items they asked for" on the Overview (it was the Needs tab): the items — numbered, parts under their
  * item, model, quantity, unit, target price and how many factory offers answer each — read only, with
- * Edit items for the lines editor in the wide panel and "Edited n×" for its history.
+ * Edit items opening the inquiry's window on its Items step, and "Edited n×" for its history.
  */
 export async function ItemsCard({ id }: { id: string }) {
   const me = await requireUser();
   const d = await dealOf(id);
   const sourcing = can(me, "sourcing.manage") ? await sourcingOf(id).catch(() => null) : null;
-  // Any of the deal's quotations sent to the customer.
-  const quoted = d.quotations.some((q) => q.revisions.some((r) => r.status !== "draft"));
   // How many offers price each item.
   const offers = new Map<string, number>();
   for (const q of sourcing?.quotes ?? []) for (const item of new Set(q.lines.map((l) => l.requestedItemId).filter((x): x is string => !!x))) offers.set(item, (offers.get(item) ?? 0) + 1);
@@ -78,8 +75,7 @@ export async function ItemsCard({ id }: { id: string }) {
         editLabel={d.items.length ? "Edit items" : "Add items"}
         actions={d.items.length ? <ItemsExcel items={d.items} /> : undefined}
         edits={needs}
-        panelTitle={d.items.length ? "Edit items" : "Add items"}
-        panelDescription="The customer’s items: type them, paste their list or upload Excel. A number like 1.1 is a part of item 1. Nothing is saved until Save changes."
+        editPanel={{ panel: "edit-request", id: "items" }}
         view={
           d.items.length ? (
             table
@@ -90,15 +86,6 @@ export async function ItemsCard({ id }: { id: string }) {
           )
         }
         phone={<ItemsView items={d.items} requirements={null} phone />}
-        edit={
-          <ItemsEditor
-            items={d.items}
-            action={dealFieldsAction.bind(null, d.id)}
-            upload={!quoted}
-            edit={{ type: "inquiry", id: d.id, card: "needs" }}
-            card={needs}
-          />
-        }
       />
     </div>
   );

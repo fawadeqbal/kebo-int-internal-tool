@@ -46,18 +46,29 @@ test("a new inquiry: New › Inquiry, the customer, what they need, saved", asyn
     .getByText(/^Al-Shifa Pharma Ltd/)
     .first()
     .click();
-  // In steps (design 17 Nov): Customer · Details · Files, the rail beside them.
-  await expect(window.getByRole("navigation", { name: "Steps" }).getByRole("button", { name: /Customer/ })).toHaveAttribute("aria-current", "step");
+  // In steps (design 17 Nov): Customer · Items · Details · Files, the rail beside them.
+  const rail = window.getByRole("navigation", { name: "Steps" });
+  for (const step of ["Customer", "Items", "Details", "Files"]) await expect(rail.getByRole("button", { name: new RegExp(`: ${step}`) })).toBeVisible();
+  await expect(rail.getByRole("button", { name: /Customer/ })).toHaveAttribute("aria-current", "step");
+  await window.getByRole("button", { name: /^Next/ }).click();
+  // Items: typed in the sheet (the first one, then its quantity), saved with the inquiry.
+  await expect(rail.getByRole("button", { name: /: Items/ })).toHaveAttribute("aria-current", "step");
+  await window.getByRole("textbox", { name: "New item: Description" }).fill("Bottle filling machine, 2,000 bph");
+  await window.getByRole("textbox", { name: "New item: Qty" }).fill("1");
+  await window.getByRole("textbox", { name: "New item: Qty" }).press("Enter");
+  await expect(window.getByRole("grid").getByRole("row", { name: "Item 1" })).toContainText("Bottle filling machine");
+  await expect(rail.getByRole("button", { name: /: Items/ })).toContainText("1 item");
   await window.getByRole("button", { name: /^Next/ }).click();
   await window.locator("#category").selectOption({ index: 1 });
   await window.locator("#title").fill(title);
-  await window.locator("#requirements").fill("A filling line, 2,000 bottles an hour.");
+  // With an item listed, what they need may stay empty.
   await window.getByRole("button", { name: /^Next/ }).click();
   await expect(window.getByText("Add files")).toBeVisible();
   await window.getByRole("button", { name: "Save inquiry" }).click();
 
   await expect(page).toHaveURL(/\/inquiries\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(title);
+  await expect(page.locator("#items")).toContainText("Bottle filling machine, 2,000 bph");
   // The note names it: its number, what it is and for whom.
   const note = page.locator("[data-note=done]");
   await expect(note).toContainText(/Inquiry RFQ-\d{4}-\d{4} added/);

@@ -28,11 +28,11 @@ describe("a new factory offer starts fresh", () => {
 
   it("choosing a factory fills nothing from its last offer", async () => {
     show();
-    // The window is in steps (design 17 Nov): Offer · Delivery · Payment · Warranty & conditions.
-    const step = (name: RegExp) => fireEvent.click(screen.getByRole("navigation", { name: "Steps" }).querySelectorAll("button")[["Offer", "Delivery", "Payment", "Warranty"].findIndex((n) => name.test(n))]!);
+    // The window is in steps (design 17 Nov): Lines · Delivery · Payment · Warranty & conditions.
+    const step = (name: RegExp) => fireEvent.click(screen.getByRole("navigation", { name: "Steps" }).querySelectorAll("button")[["Lines", "Delivery", "Payment", "Warranty"].findIndex((n) => name.test(n))]!);
     step(/Delivery/);
     fireEvent.change(document.getElementById("leadDays") as HTMLInputElement, { target: { value: "40" } });
-    step(/Offer/);
+    step(/Lines/);
     fireEvent.focus(screen.getByPlaceholderText(/search factories/i));
     fireEvent.mouseDown(await screen.findByText("Jiangsu Filling Machinery"));
     await waitFor(() => expect(screen.getAllByText("Jiangsu Filling Machinery").length).toBeGreaterThan(0));

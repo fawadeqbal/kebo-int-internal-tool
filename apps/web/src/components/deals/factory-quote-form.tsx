@@ -510,10 +510,24 @@ export function OfferHeaderForm({
   note,
   footer,
   footerStart,
-  startStep = "offer",
+  startStep = "lines",
+  step: stepAsked,
+  onStep,
+  lines,
+  linesSummary,
+  extra,
 }: {
   /** Where the window opens (design 17 Nov: the offer in steps). */
   startStep?: OfferStep;
+  /** The step, when the window keeps it (it opens the Lines step after a refused save of the lines). */
+  step?: OfferStep;
+  onStep?: (step: OfferStep) => void;
+  /** The Lines step's sheet, under the offer's own fields; it is told the currency and tax being typed. */
+  lines?: (h: { currency: string; taxRate: number; taxIncluded: boolean; errors: string[] }) => ReactNode;
+  /** More of the saved body (a new offer's lines go in the same save). */
+  extra?: Record<string, unknown>;
+  /** "7 lines", for the rail. */
+  linesSummary?: string;
   /** Left of the buttons on the first step (Remove this offer). */
   footerStart?: ReactNode;
   action: Action;
@@ -539,7 +553,9 @@ export function OfferHeaderForm({
   }));
   const [s, setS] = useState<QuoteState>(start);
   const set = <K extends keyof QuoteState>(k: K, v: QuoteState[K]) => setS((st) => ({ ...st, [k]: v }));
-  const [step, setStep] = useState<OfferStep>(startStep);
+  const [stepOwn, setStepOwn] = useState<OfferStep>(startStep);
+  const step = stepAsked ?? stepOwn;
+  const setStep = onStep ?? setStepOwn;
   const at = OFFER_STEPS.findIndex((x) => x.key === step);
   // Every new offer starts fresh (nothing is filled from the factory's last offer: decided 16 Nov 2026).
   const pickFactory = (f: QuoteState["factory"]) => set("factory", f);
@@ -627,11 +643,11 @@ export function OfferHeaderForm({
     >
       {(st) => (
         <>
-          <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
+          <input type="hidden" name="payload" value={JSON.stringify({ ...payload(s, canConvert), ...extra })} />
           {/* The factory's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
           <input type="hidden" name="factoryLabel" value={s.factory?.name ?? ""} />
           <StepsFrame
-            steps={offerStepsInfo(s, at, !!quote)}
+            steps={offerStepsInfo(s, at, !!quote, linesSummary)}
             at={step}
             onGo={setStep}
             footer={
@@ -654,7 +670,7 @@ export function OfferHeaderForm({
             }
           >
           <JumpToError st={st} onJump={setStep} />
-          {step === "offer" && (
+          {step === "lines" && (
           <>
           <PanelSection title="Who and when" first className="md:grid-cols-3">
             <Field
@@ -708,6 +724,11 @@ export function OfferHeaderForm({
               note={quote ? taxRateNote(quote.lines, quote.taxRate, s.taxRate) : undefined}
             />
           </PanelSection>
+          {lines && (
+            <PanelSection title="Lines" className="sm:grid-cols-1">
+              {lines({ currency, taxRate: Number(s.taxRate || 0), taxIncluded: s.taxIncluded ?? false, errors: lineErrors(st.errors) })}
+            </PanelSection>
+          )}
           </>
           )}
           {step === "delivery" && (
@@ -837,20 +858,20 @@ export function OfferHeaderForm({
   );
 }
 
-/** The offer's steps (design 17 Nov): who and when with its price and tax, then its terms. Its lines have their own sheet (Edit lines). */
-export type OfferStep = "offer" | "delivery" | "payment" | "warranty";
+/** The offer's steps (design 17 Nov): its lines (with who, when, the currency and the tax above them), then its terms. */
+export type OfferStep = "lines" | "delivery" | "payment" | "warranty";
 const OFFER_STEPS: { key: OfferStep; label: string }[] = [
-  { key: "offer", label: "Offer" },
+  { key: "lines", label: "Lines" },
   { key: "delivery", label: "Delivery" },
   { key: "payment", label: "Payment" },
   { key: "warranty", label: "Warranty & conditions" },
 ];
 
 /** Each step with what it holds now ("Shenjing · CNY · tax 13% incl."). */
-function offerStepsInfo(s: QuoteState, at: number, saved: boolean): StepInfo<OfferStep>[] {
+function offerStepsInfo(s: QuoteState, at: number, saved: boolean, lines?: string): StepInfo<OfferStep>[] {
   const rate = Number(s.taxRate || 0);
   const summary: Record<OfferStep, string> = {
-    offer: [s.factory?.name, s.currency.trim().toUpperCase(), rate > 0 ? `tax ${rate}%${s.taxIncluded ? " incl." : ""}` : "no tax"].filter(Boolean).join(" · "),
+    lines: [s.factory?.name, lines, s.currency.trim().toUpperCase(), rate > 0 ? `tax ${rate}%${s.taxIncluded ? " incl." : ""}` : "no tax"].filter(Boolean).join(" · "),
     delivery: [s.basis ? `${s.basis}${s.basisPlace ? ` ${s.basisPlace}` : ""}` : null, s.leadDays.trim() ? `${s.leadDays.trim()} days` : s.leadTime || null].filter(Boolean).join(" · "),
     payment: s.parts.map((p) => `${p.share}%`).join(" · "),
     warranty: [s.warrantyMonths.trim() ? `${s.warrantyMonths.trim()} months` : null, s.moq.trim() ? `MOQ ${s.moq.trim()}` : null].filter(Boolean).join(" · "),
@@ -876,10 +897,22 @@ const FIELD_STEP: Record<string, OfferStep> = {
 };
 
 /** A save refused for a field on another step opens that step, so the field and its message are in view. */
+/** What the API said about the lines of a new offer ("lines.2.unitPrice") as "Line 3: Enter the factory's price". */
+function lineErrors(errors: ActionState["errors"]): string[] {
+  const out: string[] = [];
+  for (const [key, list] of Object.entries(errors ?? {})) {
+    if (!list?.length || (key !== "lines" && !key.startsWith("lines."))) continue;
+    const n = Number(key.split(".")[1]);
+    const say = Number.isInteger(n) ? `Line ${n + 1}: ${list[0]}` : list[0]!;
+    if (!out.includes(say)) out.push(say);
+  }
+  return out;
+}
+
 function JumpToError({ st, onJump }: { st: ActionState; onJump: (step: OfferStep) => void }) {
   useEffect(() => {
     const first = Object.keys(st.errors ?? {}).find((k) => st.errors?.[k]?.length);
-    if (first) onJump(FIELD_STEP[first] ?? "offer");
+    if (first) onJump(FIELD_STEP[first] ?? "lines");
   }, [st, onJump]);
   return null;
 }

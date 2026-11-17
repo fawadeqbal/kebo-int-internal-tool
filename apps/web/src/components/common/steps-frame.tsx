@@ -101,7 +101,8 @@ export function StepsFrame<K extends string>({
           </ol>
         </nav>
         <div data-step-body className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto px-6 pt-5 pb-6 *:shrink-0 max-md:px-4">
-          <div className="flex min-h-7 items-center gap-3">
+          {/* On a phone the bar above says the step: its heading is for screen readers only, and takes no room. */}
+          <div className={cn("flex min-h-7 items-center gap-3", !heading && "max-md:contents")}>
             <h3 className="text-lg leading-7 font-bold max-md:sr-only">{current.label}</h3>
             {heading && <span className="ml-auto">{heading}</span>}
           </div>
