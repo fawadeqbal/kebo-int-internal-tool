@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, CircleCheck, Download, Eye, FileText, History, List, Paperclip, Pencil, Sparkles, Trash2, UserRound } from "lucide-react";
 import {
   ATTACHMENT_KIND_LABEL,
   CHANNEL_LABEL,
@@ -286,6 +286,17 @@ export function DealForm({
     fieldChanges.some((c) => c.key === "customer"),
     itemChanges.length > 0,
   );
+  /** How many changes each part has (the side bar's counts). */
+  const changesIn = (k: string) =>
+    k === "customer" || k === "details"
+      ? fieldChanges.filter((c) => PART_OF[c.key] === (k === "customer" ? "Customer" : "Details")).length
+      : k === "items"
+        ? itemChanges.length
+        : k === "files"
+          ? staged.length
+          : k === "changes"
+            ? total
+            : 0;
   const needWhy = !create && total > 0;
   const canSave = create || (total > 0 && !!why?.trim());
   const undo = (k: Change["key"]) => {
@@ -391,11 +402,15 @@ export function DealForm({
                           : files.length + staged.length
                             ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
                             : undefined,
-                done: !create || k < at,
+                done: create && k < at,
+                icon: STEP_ICON[x.key],
+                count: create ? undefined : changesIn(x.key) || undefined,
+                apart: x.key === "review" || x.key === "changes",
               }))}
               at={step}
               onGo={setStep}
               single={only}
+              fill={step === "items"}
               footer={
                 step === "customer" && adding !== null ? (
                   <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
@@ -415,6 +430,16 @@ export function DealForm({
                     </Button>
                   </div>
                 ) : !create ? (
+                  <>
+                  {only && step === "items" && needWhy && (
+                    <ReasonChips
+                      strip
+                      choices={reasonChoices}
+                      value={why ?? ""}
+                      onChange={(r) => setWhy(r)}
+                      title={total === 1 ? "Why the change?" : "Why these changes?"}
+                    />
+                  )}
                   <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
                     {!only && at > 0 ? (
                       <Button
@@ -453,6 +478,7 @@ export function DealForm({
                       </>
                     )}
                   </div>
+                  </>
                 ) : (
                   <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
                     {/* One strong button (design rules 18 Nov): Next is soft, Back and Review are words; ✕ closes, there is no Cancel. */}
@@ -520,7 +546,7 @@ export function DealForm({
                     }}
                   />
                 ) : (
-                  <PanelSection quiet title="Who asked" first className="md:grid-cols-3">
+                  <PanelSection quiet title="Who asked" first className="md:grid-cols-2 md:gap-x-5 md:gap-y-4">
                     <Field
                       label="Customer"
                       htmlFor="customer"
@@ -571,11 +597,32 @@ export function DealForm({
                       {changedNote("contactId")}
                     </Field>
                     <Field
+                      label="Responsible person"
+                      htmlFor="assigneeId"
+                      error={s.errors?.assigneeId}
+                      className={changedField("assigneeId")}
+                    >
+                      <Select
+                        id="assigneeId"
+                        value={v.assigneeId}
+                        onChange={(e) => set("assigneeId", e.target.value)}
+                        disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}
+                      >
+                        {assignable.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.id === meId ? `${p.name} (me)` : p.name}
+                          </option>
+                        ))}
+                        <option value="">Nobody yet</option>
+                      </Select>
+                      {changedNote("assigneeId")}
+                    </Field>
+                                      <Field
                       label="Came by"
                       htmlFor="channel"
                       required
                       error={s.errors?.channel}
-                      className={cn("md:col-span-3", changedField("channel"))}
+                      className={cn("md:col-span-2", changedField("channel"))}
                     >
                       <ChoiceChips
                         id="channel"
@@ -598,33 +645,13 @@ export function DealForm({
                       <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
                       {changedNote("requiredBy")}
                     </Field>
-                    <Field
-                      label="Responsible person"
-                      htmlFor="assigneeId"
-                      error={s.errors?.assigneeId}
-                      className={changedField("assigneeId")}
-                    >
-                      <Select
-                        id="assigneeId"
-                        value={v.assigneeId}
-                        onChange={(e) => set("assigneeId", e.target.value)}
-                        disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}
-                      >
-                        {assignable.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.id === meId ? `${p.name} (me)` : p.name}
-                          </option>
-                        ))}
-                        <option value="">Nobody yet</option>
-                      </Select>
-                      {changedNote("assigneeId")}
-                    </Field>
-                  </PanelSection>
+</PanelSection>
                 ))}
 
               {step === "items" && (
-                <PanelSection quiet title="Items they asked for" first className="sm:grid-cols-1">
+                <PanelSection quiet title="Items they asked for" first fill className="sm:grid-cols-1">
                   <LineTable
+                    fill
                     rows={sheet.rows}
                     columns={ITEM_COLUMNS}
                     noun="item"
@@ -650,7 +677,7 @@ export function DealForm({
               )}
 
               {step === "details" && (
-                <PanelSection quiet title="What they need" first className="md:grid-cols-3">
+                <PanelSection quiet title="What they need" first className="md:grid-cols-2 md:gap-x-5 md:gap-y-4">
                   <Field
                     label="Inquiry title"
                     htmlFor="title"
@@ -714,7 +741,7 @@ export function DealForm({
                     label="Priority"
                     htmlFor="priority"
                     error={s.errors?.priority}
-                    className={cn("md:col-span-3", changedField("priority"))}
+                    className={cn(only && "md:col-span-2", changedField("priority"))}
                   >
                     <ChoiceChips
                       id="priority"
@@ -731,7 +758,7 @@ export function DealForm({
                     htmlFor="requirements"
                     required={required}
                     error={s.errors?.requirements}
-                    className={cn("md:col-span-3", changedField("requirements"))}
+                    className={cn("md:col-span-2", changedField("requirements"))}
                   >
                     <Textarea
                       id="requirements"
@@ -875,73 +902,109 @@ export function DealForm({
                 </PanelSection>
               )}
 
-              {only && reasonBox}
+              {only && step !== "items" && reasonBox}
               {step === "changes" && (
                 <div className="flex flex-col gap-3.5">
                   {total ? (
-                    <ul aria-label="What changed" className="overflow-hidden rounded-xl border border-line text-[13.5px]">
+                    <div
+                      role="table"
+                      aria-label="What changed"
+                      className="overflow-hidden rounded-xl border border-line text-[13.5px] max-sm:[&>[role=row]:nth-child(2)]:border-t-0"
+                    >
+                      <div role="row" className={cn(CHANGE_ROW, "h-9 border-t-0 bg-surface-2 py-0 text-xs font-semibold text-text-2 max-sm:hidden")}>
+                        <span role="columnheader">Part</span>
+                        <span role="columnheader">What</span>
+                        <span role="columnheader">Was</span>
+                        <span role="columnheader">Now</span>
+                        <span role="columnheader">
+                          <span className="sr-only">Undo</span>
+                        </span>
+                      </div>
                       {fieldChanges.map((c) => (
-                        <li
-                          key={c.key}
-                          className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-baseline gap-3 border-t border-line px-4 py-2.5 first:border-t-0 max-sm:grid-cols-[minmax(0,1fr)_auto]"
-                        >
-                          <span className="text-text-2 max-sm:hidden">{PART_OF[c.key]}</span>
-                          <span className="min-w-0">
-                            <span className="text-text-2">{c.label}: </span>
-                            <s className="text-muted">{c.from}</s> → <b className="font-semibold">{c.to}</b>
+                        <div role="row" key={c.key} className={CHANGE_ROW}>
+                          <span role="cell" className="text-text-2 max-sm:hidden">
+                            {PART_OF[c.key]}
                           </span>
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="ghost"
-                            onClick={() => undo(c.key)}
-                            className="text-primary hover:text-primary"
-                            aria-label={`Undo: ${c.label}`}
-                          >
-                            Undo
-                          </Button>
-                        </li>
+                          <span role="cell" className="min-w-0">
+                            <span className="text-text-2 sm:text-text">
+                              <span className="sm:hidden">{PART_OF[c.key]} · </span>
+                              {c.label}
+                            </span>
+                            {/* A phone has no room for two more columns: old → new under the name. */}
+                            <span className="block sm:hidden">
+                              <s className="text-muted">{c.from}</s> → <b className="font-semibold">{c.to}</b>
+                            </span>
+                          </span>
+                          <span role="cell" title={c.from} className="min-w-0 truncate max-sm:hidden">
+                            <s className="text-muted">{c.from}</s>
+                          </span>
+                          <span role="cell" title={c.to} className="min-w-0 truncate font-semibold max-sm:hidden">
+                            {c.to}
+                          </span>
+                          <span role="cell" className="text-right">
+                            <Button
+                              type="button"
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => undo(c.key)}
+                              className="text-primary hover:text-primary"
+                              aria-label={`Undo: ${c.label}`}
+                            >
+                              Undo
+                            </Button>
+                          </span>
+                        </div>
                       ))}
                       {itemChanges.length > 0 && (
-                        <li className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-baseline gap-3 border-t border-line px-4 py-2.5 first:border-t-0 max-sm:grid-cols-[minmax(0,1fr)_auto]">
-                          <span className="text-text-2 max-sm:hidden">Items</span>
-                          <span className="flex min-w-0 flex-col gap-0.5">
+                        <div role="row" className={CHANGE_ROW}>
+                          <span role="cell" className="text-text-2 max-sm:hidden">
+                            Items
+                          </span>
+                          <span role="cell" className="flex min-w-0 flex-col gap-0.5 sm:col-span-3">
+                            <span className="text-text-2 sm:hidden">Items</span>
                             {itemChanges.slice(0, 8).map((x) => (
                               <span key={x}>{x}</span>
                             ))}
                             {itemChanges.length > 8 && <span className="text-text-2">and {itemChanges.length - 8} more</span>}
                           </span>
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="ghost"
-                            onClick={() => sheet.reset()}
-                            className="text-primary hover:text-primary"
-                            aria-label="Undo the changes to the items"
-                          >
-                            Undo
-                          </Button>
-                        </li>
+                          <span role="cell" className="text-right">
+                            <Button
+                              type="button"
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => sheet.reset()}
+                              className="text-primary hover:text-primary"
+                              aria-label="Undo the changes to the items"
+                            >
+                              Undo
+                            </Button>
+                          </span>
+                        </div>
                       )}
                       {staged.length > 0 && (
-                        <li className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-baseline gap-3 border-t border-line px-4 py-2.5 first:border-t-0 max-sm:grid-cols-[minmax(0,1fr)_auto]">
-                          <span className="text-text-2 max-sm:hidden">Files</span>
-                          <span>
+                        <div role="row" className={CHANGE_ROW}>
+                          <span role="cell" className="text-text-2 max-sm:hidden">
+                            Files
+                          </span>
+                          <span role="cell" className="min-w-0 sm:col-span-3">
+                            <span className="text-text-2 sm:hidden">Files · </span>
                             {staged.length} to add: {staged.map((f) => f.file.name).join(", ")}
                           </span>
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="ghost"
-                            onClick={() => setStaged([])}
-                            className="text-primary hover:text-primary"
-                            aria-label="Undo the files to add"
-                          >
-                            Undo
-                          </Button>
-                        </li>
+                          <span role="cell" className="text-right">
+                            <Button
+                              type="button"
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => setStaged([])}
+                              className="text-primary hover:text-primary"
+                              aria-label="Undo the files to add"
+                            >
+                              Undo
+                            </Button>
+                          </span>
+                        </div>
                       )}
-                    </ul>
+                    </div>
                   ) : (
                     <p className="text-sm text-text-2">Nothing changed.</p>
                   )}
@@ -1295,6 +1358,18 @@ export function numbered<T extends Pick<LineRow, "key" | "parentKey">>(rows: T[]
 const personName = (people: PersonWithRole[], id: string, meId: string) =>
   id ? `${people.find((p) => p.id === id)?.name ?? "Someone"}${id === meId ? " (me)" : ""}` : "Nobody yet";
 
+/** The side bar's icons (design 18 Nov). */
+const STEP_ICON: Record<string, typeof UserRound> = {
+  customer: UserRound,
+  items: List,
+  details: FileText,
+  files: Paperclip,
+  review: CircleCheck,
+  changes: History,
+};
+/** A row of the Changes table: Part · What · Was · Now · Undo on fixed columns; on a phone, What and Undo. */
+const CHANGE_ROW =
+  "grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-t border-line px-4 py-2 sm:grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,9.5rem)_minmax(0,9.5rem)_4rem]";
 /** One change in an edit: which field, its name, and old → new in words. */
 type Change = { key: keyof DealFormValues; label: string; from: string; to: string };
 const PART_OF: Record<keyof DealFormValues, string> = {

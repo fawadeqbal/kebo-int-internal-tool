@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Plus,
   Search,
+  SquareCheck,
   Trash2,
   X,
 } from "lucide-react";
@@ -112,6 +113,11 @@ export interface LineTableProps {
   sheet?: { name: string; upload?: boolean; templateRows?: { no: string; values: LineValues }[] };
   /** Lines that look the same (description and model) are tagged "Same as 1?" — nothing is removed. */
   duplicates?: boolean;
+  /**
+   * In a window, the list takes the rest of it (design 18 Nov): on a laptop the lines scroll inside the box, the
+   * tools above and the column names staying on top; on a phone Add and the count stay on top as the window scrolls.
+   */
+  fill?: boolean;
 }
 
 /* ---------------------------------------------------------------- helpers */
@@ -190,6 +196,9 @@ export function sameAs(rows: { key: string; values: LineValues }[], numbers: str
 
 /* ---------------------------------------------------------------- the table */
 
+/** Column names that stay on top while the lines scroll under them (a list filling a window). */
+const STICKY_HEAD = "md:sticky md:top-0 md:z-[3] md:shadow-[inset_0_-1px_0_var(--color-line)]";
+
 type Pending = { run: (reason: string) => Promise<LineResult>; message: string; choices: string[] };
 type Removed = { label: string; lines: NewLine[]; at: { afterKey: string | null; parentKey: string | null } };
 /** Something that can be done to a row; `short` is the toolbar's label, `hint` its key. */
@@ -220,6 +229,7 @@ export function LineTable({
   flat,
   sheet,
   duplicates = false,
+  fill = false,
 }: LineTableProps) {
   const numbers = useMemo(() => lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey }))), [rows]);
   const dupOf = useMemo(() => (duplicates ? sameAs(rows, numbers) : new Map<string, string>()), [duplicates, rows, numbers]);
@@ -271,6 +281,7 @@ export function LineTable({
   // Ticked lines (design rules 18 Nov): the dark bar above acts on them all.
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [selecting, setSelecting] = useState(false);
+  const phone = useIsPhone();
   const [askDelete, setAskDelete] = useState(false);
   const togglePick = (key: string) =>
     setPicked((p) => {
@@ -762,9 +773,21 @@ export function LineTable({
     setSelecting(false);
   };
   const pickedLabel = `${pickedRows.length} selected`;
-  const selectionBar = !readOnly && pickedRows.length > 0 && (
-    <div role="toolbar" aria-label={pickedLabel} className="sticky top-0 z-10 flex min-h-11 flex-wrap items-center gap-0.5 rounded-[10px] bg-text px-2 py-1 text-surface shadow-card">
-      <span className="mr-2 pl-1.5 text-sm font-bold">{pickedLabel}</span>
+  const stopSelecting = () => {
+    setPicked(new Set());
+    setSelecting(false);
+  };
+  const selectionBar = !readOnly && (pickedRows.length > 0 || (selecting && !phone)) && (
+    <div
+      role="toolbar"
+      aria-label={pickedRows.length ? pickedLabel : "Select lines"}
+      className="sticky top-0 z-10 flex min-h-11 flex-wrap items-center gap-0.5 rounded-[10px] border border-primary-line bg-primary-soft px-2 py-1 text-text"
+    >
+      <span className="mr-2 inline-flex h-6 items-center border-r border-primary-line pr-3.5 pl-1.5 text-sm font-bold text-primary">
+        {pickedRows.length ? pickedLabel : `Tick the ${noun}s to work on`}
+      </span>
+      {pickedRows.length > 0 && (
+        <>
       {!flat && pickedRows.some((r) => !r.parentKey) && (
         <BarButton onClick={() => void bulk("in")} disabled={busy !== null}>
           <IndentIncrease aria-hidden /> Make parts
@@ -787,22 +810,17 @@ export function LineTable({
       <BarButton onClick={() => setAskDelete(true)} disabled={busy !== null} danger>
         <Trash2 aria-hidden /> Delete
       </BarButton>
+        </>
+      )}
       <span className="flex-1" />
-      <BarButton
-        onClick={() => {
-          setPicked(new Set());
-          setSelecting(false);
-        }}
-        aria-label="Clear the selection"
-      >
-        <X aria-hidden />
-      </BarButton>
+      <Button size="sm" variant="secondary" onClick={stopSelecting}>
+        Done
+      </Button>
     </div>
   );
 
   /* ---------- on a phone (design 16 Nov): a list, and one line at a time in a window of its own */
 
-  const phone = useIsPhone();
   const Noun = noun[0]!.toUpperCase() + noun.slice(1);
   const [editing, setEditing] = useState<{ key: string | null; at: { afterKey: string | null; parentKey: string | null }; n: number; added?: string } | null>(null);
   const [needsOnly, setNeedsOnly] = useState(false);
@@ -944,17 +962,6 @@ export function LineTable({
   })();
   // What the new line can be: an item, or a part of one of the lines here.
   const kinds = flat ? [] : rows.map((r, i) => ({ key: r.key, no: numbers[i]!, top: !r.parentKey })).filter((k) => k.top);
-  const setKind = (parentKey: string | null) => {
-    const lastPart = parentKey ? [...rows].reverse().find((x) => x.parentKey === parentKey) : null;
-    setEntryAt(parentKey ? { afterKey: lastPart?.key ?? parentKey, parentKey } : { afterKey: null, parentKey: null });
-    setEntry((v) => ({
-      ...v,
-      ...Object.fromEntries(
-        columns.filter((c) => typeof c.initial === "function").map((c) => [c.key, (c.initial as (p: string | null) => string)(parentKey)]),
-      ),
-    }));
-    focus(entryCell(editable[0]!.key));
-  };
   const canBePart = !flat && (entryAt.parentKey !== null || lineAbove(rows, entryIndex >= 0 ? blockEnd(rows, entryIndex) : rows.length) !== null);
 
   const entryRow = readOnly ? null : (
@@ -982,25 +989,6 @@ export function LineTable({
         >
           {c.input ? (
             <div className="flex items-start gap-1">
-            {/* Item or part (design rules 18 Nov): the line being typed says what it is, and can be changed. */}
-            {c === editable[0] && kinds.length > 0 && (
-              <select
-                aria-label={`New ${noun}: ${Noun} or part`}
-                value={entryAt.parentKey ?? ""}
-                onChange={(e) => setKind(e.target.value || null)}
-                className={cn(
-                  "h-[42px] shrink-0 cursor-pointer appearance-none rounded-lg border-0 py-0 pr-2 pl-2.5 text-[12.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                  entryAt.parentKey ? "bg-primary-soft text-primary" : "bg-surface-3 text-text-2",
-                )}
-              >
-                <option value="">{Noun}</option>
-                {kinds.map((k) => (
-                  <option key={k.key} value={k.key}>
-                    Part of {k.no}
-                  </option>
-                ))}
-              </select>
-            )}
             <GridInput
               boxed
               col={c}
@@ -1031,16 +1019,19 @@ export function LineTable({
         {busy === "entry" ? (
           <Loader2 className="mx-auto size-4 animate-spin text-muted" aria-label="Saving" />
         ) : (
-          <span className="flex justify-center gap-0.5">
+          <span className="flex items-center justify-end gap-0.5 pr-1">
             <Button
-              size="icon-sm"
+              size="sm"
               variant="brand"
               onClick={() => void submitEntry()}
               aria-label={`Add the ${noun}`}
-              title="Add (Enter)"
+              aria-keyshortcuts="Enter"
               disabled={isBlank(entry, columns, entryAt.parentKey)}
+              className="gap-1.5 pr-2 pl-2.5"
             >
-              <Check aria-hidden />
+              <Check aria-hidden /> Add
+              {/* The key, drawn (not text): the button's name stays "Add the item". */}
+              {!inline && !flat && <kbd aria-hidden className="rounded bg-white/20 px-1.5 font-sans text-[11px] leading-5 font-semibold before:content-['Enter']" />}
             </Button>
             {inline && (
               <Button size="icon-xs" variant="ghost" onClick={() => setEntryAt({ afterKey: null, parentKey: null })} aria-label="Stop adding here" title="Esc">
@@ -1051,6 +1042,23 @@ export function LineTable({
         )}
       </td>
     </tr>
+  );
+
+  const phoneCount = !readOnly && rows.length > 0 && (
+      <div className="flex items-center justify-between gap-2 text-[13px] text-text-2">
+        <span>{countWords(rows, noun)}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setSelecting((x) => !x);
+            setPicked(new Set());
+          }}
+          className="text-primary hover:text-primary"
+        >
+          {selecting ? "Done" : "Select"}
+        </Button>
+      </div>
   );
 
   // On a phone: one line per row (tap to open it in its window), ⋯ for what can be done to it.
@@ -1072,22 +1080,6 @@ export function LineTable({
               {f.label} <b className="tabular">{f.n}</b>
             </button>
           ))}
-        </div>
-      )}
-      {!readOnly && rows.length > 0 && (
-        <div className="flex items-center justify-between gap-2 text-[13px] text-text-2">
-          <span>{countWords(rows, noun)}</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setSelecting((x) => !x);
-              setPicked(new Set());
-            }}
-            className="text-primary hover:text-primary"
-          >
-            {selecting ? "Done" : "Select"}
-          </Button>
         </div>
       )}
       <div className="overflow-hidden rounded-lg border border-line bg-surface">
@@ -1154,9 +1146,17 @@ export function LineTable({
     </div>
   );
 
+  const toolsShown = (rows.length > 8 || anyParts || tools || !readOnly || sheet) && !(selecting && !phone);
   return (
-    <div className="flex flex-col gap-2">
-      {(rows.length > 8 || anyParts || tools || !readOnly || sheet) && (
+    <div className={cn("flex flex-col gap-2", fill && "md:min-h-0 md:flex-1")}>
+      <div
+        className={cn(
+          "flex flex-col gap-2 empty:hidden",
+          // A phone: Add and the count stay on top while the window scrolls.
+          fill && phone && "sticky top-0 z-20 -mx-4 -mt-1 bg-surface px-4 pt-1 pb-2 shadow-[0_1px_0_var(--color-line)]",
+        )}
+      >
+      {toolsShown && (
         <div className="flex flex-wrap items-center gap-2">
           {/* Add first (design rules 18 Nov): the main thing done here, then the other ways in. */}
           {!readOnly && (
@@ -1194,7 +1194,7 @@ export function LineTable({
           {tools}
           {sheet && (
             <ExcelMenu
-              className="ml-auto"
+              className={cn(!(!readOnly && !phone && rows.length > 0) && "ml-auto")}
               noun={`${noun}s`}
               template={
                 canUpload
@@ -1212,8 +1212,24 @@ export function LineTable({
               exportSheet={rows.length ? () => lineExport({ name: sheet.name, columns, rows, numbers }) : undefined}
             />
           )}
+          {/* Tick boxes only when asked for (design 18 Nov): the table stays clean; Done turns them off. */}
+          {!readOnly && !phone && rows.length > 0 && <span className="ml-auto text-[13px] text-text-2">{countWords(rows, noun)}</span>}
+          {!readOnly && !phone && rows.length > 0 && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setSelecting(true);
+                setPicked(new Set());
+              }}
+            >
+              <SquareCheck aria-hidden /> Select
+            </Button>
+          )}
         </div>
       )}
+      {phone && phoneCount}
+      </div>
 
       {fromFile && (
         <FilePanel
@@ -1245,29 +1261,29 @@ export function LineTable({
       {phone ? (
         phoneList
       ) : (
-      <div className="overflow-hidden rounded-lg border border-line bg-surface">
+      <div className={cn("overflow-hidden rounded-lg border border-line bg-surface", fill && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
         {/* Read-only lines have nothing to tab to inside, so the table itself takes the keyboard (arrow keys scroll
             it sideways); editable lines are reached through their cells. */}
         <div
           ref={gridRef}
           tabIndex={readOnly ? 0 : -1}
           onKeyDown={gridKeyDown}
-          className={cn("relative overflow-x-auto", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
+          className={cn("relative overflow-x-auto", fill && "md:min-h-0 md:flex-1 md:overflow-auto", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
           aria-label={`${noun[0]!.toUpperCase()}${noun.slice(1)}s`}
           role="region"
         >
           <table role="grid" aria-rowcount={rows.length + 1} className="w-full border-collapse [&_tr>*:first-child]:border-l-0 [&_tr>*:last-child]:border-r-0" style={{ minWidth }}>
             <colgroup>
-              <col style={{ width: readOnly ? "3rem" : anyParts ? "5.5rem" : "4.5rem" }} />
+              <col style={{ width: readOnly ? "3rem" : selecting ? (anyParts ? "5.5rem" : "4.5rem") : anyParts ? "4rem" : "3rem" }} />
               {columns.map((c) => (
                 <col key={c.key} style={{ width: widthOf(c.width) }} />
               ))}
-              {!readOnly && <col style={{ width: flat ? "3rem" : "6rem" }} />}
+              {!readOnly && <col style={{ width: flat ? "6rem" : "7.75rem" }} />}
             </colgroup>
             <thead>
               <tr>
-                <th scope="col" className="h-8 border border-t-0 border-line bg-surface-2 px-1 text-center text-xs font-medium text-muted">
-                  {readOnly ? (
+                <th scope="col" className={cn("h-8 border border-t-0 border-line bg-surface-2 px-1 text-center text-xs font-medium text-muted", fill && STICKY_HEAD)}>
+                  {readOnly || !selecting ? (
                     "No."
                   ) : (
                     <span className="inline-flex items-center gap-2">
@@ -1290,13 +1306,13 @@ export function LineTable({
                   <th
                     key={c.key}
                     scope="col"
-                    className={cn("h-8 border border-t-0 border-line bg-surface-2 px-2 text-left text-xs font-medium whitespace-nowrap text-text-2", c.align === "right" && "text-right")}
+                    className={cn("h-8 border border-t-0 border-line bg-surface-2 px-2 text-left text-xs font-medium whitespace-nowrap text-text-2", c.align === "right" && "text-right", fill && STICKY_HEAD)}
                   >
                     {c.label}
                   </th>
                 ))}
                 {!readOnly && (
-                  <th scope="col" className="h-8 border border-t-0 border-line bg-surface-2">
+                  <th scope="col" className={cn("h-8 border border-t-0 border-line bg-surface-2", fill && STICKY_HEAD)}>
                     <span className="sr-only">Actions</span>
                   </th>
                 )}
@@ -1379,7 +1395,7 @@ export function LineTable({
                             {folded.has(r.key) ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
                           </button>
                         ) : null}
-                        {!readOnly && (
+                        {!readOnly && selecting ? (
                           <input
                             type="checkbox"
                             aria-label={`Select ${label}`}
@@ -1387,6 +1403,8 @@ export function LineTable({
                             onChange={() => togglePick(r.key)}
                             className={cn("mr-1.5 size-4 cursor-pointer accent-primary-solid", anyParts && "ml-4")}
                           />
+                        ) : (
+                          anyParts && !readOnly && <span aria-hidden className="w-4" />
                         )}
                         {no}
                       </span>
@@ -2133,8 +2151,8 @@ function BarButton({ children, danger, className, ...props }: ComponentProps<"bu
     <button
       type="button"
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-semibold hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-current disabled:opacity-40 [&_svg]:size-4",
-        danger && "text-[#ffb4a8] dark:text-bad",
+        "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-semibold text-text hover:bg-surface/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-text-2",
+        danger && "text-bad [&_svg]:text-bad",
         className,
       )}
       {...props}
