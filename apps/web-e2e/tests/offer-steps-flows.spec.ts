@@ -97,7 +97,7 @@ test("a new offer: the lines in its Lines step, saved with it in one go; a wrong
   expect(errors).toEqual([]);
 });
 
-test("an offer's Edit opens its steps; changing the lines of a quoted offer asks why, then saves them with the rest", async ({ page }) => {
+test("a part's Edit opens only that part, All steps opens the rest; the top Edit opens the steps; changing the lines of a quoted offer asks why", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   const deal = await newInquiry(page);
@@ -123,10 +123,34 @@ test("an offer's Edit opens its steps; changing the lines of a quoted offer asks
   await expect(page.getByRole("dialog", { name: "New quotations" })).toBeHidden();
 
   await page.goto(`/inquiries/${deal.id}/offers/${offer.id}`);
-  // Each group's Edit opens its own step.
+  // A group's Edit opens only that part (design 17 Nov): its fields, Cancel and Save, no steps.
   await page.getByRole("button", { name: "Edit payment" }).click();
-  let win = page.getByRole("dialog", { name: /Edit · Hefei Steps .*’s offer/ });
+  let win = page.getByRole("dialog", { name: /^Payment · Hefei Steps .*’s offer/ });
+  await expect(win.getByText("Start from")).toBeVisible();
+  await expect(win.getByRole("navigation", { name: "Steps" })).toHaveCount(0);
+  await expect(win.getByRole("button", { name: /^Next/ })).toHaveCount(0);
+  expect(await accessibilityProblems(page), "one part of the offer meets WCAG 2.2 AA").toEqual([]);
+  // All steps: the same window with every step, at this one, the cursor on its title.
+  await win.getByRole("button", { name: "All steps" }).click();
+  win = page.getByRole("dialog", { name: /Edit · Hefei Steps .*’s offer/ });
   await expect(win.getByRole("navigation", { name: "Steps" }).getByRole("button", { name: /Payment/ })).toHaveAttribute("aria-current", "step");
+  await expect(win.getByRole("heading", { name: "Payment, step 3 of 4" })).toBeFocused();
+  await win.getByRole("button", { name: "Cancel" }).click();
+  await expect(win).toBeHidden();
+
+  // One part saved on its own: Delivery's lead time.
+  await page.getByRole("button", { name: "Edit delivery" }).click();
+  win = page.getByRole("dialog", { name: /^Delivery · Hefei Steps .*’s offer/ });
+  await win.locator("#leadDays").fill("45");
+  await win.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(win).toBeHidden();
+  await expect(page.getByRole("region", { name: "Delivery" })).toContainText("45 days");
+
+  // Edit lines: the price and the lines only (who and when is not there).
+  await page.getByRole("button", { name: "Edit lines" }).click();
+  win = page.getByRole("dialog", { name: /^Lines · Hefei Steps .*’s offer/ });
+  await expect(win.getByRole("grid")).toBeVisible();
+  await expect(win.getByRole("textbox", { name: "Their reference" })).toHaveCount(0);
   await win.getByRole("button", { name: "Cancel" }).click();
   await expect(win).toBeHidden();
 

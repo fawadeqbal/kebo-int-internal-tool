@@ -75,17 +75,24 @@ test("the offer and the quotation in four groups; the quotation checked against 
   expect(await accessibilityProblems(page), "New quotations meets WCAG 2.2 AA").toEqual([]);
   await make.getByRole("button", { name: /Make the draft/ }).click();
   await expect(make).toBeHidden();
+  // Edit on Delivery opens only that part (design 17 Nov); All steps, below, opens the rest of the draft.
   await page.getByRole("button", { name: "Edit delivery" }).click();
-  const form = page.getByRole("dialog", { name: /Edit · QUO-\d{4}-\d{4}-A R1/ });
-  const steps = form.getByRole("navigation", { name: "Steps" });
-  await expect(steps.getByRole("button", { name: /Delivery/ })).toHaveAttribute("aria-current", "step");
-  const leads = form.getByRole("table", { name: "Lead time of each option" });
+  const part = page.getByRole("dialog", { name: /^Delivery · QUO-\d{4}-\d{4}-A R1/ });
+  await expect(part.getByRole("navigation", { name: "Steps" })).toHaveCount(0);
+  const leads = part.getByRole("table", { name: "Lead time of each option" });
   await expect(leads.getByLabel("Option A lead time", { exact: true })).toHaveValue("30");
   // (On a wide screen the check is in its own column; on a phone under the boxes.)
   await expect(leads.getByText(/gives 30 days after the advance · nothing to spare/).filter({ visible: true })).toBeVisible();
   await leads.getByLabel("Option A lead time", { exact: true }).fill("25");
   await expect(leads.getByText(/needs 30 days after the advance: 5 days more than we promise/).filter({ visible: true })).toBeVisible();
   await leads.getByLabel("Option A lead time", { exact: true }).fill("45");
+  expect(await accessibilityProblems(page), "one part of the quotation meets WCAG 2.2 AA").toEqual([]);
+  await part.getByRole("button", { name: "All steps" }).click();
+  const form = page.getByRole("dialog", { name: /Edit · QUO-\d{4}-\d{4}-A R1/ });
+  const steps = form.getByRole("navigation", { name: "Steps" });
+  await expect(steps.getByRole("button", { name: /Delivery/ })).toHaveAttribute("aria-current", "step");
+  // What was typed in the part is still there.
+  await expect(form.getByLabel("Option A lead time", { exact: true })).toHaveValue("45");
   await steps.getByRole("button", { name: /Payment/ }).click();
   await form.getByRole("button", { name: "30 · 60 · 10 after the site test" }).click();
   await steps.getByRole("button", { name: /Warranty & conditions/ }).click();

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Check } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Check, Pencil } from "lucide-react";
 import { PAYMENT_ROUTES, type PaymentRoute } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, PanelFooter, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelFooter, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { money } from "@/lib/format";
 import type { OptionView, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
@@ -81,6 +81,8 @@ export function QuoteStepsPanel({
   showCosts,
   action,
   step,
+  only = false,
+  onAllSteps,
 }: {
   number: number;
   initial: RevisionDraft;
@@ -89,6 +91,9 @@ export function QuoteStepsPanel({
   showCosts: boolean;
   action: Action;
   step: QuoteStep;
+  /** Only that part (Edit on one part); "All steps" calls onAllSteps. */
+  only?: boolean;
+  onAllSteps?: () => void;
 }) {
   const close = useClosePanel();
   return (
@@ -103,10 +108,59 @@ export function QuoteStepsPanel({
         submitLabel="Save"
         requireChanges
         stepsAt={step}
+        only={only}
+        onAllSteps={onAllSteps}
         onDone={(state) => close(state)}
         onCancel={() => close()}
       />
     </PanelBody>
+  );
+}
+
+/** A part's name in its window's title ("Delivery · Q-2611-0007"). */
+const PART_TITLE: Record<QuoteStep, string> = { lines: "Lines", delivery: "Delivery", payment: "Payment", warranty: "Warranty & conditions" };
+
+/**
+ * Edit, with its word, on the draft (design 17 Nov, edit one part): `only` opens just that part, sized to it,
+ * with Cancel and Save; "All steps" turns the window into the whole steps at that part. Without `only`
+ * (Edit at the top): the steps.
+ */
+export function QuoteEdit({
+  label,
+  quoteRef,
+  step,
+  only = false,
+  size = "xs",
+  className,
+  ...editor
+}: {
+  label: ReactNode;
+  quoteRef: string;
+  step: QuoteStep;
+  only?: boolean;
+  size?: "xs" | "sm";
+  className?: string;
+  number: number;
+  initial: RevisionDraft;
+  offers: QuoteOffers;
+  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  showCosts: boolean;
+  action: Action;
+}) {
+  const [open, setOpen] = useState(false);
+  const [one, setOne] = useState(only);
+  const width = !one || step === "lines" ? "md:w-[1180px]" : step === "warranty" ? "md:w-[680px]" : "md:w-[820px]";
+  return (
+    <>
+      <Button size={size} variant="secondary" onClick={() => (setOne(only), setOpen(true))} className={className}>
+        <Pencil aria-hidden /> {label}
+      </Button>
+      {open && (
+        <SidePanel title={one ? `${PART_TITLE[step]} · ${quoteRef}` : `Edit · ${quoteRef}`} description="Draft" onClose={() => setOpen(false)} className={width}>
+          <QuoteStepsPanel {...editor} step={step} only={one} onAllSteps={() => setOne(false)} />
+        </SidePanel>
+      )}
+    </>
   );
 }
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { buttonClass, cn } from "@kebo/ui";
+import { buttonClass } from "@kebo/ui";
 import { TabRow } from "@/components/common/record-tabs";
 
 export interface InquiryTab {
@@ -44,39 +44,17 @@ export function InquiryTabs({ base, tabs, order }: { base: string; tabs: Inquiry
   );
 }
 
-/** The "Do next" card: what to do, one line about it, and its buttons (one orange, the quiet ones before it). */
-export function NextCard({ title, meta, late, children }: { title: string; meta?: string; late?: boolean; children?: React.ReactNode }) {
-  return (
-    <section aria-label="Do next" className="no-print flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-line bg-surface px-4 py-3.5 sm:px-5">
-      <div className="flex min-w-0 flex-1 basis-64 flex-col gap-0.5">
-        <span className={cn("text-xs font-semibold", late ? "text-bad" : "text-action")}>Do next</span>
-        <span className="text-[17px] leading-snug font-bold">{title}</span>
-        {meta && <span className="text-[13px] text-text-2">{meta}</span>}
-      </div>
-      {children && <div className="flex flex-wrap items-center gap-2 max-sm:w-full [&>*]:max-sm:flex-1">{children}</div>}
-    </section>
-  );
-}
-
 /**
- * "Do next" on the tabs where the thing is not done: what it is and the way to its tab. On that tab itself
- * this shows nothing: the page has the same card with the working buttons.
+ * The inquiry's next step as the header's one orange button (the "Do next" card is gone, 17 Nov): its words
+ * and the way to its tab. On that tab itself it shows nothing: the tab has the working button.
  */
-export function InquiryNext({ base, tab, title, meta, href, label }: { base: string; tab: "overview" | "sourcing" | "quotation"; title: string; meta: string; href?: string; label?: string }) {
+export function InquiryNextButton({ base, tab, href, label }: { base: string; tab: "overview" | "sourcing" | "quotation"; href: string; label: string }) {
   const at = usePathname();
   const first = at.slice(base.length).split("/")[1] ?? "";
   if (tab !== "overview" && first === tab) return null;
-  // Full-width pages of their own (the request's edit form).
-  if (first === "edit") return null;
   return (
-    <div className="mt-4">
-      <NextCard title={title} meta={meta}>
-        {href && label && (
-          <Link href={href} className={buttonClass("primary", "md")}>
-            {label} <ArrowRight aria-hidden />
-          </Link>
-        )}
-      </NextCard>
-    </div>
+    <Link href={href} className={buttonClass("primary", "md")}>
+      {label} <ArrowRight aria-hidden />
+    </Link>
   );
 }

@@ -30,7 +30,7 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   const errors = watchErrors(page);
   const deal = await newInquiry(page, tag());
   await page.goto(`/inquiries/${deal.id}?panel=edit-request&id=items`);
-  const win = page.getByRole("dialog", { name: "Edit the request" });
+  const win = page.getByRole("dialog", { name: `Items Â· ${deal.refNo}` });
   const list = win.getByRole("list", { name: "Items" });
   await expect(list.getByRole("button", { name: /^Item 1 Tablet press/ })).toContainText("1 set");
   expect(await accessibilityProblems(page), "the items list on a phone meets WCAG 2.2 AA").toEqual([]);

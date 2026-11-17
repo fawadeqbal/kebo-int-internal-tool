@@ -491,6 +491,8 @@ export function OfferHeaderForm({
   startStep = "lines",
   step: stepAsked,
   onStep,
+  only = false,
+  onAllSteps,
   lines,
   linesSummary,
   extra,
@@ -508,6 +510,10 @@ export function OfferHeaderForm({
   linesSummary?: string;
   /** Left of the buttons on the first step (Remove this offer). */
   footerStart?: ReactNode;
+  /** Only the step it opens on (Edit on one part, design 17 Nov): no rail, Cancel and Save, and "All steps". */
+  only?: boolean;
+  /** "All steps": the same window with every step, at this one. */
+  onAllSteps?: () => void;
   action: Action;
   quote: FactoryQuoteView | null;
   today: string;
@@ -615,6 +621,7 @@ export function OfferHeaderForm({
         if (!partsBad) return true;
         setPartsTried(true);
         setStep("payment");
+        if (only && step !== "payment") onAllSteps?.();
         document.getElementById("fq-parts")?.scrollIntoView?.({ block: "center" });
         return false;
       }}
@@ -628,7 +635,19 @@ export function OfferHeaderForm({
             steps={offerStepsInfo(s, at, !!quote, linesSummary)}
             at={step}
             onGo={setStep}
+            single={only}
             footer={
+              only ? (
+                <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
+                  {onAllSteps && (
+                    <Button type="button" variant="ghost" onClick={onAllSteps} className="px-2 text-primary hover:text-primary">
+                      All steps <ChevronRight aria-hidden />
+                    </Button>
+                  )}
+                  <span className="flex-1" />
+                  {footer(true)}
+                </div>
+              ) : (
               <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
                 {at > 0 ? (
                   <Button type="button" variant="secondary" onClick={() => setStep(OFFER_STEPS[at - 1]!.key)}>
@@ -645,11 +664,20 @@ export function OfferHeaderForm({
                   </Button>
                 )}
               </div>
+              )
             }
           >
-          <JumpToError st={st} onJump={setStep} />
+          {/* A refused field on another part: every step, at that one. */}
+          <JumpToError
+            st={st}
+            onJump={(k) => {
+              setStep(k);
+              if (only && k !== step) onAllSteps?.();
+            }}
+          />
           {step === "lines" && (
           <>
+          {!only && (
           <PanelSection title="Who and when" first className="md:grid-cols-3">
             <Field
               label="Factory"
@@ -681,7 +709,8 @@ export function OfferHeaderForm({
               <Input id="validUntil" type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
             </Field>
           </PanelSection>
-          <PanelSection title="Price" className="md:grid-cols-3">
+          )}
+          <PanelSection title="Price" first={only} className="md:grid-cols-3">
             <Field
               label="Currency"
               htmlFor="currency"
@@ -888,9 +917,14 @@ function lineErrors(errors: ActionState["errors"]): string[] {
 }
 
 function JumpToError({ st, onJump }: { st: ActionState; onJump: (step: OfferStep) => void }) {
+  // Once per answer: a later step change by hand is not undone.
+  const jump = useRef(onJump);
+  useEffect(() => {
+    jump.current = onJump;
+  });
   useEffect(() => {
     const first = Object.keys(st.errors ?? {}).find((k) => st.errors?.[k]?.length);
-    if (first) onJump(FIELD_STEP[first] ?? "lines");
-  }, [st, onJump]);
+    if (first) jump.current(FIELD_STEP[first] ?? "lines");
+  }, [st]);
   return null;
 }

@@ -1,12 +1,15 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@kebo/ui/client";
 import { SidePanel, useSidePanel } from "@/components/common/panel";
-import { DealForm } from "@/components/deals/deal-form";
+import { DealForm, type RequestStep } from "@/components/deals/deal-form";
 
-type FormProps = Omit<ComponentProps<typeof DealForm>, "onSaved">;
+type FormProps = Omit<ComponentProps<typeof DealForm>, "onSaved" | "onAllSteps">;
+
+/** A part's name in its window's title ("Items · RFQ-2611-0004"). */
+const PART_TITLE: Record<RequestStep, string> = { customer: "Customer", items: "Items", details: "Details", files: "Files" };
 
 /**
  * The inquiry's one window, in the side panel over the page it was opened from: "New inquiry"
@@ -17,15 +20,19 @@ export function InquiryPanel({ refNo, customerName, numberHint, ...form }: FormP
   const router = useRouter();
   const edit = form.mode === "edit";
   const panel = useSidePanel(edit ? "edit-request" : "new-inquiry");
+  // Edit on one part (the Items card's Edit, design 17 Nov): that part only, until "All steps".
+  const [one, setOne] = useState(edit && !!form.only);
   return (
     <SidePanel
-      title={edit ? "Edit the request" : "New inquiry"}
-      description={edit ? [refNo, customerName].filter(Boolean).join(" · ") : `The number is given on save · ${numberHint ?? "RFQ"}-…`}
+      title={one ? `${PART_TITLE[form.startStep ?? "customer"]} · ${refNo ?? "the request"}` : edit ? "Edit the request" : "New inquiry"}
+      description={one ? customerName : edit ? [refNo, customerName].filter(Boolean).join(" · ") : `The number is given on save · ${numberHint ?? "RFQ"}-…`}
       onClose={() => panel.close()}
       className="md:w-[1180px]"
     >
       <DealForm
         {...form}
+        only={one}
+        onAllSteps={() => setOne(false)}
         onSaved={(r) => {
           if (edit) {
             toast({ message: `Request saved · ${refNo ?? "the inquiry"}` });

@@ -10,7 +10,7 @@ import { SubmitButton, toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { PANEL_FORM, PanelBody, PanelSection, useClosePanel, WhatHappens } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
-import { StepsFrame } from "@/components/common/steps-frame";
+import { OnePartFooter, StepsFrame } from "@/components/common/steps-frame";
 import { CountrySelect } from "@/components/people/country-select";
 import type { ActionState } from "@/lib/actions";
 import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole } from "@/lib/types-deals";
@@ -81,6 +81,8 @@ export function DealForm({
   itemsUpload = true,
   itemsEdit,
   startStep = "customer",
+  only = false,
+  onAllSteps,
   onSaved,
 }: {
   /** Saves and answers { data: { id, refNo } }; the window then sends the files and says it is saved. */
@@ -108,6 +110,9 @@ export function DealForm({
   itemsEdit?: { edit: EditRef; card?: EditCard | null };
   /** The step it opens on (the Items card's Edit: Items). */
   startStep?: RequestStep;
+  /** Only that step (Edit on one part, design 17 Nov): no rail, Cancel and Save, and "All steps". */
+  only?: boolean;
+  onAllSteps?: () => void;
   /** Saved (and the files are up). */
   onSaved: (r: { id: string; refNo?: string; title?: string; customer?: string; files?: number }) => void;
 }) {
@@ -263,7 +268,11 @@ export function DealForm({
               }))}
               at={step}
               onGo={setStep}
+              single={only}
               footer={
+                only ? (
+                  <OnePartFooter onAllSteps={onAllSteps} onCancel={() => close()} saveLabel="Save changes" />
+                ) : (
                 <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
                   {at > 0 ? (
                     <Button type="button" variant="secondary" onClick={() => setStep(REQUEST_STEPS[at - 1]!.key)}>
@@ -286,9 +295,17 @@ export function DealForm({
                     </Button>
                   )}
                 </div>
+                )
               }
             >
-            <JumpToStep st={s} onJump={setStep} />
+            {/* A refused field on another part: every step, at that one. */}
+            <JumpToStep
+              st={s}
+              onJump={(k) => {
+                setStep(k);
+                if (only && k !== step) onAllSteps?.();
+              }}
+            />
             {step === "customer" && (
             <PanelSection quiet title="Who asked" first className="md:grid-cols-3">
               <Field label="Customer" htmlFor="customer" required error={s.errors?.customerId} className="md:col-span-2">
@@ -692,9 +709,14 @@ const DETAIL_FIELDS = new Set(["title", "category", "priority", "requirements"])
 
 /** A save refused for a field on another step opens that step, so the field and its message are in view. */
 function JumpToStep({ st, onJump }: { st: ActionState; onJump: (step: RequestStep) => void }) {
+  // Once per answer: a later step change by hand is not undone.
+  const jump = useRef(onJump);
+  useEffect(() => {
+    jump.current = onJump;
+  });
   useEffect(() => {
     const first = Object.keys(st.errors ?? {}).find((k) => st.errors?.[k]?.length);
-    if (first) onJump(first === "items" || first.startsWith("items.") ? "items" : DETAIL_FIELDS.has(first) ? "details" : "customer");
-  }, [st, onJump]);
+    if (first) jump.current(first === "items" || first.startsWith("items.") ? "items" : DETAIL_FIELDS.has(first) ? "details" : "customer");
+  }, [st]);
   return null;
 }

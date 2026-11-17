@@ -11,7 +11,6 @@ import { optional } from "@/components/print/data";
 import { cheapestComplete, coverOf } from "@/components/deals/offer-facts";
 import { AddOfferButton } from "@/components/deals/offer-work";
 import { askFactories } from "../ask";
-import { NextCard } from "@/components/deals/inquiry-nav";
 import { offerFactsOf, requestsOf } from "../facts";
 import { WithSide } from "../side";
 import { inquiryNext } from "../steps";
@@ -121,34 +120,21 @@ export default async function SourcingPage({
       </div>
     );
 
-  // "Do next" with its working button, when the next thing is done on this tab (else the frame points to its tab).
+  // The next thing to do here (an offer to enter, factories to ask): its button is the orange one.
   const next = inquiryNext(d, await offerFactsOf(id));
   const ownNext = next?.tab === "sourcing" && canEdit;
-  const top = ownNext ? (
-    <NextCard title={next.title} meta={next.meta}>
-      {waiting.length > 0 || s.quotes.length > 0 ? (
-        <>
-          {ask?.button}
-          {addOffer({ variant: "primary", size: "md", label: "Enter an offer", open: sp.add === "1" })}
-        </>
-      ) : (
-        <>
-          {addOffer({ variant: "secondary", size: "md", label: "Enter an offer", open: sp.add === "1" })}
-          {(await askFactories(d, me, "primary", { label: "Ask factories", size: "md" }))?.button}
-        </>
-      )}
-    </NextCard>
-  ) : null;
+  const firstAsk = !ownNext || waiting.length > 0 || s.quotes.length > 0 ? ask : await askFactories(d, me, "primary", { label: "Ask factories", size: "sm" });
 
   // One line per factory: its offer once it is in, or that it was asked and has not answered. Others asked and closed (declined, no reply) come last.
   const others = (requests?.items ?? []).filter((r) => !r.factoryQuoteId);
   const answered = s.quotes.length;
   const asked = answered + others.length;
-  const COLS = "md:grid-cols-[16px_minmax(0,1fr)_128px_112px_92px_92px_76px_72px]";
+  // The same list as Quotations (asked 17 Nov): the factory and what it offers first, the way in at the end.
+  const COLS = "md:grid-cols-[minmax(0,1.5fr)_130px_minmax(0,1fr)_minmax(0,1fr)_124px_32px]";
   const dash = <span className="text-muted">—</span>;
 
   return (
-    <WithSide id={id} top={top}>
+    <WithSide id={id}>
       {notice}
       <Card className="overflow-clip">
         <CardHeader
@@ -161,108 +147,114 @@ export default async function SourcingPage({
                   Compare side by side
                 </ButtonLink>
               )}
-              {!ownNext && ask?.button}
-              {!ownNext && addOffer({ variant: "secondary", size: "sm", label: "Enter an offer", open: sp.add === "1" })}
+              {firstAsk?.button}
+              {addOffer({
+                variant: ownNext && (waiting.length > 0 || s.quotes.length > 0) ? "primary" : "secondary",
+                size: "sm",
+                label: "Enter an offer",
+                open: sp.add === "1",
+              })}
             </span>
           }
         />
         {asked === 0 ? (
           <NoOffers items={s.items} />
         ) : (
-          <div>
-            <div className={cn("hidden items-center gap-x-4 border-b border-line px-5 py-2 text-xs font-medium text-text-2 md:grid", COLS)}>
-              <span />
+          <>
+            <div aria-hidden className={cn("hidden items-center gap-x-4 border-b border-line bg-surface-2/60 px-5 py-2 text-xs font-medium text-text-2 md:grid", COLS)}>
               <span>Factory</span>
               <span className="text-right">Offer total</span>
               <span>Covers</span>
               <span>Lead time</span>
-              <span>Valid until</span>
-              <span>Used in</span>
               <span>Status</span>
+              <span />
             </div>
-            {s.quotes.map((x) => {
-              const cover = coverOf(x, s.items);
-              const letters = usedIn.get(x.id) ?? [];
-              const tax = offerTaxTag(x.taxRate, x.taxIncluded) ?? (x.lines.length ? "no tax" : null);
-              return (
-                <div key={x.id} className="border-b border-line last:border-b-0">
-                  <Link
-                    href={`/inquiries/${d.id}/offers/${x.id}`}
-                    className={cn("grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 text-sm hover:bg-surface-2/60", COLS)}
-                  >
-                    <ChevronRight className="size-4 text-text-2" aria-hidden />
-                    <span className="min-w-0">
-                      <span className="line-clamp-2 font-semibold">{x.factory.name}</span>
-                      <span className="block text-xs text-text-2 md:hidden">
-                        {[!x.lines.length ? "No lines yet" : cover ? (cover.all ? `All ${cover.of} items` : `${cover.n} of ${cover.of} items`) : null, tax, x.leadTime, letters.length ? `In ${letters.join(", ")}` : null].filter(Boolean).join(" · ")}
-                      </span>
-                    </span>
-                    <span className="text-right whitespace-nowrap tabular">
-                      <span className="block font-semibold">{x.lines.length ? money(x.factoryTotal, x.currency) : dash}</span>
-                      {tax && <span className="block text-xs text-text-2 max-md:hidden">{tax}</span>}
-                    </span>
-                    <span className="max-md:hidden">
-                      {!x.lines.length ? (
-                        <span className="text-warn">No lines yet</span>
-                      ) : cover ? (
-                        cover.all ? (
-                          `All ${cover.of} items`
-                        ) : (
-                          `${cover.n} of ${cover.of} items`
-                        )
-                      ) : (
-                        plural(x.lines.length, "line")
+            <ul>
+              {s.quotes.map((x) => {
+                const cover = coverOf(x, s.items);
+                const letters = usedIn.get(x.id) ?? [];
+                const tax = offerTaxTag(x.taxRate, x.taxIncluded) ?? (x.lines.length ? "no tax" : null);
+                const covers = !x.lines.length ? "No lines yet" : cover ? (cover.all ? (cover.of === 1 ? "The 1 item" : `All ${cover.of} items`) : `${cover.n} of ${cover.of} items`) : plural(x.lines.length, "line");
+                return (
+                  <li key={x.id} className="border-b border-line last:border-b-0">
+                    <Link
+                      href={`/inquiries/${d.id}/offers/${x.id}`}
+                      className={cn(
+                        "grid grid-cols-[minmax(0,1fr)_auto_32px] items-start gap-x-4 gap-y-1 px-5 py-3 text-[13px] hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-text",
+                        COLS,
                       )}
-                      {x.unpriced > 0 && <span className="block text-xs text-warn">{x.unpriced} without a price</span>}
+                    >
+                      <span className="min-w-0">
+                        <span className="block font-semibold text-text [overflow-wrap:break-word]">{x.factory.name}</span>
+                        <span className="block text-xs text-text-2 [overflow-wrap:anywhere]">
+                          {[x.reference ? `their ref. ${x.reference}` : null, `received ${date(x.receivedOn)}`, x.validUntil ? `valid until ${date(x.validUntil)}` : null].filter(Boolean).join(" · ")}
+                        </span>
+                        {/* A phone: what the other columns say, on two short lines. */}
+                        <span className="block text-xs text-text-2 md:hidden">{[covers, x.leadTime, letters.length ? `In ${letters.join(", ")}` : null].filter(Boolean).join(" · ")}</span>
+                        <span className="block text-xs font-semibold text-text tabular md:hidden">
+                          {x.lines.length ? money(x.factoryTotal, x.currency) : "—"}
+                          {tax && <span className="font-normal text-text-2"> · {tax}</span>}
+                        </span>
+                      </span>
+                      <span className="text-right whitespace-nowrap tabular max-md:hidden">
+                        <span className="block font-semibold">{x.lines.length ? money(x.factoryTotal, x.currency) : dash}</span>
+                        {tax && <span className="block text-xs text-text-2">{tax}</span>}
+                      </span>
+                      <span className="min-w-0 max-md:hidden">
+                        <span className={cn("block", !x.lines.length && "text-warn")}>{covers}</span>
+                        {x.unpriced > 0 && <span className="block text-xs text-warn">{x.unpriced} without a price</span>}
+                      </span>
+                      <span className="min-w-0 max-md:hidden">{x.leadTime ?? dash}</span>
+                      <span className="justify-self-end md:justify-self-start">
+                        <span className="block font-semibold text-ok">Offer in</span>
+                        {cheapest?.id === x.id && s.quotes.length > 1 && <span className="block text-xs text-text-2">cheapest complete</span>}
+                        {/* The quotation options priced from it (A, B…). */}
+                        {letters.length > 0 && (
+                          <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-text-2 max-md:hidden">
+                            In {letters.map((l) => <Badge key={l} tone="ok">{l}</Badge>)}
+                          </span>
+                        )}
+                      </span>
+                      <ChevronRight className="mt-0.5 size-4 self-center justify-self-center text-text-2" aria-hidden />
+                    </Link>
+                  </li>
+                );
+              })}
+              {others.map((r) => (
+                <li key={r.id} className={cn("grid grid-cols-[minmax(0,1fr)_auto_32px] items-start gap-x-4 gap-y-1 border-b border-line px-5 py-3 text-[13px] last:border-b-0", COLS)}>
+                  <span className="min-w-0">
+                    <Link href={`/factories/${r.factory.id}`} className="block font-semibold text-text [overflow-wrap:anywhere] hover:text-primary">
+                      {r.factory.name}
+                    </Link>
+                    <span className="block text-xs text-text-2">
+                      Asked {date(r.sentOn)}
+                      {r.channel ? ` by ${REQUEST_CHANNEL_LABEL[r.channel].toLowerCase()}` : ""}
+                      {r.note ? ` · ${r.note}` : ""}
                     </span>
-                    <span className="max-md:hidden">{x.leadTime ?? dash}</span>
-                    <span className="max-md:hidden">{x.validUntil ? date(x.validUntil) : dash}</span>
-                    <span className="flex flex-wrap gap-1 max-md:hidden">{letters.length ? letters.map((l) => <Badge key={l} tone="ok">{l}</Badge>) : dash}</span>
-                    <span className="max-md:hidden">
-                      <span className="font-semibold text-ok">Offer in</span>
-                      {cheapest?.id === x.id && s.quotes.length > 1 && <span className="block text-xs text-text-2">cheapest complete</span>}
-                    </span>
-                  </Link>
-                </div>
-              );
-            })}
-            {others.map((r) => (
-              <div key={r.id} className={cn("grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-line px-5 py-3 text-sm last:border-b-0", COLS)}>
-                <span />
-                <span className="min-w-0">
-                  <Link href={`/factories/${r.factory.id}`} className="line-clamp-2 font-semibold hover:text-primary">
-                    {r.factory.name}
-                  </Link>
-                  <span className="block text-xs text-text-2">
-                    Asked {date(r.sentOn)}
-                    {r.channel ? ` by ${REQUEST_CHANNEL_LABEL[r.channel].toLowerCase()}` : ""}
-                    {r.note ? ` · ${r.note}` : ""}
                   </span>
-                </span>
-                <span className="text-right max-md:hidden">{dash}</span>
-                <span className="max-md:hidden">{dash}</span>
-                <span className="max-md:hidden">{dash}</span>
-                <span className="max-md:hidden">{dash}</span>
-                <span className="max-md:hidden">{dash}</span>
-                <span className="flex items-center justify-between gap-2 max-md:col-start-2 max-md:col-end-4">
-                  <span>
-                    <span className={cn("font-semibold", r.status === "sent" ? "text-action" : r.status === "declined" ? "text-bad" : "text-text-2")}>
+                  <span className="text-right max-md:hidden">{dash}</span>
+                  <span className="max-md:hidden">{dash}</span>
+                  <span className="max-md:hidden">{dash}</span>
+                  <span className="justify-self-end md:justify-self-start">
+                    <span className={cn("block font-semibold", r.status === "sent" ? "text-action" : r.status === "declined" ? "text-bad" : "text-text-2")}>
                       {r.status === "sent" ? "Waiting" : r.statusLabel}
                     </span>
                     {r.status === "sent" && r.replyBy && <span className={cn("block text-xs", r.late ? "text-bad" : "text-text-2")}>due {date(r.replyBy)}</span>}
                   </span>
-                  {canEdit && (
-                    <RequestMore
-                      name={r.factory.name}
-                      status={r.status}
-                      setStatus={factoryRequestStatusAction.bind(null, d.id, r.id)}
-                      remove={removeFactoryRequestAction.bind(null, d.id, r.id)}
-                    />
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
+                  <span className="flex justify-center self-center">
+                    {canEdit && (
+                      <RequestMore
+                        name={r.factory.name}
+                        status={r.status}
+                        setStatus={factoryRequestStatusAction.bind(null, d.id, r.id)}
+                        remove={removeFactoryRequestAction.bind(null, d.id, r.id)}
+                      />
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </Card>
       {s.quotes.length > 0 && (
