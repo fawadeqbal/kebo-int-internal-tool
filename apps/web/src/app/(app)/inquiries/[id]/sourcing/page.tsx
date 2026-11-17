@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ChevronRight, Factory, FileText } from "lucide-react";
+import { ArrowLeft, ChevronRight, Columns3, Factory, FileText } from "lucide-react";
 import { basisText, offerTaxTag, REQUEST_CHANNEL_LABEL } from "@kebo/shared";
 import { Alert, Badge, buttonClass, ButtonLink, Card, CardHeader, cn, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
@@ -143,8 +143,9 @@ export default async function SourcingPage({
           actions={
             <span className="flex flex-wrap items-center gap-2 sm:justify-end">
               {s.quotes.length > 1 && (
-                <ButtonLink href={`${base}?view=compare`} size="sm" variant="ghost">
-                  Compare side by side
+                // A button like the others beside it (a bare word sat out of line with them on a phone).
+                <ButtonLink href={`${base}?view=compare`} size="sm" variant="secondary">
+                  <Columns3 aria-hidden /> Compare
                 </ButtonLink>
               )}
               {firstAsk?.button}
@@ -257,11 +258,6 @@ export default async function SourcingPage({
           </>
         )}
       </Card>
-      {s.quotes.length > 0 && (
-        <p className="text-xs text-muted">
-          Our cost = their price to our basis, plus tax unless it is included, in {s.currency}. A click on a line opens the offer’s own page: its lines and its details, each with its own Edit.
-        </p>
-      )}
     </WithSide>
   );
 }

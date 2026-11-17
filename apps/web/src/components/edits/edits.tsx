@@ -30,7 +30,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
         className="inline-flex h-6 items-center rounded-full bg-warn-soft px-2.5 text-xs font-semibold whitespace-nowrap text-warn hover:ring-2 hover:ring-warn/30"
         title="What changed, who and why"
       >
-        Edited {card.count}×{last?.by ? ` · last by ${last.by.split(" ")[0]}, ${whenText(last.at, style)}` : ""}
+        Edited {card.count}×{last?.by && <span className="max-sm:hidden"> · last by {last.by.split(" ")[0]}, {whenText(last.at, style)}</span>}
       </button>
       {open && (
         <Modal title={`${title} · edited ${card.count}× since first saved`} onClose={() => setOpen(false)}>

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { EditRequestWindow } from "../inquiry-windows";
-import { ATTACHMENT_KIND_LABEL, can, CHANNEL_LABEL, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, PRIORITY_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
-import { Paperclip } from "lucide-react";
+import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, PRIORITY_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
 import { Badge, Card, CardBody, CardHeader, cn, RefCode } from "@kebo/ui";
 import { DetailsCard } from "@/components/common/record";
 import { requireUser } from "@/lib/session";
@@ -30,7 +29,6 @@ export default async function DealOverview({ params, searchParams }: { params: P
   const d = await dealOf(id);
   const sourcing = can(me, "sourcing.manage");
   const [history, facts, s] = await Promise.all([d.onHold ? optional(() => dealHistoryOf(id)) : null, sourcing ? offerFactsOf(id) : null, sourcing ? sourcingOf(id).catch(() => null) : null]);
-  const contact = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts[0];
   const base = `/inquiries/${d.id}`;
 
   // On hold, or lost: what holds it or why it was lost, with the way back.
@@ -75,7 +73,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
       : facts.offers
         ? { text: "All in", tone: "text-ok" }
         : { text: "Not started", tone: "text-text-2" };
-  const lines: { kind: string; number: React.ReactNode; status: string; tone: string; fact: string; amount?: string }[] = [
+  const lines: { kind: string; number: React.ReactNode; status: string; tone: string; fact?: string; amount?: string }[] = [
     ...(facts && offerStatus
       ? [
           {
@@ -102,7 +100,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
       ),
       status: latest ? `R${latest.number} ${REVISION_STATUS_LABEL[latest.status].toLowerCase()}` : "Not made",
       tone: !latest ? "text-text-2" : latest.status === "accepted" ? "text-ok" : latest.status === "draft" || latest.status === "sent" ? "text-action" : "text-text-2",
-      fact: latest ? `valid until ${date(latest.validUntil)}${latest.sentOn ? ` · sent ${date(latest.sentOn)}` : ""}` : "Made from a factory offer, with your prices",
+      fact: latest ? `valid until ${date(latest.validUntil)}${latest.sentOn ? ` · sent ${date(latest.sentOn)}` : ""}` : undefined,
       amount: latest ? `${latest.totalUpTo ? "from " : ""}${money(latest.total, latest.currency)}` : undefined,
     },
     {
@@ -116,7 +114,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
       ),
       status: order ? `Made ${date(order.orderedOn)}` : "Not yet",
       tone: order ? "text-ok" : "text-text-2",
-      fact: order ? (order.customerRef ? `Customer ref. ${order.customerRef}` : "The work continues on the order") : "Made when the customer accepts an option",
+      fact: order?.customerRef ? `Customer ref. ${order.customerRef}` : undefined,
       amount: order ? money(order.total, order.currency) : undefined,
     },
   ];
@@ -194,40 +192,8 @@ export default async function DealOverview({ params, searchParams }: { params: P
       <DetailsCard
         title="The request"
         items={[
-          {
-            label: "Customer",
-            value: (
-              <Link href={`/customers/${d.customer.id}`} className="text-primary hover:underline">
-                {d.customer.name}
-              </Link>
-            ),
-          },
-          { label: "Contact", value: contact ? [contact.name, contact.whatsapp ?? contact.phone ?? contact.email].filter(Boolean).join(" · ") : null },
-          { label: "Came by", value: `${CHANNEL_LABEL[d.channel]} · ${date(d.createdAt)}` },
-          { label: "Category", value: d.category },
           { label: "Priority", value: PRIORITY_LABEL[d.priority] },
-          { label: "Needed by", value: d.requiredBy ? date(d.requiredBy) : null },
           { label: "What they need", value: d.requirements && <span className="whitespace-pre-line">{d.requirements}</span>, wide: true },
-          {
-            // The same files as "Files from the customer" in the request's window: what came with the request is read with it.
-            label: "Files from the customer",
-            wide: true,
-            value: d.attachments.length > 0 && (
-              <ul className="flex flex-col gap-1.5">
-                {d.attachments.map((f) => (
-                  <li key={f.id} className="flex flex-wrap items-baseline gap-x-2">
-                    <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-primary [overflow-wrap:anywhere] hover:underline">
-                      <Paperclip className="size-3.5 shrink-0 self-center" aria-hidden />
-                      {f.fileName}
-                    </a>
-                    <span className="text-xs font-normal text-text-2">
-                      {ATTACHMENT_KIND_LABEL[f.kind]} · {date(f.createdAt)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ),
-          },
         ]}
         edit={d.allowed.edit ? { panel: "edit-request", label: "Edit the request" } : null}
       />

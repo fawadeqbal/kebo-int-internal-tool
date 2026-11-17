@@ -64,7 +64,7 @@ test("a new offer: the lines in its Lines step, saved with it in one go; a wrong
   // Tax: its % and one tick for "included in their prices".
   await win.getByLabel("Tax %", { exact: true }).fill("13");
   await win.getByLabel("Tax included in their prices").check();
-  await expect(win.getByText("The price already has the tax in it")).toBeVisible();
+  await expect(win.getByLabel("Tax included in their prices")).toBeChecked();
   expect(await accessibilityProblems(page), "the offer's Lines step meets WCAG 2.2 AA").toEqual([]);
 
   // A wrong line: the quantity of line 2 is not a number. Nothing is saved; the window says which line.
@@ -175,7 +175,7 @@ test("a part's Edit opens only that part, All steps opens the rest; the top Edit
   await why.getByRole("button", { name: /Save/ }).click();
   await expect(win).toBeHidden();
   // Both saved: the reference and the new price.
-  await expect(page.getByText(`their ref. HS-${deal.tag}`)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Details" })).toContainText(`HS-${deal.tag}`);
   await expect(page.locator("main")).toContainText("9,000.00");
   const saved = await (await page.request.get(`/api/inquiries/${deal.id}/sourcing`)).json();
   const q = saved.quotes.find((x: { id: string }) => x.id === offer.id);

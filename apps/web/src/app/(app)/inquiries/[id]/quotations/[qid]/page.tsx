@@ -16,7 +16,6 @@ import { QuoteEdit } from "@/components/deals/quotation-step";
 import type { QuoteStep } from "@/components/deals/revision-editor";
 import { AnswerButton } from "@/components/deals/quotation-tab";
 import { checksOf, optionOf, QuoteLines, QuoteTerms } from "@/components/deals/quote-view";
-import { shortName } from "@/components/deals/offer-facts";
 import { SendWindow, type SendItem } from "@/components/deals/send-quote";
 import { OwnPagerTop, OwnPagerUnder } from "@/components/deals/own-pager";
 import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offersAction, reviseAction, saidNoAction, updateRevisionAction } from "../../quotation/actions";
@@ -122,7 +121,6 @@ export default async function QuotationOwnPage({
   const canAnswer = r.status === "sent" && r.canAnswer && manage;
   const waiting = q.quotations.filter((y) => y.id !== x.id && y.revisions.some((v) => v.status === "sent" && v.canAnswer)).map((y) => y.refNo);
   const o = optionOf(r);
-  const from = o?.factory ? `from ${shortName(o.factory.name)}’s offer` : o && !o.factoryQuoteId ? "own prices" : null;
   const sentBefore = x.revisions.find((v) => v.status !== "draft" && v.number < r.number);
   const meta = isDraft
     ? [sentBefore?.sentOn ? `R${sentBefore.number} sent ${date(sentBefore.sentOn)}` : null, `valid until ${date(r.validUntil)}`]
@@ -169,12 +167,9 @@ export default async function QuotationOwnPage({
         summary={
           <p className="min-w-0">
             {[
+              // (Who it goes to and the offer it is from: beside, under Goes to and From the offer.)
               `R${r.number}`,
               ...meta.filter(Boolean),
-              <Link key="c" href={`/customers/${d.customer.id}`} className="text-primary underline underline-offset-2 hover:opacity-80">
-                {d.customer.name}
-              </Link>,
-              from,
             ]
               .filter(Boolean)
               .map((m, i) => (

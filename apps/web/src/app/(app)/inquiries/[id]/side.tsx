@@ -4,7 +4,7 @@ import { can, CHANNEL_LABEL, isOpen } from "@kebo/shared";
 import { cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { date, companyToday } from "@/lib/format";
+import { date } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { getPeople } from "@/lib/loaders";
 import type { FollowUpList } from "@/lib/types-notes";
@@ -14,8 +14,6 @@ import { SIDE_COLUMNS } from "@/components/common/side-columns";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { assignAction, holdAction, moveStageAction, noteAction } from "../actions";
 import { AssignForm, AssignSelect, DecisionButtons, NoteForm } from "./panels";
-import { offerFactsOf } from "./facts";
-import { quotationStatus, statusWords } from "./steps";
 
 const quiet = "text-[13px] font-medium text-primary hover:underline";
 
@@ -30,27 +28,24 @@ function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
 }
 
 /**
- * The one panel beside every tab of an inquiry, the same sections in the same order: Inquiry (status, who
- * handles it, needed by, how it came; hold and lost), Customer (the contact and the ways to reach them),
- * Documents (the quotation, the sales order), Files and Notes.
+ * The one panel beside every tab of an inquiry, the same sections in the same order: Inquiry (who handles it,
+ * needed by, the next follow-up, how it came; hold and lost), Contact (the ways to reach them), Files and Notes.
+ * What the header says (status, customer, number) and "Where it stands" (quotation, order) is not said again.
  */
 export async function InquirySide({ id }: { id: string }) {
   const me = await requireUser();
   const d = await dealOf(id);
   const sourcing = can(me, "sourcing.manage");
-  const [people, facts, s, followUps] = await Promise.all([
+  const [people, s, followUps] = await Promise.all([
     getPeople().catch(() => []),
-    sourcing ? offerFactsOf(id) : null,
     sourcing ? sourcingOf(id).catch(() => null) : null,
     api.get<FollowUpList>("/follow-ups", { inquiryId: id, open: "true" }).catch(() => null),
   ]);
   // The next follow-up: the earliest one still open. An open inquiry is never meant to be without one.
   const nextUp = [...(followUps?.rows ?? [])].sort((a, b) => `${a.dueOn}${a.dueAt ?? ""}`.localeCompare(`${b.dueOn}${b.dueAt ?? ""}`))[0];
   const base = `/inquiries/${d.id}`;
-  const status = statusWords(d, facts, companyToday());
   const contact = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
   const phone = contact?.whatsapp ?? contact?.phone ?? null;
-  const order = d.orders.find((o) => o.status !== "cancelled");
   const name = (uid: string | null) => (uid ? (d.people[uid] ?? "Someone") : "Website form");
   const files = [
     ...d.attachments.map((f) => ({ id: f.id, name: f.fileName, from: `${name(f.uploadedById)} · ${date(f.createdAt)}` })),
@@ -85,9 +80,6 @@ export async function InquirySide({ id }: { id: string }) {
           </>
         }
       >
-        <Row label="Status">
-          <span className={cn(status.tone === "ok" && "text-ok", status.tone === "bad" && "text-bad")}>{status.text.split(" · ")[0]}</span>
-        </Row>
         {!mayAssign && (
           <Row label="Handles it">
             {d.assignee?.name ?? "Nobody yet"}
@@ -118,12 +110,8 @@ export async function InquirySide({ id }: { id: string }) {
         </Row>
       </SideSection>
 
-      <SideSection title="Customer">
-        <Row label={d.customer.name}>
-          <Link href={`/customers/${d.customer.id}`} className={quiet}>
-            Open
-          </Link>
-        </Row>
+      {/* The customer is named in the header; here, who to reach there. */}
+      <SideSection title="Contact">
         {contact ? (
           <Row label={contact.name}>
             <span className="flex flex-wrap justify-end gap-x-3">
@@ -150,30 +138,6 @@ export async function InquirySide({ id }: { id: string }) {
             <span className="font-normal text-muted">Nobody named</span>
           </Row>
         )}
-      </SideSection>
-
-      <SideSection title="Documents">
-        <Row label="Quotation">
-          {d.quotation ? (
-            <>
-              <Link href={`${base}/quotation`} className="font-semibold text-primary hover:underline">
-                {d.quotation.refNo}
-              </Link>
-              <span className="font-normal text-text-2"> · {quotationStatus(d)}</span>
-            </>
-          ) : (
-            <span className="font-normal text-muted">Not made yet</span>
-          )}
-        </Row>
-        <Row label="Sales order">
-          {order ? (
-            <Link href={`/orders/${order.id}`} className="font-semibold text-primary hover:underline">
-              {order.refNo}
-            </Link>
-          ) : (
-            <span className="font-normal text-muted">when the customer accepts</span>
-          )}
-        </Row>
       </SideSection>
 
       <SideSection

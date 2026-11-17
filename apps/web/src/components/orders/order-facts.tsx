@@ -55,13 +55,14 @@ export function KeyDates({ o, flow, now }: { o: OrderView; flow: OrderFlow | nul
   );
 }
 
-/** People, beside every page of the order: the customer and their contact, who handles it, the factories, the forwarder, the banks. */
+/** People, beside every page of the order: the customer's contact, who handles it, the factories, the forwarder, the banks. */
 export function OrderPeople({ o, flow, first }: { o: OrderView; flow: OrderFlow | null; first?: "Forwarder" | "Factory" }) {
   const ship = flow?.shipping?.shipments[0] ?? null;
   const contract = flow?.payment.bankContract ?? null;
   const factories = flow?.factory.factories ?? [];
   const rows: { role: string; name: string; sub?: string | null; href?: string }[] = [
-    { role: "Customer", name: o.customer.name, sub: o.contactName ?? null, href: `/customers/${o.customer.id}` },
+    // The customer is named in the header: here, who to talk to there.
+    ...(o.contactName ? [{ role: "Contact", name: o.contactName, href: `/customers/${o.customer.id}` }] : []),
     ...(o.inquiry.assignee ? [{ role: "Handles it", name: o.inquiry.assignee.name }] : []),
     ...factories.map((x) => ({ role: "Factory", name: x.name, sub: flow?.factory.orderNo ? `their order ${flow.factory.orderNo}` : null, href: `/factories/${x.id}` })),
     ...(ship?.forwarder
