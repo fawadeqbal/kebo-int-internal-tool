@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Check, Mail, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Check, Mail } from "lucide-react";
 import { SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type SentVia } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton, toast } from "@kebo/ui/client";
+import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { ConfirmDialog } from "@/components/common/dialog";
 import { PANEL_FORM, PanelBody, PanelFooter, useClosePanel, WhatHappens } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 
@@ -252,37 +250,3 @@ export function SendWindow({
   );
 }
 
-/** "Delete draft" on the draft's line: asks first and says what happens. */
-export function DeleteDraftButton({ number, action, backHref }: { number: number; action: Action; backHref: string }) {
-  const router = useRouter();
-  const [asking, setAsking] = useState(false);
-  const [busy, start] = useTransition();
-  return (
-    <>
-      <button type="button" onClick={() => setAsking(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-bad hover:bg-bad-soft">
-        <Trash2 className="size-4" aria-hidden /> Delete draft
-      </button>
-      {asking && (
-        <ConfirmDialog
-          title={`Delete draft R${number}?`}
-          confirmLabel="Delete the draft"
-          cancelLabel="Keep it"
-          danger
-          busy={busy}
-          onCancel={() => setAsking(false)}
-          onConfirm={() =>
-            start(async () => {
-              const r = await action({}, new FormData());
-              setAsking(false);
-              if (!r.ok) return toast(r.message ?? "The draft was not deleted.");
-              router.replace(backHref);
-              router.refresh();
-            })
-          }
-        >
-          <WhatHappens lines={[`Draft R${number} and the prices set in it are removed.`, "The factory offers stay as they are.", number > 1 ? `R${number - 1} stays as it is.` : "With no other revision, the tab goes back to “No quotation yet”."]} />
-        </ConfirmDialog>
-      )}
-    </>
-  );
-}

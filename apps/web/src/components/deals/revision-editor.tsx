@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Check, CheckCircle2, Lock } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2 } from "lucide-react";
 import {
   convertMinor,
   costSummary,
@@ -37,7 +37,7 @@ import {
   type TheirTerms,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -1083,83 +1083,6 @@ export function Fig({ label, children, strong, className }: { label: string; chi
     <div className="flex flex-col">
       <dt className="text-xs text-text-2">{label}</dt>
       <dd className={cn("text-sm font-semibold whitespace-nowrap tabular", strong && "text-base", className)}>{children}</dd>
-    </div>
-  );
-}
-
-/** "Covers everything" or what it misses, by item number. */
-export function CoverageBadge({ missing }: { missing: string[] }) {
-  return missing.length ? (
-    <Badge tone="warn">
-      <AlertTriangle aria-hidden /> Misses {missing.join(", ")}
-    </Badge>
-  ) : (
-    <Badge tone="ok">
-      <CheckCircle2 aria-hidden /> Covers all
-    </Badge>
-  );
-}
-
-/** Cost, sales, profit and margin of an option. Internal: never printed. */
-export function CostingBox({
-  currency,
-  cost,
-  sales,
-  profit,
-  margin,
-  uncosted,
-  extra = 0,
-  extraLabel,
-}: {
-  currency: string;
-  cost: number;
-  sales: number;
-  profit: number;
-  margin: number | null;
-  uncosted: number;
-  /** Part of the cost: freight and the like to reach the basis we sell on. */
-  extra?: number;
-  extraLabel?: string;
-}) {
-  const fmt = (minor: number) => formatMinor(minor, currency);
-  return (
-    <div className="rounded-lg border border-dashed border-money/40 bg-money-soft/50 p-3 text-sm">
-      <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-money">
-        <Lock className="size-3.5" aria-hidden /> Internal costing — never printed
-      </p>
-      <dl>
-        <div className="flex justify-between py-0.5">
-          <dt className="text-text-2">Cost</dt>
-          <dd className="tabular">{fmt(cost)}</dd>
-        </div>
-        {extra > 0 && (
-          <div className="flex justify-between pb-0.5 pl-3 text-xs text-muted">
-            <dt>{extraLabel ?? "incl. costs to reach our basis"}</dt>
-            <dd className="tabular">{fmt(extra)}</dd>
-          </div>
-        )}
-        <div className="flex justify-between py-0.5">
-          <dt className="text-text-2" title="After the discount">
-            Sales <span className="text-xs text-muted">after discount</span>
-          </dt>
-          <dd className="tabular">{fmt(sales)}</dd>
-        </div>
-        <div className="flex justify-between py-0.5 font-semibold">
-          <dt>Profit</dt>
-          <dd className={cn("tabular", profit < 0 && "text-bad")}>{fmt(profit)}</dd>
-        </div>
-        <div className="flex justify-between py-0.5">
-          <dt className="text-text-2">Margin</dt>
-          <dd className={cn("font-semibold tabular", margin !== null && margin < 0 && "text-bad")}>
-            {margin === null ? "—" : `${margin.toFixed(1)}%`}
-          </dd>
-        </div>
-      </dl>
-      {uncosted > 0 && (
-        <p className="mt-1.5 text-xs text-muted">
-          {uncosted} line{uncosted === 1 ? " has" : "s have"} no cost and {uncosted === 1 ? "is" : "are"} left out.
-        </p>
-      )}
     </div>
   );
 }
