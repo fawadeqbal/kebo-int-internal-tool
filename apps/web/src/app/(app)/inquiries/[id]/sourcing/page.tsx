@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronRight, Columns3, Factory, FileText } from "lucide-rea
 import { basisText, offerTaxTag, REQUEST_CHANNEL_LABEL } from "@kebo/shared";
 import { Alert, Badge, buttonClass, ButtonLink, Card, CardHeader, cn, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
-import { date, money, plural, qty, companyToday } from "@/lib/format";
+import { date, dayMonth, money, plural, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 import { optional } from "@/components/print/data";
@@ -61,11 +61,20 @@ export default async function SourcingPage({
     const c = y.revisions.find((r) => r.status === "draft") ?? y.revisions[0];
     for (const o of c?.options ?? []) if (o.factoryQuoteId) usedIn.set(o.factoryQuoteId, [...(usedIn.get(o.factoryQuoteId) ?? []), y.letter]);
   }
+  // The factories asked for this inquiry come first in the new offer's picker (design 18 Nov).
+  const requests = await requestsOf(d.id);
+  const askedFactories = (requests?.items ?? []).flatMap((r) =>
+    r.factory
+      ? [{ id: r.factory.id, name: r.factory.name, contactPerson: null, note: [r.sentOn ? `asked ${dayMonth(r.sentOn)}` : "asked", r.factoryQuoteId ? "offer in" : "no offer yet"].join(" · ") }]
+      : [],
+  );
   const addOffer = (props: { variant?: "primary" | "secondary" | "ghost"; size?: "xs" | "sm" | "md"; label?: string; open?: boolean }) =>
     canEdit ? (
       <AddOfferButton
         dealId={d.id}
         refNo={d.refNo}
+        inquiryTitle={d.title}
+        asked={askedFactories}
         today={today}
         mainCurrency={s.currency}
         rates={settings.sales.exchangeRates}
@@ -89,7 +98,6 @@ export default async function SourcingPage({
       />
     ) : null;
 
-  const requests = await requestsOf(d.id);
   const waiting = (requests?.items ?? []).filter((r) => !r.factoryQuoteId && r.status === "sent");
 
   const notice = !canEdit && (

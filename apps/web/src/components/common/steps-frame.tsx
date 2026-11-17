@@ -106,7 +106,7 @@ export function StepsFrame<K extends string>({
         </p>
       </div>
       {/* The side bar stays put and runs to the bottom; only the step's own fields scroll (asked 17 Nov). */}
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] md:min-h-[min(520px,calc(100dvh-12rem))] md:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] md:min-h-[min(520px,calc(100dvh-12rem))] md:grid-cols-[248px_minmax(0,1fr)]">
         <nav aria-label="Steps" className="min-h-0 overflow-y-auto border-r border-line bg-surface px-2.5 py-3 max-md:hidden md:row-span-2">
           <ol className="flex flex-col gap-0.5">
             {steps.map((s, k) => {

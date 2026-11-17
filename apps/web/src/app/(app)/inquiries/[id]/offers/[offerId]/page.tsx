@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
-import { offerTaxText, REQUEST_CHANNEL_LABEL } from "@kebo/shared";
+import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
 import { ButtonLink, cn, PageHeader, RevisionBadge } from "@kebo/ui";
 import { MoreMenu } from "@/components/common/more-menu";
 import { requirePermission } from "@/lib/session";
@@ -10,7 +10,7 @@ import { companyToday, date } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import { optional } from "@/components/print/data";
 import { coverOf } from "@/components/deals/offer-facts";
-import { OfferEdit, OfferLines, OfferTerms, type OfferKit } from "@/components/deals/offer-work";
+import { OfferBoxes, OfferEdit, type OfferKit } from "@/components/deals/offer-work";
 import { OwnPagerTop, OwnPagerUnder } from "@/components/deals/own-pager";
 import { getSettings } from "@/lib/loaders";
 import { editsOf } from "@/lib/edit-data";
@@ -75,6 +75,7 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
     others: s.quotes.filter((o) => o.id !== x.id && o.lines.length),
     lineActions: lines,
     linesCard: edits?.cards.lines,
+    refNo: d.refNo,
   };
   const prev = at > 0 ? s.quotes[at - 1]! : null;
   const next = at < s.quotes.length - 1 ? s.quotes[at + 1]! : null;
@@ -99,7 +100,7 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
         back={{ href: `${base}/sourcing`, label: `${d.refNo} · Factory offers` }}
         title={x.factory.name}
         summary={summary.length ? <p className="min-w-0">{summary.join(" · ")}</p> : undefined}
-        actions={canEdit ? <OfferEdit kit={kit} q={x} step="lines" words="Edit" size="sm" /> : undefined}
+        actions={canEdit ? <OfferEdit kit={kit} q={x} step="factory" words="Edit offer" size="sm" /> : undefined}
         primary={
           d.allowed.quote && x.lines.length > 0 ? (
             <ButtonLink href={`${base}/quotation?start=1&offer=${x.id}`} variant="primary" size="sm">
@@ -128,17 +129,10 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
         />
       </PageHeader>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <OfferLines kit={kit} q={x} items={s.items} canEdit={canEdit} mainCurrency={s.currency} edits={edits?.cards.lines} />
-          <section aria-labelledby="o-terms" className="flex flex-col gap-2">
-            <h2 id="o-terms" className="text-[15px] font-semibold">
-              Terms
-            </h2>
-            <OfferTerms q={x} kit={canEdit ? kit : undefined} />
-          </section>
-        </div>
+        {/* The same boxes as its steps (design 18 Nov), each with its history and Edit. */}
+        <OfferBoxes q={x} kit={kit} canEdit={canEdit} edits={edits ?? undefined} mainCurrency={s.currency} historyHref={`${base}/history`} />
         <aside aria-label="About this offer" className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
-          <Side title="Quoted in" id="o-quoted">
+          <Side title="Quoted in" id="o-quoted" last={!asked}>
             {quotedIn.length ? (
               quotedIn.map((y) => (
                 <Link key={y.id} href={`${base}/quotations/${y.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-[13px] hover:bg-surface-2">
@@ -152,31 +146,13 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
               <p className="text-[13px] text-text-2">Not quoted yet.</p>
             )}
           </Side>
-          <Side title="Their files" id="o-files">
-            {x.files.length ? (
-              <ul className="flex flex-col gap-1">
-                {x.files.map((f) => (
-                  <li key={f.id}>
-                    <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="text-[13px] font-semibold text-primary underline underline-offset-2">
-                      {f.fileName}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-[13px] text-text-2">None yet.</p>
-            )}
-          </Side>
-          <Side title="Details" id="o-who" last>
-            <dl className="flex flex-col gap-1.5">
-              {asked && <Row label="Asked">{`${date(asked.sentOn)}${asked.channel ? ` by ${REQUEST_CHANNEL_LABEL[asked.channel].toLowerCase()}` : ""}`}</Row>}
-              {x.reference && <Row label="Their ref.">{x.reference}</Row>}
-              <Row label="Received">{date(x.receivedOn)}</Row>
-              {x.validUntil && <Row label="Valid until">{date(x.validUntil)}</Row>}
-              <Row label="Currency">{x.currency}</Row>
-              <Row label="Tax">{offerTaxText(x.taxRate, x.taxIncluded)}</Row>
-            </dl>
-          </Side>
+          {asked && (
+            <Side title="Asked" id="o-asked" last>
+              <p className="text-[13px] text-text-2">
+                {`${date(asked.sentOn)}${asked.channel ? ` by ${REQUEST_CHANNEL_LABEL[asked.channel].toLowerCase()}` : ""}`}
+              </p>
+            </Side>
+          )}
         </aside>
       </div>
     </div>
@@ -191,14 +167,5 @@ function Side({ title, id, last, children }: { title: string; id: string; last?:
       </h2>
       {children}
     </section>
-  );
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex justify-between gap-3 text-[13px]">
-      <dt className="text-text-2">{label}</dt>
-      <dd className="min-w-0 text-right font-medium break-words text-text">{children}</dd>
-    </div>
   );
 }
