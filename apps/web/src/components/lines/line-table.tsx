@@ -24,16 +24,17 @@ import {
 import { lineNumbers } from "@kebo/shared";
 import { Button, cn, Input, Kbd, Textarea } from "@kebo/ui";
 import { parseList, type PastedItem } from "@/components/deals/paste-list";
-import { FloatingMenu } from "@/components/common/floating";
+import { FloatingMenu, useIsPhone } from "@/components/common/floating";
 import { ExcelMenu } from "@/components/sheets/excel-menu";
 import { lineExport, linesFromSheet, lineTemplate, type SheetLines } from "@/components/sheets/line-sheets";
+import { UNITS } from "./units";
+import { LineWindow, lineNeeds, lineSummary, PhoneLineRow, type LineWindowThen } from "./phone-lines";
 
 /* ---------------------------------------------------------------- types */
 
 export type LineValues = Record<string, string>;
 
-/** The units offered in a unit column's dropdown; "Other…" lets people type any other. */
-export const UNITS = ["pcs", "sets", "units", "kg", "tons", "m", "m²", "m³", "rolls", "cartons", "boxes", "bags", "pairs", "litres", "drums", "lot"];
+export { UNITS } from "./units";
 const OTHER_UNIT = "__other__";
 /** Picked from a list (no typing into the cell). */
 const isChoice = (c: LineColumn) => c.input === "select" || c.input === "unit";
@@ -305,6 +306,20 @@ export function LineTable({
     focus(entryCell(editable[0]!.key));
     const r = await add([{ values, partOf: null }]);
     if (!r.ok) setEntry(values); // nothing lost: put it back to fix
+  };
+
+  /** The thin "+ Add line" under the sheet: adds what is typed in the new row, else takes the cursor there. */
+  const addLine = () => {
+    if (!isBlank(entry, columns, entryAt.parentKey)) return void submitEntry();
+    const first = entryCell(editable[0]!.key);
+    if (entryAt.afterKey || entryAt.parentKey) {
+      setEntryAt({ afterKey: null, parentKey: null });
+      focus(first);
+      return;
+    }
+    const el = cells.current.get(first);
+    el?.focus();
+    el?.scrollIntoView?.({ block: "nearest" });
   };
 
   const toPart = (on: boolean) => {
@@ -671,8 +686,68 @@ export function LineTable({
     focus(entryCell(editable[0]!.key));
   };
 
+  /* ---------- on a phone (design 16 Nov): a list, and one line at a time in a window of its own */
+
+  const phone = useIsPhone();
+  const Noun = noun[0]!.toUpperCase() + noun.slice(1);
+  const [editing, setEditing] = useState<{ key: string | null; at: { afterKey: string | null; parentKey: string | null }; n: number; added?: string } | null>(null);
+  const [needsOnly, setNeedsOnly] = useState(false);
+  const valuesOf = (r: LineRow) => Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)]));
+  const needing = rows.filter((r) => lineNeeds(r.values, columns)).length;
+  const phoneRows = needsOnly && needing ? visible.filter(({ r }) => lineNeeds(r.values, columns)) : visible;
+  const editingRow = editing?.key ? (rows.find((r) => r.key === editing.key) ?? null) : null;
+  const editingAt = editingRow ? phoneRows.findIndex(({ r }) => r.key === editingRow.key) : -1;
+  const openLine = (key: string) => {
+    setMenu(null);
+    setMessage(null);
+    setEditing((e) => ({ key, at: { afterKey: null, parentKey: null }, n: (e?.n ?? 0) + 1 }));
+  };
+  const openNew = (at: { afterKey: string | null; parentKey: string | null } = { afterKey: null, parentKey: null }) => {
+    setMenu(null);
+    setCtx(null);
+    setMessage(null);
+    setEditing((e) => ({ key: null, at, n: (e?.n ?? 0) + 1 }));
+  };
+  /** The line window's save: a saved line's changed values, or a new line; then close, or the next one. */
+  const saveLine = (values: LineValues, then: LineWindowThen) => {
+    if (!editing) return;
+    const n = editing.n + 1;
+    if (editingRow) {
+      const go = () => {
+        if (then === "close") return setEditing(null);
+        const to = phoneRows[editingAt + (then === "next" ? 1 : -1)];
+        setEditing(to ? { key: to.r.key, at: { afterKey: null, parentKey: null }, n } : null);
+      };
+      const changed = Object.fromEntries(
+        editable.filter((c) => (values[c.key] ?? "") !== (editingRow.values[c.key] ?? "")).map((c) => [c.key, values[c.key] ?? ""]),
+      );
+      if (!Object.keys(changed).length) return go();
+      void run(editingRow.key, (reason) => onEdit(editingRow.key, changed, reason), go);
+      return;
+    }
+    const at = editing.at;
+    if (isBlank(values, columns, at.parentKey)) {
+      if (then === "close") setEditing(null);
+      return;
+    }
+    void run(
+      "entry",
+      (reason) => onAdd([{ values, partOf: null }], at, reason),
+      (ok) => {
+        if (then === "close") return setEditing(null);
+        // The next one goes right after it (at the same level), or at the end.
+        const last = ok.keys?.[ok.keys.length - 1];
+        const next = last && (at.afterKey || at.parentKey) ? { afterKey: last, parentKey: at.parentKey } : at;
+        setEditing({ key: null, at: next, n, added: `Added “${(values[editable[0]!.key] ?? "").split("\n")[0]!.trim()}”` });
+      },
+    );
+  };
+
   /** Does a row action (from the ⋯ menu, the right-click menu or the toolbar). */
   const act = (key: RowActionKey, r: LineRow) => {
+    // On a phone a new line is typed in its own window, where it goes.
+    if (phone && key === "below") return openNew({ afterKey: r.key, parentKey: r.parentKey });
+    if (phone && key === "part") return openNew({ afterKey: [...rows].reverse().find((x) => x.parentKey === r.key)?.key ?? r.key, parentKey: r.key });
     if (key === "below") insertBelow(r);
     else if (key === "part") addPartTo(r);
     else if (key === "out") void move(r, "outdent");
@@ -830,6 +905,89 @@ export function LineTable({
     </tr>
   );
 
+  // On a phone: one line per row (tap to open it in its window), ⋯ for what can be done to it.
+  const phoneList = (
+    <div className="flex flex-col gap-2">
+      {needing > 0 && !readOnly && (
+        <div role="group" aria-label={`Show ${noun}s`} className="flex flex-wrap gap-1.5">
+          {[
+            { on: !needsOnly, label: "All", n: rows.length, set: false },
+            { on: needsOnly, label: "Needs something", n: needing, set: true },
+          ].map((f) => (
+            <button
+              key={f.label}
+              type="button"
+              aria-pressed={f.on}
+              onClick={() => setNeedsOnly(f.set)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:font-semibold aria-pressed:text-primary"
+            >
+              {f.label} <b className="tabular">{f.n}</b>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        {rows.length === 0 ? (
+          <p className="px-3 py-4 text-sm text-text-2">{empty ?? `No ${noun}s yet.`}</p>
+        ) : phoneRows.length === 0 ? (
+          <p className="px-3 py-4 text-sm text-text-2">{q ? <>Nothing matches &ldquo;{query}&rdquo;.</> : `Every ${noun} has what it needs.`}</p>
+        ) : (
+          <ul aria-label={`${Noun}s`}>
+            {phoneRows.map(({ r, i }) => (
+              <PhoneLineRow
+                key={r.key}
+                no={numbers[i]!}
+                kind={r.parentKey ? "Part" : Noun}
+                name={(valueOf(r, columns[0]!.key) ?? "").split("\n")[0]!.trim()}
+                summary={lineSummary(r, columns, valuesOf(r))}
+                needs={lineNeeds(valuesOf(r), columns)}
+                parts={rows.filter((p) => p.parentKey === r.key).length}
+                badge={r.badge}
+                part={!!r.parentKey}
+                busy={busy === r.key}
+                onOpen={readOnly ? undefined : () => openLine(r.key)}
+                menu={
+                  readOnly ? undefined : (
+                    <span className="flex items-center pr-1">
+                      <Button
+                        id={`rowmenu-${menuId}-${r.key}`}
+                        size="icon-sm"
+                        variant="ghost"
+                        onClick={() => setMenu(menu === r.key ? null : r.key)}
+                        aria-label={`More for ${rowLabel(i)}`}
+                        aria-haspopup="menu"
+                        aria-expanded={menu === r.key}
+                        className="size-11"
+                      >
+                        <MoreHorizontal aria-hidden />
+                      </Button>
+                      {menu === r.key && (
+                        <RowMenu onClose={closeMenu} anchorId={`rowmenu-${menuId}-${r.key}`} label={rowLabel(i)}>
+                          {actionsFor(r).map((a) => (
+                            <MenuItem key={a.key} icon={a.icon} onClick={() => act(a.key, r)} disabled={a.disabled} danger={a.danger}>
+                              {a.label}
+                            </MenuItem>
+                          ))}
+                        </RowMenu>
+                      )}
+                    </span>
+                  )
+                }
+              />
+            ))}
+          </ul>
+        )}
+        {adding.length > 0 &&
+          adding.map((v, n) => (
+            <div key={n} className="flex items-center gap-2 border-t border-line px-3 py-2 text-sm text-muted">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden /> {(v[columns[0]!.key] ?? "").split("\n")[0]}
+            </div>
+          ))}
+        {footer && <div className="border-t border-line bg-surface">{footer}</div>}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-2">
       {(rows.length > 8 || anyParts || tools || !readOnly || sheet) && (
@@ -908,7 +1066,7 @@ export function LineTable({
         />
       )}
 
-      {!readOnly && (
+      {!readOnly && !phone && (
         // Like a sheet's toolbar: what can be done to the selected row, always in the same place.
         <div
           role="toolbar"
@@ -939,6 +1097,9 @@ export function LineTable({
         </div>
       )}
 
+      {phone ? (
+        phoneList
+      ) : (
       <div className="overflow-hidden rounded-lg border border-line bg-surface">
         {/* Read-only lines have nothing to tab to inside, so the table itself takes the keyboard (arrow keys scroll
             it sideways); editable lines are reached through their cells. */}
@@ -1186,6 +1347,16 @@ export function LineTable({
         )}
         {footer && <div className="border-t border-line bg-surface lg:sticky lg:bottom-0">{footer}</div>}
       </div>
+      )}
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={phone ? () => openNew() : addLine}
+          className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong text-[13px] font-medium text-primary transition-colors hover:border-primary hover:bg-primary-soft/40 max-sm:h-10"
+        >
+          <Plus className="size-3.5" aria-hidden /> Add {noun}
+        </button>
+      )}
 
       {ctxRow && (
         <FloatingMenu anchor={ctxAnchor} onClose={closeCtx} label={rowLabel(rows.indexOf(ctxRow))} width={260} align="start">
@@ -1199,10 +1370,34 @@ export function LineTable({
 
       {error && <p className="text-xs text-bad">{error}</p>}
       {/* Notices stay in view at the bottom of the screen: with 100+ lines the row may be far from the top. */}
-      {(pending || message || removed) && (
+      {editing && (
+        <LineWindow
+          title={editingRow ? rowLabel(rows.indexOf(editingRow)) : editing.at.parentKey ? `New part of ${noun} ${parentLabel(editing.at.parentKey)}` : `New ${noun}`}
+          sub={editingRow ? `${editingAt + 1} of ${phoneRows.length}` : `${rows.length} ${noun}${rows.length === 1 ? "" : "s"} so far`}
+          progress={editingRow ? (editingAt + 1) / Math.max(1, phoneRows.length) : undefined}
+          columns={columns}
+          start={editingRow ? valuesOf(editingRow) : initialValues(columns, editing.at.parentKey)}
+          row={editingRow}
+          isNew={!editingRow}
+          resetKey={String(editing.n)}
+          hasPrev={editingAt > 0}
+          hasNext={editingAt >= 0 && editingAt < phoneRows.length - 1}
+          busy={busy !== null}
+          added={editing.added}
+          problem={message}
+          reason={pending && <ReasonBox pending={pending} onCancel={() => setPending(null)} />}
+          onSave={saveLine}
+          onClose={() => {
+            setEditing(null);
+            setPending(null);
+            setMessage(null);
+          }}
+        />
+      )}
+      {((pending && !editing) || (message && !editing) || removed) && (
         <div className="fixed inset-x-0 bottom-20 z-40 flex justify-center px-4 lg:bottom-6 lg:pl-60">
           <div className="flex w-full max-w-2xl flex-col gap-2">
-            {pending && (
+            {pending && !editing && (
               <ReasonBox
                 pending={pending}
                 onCancel={() => {
@@ -1211,7 +1406,7 @@ export function LineTable({
                 }}
               />
             )}
-            {message && (
+            {message && !editing && (
               <p role="alert" className="flex items-center justify-between gap-2 rounded-lg border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad shadow-pop">
                 {message}
                 <button type="button" onClick={() => setMessage(null)} aria-label="Close" className="text-muted">
@@ -1236,7 +1431,7 @@ export function LineTable({
           </div>
         </div>
       )}
-      {!readOnly && (
+      {!readOnly && !phone && (
         <div className="text-xs text-muted">
           <p>
             Works like a sheet: click a cell and type, <Kbd>Enter</Kbd> saves and goes down, paste rows from Excel into the last row.
@@ -1499,7 +1694,7 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-muted",
+        "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40 max-sm:min-h-12 max-sm:gap-3 max-sm:text-[15px] [&_svg]:size-4 [&_svg]:text-muted max-sm:[&_svg]:size-5",
         danger && "border-t border-line text-bad hover:bg-bad-soft [&_svg]:text-bad",
       )}
     >

@@ -16,6 +16,9 @@ export interface SettingField {
   unit?: string;
   options?: { value: string; label: string }[];
   wide?: boolean;
+  /** A tick's words when shown (default On / Off). */
+  on?: string;
+  off?: string;
   placeholder?: string;
   /** Images: what it is ("logo"), for "No logo" and "Remove the logo". */
   noun?: string;
@@ -175,12 +178,10 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "defaultIncoterm", label: "Usual Incoterm", kind: "select", options: INCOTERMS.map((i) => ({ value: i, label: i })), hint: "Who pays freight and insurance. FOB: we deliver onto the ship at the Chinese port." },
       {
         name: "factoryTaxIncluded",
-        label: "Factory prices are",
-        kind: "select",
-        options: [
-          { value: "false", label: "Without tax · tax is added on top" },
-          { value: "true", label: "Tax included · the price already has the tax in it" },
-        ],
+        label: "Tax included in factory prices",
+        kind: "bool",
+        on: "Included",
+        off: "Added on top",
         hint: "How a new factory offer starts. Each offer can say otherwise.",
       },
       { name: "factoryTaxRate", label: "Factory tax", kind: "number", unit: "%", hint: "A new offer's tax %: 0 unless the factories charge tax, e.g. 13% VAT in China" },

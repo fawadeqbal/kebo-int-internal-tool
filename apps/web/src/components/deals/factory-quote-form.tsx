@@ -13,7 +13,7 @@ import {
   type LeadFrom,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
@@ -162,45 +162,16 @@ export function TaxBox({
   note?: ReactNode;
   className?: string;
 }) {
-  const choice = (value: boolean, title: string, sub: string) => (
-    <label
-      className={cn(
-        "flex cursor-pointer items-start gap-2.5 rounded-lg border bg-surface px-3 py-2.5 text-sm transition-colors",
-        included === value ? "border-primary bg-primary-soft/50 ring-1 ring-primary/30" : "border-line hover:border-line-strong",
-      )}
-    >
-      <input
-        type="radio"
-        name={`${idPrefix}-tax-included`}
-        className="mt-0.5 accent-[var(--color-primary)]"
-        checked={included === value}
-        onChange={() => onIncluded(value)}
-      />
-      <span>
-        <span className="block font-medium">{title}</span>
-        <span className="block text-xs text-text-2">{sub}</span>
-      </span>
-    </label>
-  );
+  // One tick (Fawad, 17 Nov): ticked, their prices already have the tax in them; not ticked, it is added on top.
   return (
-    <fieldset className={cn("flex flex-col gap-3 rounded-xl border border-line bg-surface-2/60 p-3 sm:p-4", className)}>
+    <fieldset className={cn("grid gap-x-3 gap-y-2 sm:grid-cols-2", className)}>
       <legend className="sr-only">Tax</legend>
-      <p className="text-sm font-semibold" aria-hidden>
-        Tax
-      </p>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-text-2">Their prices are</span>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {choice(false, "Without tax", "tax is added on top")}
-          {choice(true, "Tax included", "the price already has the tax in it")}
-        </div>
-      </div>
       <Field label="Tax %" htmlFor={`${idPrefix}-tax-rate`} error={error} hint="0 unless the factory charges tax, e.g. 13% VAT in China">
         <span className="flex items-center gap-2">
           <Input
             id={`${idPrefix}-tax-rate`}
             inputMode="decimal"
-            className="h-9 w-24 text-right tabular"
+            className="w-24 text-right tabular"
             value={rate}
             onChange={(e) => onRate(e.target.value.replace(/[^\d.]/g, ""))}
             placeholder="0"
@@ -208,7 +179,14 @@ export function TaxBox({
           <span className="text-sm text-muted">%</span>
         </span>
       </Field>
-      <p className="text-xs text-text-2">{note ?? "Applies to every line; a line can still have its own %."}</p>
+      <label htmlFor={`${idPrefix}-tax-included`} className="flex min-h-11 cursor-pointer items-start gap-2.5 text-sm sm:mt-[26px]">
+        <Checkbox id={`${idPrefix}-tax-included`} checked={included} onChange={(e) => onIncluded(e.target.checked)} className="mt-0.5 size-[18px]" />
+        <span>
+          <span className="block font-medium">Tax included in their prices</span>
+          <span className="block text-xs text-text-2">{included ? "The price already has the tax in it" : "Not ticked: the tax is added on top"}</span>
+        </span>
+      </label>
+      <p className="text-xs text-text-2 sm:col-span-2">{note ?? "Applies to every line; a line can still have its own %."}</p>
     </fieldset>
   );
 }

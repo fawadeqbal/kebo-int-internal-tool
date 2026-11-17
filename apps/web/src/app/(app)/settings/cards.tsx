@@ -41,7 +41,7 @@ function ValueText({ f, value }: { f: SettingField; value: unknown }) {
         {f.unit && ` ${f.unit}`}
       </span>
     );
-  if (f.kind === "bool") return <>{value ? "On" : "Off"}</>;
+  if (f.kind === "bool") return <>{value ? (f.on ?? "On") : (f.off ?? "Off")}</>;
   return <span className={cn("break-words", f.kind === "textarea" && "whitespace-pre-line")}>{String(value)}</span>;
 }
 
