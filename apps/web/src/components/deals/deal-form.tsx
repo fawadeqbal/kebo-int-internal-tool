@@ -199,7 +199,26 @@ export function DealForm({
         reason: why?.trim() || undefined,
         changes: sheet.diff.changes.slice(0, 60),
         keys: sheet.diff.keys.slice(0, 500),
+        lines: Object.fromEntries(Object.entries(sheet.diff.byKey).slice(0, 200)),
       }).catch(() => undefined);
+    // Each box keeps its own history (design rules 18 Nov): what changed in Customer and in Details, with why.
+    if (!create && itemsEdit && why?.trim())
+      for (const [card, part] of [
+        ["request.customer", "Customer"],
+        ["request.details", "Details"],
+      ] as const) {
+        const list = fieldChanges.filter((c) => PART_OF[c.key] === part);
+        if (!list.length) continue;
+        await recordEditAction({
+          type: itemsEdit.edit.type,
+          id: itemsEdit.edit.id,
+          card,
+          kind: "edit",
+          reason: why.trim(),
+          changes: list.map((c) => `${c.label}: ${c.from} → ${c.to}`),
+          keys: list.map((c) => c.key),
+        }).catch(() => undefined);
+      }
     const list = stagedNow.current;
     if (list.length) {
       setUploading(true);

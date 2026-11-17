@@ -13,6 +13,7 @@ import { ItemsCard } from "./items-card";
 import { FilesCard, RequestBoxes } from "./request-card";
 import { WithSide } from "./side";
 import { inquiryTitle } from "@/lib/titles";
+import { editsOf } from "@/lib/edit-data";
 
 export const generateMetadata = inquiryTitle();
 
@@ -114,7 +115,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
       )}
 
       {/* The request in the boxes of its steps (design rules 18 Nov): Customer · Details, then Items, then Files. */}
-      <RequestBoxes d={d} />
+      <RequestBoxes d={d} edits={await editsOf("inquiry", id)} />
 
       <ItemsCard id={id} />
       <FilesCard d={d} />

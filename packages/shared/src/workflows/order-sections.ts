@@ -505,6 +505,9 @@ const cardKey = (card: string) => card.split(":")[0]!;
 /** The cards that count their edits: how each reads in the history, and the order step it belongs to. */
 export const EDIT_CARDS: Record<string, { label: string; step?: FlowStep }> = {
   needs: { label: "Items" },
+  /** The inquiry's boxes (design rules 18 Nov): what changed in Customer and Details, each with its reason. */
+  "request.customer": { label: "Customer" },
+  "request.details": { label: "Details" },
   lines: { label: "Offer lines" },
   factory: { label: "Factory order", step: "factory" },
   production: { label: "Production", step: "production" },

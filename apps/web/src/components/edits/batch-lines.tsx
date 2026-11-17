@@ -42,6 +42,8 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
   const now = new Map(after.map((r, i) => [r.key, { r, no: noAfter[i]! }]));
   const changes: string[] = [];
   const keys = new Set<string>();
+  /** What changed on each saved line, by its key (its own history: "Qty 2 → 3"). */
+  const byKey: Record<string, string[]> = {};
   let filledChanged = false;
   for (const [key, { r, no }] of was)
     if (!now.has(key)) {
@@ -65,6 +67,7 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
     }
     if (diffs.length) {
       keys.add(r.key);
+      byKey[r.key] = diffs;
       changes.push(`${noAfter[i]} · ${diffs.join(", ")}`);
     }
   }
@@ -83,7 +86,7 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
     }
   }
   const added = after.some((r) => !was.has(r.key));
-  return { changes, keys: [...keys], filledChanged, added };
+  return { changes, keys: [...keys], byKey, filledChanged, added };
 }
 
 /**

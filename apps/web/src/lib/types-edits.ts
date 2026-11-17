@@ -13,7 +13,8 @@ export interface EditRef {
 export interface EditCard {
   count: number;
   first: { by: string | null; at: string } | null;
-  edits: { n: number; by: string | null; at: string; reason: string | null; changes: string[] }[];
+  /** Newest first; `keys` the lines (or fields) it changed, `lines` what changed on each. */
+  edits: { n: number; by: string | null; at: string; reason: string | null; changes: string[]; keys?: string[]; lines?: Record<string, string[]> }[];
   /** How often each line (or field) was changed. */
   keys: Record<string, number>;
 }

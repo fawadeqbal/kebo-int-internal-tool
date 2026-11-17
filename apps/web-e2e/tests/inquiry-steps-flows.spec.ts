@@ -260,3 +260,39 @@ test("Edit inquiry (⋯): every part, then Changes — old → new with Undo —
   expect([saved.channel, saved.priority]).toEqual(["whatsapp", "normal"]);
   expect(errors).toEqual([]);
 });
+
+test("history: each box's clock shows only its changes with who, when and why; a changed line has its own", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  const deal = await newInquiry(page);
+  // Came by changed, with a reason.
+  await page.goto(`/inquiries/${deal.id}?panel=edit-request&id=customer`);
+  const win = page.getByRole("dialog", { name: "Edit customer" });
+  await win.getByRole("radiogroup", { name: "Came by" }).getByRole("radio", { name: "WhatsApp" }).click();
+  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Customer asked for it" }).click();
+  await win.getByRole("button", { name: "Save 1 change" }).click();
+  await expect(win).toBeHidden();
+  // Customer's clock: the change, old → new, why; then where it started. Details' clock: only its start.
+  await page.getByRole("region", { name: "Customer" }).getByRole("button", { name: "History of customer" }).click();
+  const hist = page.getByRole("dialog", { name: "Customer · history" });
+  await expect(hist).toContainText("Came by: Email → WhatsApp");
+  await expect(hist).toContainText("Why: Customer asked for it");
+  await expect(hist).toContainText("Added with the inquiry");
+  await page.keyboard.press("Escape");
+  await page.getByRole("region", { name: "Details" }).getByRole("button", { name: "History of details" }).click();
+  await expect(page.getByRole("dialog", { name: "Details · history" })).not.toContainText("Came by");
+  await page.keyboard.press("Escape");
+  // A line's quantity changed: that line's clock says so.
+  await page.locator("#items").getByRole("link", { name: "Edit items" }).click();
+  const items = page.getByRole("dialog", { name: "Edit items" });
+  await items.getByRole("grid").getByRole("row", { name: "Item 2" }).getByRole("gridcell").nth(2).click();
+  await page.keyboard.press("Enter");
+  await page.getByLabel("Item 2: Qty").fill("3");
+  await page.keyboard.press("Enter");
+  await items.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Customer changed the quantity" }).click();
+  await items.getByRole("button", { name: "Save 1 change" }).click();
+  await expect(items).toBeHidden();
+  await page.locator("#items").getByRole("button", { name: "History of line 2" }).click();
+  await expect(page.getByRole("dialog", { name: "Line 2 · history" })).toContainText("Qty 2 → 3");
+  expect(errors).toEqual([]);
+});

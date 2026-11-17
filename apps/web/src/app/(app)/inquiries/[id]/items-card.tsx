@@ -8,6 +8,8 @@ import { EditedMark } from "@/components/edits/edits";
 import { editsOf } from "@/lib/edit-data";
 import { ItemsExcel, ItemsView } from "@/components/deals/needs-cards";
 import { itemsLine } from "./steps";
+import { dateTime } from "@/lib/format";
+import { HistoryButton } from "@/components/edits/history-button";
 
 /**
  * "Items" on the Overview, under the client's request (it was the Needs tab): the items — numbered, parts under their
@@ -36,6 +38,9 @@ export async function ItemsCard({ id }: { id: string }) {
             <Th className="text-right">Qty</Th>
             <Th className="text-right">Target price</Th>
             {sourcing && <Th>Offers</Th>}
+            <Th className="w-12">
+              <span className="sr-only">History</span>
+            </Th>
           </tr>
         </THead>
         <tbody>
@@ -57,6 +62,19 @@ export async function ItemsCard({ id }: { id: string }) {
                 </Td>
                 <Td className="text-right tabular">{i.targetPrice ? Number(i.targetPrice).toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"}</Td>
                 {sourcing && <Td>{n ? <Badge tone="ok">{n === 1 ? "1 offer" : n + " offers"}</Badge> : <Badge tone="neutral">No offer</Badge>}</Td>}
+                <Td className="text-right">
+                  {/* The line's own changes (design rules 18 Nov): only when it has some. */}
+                  {(() => {
+                    const own = (needs?.edits ?? []).filter((e) => e.lines?.[i.id]?.length);
+                    return own.length ? (
+                      <HistoryButton
+                        title={`Line ${i.no}`}
+                        allHref={`/inquiries/${id}/history`}
+                        entries={own.map((e) => ({ lines: e.lines![i.id]!, reason: e.reason, by: e.by, at: dateTime(e.at) }))}
+                      />
+                    ) : null;
+                  })()}
+                </Td>
               </Tr>
             );
           })}

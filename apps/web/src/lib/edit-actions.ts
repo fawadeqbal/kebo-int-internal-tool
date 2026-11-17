@@ -12,6 +12,8 @@ export async function recordEditAction(input: {
   reason?: string;
   changes: string[];
   keys: string[];
+  /** What changed on each line (or field), by its key. */
+  lines?: Record<string, string[]>;
 }): Promise<{ ok: boolean; n?: number; message?: string }> {
   try {
     const r = await api.post<{ n: number }>("/edits", input);
