@@ -98,9 +98,17 @@
 }
 
 
-/* On a phone a record's own top bar (← and its name, PageHeader) takes the place of the app's. */
+/* On a phone a record's own top bar (← and its name, PageHeader) takes the place of the app's; a top page's name
+   (a list's) takes the place of the app's name in the app's bar; and a record's next step, pinned at the bottom,
+   takes the place of the bottom bar (canvas row "Every page's top on a phone"). */
 @media (width < 48rem) {
   [data-shell]:has([data-record-bar]) [data-shell-top] {
+    display: none;
+  }
+  [data-shell]:has([data-page-title]) [data-shell-logo] {
+    display: none;
+  }
+  [data-shell]:has([data-record-dock] :is(a, button)) [data-quick-nav] {
     display: none;
   }
 }

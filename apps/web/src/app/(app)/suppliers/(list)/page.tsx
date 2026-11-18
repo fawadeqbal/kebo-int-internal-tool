@@ -135,7 +135,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <StatRow className="mb-4">
+      <StatRow className="mb-4" phone="line">
         <StatTile
           icon={Factory}
           iconColor={1}

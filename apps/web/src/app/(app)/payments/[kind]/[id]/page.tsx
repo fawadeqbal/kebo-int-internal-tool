@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Banknote, Check, FileText } from "lucide-react";
-import { can, PAYMENT_RECORD_KINDS, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
+import { can, PAYMENT_RECORD_KINDS, PAYMENT_RECORD_LABEL, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
 import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { date, dateTime, companyToday } from "@/lib/format";
+import { date, dateTime, companyToday, money } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
@@ -22,7 +22,9 @@ import { cache } from "react";
 /** One payment, read once per request (the page and its tab title). */
 const paymentOf = cache((kind: PaymentRecordKind, id: string) => api.get<PaymentView>(`/treasury/payments/${kind}/${id}`).catch(() => null));
 const NOUN: Partial<Record<PaymentRecordKind, string>> = { customer: "Receipt", supplier: "Supplier payment", expense: "Expense", transfer: "Transfer", refund: "Refund", credit: "From credit" };
-const titleOf = (p: PaymentView) => (p.number && NOUN[p.kind] ? `${NOUN[p.kind]} ${p.number}` : p.title);
+/** Its title is its name in words (design rule 3: never its number); what it is and its number go under it. */
+const titleOf = (p: PaymentView) => p.title;
+const kindOf = (p: PaymentView) => NOUN[p.kind] ?? PAYMENT_RECORD_LABEL[p.kind];
 
 export async function generateMetadata({ params }: { params: Promise<{ kind: string; id: string }> }) {
   const { kind, id } = await params;
@@ -87,8 +89,9 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
         icon={Banknote}
         crumbs={[...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }]}
         title={title}
+        record={{ kind: kindOf(p), number: p.number }}
         badge={<StatusBadge meaning={STATUS_MEANING[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</StatusBadge>}
-        summary={[p.party?.label, p.for.map((f) => f.label).join(", ") || null, p.number ? null : date(p.on)].filter(Boolean).join(" · ")}
+        summary={[money(p.amount, p.currency), p.party?.label, p.for.map((f) => f.label).join(", ") || null, date(p.on)].filter(Boolean).join(" · ")}
         actions={
           order?.href ? (
             <ButtonLink href={order.href} variant="secondary">

@@ -1,7 +1,7 @@
 import { ArrowRight, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { countryName } from "@/lib/countries";
-import { can, MANUAL_MOVES } from "@kebo/shared";
+import { can, MANUAL_MOVES, RECORD_KIND, RECORD_TITLE } from "@kebo/shared";
 import { ButtonLink, cn, PriorityBadge } from "@kebo/ui";
 import { companyToday } from "@/lib/format";
 import { requireUser, hasFeature } from "@/lib/session";
@@ -89,7 +89,8 @@ export default async function DealLayout({ children, params }: { children: React
           header={{
             crumbs: [{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }],
             icon: MessageSquareText,
-            title: d.title ? d.title : <span className="tabular">{d.refNo}</span>,
+            title: RECORD_TITLE.inquiry({ title: d.title, items: d.items, customer: d.customer.name }),
+            record: { kind: RECORD_KIND.inquiry, number: d.refNo },
             summary: (
               <p className="min-w-0">
                 {meta.map((m, i) => (

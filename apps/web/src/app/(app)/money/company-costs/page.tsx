@@ -82,7 +82,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         actions={list.count > 0 ? <ExportCsv what="expenses" query={{ ...span(month), category, q: text }} /> : undefined}
         primary={<AddCost setup={setup} label="Add company cost" icon={null} />}
       />
-      <StatRow className="mb-4">
+      <StatRow className="mb-4" phone="line">
         <StatTile label={month === thisMonth ? "This month" : monthName} value={whole(monthTotal, c)} sub={`${monthCount} cost${monthCount === 1 ? "" : "s"}`} />
         <StatTile label={month === thisMonth ? "Last month" : "The month before"} value={whole(before.total, c)} sub={change === null ? "—" : `${change > 0 ? "+" : ""}${change}% since`} />
         <StatTile label={`In ${month.slice(0, 4)}`} value={whole(year.total, c)} sub={`${year.count} cost${year.count === 1 ? "" : "s"}`} />

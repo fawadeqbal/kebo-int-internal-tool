@@ -649,6 +649,56 @@
   mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
 }
 
+/* A list's figures on a phone (StatRow phone="line"; design rule 15, canvas board "List pages on a phone"): the tiles
+   become one slim line of facts, each its label and value, and its line under it only when it is news (late). */
+@media (width < 40rem) {
+  [data-stat-row="line"] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.875rem;
+    row-gap: 0.125rem;
+  }
+  [data-stat-row="line"] [data-stat-how],
+  [data-stat-row="line"] [data-stat-body],
+  [data-stat-row="line"] [data-stat-figure] {
+    display: contents;
+  }
+  [data-stat-row="line"] [data-stat-how] > :not([data-stat]),
+  [data-stat-row="line"] [data-stat-more],
+  [data-stat-row="line"] [data-stat-sub=""],
+  [data-stat-row="line"] [data-stat-label] > :not(:first-child) {
+    display: none;
+  }
+  [data-stat-row="line"] [data-stat] {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.3rem;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  [data-stat-row="line"] [data-stat-label] {
+    display: inline;
+    padding: 0;
+  }
+  [data-stat-row="line"] [data-stat-label] > :first-child {
+    font-size: 12.5px;
+    color: var(--color-text-2);
+  }
+  [data-stat-row="line"] [data-stat-value] {
+    font-size: 13px;
+    line-height: 18px;
+    letter-spacing: 0;
+  }
+  [data-stat-row="line"] [data-stat-sub] {
+    font-size: 12.5px;
+  }
+}
+
 /*
  * On a phone, a table with four or more columns showing keeps a readable
  * width and scrolls sideways, instead of squeezing words one per line.

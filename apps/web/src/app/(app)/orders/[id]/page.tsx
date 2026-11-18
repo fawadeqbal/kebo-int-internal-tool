@@ -5,6 +5,7 @@ import { can, ROUTE_NAME } from "@kebo/shared";
 import { Badge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderMoneyOf, orderOf, orderSectionsOf } from "@/lib/order-data";
+import { orderName } from "@/lib/titles";
 import { date, dayMonth, money } from "@/lib/format";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
@@ -22,7 +23,7 @@ import { StageActions } from "./forms";
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const o = await orderOf(id);
-  return { title: `Order ${o.refNo}` };
+  return { title: orderName(o) };
 }
 
 const DASH = <span className="font-normal text-muted">—</span>;

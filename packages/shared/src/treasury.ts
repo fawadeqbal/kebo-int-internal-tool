@@ -59,6 +59,8 @@ export interface PaymentRow {
   direction: PaymentDirection;
   /** "Deposit for SO-2026-0032", "Inspection: SGS". */
   what: string;
+  /** Its title in words, never its number (PAYMENT_TITLE): "Deposit from Al-Shifa Pharma", "Tea gift set". */
+  name: string;
   amount: string;
   currency: string;
   party: PaymentLink | null;

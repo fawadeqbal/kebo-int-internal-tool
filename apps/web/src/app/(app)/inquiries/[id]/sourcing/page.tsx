@@ -12,7 +12,6 @@ import { offerFigures, OfferCompare, offerLine } from "@/components/deals/offer-
 import { optional } from "@/components/print/data";
 import { coverOf } from "@/components/deals/offer-facts";
 import { AddOfferButton } from "@/components/deals/offer-work";
-import { askFactories } from "../ask";
 import { requestsOf } from "../facts";
 import { WithSide } from "../side";
 import { RequestMore } from "@/components/deals/ask-window";
@@ -29,7 +28,8 @@ export const generateMetadata = inquiryTitle("Supplier offers");
  * Supplier offers (design "RFQ Desk — list pages", 18 Nov 2026): who was asked and what they offered in one list —
  * Supplier · Amount (with tax, and how) · Covers · Lead time · Incoterm · Deposit · Status (In quotation A, Offer in,
  * Waiting 3 days, Declined). A supplier still to answer is a row too, its ⋯ with Remind, They declined, Remove. The
- * page's one strong button stays in the header; the card's are plain (Ask more suppliers, New supplier offer).
+ * page's one strong button stays in the header; the card has one plain button, New supplier offer (the list's last row
+ * on a phone). Ask more suppliers is off for now (asked 19 Nov; the window stays in ../ask.tsx).
  * List | Compare once two offers have items: the offers side by side, lowest, fastest and longest marked.
  */
 export default async function SourcingPage({
@@ -43,7 +43,7 @@ export default async function SourcingPage({
   const sp = await searchParams;
   // Links from before each offer had its own page (…/sourcing?offer=<id>) open that page.
   if (sp.offer) redirect(`/inquiries/${id}/offers/${sp.offer}`);
-  const me = await requirePermission("sourcing.manage");
+  await requirePermission("sourcing.manage");
   const [d, s, settings, q] = await Promise.all([
     dealOf(id),
     sourcingOf(id),
@@ -53,7 +53,6 @@ export default async function SourcingPage({
   const canEdit = d.allowed.source;
   const base = `/inquiries/${d.id}/sourcing`;
   const today = companyToday();
-  const ask = await askFactories(d, me, "secondary", { label: "Ask more suppliers", size: "sm" });
   const compare = sp.view === "compare";
   // Which quotation option each offer is, on the newest revision (a draft when one is open).
   // Which quotations each offer is quoted in (their newest revision, a draft when one is open): A, B…
@@ -109,9 +108,6 @@ export default async function SourcingPage({
     </Alert>
   );
 
-  // The card's buttons are plain: the page's one strong button is the header's (design rules).
-  const firstAsk = waiting.length > 0 || s.quotes.length > 0 ? ask : await askFactories(d, me, "secondary", { label: "Ask suppliers", size: "sm" });
-
   // One row per supplier: its offer once it is in, else that it was asked (still waiting, declined, no reply), last.
   const others = (requests?.items ?? []).filter((r) => !r.factoryQuoteId);
   const answered = s.quotes.length;
@@ -122,7 +118,7 @@ export default async function SourcingPage({
   const summary =
     asked > 0
       ? [`${asked} asked`, `${answered} offer${answered === 1 ? "" : "s"} in`, waiting.length ? `${waiting.length} waiting` : null, declined ? `${declined} declined` : null].filter(Boolean).join(" · ")
-      : "Nobody was asked yet.";
+      : "No offer yet";
   const status = (x: FactoryQuoteView) => {
     const letters = usedIn.get(x.id) ?? [];
     return letters.length ? <Badge tone="ok">In quotation {letters.join(", ")}</Badge> : <Badge tone="info">Offer in</Badge>;
@@ -140,6 +136,8 @@ export default async function SourcingPage({
     ]
       .filter(Boolean)
       .join(" · ");
+  // An offer with its items but not one price yet says so (not "USD 0.00").
+  const unpriced = (x: FactoryQuoteView) => x.lines.length > 0 && x.unpriced >= x.lines.length;
   const covers = (x: FactoryQuoteView) => {
     const cover = coverOf(x, s.items);
     return !x.lines.length ? "No items yet" : cover ? (cover.all ? (cover.of === 1 ? "The 1 item" : `All ${cover.of} items`) : `${cover.n} of ${cover.of} items`) : plural(x.lines.length, "item");
@@ -177,12 +175,8 @@ export default async function SourcingPage({
               }
             : null
         }
-        buttons={
-          <>
-            {firstAsk?.button}
-            {addOffer({ variant: "secondary", size: "sm", label: "New supplier offer", open: sp.add === "1" })}
-          </>
-        }
+        // The card's one button is plain: the page's one strong button is the header's (design rules).
+        add={addOffer({ variant: "secondary", size: "sm", label: "New supplier offer", open: sp.add === "1" })}
       >
         {asked === 0 ? (
           <NoOffers items={s.items} />
@@ -207,7 +201,8 @@ export default async function SourcingPage({
                         {status(x)}
                       </span>
                       <span className="mt-1 block font-semibold text-text tabular">
-                        {x.lines.length ? money(f.withTax, x.currency) : "—"} <span className="font-normal text-text-2">· {covers(x)}</span>
+                        {!x.lines.length ? "—" : unpriced(x) ? <span className="text-warn">No prices yet</span> : money(f.withTax, x.currency)}{" "}
+                        <span className="font-normal text-text-2">· {covers(x)}</span>
                       </span>
                       <span className="block text-text-2">{[x.leadTime, x.basis ? [x.basis, x.basisPlace].filter(Boolean).join(" ") : null, f.deposit ? `${f.deposit} deposit` : null].filter(Boolean).join(" · ") || offerLine(x)}</span>
                     </Link>
@@ -259,7 +254,9 @@ export default async function SourcingPage({
                           <span className="block text-[12.5px] text-text-2">{offerLine(x)}</span>
                         </td>
                         <td className={cn(td, "text-right whitespace-nowrap tabular")}>
-                          {x.lines.length ? (
+                          {x.lines.length && unpriced(x) ? (
+                            <span className="font-semibold text-warn">No prices yet</span>
+                          ) : x.lines.length ? (
                             <>
                               <b className="block font-semibold">{money(f.withTax, x.currency)}</b>
                               <span className="block text-[12.5px] text-text-2">{f.taxWord}</span>
@@ -314,8 +311,8 @@ function NoOffers({ items }: { items: SourcingView["items"] }) {
     <div>
       <EmptyState
         icon={Factory}
-        title="No supplier asked yet"
-        description="Send the customer's list to two or three suppliers. Each one shows here as a charge; when it replies, enter its offer: the customer's items are listed with a price box each."
+        title="No supplier offer yet"
+        description="Enter one when a supplier sends its prices: the customer's items are listed with a price box each."
       />
       {items.length > 0 && (
         <div className="border-t border-line px-5 py-4">

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, Printer, ShoppingCart } from "lucide-react";
-import { PAYMENT_METHOD_LABEL } from "@kebo/shared";
+import { PAYMENT_METHOD_LABEL, RECORD_KIND, RECORD_TITLE } from "@kebo/shared";
 import { ButtonLink, PageHeader, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
-import { orderFilesOf, orderMoneyOf } from "@/lib/order-data";
+import { orderFilesOf, orderMoneyOf, orderOf } from "@/lib/order-data";
+import type { OrderView } from "@/lib/types-orders";
 import { requirePermission } from "@/lib/session";
 import { optional } from "@/components/print/data";
 import { date, money, whole } from "@/lib/format";
@@ -30,8 +31,12 @@ const purchaseOrdersOf = cache((order: string) => optional(() => api.get<{ items
 export async function generateMetadata({ params }: { params: Promise<{ order: string; supplier: string }> }) {
   const { order, supplier } = await params;
   const po = (await purchaseOrdersOf(order))?.items.find((p) => p.supplier.id === supplier);
-  return { title: po ? `${po.number} · ${po.supplier.name}` : "Purchase order" };
+  if (!po) return { title: "Purchase order" };
+  return { title: RECORD_TITLE.purchaseOrder({ items: linesOf(await orderOf(order), supplier), supplier: po.supplier.name }) };
 }
+
+/** The supplier's items on the order, at its prices: what this purchase order buys. */
+const linesOf = (o: OrderView, supplier: string) => o.lines.filter((l) => l.type === "goods" && l.factoryPrice && l.factory?.id === supplier);
 
 /**
  * A purchase order's own page (board PDetail): what it says, shown. Its terms, the lines at the factory's
@@ -56,7 +61,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   if (!po) notFound();
   const row = rows?.find((r) => r.supplier.id === supplier) ?? null;
   const status = row ? PURCHASE_ORDER_STATUS[row.status] : null;
-  const lines = o.lines.filter((l) => l.type === "goods" && l.factoryPrice && l.factory?.id === supplier);
+  const lines = linesOf(o, supplier);
   const plans = (m.factories?.plans ?? []).filter((p) => p.factory.id === supplier);
   const owed = (m.factories?.rows ?? []).filter((r) => r.factory.id === supplier);
   const owing = owed.filter((r) => Number(r.toPay) > 0);
@@ -96,6 +101,9 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   const payAny = owing.some((f) => !plans.some((p) => p.currency === f.currency && p.rows.some((r) => r.status !== "paid" && Number(r.open) > 0))) ? pay("Pay the supplier", true) : null;
   const sent = po.sentOn ? (po.sentEarlyReason ? `Sent ${date(po.sentOn)} · before the deposit` : `Sent ${date(po.sentOn)}`) : "Not sent";
   const meta = [
+    <Link key="f" href={`/suppliers/${po.supplier.id}`} className="hover:underline">
+      {po.supplier.name}
+    </Link>,
     <span key="o">
       for{" "}
       <Link href={orderHref} className="font-medium text-primary hover:underline">
@@ -114,7 +122,8 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       <PageHeader
         crumbs={[{ label: "Purchasing" }, { label: "Purchase orders", href: PURCHASE_ORDERS }, { label: po.number }]}
         icon={ShoppingCart}
-        title={`${po.number} · ${po.supplier.name}`}
+        title={RECORD_TITLE.purchaseOrder({ items: lines, supplier: po.supplier.name })}
+        record={{ kind: RECORD_KIND.purchaseOrder, number: po.number }}
         phoneStack
         badge={status ? <StatusBadge meaning={status.meaning}>{status.label}</StatusBadge> : undefined}
         summary={

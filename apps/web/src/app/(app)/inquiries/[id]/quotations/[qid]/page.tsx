@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment, type ReactNode } from "react";
 import { ChevronRight, Download, Eye, Lock, Send } from "lucide-react";
-import { BASIS_STEP_LABEL, can, PAPER, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, type BasisStep, type TermsCheck } from "@kebo/shared";
+import { BASIS_STEP_LABEL, can, PAPER, RECORD_KIND, RECORD_TITLE, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, type BasisStep, type TermsCheck } from "@kebo/shared";
 import { cn } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
@@ -224,7 +224,8 @@ export default async function QuotationOwnPage({
       header={{
         crumbs: [{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo, href: base }, { label: x.refNo }],
         back: { href: `${base}/quotation`, label: `${d.refNo} · Quotations` },
-        title: <span className="tabular">{x.refNo}</span>,
+        title: RECORD_TITLE.quotation({ customer: d.customer.name, option: q.quotations.length > 1 ? x.letter : null }),
+        record: { kind: RECORD_KIND.quotation, number: x.refNo },
         badge: <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[13px] font-semibold text-text-2 tabular">R{r.number}</span>,
         summary: (
           <p className="min-w-0">

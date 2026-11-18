@@ -784,7 +784,8 @@ export function AppShell({
             <button type="button" className={cn(buttonClass("ghost", "icon"), "-ml-2 md:hidden")} onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer}>
               <MenuIcon aria-hidden />
             </button>
-            <Link href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg md:hidden" aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
+            {/* On a phone a top page's own name takes this one's place (PageHeader's data-page-title, globals.css). */}
+            <Link data-shell-logo="" href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg md:hidden" aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
               <Logo companyName={companyName} logo={logo} size={32} />
               <span className="text-[15.5px] font-bold tracking-tight text-text max-[380px]:hidden">{PRODUCT_NAME}</span>
             </Link>
@@ -825,8 +826,9 @@ export function AppShell({
         </main>
       </div>
 
-      {/* Phone: bottom tab bar, thumb-reachable, with the main action in the middle */}
-      <nav aria-label="Quick" className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      {/* Phone: bottom tab bar, thumb-reachable, with the main action in the middle. On a record's page with a next
+          step, that step's button takes its place (PageHeader's data-record-dock, globals.css). */}
+      <nav data-quick-nav="" aria-label="Quick" className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         {tab(HOME_HREF, "Home", House)}
         {tab("/inquiries", "Inquiries", ClipboardList)}
         {canCreate ? (

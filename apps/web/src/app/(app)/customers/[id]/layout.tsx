@@ -1,5 +1,5 @@
 import { Pencil, Plus } from "lucide-react";
-import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
+import { can, PARTY_TYPE_LABEL, RECORD_KIND, UNKNOWN_COUNTRY } from "@kebo/shared";
 import { ButtonLink, PageHeader, RefCode } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { customerOf, customerPaymentsOf } from "@/lib/party-data";
@@ -34,13 +34,15 @@ export default async function CustomerLayout({ children, params }: { children: R
         crumbs={[{ label: "Sales" }, { label: "Customers", href: "/customers" }, { label: c.name }]}
         phoneStack
         title={c.name}
+        record={{ kind: RECORD_KIND.customer, number: c.customerCode }}
         summary={
           <>
             {c.customerCode && (
-              <>
+              // On a phone the number is in the top bar, under the name.
+              <span className="max-md:hidden">
                 <RefCode>{c.customerCode}</RefCode>
                 {" · "}
-              </>
+              </span>
             )}
             {c.type === "individual" ? PARTY_TYPE_LABEL.individual : "Company"}
             {" · "}

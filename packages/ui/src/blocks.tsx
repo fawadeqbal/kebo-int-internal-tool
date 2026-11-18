@@ -206,8 +206,14 @@ export function AddCard({
 const ICON_BG = { 1: "bg-chart-1", 2: "bg-chart-2", 3: "bg-chart-3", 4: "bg-chart-4", 5: "bg-chart-5" } as const;
 
 /** Tiles in a row of 3–6. */
-export function StatRow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]", className)}>{children}</div>;
+export function StatRow({ children, className, phone = "tiles" }: { children: ReactNode; className?: string; phone?: "tiles" | "line" }) {
+  // phone "line" (a list's figures, design rule 15 and canvas board "List pages on a phone"): on a phone the tiles
+  // become one slim line of facts ("Customers owe USD 50.1K · USD 9,449 late"), so the list starts near the top.
+  return (
+    <div data-stat-row={phone} className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]", className)}>
+      {children}
+    </div>
+  );
 }
 
 /**
@@ -260,11 +266,12 @@ export function StatTile({
 }) {
   const figure = (
     <>
-      <span className={cn("flex items-start justify-between gap-2", how && "pr-6")}>
+      <span data-stat-label="" className={cn("flex items-start justify-between gap-2", how && "pr-6")}>
         <span className="text-xs text-muted">{label}</span>
         {delta}
       </span>
       <span
+        data-stat-value=""
         title={typeof value === "string" ? value : undefined}
         className={cn(
           "truncate font-bold tracking-tight tabular",
@@ -273,22 +280,28 @@ export function StatTile({
       >
         {value}
       </span>
-      {also && <span className="truncate text-xs font-medium text-text-2">{also}</span>}
+      {also && (
+        <span data-stat-more="" className="truncate text-xs font-medium text-text-2">
+          {also}
+        </span>
+      )}
       {meter && (
-        <span className="block h-1.5 overflow-hidden rounded-full bg-surface-3" role="img" aria-label={meter.label}>
+        <span data-stat-more="" className="block h-1.5 overflow-hidden rounded-full bg-surface-3" role="img" aria-label={meter.label}>
           <span className="block h-full rounded-full bg-chart-3" style={{ width: `${Math.max(0, Math.min(100, meter.percent))}%` }} />
         </span>
       )}
-      {bar}
-      {sub && <span className={cn("text-xs", tone === "bad" ? "font-semibold text-bad" : tone === "warn" ? "font-semibold text-action" : tone === "ok" ? "font-semibold text-ok" : "text-muted")}>{sub}</span>}
+      {bar && <span data-stat-more="">{bar}</span>}
+      {sub && <span data-stat-sub={tone === "bad" || tone === "warn" ? "news" : ""} className={cn("text-xs", tone === "bad" ? "font-semibold text-bad" : tone === "warn" ? "font-semibold text-action" : tone === "ok" ? "font-semibold text-ok" : "text-muted")}>{sub}</span>}
     </>
   );
   const body = Icon ? (
-    <span className="flex min-w-0 items-start gap-3">
+    <span data-stat-body="" className="flex min-w-0 items-start gap-3">
       <span className={cn("hidden size-[42px] shrink-0 place-items-center rounded-xl text-white sm:grid", ICON_BG[iconColor])} aria-hidden>
         <Icon className="size-5" />
       </span>
-      <span className={cn("flex min-w-0 flex-1 flex-col", size === "sm" ? "gap-0.5" : "gap-1")}>{figure}</span>
+      <span data-stat-figure="" className={cn("flex min-w-0 flex-1 flex-col", size === "sm" ? "gap-0.5" : "gap-1")}>
+        {figure}
+      </span>
     </span>
   ) : (
     figure
@@ -300,16 +313,18 @@ export function StatTile({
     className,
   );
   const tile = href ? (
-    <Link href={href} className={cn(cls, "transition-colors hover:border-line-strong")}>
+    <Link data-stat="" href={href} className={cn(cls, "transition-colors hover:border-line-strong")}>
       {body}
     </Link>
   ) : (
-    <div className={cls}>{body}</div>
+    <div data-stat="" className={cls}>
+      {body}
+    </div>
   );
   if (!how) return tile;
   // The ⓘ sits on the tile, beside it in the page (a button may not be inside the tile's link).
   return (
-    <div className="relative h-full min-w-0">
+    <div data-stat-how="" className="relative h-full min-w-0">
       {tile}
       <HowMade
         title={howTitle ?? (typeof label === "string" ? label : "This figure")}

@@ -185,7 +185,8 @@ describe("treasury: every payment in one list", () => {
     expect(v).toMatchObject({
       kind: "customer",
       id: paymentId,
-      title: "Customer payment · USD 900.00",
+      // Its title says what it was and who paid it, never its number (PAYMENT_TITLE).
+      title: `Deposit from Treasury Co ${tag}`,
       recordedBy: "Manager",
       voided: null,
       // It pays one order in full: removed (and changed) as the payment on that order.
