@@ -18,6 +18,11 @@ export const RULES = {
   page: {
     /** A record page: its boxes, and the side panel beside them (rule 3). */
     withPanel: "lg:grid-cols-[minmax(0,1fr)_300px]",
+    /**
+     * A record page whose panel stays beside every tab and folds into a bar on a phone (the inquiry): 380px from
+     * 1024, 340px beside the open menu on a laptop, 420px where the page has room; one column below that.
+     */
+    withSheetPanel: "grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_340px] roomy:grid-cols-[minmax(0,1fr)_420px]",
   },
   choices: {
     /** Past this many choices, a filter's list starts with a box to type in (rule 15). */

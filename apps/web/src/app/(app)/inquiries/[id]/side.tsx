@@ -10,7 +10,7 @@ import { getPeople } from "@/lib/loaders";
 import type { FollowUpList } from "@/lib/types-notes";
 import { dueText } from "@/components/notes/kinds";
 import { PanelButton } from "@/components/orders/step-view";
-import { SIDE_COLUMNS } from "@/components/common/side-columns";
+import { RecordBody } from "@/components/records/record-page";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { SideSheet } from "@/components/common/side-sheet";
 import { assignAction, noteAction } from "../actions";
@@ -123,17 +123,11 @@ export async function InquirySide({ id }: { id: string }) {
   );
 }
 
+/** Every tab of an inquiry: its boxes, and the inquiry's panel beside them (a bar first on a phone). */
 export function WithSide({ id, top, children }: { id: string; top?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-4">
-      {top}
-      <div className={cn("grid items-start gap-4", SIDE_COLUMNS)}>
-        <div className="flex min-w-0 flex-col gap-4">{children}</div>
-        {/* On a phone its bar comes first, under the tabs; the panel opens from it. */}
-        <aside aria-label="Beside the inquiry" className="flex min-w-0 flex-col gap-4 max-lg:order-first">
-          <InquirySide id={id} />
-        </aside>
-      </div>
-    </div>
+    <RecordBody top={top} panel={{ label: "Beside the inquiry", sheet: <InquirySide id={id} /> }}>
+      {children}
+    </RecordBody>
   );
 }
