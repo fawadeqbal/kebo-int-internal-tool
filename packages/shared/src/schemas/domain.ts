@@ -188,12 +188,16 @@ export const attachmentInput = z.object({
 export type AttachmentInput = z.infer<typeof attachmentInput>;
 
 export const inquiryListQuery = listQuery.extend({
-  stage: z.union([z.enum(INQUIRY_STAGES), z.enum(["open", "overdue", "on_hold"])]).optional(),
+  stage: z.union([z.enum(INQUIRY_STAGES), z.enum(["open", "overdue", "on_hold", "all"])]).optional(),
   assignee: z.union([z.literal("me"), z.literal("unassigned"), z.uuid()]).optional(),
   customerId: z.uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
   channel: z.enum(INQUIRY_CHANNELS).optional(),
   category: z.string().trim().max(120).optional(),
+  /** "no": leave out the ones on hold (the Board's stage columns; On hold is a column of its own). */
+  held: z.enum(["no"]).optional(),
+  /** Only these (comma-separated): Select's Export to Excel. */
+  ids: z.preprocess((v) => (typeof v === "string" ? v.split(",").filter(Boolean) : v), z.array(z.uuid()).max(200)).optional(),
   sort: z.enum(["newest", "oldest", "required", "priority", "updated"]).default("newest"),
 });
 export type InquiryListQuery = z.infer<typeof inquiryListQuery>;

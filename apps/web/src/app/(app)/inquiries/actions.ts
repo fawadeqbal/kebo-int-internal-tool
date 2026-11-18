@@ -249,3 +249,33 @@ export async function saveRequestAction(id: string, version: string | null, _pre
   return locateItemErrors(given, r);
 }
 
+
+/** What Select's bar does to the ticked inquiries (design "list pages" 18 Nov), one inquiry at a time. */
+export type ManyInquiries =
+  | { kind: "assign"; assigneeId: string | null; reason?: string }
+  | { kind: "hold"; reason: string }
+  | { kind: "followUp"; title: string; dueOn: string };
+
+/** How it went: how many were done, and each one that was not (its number and the API's words). */
+export interface ManyResult {
+  done: number;
+  failed: { id: string; message: string }[];
+}
+
+export async function manyInquiriesAction(ids: string[], what: ManyInquiries): Promise<ManyResult> {
+  const failed: ManyResult["failed"] = [];
+  let done = 0;
+  for (const id of ids.slice(0, 200)) {
+    try {
+      if (what.kind === "assign") await api.post(`/inquiries/${id}/assign`, { assigneeId: what.assigneeId, reason: what.reason || null });
+      else if (what.kind === "hold") await api.post(`/inquiries/${id}/hold`, { onHold: true, note: null, reason: what.reason });
+      else await api.post("/follow-ups", { title: what.title, dueOn: what.dueOn, inquiryId: id });
+      done++;
+      refresh(id);
+    } catch (e) {
+      failed.push({ id, message: e instanceof Error ? e.message : "It did not go through." });
+    }
+  }
+  revalidatePath("/inquiries");
+  return { done, failed };
+}

@@ -32,11 +32,13 @@ export interface DealRow {
   quotation: {
     refNo: string;
     /** `total` is the accepted option's, else the lowest option's; `totalUpTo` the highest when the options differ. */
-    latest: { number: number; status: RevisionStatus; total: string; totalUpTo: string | null; totalOf: string; currency: string } | null;
+    latest: { number: number; status: RevisionStatus; total: string; totalUpTo: string | null; totalOf: string; currency: string; sentOn: string | null } | null;
   } | null;
   /** How many quotations the deal has (A, B, C…). */
   quotations?: number;
   order: { id: string; refNo: string; status: OrderStatus } | null;
+  /** The next follow-up still to do: its day, and whether that is today or already past (the company's day). */
+  nextFollowUp: { dueOn: string; dueAt: string | null; title: string; today: boolean; late: boolean } | null;
   createdAt: string;
 }
 

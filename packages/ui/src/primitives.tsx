@@ -681,18 +681,29 @@ export function LinkTabs({
   className,
   label,
   replace,
+  look = "chips",
 }: {
   tabs: { href: string; label: ReactNode; count?: number; active: boolean; alert?: boolean }[];
   className?: string;
   label: string;
   /** Switch in place (no new history step): tabs inside a window. */
   replace?: boolean;
+  /**
+   * "tabs" (design "list pages" 18 Nov: a list's stages): on a laptop underlined tabs like a record's, with their
+   * counts; on a phone round chips that slide sideways. "chips": chips everywhere.
+   */
+  look?: "chips" | "tabs";
 }) {
+  const tabsLook = look === "tabs";
   return (
     <ScrollFade
       as="nav"
       aria-label={label}
-      className={cn("-mx-4 flex items-center gap-2 overflow-x-auto overflow-y-hidden px-4 py-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0.5 [&::-webkit-scrollbar]:hidden", className)}
+      className={cn(
+        "-mx-4 flex items-center gap-2 overflow-x-auto overflow-y-hidden px-4 py-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0.5 [&::-webkit-scrollbar]:hidden",
+        tabsLook && "sm:items-stretch sm:gap-x-[22px] sm:border-b sm:border-line sm:px-0 sm:py-0",
+        className,
+      )}
     >
       {tabs.map((t) => (
         <Link
@@ -704,11 +715,16 @@ export function LinkTabs({
           className={cn(
             "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap transition-colors [&_svg]:size-4",
             t.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
+            tabsLook && "max-sm:rounded-full max-sm:text-[13.5px] max-sm:font-semibold",
+            tabsLook &&
+              (t.active
+                ? "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-primary-solid sm:bg-transparent sm:px-0 sm:text-[13.5px] sm:font-bold sm:text-text"
+                : "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-transparent sm:bg-transparent sm:px-0 sm:text-[13.5px] sm:font-medium sm:text-text-2 sm:hover:text-text"),
           )}
         >
           {t.label}
           {t.count !== undefined && (
-            <span className={cn("tabular", t.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{t.count}</span>
+            <span className={cn("tabular", tabsLook && "text-xs font-semibold", t.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{t.count}</span>
           )}
           <Pending />
         </Link>
