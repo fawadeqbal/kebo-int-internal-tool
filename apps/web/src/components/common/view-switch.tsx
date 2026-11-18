@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { cn } from "@kebo/ui";
 
 export interface SwitchView {
@@ -9,15 +10,18 @@ export interface SwitchView {
   hint?: string;
   /** Its colour, e.g. "text-warn". */
   tone?: string;
+  /** An icon before the label (List, Board). */
+  icon?: ReactNode;
 }
 
 /**
  * One of a few views of the same thing (an order's or a customer's money):
  * a segmented switch of links, so each view has its own address.
  */
-export function ViewSwitch({ label, views, current }: { label: string; views: SwitchView[]; current: string }) {
+export function ViewSwitch({ label, views, current, compact }: { label: string; views: SwitchView[]; current: string; compact?: boolean }) {
   return (
-    <nav aria-label={label} className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-surface-3 p-1">
+    // compact: as tall as the header's buttons (40 px), beside them.
+    <nav aria-label={label} className={cn("inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-surface-3 p-1", compact && "h-10 [&>a]:h-8 [&_svg]:size-4")}>
       {views.map((v) => (
         <Link
           key={v.key}
@@ -29,6 +33,7 @@ export function ViewSwitch({ label, views, current }: { label: string; views: Sw
             v.key === current ? "bg-surface font-semibold text-text shadow-sm" : "text-text-2 hover:text-text",
           )}
         >
+          {v.icon}
           {v.label}
           {v.hint && <span className={cn("hidden text-xs font-medium sm:inline", v.tone ?? "text-muted")}>{v.hint}</span>}
         </Link>

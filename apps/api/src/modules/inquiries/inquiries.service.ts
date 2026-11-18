@@ -70,11 +70,13 @@ export class InquiriesService {
     if (q.stage === "open") and.push({ stage: { in: [...OPEN_STAGES] } });
     else if (q.stage === "overdue") and.push({ stage: { in: [...OPEN_STAGES] }, requiredBy: { lt: today } });
     else if (q.stage === "on_hold") and.push({ onHold: true, stage: { in: [...OPEN_STAGES] } });
-    else if (q.stage) and.push({ stage: q.stage });
+    else if (q.stage && q.stage !== "all") and.push({ stage: q.stage });
     if (q.assignee === "me") and.push({ assigneeId: user.id });
     else if (q.assignee === "unassigned") and.push({ assigneeId: null });
     else if (q.assignee) and.push({ assigneeId: q.assignee });
     if (q.customerId) and.push({ customerId: q.customerId });
+    if (q.ids?.length) and.push({ id: { in: q.ids } });
+    if (q.held === "no") and.push({ onHold: false });
     if (q.priority) and.push({ priority: q.priority });
     if (q.channel) and.push({ channel: q.channel });
     if (q.category) and.push({ category: { equals: q.category, mode: "insensitive" } });
@@ -107,7 +109,7 @@ export class InquiriesService {
           : q.sort === "updated"
             ? [{ updatedAt: "desc" }]
             : [{ createdAt: "desc" }];
-    const [rows, total, byStage, overdue, onHold] = await Promise.all([
+    const [rows, total, byStage, overdue, onHold, lateFollowUps] = await Promise.all([
       this.prisma.db.inquiry.findMany({
         where,
         orderBy,
@@ -124,11 +126,13 @@ export class InquiriesService {
               revisions: {
                 where: { deletedAt: null },
                 orderBy: { number: "desc" },
-                select: { number: true, status: true, currency: true, ...optionFigures },
+                select: { number: true, status: true, currency: true, sentOn: true, ...optionFigures },
               },
             },
           },
           orders: { where: { status: { not: "cancelled" } }, select: { id: true, refNo: true, status: true } },
+          // The next follow-up still to do (the list's Next follow-up column, design "list pages" 18 Nov).
+          followUps: { where: { doneAt: null }, orderBy: [{ dueOn: "asc" }, { dueAt: "asc" }], take: 1, select: { dueOn: true, dueAt: true, title: true } },
         },
       }),
       this.prisma.db.inquiry.count({ where }),
@@ -136,6 +140,10 @@ export class InquiriesService {
       // The list's two other chips (past needed-by, on hold), for the same search.
       this.prisma.db.inquiry.count({ where: this.where(user, { ...q, stage: "overdue" }) }),
       this.prisma.db.inquiry.count({ where: this.where(user, { ...q, stage: "on_hold" }) }),
+      // Open inquiries whose next follow-up is past (the list's facts line), for the same search.
+      this.prisma.db.inquiry.count({
+        where: { AND: [this.where(user, { ...q, stage: "open" }), { followUps: { some: { doneAt: null, dueOn: { lt: new Date(`${this.clock.today()}T00:00:00Z`) } } } }] },
+      }),
     ]);
     const { sales } = await this.settings.get();
     const sorted =
@@ -148,7 +156,7 @@ export class InquiriesService {
       page: q.page,
       pageSize: q.pageSize,
       /** By stage, and `overdue` / `on_hold` (open ones past their needed-by date / on hold). */
-      counts: { ...Object.fromEntries(byStage.map((g) => [g.stage, g._count])), overdue, on_hold: onHold } as Record<string, number>,
+      counts: { ...Object.fromEntries(byStage.map((g) => [g.stage, g._count])), overdue, on_hold: onHold, late_follow_ups: lateFollowUps } as Record<string, number>,
       rows: sorted.map((i) => {
         const deal = dealQuotations(i.quotations, sales.currency, sales.exchangeRates).deal;
         return {
@@ -174,6 +182,13 @@ export class InquiriesService {
           /** How many quotations the deal has. */
           quotations: i.quotations.length,
           order: i.orders[0] ?? null,
+          /** The next follow-up still to do: its day, and whether that is today or already past (the company's day). */
+          nextFollowUp: i.followUps[0]
+            ? (() => {
+                const due = fromDbDateOrNull(i.followUps[0].dueOn)!;
+                return { dueOn: due, dueAt: i.followUps[0].dueAt, title: i.followUps[0].title, today: due === today, late: due < today };
+              })()
+            : null,
           createdAt: i.createdAt,
           updatedAt: i.updatedAt,
         };

@@ -61,7 +61,9 @@ const stamp = () => companyToday();
 async function deals(q: Q): Promise<SheetSpec> {
   const stage = q.stage ?? "open";
   const rows = await allPages<DealRow>("/inquiries", {
-    stage: stage === "all" ? undefined : stage,
+    // Select's export: the ticked ones, whatever their stage.
+    stage: stage === "all" || q.ids ? undefined : stage,
+    ids: q.ids,
     q: q.q,
     assignee: q.assignee,
     customerId: q.customer ?? q.customerId,

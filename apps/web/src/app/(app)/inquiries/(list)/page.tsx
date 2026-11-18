@@ -1,212 +1,120 @@
 import Link from "next/link";
-import { ExportCsv } from "@/components/sheets/export-link";
 import { OpenPanelButton } from "@/components/common/panel";
 import { NewInquiryWindow } from "../inquiry-windows";
-import { Check, Clock, Factory, FileText, LayoutGrid, List, MessageSquareText, Plus, Target, TrendingUp, UserRound, X } from "lucide-react";
-import {
-  can,
-  CHANNEL_LABEL,
-  INQUIRY_CHANNELS,
-  INQUIRY_STAGE_LABEL,
-  INQUIRY_STAGE_TONE,
-  LOST_REASON_LABEL,
-  PRIORITIES,
-  PRIORITY_LABEL,
-  REVISION_STATUS_LABEL,
-  UNKNOWN_COUNTRY,
-  type Priority,
-} from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, THead, Td, Th, toPage } from "@kebo/ui";
+import { MessageSquareText, Plus, X } from "lucide-react";
+import { can, UNKNOWN_COUNTRY } from "@kebo/shared";
+import { buildHref, ButtonLink, Card, DataRow, EmptyState, LinkTabs, Pager, PhoneList, THead, Td, Th, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
+import { FactLine, FollowUpDay, ListRow, PriorityTag, Responsible, Stands } from "@/components/lists/list-parts";
+import { SelectButton, SelectCell, SelectHead, SelectionFrame, WhenSelecting } from "@/components/lists/selection";
+import { InquirySelectBar } from "./select-bar";
 import { hasFeature, requireUser } from "@/lib/session";
-import { date, short, countOf, daysText } from "@/lib/format";
+import { companyToday, countOf, date, dayMonth, soonDay } from "@/lib/format";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { DealRow, Paged } from "@/lib/types";
 import type { Funnel } from "@/lib/types-facts";
-import { crumbsFor, labelFor } from "@/lib/nav";
+import { inquiryFacts, inquiryFilters, InquiriesHeader, readFilters, StagePill, whereItStands } from "../list-shared";
 
 export const metadata = { title: "Inquiries" };
 
 type Params = Record<string, string | undefined>;
 
-/** The chips (board): the working list (All open) first, then each stage, on hold, and Mine. */
-const CHIPS = ["open", "new", "sourcing", "quoted", "on_hold", "won", "lost", "overdue"] as const;
-type Chip = (typeof CHIPS)[number];
-
-const PRIORITY_TONE: Record<Priority, "neutral" | "warn" | "bad"> = { low: "neutral", normal: "neutral", high: "warn", urgent: "bad" };
-
-/** "Where it is": the quotation's last step, else how far the asking got. */
-function whereItIs(d: DealRow): string {
-  if (d.order) return `Order ${d.order.refNo}`;
-  const r = d.quotation?.latest;
-  if (r) return `R${r.number} ${REVISION_STATUS_LABEL[r.status].toLowerCase()}${d.onHold ? " · on hold" : ""}`;
-  if (d.asked || d.offers) return [d.asked ? `${d.asked} asked` : null, d.offers ? `${d.offers} offer${d.offers === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ");
-  return "—";
-}
-
-function Stage({ d }: { d: DealRow }) {
-  if (d.stage === "lost") return <StatusBadge meaning="bad">{d.lostReason ? `Lost · ${LOST_REASON_LABEL[d.lostReason].toLowerCase()}` : "Lost"}</StatusBadge>;
-  if (d.onHold)
-    return (
-      <Badge tone="primary" dot>
-        {INQUIRY_STAGE_LABEL[d.stage]} · on hold
-      </Badge>
-    );
-  return <StatusBadge meaning={d.stage === "new" ? "neutral" : d.stage === "quoted" ? "warn" : INQUIRY_STAGE_TONE[d.stage]}>{INQUIRY_STAGE_LABEL[d.stage]}</StatusBadge>;
-}
+/** The tabs are the stages (design "list pages" 18 Nov): Open first, then each stage, on hold, closed ones, All. */
+const TABS = ["open", "new", "sourcing", "quoted", "on_hold", "won", "lost", "overdue", "all"] as const;
+type Tab = (typeof TABS)[number];
+const TAB_LABEL: Record<Tab, string> = { open: "Open", new: "New", sourcing: "Sourcing", quoted: "Quoted", on_hold: "On hold", won: "Won", lost: "Lost", overdue: "Past needed-by", all: "All" };
 
 /**
- * Inquiries (board "Inquiries — list"): Board, Export CSV and New inquiry; Open, Quoted value, Won this month,
- * Win rate and Time to quote; chips by stage with counts and Mine; search with Category, Came by,
- * Handles and Priority; each inquiry with what, who, how it came, when, who handles it, priority, where it is
- * and its stage.
+ * Inquiries (design "RFQ Desk — list pages", 18 Nov 2026): one strong button, New inquiry (on a phone the + in
+ * the bottom bar); List | Board and ⋯ (Export to Excel) beside it; one slim line of facts; the stages as tabs with
+ * their counts; search and filters in one row (Responsible person first, Me its first choice); each inquiry with
+ * its number, what and who, when it came, who is responsible, where it stands and its next follow-up.
  */
-export default async function DealsPage({ searchParams }: { searchParams: Promise<Params> }) {
+export default async function InquiriesPage({ searchParams }: { searchParams: Promise<Params> }) {
   const me = await requireUser();
   const sp = await searchParams;
-  const mine = sp.mine === "1";
-  const chip: Chip = CHIPS.includes(sp.stage as Chip) ? (sp.stage as Chip) : "open";
-  const channel = INQUIRY_CHANNELS.find((c) => c === sp.channel);
-  const priority = PRIORITIES.find((p) => p === sp.priority);
-  const assignee = mine ? "me" : sp.assignee || undefined;
+  const f = readFilters(sp);
+  const { assignee, channel, priority } = f;
+  const tab: Tab = TABS.includes(sp.stage as Tab) ? (sp.stage as Tab) : "open";
   const year = new Date().getFullYear();
-  const month = new Date().toISOString().slice(0, 7);
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  const query = { stage: chip, q: sp.q?.trim() || undefined, assignee, customerId: sp.customer, priority, channel, category: sp.category || undefined };
-  const [data, settings, people, yearFunnel, monthFunnel, mineCount] = await Promise.all([
+  const excel = await hasFeature("excel");
+  const query = { stage: tab, ...f };
+  const [data, settings, people, yearFunnel] = await Promise.all([
     api.get<Paged<DealRow> & { counts: Record<string, number> }>("/inquiries", { ...query, page: toPage(sp.page) }),
     getSettings(),
     getPeople().catch(() => []),
     insights ? api.get<Funnel>("/insights/facts/funnel", { from: `${year}-01-01`, to: `${year}-12-31` }).catch(() => null) : null,
-    insights ? api.get<Funnel>("/insights/facts/funnel", { from: `${month}-01`, to: `${month}-31` }).catch(() => null) : null,
-    // The Mine tab's count: my open inquiries, for the same search.
-    api
-      .get<Paged<DealRow>>("/inquiries", { ...query, stage: "open", assignee: "me", page: 1, pageSize: 1 })
-      .then((r) => r.total)
-      .catch(() => null),
   ]);
   const c = data.counts;
-  const count = (s: Chip) => (s === "open" ? (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0) : (c[s] ?? 0));
-  const keep = { stage: chip === "open" ? undefined : chip, mine: mine ? "1" : undefined, q: sp.q, assignee: mine ? undefined : sp.assignee, customer: sp.customer, priority, channel, category: sp.category };
+  const count = (t: Tab) =>
+    t === "open"
+      ? (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0)
+      : t === "all"
+        ? (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0) + (c.won ?? 0) + (c.lost ?? 0)
+        : (c[t] ?? 0);
+  const keep = { stage: tab === "open" ? undefined : tab, q: sp.q, assignee, customer: sp.customer, priority, channel, category: sp.category };
   const href = (patch: Params) => buildHref("/inquiries", keep, { page: undefined, ...patch });
-  const narrowed = !!(sp.q || sp.assignee || sp.customer || priority || channel || sp.category || mine || chip !== "open");
+  const narrowed = !!(sp.q || assignee || sp.customer || priority || channel || sp.category || tab !== "open");
   const canCreate = can(me, "inquiries.create");
   const currency = settings.sales.currency;
-
-  const chipLabel = (s: Chip) =>
-    ({ open: "Open", new: "New", sourcing: "Sourcing", quoted: "Quoted", on_hold: "On hold", won: "Won", lost: "Lost", overdue: "Past needed-by" })[s];
-  const chipIcon = { open: List, new: Plus, sourcing: Factory, quoted: FileText, on_hold: Clock, won: Check, lost: X, overdue: Clock } as const;
+  const today = companyToday();
 
   return (
     <div>
-      <PageHeader
-        crumbs={crumbsFor("/inquiries")}
-        icon={MessageSquareText}
-        title={labelFor("/inquiries")}
-        summary="Every request for a price, from the first message to won or lost"
-        papers={
-          <>
-            <ButtonLink href="/inquiries/board">
-              <LayoutGrid aria-hidden /> Board
-            </ButtonLink>
-            <ExportCsv what="inquiries" query={{ ...query, customer: sp.customer }} />
-          </>
-        }
-        primary={
-          canCreate && (
-            <OpenPanelButton panel="new-inquiry" variant="primary" label="Add inquiry">
-              <Plus aria-hidden /> <span className="sm:hidden">Add</span>
-              <span className="max-sm:hidden">Add inquiry</span>
-            </OpenPanelButton>
-          )
-        }
-      />
+      <InquiriesHeader me={me} view="list" excel={excel} query={{ stage: keep.stage, q: sp.q, assignee, customer: sp.customer, priority, channel, category: sp.category }} />
 
-      <StatRow className="mb-4">
-        <StatTile icon={MessageSquareText} iconColor={1} label="Open" value={count("open")} sub={`${c.new ?? 0} new · ${c.sourcing ?? 0} sourcing · ${c.quoted ?? 0} quoted`} href="/inquiries" />
-        {yearFunnel && <StatTile icon={FileText} iconColor={3} label="Quoted value" value={short(yearFunnel.quotedValue, currency)} sub={`${yearFunnel.quoted} quotations this year`} />}
-        {monthFunnel && <StatTile icon={TrendingUp} iconColor={2} label="Won this month" value={monthFunnel.won} tone="ok" sub={short(monthFunnel.wonValue, currency)} />}
-        {yearFunnel && <StatTile icon={Target} iconColor={4} label="Win rate" value={yearFunnel.winRate === null ? "—" : `${Math.round(yearFunnel.winRate)}%`} sub="this year" />}
-        {yearFunnel && (
-          <StatTile
-            icon={Clock}
-            iconColor={5}
-            label="Time to quote"
-            value={daysText(yearFunnel.medianDaysToFirstQuote)}
-            sub="typical, new → R1 sent"
-          />
-        )}
-      </StatRow>
+      <FactLine facts={inquiryFacts(yearFunnel, c.late_follow_ups ?? 0, currency)} />
 
       <LinkTabs
         label="Which inquiries"
+        look="tabs"
         className="mb-4"
-        tabs={[
-          ...CHIPS.filter((s) => s !== "overdue" || count(s) > 0 || chip === s).map((s) => {
-            const Icon = chipIcon[s];
-            return {
-              href: href({ stage: s === "open" ? undefined : s, mine: undefined }),
-              label: (
-                <>
-                  <Icon aria-hidden />
-                  {chipLabel(s)}
-                </>
-              ),
-              count: count(s),
-              alert: s === "overdue" && count(s) > 0,
-              active: chip === s && !mine,
-            };
-          }),
-          {
-            href: href({ mine: mine ? undefined : "1", stage: undefined }),
-            label: (
-              <>
-                <UserRound aria-hidden />
-                Mine
-              </>
-            ),
-            count: mineCount ?? undefined,
-            active: mine,
-          },
-        ]}
+        tabs={TABS.filter((t) => t !== "overdue" || count(t) > 0 || tab === t).map((t) => ({
+          href: href({ stage: t === "open" ? undefined : t }),
+          label: TAB_LABEL[t],
+          count: count(t),
+          alert: t === "overdue" && count(t) > 0,
+          active: tab === t,
+        }))}
       />
 
+      <SelectionFrame ids={data.rows.map((d) => d.id)}>
+      <WhenSelecting>
+        <InquirySelectBar
+          rows={data.rows.map((d) => ({ id: d.id, refNo: d.refNo, assigned: !!d.assignee, open: !d.onHold && (d.stage === "new" || d.stage === "sourcing" || d.stage === "quoted") }))}
+          people={people.map((p) => ({ id: p.id, name: p.name }))}
+          meId={me.id}
+          canAssign={can(me, "inquiries.assign")}
+          today={today}
+        />
+      </WhenSelecting>
+      <WhenSelecting not>
       <FilterCard
+        end={data.rows.length > 0 && <SelectButton />}
         count={countOf(data.total, "inquiry", "inquiries")}
         search="Search number, title, customer…"
         value={sp.q}
-        keep={{ stage: keep.stage, mine: keep.mine, customer: sp.customer }}
-        clearHref={href({ q: undefined })}
-        selects={[
-          { name: "category", label: "Category", value: sp.category, options: settings.sales.categories.map((x) => ({ value: x, label: x })) },
-          { name: "channel", label: "Came by", value: channel, options: INQUIRY_CHANNELS.map((x) => ({ value: x, label: CHANNEL_LABEL[x] })) },
-          ...(mine ? [] : [{ name: "assignee", label: "Handles", value: sp.assignee, options: [{ value: "unassigned", label: "Nobody yet" }, ...people.map((p) => ({ value: p.id, label: p.name }))] }]),
-          { name: "priority", label: "Priority", value: priority, options: PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABEL[p] })) },
-        ]}
+        keep={{ stage: keep.stage, customer: sp.customer }}
+        selects={inquiryFilters(f, people, me.id, settings.sales.categories)}
       />
+      </WhenSelecting>
 
       <Card className="overflow-clip p-0">
         {data.rows.length === 0 ? (
           <EmptyState
             icon={MessageSquareText}
             title={narrowed ? "No inquiries match" : "No inquiries yet"}
-            description={
-              narrowed
-                ? sp.q
-                  ? `Nothing matches “${sp.q}” here. Try part of the RFQ number, the customer or an item.`
-                  : "Try another stage or filter, or clear the filters."
-                : "Every RFQ shows here, from the first message to won or lost. Inquiries from the website arrive by themselves."
-            }
             action={
               narrowed ? (
                 <ButtonLink href="/inquiries">
                   <X aria-hidden /> Clear filters
                 </ButtonLink>
               ) : canCreate ? (
-                <OpenPanelButton panel="new-inquiry">
-                  <Plus aria-hidden /> Add the first inquiry
+                <OpenPanelButton panel="new-inquiry" variant="primary">
+                  <Plus aria-hidden /> New inquiry
                 </OpenPanelButton>
               ) : undefined
             }
@@ -215,62 +123,66 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           <>
             <PhoneList label="Inquiries">
               {data.rows.map((d) => (
-                <PhoneRow key={d.id} href={`/inquiries/${d.id}`} title={d.title} line={`${d.refNo} · ${d.customer.name}`} status={<Stage d={d} />} figure={whereItIs(d)} />
+                <ListRow
+                  key={d.id}
+                  href={`/inquiries/${d.id}`}
+                  title={d.title}
+                  tag={<PriorityTag priority={d.priority} />}
+                  end={<FollowUpDay next={d.nextFollowUp} day={soonDay} />}
+                  line={`${d.customer.name} · ${d.refNo}`}
+                  stands={<Stands pill={<StagePill d={d} />} fact={whereItStands(d, today)} />}
+                  who={<Responsible name={d.assignee?.name} short />}
+                />
               ))}
             </PhoneList>
-            <DataTable label="Inquiries" className="max-sm:hidden" tableClassName="min-w-[960px] text-[13px] roomy:min-w-[1120px]">
-                <THead>
-                  <tr>
-                    <Th>Inquiry</Th>
-                    <Th>What · customer</Th>
-                    {/* Shown only where the page has room for them (roomy): the list fits beside the open menu without them. */}
-                    <Th className="hidden roomy:table-cell">Category</Th>
-                    <Th className="hidden roomy:table-cell">Came by</Th>
-                    <Th>Received</Th>
-                    <Th>Handles</Th>
-                    <Th>Priority</Th>
-                    <Th>Where it is</Th>
-                    <Th>Stage</Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {data.rows.map((d) => (
-                    <DataRow key={d.id} href={`/inquiries/${d.id}`}>
-                      <Td>
-                        <RefCode href={`/inquiries/${d.id}`}>{d.refNo}</RefCode>
-                      </Td>
-                      <Td>
-                        <Link href={`/inquiries/${d.id}`} className="block max-w-72 truncate font-semibold hover:text-primary">
+            <DataTable label="Inquiries" className="max-sm:hidden" tableClassName="min-w-[960px] text-[13.5px]">
+              <THead>
+                <tr>
+                  <SelectHead />
+                  <Th>No.</Th>
+                  <Th>Inquiry</Th>
+                  <Th>Received</Th>
+                  <Th>Responsible person</Th>
+                  <Th>Where it stands</Th>
+                  <Th>Next follow-up</Th>
+                </tr>
+              </THead>
+              <tbody>
+                {data.rows.map((d) => (
+                  <DataRow key={d.id} href={`/inquiries/${d.id}`}>
+                    <SelectCell id={d.id} label={d.refNo} />
+                    <Td className="w-[124px] text-[13px] whitespace-nowrap text-muted tabular">{d.refNo}</Td>
+                    <Td>
+                      <span className="flex max-w-[26rem] items-baseline">
+                        <Link href={`/inquiries/${d.id}`} className="truncate font-semibold hover:text-primary">
                           {d.title}
                         </Link>
-                        <span className="block max-w-72 truncate text-xs text-text-2">
-                          {d.customer.name}
-                          {d.customer.country === UNKNOWN_COUNTRY && <span className="text-warn"> · country not set</span>}
-                        </span>
-                      </Td>
-                      <Td className="hidden roomy:table-cell">{d.category}</Td>
-                      <Td className="hidden roomy:table-cell">
-                        <Badge>{CHANNEL_LABEL[d.channel].replace(" form", "")}</Badge>
-                      </Td>
-                      <Td className="whitespace-nowrap">{date(d.createdAt)}</Td>
-                      <Td>{d.assignee?.name ?? <StatusBadge meaning="warn">Nobody yet</StatusBadge>}</Td>
-                      <Td>
-                        <Badge tone={PRIORITY_TONE[d.priority]}>{PRIORITY_LABEL[d.priority]}</Badge>
-                      </Td>
-                      <Td className="whitespace-nowrap">
-                        {whereItIs(d)}
-                        {d.overdue && d.requiredBy && <span className="block text-xs font-medium text-bad">needed by {date(d.requiredBy)}</span>}
-                      </Td>
-                      <Td>
-                        <Stage d={d} />
-                      </Td>
-                    </DataRow>
-                  ))}
-                </tbody>
+                        <PriorityTag priority={d.priority} />
+                      </span>
+                      <span className="block max-w-[26rem] truncate text-[12.5px] text-text-2">
+                        {d.customer.name}
+                        {d.customer.country === UNKNOWN_COUNTRY && <span className="text-warn"> · country not set</span>}
+                      </span>
+                    </Td>
+                    <Td className="whitespace-nowrap">{dayMonth(d.createdAt)}</Td>
+                    <Td>
+                      <Responsible name={d.assignee?.name} />
+                    </Td>
+                    <Td>
+                      <Stands pill={<StagePill d={d} />} fact={whereItStands(d, today)} />
+                      {d.overdue && d.requiredBy && <span className="mt-0.5 block text-xs font-medium text-bad">needed by {date(d.requiredBy)}</span>}
+                    </Td>
+                    <Td>
+                      <FollowUpDay next={d.nextFollowUp} day={soonDay} />
+                    </Td>
+                  </DataRow>
+                ))}
+              </tbody>
             </DataTable>
           </>
         )}
       </Card>
+      </SelectionFrame>
       <Pager base="/inquiries" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
 
       {sp.panel === "new-inquiry" && <NewInquiryWindow customerId={sp.for} />}

@@ -418,6 +418,6 @@ describe("the menu over the page (phone)", () => {
   it("the bottom bar starts with Home", () => {
     shell(everything());
     const bar = within(screen.getByRole("navigation", { name: "Quick" }));
-    expect(bar.getAllByRole("link").map((a) => a.textContent || a.getAttribute("aria-label"))).toEqual(["Home", "Inquiries", "Add inquiry", "Alerts5"]);
+    expect(bar.getAllByRole("link").map((a) => a.textContent || a.getAttribute("aria-label"))).toEqual(["Home", "Inquiries", "New inquiry", "Alerts5"]);
   });
 });

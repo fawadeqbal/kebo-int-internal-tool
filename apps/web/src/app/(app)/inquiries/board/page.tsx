@@ -1,65 +1,46 @@
 import Link from "next/link";
-import { OpenPanelButton } from "@/components/common/panel";
 import { NewInquiryWindow } from "../inquiry-windows";
-import { LayoutGrid, List, MessageSquareText, Package, Plus } from "lucide-react";
-import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, REVISION_STATUS_LABEL, type InquiryStage } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, LinkTabs, PageHeader, RefCode, StatusBadge } from "@kebo/ui";
+import { can } from "@kebo/shared";
+import { Badge, buildHref, LinkTabs } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
+import { FactLine, FollowUpDay, PriorityTag, Responsible } from "@/components/lists/list-parts";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { api } from "@/lib/api";
-import { requireUser } from "@/lib/session";
-import { plural, short, whole } from "@/lib/format";
+import { hasFeature, requireUser } from "@/lib/session";
+import { companyToday, countOf, soonDay } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
+import type { Funnel } from "@/lib/types-facts";
+import { inquiryFacts, inquiryFilters, InquiriesHeader, readFilters, whereItStands } from "../list-shared";
 
-export const metadata = { title: "Inquiry pipeline" };
+export const metadata = { title: "Inquiries · Board" };
 
 type Params = Record<string, string | undefined>;
-const COLUMNS: { key: InquiryStage; note: string }[] = [
-  { key: "new", note: "Not asked suppliers yet" },
-  { key: "sourcing", note: "Getting supplier prices" },
-  { key: "quoted", note: "Waiting for the customer" },
-  { key: "won", note: "The latest won" },
-  { key: "lost", note: "The latest lost" },
-];
-const LATEST = 8;
 
-/** One inquiry on the board: its number, what it is, the customer, the quotation or the order, and what to watch. */
-function DealCard({ d }: { d: DealRow }) {
-  const r = d.quotation?.latest;
+/** The open stages are the columns; won and lost fold into one small Closed column. */
+const COLUMNS = [
+  { key: "new", label: "New", tone: "neutral" },
+  { key: "sourcing", label: "Sourcing", tone: "info" },
+  { key: "quoted", label: "Quoted", tone: "warn" },
+  { key: "on_hold", label: "On hold", tone: "neutral" },
+] as const;
+type Column = (typeof COLUMNS)[number]["key"];
+const SHOWN = 12;
+
+/** One inquiry on the board: the row's facts in the row's order (number, what, who for, where it stands, who, next). */
+function Card({ d, today }: { d: DealRow; today: string }) {
   return (
     <li>
-      <Link href={`/inquiries/${d.id}`} className="flex flex-col gap-1.5 rounded-xl border border-line bg-surface p-3 shadow-card transition-colors hover:border-primary-line">
-        {/* A long status wraps under the number in a narrow column instead of sticking out of the card. */}
-        <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-          <RefCode>{d.refNo}</RefCode>
-          {d.onHold ? (
-            <Badge tone="primary" dot>
-              On hold
-            </Badge>
-          ) : d.stage === "won" ? (
-            <StatusBadge meaning="ok">Won</StatusBadge>
-          ) : d.stage === "lost" ? (
-            <StatusBadge meaning="bad">{d.lostReason ? LOST_REASON_LABEL[d.lostReason] : "Lost"}</StatusBadge>
-          ) : d.priority === "urgent" ? (
-            <StatusBadge meaning="bad">Urgent</StatusBadge>
-          ) : !d.assignee ? (
-            <StatusBadge meaning="warn">Assign</StatusBadge>
-          ) : d.overdue ? (
-            <StatusBadge meaning="bad">Past needed-by</StatusBadge>
-          ) : d.stage === "sourcing" && d.offers && !r ? (
-            <StatusBadge meaning="info">Make quotation</StatusBadge>
-          ) : d.priority === "high" ? (
-            <StatusBadge meaning="warn">High</StatusBadge>
-          ) : null}
+      <Link href={`/inquiries/${d.id}`} className="block rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[13px] leading-[18px] transition-colors hover:border-primary-line">
+        <span className="block text-xs text-muted tabular">{d.refNo}</span>
+        <span className="block text-[13.5px] font-semibold text-text">
+          {d.title}
+          <PriorityTag priority={d.priority} />
         </span>
-        <span className="truncate text-[13px] font-bold text-text">{d.title}</span>
-        <span className="truncate text-xs text-text-2">
-          {d.order
-            ? `${d.order.refNo}${r ? ` · ${whole(r.total, r.currency)}` : ""}`
-            : [
-                d.customer.name,
-                r ? `R${r.number} ${REVISION_STATUS_LABEL[r.status].toLowerCase()}` : d.offers ? `${d.offers} offer${d.offers === 1 ? "" : "s"}` : (d.assignee?.name ?? "nobody yet"),
-              ].join(" · ")}
+        <span className="block truncate text-[12.5px] text-text-2">{d.customer.name}</span>
+        <span className="mt-1 block text-text-2">{whereItStands(d, today)}</span>
+        <span className="mt-2 flex items-center justify-between gap-2 text-[12.5px]">
+          <Responsible name={d.assignee?.name} short />
+          <FollowUpDay next={d.nextFollowUp} day={soonDay} />
         </span>
       </Link>
     </li>
@@ -67,113 +48,95 @@ function DealCard({ d }: { d: DealRow }) {
 }
 
 /**
- * The inquiry pipeline (board): one column per stage — New, Sourcing, Quoted, then the latest won and lost.
- * Each card opens its inquiry, where the stage moves (asking factories, sending, accepting, lost). On a
- * phone and a tablet one column at a time, picked with chips.
+ * Inquiries · Board (design "RFQ Desk — list pages", 18 Nov 2026): the same list in columns, with the same header,
+ * facts, search and filters; the stages are the columns, so there are no tabs. Won and Lost fold into one Closed
+ * column (the List's Won and Lost tabs show them in full). On a phone and a tablet one column at a time.
  */
 export default async function InquiryBoardPage({ searchParams }: { searchParams: Promise<Params> }) {
   const me = await requireUser();
   const sp = await searchParams;
-  const mine = sp.mine === "1" || sp.assignee === "me";
-  const keep = { mine: mine ? "1" : undefined, q: sp.q, assignee: sp.assignee, category: sp.category };
-  const [settings, people] = await Promise.all([getSettings(), getPeople().catch(() => [])]);
-  const lists = await Promise.all(
-    COLUMNS.map((c) =>
-      api.get<Paged<DealRow>>("/inquiries", {
-        stage: c.key,
-        assignee: mine ? "me" : sp.assignee || undefined,
-        q: sp.q?.trim() || undefined,
-        category: sp.category || undefined,
-        sort: "newest",
-        pageSize: c.key === "won" || c.key === "lost" ? LATEST : 50,
-      }),
-    ),
-  );
-  const currency = settings.sales.currency;
-  // A column's worth: its quotations' latest totals in the main currency (the cards shown).
-  const cols = COLUMNS.map((c, i) => ({
-    ...c,
-    rows: lists[i]!.rows,
-    total: lists[i]!.total,
-    value: lists[i]!.rows.reduce((t, d) => t + (d.quotation?.latest && d.quotation.latest.currency === currency ? Number(d.quotation.latest.total) : 0), 0),
-  }));
-  const open = cols.filter((c) => c.key === "new" || c.key === "sourcing" || c.key === "quoted").reduce((t, c) => t + c.total, 0);
-  const phoneKey = cols.some((c) => c.key === sp.stage) ? sp.stage! : "new";
+  const f = readFilters(sp);
+  const year = new Date().getFullYear();
+  const insights = can(me, "reports.view") && (await hasFeature("insights"));
+  const [settings, people, excel, funnel, ...lists] = await Promise.all([
+    getSettings(),
+    getPeople().catch(() => []),
+    hasFeature("excel"),
+    insights ? api.get<Funnel>("/insights/facts/funnel", { from: `${year}-01-01`, to: `${year}-12-31` }).catch(() => null) : null,
+    ...COLUMNS.map((c) => api.get<Paged<DealRow> & { counts: Record<string, number> }>("/inquiries", { stage: c.key, held: c.key === "on_hold" ? undefined : "no", ...f, sort: "newest", pageSize: SHOWN })),
+  ]);
+  const counts = lists[0]!.counts;
+  // On hold has its own column: the open stages' columns hold only the ones going on (held=no).
+  const cols = COLUMNS.map((c, i) => ({ ...c, rows: lists[i]!.rows, total: lists[i]!.total }));
+  const open = (counts.new ?? 0) + (counts.sourcing ?? 0) + (counts.quoted ?? 0);
+  const today = companyToday();
+  const keep = { q: sp.q, assignee: f.assignee, category: f.category, channel: f.channel, priority: f.priority, customer: sp.customer };
+  const phoneKey: Column = cols.some((c) => c.key === sp.stage) ? (sp.stage as Column) : "new";
+  const listOf = (stage: string) => buildHref("/inquiries", {}, { ...keep, stage });
+
   const column = (c: (typeof cols)[number], hideTitle = false) => (
-    <section key={c.key} aria-label={INQUIRY_STAGE_LABEL[c.key]} className="flex min-w-0 flex-col gap-2.5 rounded-2xl bg-surface-3/60 p-3">
+    <section key={c.key} aria-label={c.label} className="flex min-w-0 flex-col gap-2 rounded-xl bg-surface-3/70 p-2.5">
       {!hideTitle && (
-        <header className="flex items-baseline justify-between gap-2 px-1">
-          <h2 className="text-sm font-bold">
-            {INQUIRY_STAGE_LABEL[c.key]} <span className="font-medium text-muted">{c.total}</span>
-          </h2>
-          <span className="truncate text-xs text-muted" title={c.note}>
-            {c.value ? short(c.value, currency) : c.note}
-          </span>
-        </header>
+        <h2 className="mx-0.5 flex items-center gap-2 text-[13.5px] font-bold">
+          <Badge tone={c.tone}>{c.label}</Badge>
+          <span className="text-[12.5px] font-semibold text-muted">{c.total}</span>
+        </h2>
       )}
       {c.rows.length ? (
         <ul className="flex flex-col gap-2">
           {c.rows.map((d) => (
-            <DealCard key={d.id} d={d} />
+            <Card key={d.id} d={d} today={today} />
           ))}
         </ul>
       ) : (
-        <p className="rounded-xl border-2 border-dashed border-line-strong px-3 py-6 text-center text-xs text-muted">Nothing here</p>
+        <p className="px-1 pt-1 pb-2 text-[13px] text-muted">{c.key === "on_hold" ? "Nothing on hold." : `No ${c.label.toLowerCase()} inquiries.`}</p>
       )}
       {c.total > c.rows.length && (
-        <Link href={`/inquiries?stage=${c.key}`} className="px-1 text-xs font-medium text-primary hover:underline">
-          All {c.total}
+        <Link href={listOf(c.key)} className="px-1 text-[13px] font-semibold text-primary hover:underline">
+          Show {c.total - c.rows.length} more
         </Link>
       )}
+    </section>
+  );
+  const closed = (
+    <section aria-label="Closed" className="rounded-xl border border-dashed border-line-strong bg-surface p-3 text-[13px] leading-5">
+      <h2 className="mb-1.5 text-[13.5px] font-bold">Closed</h2>
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Link href={listOf("won")} className="inline-flex items-center gap-1.5 hover:underline">
+          <Badge tone="ok">Won</Badge> {counts.won ?? 0}
+        </Link>
+        <Link href={listOf("lost")} className="inline-flex items-center gap-1.5 hover:underline">
+          <Badge tone="bad">Lost</Badge> {counts.lost ?? 0}
+        </Link>
+      </p>
     </section>
   );
 
   return (
     <div>
-      <PageHeader
-        crumbs={[{ label: "Sales" }, { label: "Inquiry board" }]}
-        icon={LayoutGrid}
-        title="Inquiry board"
-        summary={`${plural(open, "open inquiry", "open inquiries")} · open a card to move its stage. Won and lost ask for the details first.`}
-        actions={
-          <ButtonLink href="/inquiries" variant="secondary">
-            <List aria-hidden /> List
-          </ButtonLink>
-        }
-        primary={
-          can(me, "inquiries.create") && (
-            <OpenPanelButton panel="new-inquiry" variant="primary">
-              <Plus aria-hidden /> Add inquiry
-            </OpenPanelButton>
-          )
-        }
-      />
-      <LinkTabs
-        label="Boards"
-        className="mb-4"
-        tabs={[
-          { href: "/inquiries/board", label: <><MessageSquareText aria-hidden />Inquiries</>, active: true },
-          { href: "/orders/board", label: <><Package aria-hidden />Orders</>, active: false },
-        ]}
-      />
+      <InquiriesHeader me={me} view="board" excel={excel} query={keep} />
+      <FactLine facts={inquiryFacts(funnel, counts.late_follow_ups ?? 0, settings.sales.currency)} />
       <FilterCard
-        search="Search…"
+        search="Search number, title, customer…"
         value={sp.q}
-        clearHref="/inquiries/board"
-        selects={[
-          { name: "assignee", label: "Handles", value: mine ? "me" : sp.assignee, options: [{ value: "me", label: "Me" }, { value: "unassigned", label: "Nobody yet" }, ...people.map((p) => ({ value: p.id, label: p.name }))] },
-          { name: "category", label: "Category", value: sp.category, options: settings.sales.categories.map((x) => ({ value: x, label: x })) },
-        ]}
+        keep={{ customer: sp.customer }}
+        count={countOf(open, "open inquiry", "open inquiries")}
+        selects={inquiryFilters(f, people, me.id, settings.sales.categories)}
       />
       <div className="xl:hidden">
         <LinkTabs
           label="Stage"
+          look="tabs"
           className="mb-4"
-          tabs={cols.map((c) => ({ href: buildHref("/inquiries/board", keep, { stage: c.key }), label: INQUIRY_STAGE_LABEL[c.key], count: c.total, active: c.key === phoneKey }))}
+          tabs={cols.map((c) => ({ href: buildHref("/inquiries/board", keep, { stage: c.key }), label: c.label, count: c.total, active: c.key === phoneKey }))}
         />
         {column(cols.find((c) => c.key === phoneKey)!, true)}
+        <div className="mt-3">{closed}</div>
       </div>
-      <div className="hidden items-start gap-3 xl:grid xl:grid-cols-5">{cols.map((c) => column(c))}</div>
+      <div className="hidden items-start gap-3 xl:grid xl:grid-cols-[repeat(4,minmax(0,1fr))_200px]">
+        {cols.map((c) => column(c))}
+        {closed}
+      </div>
 
       {sp.panel === "new-inquiry" && <NewInquiryWindow customerId={sp.for} />}
     </div>

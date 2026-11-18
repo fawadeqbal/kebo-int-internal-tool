@@ -71,6 +71,17 @@ export const hourNow = () => hourIn(currentZone());
 export const date = (d: ISODate | Date | string | null | undefined) => fmtDate(d ?? null, timeStyle());
 /** A day without its year ("14 Nov", "14/11"). */
 export const dayMonth = (d: ISODate | Date | string | null | undefined) => formatDayMonth(d ?? null, timeStyle());
+/**
+ * A day soon, as a list says it (design "list pages" 18 Nov): "Tomorrow", "Fri 20 Nov" within the week, else
+ * "24 Nov" (today and late days are said by the list itself).
+ */
+export const soonDay = (iso: string) => {
+  const today = companyToday();
+  const days = Math.round((Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  if (days === 1) return "Tomorrow";
+  if (days > 1 && days < 7) return `${new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })} ${dayMonth(iso.slice(0, 10))}`;
+  return dayMonth(iso.slice(0, 10));
+};
 /** A moment's day and time ("14 Nov 2026, 15:30" / "…, 3:30 PM"). */
 export const dateTime = (d: Date | string | null | undefined) => fmtDateTime(d ?? null, timeStyle());
 /** A moment's time of day ("15:30", "3:30 PM"). */

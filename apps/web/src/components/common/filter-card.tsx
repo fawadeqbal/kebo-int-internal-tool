@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Search, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
 import { cn } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "./floating";
 
@@ -211,6 +212,118 @@ function MonthStep({ m, onPick }: { m: FilterMonth; onPick: (name: string, value
 }
 
 /**
+ * A phone's filters (design "list pages" 18 Nov): one sheet with every filter, its choices as buttons (a long list
+ * as rows, with a box to find in), each applied at once; Clear, and one strong button that closes it and says
+ * what the list now holds ("Show 15 inquiries").
+ */
+function FilterSheet({
+  selects,
+  onPick,
+  onClear,
+  count,
+  anyOn,
+  onClose,
+}: {
+  selects: FilterSelect[];
+  onPick: (name: string, value: string | undefined) => void;
+  onClear: () => void;
+  count?: string;
+  anyOn: boolean;
+  onClose: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [find, setFind] = useState<Record<string, string>>({});
+  useEffect(() => {
+    box.current?.querySelector<HTMLElement>("[data-sheet-close]")?.focus({ preventScroll: true });
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onClose]);
+  return createPortal(
+    <div className="fixed inset-x-0 top-[var(--vvt,0px)] z-[110] flex h-[var(--vvh,100dvh)] flex-col justify-end">
+      <button type="button" aria-label="Close the filters" tabIndex={-1} className="absolute inset-0 bg-black/40 animate-in fade-in" onClick={onClose} />
+      <div ref={box} role="dialog" aria-modal="true" aria-label="Filters" className="relative flex max-h-[88dvh] flex-col rounded-t-2xl border-t border-line bg-surface shadow-pop">
+        <span className="mx-auto mt-2 h-1 w-10 rounded-full bg-line-strong" aria-hidden />
+        <div className="flex items-center justify-between border-b border-line py-1 pr-1.5 pl-4">
+          <p className="text-[17px] font-bold text-text">Filters</p>
+          <button type="button" data-sheet-close aria-label="Close" onClick={onClose} className="grid size-11 place-items-center rounded-full text-text-2 hover:bg-surface-2">
+            <X className="size-5" aria-hidden />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-4">
+          {selects.map((f) => {
+            const all = { value: "", label: f.all ?? "All" };
+            // Choices as buttons; a long list (people, customers) as rows with a box to find in.
+            const rows = f.options.length > LONG;
+            const q = (find[f.name] ?? "").trim().toLowerCase();
+            const shown = q ? f.options.filter((o) => o.label.toLowerCase().includes(q)) : f.options;
+            const on = (v: string) => (f.value ?? "") === v;
+            return (
+              <section key={f.name} aria-label={f.label}>
+                <h3 className="mt-4 mb-2 text-[13px] font-bold text-text-2">{f.label}</h3>
+                {rows ? (
+                  <div role="radiogroup" aria-label={f.label}>
+                    <label className="mb-1 flex h-11 items-center gap-2 rounded-[10px] border border-line-strong px-3 text-[15px] focus-within:border-primary">
+                      <Search className="size-4 shrink-0 text-muted" aria-hidden />
+                      <span className="sr-only">Find {f.label.toLowerCase()}</span>
+                      <input
+                        type="search"
+                        value={find[f.name] ?? ""}
+                        onChange={(e) => setFind((x) => ({ ...x, [f.name]: e.target.value }))}
+                        className="min-w-0 flex-1 bg-transparent outline-none [&::-webkit-search-cancel-button]:appearance-none"
+                      />
+                    </label>
+                    {[...(q ? [] : [all]), ...shown].map((o) => (
+                      <button
+                        key={o.value || "all"}
+                        type="button"
+                        role="radio"
+                        aria-checked={on(o.value)}
+                        onClick={() => onPick(f.name, o.value || undefined)}
+                        className="flex min-h-11 w-full items-center gap-3 border-b border-line/70 text-left text-[15px] text-text last:border-b-0"
+                      >
+                        <span className={cn("size-5 shrink-0 rounded-full border-[1.5px] border-line-strong", on(o.value) && "border-[6px] border-primary-solid")} aria-hidden />
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {[all, ...f.options].map((o) => (
+                      <button
+                        key={o.value || "all"}
+                        type="button"
+                        aria-pressed={on(o.value)}
+                        onClick={() => onPick(f.name, o.value || undefined)}
+                        className={cn(
+                          "h-10 rounded-full border px-3.5 text-sm font-semibold",
+                          on(o.value) ? "border-primary-line bg-primary-soft text-primary" : "border-line-strong bg-surface text-text-2",
+                        )}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+        <div className="flex gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+          <button type="button" onClick={onClear} disabled={!anyOn} className="h-12 shrink-0 rounded-xl border border-line-strong px-4 text-[15px] font-semibold text-text disabled:opacity-50">
+            Clear
+          </button>
+          <button type="button" onClick={onClose} className="h-12 flex-1 rounded-xl bg-action-solid px-4 text-[15px] font-semibold text-white shadow-sm">
+            {count ? `Show ${count}` : "Show the list"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
  * The filters of a list, in one line under its tabs: the search (it finds as you type), then a button per filter
  * named only by what it filters; a choice changes the list at once. A chosen filter is green and says the choice,
  * with × to take it off, and "Clear all" takes off every one. Lists by month have ‹ month › in the same line.
@@ -225,7 +338,10 @@ export function FilterCard({
   keep = {},
   month,
   count,
+  end,
 }: {
+  /** At the end of the line on a laptop, after the count (Select). */
+  end?: ReactNode;
   /** The search box's words: "Search number, title, customer…". */
   search: string;
   value?: string;
@@ -290,6 +406,8 @@ export function FilterCard({
 
   const pick = (name: string, v: string | undefined) => go({ [name]: v });
   const anyOn = !!value || selects.some((s) => s.value);
+  const chosen = selects.filter((s) => s.value).length;
+  const [sheet, setSheet] = useState(false);
   const clear = () => {
     setText("");
     go({ q: undefined, ...Object.fromEntries(selects.map((s) => [s.name, undefined])) });
@@ -297,7 +415,7 @@ export function FilterCard({
 
   return (
     <div role="search" aria-label="Filter the list" aria-busy={pending} className="mb-4 flex flex-wrap items-center gap-2">
-      <label className="relative flex h-10 min-w-0 flex-[0_1_340px] items-center rounded-[10px] border border-line-strong bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 max-sm:h-11 max-sm:basis-full">
+      <label className={cn("relative flex h-10 min-w-0 flex-[0_1_340px] items-center rounded-[10px] border border-line-strong bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 max-sm:h-11", selects.length ? "max-sm:flex-1" : "max-sm:basis-full")}>
         <span className="sr-only">{search.replace(/…$/, "")}</span>
         {pending ? (
           <LoaderCircle className="pointer-events-none absolute left-3 size-4 animate-spin text-muted" aria-hidden />
@@ -331,14 +449,32 @@ export function FilterCard({
           </button>
         )}
       </label>
+      {/* A phone: one Filters button beside the search (the number of filters on), the choices in a sheet. */}
+      {selects.length > 0 && (
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={sheet}
+          onClick={() => setSheet(true)}
+          className={cn(
+            "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-sm font-semibold sm:hidden",
+            chosen ? "border-primary-line bg-primary-soft text-primary" : "border-line-strong bg-surface text-text",
+          )}
+        >
+          <ListFilter className="size-4" aria-hidden /> Filters
+          {chosen > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary-solid px-1 text-[11px] font-bold text-white">{chosen}</span>}
+        </button>
+      )}
       {(selects.length > 0 || month || anyOn) && (
-        <div className="flex min-w-0 items-center gap-2 max-sm:-mx-4 max-sm:basis-[calc(100%+2rem)] max-sm:overflow-x-auto max-sm:px-4 max-sm:py-0.5 max-sm:[scrollbar-width:none] sm:flex-wrap max-sm:[&::-webkit-scrollbar]:hidden">
+        <div className={cn("flex min-w-0 items-center gap-2 max-sm:basis-full sm:flex-wrap", !month && "max-sm:hidden")}>
           {selects.map((s) => (
-            <FilterButton key={s.name} s={s} onPick={pick} />
+            <span key={s.name} className="contents max-sm:hidden">
+              <FilterButton s={s} onPick={pick} />
+            </span>
           ))}
           {month && <MonthStep m={month} onPick={pick} />}
           {anyOn && (
-            <button type="button" onClick={clear} className="h-10 shrink-0 rounded-md px-1.5 text-[13px] font-semibold whitespace-nowrap text-primary hover:underline">
+            <button type="button" onClick={clear} className="h-10 shrink-0 rounded-md px-1.5 text-[13px] font-semibold whitespace-nowrap text-primary hover:underline max-sm:hidden">
               Clear all
             </button>
           )}
@@ -349,6 +485,8 @@ export function FilterCard({
           {count}
         </span>
       )}
+      {end && <div className="flex items-center gap-2 max-sm:hidden">{end}</div>}
+      {sheet && <FilterSheet selects={selects} onPick={pick} onClear={clear} count={count} anyOn={anyOn} onClose={() => setSheet(false)} />}
     </div>
   );
 }
