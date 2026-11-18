@@ -26,7 +26,17 @@ export type RecordPanelProps = { label: string; sections: PanelSection[] } | { l
  * then its boxes with its panel beside them. The record's own page only says what goes in each slot. A record
  * with tabs (an inquiry) puts RecordTop in its layout and RecordBody in each tab.
  */
-export function RecordPage({ pager, header, panel, children }: { pager?: RecordPager | null; header: RecordHeaderProps; panel?: RecordPanelProps | null; children: ReactNode }) {
+export function RecordPage({
+  pager,
+  header,
+  panel,
+  children,
+}: {
+  pager?: RecordPager | null;
+  header: RecordHeaderProps;
+  panel?: RecordPanelProps | null;
+  children: ReactNode;
+}) {
   return (
     <div className="relative">
       <RecordTop pager={pager} header={header} />
@@ -43,7 +53,17 @@ export type RecordHeaderProps = Omit<ComponentProps<typeof PageHeader>, "childre
  * `relative`), the header — the path, its name, the state in words, one strong button and ⋯ — then a notice
  * (what needs a look) and its tabs.
  */
-export function RecordTop({ pager, header, notice, tabs }: { pager?: RecordPager | null; header: RecordHeaderProps; notice?: ReactNode; tabs?: ReactNode }) {
+export function RecordTop({
+  pager,
+  header,
+  notice,
+  tabs,
+}: {
+  pager?: RecordPager | null;
+  header: RecordHeaderProps;
+  notice?: ReactNode;
+  tabs?: ReactNode;
+}) {
   return (
     <>
       {pager && <OwnPagerTop {...pager} />}
@@ -87,7 +107,11 @@ export function RecordPanel({ label, sections }: { label: string; sections: Pane
   return (
     <aside aria-label={label} className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
       {sections.map((s, i) => (
-        <section key={s.id} aria-labelledby={s.id} className={cn("flex flex-col gap-1 px-4 py-3", i < sections.length - 1 && "border-b border-line")}>
+        <section
+          key={s.id}
+          aria-labelledby={s.id}
+          className={cn("flex flex-col gap-1 px-4 py-3", i < sections.length - 1 && "border-b border-line")}
+        >
           <h2 id={s.id} className="mb-1 text-[15px] font-semibold">
             {s.title}
           </h2>

@@ -38,3 +38,4 @@ export * from "./dev-tools";
 export * from "./workflows/search";
 export * from "./records/types";
 export * from "./records/inquiry";
+export * from "./records/paper-terms";

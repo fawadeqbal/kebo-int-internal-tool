@@ -4,12 +4,13 @@ import { useMemo, useRef, useState, useTransition, type ReactNode } from "react"
 import { useRouter } from "next/navigation";
 import { Copy, Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { factoryTaxMinor, formatMinor, toMinor } from "@kebo/money";
-import { ATTACHMENT_KIND_LABEL, basisText, lineNumbers, offerTaxText, partsWords, warrantyLine, type AttachmentKind } from "@kebo/shared";
+import { ATTACHMENT_KIND_LABEL, lineNumbers, offerTaxText, PAPER, type AttachmentKind } from "@kebo/shared";
 import { Button, cn, Field, RULES, Select, Textarea } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { PanelBody, SidePanel, useClosePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
+import { PaperFacts, PaperLayout } from "@/components/records/paper-boxes";
 import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
 import { recordEditAction } from "@/lib/edit-actions";
 import { ConfirmDialog } from "@/components/common/dialog";
@@ -881,9 +882,10 @@ export function OfferBoxes({
       />
     ) : undefined;
 
+  const terms = PAPER.ofOffer(q);
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+    <PaperLayout
+      party={
         <RecordBox title="Supplier" what="the supplier" canEdit={canEdit} edit={edit("factory", "the supplier")} history={history(["offer.factory"], "Supplier")}>
           <BoxFacts
             rows={[
@@ -906,67 +908,58 @@ export function OfferBoxes({
             ]}
           />
         </RecordBox>
+      }
+      terms={
         <RecordBox title="Delivery & payment" what="delivery and payment" canEdit={canEdit} edit={edit("terms", "delivery and payment")} history={history(["offer.terms"], "Delivery & payment")}>
-          <BoxFacts
-            rows={[
-              ["Delivery", q.basis ? basisText(q.basis, q.basisPlace) : null],
-              ["Lead time", q.leadTime || null],
-              ["Payment", q.paymentParts.length ? partsWords(q.paymentParts, "factory") : null],
-              ["Payment note", q.paymentTerms ? <span className="line-clamp-3 whitespace-pre-line">{q.paymentTerms}</span> : null],
-            ]}
-          />
+          <PaperFacts terms={terms} kind="offer" box="terms" />
         </RecordBox>
-      </div>
-      <RecordBox
-        title="Prices"
-        count={[q.lines.length ? linesCount(offerRows(q.lines)) : null, q.currency, Number(q.taxRate) > 0 ? offerTaxText(q.taxRate, q.taxIncluded) : "no tax"].filter(Boolean).join(" · ")}
-        what="prices"
-        canEdit={canEdit}
-        edit={<OfferEdit kit={kit} q={q} step="prices" what="prices" words={q.lines.length ? undefined : "Add items"} only variant="ghost" />}
-        tools={<LinesExcel name={`Prices from ${q.factory.name}`} rows={rows} columns={columns} numbers={numbers} />}
-        history={history(["lines", "offer.prices"], "Prices")}
-      >
-        {q.lines.length ? (
-          <>
-            <div className="p-3 max-sm:hidden">
-              <LinesView label={`${q.factory.name} · prices`} rows={rows} columns={viewColumns} numbers={numbers} footer={footer} />
-            </div>
-            {/* A phone: one line per row, its quantity and price under its name, the total on the right. */}
-            <ul aria-label={`${q.factory.name} · prices`} className="flex flex-col divide-y divide-line px-4 text-sm sm:hidden">
-              {q.lines.map((l) => (
-                <li key={l.id} className={cn("flex flex-col gap-1 py-2.5", l.parentId && "pl-4")}>
-                  <span className="flex gap-2">
-                    <span className="w-6 shrink-0 text-xs text-muted tabular">{l.no}</span>
-                    <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{l.description.split("\n")[0]}</span>
-                  </span>
-                  <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-8 text-xs text-text-2 tabular">
-                    <span>
-                      {Number(l.quantity).toLocaleString("en-US")} {l.unit}
-                      {Number(l.unitPrice) ? <> × {Number(l.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</> : " · no price yet"}
+      }
+      prices={
+        <RecordBox
+          title="Prices"
+          count={[q.lines.length ? linesCount(offerRows(q.lines)) : null, q.currency, Number(q.taxRate) > 0 ? offerTaxText(q.taxRate, q.taxIncluded) : "no tax"].filter(Boolean).join(" · ")}
+          what="prices"
+          canEdit={canEdit}
+          edit={<OfferEdit kit={kit} q={q} step="prices" what="prices" words={q.lines.length ? undefined : "Add items"} only variant="ghost" />}
+          tools={<LinesExcel name={`Prices from ${q.factory.name}`} rows={rows} columns={columns} numbers={numbers} />}
+          history={history(["lines", "offer.prices"], "Prices")}
+        >
+          {q.lines.length ? (
+            <>
+              <div className="p-3 max-sm:hidden">
+                <LinesView label={`${q.factory.name} · prices`} rows={rows} columns={viewColumns} numbers={numbers} footer={footer} />
+              </div>
+              {/* A phone: one line per row, its quantity and price under its name, the total on the right. */}
+              <ul aria-label={`${q.factory.name} · prices`} className="flex flex-col divide-y divide-line px-4 text-sm sm:hidden">
+                {q.lines.map((l) => (
+                  <li key={l.id} className={cn("flex flex-col gap-1 py-2.5", l.parentId && "pl-4")}>
+                    <span className="flex gap-2">
+                      <span className="w-6 shrink-0 text-xs text-muted tabular">{l.no}</span>
+                      <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{l.description.split("\n")[0]}</span>
                     </span>
-                    {Number(l.unitPrice) > 0 && <span className="text-sm font-semibold text-text">{formatMinor(Math.round(toMinor(l.unitPrice) * Number(l.quantity)), q.currency)}</span>}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="border-t border-line sm:hidden">{footer}</div>
-          </>
-        ) : (
-          <p className="px-5 py-4 text-sm text-muted max-sm:px-4">No items yet.</p>
-        )}
-      </RecordBox>
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <RecordBox title="Warranty & conditions" what="the warranty and conditions" canEdit={canEdit} edit={edit("conditions", "the warranty and conditions")} history={history(["offer.conditions"], "Warranty & conditions")}>
-          <BoxFacts
-            rows={[
-              ["Warranty", warrantyLine(q)?.replace(/\.$/, "") ?? null],
-              ["Minimum order", q.moq || null],
-              ["Notes", q.notes ? <span className="line-clamp-4 whitespace-pre-line">{q.notes}</span> : null],
-            ]}
-          />
+                    <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-8 text-xs text-text-2 tabular">
+                      <span>
+                        {Number(l.quantity).toLocaleString("en-US")} {l.unit}
+                        {Number(l.unitPrice) ? <> × {Number(l.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</> : " · no price yet"}
+                      </span>
+                      {Number(l.unitPrice) > 0 && <span className="text-sm font-semibold text-text">{formatMinor(Math.round(toMinor(l.unitPrice) * Number(l.quantity)), q.currency)}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="border-t border-line sm:hidden">{footer}</div>
+            </>
+          ) : (
+            <p className="px-5 py-4 text-sm text-muted max-sm:px-4">No items yet.</p>
+          )}
         </RecordBox>
-      </div>
-    </div>
+      }
+      conditions={
+        <RecordBox title="Warranty & conditions" what="the warranty and conditions" canEdit={canEdit} edit={edit("conditions", "the warranty and conditions")} history={history(["offer.conditions"], "Warranty & conditions")}>
+          <PaperFacts terms={terms} kind="offer" box="conditions" />
+        </RecordBox>
+      }
+    />
   );
 }
 
