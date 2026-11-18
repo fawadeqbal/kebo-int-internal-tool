@@ -1,5 +1,5 @@
 import { LayoutGrid, List, Plus } from "lucide-react";
-import { can, CHANNEL_LABEL, INQUIRY_CHANNELS, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, PRIORITIES, PRIORITY_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
+import { can, CHANNEL_LABEL, INQUIRY, INQUIRY_CHANNELS, inquiryStateOf, LOST_REASON_LABEL, PRIORITIES, PRIORITY_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
 import { Badge, buildHref, PageHeader } from "@kebo/ui";
 import { OpenPanelButton } from "@/components/common/panel";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -102,11 +102,10 @@ export function InquiriesHeader({ me, view, excel, query }: { me: Me; view: "lis
   );
 }
 
-/** The stage, as a pill: on hold says so in place of its stage. */
+/** The stage, as a pill (the inquiry's record type): on hold says so in place of its stage. */
 export function StagePill({ d }: { d: DealRow }) {
-  if (d.onHold && (d.stage === "new" || d.stage === "sourcing" || d.stage === "quoted")) return <Badge tone="neutral">On hold</Badge>;
-  const tone = { new: "neutral", sourcing: "info", quoted: "warn", won: "ok", lost: "bad" } as const;
-  return <Badge tone={tone[d.stage]}>{INQUIRY_STAGE_LABEL[d.stage]}</Badge>;
+  const s = INQUIRY.states[inquiryStateOf(d)];
+  return <Badge tone={s.tone}>{s.words}</Badge>;
 }
 
 /** Where it stands: the one fact that matters now, beside the stage ("1 of 3 suppliers answered", "R1 sent 16 Nov"). */

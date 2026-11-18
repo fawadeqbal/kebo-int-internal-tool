@@ -4,7 +4,7 @@ import { lockScroll } from "@/lib/scroll-lock";
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { buttonClass, cn, type ButtonSize, type ButtonVariant } from "@kebo/ui";
+import { buttonClass, cn, RULES, type ButtonSize, type ButtonVariant } from "@kebo/ui";
 import { useChanges, watchChanges } from "./changes";
 import { useFormNotice } from "./form-notice";
 import { focusables, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead, type LostInfo } from "./dialog";
@@ -135,7 +135,7 @@ export function SidePanel({
             form.requestSubmit();
           }
         }}
-        className={cn(WINDOW_BOX, "md:w-[720px]", className)}
+        className={cn(WINDOW_BOX, RULES.window.wideRows, className)}
       >
         <WindowHead id={id} title={title} description={description} onClose={() => request()} headRef={head} />
         <PanelClose.Provider value={request}>

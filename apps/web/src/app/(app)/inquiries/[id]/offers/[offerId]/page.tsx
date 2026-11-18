@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { ButtonLink, cn, PageHeader, RevisionBadge } from "@kebo/ui";
+import { ButtonLink, cn, PageHeader, RevisionBadge, RULES } from "@kebo/ui";
 import { MoreMenu } from "@/components/common/more-menu";
 import { requirePermission } from "@/lib/session";
 import { companyToday, date } from "@/lib/format";
@@ -128,7 +128,7 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
           next={next ? { href: `${base}/offers/${next.id}`, name: next.factory.name } : null}
         />
       </PageHeader>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className={cn("grid items-start gap-4", RULES.page.withPanel)}>
         {/* The same boxes as its steps (design 18 Nov), each with its history and Edit. */}
         <OfferBoxes q={x} kit={kit} canEdit={canEdit} edits={edits ?? undefined} mainCurrency={s.currency} historyHref={`${base}/history`} />
         <aside aria-label="About this offer" className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">

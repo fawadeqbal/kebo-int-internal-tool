@@ -2,7 +2,7 @@ import Link from "next/link";
 import { OpenPanelButton } from "@/components/common/panel";
 import { NewInquiryWindow } from "../inquiry-windows";
 import { MessageSquareText, Plus, X } from "lucide-react";
-import { can, UNKNOWN_COUNTRY } from "@kebo/shared";
+import { can, INQUIRY, UNKNOWN_COUNTRY } from "@kebo/shared";
 import { buildHref, ButtonLink, Card, DataRow, EmptyState, LinkTabs, Pager, PhoneList, THead, Td, Th, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { DataTable } from "@/components/common/data-table";
@@ -24,7 +24,8 @@ type Params = Record<string, string | undefined>;
 /** The tabs are the stages (design "list pages" 18 Nov): Open first, then each stage, on hold, closed ones, All. */
 const TABS = ["open", "new", "sourcing", "quoted", "on_hold", "won", "lost", "overdue", "all"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { open: "Open", new: "New", sourcing: "Sourcing", quoted: "Quoted", on_hold: "On hold", won: "Won", lost: "Lost", overdue: "Past needed-by", all: "All" };
+const S = INQUIRY.states;
+const TAB_LABEL: Record<Tab, string> = { open: "Open", new: S.new.words, sourcing: S.sourcing.words, quoted: S.quoted.words, on_hold: S.on_hold.words, won: S.won.words, lost: S.lost.words, overdue: "Past needed-by", all: "All" };
 
 /**
  * Inquiries (design "RFQ Desk — list pages", 18 Nov 2026): one strong button, New inquiry (on a phone the + in
@@ -94,7 +95,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
       <WhenSelecting not>
       <FilterCard
         end={data.rows.length > 0 && <SelectButton />}
-        count={countOf(data.total, "inquiry", "inquiries")}
+        count={countOf(data.total, INQUIRY.name.one, INQUIRY.name.many)}
         search="Search number, title, customer…"
         value={sp.q}
         keep={{ stage: keep.stage, customer: sp.customer }}
@@ -106,7 +107,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
         {data.rows.length === 0 ? (
           <EmptyState
             icon={MessageSquareText}
-            title={narrowed ? "No inquiries match" : "No inquiries yet"}
+            title={narrowed ? `No ${INQUIRY.name.many} match` : `No ${INQUIRY.name.many} yet`}
             action={
               narrowed ? (
                 <ButtonLink href="/inquiries">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { NewInquiryWindow } from "../inquiry-windows";
-import { can } from "@kebo/shared";
-import { Badge, buildHref, LinkTabs } from "@kebo/ui";
+import { can, INQUIRY } from "@kebo/shared";
+import { Badge, buildHref, LinkTabs, RULES } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { FactLine, FollowUpDay, PriorityTag, Responsible } from "@/components/lists/list-parts";
 import { getPeople, getSettings } from "@/lib/loaders";
@@ -17,14 +17,9 @@ export const metadata = { title: "Inquiries · Board" };
 type Params = Record<string, string | undefined>;
 
 /** The open stages are the columns; won and lost fold into one small Closed column. */
-const COLUMNS = [
-  { key: "new", label: "New", tone: "neutral" },
-  { key: "sourcing", label: "Sourcing", tone: "info" },
-  { key: "quoted", label: "Quoted", tone: "warn" },
-  { key: "on_hold", label: "On hold", tone: "neutral" },
-] as const;
+const COLUMNS = (["new", "sourcing", "quoted", "on_hold"] as const).map((key) => ({ key, label: INQUIRY.states[key].words, tone: INQUIRY.states[key].tone }));
 type Column = (typeof COLUMNS)[number]["key"];
-const SHOWN = 12;
+const SHOWN = RULES.board.perColumn;
 
 /** One inquiry on the board: the row's facts in the row's order (number, what, who for, where it stands, who, next). */
 function Card({ d, today }: { d: DealRow; today: string }) {
@@ -89,7 +84,7 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
           ))}
         </ul>
       ) : (
-        <p className="px-1 pt-1 pb-2 text-[13px] text-muted">{c.key === "on_hold" ? "Nothing on hold." : `No ${c.label.toLowerCase()} inquiries.`}</p>
+        <p className="px-1 pt-1 pb-2 text-[13px] text-muted">{c.key === "on_hold" ? "Nothing on hold." : `No ${c.label.toLowerCase()} ${INQUIRY.name.many}.`}</p>
       )}
       {c.total > c.rows.length && (
         <Link href={listOf(c.key)} className="px-1 text-[13px] font-semibold text-primary hover:underline">
@@ -103,10 +98,10 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
       <h2 className="mb-1.5 text-[13.5px] font-bold">Closed</h2>
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Link href={listOf("won")} className="inline-flex items-center gap-1.5 hover:underline">
-          <Badge tone="ok">Won</Badge> {counts.won ?? 0}
+          <Badge tone={INQUIRY.states.won.tone}>{INQUIRY.states.won.words}</Badge> {counts.won ?? 0}
         </Link>
         <Link href={listOf("lost")} className="inline-flex items-center gap-1.5 hover:underline">
-          <Badge tone="bad">Lost</Badge> {counts.lost ?? 0}
+          <Badge tone={INQUIRY.states.lost.tone}>{INQUIRY.states.lost.words}</Badge> {counts.lost ?? 0}
         </Link>
       </p>
     </section>
@@ -120,7 +115,7 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
         search="Search number, title, customer…"
         value={sp.q}
         keep={{ customer: sp.customer }}
-        count={countOf(open, "open inquiry", "open inquiries")}
+        count={countOf(open, `open ${INQUIRY.name.one}`, `open ${INQUIRY.name.many}`)}
         selects={inquiryFilters(f, people, me.id, settings.sales.categories)}
       />
       <div className="xl:hidden">

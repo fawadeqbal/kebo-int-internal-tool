@@ -5,3 +5,4 @@ export * from "./pagination";
 export * from "./scroll-fade";
 export * from "./pending";
 export * from "./blocks";
+export * from "./rules";
