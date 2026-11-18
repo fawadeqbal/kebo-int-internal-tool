@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Check, CheckCircle2 } from "lucide-react";
 import {
   convertMinor,
@@ -45,7 +45,7 @@ import type { OfferLine, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
-import { PANEL_FORM, PanelFooter, PanelSection } from "@/components/common/panel";
+import { PANEL_FORM, PanelFooter, PanelSection, useReportDirty } from "@/components/common/panel";
 import { OnePartFooter, StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
 import { PriceSheet, PriceTotals } from "./price-editor";
 import { shortName } from "./offer-facts";
@@ -497,6 +497,13 @@ export function RevisionEditor({
   const show = (section: Section) => !step || (section !== "options" && shownSteps.includes(SECTION_STEP[section]));
   const stepAt = step ? QUOTE_STEPS.findIndex((x) => x.key === step) : 0;
   const dirty = JSON.stringify(s) !== saved;
+  // The editor knows what changed: never leave it to the window comparing what is on screen (moving to another
+  // step is not a change).
+  const reportDirty = useReportDirty();
+  useEffect(() => {
+    reportDirty(dirty);
+    return () => reportDirty(null);
+  }, [dirty, reportDirty]);
   const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => setS((st) => ({ ...st, [k]: v }));
   const setOption = (key: string, patch: Partial<OptionState>) =>
     setS((st) => ({ ...st, options: st.options.map((o) => (o.key === key ? { ...o, ...patch } : o)) }));
@@ -1049,12 +1056,7 @@ export function RevisionEditor({
             ) : (
               <>
                 {sections}
-              <PanelFooter start={footNote}>
-                {onCancel && (
-                  <Button type="button" variant="ghost" onClick={onCancel}>
-                    Cancel
-                  </Button>
-                )}
+              <PanelFooter start={footNote} onCancel={onCancel}>
                 <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
                   <Check aria-hidden /> {submitLabel}
                 </SubmitButton>

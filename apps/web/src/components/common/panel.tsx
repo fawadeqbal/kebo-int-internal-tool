@@ -21,8 +21,31 @@ const PanelClose = createContext<(arg?: CloseArg) => void>(() => {});
  * changes?" first, only when something was really changed).
  */
 export const useClosePanel = () => useContext(PanelClose);
+/** Whether a footer is in a window (its Cancel closes that window). */
+const InWindow = createContext(false);
 /** For a window that is not a SidePanel (a page shown as a window) to give its forms the same Cancel. */
-export const PanelCloseProvider = PanelClose.Provider;
+export function PanelCloseProvider({ value, children }: { value: (arg?: CloseArg) => void; children: ReactNode }) {
+  return (
+    <InWindow.Provider value>
+      <PanelClose.Provider value={value}>{children}</PanelClose.Provider>
+    </InWindow.Provider>
+  );
+}
+
+/**
+ * A window's Cancel (canvas row "Cancel, not ✕", approved 19 Nov): beside its save, the same in every window. It
+ * closes the window — at once when nothing changed, else after "Discard your change?" — like Escape and the phone's
+ * Back. On a phone it takes the ✕'s place (the ✕ steps aside while a window has one, globals.css); on a laptop the
+ * ✕ stays too. `onClick`: a window that closes in its own way.
+ */
+export function WindowCancel({ label = "Cancel", onClick, disabled, className }: { label?: string; onClick?: () => void; disabled?: boolean; className?: string }) {
+  const close = useClosePanel();
+  return (
+    <button type="button" data-window-cancel="" disabled={disabled} onClick={onClick ?? (() => close())} className={buttonClass("secondary", "md", className)}>
+      {label}
+    </button>
+  );
+}
 
 const PanelDirty = createContext<(dirty: boolean | null) => void>(() => {});
 /**
@@ -156,13 +179,13 @@ export function SidePanel({
         className={cn(WINDOW_BOX, RULES.window.wideRows, className)}
       >
         <WindowHead id={id} title={title} description={description} onClose={() => request()} headRef={head} />
-        <PanelClose.Provider value={request}>
+        <PanelCloseProvider value={request}>
           <PanelDirty.Provider value={setReported}>
             <PanelLost.Provider value={setLost}>
               <FooterSlot.Provider value={footerSlot}>{children}</FooterSlot.Provider>
             </PanelLost.Provider>
           </PanelDirty.Provider>
-        </PanelClose.Provider>
+        </PanelCloseProvider>
       </div>
       {asking && (
         <ThrowAwayConfirm
@@ -255,7 +278,19 @@ export function PanelSection({
  * body's padding, so nothing shows under it); `end`: a quiet action on the
  * right (Remove this offer). On a phone the buttons share its width, big.
  */
-export function PanelActions({ children, end, className }: { children: ReactNode; end?: ReactNode; className?: string }) {
+export function PanelActions({
+  children,
+  end,
+  className,
+  cancel = true,
+}: {
+  children: ReactNode;
+  end?: ReactNode;
+  className?: string;
+  /** Cancel first, in a window (false: the window's buttons already say how to leave). */
+  cancel?: boolean;
+}) {
+  const inWindow = useContext(InWindow);
   return (
     <div
       data-window-footer=""
@@ -266,6 +301,7 @@ export function PanelActions({ children, end, className }: { children: ReactNode
         className,
       )}
     >
+      {cancel && inWindow && <WindowCancel />}
       {children}
       {end && <span className="ml-auto">{end}</span>}
     </div>
@@ -276,13 +312,20 @@ export function PanelActions({ children, end, className }: { children: ReactNode
  * The footer of a window that makes or edits a record (inquiry, factory offer, quotation), the same in each:
  * a note or the red "Remove…" on the left; Cancel, the quiet saves, then the one orange save on the right.
  */
-export function PanelFooter({ start, children }: { start?: ReactNode; children: ReactNode }) {
+export function PanelFooter({ start, onCancel, children }: { start?: ReactNode; onCancel?: () => void; children: ReactNode }) {
   return (
-    <PanelActions className="justify-end">
-      {start && <span className="mr-auto min-w-0 text-[12.5px] text-text-2">{start}</span>}
+    <PanelActions className="justify-end" cancel={false}>
+      {start && <span className="mr-auto min-w-0 text-[12.5px] text-text-2 max-md:basis-full">{start}</span>}
+      {/* `onCancel`: a form that leaves in its own way (an editor on the page) still has its Cancel here. */}
+      {onCancel ? <WindowCancel onClick={onCancel} /> : <WindowCancelIn />}
       {children}
     </PanelActions>
   );
+}
+
+/** Cancel, when the footer is in a window (for a footer that places it itself: `cancel={false}` on PanelActions). */
+export function WindowCancelIn() {
+  return useContext(InWindow) ? <WindowCancel /> : null;
 }
 
 /** "What happens": said above the button of a window that changes a status or removes something. */

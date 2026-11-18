@@ -10,7 +10,7 @@ import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { FloatingMenu } from "@/components/common/floating";
-import { useClosePanel, WhatHappens } from "@/components/common/panel";
+import { useClosePanel, WhatHappens, WindowCancel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryRequests } from "@/lib/types-flow";
 
@@ -167,9 +167,7 @@ export function AskWindow({
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-line bg-surface-2/50 px-5 py-3.5 sm:px-6">
-            <Button variant="ghost" onClick={() => close()}>
-              Cancel
-            </Button>
+            <WindowCancel />
             <SubmitButton pendingText="Saving…" disabled={!picked.length}>
               <Check aria-hidden /> Save · {picked.length} request{picked.length === 1 ? "" : "s"}
             </SubmitButton>

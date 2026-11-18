@@ -1,7 +1,7 @@
 "use client";
 
 import { Mail } from "lucide-react";
-import { Alert, Button, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Alert, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
@@ -96,9 +96,6 @@ export function SendForm({ action, deposit, today, supplierRef }: { action: Acti
             )}
           </PanelBody>
           <PanelActions className="static mx-0 mb-0 justify-end">
-            <Button variant="ghost" onClick={close}>
-              Cancel
-            </Button>
             <SubmitButton pendingText="Saving…">
               <Mail aria-hidden /> Send purchase order
             </SubmitButton>

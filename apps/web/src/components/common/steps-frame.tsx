@@ -4,7 +4,7 @@ import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, cn, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
-import { FooterTotal } from "./panel";
+import { FooterTotal, WindowCancel } from "./panel";
 
 /*
  * Editing in steps (design "one way, any number"; side bar 18 Nov): one window, the steps listed on the left like a
@@ -187,31 +187,31 @@ export function StepsFooter({
   onNext: () => void;
   saveLabel?: string;
   canSave?: boolean;
-  /** Cancel on the first step (a new record), where there is no Back. */
+  /** Cancel's own way to close (by default it closes the window, asking first when something changed). */
   onCancel?: () => void;
 }) {
   return (
-    <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4 max-sm:flex-wrap">
+    // Canvas row "Cancel, not ✕": ‹ (back one step) · Cancel · Next — Next the strong one, Save on the last step; on a
+    // laptop Back on the left, Cancel beside the saves. On a phone a step's own Save waits for the last step.
+    <div
+      data-window-footer=""
+      className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4 max-sm:flex-wrap max-md:[&>button]:min-h-12 max-md:[&>button:not([data-back])]:flex-1"
+    >
       {/* A phone: the items' total on its own line above the buttons (design "Items on a small phone"). */}
       <FooterTotal line />
-      {first ? (
-        onCancel && (
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            Cancel
-          </Button>
-        )
-      ) : (
-        <Button type="button" variant="secondary" onClick={onBack}>
-          <ChevronLeft aria-hidden /> Back
+      {!first && (
+        <Button type="button" variant="secondary" data-back="" aria-label="Back" onClick={onBack} className="max-md:size-12 max-md:px-0">
+          <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
         </Button>
       )}
-      <span className="flex-1" />
-      <SubmitButton variant={last ? "primary" : "secondary"} pendingText="Saving…" disabled={!canSave}>
+      <span className="flex-1 max-md:hidden" />
+      <WindowCancel onClick={onCancel} />
+      <SubmitButton variant={last ? "primary" : "secondary"} pendingText="Saving…" disabled={!canSave} className={cn(!last && "max-md:hidden")}>
         {saveLabel}
       </SubmitButton>
       {!last && (
         <Button type="button" variant="primary" onClick={onNext}>
-          Next <ChevronRight aria-hidden />
+          Next <ChevronRight aria-hidden className="max-md:hidden" />
         </Button>
       )}
     </div>
@@ -232,14 +232,12 @@ export function OnePartFooter({
   saveLabel?: string;
 }) {
   return (
-    <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
-      <FooterTotal />
-      <span className="flex-1" />
-      {onCancel && (
-        <Button type="button" variant="ghost" onClick={onCancel} className="max-md:hidden">
-          Cancel
-        </Button>
-      )}
+    // Canvas row "Cancel, not ✕": Cancel · Save, each half the width on a phone.
+    <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:flex-wrap max-md:px-4 max-md:[&>button]:min-h-12 max-md:[&>button]:flex-1">
+      {/* A phone: the items' total on its own line, then Cancel · Save (canvas board "Items windows"). */}
+      <FooterTotal line />
+      <span className="flex-1 max-md:hidden" />
+      <WindowCancel onClick={onCancel} />
       <SubmitButton variant="primary" pendingText="Saving…" disabled={!canSave}>
         <Check aria-hidden /> {saveLabel}
       </SubmitButton>

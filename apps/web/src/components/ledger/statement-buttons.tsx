@@ -108,14 +108,14 @@ function SharePanel({ s, onClose }: { s: IssuedStatement; onClose: () => void })
         <Field label="Message" htmlFor={`${id}-m`}>
           <Textarea id={`${id}-m`} rows={5} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
         </Field>
-        <PanelActions>
+        <PanelActions cancel={false}>
           <Button size="sm" variant="primary" disabled={pending} onClick={doShare}>
             {pending ? "Preparing…" : "Share"}
           </Button>
           <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(downloadOnly)}>
             Download only
           </Button>
-          <Button size="sm" variant="ghost" onClick={onClose}>
+          <Button size="sm" variant="ghost" data-window-cancel="" onClick={onClose}>
             {copied ? "Done" : "Cancel"}
           </Button>
         </PanelActions>

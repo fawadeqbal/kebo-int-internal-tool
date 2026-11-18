@@ -4,8 +4,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Modal } from "@/components/common/dialog";
 import { PanelActions, PanelBody, SidePanel, useClosePanel } from "@/components/common/panel";
 
+/** Its footer gets the window's Cancel by itself (canvas row "Cancel, not ✕"). */
 function Form({ onSubmit }: { onSubmit: () => void }) {
-  const close = useClosePanel();
   return (
     <form
       onSubmit={(e) => {
@@ -20,9 +20,6 @@ function Form({ onSubmit }: { onSubmit: () => void }) {
         <input id="city" />
         <PanelActions>
           <button type="submit">Save</button>
-          <button type="button" onClick={close}>
-            Cancel
-          </button>
         </PanelActions>
       </PanelBody>
     </form>
@@ -71,13 +68,14 @@ describe("SidePanel", () => {
     render(<Harness />);
     openPanel();
     const dialog = screen.getByRole("dialog");
-    // From the last control, Tab goes round to the first (✕ in the header).
-    screen.getByRole("button", { name: "Cancel" }).focus();
+    // From the last control (Save, after Cancel), Tab goes round to the first (✕ in the header).
+    expect(screen.getAllByRole("button", { name: "Cancel" })).toHaveLength(1);
+    screen.getByRole("button", { name: "Save" }).focus();
     fireEvent.keyDown(document.activeElement!, { key: "Tab" });
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
     // And Shift+Tab from the first goes to the last.
     fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save" }));
     // Focus that lands outside is brought back.
     act(() => screen.getByRole("button", { name: "New customer", hidden: true }).focus());
     expect(dialog.contains(document.activeElement)).toBe(true);

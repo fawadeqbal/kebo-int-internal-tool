@@ -49,8 +49,8 @@ test("a new inquiry: New › Inquiry, the customer, what they need, saved", asyn
   // In steps (design 17 Nov, Review added 18 Nov): Customer · Items · Details · Files · Review, the rail beside them.
   const rail = window.getByRole("navigation", { name: "Steps" });
   for (const step of ["Customer", "Items", "Details", "Files", "Review"]) await expect(rail.getByRole("button", { name: new RegExp(`: ${step}`) })).toBeVisible();
-  // One strong button, at the end: no Cancel (✕ closes), no save before Review.
-  await expect(window.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  // One strong button, at the end; Cancel beside it (canvas row "Cancel, not ✕"); no save before Review.
+  await expect(window.getByRole("button", { name: "Cancel" })).toHaveCount(1);
   await expect(window.getByRole("button", { name: "Confirm and save" })).toHaveCount(0);
   await expect(rail.getByRole("button", { name: /Customer/ })).toHaveAttribute("aria-current", "step");
   await window.getByRole("button", { name: /^Next/ }).click();
@@ -203,8 +203,8 @@ test("a form on a phone: ✕ at the top left; the phone's Back asks before throw
   await expect(page.getByRole("alertdialog", { name: "Discard your change?" })).toBeVisible();
   await page.getByRole("button", { name: "Keep editing" }).click();
   await expect(form.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Kabul Medical Supplies");
-  // ✕ (Close) asks the same; Discard closes the form, back on Customers.
-  await form.getByRole("button", { name: "Close" }).click();
+  // Cancel asks the same; Discard closes the form, back on Customers.
+  await form.getByRole("button", { name: "Cancel" }).click();
   await page.getByRole("button", { name: "Discard" }).click();
   await expect(form).toBeHidden();
   await expect(page).toHaveURL((u) => u.pathname === "/customers" && !u.searchParams.has("panel"));

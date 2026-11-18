@@ -24,14 +24,10 @@ export const dayLabel = (iso: string | null | undefined, style: TimeStyle = time
 /* ---------------------------------------------------------------- the side panel (common/panel) */
 
 function PanelFooter({ save = "Save", busy, note }: { save?: string; busy?: boolean; note?: ReactNode }) {
-  const close = useClosePanel();
   return (
     <PanelActions>
       <Button type="submit" size="sm" disabled={busy} aria-busy={busy}>
         {busy ? "Saving…" : save}
-      </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={() => close()} disabled={busy}>
-        Cancel
       </Button>
       <span className="text-xs text-muted">{note ?? "Changes show in the step’s Changes."}</span>
     </PanelActions>

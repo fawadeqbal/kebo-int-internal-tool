@@ -1,9 +1,9 @@
 "use client";
 
-import { Button, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
 import { Check } from "lucide-react";
 import type { ActionState } from "@/lib/actions";
 import type { Person } from "@/lib/types";
@@ -29,7 +29,6 @@ function FactoryForm({
   meId: string;
   onSaved: (s: ActionState) => void;
 }) {
-  const close = useClosePanel();
   return (
     <ActionForm action={action} onDone={onSaved} showSuccess={false} className="flex min-h-0 flex-1 flex-col">
       {(s) => {
@@ -80,9 +79,6 @@ function FactoryForm({
               </Field>
             </div>
             <PanelActions className="justify-end">
-              <Button variant="ghost" onClick={close} className="max-md:hidden">
-                Cancel
-              </Button>
               <SubmitButton pendingText="Saving…">
                 <Check aria-hidden /> {factory ? "Save changes" : "Save supplier"}
               </SubmitButton>

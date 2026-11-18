@@ -11,6 +11,7 @@ import { BottomSheet } from "@/components/common/bottom-sheet";
 import { useIsPhone } from "@/components/common/floating";
 import { useFooterSlot } from "@/components/common/panel";
 import { UNITS } from "@/components/lines/line-table";
+import { PhoneLineRow, PhonePriceBox } from "@/components/lines/phone-lines";
 import type { QuoteOffers } from "@/lib/types-deals";
 import type { Fx } from "@/lib/fx";
 import { ErrorText, numberText, rowKey } from "./form-bits";
@@ -319,39 +320,39 @@ export function PriceSheet({
                 </tbody>
               </table>
             </div>
-            {/* Phone (design "Items on a small phone"): the item line — number, name (two lines), model under it, a part in
-                line with its item — with the price box in it (pricing is the work here), the margin and the amount under it. */}
-            <ul aria-label={`Option ${letter} prices`} className="flex flex-col divide-y divide-line sm:hidden">
+            {/* Phone (design "Items on a small phone"): the one item line (PhoneLineRow) with its price box in it
+                (PhonePriceBox: pricing is the work here), the cost beside how many, the margin and the amount under it. */}
+            <ul aria-label={`Option ${letter} prices`} className="flex flex-col sm:hidden">
               {lineView.map(({ l, i, price, cost, m, part }) => {
                 const amount = totals.lines[i]?.lineTotal ?? 0;
                 return (
-                  <li key={l.id} className="flex items-start gap-1.5 py-2.5 pr-3 pl-3">
-                    <span className={cn("w-[34px] shrink-0 pt-0.5 text-[13px] tabular", part ? "font-medium text-muted" : "font-semibold text-text-2")}>{l.no}</span>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className={cn("line-clamp-2 text-[15px] leading-snug [overflow-wrap:anywhere]", part ? "font-medium" : "font-semibold")}>{l.description.split("\n")[0]}</span>
-                      {l.model && <span className="truncate text-xs text-muted">{l.model}</span>}
-                      <span className="mt-1.5 flex items-center justify-between gap-2">
-                        <span className="min-w-0 text-[13px] text-text-2 tabular">
-                          {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
-                          {showCosts && cost !== null && cost > 0 && <span className="block text-xs whitespace-nowrap">cost {amount2(Number(fromMinor(cost)))}</span>}
-                        </span>
-                        <PriceInput
-                          aria-label={`Unit price for ${l.no}`}
-                          data-price-m={`${at}:${i}`}
-                          className="h-11 w-36 shrink-0 text-base"
-                          value={price}
-                          placeholder="0.00"
-                          onChange={(v) => setPrice(l.id, v)}
-                          onKeyDown={priceKeys(i, "data-price-m")}
-                          onPaste={pricePaste(i)}
-                        />
-                      </span>
-                      <span className="mt-1 flex items-baseline justify-between gap-2 text-xs tabular">
-                        <span className={tone(m)}>{showCosts && m !== null ? `margin ${m.toFixed(1)}%` : ""}</span>
-                        <span className="text-sm font-bold text-text">{amount > 0 ? amount2(Number(fromMinor(amount))) : <span className="font-normal text-muted">—</span>}</span>
-                      </span>
-                    </span>
-                  </li>
+                  <PhoneLineRow
+                    key={l.id}
+                    no={l.no}
+                    kind={part ? "Part" : "Item"}
+                    name={l.description.split("\n")[0]!}
+                    under={l.model}
+                    line={[
+                      `${Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${l.unit}`,
+                      ...(showCosts && cost !== null && cost > 0 ? [`cost ${amount2(Number(fromMinor(cost)))}`] : []),
+                    ]}
+                    amount={amount > 0 ? amount2(Number(fromMinor(amount))) : null}
+                    needs={null}
+                    part={part}
+                    busy={false}
+                    field={
+                      <PhonePriceBox
+                        value={price}
+                        onChange={(v) => setPrice(l.id, v)}
+                        label={`Unit price for ${l.no}`}
+                        index={i}
+                        group={`m${at}`}
+                        needed={!part}
+                        onPaste={pricePaste(i)}
+                      />
+                    }
+                    note={showCosts && m !== null ? <span className={tone(m)}>margin {m.toFixed(1)}%</span> : null}
+                  />
                 );
               })}
             </ul>

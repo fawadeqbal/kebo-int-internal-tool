@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { Clock } from "lucide-react";
 import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from "@kebo/shared";
-import { Button, Field, Select, Textarea } from "@kebo/ui";
+import { Field, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelButton } from "@/components/orders/step-view";
@@ -14,15 +14,11 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /** A panel form's Save / Cancel. */
 function Buttons({ save, danger }: { save: string; danger?: boolean }) {
-  const close = useClosePanel();
   return (
     <PanelActions>
       <SubmitButton size="sm" variant={danger ? "danger" : "primary"} pendingText="Saving…">
         {save}
       </SubmitButton>
-      <Button type="button" size="sm" variant="ghost" onClick={close}>
-        Cancel
-      </Button>
     </PanelActions>
   );
 }

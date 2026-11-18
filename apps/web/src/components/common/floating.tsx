@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { cn } from "@kebo/ui";
+import { Button, cn } from "@kebo/ui";
 
 type Anchor = () => HTMLElement | null;
 
@@ -181,20 +181,28 @@ export function FloatingMenu({
           onClick={onClose}
           tabIndex={-1}
         />
-        <div
-          ref={panel}
-          role="menu"
-          aria-label={label}
-          onKeyDown={keys}
-          className={cn(
-            "relative flex max-h-[80dvh] flex-col overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base [&_[role=menuitemradio]]:min-h-12 [&_[role=menuitemradio]]:text-base",
-            HIDE_EMPTY,
-          )}
-        >
-          <span className="mx-auto mb-1 h-1 w-10 rounded-full bg-line-strong" aria-hidden />
-          {header ?? <p className="px-2.5 pt-1 pb-2 text-xs font-medium text-muted">{label}</p>}
-          {children}
-          {emptyNote}
+        {/* The sheet: its name (or header), its items, then Cancel at the bottom (canvas row "Cancel, not ✕"). */}
+        <div onKeyDown={keys} className="relative flex max-h-[80dvh] flex-col rounded-t-2xl border-t border-line bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop">
+          <span className="mx-auto mt-2 mb-1 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
+          <div className="shrink-0 px-2">{header ?? <p className="px-2.5 pt-1 pb-2 text-xs font-medium text-muted">{label}</p>}</div>
+          <div
+            ref={panel}
+            role="menu"
+            aria-label={label}
+            className={cn(
+              "flex min-h-0 flex-col overflow-y-auto px-2 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base [&_[role=menuitemradio]]:min-h-12 [&_[role=menuitemradio]]:text-base",
+              HIDE_EMPTY,
+            )}
+          >
+            {children}
+            {emptyNote}
+          </div>
+          {/* Its way out, where the thumb is (canvas row "Cancel, not ✕"): Cancel across the sheet, after a gap. */}
+          <div className="shrink-0 border-t-[6px] border-surface-2 px-3 pt-2.5">
+            <Button type="button" variant="secondary" onClick={onClose} className="min-h-12 w-full">
+              Cancel
+            </Button>
+          </div>
         </div>
       </div>,
       document.body,

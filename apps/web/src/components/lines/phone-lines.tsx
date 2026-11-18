@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Plus, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Plus } from "lucide-react";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { FIT_VIEW, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
@@ -42,7 +42,13 @@ const priceText = (raw: string) => {
  * how many, × the unit price when it has one, then the rest by name (a tax of its own, another spec of…); and the
  * amount on the right (the line's computed total, when it has a price). Empty values and 0 are left out.
  */
-export function linePhoneParts(row: LineRow, columns: LineColumn[], values: LineValues): { under: ReactNode; line: ReactNode[]; amount: ReactNode } {
+export function linePhoneParts(
+  row: LineRow,
+  columns: LineColumn[],
+  values: LineValues,
+  /** The price is typed in the row itself (PhonePriceBox): the grey line says only how many. */
+  priceInRow = false,
+): { under: ReactNode; line: ReactNode[]; amount: ReactNode } {
   const priceCol = columns.find((c) => c.input && PRICE_KEYS.has(c.key));
   const price = priceCol ? (values[priceCol.key] ?? "").trim() : "";
   const priced = !!priceCol && !isZero(price);
@@ -52,7 +58,9 @@ export function linePhoneParts(row: LineRow, columns: LineColumn[], values: Line
   const model = (values.model ?? "").trim();
   const line: ReactNode[] = [];
   const qty = (values.quantity ?? "").trim();
-  if (qty || priced) line.push(`${qty ? `${qty} ${values.unit ?? ""}`.trim() : ""}${priced ? `${qty ? " × " : ""}${priceText(price)}` : ""}`);
+  if (priceInRow) {
+    if (qty) line.push(`${qty} ${values.unit ?? ""}`.trim());
+  } else if (qty || priced) line.push(`${qty ? `${qty} ${values.unit ?? ""}`.trim() : ""}${priced ? `${qty ? " × " : ""}${priceText(price)}` : ""}`);
   const rank = (c: LineColumn) => (c.input === "number" ? 1 : !c.input ? 3 : 4);
   for (const c of [...columns.slice(1)].sort((a, b) => rank(a) - rank(b))) {
     if (["unit", "quantity", "model"].includes(c.key) || c === priceCol || c === totalCol) continue;
@@ -78,6 +86,87 @@ export function linePhoneParts(row: LineRow, columns: LineColumn[], values: Line
     );
   }
   return { under: model || null, line, amount };
+}
+
+/** The column whose value is typed in a phone row itself: the unit price (or the supplier price). */
+export const phonePriceColumn = (columns: LineColumn[]) => columns.find((c) => c.input && PRICE_KEYS.has(c.key)) ?? null;
+
+/**
+ * A price typed right in an item's line on a phone (canvas "Items on a small phone"; asked 19 Nov: pricing an item
+ * must not take a tap, a sheet and a window). Figures on the right, the whole value selected on focus, the number
+ * keys; Enter (or ↓) goes to the next line's price, Shift+Enter (↑) to the one above. Shown tidy (1,850.00) while not
+ * typed in. `onChange`: every key goes up at once (an editor that saves later); else `onCommit` when the box is left
+ * with a new value (a list that saves each change).
+ */
+export function PhonePriceBox({
+  value,
+  onChange,
+  onCommit,
+  label,
+  index,
+  group,
+  className,
+  needed = true,
+  ...props
+}: Omit<ComponentProps<"input">, "value" | "onChange"> & {
+  value: string;
+  onChange?: (v: string) => void;
+  onCommit?: (v: string) => void;
+  /** "Unit price for 2.1". */
+  label: string;
+  /** Its place in the list and the list's name: Enter moves to the next box of the same list. */
+  index: number;
+  group: string;
+  /** Empty is something to fill in (an item); a part is priced in its item, so its empty box is quiet. */
+  needed?: boolean;
+}) {
+  const [typing, setTyping] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const live = !!onChange;
+  const raw = live || !typing ? value : draft;
+  const n = Number(raw.replace(/,/g, ""));
+  // Not typed in: tidy figures, and nothing at all for 0 (its place says Price).
+  const shown = typing ? raw : raw.trim() === "" || (Number.isFinite(n) && n === 0) ? "" : Number.isFinite(n) ? priceText(raw) : raw;
+  const go = (to: number) => document.querySelector<HTMLInputElement>(`[data-price-row="${group}:${to}"]`)?.focus();
+  return (
+    <input
+      {...props}
+      aria-label={label}
+      data-price-row={`${group}:${index}`}
+      inputMode="decimal"
+      enterKeyHint="next"
+      autoComplete="off"
+      placeholder="Price"
+      value={shown}
+      className={cn(
+        "h-11 w-36 min-w-0 shrink-0 rounded-lg border bg-surface px-3 text-right text-base tabular outline-none placeholder:text-muted/80 focus:border-primary focus:ring-2 focus:ring-primary/30",
+        needed && isZero(raw.trim()) ? "border-action/50" : "border-line-strong",
+        className,
+      )}
+      onFocus={(e) => {
+        setDraft(isZero(value.trim()) ? "" : value);
+        setTyping(true);
+        const el = e.currentTarget;
+        requestAnimationFrame(() => el.select());
+      }}
+      onBlur={() => {
+        setTyping(false);
+        // Emptied, or 0 typed, where it was 0: nothing changed.
+        if (!live && draft !== value && !(isZero(draft.trim()) && isZero(value.trim()))) onCommit?.(draft);
+      }}
+      onChange={(e) => (live ? onChange!(e.target.value) : setDraft(e.target.value))}
+      onKeyDown={(e) => {
+        props.onKeyDown?.(e);
+        if (e.defaultPrevented) return;
+        const to = e.key === "ArrowDown" || (e.key === "Enter" && !e.shiftKey) ? index + 1 : e.key === "ArrowUp" || (e.key === "Enter" && e.shiftKey) ? index - 1 : null;
+        if (to === null) return;
+        e.preventDefault();
+        const next = document.querySelector<HTMLInputElement>(`[data-price-row="${group}:${to}"]`);
+        if (next) go(to);
+        else e.currentTarget.blur();
+      }}
+    />
+  );
 }
 
 /**
@@ -106,7 +195,16 @@ export function PhoneLineRow({
   open,
   pick,
   dup,
+  field,
+  note,
 }: {
+  /**
+   * A box typed in right in the row (PhonePriceBox): on the right of the line that says how many, the amount
+   * under it. The rest of the row still opens its sheet.
+   */
+  field?: ReactNode;
+  /** With a field: on the left of the amount ("margin 15.0%"). */
+  note?: ReactNode;
   /** Select mode: a tick box; a tap ticks it (instead of opening the sheet). */
   pick?: { on: boolean; toggle: () => void };
   /** "Same as 1?": it looks like an earlier line. */
@@ -205,6 +303,76 @@ export function PhoneLineRow({
     </>
   );
   const box = "flex min-h-16 min-w-0 flex-1 items-start gap-1.5 py-2.5 pr-2.5 pl-3 text-left";
+  if (field && !pick) {
+    // The row with a box in it: the box is its own (a button cannot hold a box), so the row's tap is a button laid
+    // under the words, and the words let the tap through to it.
+    const words = (
+      <>
+        <span className={cn("w-[34px] shrink-0 pt-0.5 text-[13px] tabular", part ? "font-medium text-muted" : "font-semibold text-text-2")}>
+          <span className="sr-only">{kind} </span>
+          {no}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex items-start gap-1.5">
+            <span className={cn("line-clamp-2 min-w-0 flex-1 text-[15px] leading-snug [overflow-wrap:anywhere]", part ? "font-medium" : "font-semibold")}>
+              {name || <span className="text-muted">No description yet</span>}
+            </span>
+            {busy ? (
+              <Loader2 className="mt-1 size-4 shrink-0 animate-spin text-muted" aria-label="Saving" />
+            ) : (
+              onOpen && <MoreHorizontal aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
+            )}
+          </span>
+          {under && <span className="truncate text-xs text-muted">{under}</span>}
+          <span className="mt-1.5 flex items-center justify-between gap-2">
+            <span className="line-clamp-2 min-w-0 text-[13px] text-text-2 tabular [overflow-wrap:anywhere]">
+              {line.map((s, n) => (
+                <Fragment key={n}>
+                  {n > 0 && " · "}
+                  {s}
+                </Fragment>
+              ))}
+            </span>
+            <span className="pointer-events-auto relative z-[1]">{field}</span>
+          </span>
+          <span className="mt-1 flex items-baseline justify-between gap-2 text-xs tabular">
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {note}
+              {dup && <span className="rounded-md bg-warn-soft px-1.5 py-0.5 text-xs font-semibold text-warn">{dup}</span>}
+              {needs && needs !== "No price" && missingMark}
+              {badge}
+            </span>
+            <span className="shrink-0 text-sm font-bold whitespace-nowrap text-text">{amount || <span className="font-normal text-muted">—</span>}</span>
+          </span>
+        </span>
+      </>
+    );
+    return (
+      <li
+        data-line={lineKey}
+        className={cn(
+          "relative flex scroll-mt-40 scroll-mb-24 items-stretch border-b border-line last:border-b-0",
+          dup && "bg-warn-soft/40",
+          open && "bg-surface-2",
+          fresh && "bg-primary-soft/60 shadow-[inset_3px_0_0_var(--color-primary-solid)]",
+        )}
+      >
+        {onOpen && (
+          <button
+            id={rowId}
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            aria-label={`${kind} ${no} ${name || "No description yet"}`}
+            onClick={() => (held.current ? (held.current = false) : onOpen())}
+            {...hold}
+            className="absolute inset-0 select-none active:bg-surface-2 [-webkit-touch-callout:none]"
+          />
+        )}
+        <div className={cn(box, "pointer-events-none relative")}>{words}</div>
+      </li>
+    );
+  }
   return (
     <li
       data-line={lineKey}
@@ -503,10 +671,8 @@ export function LineWindow({
       }}
       className={cn("fixed inset-0 z-[100] flex animate-in flex-col bg-surface", FIT_VIEW)}
     >
-      <div className="flex min-h-15 items-center gap-1.5 border-b border-line py-1.5 pr-4 pl-1">
-        <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={close} disabled={busy} className="size-11 rounded-full [&_svg]:size-[22px]">
-          <X aria-hidden />
-        </Button>
+      {/* Its name on top; Cancel at the bottom, beside Add or Save (canvas row "Cancel, not ✕"). */}
+      <div className="flex min-h-15 items-center gap-1.5 border-b border-line py-1.5 pr-4 pl-4">
         <div className="min-w-0 flex-1">
           <h2 id={`${id}-title`} ref={head} tabIndex={-1} className="truncate text-lg font-semibold tracking-tight outline-none">
             {title}
@@ -567,17 +733,20 @@ export function LineWindow({
         )}
         {reason}
       </div>
-      <div className="flex items-center gap-2.5 border-t border-line bg-surface px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="flex items-center gap-2 border-t border-line bg-surface px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {!isNew && (
           <>
-            <Button variant="secondary" aria-label="Previous" onClick={() => save("prev")} disabled={!hasPrev || busy} className="size-10 px-0">
+            <Button variant="secondary" aria-label="Previous" onClick={() => save("prev")} disabled={!hasPrev || busy} className="size-12 shrink-0 px-0">
               <ChevronLeft aria-hidden />
             </Button>
-            <Button variant="secondary" aria-label="Next" onClick={() => save("next")} disabled={!hasNext || busy} className="size-10 px-0">
+            <Button variant="secondary" aria-label="Next" onClick={() => save("next")} disabled={!hasNext || busy} className="size-12 shrink-0 px-0">
               <ChevronRight aria-hidden />
             </Button>
           </>
         )}
+        <Button variant="secondary" data-window-cancel="" onClick={close} disabled={busy} className={cn("h-12 text-[15px]", isNew ? "shrink-0 px-3.5" : "flex-1")}>
+          Cancel
+        </Button>
         {isNew ? (
           // Add (adds it and closes) and the strong Add & next (the next one opens, ready to type), side by side.
           <>
@@ -589,17 +758,10 @@ export function LineWindow({
             </Button>
           </>
         ) : (
-          <>
-            <span className="flex-1" />
-            <Button variant={hasNext ? "secondary" : "primary"} onClick={() => save("close")} disabled={busy} className="h-10">
-              {busy ? "Saving…" : "Save"}
-            </Button>
-            {hasNext && (
-              <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-10">
-                Save &amp; next
-              </Button>
-            )}
-          </>
+          // Save (and close); › beside ‹ saves and opens the next one.
+          <Button variant="primary" onClick={() => save("close")} disabled={busy} className="h-12 flex-1 text-[15px]">
+            {busy ? "Saving…" : "Save"}
+          </Button>
         )}
       </div>
       {asking && (

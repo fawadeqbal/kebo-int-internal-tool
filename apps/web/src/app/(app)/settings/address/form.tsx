@@ -6,7 +6,7 @@ import { Alert, Field, Input } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel } from "@/components/common/panel";
 import { changeAddressAction, checkAddressAction } from "./actions";
 import type { AddressView } from "./types";
 
@@ -29,7 +29,6 @@ export function AddressEdit({ view }: { view: AddressView }) {
 
 /** A new short name, checked as it is typed: free, taken or not allowed. */
 export function AddressForm({ view, disabled, onSaved }: { view: AddressView; disabled: boolean; onSaved?: () => void }) {
-  const close = useClosePanel();
   const [slug, setSlug] = useState("");
   const [check, setCheck] = useState<AddressView["check"]>(null);
   const [busy, setBusy] = useState(false);
@@ -111,9 +110,6 @@ export function AddressForm({ view, disabled, onSaved }: { view: AddressView; di
         <SubmitButton pendingText="Changing…" disabled={disabled || !free}>
           Change the address
         </SubmitButton>
-        <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
-          Cancel
-        </button>
         <PanelKeys />
       </PanelActions>
     </ActionForm>

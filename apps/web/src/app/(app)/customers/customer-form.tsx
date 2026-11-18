@@ -7,7 +7,7 @@ import { PARTY_TYPE_LABEL, PARTY_TYPES, customerLetters, UNKNOWN_COUNTRY, type P
 import { Alert, Button, buttonClass, Card, CardBody, CardFooter, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody } from "@/components/common/panel";
 import { CountrySelect } from "@/components/people/country-select";
 import type { ActionState } from "@/lib/actions";
 import type { Contact, CustomerDetail } from "@/lib/types-people";
@@ -98,7 +98,6 @@ export function CustomerForm({
   inPanel?: boolean;
   onSaved?: (state: ActionState) => void;
 }) {
-  const close = useClosePanel();
   const [draft, setDraft] = useState<Draft>(() => ({
     type: customer?.type ?? "company",
     name: customer?.name ?? "",
@@ -359,9 +358,6 @@ export function CustomerForm({
           <PanelBody className={PANEL_FORM}>
             {form(s)}
             <PanelActions className="justify-end">
-              <Button variant="ghost" onClick={close} className="max-md:hidden">
-                Cancel
-              </Button>
               <SubmitButton pendingText="Saving…">
                 <Check aria-hidden /> {customer ? "Save changes" : "Save customer"}
               </SubmitButton>

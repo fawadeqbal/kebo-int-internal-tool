@@ -38,7 +38,7 @@ import { useExcelAllowed } from "@/components/common/features";
 import { lineExport, linesFromSheet, lineTemplate, type SheetLines } from "@/components/sheets/line-sheets";
 import type { ReadSheet } from "@/lib/sheet-spec";
 import { UNITS } from "./units";
-import { LineWindow, lineNeeds, linePhoneParts, PhoneLineRow, type LineWindowThen } from "./phone-lines";
+import { LineWindow, lineNeeds, linePhoneParts, PhoneLineRow, PhonePriceBox, phonePriceColumn, type LineWindowThen } from "./phone-lines";
 import { BottomSheet } from "@/components/common/bottom-sheet";
 import { useFooterSlot } from "@/components/common/panel";
 
@@ -909,6 +909,8 @@ export function LineTable({
   const valuesOf = (r: LineRow) => Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)]));
   const needing = rows.filter((r) => lineNeeds(r.values, columns, !!r.parentKey)).length;
   const phoneRows = needsOnly && needing ? visible.filter(({ r }) => lineNeeds(r.values, columns, !!r.parentKey)) : visible;
+  // On a phone the price is typed right in the line (asked 19 Nov: no tap, sheet and window to price an item).
+  const inRowPrice = !readOnly && !selecting ? phonePriceColumn(columns) : null;
   const editingRow = editing?.key ? (rows.find((r) => r.key === editing.key) ?? null) : null;
   const editingAt = editingRow ? phoneRows.findIndex(({ r }) => r.key === editingRow.key) : -1;
   /** A new part's line (what it goes under). */
@@ -1426,10 +1428,22 @@ export function LineTable({
       ) : (
         <div className="overflow-hidden rounded-lg border border-line bg-surface">
           <ul aria-label={`${Noun}s`}>
-            {phoneRows.map(({ r, i }) => {
-              const bits = linePhoneParts(r, columns, valuesOf(r));
+            {phoneRows.map(({ r, i }, at) => {
+              const bits = linePhoneParts(r, columns, valuesOf(r), !!inRowPrice);
               return (
                 <PhoneLineRow
+                  field={
+                    inRowPrice && (
+                      <PhonePriceBox
+                        value={valueOf(r, inRowPrice.key)}
+                        onCommit={(v) => saveValue(r.key, inRowPrice.key, v)}
+                        label={`${inRowPrice.label} for ${numbers[i]}`}
+                        index={at}
+                        group={menuId}
+                        needed={!r.parentKey}
+                      />
+                    )
+                  }
                   key={r.key}
                   no={numbers[i]!}
                   kind={r.parentKey ? "Part" : Noun}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, CircleCheck, Download, Eye, FileText, History, List, Paperclip, Pencil, Sparkles, Trash2, UserRound } from "lucide-react";
 import {
   ATTACHMENT_KIND_LABEL,
@@ -19,7 +19,7 @@ import {
 import { Alert, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens, WindowCancel } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
 import { StepsFrame } from "@/components/common/steps-frame";
 import { CountrySelect } from "@/components/people/country-select";
@@ -34,7 +34,7 @@ import { ChoiceChips } from "@/components/common/choice-chips";
 import { send, type Staged } from "./documents-panel";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
 import { LineTable } from "@/components/lines/line-table";
-import { ReasonChips } from "@/components/edits/reason-chips";
+import { ReasonSheet } from "@/components/edits/reason-chips";
 import { recordEditAction } from "@/lib/edit-actions";
 import type { DealItem } from "@/lib/types";
 import type { LineRow } from "@/components/lines/line-table";
@@ -298,7 +298,10 @@ export function DealForm({
             ? total
             : 0;
   const needWhy = !create && total > 0;
-  const canSave = create || (total > 0 && !!why?.trim());
+  // Something changed: Save asks why, once, in a sheet (canvas board "Why the change? at Save").
+  const canSave = create || total > 0;
+  const [askWhy, setAskWhy] = useState(false);
+  const formId = useId();
   const undo = (k: Change["key"]) => {
     if (k === "customer") {
       set("customer", initial.customer);
@@ -317,14 +320,19 @@ export function DealForm({
   };
   const changedField = (k: keyof DealFormValues) =>
     changedOf(k) ? "[&_:is(input,select,textarea)]:border-action/70 [&_[aria-checked=true]]:border-action" : undefined;
-  const reasonBox = needWhy ? (
-    <ReasonChips
+  const whySheet = (
+    <ReasonSheet
+      open={askWhy && needWhy}
+      onClose={() => setAskWhy(false)}
       choices={reasonChoices}
       value={why ?? ""}
       onChange={(r) => setWhy(r)}
+      formId={formId}
       title={total === 1 ? "Why the change?" : "Why these changes?"}
+      what={`${total} change${total === 1 ? "" : "s"}: ${lost.slice(0, 2).join(" · ")}`}
+      saveLabel={saveLabel}
     />
-  ) : null;
+  );
   useEffect(() => {
     reportLost(
       lost.length
@@ -333,7 +341,10 @@ export function DealForm({
           : { lines: lost }
         : null,
     );
-    reportDirty(lost.length ? true : null);
+    // The form knows what changed: never leave it to the window comparing what is on screen (moving to another
+    // step is not a change).
+    reportDirty(lost.length > 0);
+    return () => reportDirty(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the words, not the list's identity
   }, [lostKey, create, reportLost, reportDirty]);
 
@@ -357,6 +368,7 @@ export function DealForm({
   return (
     <PanelBody fill>
       <ActionForm
+        id={formId}
         action={submit}
         keepFields
         showSuccess={false}
@@ -367,7 +379,12 @@ export function DealForm({
             go(at + 1);
             return false;
           }
-          // Nothing changed: nothing to save; something changed: why, first (the box is in the window).
+          // Nothing changed: nothing to save; something changed: why, first — asked here, once (a sheet).
+          if (needWhy && !why?.trim()) {
+            setAskWhy(true);
+            return false;
+          }
+          setAskWhy(false);
           return canSave;
         }}
         banner={(st) =>
@@ -431,15 +448,7 @@ export function DealForm({
                   </div>
                 ) : !create ? (
                   <>
-                  {only && step === "items" && needWhy && (
-                    <ReasonChips
-                      strip
-                      choices={reasonChoices}
-                      value={why ?? ""}
-                      onChange={(r) => setWhy(r)}
-                      title={total === 1 ? "Why the change?" : "Why these changes?"}
-                    />
-                  )}
+                  {whySheet}
                   <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
                     {!only && at > 0 ? (
                       <Button
@@ -454,7 +463,8 @@ export function DealForm({
                     ) : (
                       lastChanged && <span className="text-xs text-text-2 max-md:hidden">Last changed {lastChanged}</span>
                     )}
-                    <span className="flex-1" />
+                    <span className="flex-1 max-md:hidden" />
+                    <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
                     {only || step === "changes" ? (
                       <SubmitButton
                         variant="strong"
@@ -468,11 +478,11 @@ export function DealForm({
                     ) : (
                       <>
                         {at < STEPS.length - 2 && (
-                          <Button type="button" variant="ghost" onClick={() => setStep("changes")}>
+                          <Button type="button" variant="ghost" onClick={() => setStep("changes")} className="max-md:hidden">
                             Changes{total ? ` · ${total}` : ""}
                           </Button>
                         )}
-                        <Button type="button" variant="soft" onClick={() => go(at + 1)}>
+                        <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
                           Next <ChevronRight aria-hidden />
                         </Button>
                       </>
@@ -481,7 +491,7 @@ export function DealForm({
                   </>
                 ) : (
                   <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
-                    {/* One strong button (design rules 18 Nov): Next is soft, Back and Review are words; ✕ closes, there is no Cancel. */}
+                    {/* One strong button (design rules 18 Nov): Next is soft, Back and Review are words; Cancel beside them (canvas row "Cancel, not ✕"). */}
                     {at > 0 ? (
                       <Button
                         type="button"
@@ -494,6 +504,7 @@ export function DealForm({
                       </Button>
                     ) : null}
                     <span className="flex-1 max-md:hidden" />
+                    <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
                     {create && step === "review" ? (
                       <SubmitButton
                         variant="strong"
@@ -505,14 +516,13 @@ export function DealForm({
                       </SubmitButton>
                     ) : (
                       <>
-                        <span className="flex-1 md:hidden" />
                         {create && at < STEPS.length - 2 && (
-                          <Button type="button" variant="ghost" onClick={() => setStep("review")}>
+                          <Button type="button" variant="ghost" onClick={() => setStep("review")} className="max-md:hidden">
                             Review
                           </Button>
                         )}
                         {!last && (
-                          <Button type="button" variant="soft" onClick={() => go(at + 1)}>
+                          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
                             Next <ChevronRight aria-hidden />
                           </Button>
                         )}
@@ -902,7 +912,6 @@ export function DealForm({
                 </PanelSection>
               )}
 
-              {only && step !== "items" && reasonBox}
               {step === "changes" && (
                 <div className="flex flex-col gap-3.5">
                   {total ? (
@@ -1008,7 +1017,6 @@ export function DealForm({
                   ) : (
                     <p className="text-sm text-text-2">Nothing changed.</p>
                   )}
-                  {reasonBox}
                 </div>
               )}
               {step === "review" && (

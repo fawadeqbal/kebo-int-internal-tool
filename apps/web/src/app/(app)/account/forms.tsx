@@ -14,7 +14,6 @@ import {
   PanelKeys,
   PanelSection,
   SidePanel,
-  useClosePanel,
   useSidePanel,
 } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
@@ -40,7 +39,6 @@ export function PasswordEdit({ action }: { action: Action }) {
 }
 
 export function PasswordForm({ action, onSaved }: { action: Action; onSaved?: () => void }) {
-  const close = useClosePanel();
   return (
     <ActionForm
       action={action}
@@ -72,9 +70,6 @@ export function PasswordForm({ action, onSaved }: { action: Action; onSaved?: ()
           </PanelSection>
           <PanelActions>
             <SubmitButton pendingText="Changing…">Change my password</SubmitButton>
-            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
-              Cancel
-            </button>
             <PanelKeys />
           </PanelActions>
         </>

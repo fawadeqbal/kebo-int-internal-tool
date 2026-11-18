@@ -6,7 +6,7 @@ import { Button, cn } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import { PANEL_FORM, PanelBody, PanelFooter, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelFooter, SidePanel, WhatHappens } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { WindowFiles } from "./section-files";
 
@@ -21,12 +21,8 @@ export const ROW_LINK = "text-[13px] font-medium whitespace-nowrap text-primary 
 const SMALL = "h-8 px-2.5 text-[13px]";
 
 function Foot({ submit, danger, note }: { submit: string; danger?: boolean; note?: ReactNode }) {
-  const close = useClosePanel();
   return (
     <PanelFooter start={note}>
-      <Button type="button" variant="ghost" onClick={() => close()}>
-        Cancel
-      </Button>
       <SubmitButton variant={danger ? "danger" : "primary"}>{submit}</SubmitButton>
     </PanelFooter>
   );

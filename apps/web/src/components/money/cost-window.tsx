@@ -21,7 +21,7 @@ import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { MoneyInput } from "@/components/common/money-input";
-import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, SidePanel, WhatHappens, WindowCancelIn } from "@/components/common/panel";
 import { useWindowDone } from "@/components/common/route-window";
 import { costChoicesAction, expenseAction, submitCostAction, voidExpenseAction } from "@/app/(app)/money/actions";
 import type { ActionState } from "@/lib/actions";
@@ -196,7 +196,6 @@ export function CostForm({
 }) {
   const { date } = useTime();
   const me = useMe();
-  const closePanel = useClosePanel();
   const inWindow = useWindowDone() !== null;
   const s0 = setup;
   const send = mode.kind === "send" ? mode : null;
@@ -336,11 +335,7 @@ export function CostForm({
   );
   const buttons = (
     <>
-      {(inPanel || inWindow) && (
-        <Button type="button" variant="ghost" onClick={() => closePanel()}>
-          Cancel
-        </Button>
-      )}
+      <WindowCancelIn />
       <SubmitButton pendingText={file ? "Saving, sending the file…" : "Saving…"}>
         {saveLabel}
       </SubmitButton>
@@ -671,7 +666,7 @@ export function CostForm({
             </Field>
           )}
 
-          <PanelActions className={cn("justify-end gap-x-3 gap-y-2", !(inPanel || inWindow) && "static mx-0 mb-0 border-t-0 px-0 sm:mx-0 sm:px-0")}>
+          <PanelActions className={cn("justify-end gap-x-3 gap-y-2", !(inPanel || inWindow) && "static mx-0 mb-0 border-t-0 px-0 sm:mx-0 sm:px-0")} cancel={false}>
             {footerStart && <span className={cn("mr-auto min-w-0 flex-[1_1_9rem] text-[12.5px] text-text-2", !expense && "max-sm:hidden")}>{footerStart}</span>}
             {buttons}
           </PanelActions>
