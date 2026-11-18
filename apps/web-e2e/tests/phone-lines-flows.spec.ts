@@ -42,7 +42,13 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   await expect(two.getByLabel("Description")).toBeFocused();
   await two.getByLabel("Description").fill("Blister packing machine");
   await two.getByLabel("Qty").fill("2");
-  await two.getByRole("button", { name: "sets", exact: true }).click();
+  // Unit (design 18 Nov): one dropdown â€” the units used here first, every unit, Otherâ€¦ to type your own.
+  await two.getByRole("button", { name: "Unit" }).click();
+  const units = page.getByRole("menu", { name: "Unit" });
+  await expect(units).toContainText("Used here");
+  await units.getByRole("menuitemradio", { name: "sets" }).click();
+  await expect(units).toBeHidden();
+  await expect(two.getByRole("button", { name: "Unit" })).toContainText("sets");
   expect(await accessibilityProblems(page), "a line's window meets WCAG 2.2 AA").toEqual([]);
   await two.getByRole("button", { name: /Add & next/ }).click();
   const three = page.getByRole("dialog", { name: "New item 3" });
@@ -74,10 +80,15 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   await expect(part.getByRole("radiogroup")).toHaveCount(0);
   await part.getByLabel("Description").fill("Upper punch, 12 mm round");
   await part.getByLabel("Qty").fill("35");
+  // A unit not in the list: Otherâ€¦ turns the box into one to type in.
+  await part.getByRole("button", { name: "Unit" }).click();
+  await page.getByRole("menu", { name: "Unit" }).getByRole("menuitem", { name: "Otherâ€¦" }).click();
+  await expect(part.getByRole("textbox", { name: "Unit" })).toBeFocused();
+  await part.getByRole("textbox", { name: "Unit" }).fill("bundles");
   expect(await accessibilityProblems(page), "a part's window meets WCAG 2.2 AA").toEqual([]);
   await part.getByRole("button", { name: "Add", exact: true }).click();
   await expect(part).toBeHidden();
-  await expect(list.getByRole("button", { name: /^Part 1\.1 Upper punch/ })).toContainText("35");
+  await expect(list.getByRole("button", { name: /^Part 1\.1 Upper punch/ })).toContainText("35 bundles");
 
   // A part that should be an item: Make it an item turns the same window into the next item.
   await list.getByRole("button", { name: "Add a part to Item 2" }).click();
@@ -117,7 +128,7 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   const desc = (i: { description: string; quantity: string; unit: string }) => [i.description, Number(i.quantity), i.unit];
   expect(saved.items.map(desc)).toEqual([
     ["Tablet press", 3, "set"],
-    ["Upper punch, 12 mm round", 35, "sets"],
+    ["Upper punch, 12 mm round", 35, "bundles"],
     ["Blister packing machine", 2, "sets"],
   ]);
   expect(errors).toEqual([]);

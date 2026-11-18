@@ -59,12 +59,19 @@ test("a new offer: Factory, Prices, Delivery & payment, Conditions, Review; a wr
   await page.keyboard.press("Enter");
   await page.getByLabel("Line 1: Price CNY").fill("120000");
   await page.keyboard.press("Enter");
-  await expect(win.getByText(/^Total\s+CNY/)).toContainText("120,000.00");
-  // Tax: included, added or none, and its %.
+  const totals = win.getByRole("group", { name: "Totals" });
+  await expect(totals).toContainText("120,000.00");
+  // Tax: included, added or none, and its %. With tax, every line shows its % and the totals show the tax (design 18 Nov).
   const tax = win.getByRole("radiogroup", { name: "Tax" });
   await tax.getByRole("radio", { name: "Included" }).click();
   await win.getByLabel("Tax %", { exact: true }).fill("13");
   await expect(tax.getByRole("radio", { name: "Included" })).toHaveAttribute("aria-checked", "true");
+  await expect(sheet.getByRole("columnheader", { name: "Tax", exact: true })).toBeVisible();
+  await expect(sheet.getByRole("row", { name: "Line 1" })).toContainText("13%");
+  await expect(totals).toContainText("Before tax");
+  await expect(totals).toContainText("Tax 13% · included");
+  await expect(totals).toContainText("13,805.31");
+  await expect(totals).toContainText(/Total with tax\s*CNY 120,000\.00/);
   expect(await accessibilityProblems(page), "the offer's Prices step meets WCAG 2.2 AA").toEqual([]);
 
   // A wrong line: the quantity of line 2 is 0. Nothing is saved; the window opens Prices and says which line.
