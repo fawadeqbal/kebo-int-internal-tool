@@ -213,5 +213,18 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   const q = saved.quotes.find((x: { id: string }) => x.id === offer.id);
   expect(q.reference).toBe(`HS-${deal.tag}`);
   expect(q.lines.map((l: { unitPrice: string }) => Number(l.unitPrice))).toEqual([98000, 4500]);
+
+  // The quotation made before the price changed says so, with the price then and now; Keep these prices takes the
+  // offer as it is now and keeps the customer's prices, and the note goes.
+  const made = (await (await page.request.get(`/api/inquiries/${deal.id}/quotation`)).json()).quotations[0];
+  await page.goto(`/inquiries/${deal.id}/quotations/${made.id}`);
+  const note = page.getByRole("status").filter({ hasText: /changed its offer after this quotation was made/ });
+  await expect(note).toContainText(/4,000\.00 → .*4,500\.00/);
+  expect(await accessibilityProblems(page), "the quotation with its offer changed meets WCAG 2.2 AA").toEqual([]);
+  const before = (await (await page.request.get(`/api/revisions/${made.revisions[0].id}`)).json()).options[0].lines.map((l: { unitPrice: string }) => l.unitPrice);
+  await note.getByRole("button", { name: "Keep these prices" }).click();
+  await expect(note).toHaveCount(0);
+  const after = (await (await page.request.get(`/api/revisions/${made.revisions[0].id}`)).json()).options[0].lines.map((l: { unitPrice: string }) => l.unitPrice);
+  expect(after).toEqual(before);
   expect(errors).toEqual([]);
 });

@@ -79,6 +79,19 @@ export function factoryUnitCostMinor(unitPriceMinor: Minor, taxRate: number | st
 }
 
 /**
+ * What one unit of a supplier's price costs us when we quote on it (canvas "From the supplier offer to the
+ * quotation", change 6): with its tax (factoryUnitCostMinor), less the export VAT refund — `refundPercent` of the
+ * price before tax, never more than the tax itself. 0% (the default): the cost with its tax, as before.
+ */
+export function quoteUnitCostMinor(unitPriceMinor: Minor, taxRate: number | string, taxIncluded = false, refundPercent: number | string = 0): Minor {
+  const cost = factoryUnitCostMinor(unitPriceMinor, taxRate, taxIncluded);
+  const refund = Math.min(Math.max(Number(refundPercent) || 0, 0), Math.max(Number(taxRate) || 0, 0));
+  if (!refund) return cost;
+  const before = cost - factoryTaxMinor(unitPriceMinor, taxRate, taxIncluded);
+  return cost - roundHalfAway((before * refund) / 100);
+}
+
+/**
  * The tax in an amount at a factory's prices: added on top when the prices are
  * without tax (amount × r/100), or the part already inside when tax is
  * included (amount − amount / (1 + r/100)). Exact, rounded half away from zero.

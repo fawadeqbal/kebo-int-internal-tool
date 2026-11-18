@@ -1156,6 +1156,9 @@ model QuoteLine {
   unitCost           Decimal?          @map("unit_cost") @db.Decimal(14, 2)
   factoryQuoteLineId String?           @map("factory_quote_line_id") @db.Uuid
   factoryQuoteLine   FactoryQuoteLine? @relation(fields: [factoryQuoteLineId], references: [id], onDelete: SetNull)
+  /// The supplier's price it was quoted from, in the offer's currency (internal): when the offer's price is no
+  /// longer this, the quotation says the offer changed after it was made.
+  factoryUnitPrice   Decimal?          @map("factory_unit_price") @db.Decimal(14, 2)
   /// Factory currency units per quotation currency unit when the cost was converted.
   fxRate             Decimal?          @map("fx_rate") @db.Decimal(24, 14)
   sortOrder          Int               @default(0) @map("sort_order")

@@ -110,6 +110,16 @@ export const salesSettings = z.object({
   factoryAdvancePercent: z.coerce.number().min(0).max(100).default(30),
   defaultIncoterm: z.enum(INCOTERMS).default("FOB"),
   /**
+   * Days added to a supplier's lead time when a quotation is made from its offer (canvas "From the supplier offer to
+   * the quotation", change 4): our time to book, inspect and truck to the port.
+   */
+  leadSpareDays: z.coerce.number().int("Whole days").min(0, "Cannot be negative").max(180, "At most 180 days").default(7),
+  /**
+   * The export VAT refund we get on what we buy from suppliers, as a % of the price before tax (change 6): taken off
+   * a supplier's tax in what a quotation costs us. 0: no refund (the tax is cost in full).
+   */
+  exportVatRefundPercent: z.coerce.number().min(0, "Cannot be negative").max(100, "Cannot be more than 100%").refine((n) => Math.round(n * 100) === n * 100, "Use at most 2 decimals").default(0),
+  /**
    * New factory offers start with these: prices without tax (the tax % is added on top) or with
    * tax included, and the tax %. 0 unless the factories charge tax (e.g. 13% VAT in China).
    */

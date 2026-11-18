@@ -19,6 +19,9 @@ import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/dec
 import type { SessionUser } from "../../common/auth/session-user";
 import { QuotationsService } from "./quotations.service";
 
+/** Take a changed supplier offer's prices into a draft: priced again at its margins (update), or its prices kept. */
+const offerPricesInput = z.object({ mode: z.enum(["update", "keep"]) });
+
 @ApiTags("quotations")
 @Controller()
 export class QuotationsController {
@@ -115,6 +118,14 @@ export class QuotationsController {
   @RequirePermissions("quotations.manage")
   update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(revisionInput)) body: RevisionInput) {
     return this.quotations.updateRevision(user, id, body);
+  }
+
+  /** { mode: update | keep } — a draft takes its supplier offer's new prices: priced again at its margins, or kept. */
+  @Post("revisions/:id/offer-prices")
+  @HttpCode(200)
+  @RequirePermissions("quotations.manage")
+  offerPrices(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(offerPricesInput)) body: { mode: "update" | "keep" }) {
+    return this.quotations.offerPrices(user, id, body.mode);
   }
 
   @Delete("revisions/:id")

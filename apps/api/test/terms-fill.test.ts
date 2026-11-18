@@ -137,7 +137,7 @@ describe("old records take the terms they were agreed on, once", () => {
     expect(after.agreed).toEqual(before.agreed);
     expect(after.factoryTerms).toEqual(before.factoryTerms);
     const withPort = (bullets: unknown[]) =>
-      bullets.map((b) => (typeof b === "string" ? b.replace("Shipment: by sea,", "Shipment: by sea to Karachi,").replace(/^Shipped\.$/, "Shipped to Karachi.") : b));
+      bullets.map((b) => (typeof b === "string" ? b.replace(/^Shipment: by sea( from [^,]+)?,/, (_m, from: string | undefined) => `Shipment: by sea${from ?? ""} to Karachi,`).replace(/^Shipped( from [^.]+)?\.$/, (_m, from: string | undefined) => `Shipped${from ?? ""} to Karachi.`) : b));
     expect(after.contract).toEqual(withPort(before.contract));
     expect(after.contract).toContain("Delivery: 45 days after the deposit.");
     expect(after.proforma).toEqual(withPort(before.proforma));

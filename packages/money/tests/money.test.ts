@@ -22,6 +22,7 @@ import {
   toMinor,
   withTaxMinor,
   factoryUnitCostMinor,
+  quoteUnitCostMinor,
   factoryTaxMinor,
   orderProfit,
   orderCosting,
@@ -136,6 +137,20 @@ describe("costing", () => {
     expect(factoryUnitCostMinor(100_00, 0, false)).toBe(100_00);
     expect(factoryTaxMinor(100_50, 13)).toBe(13_07); // 113.57 − 100.50
     expect(factoryTaxMinor(302_000_00, 0)).toBe(0);
+  });
+
+  it("costs a supplier price to quote on: with its tax, less the export VAT refund on the price before tax", () => {
+    // No refund: exactly the cost with tax.
+    expect(quoteUnitCostMinor(86_000_00, 13, false)).toBe(97_180_00);
+    expect(quoteUnitCostMinor(86_000_00, 13, false, 0)).toBe(97_180_00);
+    // 13% added, 13% refunded: the price before tax.
+    expect(quoteUnitCostMinor(86_000_00, 13, false, 13)).toBe(86_000_00);
+    // 13% included (113.00 holds 13.00), 9% refunded on the 100.00 before tax: 113.00 − 9.00.
+    expect(quoteUnitCostMinor(113_00, 13, true, 9)).toBe(104_00);
+    // Never more than the tax: a 13% refund on a 9% tax gives back the 9%.
+    expect(quoteUnitCostMinor(100_00, 9, false, 13)).toBe(100_00);
+    // No tax: nothing to refund.
+    expect(quoteUnitCostMinor(100_00, 0, false, 13)).toBe(100_00);
   });
 
   it("costs a factory price with tax included as the price itself, the tax inside shown only", () => {

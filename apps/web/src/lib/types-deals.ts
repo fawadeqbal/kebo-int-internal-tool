@@ -278,6 +278,11 @@ export interface OptionView {
   factoryBasisPlace?: string | null;
   /** People who see costs: what the option's factory gives now, to check the promise against. */
   factoryTerms?: FactoryTerms | null;
+  /** People who see costs: the day the supplier's prices end, and the offer's currency. */
+  factoryValidUntil?: string | null;
+  factoryCurrency?: string | null;
+  /** People who see costs: supplier prices changed after this was quoted (now null: gone from the offer). */
+  offerChanged?: { no: string; description: string; was: string; now: string | null }[];
   gap?: { needed: BasisStep[]; extra: BasisStep[] } | null;
   costs?: BasisCost[];
 }

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, Prisma, toDbDate } from "@kebo/database";
-import { convertMinor, costSummary, documentTotals, factoryUnitCostMinor, fromMinor, fxRate, priceForMargin, toMinor } from "@kebo/money";
+import { convertMinor, costSummary, documentTotals, fromMinor, fxRate, priceForMargin, quoteUnitCostMinor, toMinor } from "@kebo/money";
 import {
   BASIS_STEP_LABEL,
   BASIS_STEPS,
@@ -44,6 +44,7 @@ import {
   type QuotePartRule,
   type SentVia,
   SENT_VIA_TEXT,
+  unpricedItems,
 } from "@kebo/shared";
 import { addDays, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -60,12 +61,16 @@ import { customerSnapshot } from "../orders/buyer";
 import { figuresOf } from "./revision-figures";
 import { CompanyMail } from "../../common/notify/company-mail";
 
+/** Incoterms whose place is at the supplier's end (its works or its port): there the offer's place is ours too. */
+const AT_THE_SUPPLIER = new Set<Incoterm>(["EXW", "FCA", "FAS", "FOB"]);
+
 /** NUMERIC(14,2) can hold up to this; totals above it are refused with a clear message. */
 const MAX_TOTAL_MINOR = 999_999_999_999_99;
 
 /** Lines with what is needed to number them (factory parts, or the customer's item parts). */
 export const numberedLineInclude = {
-  factoryQuoteLine: { select: { parentId: true } },
+  // (Its price now, too: a quotation says when the offer's price changed after it was made.)
+  factoryQuoteLine: { select: { parentId: true, unitPrice: true } },
   requestedItem: { select: { parentId: true } },
 } satisfies Prisma.QuoteLineInclude;
 
@@ -87,6 +92,8 @@ const revisionInclude = {
           warranty: true,
           warrantyMonths: true,
           warrantyFrom: true,
+          // A quotation is never valid longer than the supplier's prices (canvas "From the supplier offer to the quotation").
+          validUntil: true,
         },
       },
       lines: { orderBy: { sortOrder: "asc" }, include: numberedLineInclude },
@@ -120,6 +127,8 @@ export function companySnapshot(s: Settings) {
 export { customerSnapshot };
 
 type Db = Tx | PrismaService["db"];
+/** One supplier offer a quotation can be made from (QuotationsService.offers). */
+type OfferChoice = Awaited<ReturnType<QuotationsService["offers"]>>["offers"][number];
 
 /** A factory offer's terms as facts (design "terms that travel"): see @kebo/shared offerTermsOf. */
 export const factoryTerms = offerTermsOf;
@@ -194,7 +203,7 @@ export class QuotationsService {
       const rate = fxRate(q.currency, currency, sales.currency, sales.exchangeRates);
       const no = lineNumbers(q.lines.map((l) => ({ key: l.id, parentKey: l.parentId })));
       const lines = q.lines.map((l, n) => {
-        const cost = rate ? convertMinor(factoryUnitCostMinor(decimalToMinor(l.unitPrice), Number(l.taxRate), q.taxIncluded), rate) : null;
+        const cost = rate ? convertMinor(quoteUnitCostMinor(decimalToMinor(l.unitPrice), Number(l.taxRate), q.taxIncluded, sales.exportVatRefundPercent), rate) : null;
         return {
           id: l.id,
           no: no[n]!,
@@ -233,8 +242,8 @@ export class QuotationsService {
         ),
         /** No exchange rate for its currency in Settings: costs are unknown. */
         missingRate: rate === null,
-        /** Lines still without a factory price (a line priced in its parts does not count). */
-        unpriced: q.lines.filter((l) => Number(l.unitPrice) === 0 && !q.lines.some((p) => p.parentId === l.id)).length,
+        /** Items still without a supplier price (a part is priced in its item; an item priced in its parts is priced). */
+        unpriced: unpricedItems(q.lines.map((l) => ({ id: l.id, parentId: l.parentId, price: l.unitPrice.toString() }))),
         totalCost: rate === null ? null : fromMinor(lines.reduce((t, l) => t + Math.round((l.costMinor ?? 0) * Number(l.quantity)), 0)),
         lines: lines.map(({ costMinor: _c, ...l }) => l),
       };
@@ -326,6 +335,22 @@ export class QuotationsService {
             factoryBasisPlace: o.factoryBasisPlace,
             /** What the option's factory gives now (its offer's terms), to check the promise against. */
             factoryTerms: o.factoryQuote ? factoryTerms(o.factoryQuote, usualAdvance) : null,
+            /** The day the supplier's prices end (a quotation is never valid longer than them). */
+            factoryValidUntil: o.factoryQuote ? fromDbDateOrNull(o.factoryQuote.validUntil) : null,
+            factoryCurrency: o.factoryQuote?.currency ?? null,
+            /**
+             * The supplier's prices that changed after this was quoted (canvas "From the supplier offer to the quotation",
+             * change 7): each line's price then and now, in the offer's currency (now null: gone from the offer). Lines
+             * quoted before the price was kept say nothing.
+             */
+            offerChanged: o.factoryQuote
+              ? o.lines.flatMap((l, i) => {
+                  if (l.factoryUnitPrice === null) return [];
+                  const now = l.factoryQuoteLine?.unitPrice ?? null;
+                  if (now !== null && now.equals(l.factoryUnitPrice)) return [];
+                  return [{ no: no[i]!, description: l.description.split("\n")[0]!, was: l.factoryUnitPrice.toFixed(2), now: now?.toFixed(2) ?? null }];
+                })
+              : [],
             gap,
             costs: o.costs
               .sort((a, b) => BASIS_STEPS.indexOf(a.step) - BASIS_STEPS.indexOf(b.step))
@@ -517,8 +542,8 @@ export class QuotationsService {
     return {
       number,
       currency: first!.currency,
-      ...first!.terms,
-      options: [this.optionFrom(best, available.items, settings.sales.defaultMarginPercent)],
+      ...this.offerTerms(first!.terms, best),
+      options: [this.optionFrom(best, available.items, settings.sales.defaultMarginPercent, settings.sales.leadSpareDays)],
       from: first!.from,
     };
   }
@@ -567,21 +592,44 @@ export class QuotationsService {
   }
 
   /**
+   * A quotation made from a supplier's offer starts from what the offer says (canvas "From the supplier offer to the
+   * quotation", 19 Nov): the offer's place when we quote its Incoterm at its end (FOB Qingdao, not just FOB); its
+   * warranty (12 months from shipment), so the promise is covered; and never valid longer than its prices (cut at the
+   * offer's last day, while that is still ahead). Everything can still be changed in the draft.
+   */
+  private offerTerms<T extends { incoterm: Incoterm; incotermPlace: string | null; warrantyMonths: number | null; warrantyFrom: string | null; validUntil: ISODate }>(
+    terms: T,
+    offer: OfferChoice | null | undefined,
+  ): T {
+    if (!offer) return terms;
+    const out = { ...terms };
+    if (offer.basis && offer.basis === terms.incoterm && AT_THE_SUPPLIER.has(offer.basis) && offer.basisPlace?.trim()) out.incotermPlace = offer.basisPlace.trim();
+    if (offer.terms.warrantyMonths !== null && offer.terms.warrantyFrom) {
+      out.warrantyMonths = offer.terms.warrantyMonths;
+      out.warrantyFrom = offer.terms.warrantyFrom;
+    }
+    if (offer.validUntil && offer.validUntil >= this.clock.today() && offer.validUntil < out.validUntil) out.validUntil = offer.validUntil as ISODate;
+    return out;
+  }
+
+  /**
    * An option quoting one factory offer: its lines priced at `margin` (on the price) over their cost, and what
    * the factory gives promised to the customer from the same moment (the days can be raised; an older offer's
    * words as they are). Without an offer: the customer's items, to be priced by hand.
    */
   private optionFrom(
-    offer: Awaited<ReturnType<QuotationsService["offers"]>>["offers"][number] | null | undefined,
+    offer: OfferChoice | null | undefined,
     items: { id: string }[],
     margin: number,
+    /** Added to the supplier's days (Settings: leadSpareDays). */
+    spare = 0,
   ): OptionInput {
     if (!offer) return { factoryQuoteId: null, discount: 0, leadTime: null, leadDays: null, leadFrom: null, charges: [], costs: [], prices: items.map((i) => ({ lineId: i.id, unitPrice: 0 })) };
     return {
       factoryQuoteId: offer.factoryQuoteId,
       discount: 0,
       ...(offer.leadDays !== null
-        ? { leadDays: offer.leadDays, leadFrom: offer.leadFrom, leadTime: leadWords(offer.leadDays, offer.leadFrom, "customer") }
+        ? { leadDays: offer.leadDays + spare, leadFrom: offer.leadFrom, leadTime: leadWords(offer.leadDays + spare, offer.leadFrom, "customer") }
         : { leadTime: offer.leadTime }),
       charges: [],
       costs: [],
@@ -618,10 +666,9 @@ export class QuotationsService {
         const offer = offerId ? available.offers.find((o) => o.factoryQuoteId === offerId) : null;
         if (offerId && !offer) throw new DomainError("One of the offers is no longer on this inquiry, or has no items yet. Reload the page.");
         const values: RevisionInput = {
-          ...first.terms,
+          ...this.offerTerms({ ...first.terms, validUntil: input.validUntil }, offer),
           currency: input.currency as Currency,
-          validUntil: input.validUntil,
-          options: [this.optionFrom(offer, available.items, input.margin)],
+          options: [this.optionFrom(offer, available.items, input.margin, settings.sales.leadSpareDays)],
         };
         let q = free.shift() ?? null;
         if (!q) {
@@ -710,7 +757,7 @@ export class QuotationsService {
         basis = { factoryBasis: q.basis, factoryBasisPlace: q.basisPlace };
         const rate = fxRate(q.currency, input.currency, sales.currency, sales.exchangeRates);
         for (const l of q.lines) {
-          const cost = rate ? convertMinor(factoryUnitCostMinor(decimalToMinor(l.unitPrice), Number(l.taxRate), q.taxIncluded), rate) : null;
+          const cost = rate ? convertMinor(quoteUnitCostMinor(decimalToMinor(l.unitPrice), Number(l.taxRate), q.taxIncluded, sales.exportVatRefundPercent), rate) : null;
           lines.push({
             requestedItemId: l.requestedItemId,
             type: "goods",
@@ -721,6 +768,7 @@ export class QuotationsService {
             unitPrice: priceOf(l.id, l.description),
             unitCost: cost === null ? null : fromMinor(cost),
             factoryQuoteLineId: l.id,
+            factoryUnitPrice: l.unitPrice,
             fxRate: rate,
           });
         }
@@ -877,6 +925,40 @@ export class QuotationsService {
       quotation: { id: r.quotation.id, refNo: r.quotation.refNo, letter: r.quotation.letter, inquiryId: r.quotation.inquiryId },
       ...this.view(user, r, items, usual),
     };
+  }
+
+  /**
+   * A draft whose supplier offer changed after it was made (canvas "From the supplier offer to the quotation", change
+   * 7): `update` prices each line again at the margin it had, on the offer's cost now; `keep` keeps its prices on the
+   * offer's cost now (the margin moves). Either way the draft is saved on the offer as it is now, so it says nothing more.
+   */
+  async offerPrices(user: SessionUser, revisionId: string, mode: "update" | "keep") {
+    this.assertCan(user);
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see supplier prices can take an offer's new prices.");
+    const { r } = await this.loadRevision(user, revisionId);
+    if (!isEditable(r.status)) throw new DomainError("Only a draft takes the offer's new prices. Start a new revision to change what the customer has seen.");
+    const input = this.asInput(r);
+    if (mode === "update") {
+      const available = await this.offers(user, r.quotation.inquiryId, r.currency);
+      input.options = input.options.map((o, n) => {
+        const row = r.options[n];
+        const offer = o.factoryQuoteId ? available.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
+        if (!row || !offer) return o;
+        return {
+          ...o,
+          prices: o.prices.map((p) => {
+            const line = row.lines.find((l) => l.factoryQuoteLineId === p.lineId);
+            const now = offer.lines.find((l) => l.id === p.lineId)?.unitCost ?? null;
+            if (!line || line.unitCost === null || now === null || !(Number(line.unitPrice) > 0)) return p;
+            // The margin it had, exactly (on the price), on the cost now.
+            const margin = ((Number(line.unitPrice) - Number(line.unitCost)) / Number(line.unitPrice)) * 100;
+            if (!(margin < 100)) return p;
+            return { ...p, unitPrice: Number(fromMinor(priceForMargin(toMinor(now), margin))) };
+          }),
+        };
+      });
+    }
+    return this.updateRevision(user, revisionId, input);
   }
 
   /** A saved draft as the editor sends it back. */

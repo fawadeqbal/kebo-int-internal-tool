@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment, type ReactNode } from "react";
 import { ChevronRight, Download, Eye, Lock, Send } from "lucide-react";
-import { BASIS_STEP_LABEL, can, PAPER, RECORD_KIND, RECORD_TITLE, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, type BasisStep, type TermsCheck } from "@kebo/shared";
+import { BASIS_STEP_LABEL, can, PAPER, RECORD_KIND, RECORD_TITLE, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, unpricedItems, type BasisStep, type TermsCheck } from "@kebo/shared";
 import { cn } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
@@ -22,7 +22,9 @@ import { AnswerButton } from "@/components/deals/quotation-tab";
 import { CheckChip, checksOf, optionOf, optionTitle, PaymentParts, quoteCount, quotePrices } from "@/components/deals/quote-view";
 import { EditAllWindow, NewRevisionWindow, UrlWindow } from "@/components/deals/quote-windows";
 import { SendWindow, type SendItem } from "@/components/deals/send-quote";
-import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offersAction, reviseAction, saidNoAction, updateRevisionAction } from "../../quotation/actions";
+import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offerPricesAction, offersAction, reviseAction, saidNoAction, updateRevisionAction } from "../../quotation/actions";
+import { ActionForm } from "@/components/common/action-form";
+import { SubmitButton } from "@kebo/ui/client";
 import { inquiryTitle } from "@/lib/titles";
 
 export const generateMetadata = inquiryTitle("Quotation");
@@ -126,6 +128,11 @@ export default async function QuotationOwnPage({
         }
       : { text: REVISION_STATUS_LABEL[r.status], tone: r.status === "accepted" ? "ok" : r.status === "rejected" ? "bad" : "mute" };
   const checks = isDraft ? draftChecks(r) : [];
+  // The supplier's offer changed after this was quoted (people who see costs; not once the customer answered).
+  const changed = isDraft || r.status === "sent" ? r.options.flatMap((opt) => (opt.factory && opt.offerChanged?.length ? [{ opt, lines: opt.offerChanged }] : [])) : [];
+  // A quotation from one offer says when the supplier's prices end, beside its own Valid until.
+  const endOf = r.options.length === 1 ? r.options[0] : null;
+  const ends = endOf?.factory && endOf.factoryValidUntil ? { who: endOf.factory.name, on: endOf.factoryValidUntil } : null;
   const prev = at > 0 ? q.quotations[at - 1] : null;
   const next = at < q.quotations.length - 1 ? q.quotations[at + 1] : null;
 
@@ -246,6 +253,38 @@ export default async function QuotationOwnPage({
         sections: quoteSide({ x, r, here, base, offers: showCosts ? offers : null }),
       }}
     >
+      {changed.map(({ opt, lines }) => (
+        <Notice
+          key={opt.id}
+          tone="todo"
+          title={`${opt.factory!.name} changed its offer after this quotation was made`}
+          action={
+            isDraft && manage ? (
+              <span className="flex flex-wrap gap-2">
+                <ActionForm action={offerPricesAction.bind(null, d.id, r.id, "keep")}>
+                  <SubmitButton variant="secondary" size="sm" pendingText="Saving…">
+                    Keep these prices
+                  </SubmitButton>
+                </ActionForm>
+                <ActionForm action={offerPricesAction.bind(null, d.id, r.id, "update")}>
+                  <SubmitButton variant="secondary" size="sm" pendingText="Updating…">
+                    Update prices
+                  </SubmitButton>
+                </ActionForm>
+              </span>
+            ) : x.canStartRevision && manage ? (
+              <Link href={`${here}?panel=new-revision`} scroll={false} className="text-sm font-semibold text-primary underline underline-offset-2">
+                New revision
+              </Link>
+            ) : null
+          }
+        >
+          {lines
+            .map((l) => `${l.no} ${l.description}: ${money(l.was, opt.factoryCurrency ?? "")} → ${l.now === null ? "gone from the offer" : money(l.now, opt.factoryCurrency ?? "")}`)
+            .join(" · ")}
+          {isDraft ? ". Update prices keeps each item's margin on the new cost; Keep these prices keeps the customer's prices." : ". A sent quotation stays as it is: a new revision takes the new prices."}
+        </Notice>
+      ))}
       {checks.length > 0 && (
         <Notice tone="todo" title={`Before you send R${r.number}`}>
           <ul className={cn(checks.length > 1 && "list-disc pl-4")}>
@@ -268,7 +307,18 @@ export default async function QuotationOwnPage({
                 ],
                 ["Contact", who?.name ?? null],
                 ["Email", who?.email ?? null],
-                ["Valid until", `${date(r.validUntil)}${passed ? ", which has passed" : ""}`],
+                [
+                  "Valid until",
+                  <>
+                    {date(r.validUntil)}
+                    {passed ? ", which has passed" : ""}
+                    {ends && (
+                      <span className="mt-1 block w-fit max-w-full rounded-md bg-surface-2 px-2 py-0.5 text-xs font-semibold text-text-2">
+                        {ends.who}&rsquo;s prices end {date(ends.on)}
+                      </span>
+                    )}
+                  </>,
+                ],
                 ["Sent on", r.sentOn ? `${date(r.sentOn)}${r.sentVia ? ` ${SENT_VIA_TEXT[r.sentVia]}` : ""}` : null],
               ]}
             />
@@ -390,7 +440,8 @@ function draftChecks(r: RevisionView): string[] {
   return r.options.flatMap((o) => {
     const who = many ? `Option ${o.letter}` : "The quotation";
     const out: string[] = [];
-    const unpriced = o.lines.filter((l) => !(Number(l.unitPrice) > 0)).length;
+    // A part is priced in its item; an item priced in its parts is priced (the one rule, unpricedItems).
+    const unpriced = unpricedItems(o.lines.map((l) => ({ id: l.no, parentId: l.no.includes(".") ? l.no.slice(0, l.no.lastIndexOf(".")) : null, price: l.unitPrice })));
     if (unpriced) out.push(`${who}: ${unpriced} item${unpriced === 1 ? "" : "s"} without a price.`);
     if (o.factory && o.coverage.missing.length)
       out.push(`${who} does not include item${o.coverage.missing.length === 1 ? "" : "s"} ${o.coverage.missing.join(", ")}; the customer will see ${o.coverage.missing.length === 1 ? "it" : "them"} missing.`);
@@ -406,6 +457,9 @@ function draftChecks(r: RevisionView): string[] {
       }
     }
     if (o.costing && o.costing.marginPercent !== null && o.costing.marginPercent < 0) out.push(`${who} sells below cost.`);
+    // Never valid longer than the supplier's prices (canvas "From the supplier offer to the quotation").
+    if (o.factory && o.factoryValidUntil && r.validUntil > o.factoryValidUntil)
+      out.push(`${who} is valid until ${date(r.validUntil)}, after ${o.factory.name}'s prices end (${date(o.factoryValidUntil)}).`);
     // What we promise against what the factory gives (people who see costs): lead time, payment, warranty.
     for (const c of checksOf({ ...r, options: [o] }, o)) if (!c.ok) out.push(`${who}: ${c.text}`);
     return out;

@@ -107,10 +107,11 @@ describe("terms in four groups: the supplier offer and the quotation", () => {
     // No parts kept yet: the company's deposit and balance (the form shows them as parts).
     expect(draft.paymentParts).toBeNull();
     expect(draft).toMatchObject({ depositPercent: 30, balanceTerms: "before_shipment" });
-    // The demo company's usual warranty: "Warranty: 12 months from the site acceptance test (SAT), parts and service."
-    expect(draft).toMatchObject({ warrantyMonths: 12, warrantyFrom: "sat", warranty: "parts and service" });
-    // The option promises the factory's days, from the deposit.
-    expect(draft.options[0]).toMatchObject({ factoryQuoteId: offerId, leadDays: 30, leadFrom: "after_payment", leadTime: "30 days after the deposit" });
+    // The warranty's months as the offer gives them (12 from shipment), so the promise is covered; the company's
+    // words for what it covers ("…, parts and service") stay (canvas "From the supplier offer to the quotation").
+    expect(draft).toMatchObject({ warrantyMonths: 12, warrantyFrom: "shipment", warranty: "parts and service" });
+    // The option promises the factory's days plus the company's spare days (Settings: 7), from the deposit.
+    expect(draft.options[0]).toMatchObject({ factoryQuoteId: offerId, leadDays: 37, leadFrom: "after_payment", leadTime: "37 days after the deposit" });
     // What the offer gives, for the checks beside each option.
     const offers = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body;
     expect(offers.offers[0].terms).toMatchObject({ leadDays: 30, leadFrom: "after_payment", warrantyMonths: 12, warrantyFrom: "shipment" });

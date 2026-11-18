@@ -80,9 +80,10 @@ test("the offer and the quotation in four groups; the quotation checked against 
   const part = page.getByRole("dialog", { name: /^Delivery & payment · QUO-\d{4}-\d{4}-A R1/ });
   await expect(part.getByRole("navigation", { name: "Steps" })).toHaveCount(0);
   const leads = part.getByRole("table", { name: "Lead time of each option" });
-  await expect(leads.getByLabel("Option A lead time", { exact: true })).toHaveValue("30");
+  // The supplier's 30 days plus the company's 7 spare days (Settings), so a late supplier is not late for the customer.
+  await expect(leads.getByLabel("Option A lead time", { exact: true })).toHaveValue("37");
   // (On a wide screen the check is in its own column; on a phone under the boxes.)
-  await expect(leads.getByText(/gives 30 days after the deposit · nothing to spare/).filter({ visible: true })).toBeVisible();
+  await expect(leads.getByText(/gives 30 days after the deposit · 7 days to spare/).filter({ visible: true })).toBeVisible();
   await leads.getByLabel("Option A lead time", { exact: true }).fill("25");
   await expect(leads.getByText(/needs 30 days after the deposit: 5 days more than we promise/).filter({ visible: true })).toBeVisible();
   await leads.getByLabel("Option A lead time", { exact: true }).fill("45");
