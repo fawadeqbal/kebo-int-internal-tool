@@ -113,7 +113,7 @@ test("each quotation and each offer has its own page: the lists open them, â€¹ â
   // The offers tab shows each offer's tax, and opens its page.
   await page.getByRole("link", { name: /Supplier offers/ }).last().click();
   await expect(page).toHaveURL((u) => u.pathname === `/inquiries/${deal.id}/sourcing`);
-  await expect(page.getByText("tax incl. 13%", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText("13% tax included", { exact: true }).filter({ visible: true }).first()).toBeVisible();
   // An old link to an offer opened in place lands on its page.
   await page.goto(`/inquiries/${deal.id}/quotation?q=${a!.id}`);
   await expect(page).toHaveURL((u) => u.pathname === `/inquiries/${deal.id}/quotations/${a!.id}`);
