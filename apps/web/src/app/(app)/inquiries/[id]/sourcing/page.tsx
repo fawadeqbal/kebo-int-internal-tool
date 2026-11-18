@@ -2,12 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, Columns3, Factory, List } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { Alert, Badge, Card, CardHeader, cn, EmptyState } from "@kebo/ui";
+import { Alert, Badge, cn, EmptyState } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { dayMonth, money, plural, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
-import { ViewSwitch } from "@/components/common/view-switch";
+import { TabList } from "@/components/lists/tab-list";
 import { offerFigures, OfferCompare, offerLine } from "@/components/deals/offer-list";
 import { optional } from "@/components/print/data";
 import { coverOf } from "@/components/deals/offer-facts";
@@ -162,29 +162,28 @@ export default async function SourcingPage({
   return (
     <WithSide id={id}>
       {notice}
-      <Card className="overflow-clip">
-        <CardHeader
-          title="Supplier offers"
-          description={summary}
-          actions={
-            // A phone: the row would wrap, so each goes full width (design rules 4); the switch's halves share it.
-            <span className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:flex-col max-sm:items-stretch max-sm:*:w-full max-sm:[&>nav>a]:flex-1 max-sm:[&>nav>a]:justify-center sm:justify-end">
-              {priced > 1 && (
-                <ViewSwitch
-                  label="Show the offers as"
-                  compact="sm"
-                  current={compare ? "compare" : "list"}
-                  views={[
-                    { key: "list", label: "List", icon: <List aria-hidden className="size-4" />, href: base },
-                    { key: "compare", label: "Compare", icon: <Columns3 aria-hidden className="size-4" />, href: `${base}?view=compare` },
-                  ]}
-                />
-              )}
-              {firstAsk?.button}
-              {addOffer({ variant: "secondary", size: "sm", label: "New supplier offer", open: sp.add === "1" })}
-            </span>
-          }
-        />
+      <TabList
+        title="Supplier offers"
+        summary={summary}
+        views={
+          priced > 1
+            ? {
+                label: "Show the offers as",
+                current: compare ? "compare" : "list",
+                options: [
+                  { key: "list", label: "List", icon: <List aria-hidden className="size-4" />, href: base },
+                  { key: "compare", label: "Compare", icon: <Columns3 aria-hidden className="size-4" />, href: `${base}?view=compare` },
+                ],
+              }
+            : null
+        }
+        buttons={
+          <>
+            {firstAsk?.button}
+            {addOffer({ variant: "secondary", size: "sm", label: "New supplier offer", open: sp.add === "1" })}
+          </>
+        }
+      >
         {asked === 0 ? (
           <NoOffers items={s.items} />
         ) : compare && priced > 1 ? (
@@ -305,7 +304,7 @@ export default async function SourcingPage({
             </div>
           </>
         )}
-      </Card>
+      </TabList>
     </WithSide>
   );
 }
