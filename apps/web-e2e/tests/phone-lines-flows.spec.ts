@@ -107,7 +107,9 @@ test("inquiry items on a phone: a list, Add & next, a tap opens the item's sheet
   // The item's sheet: headed by the item, Edit first, Add a part (with the number it gets); Delete, then Undo.
   await list.getByRole("button", { name: /^Item 2 Blister packing machine/ }).click();
   const sheet = page.getByRole("menu", { name: "Item 2" });
-  await expect(sheet).toContainText("2 · Blister packing machine");
+  // Its head (the item) with ✕ beside it, above the menu.
+  await expect(page.getByText("2 · Blister packing machine")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Close", exact: true }).last()).toBeVisible();
   await expect(sheet.getByRole("menuitem", { name: /^Add a part/ })).toContainText("2.1");
   await expect(sheet.getByRole("menuitem", { name: "Edit" })).toBeVisible();
   expect(await accessibilityProblems(page), "an item's sheet meets WCAG 2.2 AA").toEqual([]);
@@ -140,7 +142,7 @@ test("inquiry items on a phone: a list, Add & next, a tap opens the item's sheet
   expect(errors).toEqual([]);
 });
 
-test("offer lines on a phone: what a line still needs is marked and can be shown alone; the price typed in its window", async ({ page }) => {
+test("offer lines on a phone: what a line still needs is marked and can be shown alone; the price typed in its line", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   const t = tag();
@@ -158,20 +160,24 @@ test("offer lines on a phone: what a line still needs is marked and can be shown
   await page.getByRole("button", { name: "Edit prices" }).click();
   const win = page.getByRole("dialog", { name: "Edit prices" });
   const list = win.getByRole("list", { name: "Items" });
-  await expect(list.getByRole("button", { name: /^Item 2 Punches and dies/ })).toContainText("No price");
+  // The price is typed right in the line (asked 19 Nov): an item without one has an empty, marked box.
+  const box = list.getByLabel("Unit price CNY for 2");
+  await expect(box).toHaveValue("");
+  await expect(list.getByLabel("Unit price CNY for 1")).toHaveValue("98,000.00");
   // What is missing, said once: the chip says it (No price), only while an item needs something.
   const chips = win.getByRole("group", { name: "Show items" });
   await chips.getByRole("button", { name: /^No price/ }).click();
   await expect(list.getByRole("button")).toHaveCount(1);
-  await list.getByRole("button", { name: /^Item 2 Punches and dies/ }).click();
-  await page.getByRole("menu", { name: "Item 2" }).getByRole("menuitem", { name: "Edit" }).click();
-  const line = page.getByRole("dialog", { name: "Item 2" });
-  await line.getByLabel("Unit price CNY").fill("4500");
-  await line.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(line).toBeHidden();
+  await box.click();
+  await box.pressSequentially("4500");
+  await box.press("Enter");
   // Nothing needs anything now: the filter goes, every line shows.
   await expect(chips).toHaveCount(0);
-  await expect(list.getByRole("button", { name: /^Item 2 Punches and dies/ })).toContainText(/4,?500/);
+  await expect(list.getByLabel("Unit price CNY for 2")).toHaveValue(/4,?500/);
+  // The line's sheet still has Edit (the whole item in its window).
+  await list.getByRole("button", { name: /^Item 2 Punches and dies/ }).click();
+  await expect(page.getByRole("menu", { name: "Item 2" }).getByRole("menuitem", { name: "Edit" })).toBeVisible();
+  await page.keyboard.press("Escape");
   // A change asks why (design rules 18 Nov), then the save counts it.
   await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Supplier changed its price" }).click();
   await win.getByRole("button", { name: "Save 1 change" }).click();
@@ -307,7 +313,7 @@ test.describe("the smallest phone (320 × 568)", () => {
     await page.goto(`/inquiries/${deal.id}/offers/${offer.id}?panel=edit-offer&id=prices`);
     const win = page.getByRole("dialog", { name: "Edit prices" });
     const list = win.getByRole("list", { name: "Items" });
-    await expect(list.getByRole("button", { name: /^Item 1 Tablet press/ })).toContainText("98,000.00");
+    await expect(list.getByLabel("Unit price CNY for 1")).toHaveValue("98,000.00");
     // One line of tools: Find (it says how many), +, ⋯; no Add item bar and no Copy button in the way.
     await expect(win.getByRole("searchbox", { name: "Find an item" })).toHaveAttribute("placeholder", "Find in 1 item");
     await expect(win.getByRole("button", { name: "Add item", exact: true })).toBeVisible();
@@ -354,6 +360,8 @@ test.describe("the smallest phone (320 × 568)", () => {
     // Deleting ends Select: Find · + · ⋯ are back.
     await expect(list.getByRole("button")).toHaveCount(2);
     await expect(win.getByRole("searchbox", { name: "Find an item" })).toBeVisible();
+    // (The list back at its top: a price box half under the sticky tools is not a target to judge.)
+    await list.getByLabel("Unit price CNY for 1").scrollIntoViewIfNeeded();
     expect(await accessibilityProblems(page), "the items list on the smallest phone meets WCAG 2.2 AA").toEqual([]);
     expect(errors).toEqual([]);
   });

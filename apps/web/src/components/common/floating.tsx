@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { cn } from "@kebo/ui";
+import { X } from "lucide-react";
+import { Button, cn } from "@kebo/ui";
 
 type Anchor = () => HTMLElement | null;
 
@@ -181,20 +182,28 @@ export function FloatingMenu({
           onClick={onClose}
           tabIndex={-1}
         />
-        <div
-          ref={panel}
-          role="menu"
-          aria-label={label}
-          onKeyDown={keys}
-          className={cn(
-            "relative flex max-h-[80dvh] flex-col overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base [&_[role=menuitemradio]]:min-h-12 [&_[role=menuitemradio]]:text-base",
-            HIDE_EMPTY,
-          )}
-        >
-          <span className="mx-auto mb-1 h-1 w-10 rounded-full bg-line-strong" aria-hidden />
-          {header ?? <p className="px-2.5 pt-1 pb-2 text-xs font-medium text-muted">{label}</p>}
-          {children}
-          {emptyNote}
+        {/* The sheet: its name (or header) with ✕ on the right (asked 19 Nov: a sheet closes from its own ✕ too,
+            not only by a tap beside it), then its items. */}
+        <div onKeyDown={keys} className="relative flex max-h-[80dvh] flex-col rounded-t-2xl border-t border-line bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop">
+          <span className="mx-auto mt-2 mb-1 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
+          <div className="flex shrink-0 items-start gap-1 pr-1.5 pl-2">
+            <div className="min-w-0 flex-1">{header ?? <p className="px-2.5 pt-1 pb-2 text-xs font-medium text-muted">{label}</p>}</div>
+            <Button type="button" size="icon-sm" variant="ghost" onClick={onClose} aria-label="Close" className="mt-0.5">
+              <X aria-hidden />
+            </Button>
+          </div>
+          <div
+            ref={panel}
+            role="menu"
+            aria-label={label}
+            className={cn(
+              "flex min-h-0 flex-col overflow-y-auto px-2 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base [&_[role=menuitemradio]]:min-h-12 [&_[role=menuitemradio]]:text-base",
+              HIDE_EMPTY,
+            )}
+          >
+            {children}
+            {emptyNote}
+          </div>
         </div>
       </div>,
       document.body,
