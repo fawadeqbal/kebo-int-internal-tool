@@ -4,7 +4,7 @@ import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "re
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
-import { ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted } from "@/components/common/dialog";
+import { FIT_VIEW, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
 import { FloatingMenu } from "@/components/common/floating";
 import { UNITS } from "./units";
@@ -428,7 +428,7 @@ export function LineWindow({
         e.stopPropagation();
         close();
       }}
-      className="fixed inset-0 z-[100] flex animate-in flex-col bg-surface"
+      className={cn("fixed inset-0 z-[100] flex animate-in flex-col bg-surface", FIT_VIEW)}
     >
       <div className="flex min-h-15 items-center gap-1.5 border-b border-line py-1.5 pr-4 pl-1">
         <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={close} disabled={busy} className="size-11 rounded-full [&_svg]:size-[22px]">

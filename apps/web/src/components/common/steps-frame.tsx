@@ -90,7 +90,7 @@ export function StepsFrame<K extends string>({
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Phone: a thin bar of the steps, the step's name with where it is, and what comes next (a screen reader
           hears the same from the step's title). */}
-      <div aria-hidden className="border-b border-line px-4 pt-2.5 pb-3 md:hidden">
+      <div aria-hidden className="kb-tight border-b border-line px-4 pt-2.5 pb-3 md:hidden">
         <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }} aria-hidden>
           {steps.map((s, k) => (
             <span key={s.key} className={cn("h-[3px] rounded-full", k < i ? "bg-text-2/70" : k === i ? "bg-text" : "bg-line")} />
@@ -103,7 +103,7 @@ export function StepsFrame<K extends string>({
               {i + 1} of {steps.length}
             </span>
           </span>
-          {next && <span className="truncate text-xs text-text-2">Next: {next.label}</span>}
+          {next && <span className="kb-hide truncate text-xs text-text-2">Next: {next.label}</span>}
         </p>
       </div>
       {/* The side bar stays put and runs to the bottom; only the step's own fields scroll (asked 17 Nov). */}

@@ -104,3 +104,20 @@
     display: none;
   }
 }
+
+/* Typing on a phone (KeyboardWatch, design 18 Nov): with the keyboard up a tall box gets shorter, so the window's
+   title, the box being typed in and the buttons all fit above the keyboard; the steps bar drops its "Next:" line. */
+@media (width < 48rem) {
+  :root[data-keyboard="open"] [role="dialog"] textarea {
+    min-height: 0;
+    max-height: max(5.5rem, calc(var(--vvh, 100dvh) * 0.28));
+    overflow-y: auto;
+  }
+  :root[data-keyboard="open"] .kb-hide {
+    display: none;
+  }
+  :root[data-keyboard="open"] .kb-tight {
+    padding-top: 0.375rem;
+    padding-bottom: 0.5rem;
+  }
+}

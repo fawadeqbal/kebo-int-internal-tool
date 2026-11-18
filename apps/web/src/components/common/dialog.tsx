@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Trash2, X } from "lucide-react";
-import { Button } from "@kebo/ui";
+import { Button, cn } from "@kebo/ui";
 import { lockScroll } from "@/lib/scroll-lock";
 import { useChanges, watchChanges } from "./changes";
 
@@ -116,7 +116,7 @@ export function ConfirmDialog({
   }, [mounted]);
   if (!mounted) return null;
   return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-center p-4" data-layer>
+    <div className={cn("fixed inset-0 z-[100] grid place-items-center p-4", FIT_VIEW)} data-layer>
       {/* The dim backdrop: a click on it is the way back (the keyboard has Escape and the button). */}
       <div aria-hidden className="absolute inset-0 bg-black/40" onClick={() => !busy && onCancel()} />
       <div
@@ -183,7 +183,7 @@ export function ThrowAwayConfirm({ what, lost, onKeep, onThrow }: { what?: React
   const title = lost?.title ?? (lines.length > 1 ? "Discard your changes?" : "Discard your change?");
   const text = lost?.text ?? (what ? <>What you changed in &ldquo;{what}&rdquo; isn’t saved yet.</> : "It isn’t saved yet.");
   return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-center p-4 max-sm:items-end max-sm:p-0" data-layer>
+    <div className={cn("fixed inset-0 z-[100] grid place-items-center p-4 max-sm:items-end max-sm:p-0", FIT_VIEW)} data-layer>
       <div aria-hidden className="absolute inset-0 bg-black/40" onClick={onKeep} />
       <div
         ref={box}
@@ -284,9 +284,14 @@ export function useBackGuard(handle: () => void, wants: () => boolean) {
  * Tablet and up: a window in the middle of the screen, as tall as its content (88% of the screen at most),
  * its width chosen for its form; a phone: the whole screen. Title and one line under it, ✕ on the right.
  */
-export const WINDOW_LAYER = "fixed inset-0 flex md:items-start md:justify-center md:overflow-y-auto md:px-6 md:py-[6vh]";
+/**
+ * On a phone a full-screen layer covers only the screen above the keyboard (KeyboardWatch keeps --vvh and --vvt),
+ * so a window's title stays on top and its buttons sit right on the keyboard. Without a keyboard: the whole screen.
+ */
+export const FIT_VIEW = "max-md:bottom-auto max-md:top-[var(--vvt,0px)] max-md:h-[var(--vvh,100dvh)]";
+export const WINDOW_LAYER = "fixed inset-0 flex max-md:bottom-auto max-md:top-[var(--vvt,0px)] max-md:h-[var(--vvh,100dvh)] md:items-start md:justify-center md:overflow-y-auto md:px-6 md:py-[6vh]";
 export const WINDOW_BOX =
-  "relative flex h-dvh w-full animate-in flex-col bg-surface shadow-pop md:h-auto md:max-h-[88vh] md:max-w-[calc(100vw-3rem)] md:overflow-hidden md:rounded-2xl md:border md:border-line";
+  "relative flex h-full w-full animate-in flex-col bg-surface shadow-pop md:h-auto md:max-h-[88vh] md:max-w-[calc(100vw-3rem)] md:overflow-hidden md:rounded-2xl md:border md:border-line";
 
 export function WindowHead({
   id,
