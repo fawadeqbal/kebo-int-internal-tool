@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { lineNumbers } from "@kebo/shared";
 import { Alert, Button } from "@kebo/ui";
-import { PanelActions, PanelBody, useClosePanel, useReportDirty } from "@/components/common/panel";
+import { PanelActions, PanelBody, useReportDirty } from "@/components/common/panel";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineTableProps, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { insertLines, moveLine, removeLine } from "@/components/lines/local-lines";
 import type { EditCard, EditRef } from "@/lib/types-edits";
@@ -247,7 +247,6 @@ export function BatchLines({
   /** The table takes the window's height: its tools and head stay, only the items scroll (default). */
   fill?: boolean;
 } & Omit<LineTableProps, "rows" | "columns" | "onAdd" | "onEdit" | "onRemove" | "onMove" | "footer" | "readOnly">) {
-  const close = useClosePanel();
   const { save, dialog, busy, error, setError } = useEditSave({ edit, card });
   const { rows, local, diff, dirty, run: send, askWhy, add } = useBatchLines({ rows: saved, columns, plain, askOnAdd });
   const run = (reason?: string) => send(handlers, reason);
@@ -270,9 +269,6 @@ export function BatchLines({
           }}
         >
           {busy ? "Saving…" : saveLabel}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => close()} disabled={busy}>
-          Cancel
         </Button>
         <span className="text-xs text-muted">
           {count ? `${count} change${count === 1 ? "" : "s"} not saved yet${askWhy ? " · Save asks why" : ""}` : "Nothing changed yet"}

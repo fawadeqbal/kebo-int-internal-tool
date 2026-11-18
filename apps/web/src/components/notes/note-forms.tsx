@@ -10,7 +10,7 @@ import { followUpReopenAction, removeFollowUpAction, removeNoteAction } from "@/
 import Link from "next/link";
 import { ActionForm } from "@/components/common/action-form";
 import { Modal } from "@/components/common/dialog";
-import { PANEL_FORM, PanelActions, PanelBody, PanelSection, useClosePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelSection, useClosePanel, WindowCancel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { NOTE_ICON } from "./kinds";
 import { useTime } from "@/lib/time-client";
@@ -176,9 +176,6 @@ export function FollowUpForm({
               <SubmitButton size="sm" pendingText="Adding…">
                 Add the follow-up
               </SubmitButton>
-              <Button type="button" size="sm" variant="ghost" onClick={close}>
-                Cancel
-              </Button>
             </PanelActions>
           </>
         )}
@@ -394,9 +391,7 @@ export function FollowUpFields({
           )}
           {/* In its window: Cancel and save at the bottom right, like every window. */}
           <div className="col-span-2 flex flex-wrap items-center justify-end gap-3 border-t border-line pt-4 sm:col-span-3">
-            <Button type="button" variant="ghost" onClick={() => closePanel()}>
-              Cancel
-            </Button>
+            <WindowCancel />
             <SubmitButton pendingText="Saving…">
               <Check aria-hidden />
               {submit}

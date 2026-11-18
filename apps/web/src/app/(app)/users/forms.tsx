@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Button, Field, Input, Select } from "@kebo/ui";
+import { Field, Input, Select } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { RoleRow } from "@/lib/types-people";
 
@@ -38,17 +38,13 @@ function RoleField({ value, roles, error, disabled }: { value: string; roles: Ro
 
 /** A user form in the side panel: its groups, then Save / Cancel pinned at the bottom. */
 function PanelForm({ action, onSaved, save, pending, children }: { action: Action; onSaved: (s: ActionState) => void; save: string; pending: string; children: (s: ActionState) => ReactNode }) {
-  const close = useClosePanel();
   return (
     <ActionForm action={action} onDone={onSaved} showSuccess={false} className="flex min-h-0 flex-1 flex-col">
       {(s) => (
         <PanelBody className={PANEL_FORM}>
           {children(s)}
-          <PanelActions className="max-md:[&>button:first-child]:flex-1">
+          <PanelActions>
             <SubmitButton pendingText={pending}>{save}</SubmitButton>
-            <Button variant="ghost" onClick={close} className="max-md:hidden">
-              Cancel
-            </Button>
             <PanelKeys />
           </PanelActions>
         </PanelBody>

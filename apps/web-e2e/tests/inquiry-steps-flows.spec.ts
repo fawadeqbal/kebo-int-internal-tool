@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { accessibilityProblems, watchErrors } from "./check";
+import { accessibilityProblems, watchErrors, answerWhy } from "./check";
 
 /**
  * Design "RFQ Desk — quote options" (17 Nov 2026): the inquiry's window in steps, Customer · Items ·
@@ -49,10 +49,9 @@ test("the Items card's Edit opens only the items; nothing changed is nothing to 
   await page.keyboard.press("Enter");
   await page.getByLabel("Item 2: Quantity").fill("0");
   await page.keyboard.press("Enter");
-  await expect(win.getByRole("button", { name: "Save 1 change" })).toBeDisabled();
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Other…" }).click();
-  await win.getByRole("textbox", { name: "Why, in your words" }).fill("The customer wants three sets");
+  await expect(win.getByRole("button", { name: "Save 1 change" })).toBeEnabled();
   await win.getByRole("button", { name: "Save 1 change" }).click();
+  await answerWhy(page, "Other…", "The customer wants three sets");
   await expect(win.getByRole("alert").filter({ hasText: "Fix this item" })).toContainText("Item 2:");
   const before = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
   expect(before.items.map((i: { quantity: string }) => Number(i.quantity))).toEqual([1, 2]);
@@ -98,8 +97,8 @@ test("the Overview is the client's request in its window's parts, each part's Ed
   await win.locator("#title").fill("Tablet press line");
   // The change is marked, and why is asked once.
   await expect(win.getByText(/Changed · was/)).toBeVisible();
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Typed wrong" }).click();
   await win.getByRole("button", { name: "Save 1 change" }).click();
+  await answerWhy(page, "Typed wrong");
   await expect(win).toBeHidden();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Tablet press line");
 
@@ -270,9 +269,9 @@ test("Edit inquiry (⋯): every part, then Changes — old → new with Undo —
   // Undo one: it is as it was, and the count follows.
   await list.getByRole("button", { name: "Undo: Priority" }).click();
   await expect(list).not.toContainText("Priority");
-  await expect(win.getByRole("button", { name: "Save 1 change" })).toBeDisabled();
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Customer asked for it" }).click();
+  await expect(win.getByRole("button", { name: "Save 1 change" })).toBeEnabled();
   await win.getByRole("button", { name: "Save 1 change" }).click();
+  await answerWhy(page, "Customer asked for it");
   await expect(win).toBeHidden();
   const saved = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
   expect([saved.channel, saved.priority]).toEqual(["whatsapp", "normal"]);
@@ -287,8 +286,8 @@ test("history: each box's clock shows only its changes with who, when and why; a
   await page.goto(`/inquiries/${deal.id}?panel=edit-request&id=customer`);
   const win = page.getByRole("dialog", { name: "Edit customer" });
   await win.getByRole("radiogroup", { name: "Came by" }).getByRole("radio", { name: "WhatsApp" }).click();
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Customer asked for it" }).click();
   await win.getByRole("button", { name: "Save 1 change" }).click();
+  await answerWhy(page, "Customer asked for it");
   await expect(win).toBeHidden();
   // Customer's clock: the change, old → new, why; then where it started. Details' clock: only its start.
   await page.getByRole("region", { name: "Customer" }).getByRole("button", { name: "History of customer" }).click();
@@ -307,8 +306,8 @@ test("history: each box's clock shows only its changes with who, when and why; a
   await page.keyboard.press("Enter");
   await page.getByLabel("Item 2: Quantity").fill("3");
   await page.keyboard.press("Enter");
-  await items.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Customer changed the quantity" }).click();
   await items.getByRole("button", { name: "Save 1 change" }).click();
+  await answerWhy(page, "Customer changed the quantity");
   await expect(items).toBeHidden();
   await page.locator("#items").getByRole("button", { name: "History of item 2" }).click();
   await expect(page.getByRole("dialog", { name: "Item 2 · history" })).toContainText("Quantity 2 → 3");

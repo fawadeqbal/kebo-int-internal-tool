@@ -7,7 +7,7 @@ import { Button, Field, Input } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useClosePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
 import { checkDomainAction, connectDomainAction, removeDomainAction } from "./actions";
 
 /** "+ Connect a domain" in the card's header, and the window it opens (?panel=own-domain). */
@@ -30,7 +30,6 @@ export function ConnectDomain({ ours }: { ours: string }) {
 }
 
 function ConnectForm({ ours, onSaved }: { ours: string; onSaved: () => void }) {
-  const close = useClosePanel();
   const [domain, setDomain] = useState("");
   const shown = domain.trim() || "Your domain";
   return (
@@ -64,9 +63,6 @@ function ConnectForm({ ours, onSaved }: { ours: string; onSaved: () => void }) {
           />
           <PanelActions>
             <SubmitButton pendingText="Checking…">Continue</SubmitButton>
-            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
-              Cancel
-            </button>
             <PanelKeys />
           </PanelActions>
         </>

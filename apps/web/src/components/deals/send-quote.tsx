@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Mail } from "lucide-react";
 import { SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type SentVia } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelBody, PanelFooter, useClosePanel, WhatHappens } from "@/components/common/panel";
@@ -194,9 +194,6 @@ export function SendWindow({
                 }
               />
               <PanelFooter>
-                <Button type="button" variant="ghost" onClick={() => close()}>
-                  Cancel
-                </Button>
                 <SubmitButton pendingText="Sending…">
                   <Mail aria-hidden /> {many ? `Send ${chosen.length}` : "Send email"}
                 </SubmitButton>
@@ -235,9 +232,6 @@ export function SendWindow({
                 ]}
               />
               <PanelFooter>
-                <Button type="button" variant="ghost" onClick={() => close()}>
-                  Cancel
-                </Button>
                 <SubmitButton pendingText="Saving…">
                   <Check aria-hidden /> {many ? `Mark ${chosen.length} as sent` : `Mark R${number} as sent`}
                 </SubmitButton>

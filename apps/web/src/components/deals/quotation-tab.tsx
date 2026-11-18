@@ -267,9 +267,6 @@ function NewQuotationsForm({
             </fieldset>
 
             <PanelFooter>
-              <Button type="button" variant="ghost" onClick={() => close()}>
-                Cancel
-              </Button>
               <SubmitButton pendingText="Making…" disabled={!ticked.length || !marginOk}>
                 <Check aria-hidden /> {ticked.length === 1 ? "Make the draft" : `Make ${ticked.length || ""} drafts`}
               </SubmitButton>
@@ -409,9 +406,6 @@ function SaidNoForm({ action, today, number, othersWaiting }: { action: Action; 
               ]}
             />
             <PanelFooter>
-              <Button type="button" variant="ghost" onClick={() => close()}>
-                Cancel
-              </Button>
               <SubmitButton variant={closeDeal ? "danger" : "primary"} pendingText="Saving…">
                 {closeDeal ? "Mark as lost" : `Mark R${number} rejected`}
               </SubmitButton>

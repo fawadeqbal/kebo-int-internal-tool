@@ -309,8 +309,10 @@ export function WindowHead({
   headRef?: RefObject<HTMLHeadingElement | null>;
 }) {
   return (
-    // A window closes with ✕ (design rules 18 Nov): on the right on a laptop, at the top left on a phone (the form fills the screen).
-    <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 max-md:min-h-14 max-md:items-center max-md:justify-start max-md:gap-1 max-md:py-1.5 max-md:pr-4 max-md:pl-1 sm:px-6">
+    // A window closes with ✕ on the right on a laptop. On a phone (the form fills the screen) its Cancel beside Save
+    // does it, and the ✕ steps aside (canvas row "Cancel, not ✕", globals.css); a window without a Cancel keeps it,
+    // at the top left.
+    <div data-window-head="" className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 max-md:min-h-14 max-md:items-center max-md:justify-start max-md:gap-1 max-md:py-1.5 max-md:pr-4 max-md:pl-1 sm:px-6">
       <div className="min-w-0 max-md:order-2 max-md:flex-1">
         <h2 id={`${id}-title`} ref={headRef} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none max-md:line-clamp-2 max-md:text-base max-md:leading-snug">
           {title}
@@ -321,7 +323,7 @@ export function WindowHead({
           </p>
         )}
       </div>
-      <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled} className="max-md:order-1 max-md:size-11 max-md:rounded-full max-md:[&_svg]:size-[22px]">
+      <Button data-window-x="" size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled} className="max-md:order-1 max-md:size-11 max-md:rounded-full max-md:[&_svg]:size-[22px]">
         <X aria-hidden />
       </Button>
     </div>
@@ -347,6 +349,7 @@ export function Modal({
   onClose,
   busy,
   size = "md",
+  cancel = true,
 }: {
   title: ReactNode;
   sub?: ReactNode;
@@ -355,6 +358,8 @@ export function Modal({
   onClose: () => void;
   busy?: boolean;
   size?: "md" | "lg";
+  /** Cancel first in its footer (false: the footer already says how to leave). */
+  cancel?: boolean;
 }) {
   const id = useId();
   const box = useRef<HTMLDivElement>(null);
@@ -390,7 +395,16 @@ export function Modal({
       >
         <WindowHead id={id} title={title} description={sub} onClose={close} disabled={busy} />
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 *:shrink-0 sm:px-6">{children}</div>
-        {footer && <div className={WINDOW_FOOTER}>{footer}</div>}
+        {footer && (
+          <div className={cn(WINDOW_FOOTER, "max-md:[&>button]:min-h-12 max-md:[&>button]:flex-1")}>
+            {cancel && (
+              <Button type="button" variant="secondary" data-window-cancel="" onClick={close} disabled={busy}>
+                Cancel
+              </Button>
+            )}
+            {footer}
+          </div>
+        )}
       </div>
       {asking && (
         <ThrowAwayConfirm

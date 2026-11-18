@@ -3,10 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { lockScroll } from "@/lib/scroll-lock";
-import { Button, ButtonLink, cn } from "@kebo/ui";
+import { ButtonLink, cn } from "@kebo/ui";
 import { useChanges, watchChanges } from "./changes";
 import { focusables, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
-import { PanelCloseProvider, PanelFooter, useClosePanel } from "./panel";
+import { PanelCloseProvider, PanelFooter } from "./panel";
 
 /** Inside a RouteWindow: called by a form once it saved, to close the window (back to the page under it). */
 const WindowDone = createContext<(() => void) | null>(null);
@@ -110,16 +110,8 @@ export function RouteWindow({
  */
 export function FormButtons({ children, cancelHref }: { children: ReactNode; cancelHref?: string }) {
   const inWindow = useWindowDone() !== null;
-  const close = useClosePanel();
   if (inWindow)
-    return (
-      <PanelFooter>
-        <Button type="button" variant="ghost" onClick={() => close()}>
-          Cancel
-        </Button>
-        {children}
-      </PanelFooter>
-    );
+    return <PanelFooter>{children}</PanelFooter>;
   return (
     <div className="flex flex-wrap justify-end gap-3">
       {cancelHref && (

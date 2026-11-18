@@ -126,9 +126,10 @@ export function ReasonDialog({
       sub={sub}
       onClose={onCancel}
       busy={busy}
+      cancel={false}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
+          <Button type="button" variant="secondary" data-window-cancel="" onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </Button>
           <Button type="button" disabled={!reason || busy} onClick={() => onSave(reason)}>

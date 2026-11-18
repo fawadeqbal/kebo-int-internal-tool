@@ -13,7 +13,6 @@ import {
   PanelKeys,
   PanelSection,
   SidePanel,
-  useClosePanel,
   useSidePanel,
 } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
@@ -92,7 +91,6 @@ function PanelForm({
   onSaved: () => void;
   danger?: boolean;
 }) {
-  const close = useClosePanel();
   return (
     <ActionForm
       action={action}
@@ -115,9 +113,6 @@ function PanelForm({
             <SubmitButton variant={danger ? "danger" : "primary"} pendingText="Saving…">
               {submit}
             </SubmitButton>
-            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
-              Cancel
-            </button>
             <PanelKeys />
           </PanelActions>
         </>

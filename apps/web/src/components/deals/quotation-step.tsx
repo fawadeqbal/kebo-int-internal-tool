@@ -289,9 +289,6 @@ export function AcceptForm({
             )}
           </PanelBody>
           <PanelActions className="static mx-0 mb-0 justify-end">
-            <Button variant="ghost" onClick={close}>
-              Cancel
-            </Button>
             <SubmitButton pendingText="Saving…" disabled={!optionId}>
               <Check aria-hidden /> Accept and make the order
             </SubmitButton>
@@ -322,9 +319,6 @@ export function ExpiredForm({ action, today, number }: { action: Action; today: 
             </Field>
             <WhatHappens lines={[<>R{number} is marked <strong>Expired</strong>.</>, "The inquiry stays open.", `“Do next” becomes “Start R${number + 1} from R${number}”.`]} />
             <PanelFooter>
-              <Button type="button" variant="ghost" onClick={() => close()}>
-                Cancel
-              </Button>
               <SubmitButton pendingText="Saving…">
                 Mark R{number} expired
               </SubmitButton>

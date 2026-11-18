@@ -24,10 +24,10 @@ import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
-import { FooterTotal, PANEL_FORM, PanelSection, useReportDirty, useReportLost } from "@/components/common/panel";
+import { FooterTotal, PANEL_FORM, PanelSection, useReportDirty, useReportLost, WindowCancel } from "@/components/common/panel";
 import { StepsFrame } from "@/components/common/steps-frame";
 import { ChoiceChips } from "@/components/common/choice-chips";
-import { ReasonChips } from "@/components/edits/reason-chips";
+import { ReasonSheet } from "@/components/edits/reason-chips";
 import { date, money } from "@/lib/format";
 import { Facts, ReviewBox } from "./deal-form";
 import {
@@ -689,7 +689,10 @@ export function OfferHeaderForm({
       : fieldChanges.filter((c) => c.part === k).length + (k === "prices" ? linesChanges.length : 0) + (k === "factory" ? filesAdded.length : 0);
   const [why, setWhy] = useState("");
   const needWhy = !create && total > 0;
-  const canSave = create || (total > 0 && !!why.trim());
+  // Something changed: Save asks why, once, in a sheet (canvas board "Why the change? at Save").
+  const canSave = create || total > 0;
+  const [askWhy, setAskWhy] = useState(false);
+  const formId = useId();
   const saveLabel = total ? `Save ${total} change${total === 1 ? "" : "s"}` : "No changes";
   const changedNote = (k: string) => {
     const c = changedOf(k);
@@ -702,9 +705,19 @@ export function OfferHeaderForm({
   };
   const changedField = (k: string) =>
     changedOf(k) ? "[&_:is(input,select,textarea)]:border-action/70 [&_[aria-checked=true]]:border-action" : undefined;
-  const reasonBox = needWhy ? (
-    <ReasonChips choices={OFFER_REASONS} value={why} onChange={setWhy} title={total === 1 ? "Why the change?" : "Why these changes?"} />
-  ) : null;
+  const whySheet = (
+    <ReasonSheet
+      open={askWhy && needWhy}
+      onClose={() => setAskWhy(false)}
+      choices={OFFER_REASONS}
+      value={why}
+      onChange={setWhy}
+      formId={formId}
+      title={total === 1 ? "Why the change?" : "Why these changes?"}
+      what={`${total} change${total === 1 ? "" : "s"}: ${[...fieldChanges.map((c) => `${c.label} ${c.from} → ${c.to}`), ...linesChanges].slice(0, 2).join(" · ")}`}
+      saveLabel={saveLabel}
+    />
+  );
   const undo = (k: string) => {
     const back: Partial<QuoteState> =
       k === "tax"
@@ -732,7 +745,10 @@ export function OfferHeaderForm({
     reportLost(
       lost.length ? (create ? { title: "Close without saving?", text: "This new offer isn’t saved yet. These will be lost:", lines: lost } : { lines: lost.slice(0, 6) }) : null,
     );
-    reportDirty(lost.length ? true : null);
+    // The form knows what changed: never leave it to the window comparing what is on screen (moving to another
+    // step is not a change).
+    reportDirty(lost.length > 0);
+    return () => reportDirty(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the words, not the list's identity
   }, [lostKey, create, reportLost, reportDirty]);
 
@@ -755,12 +771,13 @@ export function OfferHeaderForm({
       footerStart
     );
   const footer = create ? (
-    // One strong button (design rules 18 Nov): Next is soft, Back and Review are words; ✕ closes, there is no Cancel.
+    // One strong button (design rules 18 Nov): Next is soft, Back and Review are words; Cancel beside them (canvas row "Cancel, not ✕").
     // On a phone the items' total is a line of its own above them (design "Items on a small phone").
     <div data-window-footer="" className={cn(bar, "max-sm:flex-wrap")}>
       <FooterTotal line />
       {back}
-      <span className="flex-1" />
+      <span className="flex-1 max-md:hidden" />
+      <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
       {step === "review" ? (
         <>
           {onAnother && (
@@ -775,11 +792,11 @@ export function OfferHeaderForm({
       ) : (
         <>
           {at < STEPS.length - 2 && (
-            <Button type="button" variant="ghost" onClick={() => setStep("review")}>
+            <Button type="button" variant="ghost" onClick={() => setStep("review")} className="max-md:hidden">
               Review
             </Button>
           )}
-          <Button type="button" variant="soft" onClick={() => go(at + 1)}>
+          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
             Next <ChevronRight aria-hidden />
           </Button>
         </>
@@ -787,16 +804,13 @@ export function OfferHeaderForm({
     </div>
   ) : (
     <>
-      {/* Under a long list, Why? is a strip right above Save (design 18 Nov). */}
-      {only && step === "prices" && needWhy && (
-        <ReasonChips strip choices={OFFER_REASONS} value={why} onChange={setWhy} title={total === 1 ? "Why the change?" : "Why these changes?"} />
-      )}
-      <div data-window-footer="" className={cn(bar, !only && "max-sm:flex-wrap")}>
-        {/* On a phone the items' total: beside Save in one part, on its own line above the steps' buttons. */}
-        {!only && <FooterTotal line />}
+      {whySheet}
+      <div data-window-footer="" className={cn(bar, "max-sm:flex-wrap")}>
+        {/* On a phone the items' total on its own line above the buttons: Cancel · Save (canvas row "Cancel, not ✕"). */}
+        <FooterTotal line />
         {back}
-        {only && <FooterTotal />}
-        <span className="flex-1" />
+        <span className="flex-1 max-md:hidden" />
+        <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
         {only || step === "changes" ? (
           <SubmitButton variant="strong" size="lg" disabled={!canSave} pendingText="Saving…" className="max-md:flex-1">
             <Check aria-hidden /> {saveLabel}
@@ -804,11 +818,11 @@ export function OfferHeaderForm({
         ) : (
           <>
             {at < STEPS.length - 2 && (
-              <Button type="button" variant="ghost" onClick={() => setStep("changes")}>
+              <Button type="button" variant="ghost" onClick={() => setStep("changes")} className="max-md:hidden">
                 Changes{total ? ` · ${total}` : ""}
               </Button>
             )}
-            <Button type="button" variant="soft" onClick={() => go(at + 1)}>
+            <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
               Next <ChevronRight aria-hidden />
             </Button>
           </>
@@ -823,6 +837,7 @@ export function OfferHeaderForm({
 
   return (
     <ActionForm
+      id={formId}
       action={action}
       onDone={(st) => onDone(st, { reason: why.trim() || undefined, changes: fieldChanges })}
       className={cn(PANEL_FORM, "min-h-0 gap-0")}
@@ -840,7 +855,12 @@ export function OfferHeaderForm({
           document.getElementById("fq-parts")?.scrollIntoView?.({ block: "center" });
           return false;
         }
-        // Nothing changed: nothing to save; something changed: why, first.
+        // Nothing changed: nothing to save; something changed: why, first — asked here, once.
+        if (needWhy && !why.trim()) {
+          setAskWhy(true);
+          return false;
+        }
+        setAskWhy(false);
         return canSave;
       }}
     >
@@ -1056,7 +1076,6 @@ export function OfferHeaderForm({
               </PanelSection>
             )}
 
-            {only && step !== "prices" && reasonBox}
 
             {step === "review" && (
               <div className="flex flex-col gap-3.5">
@@ -1180,7 +1199,6 @@ export function OfferHeaderForm({
                 ) : (
                   <p className="text-sm text-text-2">Nothing changed.</p>
                 )}
-                {reasonBox}
               </div>
             )}
             {note}

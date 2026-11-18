@@ -8,7 +8,7 @@ import { Button, cn, Field, Input, Select } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
-import { PanelActions, PanelBody, SidePanel, useClosePanel } from "@/components/common/panel";
+import { PanelActions, PanelBody, SidePanel, WindowCancelIn } from "@/components/common/panel";
 import { money } from "@/lib/format";
 import { useTime } from "@/lib/time-client";
 import type { ActionState } from "@/lib/actions";
@@ -113,7 +113,6 @@ export function PlanEditor({
   onDone: () => void;
 }) {
   const base = useId();
-  const close = useClosePanel();
   const [parts, setParts] = useState<PlanPart[]>(start);
   const [tried, setTried] = useState(false);
   const ruleOf = (v: string) => rules.find((r) => r.value === v);
@@ -405,7 +404,7 @@ export function PlanEditor({
         </Button>
       </PanelBody>
       {/* Under the parts, outside the scrolling: the sum stays in view above Save. */}
-      <PanelActions className="static mx-0 mb-0 justify-end sm:mx-0">
+      <PanelActions className="static mx-0 mb-0 justify-end sm:mx-0" cancel={false}>
         <div className={cn("flex basis-full items-center gap-3 rounded-lg px-3 py-2", ok ? "bg-ok-soft" : "bg-bad-soft")}>
           <b role="status" className={cn("text-[13px] whitespace-nowrap tabular", ok ? "text-ok" : "text-bad")}>
             {ok
@@ -434,9 +433,7 @@ export function PlanEditor({
           </p>
         )}
         <span className="mr-auto text-xs text-muted max-md:hidden">Ctrl+Enter saves · Esc closes</span>
-        <Button variant="ghost" onClick={() => (close ? close() : onDone())}>
-          Cancel
-        </Button>
+        <WindowCancelIn />
         <SubmitButton pendingText="Saving…">Save the plan</SubmitButton>
       </PanelActions>
     </ActionForm>

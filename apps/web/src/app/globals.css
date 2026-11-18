@@ -113,6 +113,17 @@
   }
 }
 
+/* A window with a Cancel beside its save (canvas row "Cancel, not ✕", 19 Nov): on a phone that is how it closes, so
+   the ✕ at the top steps aside and the title starts at the edge. A window without one keeps its ✕. */
+@media (width < 48rem) {
+  [role="dialog"]:has([data-window-cancel]) [data-window-x] {
+    display: none;
+  }
+  [role="dialog"]:has([data-window-cancel]) [data-window-head] {
+    padding-left: 1rem;
+  }
+}
+
 /* Typing on a phone (KeyboardWatch, design 18 Nov): with the keyboard up a tall box gets shorter, so the window's
    title, the box being typed in and the buttons all fit above the keyboard; the steps bar drops its "Next:" line. */
 @media (width < 48rem) {

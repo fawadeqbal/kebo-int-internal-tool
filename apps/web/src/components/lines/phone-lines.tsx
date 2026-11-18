@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Plus, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Plus } from "lucide-react";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { FIT_VIEW, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
@@ -671,10 +671,8 @@ export function LineWindow({
       }}
       className={cn("fixed inset-0 z-[100] flex animate-in flex-col bg-surface", FIT_VIEW)}
     >
-      <div className="flex min-h-15 items-center gap-1.5 border-b border-line py-1.5 pr-4 pl-1">
-        <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={close} disabled={busy} className="size-11 rounded-full [&_svg]:size-[22px]">
-          <X aria-hidden />
-        </Button>
+      {/* Its name on top; Cancel at the bottom, beside Add or Save (canvas row "Cancel, not ✕"). */}
+      <div className="flex min-h-15 items-center gap-1.5 border-b border-line py-1.5 pr-4 pl-4">
         <div className="min-w-0 flex-1">
           <h2 id={`${id}-title`} ref={head} tabIndex={-1} className="truncate text-lg font-semibold tracking-tight outline-none">
             {title}
@@ -735,17 +733,20 @@ export function LineWindow({
         )}
         {reason}
       </div>
-      <div className="flex items-center gap-2.5 border-t border-line bg-surface px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="flex items-center gap-2 border-t border-line bg-surface px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {!isNew && (
           <>
-            <Button variant="secondary" aria-label="Previous" onClick={() => save("prev")} disabled={!hasPrev || busy} className="size-10 px-0">
+            <Button variant="secondary" aria-label="Previous" onClick={() => save("prev")} disabled={!hasPrev || busy} className="size-12 shrink-0 px-0">
               <ChevronLeft aria-hidden />
             </Button>
-            <Button variant="secondary" aria-label="Next" onClick={() => save("next")} disabled={!hasNext || busy} className="size-10 px-0">
+            <Button variant="secondary" aria-label="Next" onClick={() => save("next")} disabled={!hasNext || busy} className="size-12 shrink-0 px-0">
               <ChevronRight aria-hidden />
             </Button>
           </>
         )}
+        <Button variant="secondary" data-window-cancel="" onClick={close} disabled={busy} className={cn("h-12 text-[15px]", isNew ? "shrink-0 px-3.5" : "flex-1")}>
+          Cancel
+        </Button>
         {isNew ? (
           // Add (adds it and closes) and the strong Add & next (the next one opens, ready to type), side by side.
           <>
@@ -757,17 +758,10 @@ export function LineWindow({
             </Button>
           </>
         ) : (
-          <>
-            <span className="flex-1" />
-            <Button variant={hasNext ? "secondary" : "primary"} onClick={() => save("close")} disabled={busy} className="h-10">
-              {busy ? "Saving…" : "Save"}
-            </Button>
-            {hasNext && (
-              <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-10">
-                Save &amp; next
-              </Button>
-            )}
-          </>
+          // Save (and close); › beside ‹ saves and opens the next one.
+          <Button variant="primary" onClick={() => save("close")} disabled={busy} className="h-12 flex-1 text-[15px]">
+            {busy ? "Saving…" : "Save"}
+          </Button>
         )}
       </div>
       {asking && (

@@ -4,7 +4,7 @@ import { Field, Input } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel } from "@/components/common/panel";
 import { platformPasswordAction } from "@/app/platform/actions";
 
 /** ✎ Change in the Password card's header, and the side panel it opens (?panel=password). */
@@ -25,7 +25,6 @@ export function PasswordEdit() {
 }
 
 export function PasswordForm({ onSaved }: { onSaved?: () => void }) {
-  const close = useClosePanel();
   return (
     <ActionForm
       action={platformPasswordAction}
@@ -52,9 +51,6 @@ export function PasswordForm({ onSaved }: { onSaved?: () => void }) {
           </PanelSection>
           <PanelActions>
             <SubmitButton pendingText="Changing…">Change password</SubmitButton>
-            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
-              Cancel
-            </button>
             <PanelKeys />
           </PanelActions>
         </>

@@ -63,3 +63,14 @@ export async function expectSoundPage(page: Page, errors: string[]) {
   expect(await sidewaysBy(page), "pixels wider than the screen").toBeLessThanOrEqual(1);
   expect(await accessibilityProblems(page), "accessibility (WCAG 2.2 AA)").toEqual([]);
 }
+
+/**
+ * "Why the change?" asked once at Save (canvas board "Why the change? at Save"): picks the reason in the sheet (with
+ * the words for Other…) and saves from it.
+ */
+export async function answerWhy(page: Page, reason: string, words?: string) {
+  const sheet = page.getByRole("dialog", { name: /^Why (the change|these changes)\?$/ });
+  await sheet.getByRole("radiogroup").getByRole("radio", { name: reason }).click();
+  if (words) await sheet.getByRole("textbox", { name: "Why, in your words" }).fill(words);
+  await sheet.getByRole("button", { name: /^Save/ }).click();
+}

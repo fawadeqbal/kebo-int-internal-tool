@@ -5,7 +5,7 @@ import { MODULE_PRESETS, PLAN_FEATURES, withPreset } from "@kebo/shared";
 import { Button, Checkbox, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { Plan } from "@/lib/types-platform";
 
@@ -13,7 +13,6 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /** A plan's price, limits and features. */
 export function PlanForm({ action, plan, onDone, submit }: { action: Action; plan?: Plan; onDone?: () => void; submit: string }) {
-  const close = useClosePanel();
   const [features, setFeatures] = useState<string[]>(() => (plan ? [...plan.features] : Object.keys(PLAN_FEATURES)));
   const toggle = (k: string, on: boolean) => setFeatures((f) => (on ? [...f, k] : f.filter((x) => x !== k)));
   return (
@@ -91,9 +90,6 @@ export function PlanForm({ action, plan, onDone, submit }: { action: Action; pla
           )}
           <PanelActions>
             <SubmitButton pendingText="Saving…">{submit}</SubmitButton>
-            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
-              Cancel
-            </button>
             <PanelKeys />
           </PanelActions>
         </>

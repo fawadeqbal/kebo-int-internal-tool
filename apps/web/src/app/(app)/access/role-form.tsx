@@ -7,7 +7,7 @@ import { Alert, Checkbox, cn, Field, Input, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useFeatures } from "@/components/common/features";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -69,7 +69,6 @@ export function RoleForm({
   locked?: boolean;
   submitLabel: string;
 }) {
-  const close = useClosePanel();
   const superAdmin = !!role?.superAdmin;
   const fixed = superAdmin || locked;
   const [picked, setPicked] = useState<Set<Permission>>(() => new Set(role?.permissions ?? ["dashboard.view"]));
@@ -211,9 +210,6 @@ export function RoleForm({
 
           <PanelActions>
             <SubmitButton pendingText="Saving…">{submitLabel}</SubmitButton>
-            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
-              Cancel
-            </button>
             <PanelKeys />
           </PanelActions>
         </>

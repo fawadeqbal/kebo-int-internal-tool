@@ -6,7 +6,7 @@ import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
 import { useFeature } from "@/components/common/features";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel } from "@/components/common/panel";
 import { SwitchList } from "@/components/common/switch-list";
 import type { ActionState } from "@/lib/actions";
 import { ColoursCard } from "./colours";
@@ -191,7 +191,6 @@ function CardForm({
   onSaved: () => void;
 }) {
   const time = useTime();
-  const close = useClosePanel();
   return (
     <ActionForm
       action={action}
@@ -241,9 +240,6 @@ function CardForm({
           </PanelSection>
           <PanelActions>
             <SubmitButton pendingText="Saving…">Save</SubmitButton>
-            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
-              Cancel
-            </button>
             <PanelKeys />
           </PanelActions>
         </>

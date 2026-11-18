@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { accessibilityProblems, watchErrors } from "./check";
+import { accessibilityProblems, watchErrors, answerWhy } from "./check";
 
 /**
  * Design "RFQ Desk — factory offer" (18 Nov 2026, the inquiry's rules): a factory's offer is typed in one steps
@@ -146,9 +146,9 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   // A change: marked, counted, and why is asked before it can be saved.
   await win.locator("#leadDays").fill("45");
   await expect(win.getByText(/Changed · was/)).toBeVisible();
-  await expect(win.getByRole("button", { name: "Save 1 change" })).toBeDisabled();
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Supplier changed its terms" }).click();
+  await expect(win.getByRole("button", { name: "Save 1 change" })).toBeEnabled();
   await win.getByRole("button", { name: "Save 1 change" }).click();
+  await answerWhy(page, "Supplier changed its terms");
   await expect(win).toBeHidden();
   await expect(page.getByRole("region", { name: "Delivery & payment", exact: true })).toContainText("45 days");
 
@@ -163,25 +163,42 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   await page.keyboard.press("Enter");
   await page.getByLabel("Item 2: Unit price CNY").fill("4500");
   await page.keyboard.press("Enter");
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Supplier changed its price" }).click();
   await win.getByRole("button", { name: "Save 1 change" }).click();
+  await answerWhy(page, "Supplier changed its price");
   await expect(win).toBeHidden();
   await expect(page.getByRole("region", { name: "Prices", exact: true })).toContainText("9,000.00");
 
-  // Edit offer: every part; the side bar counts the changes; Changes lists them with Undo; why once.
+  // Edit offer: only moving between its steps changes nothing, so Cancel just closes it (no "Discard?").
   await page.getByRole("button", { name: /^More for .*offer/ }).click();
   await page.getByRole("menuitem", { name: "Edit offer" }).click();
   win = page.getByRole("dialog", { name: "Edit offer" });
-  const rail = win.getByRole("navigation", { name: "Steps" });
+  let rail = win.getByRole("navigation", { name: "Steps" });
+  await rail.getByRole("button", { name: /Prices/ }).click();
+  await expect(rail.getByRole("button", { name: /Prices/ })).toHaveAttribute("aria-current", "step");
+  await rail.getByRole("button", { name: /Warranty/ }).click();
+  await win.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("alertdialog", { name: "Discard your change?" })).toHaveCount(0);
+  await expect(win).toBeHidden();
+
+  // Every part; the side bar counts the changes; Changes lists them with Undo; why once.
+  await page.getByRole("button", { name: /^More for .*offer/ }).click();
+  await page.getByRole("menuitem", { name: "Edit offer" }).click();
+  win = page.getByRole("dialog", { name: "Edit offer" });
+  rail = win.getByRole("navigation", { name: "Steps" });
   await expect(rail.getByRole("button", { name: /Supplier/ })).toHaveAttribute("aria-current", "step");
   await win.getByRole("textbox", { name: "Their reference" }).fill(`HS-${deal.tag}`);
   await expect(rail.getByRole("button", { name: /Supplier/ })).toContainText("1");
+  // One real change: Cancel asks first; Keep editing keeps it.
+  await win.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("alertdialog", { name: "Discard your change?" })).toBeVisible();
+  await page.getByRole("button", { name: "Keep editing" }).click();
+  await expect(win.getByRole("textbox", { name: "Their reference" })).toHaveValue(`HS-${deal.tag}`);
   await win.getByRole("button", { name: /^Changes · 1/ }).click();
   const list = win.getByRole("table", { name: "What changed" });
   await expect(list.getByRole("row").filter({ hasText: "Their reference" }).getByRole("cell").nth(3)).toHaveText(`HS-${deal.tag}`);
   expect(await accessibilityProblems(page), "the offer's Changes step meets WCAG 2.2 AA").toEqual([]);
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Typed wrong" }).click();
   await win.getByRole("button", { name: "Save 1 change" }).click();
+  await answerWhy(page, "Typed wrong");
   await expect(win).toBeHidden();
   await expect(page.getByRole("region", { name: "Supplier", exact: true })).toContainText(`HS-${deal.tag}`);
 
