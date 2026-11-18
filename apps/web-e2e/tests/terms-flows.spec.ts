@@ -75,9 +75,9 @@ test("the offer and the quotation in four groups; the quotation checked against 
   expect(await accessibilityProblems(page), "New quotations meets WCAG 2.2 AA").toEqual([]);
   await make.getByRole("button", { name: /Make the draft/ }).click();
   await expect(make).toBeHidden();
-  // Edit on Delivery opens only that part (design 17 Nov); All steps, below, opens the rest of the draft.
-  await page.getByRole("button", { name: "Edit delivery" }).click();
-  const part = page.getByRole("dialog", { name: /^Delivery · QUO-\d{4}-\d{4}-A R1/ });
+  // Edit on Delivery & payment opens only that box (design 17 Nov); All steps, below, opens the rest of the draft.
+  await page.getByRole("button", { name: "Edit delivery and payment" }).click();
+  const part = page.getByRole("dialog", { name: /^Delivery & payment · QUO-\d{4}-\d{4}-A R1/ });
   await expect(part.getByRole("navigation", { name: "Steps" })).toHaveCount(0);
   const leads = part.getByRole("table", { name: "Lead time of each option" });
   await expect(leads.getByLabel("Option A lead time", { exact: true })).toHaveValue("30");
@@ -102,10 +102,10 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(form).toBeHidden();
 
-  // Before it is sent, the quotation says what to look at; its Payment group has the parts.
+  // Before it is sent, the quotation says what to look at; its Delivery & payment box has the parts.
   await expect(page.getByText(/Before you send R1/)).toBeVisible();
   await expect(page.getByText(/the last 2 months of ours are not covered/).filter({ visible: true }).first()).toBeVisible();
-  const payment = page.getByRole("region", { name: "Payment", exact: true });
+  const payment = page.getByRole("region", { name: "Delivery & payment", exact: true });
   for (const part of ["30% with the order", "60% before shipment", "10% after the site acceptance test (SAT)"]) await expect(payment.getByText(part)).toBeVisible();
   expect(await accessibilityProblems(page), "the Quotations tab meets WCAG 2.2 AA").toEqual([]);
 

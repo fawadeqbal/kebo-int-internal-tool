@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, ChevronRight } from "lucide-react";
-import { can } from "@kebo/shared";
-import { Alert, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
+import { ChevronRight } from "lucide-react";
+import { can, REVISION_STATUS_LABEL } from "@kebo/shared";
+import { ButtonLink, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
+import { Notice } from "@/components/records/notice";
+import { TabList } from "@/components/lists/tab-list";
 import { requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import { dealOf, quotationOf } from "@/lib/deal-data";
@@ -21,6 +23,16 @@ const totalText = (r: RevisionView) => (r.status === "draft" && !(Number(r.total
 
 /** The revision a quotation shows first: its open draft, else its newest one. */
 const currentOf = (q: QuotationOfDeal) => q.revisions.find((r) => r.status === "draft") ?? q.revisions[0]!;
+
+/** The list's one line of counts: "3 quotations · 1 draft · 2 sent". */
+function summaryOf(quotations: QuotationOfDeal[]) {
+  const by = new Map<string, number>();
+  for (const x of quotations) {
+    const s = REVISION_STATUS_LABEL[currentOf(x).status].toLowerCase();
+    by.set(s, (by.get(s) ?? 0) + 1);
+  }
+  return [`${quotations.length} quotation${quotations.length === 1 ? "" : "s"}`, ...[...by].map(([s, n]) => `${n} ${s}`)].join(" · ");
+}
 
 /**
  * Quotations (design "one way, any number", 17 Nov: each on its own page): the deal's quotations, A, B, C…, one
@@ -86,46 +98,33 @@ export default async function QuotationPage({
     <WithSide id={id}>
     <div className="flex flex-col gap-4">
       {accepted && order && (
-        <section aria-label="Order created" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok-soft p-4">
-          <p className="flex items-center gap-2 text-sm">
-            <CheckCircle2 className="size-5 shrink-0 text-ok" aria-hidden />
-            <span>
-              {d.customer.name} accepted R{accepted.number}
-              {accepted.answeredOn ? ` on ${date(accepted.answeredOn)}` : ""}. Sales order <span className="font-medium">{order.refNo}</span> was made (
-              {money(order.total, order.currency)}); the work continues there.
-            </span>
-          </p>
-          <ButtonLink href={`/orders/${order.id}`} size="sm">
-            Open the order
-          </ButtonLink>
-        </section>
+        <Notice
+          tone="ok"
+          title={`${d.customer.name} accepted R${accepted.number}${accepted.answeredOn ? ` on ${date(accepted.answeredOn)}` : ""}.`}
+          action={
+            <ButtonLink href={`/orders/${order.id}`} size="sm">
+              Open the order
+            </ButtonLink>
+          }
+        >
+          Sales order <span className="font-medium text-text">{order.refNo}</span> was made ({money(order.total, order.currency)}); the work continues there.
+        </Notice>
       )}
 
       {quotations.length > 0 && !manage && !(accepted && order) && (
-        <Alert tone="info">{quoter && q.whyNotStart ? q.whyNotStart : "Only the person handling this inquiry (or a manager) can change the quotations or record the customer's answer."}</Alert>
+        <Notice tone="info" title={quoter && q.whyNotStart ? q.whyNotStart : "Only the person handling this inquiry (or a manager) can change the quotations or record the customer's answer."} />
       )}
 
       {quotations.length === 0 ? (
-        <Card>
-          <CardHeader title="Quotations" actions={newButton("primary")} />
-          <CardBody>
-            <p className="text-sm text-text-2">
-              {manage
-                ? "None yet. New quotations makes one draft for each supplier offer you tick, or one priced by hand."
-                : (q.whyNotStart ?? "The person handling this inquiry makes the quotations.")}
-            </p>
-          </CardBody>
-        </Card>
+        <TabList title="Quotations" buttons={newButton("primary")}>
+          <p className="border-t border-line px-5 py-4 text-sm text-text-2 max-sm:px-4">
+            {manage
+              ? "None yet. New quotations makes one draft for each supplier offer you tick, or one priced by hand."
+              : (q.whyNotStart ?? "The person handling this inquiry makes the quotations.")}
+          </p>
+        </TabList>
       ) : (
-        <Card className="overflow-clip">
-          <CardHeader
-            title={
-              <>
-                Quotations<span className="font-normal text-text-2"> · {quotations.length}</span>
-              </>
-            }
-            actions={newButton()}
-          />
+        <TabList title="Quotations" summary={summaryOf(quotations)} buttons={newButton()}>
           <div aria-hidden className={cn("hidden items-center gap-x-4 border-b border-line bg-surface-2/60 px-5 py-2 text-xs font-medium text-text-2 md:grid", COLS)}>
             <span>Quotation</span>
             <span className="text-right">Total</span>
@@ -174,7 +173,7 @@ export default async function QuotationPage({
               );
             })}
           </ul>
-        </Card>
+        </TabList>
       )}
     </div>
     </WithSide>

@@ -91,11 +91,11 @@ test("each quotation and each offer has its own page: the lists open them, ‹ �
   await expect(page.getByRole("heading", { level: 1, name: b!.refNo })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Inquiry" })).toHaveCount(0);
   // Every Edit has its word and says what it edits.
-  await expect(page.getByRole("button", { name: "Edit items" })).toBeVisible();
-  for (const part of ["delivery", "payment", "warranty and conditions"]) await expect(page.getByRole("button", { name: `Edit ${part}` })).toBeVisible();
-  // Beside it: its revisions, the offer it came from, who it goes to.
+  // (The boxes of every paper: Customer | Delivery & payment, Prices, Warranty & conditions; canvas "The quotation, from the pieces".)
+  for (const part of ["prices", "delivery and payment", "warranty and conditions"]) await expect(page.getByRole("button", { name: `Edit ${part}` })).toBeVisible();
+  // Who it goes to in its Customer box; beside it, its revisions and the offer it came from.
+  await expect(page.getByRole("region", { name: "Customer", exact: true })).toContainText(deal.customer);
   await expect(page.getByRole("region", { name: "Revisions" }).getByRole("link", { name: /R1/ })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("region", { name: "Goes to" })).toContainText(deal.customer);
   expect(await accessibilityProblems(page), "a quotation's page meets WCAG 2.2 AA").toEqual([]);
   // ‹ › through the inquiry's quotations.
   await page.getByRole("link", { name: `Previous quotation, ${a!.refNo}` }).click();

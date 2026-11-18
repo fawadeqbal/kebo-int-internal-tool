@@ -23,7 +23,9 @@ import { FileRow, FileZone } from "@/components/common/file-zone";
 import { fileSize } from "@/lib/format";
 import { convertText, type Fx } from "@/lib/fx";
 import { OFFER_PART_LABEL, OfferHeaderForm, type AskedFactory, type OfferPart, type OfferSaved, type OfferStep } from "./factory-quote-form";
-import { LinesExcel, LinesView } from "./lines-view";
+import { LinesExcel } from "./lines-view";
+import { ItemsBox } from "@/components/records/items-box";
+import { Totals } from "@/components/records/totals";
 import { useBatchLines, type LineHandlers } from "@/components/edits/batch-lines";
 import { editedMark } from "@/components/edits/edits";
 import type { EditCard, EditsView } from "@/lib/types-edits";
@@ -656,7 +658,7 @@ export function OfferTotals({
   savedRate?: number;
   included: boolean;
   fx?: Fx;
-  /** One more line at the bottom ("Our cost"). */
+  /** Ours only, in the shaded strip above the totals ("Our cost"). */
   extra?: [string, ReactNode];
 }) {
   const byRate = new Map<number, { amount: number; lines: number }>();
@@ -688,42 +690,23 @@ export function OfferTotals({
     ) : (
       `Tax ${rates[0] ?? taxRate}% · ${how}`
     );
-  const row = "flex items-baseline justify-between gap-4";
+  // The one totals block (canvas "What changes, piece by piece"): our cost in its shaded strip above.
   return (
-    <div role="group" aria-label="Totals" className="px-3 py-2.5">
-    <dl className="ml-auto flex w-full max-w-[22rem] flex-col gap-1 text-sm">
-      {!noTax && (
-        <>
-          <div className={row}>
-            <dt className="text-text-2">Before tax</dt>
-            <dd>{money(included ? sum - tax : sum)}</dd>
-          </div>
-          <div className={row}>
-            <dt className="text-text-2">{taxLabel}</dt>
-            <dd>{money(tax)}</dd>
-          </div>
-        </>
-      )}
-      <div className={cn(row, "font-bold text-text", !noTax && "mt-0.5 border-t border-line pt-1.5")}>
-        <dt>{noTax ? "Total · no tax" : "Total with tax"}</dt>
-        <dd className="text-[15px]">{money(total)}</dd>
-      </div>
-      {main && (
-        <div className="text-right text-xs text-text-2 tabular">
-          <dt className="sr-only">In {fx!.main}</dt>
-          <dd>
-            ≈ {fx!.main} {Number(main).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </dd>
-        </div>
-      )}
-      {extra && (
-        <div className={cn(row, "text-text-2")}>
-          <dt>{extra[0]}</dt>
-          <dd className="tabular">{extra[1]}</dd>
-        </div>
-      )}
-    </dl>
-    </div>
+    <Totals
+      ours={extra ? [{ label: extra[0], value: extra[1] }] : null}
+      rows={[
+        ...(noTax
+          ? []
+          : [
+              { label: "Before tax", value: money(included ? sum - tax : sum) },
+              { label: taxLabel, value: money(tax) },
+            ]),
+        { label: noTax ? "Total · no tax" : "Total with tax", value: money(total), big: true },
+        ...(main
+          ? [{ label: `In ${fx!.main}`, value: `≈ ${fx!.main} ${Number(main).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, quiet: true }]
+          : []),
+      ]}
+    />
   );
 }
 
@@ -915,7 +898,7 @@ export function OfferBoxes({
         </RecordBox>
       }
       prices={
-        <RecordBox
+        <ItemsBox
           title="Prices"
           count={[q.lines.length ? linesCount(offerRows(q.lines)) : null, q.currency, Number(q.taxRate) > 0 ? offerTaxText(q.taxRate, q.taxIncluded) : "no tax"].filter(Boolean).join(" · ")}
           what="prices"
@@ -923,36 +906,27 @@ export function OfferBoxes({
           edit={<OfferEdit kit={kit} q={q} step="prices" what="prices" words={q.lines.length ? undefined : "Add items"} only variant="ghost" />}
           tools={<LinesExcel name={`Prices from ${q.factory.name}`} rows={rows} columns={columns} numbers={numbers} />}
           history={history(["lines", "offer.prices"], "Prices")}
-        >
-          {q.lines.length ? (
-            <>
-              <div className="p-3 max-sm:hidden">
-                <LinesView label={`${q.factory.name} · prices`} rows={rows} columns={viewColumns} numbers={numbers} footer={footer} />
-              </div>
-              {/* A phone: one line per row, its quantity and price under its name, the total on the right. */}
-              <ul aria-label={`${q.factory.name} · prices`} className="flex flex-col divide-y divide-line px-4 text-sm sm:hidden">
-                {q.lines.map((l) => (
-                  <li key={l.id} className={cn("flex flex-col gap-1 py-2.5", l.parentId && "pl-4")}>
-                    <span className="flex gap-2">
-                      <span className="w-6 shrink-0 text-xs text-muted tabular">{l.no}</span>
-                      <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{l.description.split("\n")[0]}</span>
-                    </span>
-                    <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-8 text-xs text-text-2 tabular">
-                      <span>
-                        {Number(l.quantity).toLocaleString("en-US")} {l.unit}
-                        {Number(l.unitPrice) ? <> × {Number(l.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</> : " · no price yet"}
-                      </span>
-                      {Number(l.unitPrice) > 0 && <span className="text-sm font-semibold text-text">{formatMinor(Math.round(toMinor(l.unitPrice) * Number(l.quantity)), q.currency)}</span>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="border-t border-line sm:hidden">{footer}</div>
-            </>
-          ) : (
-            <p className="px-5 py-4 text-sm text-muted max-sm:px-4">No items yet.</p>
-          )}
-        </RecordBox>
+          label={`${q.factory.name} · prices`}
+          rows={rows}
+          columns={viewColumns}
+          numbers={numbers}
+          totals={footer}
+          // A phone: one line per row, its quantity and price under its name, the amount on the right.
+          phone={q.lines.map((l) => ({
+            key: l.id,
+            no: l.no,
+            part: !!l.parentId,
+            title: l.description.split("\n")[0],
+            sub: (
+              <>
+                {Number(l.quantity).toLocaleString("en-US")} {l.unit}
+                {Number(l.unitPrice) ? <> × {Number(l.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</> : " · no price yet"}
+              </>
+            ),
+            amount: Number(l.unitPrice) > 0 ? formatMinor(Math.round(toMinor(l.unitPrice) * Number(l.quantity)), q.currency) : undefined,
+          }))}
+          empty="No items yet."
+        />
       }
       conditions={
         <RecordBox title="Warranty & conditions" what="the warranty and conditions" canEdit={canEdit} edit={edit("conditions", "the warranty and conditions")} history={history(["offer.conditions"], "Warranty & conditions")}>

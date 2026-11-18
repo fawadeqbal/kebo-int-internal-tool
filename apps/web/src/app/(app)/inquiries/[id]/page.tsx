@@ -9,6 +9,7 @@ import { optional } from "@/components/print/data";
 import { shortName } from "@/components/deals/offer-facts";
 import { holdAction, moveStageAction } from "../actions";
 import { DecisionButtons } from "./panels";
+import { Notice } from "@/components/records/notice";
 import { ItemsCard } from "./items-card";
 import { FilesCard, RequestBoxes } from "./request-card";
 import { WithSide } from "./side";
@@ -30,31 +31,32 @@ export default async function DealOverview({ params, searchParams }: { params: P
   const sourcing = can(me, "sourcing.manage");
   const history = d.onHold ? await optional(() => dealHistoryOf(id)) : null;
 
-  // On hold, or lost: what holds it or why it was lost, with the way back.
+  // On hold, or lost: what holds it or why it was lost, with the way back, in the one notice.
   const lastHold = d.onHold ? (history ?? []).find((e) => /hold/i.test(e.summary ?? e.action)) : null;
   const state = d.onHold ? (
-    <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-5 py-4">
-      <div>
-        <strong>On hold{lastHold ? ` since ${date(lastHold.at)}` : ""}.</strong>
-        <span className="block text-sm text-text-2">Reminders are paused. The stage stays “{INQUIRY_STAGE_LABEL[d.stage]}”.</span>
-      </div>
-      {d.canWork && d.allowed.hold && (
-        <DecisionButtons stage={d.stage} onHold canHold canReopen={false} only="hold" stageAction={moveStageAction.bind(null, d.id)} holdAction={holdAction.bind(null, d.id)} />
-      )}
-    </section>
+    <Notice
+      tone="info"
+      title={`On hold${lastHold ? ` since ${date(lastHold.at)}` : ""}.`}
+      action={
+        d.canWork && d.allowed.hold ? (
+          <DecisionButtons stage={d.stage} onHold canHold canReopen={false} only="hold" stageAction={moveStageAction.bind(null, d.id)} holdAction={holdAction.bind(null, d.id)} />
+        ) : undefined
+      }
+    >
+      Reminders are paused. The stage stays “{INQUIRY_STAGE_LABEL[d.stage]}”.
+    </Notice>
   ) : d.stage === "lost" ? (
-    <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bad/25 bg-bad-soft px-5 py-4">
-      <div>
-        <strong className="text-bad">
-          Lost{d.closedAt ? ` on ${date(d.closedAt)}` : ""}
-          {d.lostReason ? ` · ${LOST_REASON_LABEL[d.lostReason]}` : ""}.
-        </strong>
-        <span className="block text-sm text-text-2">{d.allowed.reopen ? "A manager can reopen it and quote again." : "Ask a manager to reopen it if they come back."}</span>
-      </div>
-      {d.canWork && d.allowed.reopen && (
-        <DecisionButtons stage={d.stage} onHold={false} canHold={false} canReopen stageAction={moveStageAction.bind(null, d.id)} holdAction={holdAction.bind(null, d.id)} />
-      )}
-    </section>
+    <Notice
+      tone="bad"
+      title={`Lost${d.closedAt ? ` on ${date(d.closedAt)}` : ""}${d.lostReason ? ` · ${LOST_REASON_LABEL[d.lostReason]}` : ""}.`}
+      action={
+        d.canWork && d.allowed.reopen ? (
+          <DecisionButtons stage={d.stage} onHold={false} canHold={false} canReopen stageAction={moveStageAction.bind(null, d.id)} holdAction={holdAction.bind(null, d.id)} />
+        ) : undefined
+      }
+    >
+      {d.allowed.reopen ? "A manager can reopen it and quote again." : "Ask a manager to reopen it if they come back."}
+    </Notice>
   ) : null;
 
   const order = d.orders.find((o) => o.status !== "cancelled");

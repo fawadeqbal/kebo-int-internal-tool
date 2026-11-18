@@ -74,6 +74,8 @@ export interface LineColumn {
   required?: string;
   /** Hidden on phones in saved rows (shown when the row is opened). */
   phoneHidden?: boolean;
+  /** Ours only (our cost, the margin): shaded in a read-only sheet. */
+  shade?: boolean;
   /** In a phone row's grey line: what to say (null: leave it out); without it, "Label value". */
   summary?: (values: LineValues, row?: LineRow) => ReactNode | null;
   /** A choice column in an Excel file: each value as written there (by default each option's label). */
