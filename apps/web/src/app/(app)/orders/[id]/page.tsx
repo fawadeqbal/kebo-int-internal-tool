@@ -110,8 +110,8 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
         title="Their order"
         cols={4}
         rows={[
-          { label: "Their PO no.", value: o.customerRef },
-          { label: "PO date", value: o.customerPoOn ? date(o.customerPoOn) : null },
+          { label: "Customer's order no.", value: o.customerRef },
+          { label: "Customer's order date", value: o.customerPoOn ? date(o.customerPoOn) : null },
           {
             label: "They accepted",
             value: q ? (
@@ -199,9 +199,9 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
             <tr>
               <Th>No.</Th>
               <Th>Item</Th>
-              <Th className="text-right">Qty</Th>
+              <Th className="text-right">Quantity</Th>
               <Th className="text-right">Amount</Th>
-              <Th>From the factory</Th>
+              <Th>From the supplier</Th>
               <Th>Packed</Th>
               <Th>Delivered</Th>
             </tr>
@@ -234,7 +234,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
                         {n(l.receivedQty)} of {n(l.quantity)}
                       </Badge>
                     ) : ordered ? (
-                      <Badge tone="neutral">At the factory</Badge>
+                      <Badge tone="neutral">At the supplier</Badge>
                     ) : (
                       DASH
                     )}

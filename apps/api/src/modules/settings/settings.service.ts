@@ -61,7 +61,7 @@ export class SettingsService {
       db.allocation.count({ where: { target: "purchase" }, take: 1 }),
       db.expense.count({ take: 1 }),
     ]);
-    const has = [orders && "orders", payments && "payments", factoryPayments && "factory payments", expenses && "expenses"].filter(
+    const has = [orders && "orders", payments && "payments", factoryPayments && "supplier payments", expenses && "expenses"].filter(
       (x): x is string => !!x,
     );
     if (!has.length) return { locked: false, reason: null };

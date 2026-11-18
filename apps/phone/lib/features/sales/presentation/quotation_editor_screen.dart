@@ -61,7 +61,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
       );
       final lines = <String, Json>{}, names = <String, String>{};
       for (final o in offers.list('offers', (m) => m)) {
-        names[o.str('factoryQuoteId')] = o.at('factory.name') ?? 'Factory';
+        names[o.str('factoryQuoteId')] = o.at('factory.name') ?? 'Supplier';
         for (final l in o.list('lines', (m) => m)) {
           lines[l.str('id')] = l;
         }
@@ -185,8 +185,8 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
                   title: 'Revision ${v.integer('number') == 0 ? '' : v.integer('number')}'.trim(),
                   items: [
                     KDetail('Currency', cur),
-                    KDetail('Price basis', '${v.str('incoterm')} ${v.strOrNull('incotermPlace') ?? ''}'.trim()),
-                    KDetail('Advance', '${v['depositPercent'] ?? 30}%'),
+                    KDetail('Incoterm', '${v.str('incoterm')} ${v.strOrNull('incotermPlace') ?? ''}'.trim()),
+                    KDetail('Deposit', '${v['depositPercent'] ?? 30}%'),
                   ],
                 ),
                 const SizedBox(height: KSpace.s4),
@@ -213,7 +213,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
                     children: [
                       Expanded(
                         child: KTextField(
-                          label: 'Margin for every line',
+                          label: 'Margin for every item',
                           controller: _margin,
                           suffix: '%',
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -228,7 +228,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
                   const SizedBox(height: KSpace.s6),
                   KSection(
                     title:
-                        '${v.list('options', (m) => m).length > 1 ? 'Option ${String.fromCharCode(65 + i)} · ' : ''}${_factory[o.strOrNull('factoryQuoteId')] ?? 'Our own lines'}',
+                        '${v.list('options', (m) => m).length > 1 ? 'Option ${String.fromCharCode(65 + i)} · ' : ''}${_factory[o.strOrNull('factoryQuoteId')] ?? 'Our own charges'}',
                     children: [
                       for (final p in o.list('prices', (m) => m))
                         Builder(
@@ -240,7 +240,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: KSpace.s3),
                               child: KTextField(
-                                label: '${l?.strOrNull('no') ?? ''} ${l?.strOrNull('description') ?? 'Line'}'.trim(),
+                                label: '${l?.strOrNull('no') ?? ''} ${l?.strOrNull('description') ?? 'Item'}'.trim(),
                                 controller: _prices[p.str('lineId')],
                                 prefix: cur,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),

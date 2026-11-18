@@ -289,7 +289,7 @@ export class HomeService {
       inquiries: {
         open: inquiries.reduce((t, s) => t + s.n, 0),
         stages: [
-          { key: "new", label: "New", count: inq("new")?.n ?? 0, value: null, ...(inq("new")?.old ? note(`${inq("new")!.old} waiting more than 7 days`, "warn") : note("not asked from factories yet")) },
+          { key: "new", label: "New", count: inq("new")?.n ?? 0, value: null, ...(inq("new")?.old ? note(`${inq("new")!.old} waiting more than 7 days`, "warn") : note("not asked from suppliers yet")) },
           { key: "sourcing", label: "Waiting for prices", count: inq("sourcing")?.n ?? 0, value: null, ...(inq("sourcing")?.old ? note(`${inq("sourcing")!.old} waiting more than 7 days`, "warn") : note("asked, prices not in yet")) },
           { key: "quoted", label: "Quoted", count: q?.count ?? 0, value: fromMinor(m(q?.value)), ...(q?.old ? note(`${q.old} sent more than 7 days ago`, "warn") : note("with the customer")) },
         ],

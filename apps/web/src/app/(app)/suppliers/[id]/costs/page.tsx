@@ -124,7 +124,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
                 </ButtonLink>
               )}
               {(can(me, "payments.record") || can(me, "expenses.manage")) && (
-                <ButtonLink href={`/payments/new?kind=out&factory=${f.id}&back=/factories/${f.id}/costs`} variant="primary" size="sm">
+                <ButtonLink href={`/payments/new?kind=out&factory=${f.id}&back=/suppliers/${f.id}/costs`} variant="primary" size="sm">
                   <Banknote aria-hidden /> Pay supplier
                 </ButtonLink>
               )}
@@ -134,7 +134,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
         {lines.length === 0 ? (
           <EmptyState
             title="Nothing bought yet"
-            description="What we buy from this factory and what we pay it show here, with what we owe after each."
+            description="What we buy from this supplier and what we pay it show here, with what we owe after each."
           />
         ) : (
           <DataTable label="Statement" tableClassName="min-w-[1000px] text-[13px]">

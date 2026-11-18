@@ -72,7 +72,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
           <CardHeader
             title={
               <>
-                Factory quotes<span className="text-xs font-normal text-muted"> · internal · only people who see factory prices</span>
+                Supplier offers<span className="text-xs font-normal text-muted"> · internal · only people who see supplier prices</span>
               </>
             }
           />
@@ -124,7 +124,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
                 </a>
               ))}
             </div>
-            <p className="text-xs text-muted">Papers made here are not uploads: they are made again from the data whenever opened.</p>
+            <p className="text-xs text-muted">Documents made here are not uploads: they are made again from the data whenever opened.</p>
           </CardBody>
         </Card>
       )}

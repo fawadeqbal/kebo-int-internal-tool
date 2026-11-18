@@ -165,7 +165,7 @@ export function PapersCard({
   addAction,
   updateActions,
   variant = "side",
-  title = "Papers",
+  title = "Documents",
   description,
   back,
 }: {
@@ -317,7 +317,7 @@ export function PapersCard({
           })}
         </ul>
       ) : (
-        <p className="px-4 py-4 text-sm text-muted">No papers on this step yet.</p>
+        <p className="px-4 py-4 text-sm text-muted">No documents on this step yet.</p>
       )}
     </Card>
   );

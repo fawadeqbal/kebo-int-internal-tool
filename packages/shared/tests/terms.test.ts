@@ -30,12 +30,12 @@ import {
 // same four groups, with their words worked out from them; old offers and quotations read as they did.
 const part = (label: string, percent: number, rule: string, days: number | null = null): TermPart => ({ label, percent, rule, days });
 const THREE = [part("Deposit 30%", 30, "on_order"), part("Before shipment 60%", 60, "before_shipment"), part("After the site test 10%", 10, "after_sat")];
-const JINAN = [part("Advance 30%", 30, "on_order"), part("Balance 70%", 70, "on_ready")];
+const JINAN = [part("Deposit 30%", 30, "on_order"), part("Balance 70%", 70, "on_ready")];
 
 describe("lead times are days from a moment", () => {
   it("words for each side", () => {
     expect(leadWords(45, "after_payment", "customer")).toBe("45 days after the deposit");
-    expect(leadWords(30, "after_payment", "factory")).toBe("30 days after the advance");
+    expect(leadWords(30, "after_payment", "factory")).toBe("30 days after the deposit");
     expect(leadWords(1, "after_order", "customer")).toBe("1 day after the order");
     expect(leadWords(60, "after_drawings", "factory")).toBe("60 days after the drawings are approved");
   });
@@ -77,13 +77,13 @@ describe("warranties are months from a moment", () => {
 });
 
 describe("the payment is parts", () => {
-  it("an old quotation's deposit and balance, and an old offer's advance, read as parts", () => {
+  it("an old quotation's deposit and balance, and an old offer's deposit, read as parts", () => {
     expect(quotePartsOf({ paymentParts: null, depositPercent: 30, balanceTerms: "before_shipment" })).toEqual([
       part("Deposit 30%", 30, "on_order"),
       part("Balance 70%", 70, "before_shipment"),
     ]);
     expect(quotePartsOf({ paymentParts: null, depositPercent: 0, balanceTerms: "letter_of_credit" })).toEqual([part("Payment", 100, "lc", 0)]);
-    expect(offerPartsOf({ paymentParts: null, advancePercent: 50 }, 30)).toEqual([part("Advance 50%", 50, "on_order"), part("Balance 50%", 50, "on_ready")]);
+    expect(offerPartsOf({ paymentParts: null, advancePercent: 50 }, 30)).toEqual([part("Deposit 50%", 50, "on_order"), part("Balance 50%", 50, "on_ready")]);
     // No advance said: the company's usual one.
     expect(offerPartsOf({ paymentParts: null, advancePercent: null }, 30)).toEqual(JINAN);
     // Kept parts are read as kept.
@@ -101,11 +101,11 @@ describe("the payment is parts", () => {
   it("a deposit and one balance print Kebo's sentence as before; more parts print each share", () => {
     const plain = quotePartsOf({ paymentParts: null, depositPercent: 30, balanceTerms: "before_shipment" });
     expect(plainQuoteParts(plain)).toBe(true);
-    expect(quotePaymentSentence(plain)).toBe("Our usual payment is made by 30% Advance deposit and 70% before shipment.");
+    expect(quotePaymentSentence(plain)).toBe("Our usual payment is made by 30% deposit and 70% before shipment.");
     expect(plainQuoteParts(THREE)).toBe(false);
-    expect(quotePaymentSentence(THREE)).toBe("Our usual payment is made by 30% Advance deposit, 60% before shipment and 10% after the site acceptance test (SAT).");
+    expect(quotePaymentSentence(THREE)).toBe("Our usual payment is made by 30% deposit, 60% before shipment and 10% after the site acceptance test (SAT).");
     expect(quotePaymentSentence([part("Deposit", 30, "on_order"), part("LC", 70, "lc", 90)])).toBe(
-      "Our usual payment is made by 30% Advance deposit and 70% by letter of credit, 90 days after the documents.",
+      "Our usual payment is made by 30% deposit and 70% by letter of credit, 90 days after the documents.",
     );
     expect(partsWords(JINAN, "factory")).toBe("30% when we order · 70% when ready");
   });
@@ -138,7 +138,7 @@ describe("the payment is parts", () => {
   });
 });
 
-describe("what we promise, beside what the factory gives", () => {
+describe("what we promise, beside what the supplier gives", () => {
   const ours = (o: Partial<OurTerms> = {}): OurTerms => ({
     leadDays: 45,
     leadFrom: "after_payment",
@@ -160,10 +160,10 @@ describe("what we promise, beside what the factory gives", () => {
     ...t,
   });
 
-  it("lead time: the days to spare, or the days the factory needs more", () => {
-    expect(leadCheck(ours(), theirs())).toEqual({ key: "lead", ok: true, word: "15 days to spare", text: "Jinan gives 30 days after the advance · 15 days to spare" });
+  it("lead time: the days to spare, or the days the supplier needs more", () => {
+    expect(leadCheck(ours(), theirs())).toEqual({ key: "lead", ok: true, word: "15 days to spare", text: "Jinan gives 30 days after the deposit · 15 days to spare" });
     expect(leadCheck(ours({ leadDays: 30 }), theirs())?.word).toBe("Nothing to spare");
-    expect(leadCheck(ours({ leadDays: 25 }), theirs())).toEqual({ key: "lead", ok: false, word: "5 days short", text: "Jinan needs 30 days after the advance: 5 days more than we promise." });
+    expect(leadCheck(ours({ leadDays: 25 }), theirs())).toEqual({ key: "lead", ok: false, word: "5 days short", text: "Jinan needs 30 days after the deposit: 5 days more than we promise." });
     expect(leadCheck(ours(), theirs({ leadFrom: "after_drawings" }))).toMatchObject({ ok: false, word: "Allow for the drawings" });
     expect(leadCheck(ours({ leadDays: null }), theirs())).toBeNull();
   });
@@ -191,12 +191,12 @@ describe("what we promise, beside what the factory gives", () => {
     expect(paymentCheck(ours(), theirs({ costMinor: null }))).toBeNull();
   });
 
-  it("warranty: the months the factory does not cover, counted from shipment", () => {
+  it("warranty: the months the supplier does not cover, counted from shipment", () => {
     expect(warrantyCheck(ours(), theirs())).toEqual({
       key: "warranty",
       ok: false,
       word: "2 months not covered",
-      text: "Jinan gives 12 months from shipment (the site test is about 2 months after shipment), so the last 2 months of ours are not covered by the factory: ask Jinan for 14 months, or keep it in mind.",
+      text: "Jinan gives 12 months from shipment (the site test is about 2 months after shipment), so the last 2 months of ours are not covered by the supplier: ask Jinan for 14 months, or keep it in mind.",
     });
     expect(warrantyCheck(ours({ warrantyFrom: "shipment" }), theirs())).toEqual({ key: "warranty", ok: true, word: "Covered", text: "Covered: Jinan gives 12 months from shipment." });
     expect(warrantyCheck(ours(), theirs({ warrantyMonths: null }))).toBeNull();
@@ -232,8 +232,8 @@ describe("what we promise, beside what the factory gives", () => {
   });
 });
 
-describe("the factory's plan on an order, from its offer's parts", () => {
-  it("an advance and the rest when ready is the usual plan (left to it, as before)", () => {
+describe("the supplier's plan on an order, from its offer's parts", () => {
+  it("a deposit and the rest when ready is the usual plan (left to it, as before)", () => {
     expect(plainOfferParts(JINAN)).toBe(true);
     expect(plainOfferParts([part("All when ready", 100, "on_ready")])).toBe(true);
     expect(plainOfferParts([part("All with the order", 100, "on_order")])).toBe(true);

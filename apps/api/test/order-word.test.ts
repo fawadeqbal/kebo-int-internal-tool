@@ -34,7 +34,7 @@ describe("the order's one status word", () => {
     }
   });
 
-  it("follows the facts, not a stage moved by hand: back when the factory order is undone, forward only when it is placed", async () => {
+  it("follows the facts, not a stage moved by hand: back when the purchase order is undone, forward only when it is placed", async () => {
     const db = prisma.company(FIRST_COMPANY_ID);
     // An open order not ordered from the factory yet and with nothing shipped: Confirmed.
     const o = await db.order.findFirst({

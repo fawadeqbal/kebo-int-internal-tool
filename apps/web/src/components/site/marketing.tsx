@@ -410,7 +410,7 @@ function HeroDocument() {
           </tbody>
         </table>
         <div className="mt-3 flex items-center justify-between border-t border-(--s-line) pt-3 text-sm text-(--s-steel)">
-          <span>Margin on factory cost</span>
+          <span>Margin on supplier cost</span>
           <span className="font-mono">18%</span>
         </div>
         <div className="mt-2 flex items-baseline justify-between">

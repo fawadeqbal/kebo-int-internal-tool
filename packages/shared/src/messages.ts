@@ -12,7 +12,7 @@ export type MessageGroup = (typeof MESSAGE_GROUPS)[number];
 export const MESSAGE_GROUP_LABEL: Record<MessageGroup, string> = {
   sales: "Inquiries and quotations",
   money: "Customer money",
-  orders: "Orders and the factory",
+  orders: "Orders and the supplier",
   approvals: "Approvals",
   followups: "Follow-ups",
   people: "People and notes",

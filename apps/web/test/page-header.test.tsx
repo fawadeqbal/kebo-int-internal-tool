@@ -3,7 +3,7 @@ import { render } from "@testing-library/react";
 import { ButtonLink, PageHeader, StatusBadge } from "@kebo/ui";
 
 describe("PageHeader", () => {
-  it("has one primary slot: papers and ⋯ stay secondary, so a page shows at most one primary", () => {
+  it("has one primary slot: documents and ⋯ stay secondary, so a page shows at most one primary", () => {
     const { container } = render(
       <PageHeader
         title="SO-2026-0447"

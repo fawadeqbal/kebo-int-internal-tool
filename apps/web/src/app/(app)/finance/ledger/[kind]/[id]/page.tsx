@@ -61,7 +61,7 @@ export default async function PartyLedgerPage({
   const rows = sp.cur ? p.rows.filter((r) => r.currency === sp.cur) : p.rows;
   const currencies = p.currencies.filter((c) => !sp.cur || c.currency === sp.cur);
   const single = currencies.length === 1 ? currencies[0]!.currency : null;
-  const plural = kind === "customer" ? "Customers" : kind === "factory" ? "Factories" : "Staff";
+  const plural = kind === "customer" ? "Customers" : kind === "factory" ? "Suppliers" : "Staff";
   const closing = p.currencies.filter((c) => Number(c.closing) !== 0).map((c) => money(c.closing, c.currency));
   const summary = [
     kind === "customer" ? "customer" : kind === "factory" ? "factory" : "staff (to repay)",
@@ -110,7 +110,7 @@ export default async function PartyLedgerPage({
           { key: "all", label: "All entries" },
           { key: "accounts", label: "By account" },
           { key: "customers", label: "Customers" },
-          { key: "factories", label: "Factories" },
+          { key: "factories", label: "Suppliers" },
           { key: "staff", label: "Staff" },
           { key: "orders", label: "Orders" },
         ].map((v) => ({

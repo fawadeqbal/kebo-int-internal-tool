@@ -16,12 +16,12 @@ export default async function FactoryLayout({ children, params }: { children: Re
   const me = await requirePermission("sourcing.manage");
   const [f, managers] = await Promise.all([factoryOf(id), can(me, "expenses.manage") ? hasFeature("expenses") : false]);
   const r = f.record;
-  const base = `/factories/${f.id}`;
+  const base = `/suppliers/${f.id}`;
 
   return (
     <div>
       <PageHeader
-        crumbs={[{ label: "Purchasing" }, { label: "Suppliers", href: "/factories" }, { label: f.name }]}
+        crumbs={[{ label: "Purchasing" }, { label: "Suppliers", href: "/suppliers" }, { label: f.name }]}
         icon={Factory}
         phoneStack
         title={f.name}

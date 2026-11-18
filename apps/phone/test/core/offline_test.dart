@@ -184,7 +184,7 @@ void main() {
     };
     final (api, box, server, _) = _setup(answers);
     server.offline = true;
-    await (box.chain('Factory visit')..patch(
+    await (box.chain('Supplier visit')..patch(
           '/api/orders/o1/details',
           {'readyBy': <Object?>[]},
           guard: {

@@ -247,7 +247,7 @@ describe("money fixes", () => {
     });
   });
 
-  describe("what we owe a factory", () => {
+  describe("what we owe a supplier", () => {
     let d: Awaited<ReturnType<typeof deal>>;
     let orderId: string;
     let lineIds: string[];
@@ -281,12 +281,12 @@ describe("money fixes", () => {
       expect(m.factories.rows).toEqual([expect.objectContaining({ currency: "CNY", owed: "194.96", toPay: "194.96", lines: 2 })]);
     });
 
-    it("stays as ordered when the factory's offer changes or loses a line", async () => {
+    it("stays as ordered when the supplier's offer changes or loses an item", async () => {
       await api(app, sana)
-        .patch(`/factory-lines/${lineIds[0]}`, { unitPrice: 200, taxRate: 0, reason: "Factory raised its price" })
+        .patch(`/factory-lines/${lineIds[0]}`, { unitPrice: 200, taxRate: 0, reason: "Supplier raised its price" })
         .expect(200);
       await api(app, sana)
-        .delete(`/factory-lines/${lineIds[1]}?reason=${encodeURIComponent("Factory dropped it")}`)
+        .delete(`/factory-lines/${lineIds[1]}?reason=${encodeURIComponent("Supplier dropped it")}`)
         .expect(200);
       const m = await orderMoney(orderId);
       expect(m.factories.rows).toEqual([expect.objectContaining({ owed: "194.96", toPay: "194.96", lines: 2 })]);
@@ -374,7 +374,7 @@ describe("money fixes", () => {
 
   describe("expense rates", () => {
     it("are 1 in the main currency, kept while the currency stays, and looked up (or asked for) when it changes", async () => {
-      const base = { category: "office", description: `Paper ${tag}`, spentOn: today };
+      const base = { category: "office", description: `Document ${tag}`, spentOn: today };
       const e = (
         await api(app, manager)
           .post("/expenses", { ...base, amount: 70, currency: "CNY", rate: 7 })
@@ -579,7 +579,7 @@ describe("money fixes", () => {
     });
   });
 
-  it("works out what a factory line owes the same way in the database as in the app", async () => {
+  it("works out what a supplier item owes the same way in the database as in the app", async () => {
     // Random prices, taxes and quantities with 2 decimals, and the half-cent cases.
     let seed = 42;
     const rnd = (n: number) => ((seed = (seed * 1103515245 + 12345) % 2 ** 31), seed % n);

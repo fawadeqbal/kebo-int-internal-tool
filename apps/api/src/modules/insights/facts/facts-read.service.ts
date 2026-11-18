@@ -391,7 +391,7 @@ export class FactsReadService {
    */
   async owed(user: SessionUser, q: { side: "receivable" | "payable" }) {
     const { seeMoney, today, currency } = await this.open(user);
-    if (q.side === "payable" && !seeMoney) throw new ForbiddenError("Only people who may see money see what we owe factories.");
+    if (q.side === "payable" && !seeMoney) throw new ForbiddenError("Only people who may see money see what we owe suppliers.");
     const table = Prisma.raw(q.side === "receivable" ? "order_facts" : "factory_order_facts");
     const party = Prisma.raw(q.side === "receivable" ? "f.customer_id" : "f.factory_id");
     const rows = await this.prisma.db.$queryRaw<{ partyId: string; total: string; overdue: string }[]>`
@@ -408,7 +408,7 @@ export class FactsReadService {
    */
   async factoryOrders(user: SessionUser, q: { factoryId: string }) {
     const { seeMoney, currency } = await this.open(user);
-    if (!seeMoney) throw new ForbiddenError("Only people who may see money see what we owe factories.");
+    if (!seeMoney) throw new ForbiddenError("Only people who may see money see what we owe suppliers.");
     const rows = await this.prisma.db.$queryRaw<
       { orderId: string; refNo: string; orderedOn: Date; status: string; stage: string; currency: string | null; owed: string | null; paid: string | null; toPay: string | null; owedMain: string; paidMain: string; toPayMain: string; readyPromised: Date | null; readyActual: Date | null; daysLate: number | null }[]
     >`
@@ -452,7 +452,7 @@ export class FactsReadService {
     trusted = false,
   ) {
     const { seeMoney, today, currency } = await this.open(user, trusted);
-    if (q.side === "payable" && !seeMoney) throw new ForbiddenError("Only people who may see money see what we owe factories.");
+    if (q.side === "payable" && !seeMoney) throw new ForbiddenError("Only people who may see money see what we owe suppliers.");
     const table = Prisma.raw(q.side === "receivable" ? "order_facts" : "factory_order_facts");
     const scope =
       q.side === "receivable"

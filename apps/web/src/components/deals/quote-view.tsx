@@ -121,7 +121,7 @@ function OptionTable({ o, currency, title }: { o: OptionView; currency: string; 
     <div className="flex flex-col gap-2">
       {title && <p className="text-[13px] font-semibold">{title}</p>}
       {/* A phone: one line per row, nothing wider than the screen. */}
-      <ul aria-label={title ?? "Lines"} className="flex flex-col divide-y divide-line rounded-xl border border-line bg-surface sm:hidden">
+      <ul aria-label={title ?? "Items"} className="flex flex-col divide-y divide-line rounded-xl border border-line bg-surface sm:hidden">
         {o.lines.map((l) => {
           const part = l.no.includes(".");
           const m = costs ? marginOf(l.unitPrice, l.unitCost) : null;
@@ -156,7 +156,7 @@ function OptionTable({ o, currency, title }: { o: OptionView; currency: string; 
         })}
       </ul>
       {/* It can scroll sideways, so Tab stops on it. */}
-      <div tabIndex={0} role="region" aria-label={title ?? "Lines"} className="overflow-x-auto rounded-xl border border-line bg-surface focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none max-sm:hidden">
+      <div tabIndex={0} role="region" aria-label={title ?? "Items"} className="overflow-x-auto rounded-xl border border-line bg-surface focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none max-sm:hidden">
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="bg-surface-2 text-left text-xs text-text-2">
@@ -167,7 +167,7 @@ function OptionTable({ o, currency, title }: { o: OptionView; currency: string; 
                 Item
               </th>
               <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium">
-                Qty
+                Quantity
               </th>
               {costs && (
                 <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium max-md:hidden">

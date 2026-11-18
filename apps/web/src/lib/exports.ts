@@ -83,7 +83,7 @@ async function deals(q: Q): Promise<SheetSpec> {
       text("Channel", 11),
       text("Category", 18),
       count("Items"),
-      text("Handled by", 16),
+      text("Responsible person", 16),
       text("Received on", 12),
       text("Required by", 12),
       text("Quotation", 14),
@@ -136,7 +136,7 @@ async function orders(q: Q): Promise<SheetSpec> {
       text("Country", 14),
       text("Inquiry", 14),
       text("Inquiry title", 30),
-      text("Handled by", 16),
+      text("Responsible person", 16),
       text("Stage", 13),
       text("Ordered on", 12),
       text("Ready on", 12),
@@ -206,10 +206,10 @@ async function customers(q: Q): Promise<SheetSpec> {
 async function factories(q: Q): Promise<SheetSpec> {
   const rows = await allPages<FactoryRow>("/factories", { q: q.q, mine: q.mine === "1" ? "true" : undefined, city: q.city, owner: q.owner, status: q.status });
   return {
-    name: `Factories ${stamp()}`,
-    title: "Factories",
+    name: `Suppliers ${stamp()}`,
+    title: "Suppliers",
     columns: [
-      text("Factory name", 32),
+      text("Supplier name", 32),
       text("Contact person", 22),
       text("Phone", 18),
       text("Email", 26),
@@ -243,7 +243,7 @@ async function receivables(): Promise<SheetSpec> {
     columns: [
       text("Order no.", 14),
       text("Customer", 28),
-      text("Handled by"),
+      text("Responsible person"),
       text("Stage", 13),
       text("Currency", 9),
       money("Total"),
@@ -278,10 +278,10 @@ async function receivables(): Promise<SheetSpec> {
 async function payables(q: Q): Promise<SheetSpec> {
   const rows = await api.get<Payable[]>("/money/payables", { mine: q.mine === "1" ? "true" : undefined });
   return {
-    name: `To pay factories ${stamp()}`,
+    name: `To pay suppliers ${stamp()}`,
     title: "To pay",
     columns: [
-      text("Factory", 30),
+      text("Supplier", 30),
       text("Looked after by"),
       text("Currency", 9),
       money("Owed"),
@@ -378,7 +378,7 @@ async function ledgerParty(q: Q): Promise<SheetSpec> {
 
 const CASH_KIND: Record<string, string> = {
   in: "Money in",
-  factory: "Paid to factory",
+  factory: "Paid to supplier",
   expense: "Expense",
   transfer_out: "Transfer out",
   transfer_in: "Transfer in",
@@ -465,7 +465,7 @@ async function expenses(q: Q): Promise<SheetSpec> {
       text("Customer", 24),
       text("Inquiry", 14),
       text("Order", 14),
-      text("Factory", 22),
+      text("Supplier", 22),
       text("Paid by"),
       text("Account", 18),
       text("Currency", 9),
@@ -607,7 +607,7 @@ async function quotation(q: Q): Promise<SheetSpec> {
     text("No.", 7),
     text("Description", 48),
     text("Model", 16),
-    { header: "Qty", kind: "number", width: 10 },
+    { header: "Quantity", kind: "number", width: 10 },
     text("Unit", 9),
     ...(internal
       ? [...(costs ? [money(`Unit cost ${c}`), count("Margin %")] : []), money(`Unit price ${c}`), money(`Amount ${c}`)]
@@ -667,13 +667,13 @@ async function factoryList(q: Q): Promise<SheetSpec> {
   if (!UUID.test(q.id ?? "")) throw new ExportNotFound();
   const d = await api.get<DealDetail>(`/inquiries/${q.id}`);
   return {
-    name: `${d.refNo} list for factories`,
+    name: `${d.refNo} list for suppliers`,
     title: d.refNo,
     columns: [
       text("No.", 7),
       text("Item", 52),
       text("Model", 18),
-      { header: "Qty", kind: "number", width: 10 },
+      { header: "Quantity", kind: "number", width: 10 },
       text("Unit", 9),
       money("Your unit price"),
       money("Your total"),
@@ -691,7 +691,7 @@ async function purchaseOrders(): Promise<SheetSpec> {
   return {
     name: `Purchase orders ${stamp()}`,
     title: "Purchase orders",
-    columns: [text("PO", 16), text("Supplier", 30), text("Sales order", 16), text("Customer", 28), text("Currency", 9), money("Total"), money("Paid"), money("To pay"), text("Ready"), text("Sent"), text("Their no.", 16), text("Status", 16)],
+    columns: [text("Purchase order", 16), text("Supplier", 30), text("Sales order", 16), text("Customer", 28), text("Currency", 9), money("Total"), money("Paid"), money("To pay"), text("Ready"), text("Sent"), text("Their no.", 16), text("Status", 16)],
     rows: rows.map((r): Cell[] => [
       r.po?.number ?? null,
       r.supplier.name,

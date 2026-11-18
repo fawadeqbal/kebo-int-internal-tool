@@ -22,7 +22,7 @@ export type OrderTab = (typeof ORDER_TABS)[number];
 export const ORDER_TAB_LABEL: Record<OrderTab, string> = {
   overview: "Overview",
   payment: "Payment",
-  factory: "Factory order",
+  factory: "Purchase order",
   production: "Production",
   shipping: "Shipping",
   delivery: "Delivery & SAT",
@@ -76,7 +76,7 @@ export const ORDER_SECTION_LABEL: Record<OrderSection, string> = {
   factory_payments: "Payments made",
   ready_date: "Ready date",
   fat: "Factory test (FAT)",
-  goods: "Goods from the factory",
+  goods: "Goods from the supplier",
   booking: "Booking",
   container: "Container and loading",
   vessel: "Vessel and bill of lading",
@@ -141,7 +141,7 @@ export const FREIGHT_TERMS_LABEL: Record<FreightTerms, string> = { prepaid: "Pre
 /** Who bears a claim. */
 export const CLAIM_BEARERS = ["factory", "us", "customer"] as const;
 export type ClaimBearer = (typeof CLAIM_BEARERS)[number];
-export const CLAIM_BEARER_LABEL: Record<ClaimBearer, string> = { factory: "The factory", us: "We do", customer: "The customer" };
+export const CLAIM_BEARER_LABEL: Record<ClaimBearer, string> = { factory: "The supplier", us: "We do", customer: "The customer" };
 
 /** What is stored about one order, gathered once: every section's word is read from it. Dates are YYYY-MM-DD. */
 export interface StoredFacts {
@@ -319,7 +319,7 @@ export function stageWords(f: SectionFacts, today: ISODate): Record<(typeof ORDE
   const extra = f.documents.filter((d) => d.kind !== "proforma_invoice" && !asked.includes(d.kind));
   const total = asked.length + 1 + extra.length;
   const ready = asked.filter(done).length + (f.proforma || done("proforma_invoice") ? 1 : 0) + extra.filter((d) => documentDone(d.status)).length;
-  const documents: StageWord = { word: `${ready} of ${total} papers`, tone: ready >= total ? "ok" : "neutral", tab: `${ready} of ${total}` };
+  const documents: StageWord = { word: `${ready} of ${total} documents`, tone: ready >= total ? "ok" : "neutral", tab: `${ready} of ${total}` };
 
   return { payment, factory, production, shipping, delivery, documents };
 }
@@ -350,7 +350,7 @@ const PAPER_SHORT: Record<OrderDocumentKind, string> = {
   certificate_of_origin: "origin",
   insurance: "insurance",
   inspection: "inspection",
-  other: "other paper",
+  other: "other document",
 };
 
 export interface StageStand extends StageWord {
@@ -384,7 +384,7 @@ export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
   const fac = f.factories ?? [];
   const names = list(fac.map((x) => x.name));
   const factory = !f.factoryOrderedOn
-    ? join(names || "Not ordered from the factory yet", fac.length === 1 ? amount(fac[0]!.currency, fac[0]!.owed) : null)
+    ? join(names || "Not ordered from the supplier yet", fac.length === 1 ? amount(fac[0]!.currency, fac[0]!.owed) : null)
     : join(
         names,
         `ordered ${dayMonth(f.factoryOrderedOn)}`,
@@ -401,9 +401,9 @@ export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
       ? `factory test planned ${dayMonth(test.plannedOn)}`
       : null;
   const left = f.readyOn ? daysBetween(today, f.readyOn) : 0;
-  const goods = f.goods.lines > 0 && f.goods.received > 0 ? `${f.goods.received} of ${many(f.goods.lines, "line")} received` : null;
+  const goods = f.goods.lines > 0 && f.goods.received > 0 ? `${f.goods.received} of ${many(f.goods.lines, "item")} received` : null;
   const production = received
-    ? join(f.readyOn ? `Ready ${dayMonth(f.readyOn)}` : null, fat, `${f.goods.received} of ${many(f.goods.lines, "line")} received`)
+    ? join(f.readyOn ? `Ready ${dayMonth(f.readyOn)}` : null, fat, `${f.goods.received} of ${many(f.goods.lines, "item")} received`)
     : f.readyOn
       ? join(left > 0 ? `${many(left, "day")} left` : left === 0 ? "ready today" : `${many(-left, "day")} late`, fat, goods)
       : join("No ready date yet", fat);
@@ -443,7 +443,7 @@ export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
   const made = [...(hasProforma ? ["proforma"] : []), ...asked.filter(done).map((k) => PAPER_SHORT[k])];
   const toCome = [...(hasProforma ? [] : ["proforma"]), ...asked.filter((k) => !done(k)).map((k) => PAPER_SHORT[k])];
   const sentence = list(made);
-  const documents = made.length ? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)} ready` : "No paper yet";
+  const documents = made.length ? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)} ready` : "No document yet";
   const documentsMissing = toCome.length ? (toCome.length <= 3 ? `${toCome.join(", ")} to come` : `${toCome.length} to come`) : "";
 
   const row = (stage: (typeof ORDER_FLOW_STAGES)[number], fact: string, missing = ""): StageStand => ({ stage, label: ORDER_TAB_LABEL[stage], ...w[stage], fact, missing });
@@ -508,21 +508,21 @@ export const EDIT_CARDS: Record<string, { label: string; step?: FlowStep }> = {
   /** The inquiry's boxes (design rules 18 Nov): what changed in Customer and Details, each with its reason. */
   "request.customer": { label: "Customer" },
   "request.details": { label: "Details" },
-  lines: { label: "Offer lines" },
+  lines: { label: "Offer items" },
   /** A factory offer's boxes (design 18 Nov): what changed in each part, with its reason. */
-  "offer.factory": { label: "Factory" },
+  "offer.factory": { label: "Supplier" },
   "offer.prices": { label: "Prices" },
   "offer.terms": { label: "Delivery & payment" },
   "offer.conditions": { label: "Conditions" },
-  factory: { label: "Factory order", step: "factory" },
+  factory: { label: "Purchase order", step: "factory" },
   production: { label: "Production", step: "production" },
-  "lines.received": { label: "Lines from the factory", step: "production" },
-  "lines.packing": { label: "Packing lines", step: "shipping" },
+  "lines.received": { label: "Items from the supplier", step: "production" },
+  "lines.packing": { label: "Packing list", step: "shipping" },
   "packing.marks": { label: "Shipping marks", step: "shipping" },
   shipment: { label: "Shipment", step: "shipping" },
   shipping: { label: "Shipping", step: "shipping" },
   delivery: { label: "Delivery", step: "delivery" },
-  "lines.delivered": { label: "Lines delivered", step: "delivery" },
+  "lines.delivered": { label: "Items delivered", step: "delivery" },
 };
 /** "Lines from the factory" for "lines.received"; the key itself when it is not a known card. */
 export const editCardLabel = (card: string) => EDIT_CARDS[cardKey(card)]?.label ?? card;

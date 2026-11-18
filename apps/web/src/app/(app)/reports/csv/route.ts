@@ -47,7 +47,7 @@ function toCsv(r: ReportView) {
     row("Person", "Won", "Lost", "Win rate %"),
     ...r.people.map((x) => row(x.person, x.won, x.lost, x.winRatePercent)),
     "",
-    row("Estimated profit (lines without a cost are left out of profit and margin)"),
+    row("Estimated profit (items without a cost are left out of profit and margin)"),
     row("Group", "Name", "Orders", "Sales", "Not costed", "Cost", PROFIT_LABEL.grossOnQuote, "Margin %", "Costed %"),
     row(
       "Total",

@@ -135,9 +135,9 @@ export function ExpenseRecord({
         ...(e.factory
           ? [
               {
-                label: "Factory visited",
+                label: "Supplier visited",
                 value: (
-                  <Link href={`/factories/${e.factory.id}`} className="hover:text-primary">
+                  <Link href={`/suppliers/${e.factory.id}`} className="hover:text-primary">
                     {e.factory.name}
                   </Link>
                 ),

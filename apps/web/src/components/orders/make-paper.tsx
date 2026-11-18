@@ -157,7 +157,7 @@ function CheckRow({
               </form>
             </li>
           ))}
-          <li className="text-xs text-muted">Saved on the order&apos;s line, so every paper has it.</li>
+          <li className="text-xs text-muted">Saved on the order&apos;s item, so every document has it.</li>
         </ul>
       )}
     </li>
@@ -212,7 +212,7 @@ function RefreshBuyer({
           </div>
           <p className="text-sm text-text-2">
             {changes.length ? `The customer's ${changes.join(", ")} changed since the order was made. ` : ""}
-            Papers made from now on print the customer as it is now. Papers already made final keep the buyer they were printed with.
+            Documents made from now on print the customer as it is now. Documents already made final keep the buyer they were printed with.
           </p>
           <label htmlFor={`${id}-reason`} className="text-sm font-medium">
             Why? <span className="font-normal text-muted">Kept in the order&apos;s history.</span>
@@ -274,7 +274,7 @@ function BuyerBox({
       {numbers && <p className="text-xs text-muted">{numbers}</p>}
       {changes.length > 0 ? (
         <p className="mt-2 text-xs text-action">
-          The customer&apos;s {changes.join(", ")} changed since. This paper prints the buyer as on the order until it is refreshed.
+          The customer&apos;s {changes.join(", ")} changed since. This document prints the buyer as on the order until it is refreshed.
         </p>
       ) : (
         <p className="mt-2 text-xs text-muted">
@@ -309,10 +309,10 @@ function TermsBox({ p }: { p: PaperChecks }) {
         <strong>{t.route}</strong>.
       </p>
       <p className="mt-0.5 text-xs text-text-2">
-        The paper words the payment terms from the route; the agreed conditions are {t.printed ? "printed too" : "left off"}.{" "}
+        The document words the payment terms from the route; the agreed conditions are {t.printed ? "printed too" : "left off"}.{" "}
         {/* One place for how the order's papers print (design "terms that travel"). */}
         <Link href={`/orders/${p.orderId}/documents`} className="font-medium text-primary hover:underline">
-          Change in How the papers print
+          Change in How the documents print
         </Link>
       </p>
     </section>
@@ -418,7 +418,7 @@ export function MakePaper({
         </div>
 
         {p.factories && p.factories.length > 1 && (
-          <nav aria-label="Factory" className="flex flex-wrap gap-1.5">
+          <nav aria-label="Supplier" className="flex flex-wrap gap-1.5">
             {p.factories.map((f) => (
               <Link
                 key={f.id}
@@ -533,7 +533,7 @@ export function MakePaper({
           )
         ) : (
           <p className="text-xs text-muted">
-            You can see this paper; making it needs the &ldquo;Papers, documents and bank&rdquo; permission.
+            You can see this document; making it needs the &ldquo;Documents and bank&rdquo; permission.
           </p>
         )}
 

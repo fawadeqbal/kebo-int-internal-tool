@@ -271,7 +271,7 @@ const OWE_CHIPS = [
   { key: "all", label: "All open" },
   { key: "late", label: "Late" },
   { key: "week", label: "Due this week" },
-  { key: "factories", label: "Factories" },
+  { key: "factories", label: "Suppliers" },
   { key: "bills", label: "Freight and other bills" },
   { key: "repay", label: "To repay our people" },
 ] as const;

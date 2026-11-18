@@ -45,7 +45,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const rows = keys.length ? list.papers.filter((p) => keys.includes(p.key)) : list.papers.filter((p) => p.inSet && paperDone(p.state));
   const made = (r: PaperRow) => r.source === "app" && r.printable && (paperDone(r.state) || r.live || r.state === "draft");
   const usable = rows.filter((r) => made(r) || r.doc?.file);
-  if (!usable.length) return new Response("None of these papers has a file or a print yet.", { status: 404 });
+  if (!usable.length) return new Response("None of these documents has a file or a print yet.", { status: 404 });
 
   const printPath = (r: PaperRow) => {
     const q = new URLSearchParams(r.ref ? { ref: r.ref } : {});
@@ -83,7 +83,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       entries[name] = p.data;
     });
     return new Response(Buffer.from(zipSync(entries, { level: 0 })), {
-      headers: attachmentHeaders(`${list.refNo} papers.zip`, "application/zip"),
+      headers: attachmentHeaders(`${list.refNo} documents.zip`, "application/zip"),
     });
   }
 
@@ -110,7 +110,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
   }
   if (!out.getPageCount())
-    return new Response("None of these papers could be joined into one PDF. Download them as a zip.", { status: 422 });
-  out.setTitle(`${list.refNo} papers`);
-  return new Response(Buffer.from(await out.save()), { headers: attachmentHeaders(pdfName(`${list.refNo} papers`), "application/pdf") });
+    return new Response("None of these documents could be joined into one PDF. Download them as a zip.", { status: 422 });
+  out.setTitle(`${list.refNo} documents`);
+  return new Response(Buffer.from(await out.save()), { headers: attachmentHeaders(pdfName(`${list.refNo} documents`), "application/pdf") });
 }

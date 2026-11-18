@@ -52,7 +52,7 @@ export function FactoryOrderWindow({
 
 /** "Pay the factory": money sent to a factory on this order, with its slip. */
 export function PayFactoryWindow({
-  label = "Pay the factory",
+  label = "Pay the supplier",
   main,
   sub,
   ...p
@@ -75,7 +75,7 @@ export function PayFactoryWindow({
   const { startOpen, onClosed, ...fields } = p;
   return (
     <>
-      <FormWindow button={{ label, kind: main ? "main" : "plain" }} title="Pay the factory" sub={sub} size="lg" disabled={!p.factories.length} startOpen={startOpen} onClosed={onClosed}>
+      <FormWindow button={{ label, kind: main ? "main" : "plain" }} title="Pay the supplier" sub={sub} size="lg" disabled={!p.factories.length} startOpen={startOpen} onClosed={onClosed}>
         {(close) => <FactoryPaymentForm {...fields} bare onClose={close} onFileError={setFileError} />}
       </FormWindow>
       {fileError && <Alert tone="error">{fileError}</Alert>}
@@ -157,8 +157,8 @@ function FactoryAgreedFields({ state, values, payment, sent }: { state: ActionSt
     <>
       <p className="rounded-md bg-info-soft px-3 py-2 text-xs text-text">
         {sent
-          ? "Their offer stays as they sent it. What you change here is what this purchase order and its paper use from now on; a paper already made final keeps what it said."
-          : "Not sent yet: it goes to the factory with what you set here."}
+          ? "Their offer stays as they sent it. What you change here is what this purchase order and its document use from now on; a document already made final keeps what it said."
+          : "Not sent yet: it goes to the supplier with what you set here."}
       </p>
       <input type="hidden" name="leadDays" value={leadDays.trim()} />
       <input type="hidden" name="leadFrom" value={leadDays.trim() ? leadFrom : ""} />
@@ -167,7 +167,7 @@ function FactoryAgreedFields({ state, values, payment, sent }: { state: ActionSt
       <input type="hidden" name="warranty" value={covers} />
 
       <PanelSection title="Delivery" sub="where they hand the goods over, and how long they need" first>
-        <Field label="Delivery basis (Incoterm)" htmlFor="fac-basis" optional error={e.basis}>
+        <Field label="Incoterm" htmlFor="fac-basis" optional error={e.basis}>
           <Select id="fac-basis" name="basis" defaultValue={v("basis")}>
             <option value="">Not said</option>
             {INCOTERMS.map((t) => (
@@ -207,7 +207,7 @@ function FactoryAgreedFields({ state, values, payment, sent }: { state: ActionSt
         <Field label="Minimum order" htmlFor="fac-moq" optional error={e.moq}>
           <Input id="fac-moq" name="moq" maxLength={60} defaultValue={v("moq")} />
         </Field>
-        <Field label="Notes to the factory" htmlFor="fac-notes" optional error={e.notes}>
+        <Field label="Notes to the supplier" htmlFor="fac-notes" optional error={e.notes}>
           <Textarea id="fac-notes" name="notes" rows={3} className="min-h-0" maxLength={5000} defaultValue={v("notes")} />
         </Field>
       </PanelSection>

@@ -51,7 +51,7 @@ export async function saveFactoryQuoteAction(
     await attempt(
       form,
       () => (quoteId ? api.put(`/factory-quotes/${quoteId}`, body) : api.post(`/inquiries/${dealId}/factory-quotes`, body)),
-      quoteId ? "Factory prices saved." : "Factory prices added.",
+      quoteId ? "Supplier prices saved." : "Supplier prices added.",
     ),
   );
   if (!r.ok) return r;
@@ -72,7 +72,7 @@ export async function removeFactoryQuoteAction(dealId: string, quoteId: string, 
   const r = await attempt(
     form,
     () => api.delete(`/factory-quotes/${quoteId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`),
-    "Factory prices removed.",
+    "Supplier prices removed.",
   );
   if (r.ok) refresh(dealId);
   return r;

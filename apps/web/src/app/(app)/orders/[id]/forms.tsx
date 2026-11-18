@@ -229,11 +229,11 @@ export function DetailsCard({
     ...fixed,
     { label: "Ship by", value: shipBy },
     {
-      label: compact ? "Ready by" : "Ready at factory",
+      label: compact ? "Ready by" : "Ready at supplier",
       value: shown.readyOn,
       note: readyEach ? (
         <a href={readyEach.href} className="text-xs font-normal text-primary hover:underline">
-          the latest of {readyEach.count} factories · edit in Factory
+          the latest of {readyEach.count} suppliers · edit in Supplier
         </a>
       ) : undefined,
     },
@@ -269,16 +269,16 @@ export function DetailsCard({
           </dl>
         }
         {editing && (
-          <SidePanel title="Edit the order" description="Its dates, the customer's PO, and who the goods go to. Saving updates every page of the order." onClose={() => setEditing(false)}>
+          <SidePanel title="Edit the order" description="Its dates, the customer's order no., and who the goods go to. Saving updates every page of the order." onClose={() => setEditing(false)}>
           <PanelBody>
           <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3">
             {(s) => (
               <>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Their PO no." htmlFor="d-po" optional error={s.errors?.customerRef}>
+                  <Field label="Customer's order no." htmlFor="d-po" optional error={s.errors?.customerRef}>
                     <Input id="d-po" name="customerRef" maxLength={80} defaultValue={s.values?.customerRef ?? values.customerRef ?? ""} />
                   </Field>
-                  <Field label="Their PO date" htmlFor="d-poOn" optional error={s.errors?.customerPoOn}>
+                  <Field label="Customer's order date" htmlFor="d-poOn" optional error={s.errors?.customerPoOn}>
                     <Input id="d-poOn" name="customerPoOn" type="date" max={today} defaultValue={s.values?.customerPoOn ?? values.customerPoOn ?? ""} />
                   </Field>
                 </div>
@@ -308,9 +308,9 @@ export function DetailsCard({
                 </Field>
                 {readyEach ? (
                   <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs text-text-2">
-                    Each of the {readyEach.count} factories gives its own ready date:{" "}
+                    Each of the {readyEach.count} suppliers gives its own ready date:{" "}
                     <a href={readyEach.href} className="font-medium text-primary hover:underline">
-                      edit them on the Factory step
+                      edit them on the Supplier step
                     </a>
                     .
                   </p>
@@ -469,9 +469,9 @@ export function CancelOrderForm({
               {factoryPaid.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <input type="hidden" name="factoryMoney" value={factoryMoney} />
-                  <p className="text-sm font-semibold">Factory advance {factoryPaid.join(", ")}</p>
-                  <div role="radiogroup" aria-label="Money paid to the factory" className="grid gap-2 sm:grid-cols-2">
-                    {choice("refund_due", factoryMoney, "Refund expected from the factory", () => setFactoryMoney("refund_due"))}
+                  <p className="text-sm font-semibold">Supplier deposit {factoryPaid.join(", ")}</p>
+                  <div role="radiogroup" aria-label="Money paid to the supplier" className="grid gap-2 sm:grid-cols-2">
+                    {choice("refund_due", factoryMoney, "Refund expected from the supplier", () => setFactoryMoney("refund_due"))}
                     {choice("loss", factoryMoney, "A loss on this order", () => setFactoryMoney("loss"))}
                   </div>
                 </div>

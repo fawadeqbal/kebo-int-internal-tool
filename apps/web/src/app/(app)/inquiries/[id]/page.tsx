@@ -78,7 +78,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
       {order && d.stage === "won" && (
         <div className="grid items-start gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader title="The deal" />
+            <CardHeader title="Accepted quotation" />
             <CardBody className="flex flex-col gap-2 text-sm">
               {opt && row("Accepted", `R${rev!.number} · Option ${opt.letter}${opt.factory ? ` · ${shortName(opt.factory.name)}` : ""}`)}
               {row("Sale", money(opt?.total ?? order.total, c))}

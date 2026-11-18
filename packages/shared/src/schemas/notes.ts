@@ -88,7 +88,7 @@ const oneTarget = (v: Partial<Record<(typeof TARGET_KEYS)[number], string | null
     ctx.addIssue({
       code: "custom",
       path: [given[1]!],
-      message: "A follow-up is on one record at most: an inquiry, an order, a customer or a factory",
+      message: "A follow-up is on one record at most: an inquiry, an order, a customer or a supplier",
     });
 };
 

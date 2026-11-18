@@ -77,7 +77,7 @@ export function paymentSentenceOf(depositPercent: number, balanceTerms: BalanceT
   const lower = rest.charAt(0).toLowerCase() + rest.slice(1);
   if (depositPercent <= 0) return `Payment: ${rest}.`;
   if (depositPercent >= 100) return "Our usual payment is made by 100% Advance payment.";
-  return `Our usual payment is made by ${depositPercent}% Advance deposit and ${100 - depositPercent}% ${lower.replace(/^balance /, "")}.`;
+  return `Our usual payment is made by ${depositPercent}% deposit and ${100 - depositPercent}% ${lower.replace(/^balance /, "")}.`;
 }
 
 /**

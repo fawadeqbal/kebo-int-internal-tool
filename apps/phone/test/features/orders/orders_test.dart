@@ -60,7 +60,7 @@ Map<String, Object?> _answers() => {
   },
   '/api/orders/$_id/sections': {
     'stands': [
-      {'stage': 'payment', 'label': 'Payment', 'word': 'Advance in', 'tone': 'ok', 'fact': 'USD 28,920 of 48,200'},
+      {'stage': 'payment', 'label': 'Payment', 'word': 'Deposit in', 'tone': 'ok', 'fact': 'USD 28,920 of 48,200'},
       {
         'stage': 'shipping',
         'label': 'Shipping',
@@ -98,7 +98,7 @@ Map<String, Object?> _answers() => {
     'label': 'Commercial invoice',
     'canMake': true,
     'checks': [
-      {'key': 'lines', 'label': 'Lines', 'value': '1 line · USD 48,200', 'ok': true, 'required': true},
+      {'key': 'lines', 'label': 'Items', 'value': '1 item · USD 48,200', 'ok': true, 'required': true},
       {'key': 'bl', 'label': 'B/L number', 'value': 'Missing', 'ok': false, 'required': true, 'fix': 'blNo'},
     ],
     'fixes': {
@@ -142,7 +142,7 @@ void main() {
     expect(find.textContaining('USD 19.3k due'), findsOneWidget);
   });
 
-  testWidgets('an order: header, next, where it stands, money, papers, files', (t) async {
+  testWidgets('an order: header, next, where it stands, money, documents, files', (t) async {
     await _open(t, '/orders/order/$_id');
     expect(find.text('Sales order · SO-2026-0035'), findsOneWidget);
     expect(find.textContaining('Balance due'), findsWidgets);
@@ -183,12 +183,12 @@ void main() {
     await t.pump(const Duration(seconds: 7));
   });
 
-  testWidgets('a paper: what is missing is added, then a draft is made', (t) async {
+  testWidgets('a document: what is missing is added, then a draft is made', (t) async {
     final (_, server) = await _open(t, '/orders/order/$_id/paper/invoice');
     expect(find.text('1 thing missing before it can be made final.'), findsOneWidget);
     await t.tap(find.text('Add'));
     await t.pumpAndSettle();
-    expect(find.text('Saved on the shipment, so every paper uses it.'), findsOneWidget);
+    expect(find.text('Saved on the shipment, so every document uses it.'), findsOneWidget);
     await t.enterText(find.widgetWithText(KTextField, 'B/L number'), 'MSCU1234567');
     await t.tap(find.text('Save').last);
     await t.pumpAndSettle();

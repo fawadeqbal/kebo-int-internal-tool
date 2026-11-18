@@ -23,7 +23,7 @@ type Props =
 export function PartyExcel(props: Props) {
   const { kind, importAction, exportHref } = props;
   const [review, setReview] = useState<{ file: string; read: PartyRead<CustomerInput | FactoryInput> } | null>(null);
-  const one = kind === "customers" ? "customer" : "factory";
+  const one = kind === "customers" ? "customer" : "supplier";
   const many = kind;
 
   const upload = (sheet: ReadSheet, file: string) =>
@@ -73,7 +73,7 @@ function Review({
   const title = useRef<HTMLHeadingElement>(null);
   const good = read.items.filter((i) => i.input);
   const bad = read.items.length - good.length;
-  const count = (k: number, word = one) => `${k} ${k === 1 ? word : word === "factory" ? "factories" : `${word}s`}`;
+  const count = (k: number, word = one) => `${k} ${k === 1 ? word : `${word}s`}`;
 
   useEffect(() => {
     title.current?.focus();

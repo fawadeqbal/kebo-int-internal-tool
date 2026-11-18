@@ -361,7 +361,7 @@ class _ExpenseState extends ConsumerState<_Expense> {
         KTextField(
           label: 'For',
           controller: _what,
-          hint: 'Taxi to the factory in Ningbo',
+          hint: 'Taxi to the supplier in Ningbo',
           error: _fields['description'],
         ),
         const SizedBox(height: KSpace.s4),

@@ -81,9 +81,9 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
     <PanelButton
       size="sm"
       className={SMALL}
-      label="Edit lines"
+      label="Edit items"
       title="Delivery"
-      description="How many of each line reached the customer, and in what condition. Nothing is saved until Save changes."
+      description="How many of each item reached the customer, and in what condition. Nothing is saved until Save changes."
       panelClassName="md:w-[1180px]"
       body={<OrderLinesEditor set="delivered" orderId={o.id} lines={goodsLines} today={now} edit={{ type: "order", id: o.id, card: "lines.delivered" }} card={edits.cards["lines.delivered"]} />}
     />
@@ -121,7 +121,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
             { label: "Delivered on", value: dv.deliveredOn ? date(dv.deliveredOn) : null },
             { label: "Received by", value: dv.receivedBy },
             { label: "Condition", value: dv.condition ? DELIVERY_CONDITION_LABEL[dv.condition] : null },
-            { label: "Lines", value: goodsLines.length ? `${delivered} of ${goodsLines.length} in full` : null },
+            { label: "Items", value: goodsLines.length ? `${delivered} of ${goodsLines.length} in full` : null },
             ...(dv.note ? [{ label: "Note", value: dv.note }] : []),
           ]}
           actions={

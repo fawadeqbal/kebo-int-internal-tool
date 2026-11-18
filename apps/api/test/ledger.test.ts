@@ -192,7 +192,7 @@ describe("the ledger", () => {
     }
   });
 
-  it("an order and what we owe its factory, from the day it is made", async () => {
+  it("an order and what we owe its supplier, from the day it is made", async () => {
     const orderId = await newOrder();
     const o = await db().order.findUniqueOrThrow({ where: { id: orderId } });
     const order = await rowsOf("order", orderId);
@@ -448,7 +448,7 @@ describe("the ledger", () => {
         .post("/expenses", {
           orderId,
           category: "courier",
-          description: `DHL papers ${tag}`,
+          description: `DHL documents ${tag}`,
           amount: 62,
           currency: "USD",
           spentOn: day(-1),
@@ -467,13 +467,13 @@ describe("the ledger", () => {
       .patch(`/expenses/${e.id}`, {
         orderId,
         category: "courier",
-        description: `DHL papers ${tag}`,
+        description: `DHL documents ${tag}`,
         amount: 62,
         currency: "USD",
         spentOn: day(-1),
         accountId: usdAccount,
         borneBy: "customer",
-        reason: "Their papers",
+        reason: "Their documents",
       })
       .expect(200);
     rows = await rowsOf("expense", e.id);
@@ -484,7 +484,7 @@ describe("the ledger", () => {
       [`customer:${customerId}`, 62, 0],
       ["expenses_recovered", 0, 62],
     ]);
-    expect(rows.filter((r) => r.reversesId).every((r) => r.reason === "Their papers")).toBe(true);
+    expect(rows.filter((r) => r.reversesId).every((r) => r.reason === "Their documents")).toBe(true);
     expect(Number((await due(orderId)).due)).toBe(dueBefore + 62);
     await agrees();
     // Borne by the factory instead (CNY 710 → off what we owe it, in CNY).
@@ -507,7 +507,7 @@ describe("the ledger", () => {
     rows = await rowsOf("expense", f.id);
     expect(rows.map((r) => [r.account, r.currency, n(r.debit), n(r.credit)])).toContainEqual([`factory:${factoryId}`, "CNY", 710, 0]);
     await agrees();
-    await api(app, manager).post(`/expenses/${f.id}/void`, { reason: "Factory refused" }).expect(200);
+    await api(app, manager).post(`/expenses/${f.id}/void`, { reason: "Supplier refused" }).expect(200);
     await agrees();
 
     // From Sana's own money: we owe her until it is repaid.
@@ -634,7 +634,7 @@ describe("the ledger", () => {
     await agrees();
   });
 
-  it("an order's or factory part's amounts change: the difference is posted as a correction", async () => {
+  it("an order's or supplier part's amounts change: the difference is posted as a correction", async () => {
     const orderId = await newOrder(10000);
     const o = await db().order.findUniqueOrThrow({ where: { id: orderId }, include: { lines: true } });
     const line = o.lines.find((l) => l.factoryId)!;
@@ -744,11 +744,11 @@ describe("the ledger", () => {
     const accounts = (await api(app, manager).get("/ledger/accounts").expect(200)).body;
     expect(accounts.totals.balanced).toBe(true);
     expect(accounts.groups.map((g: { group: string }) => g.group)).toEqual(
-      expect.arrayContaining(["Money", "Customers", "Factories", "Sales"]),
+      expect.arrayContaining(["Money", "Customers", "Suppliers", "Sales"]),
     );
   });
 
-  it("statements: a paper per party and currency, numbered per party and year when issued", async () => {
+  it("statements: a document per party and currency, numbered per party and year when issued", async () => {
     const draft = (await api(app, manager).get(`/ledger/parties/customer/${customerId}/statement?from=${day(-30)}&to=${today}&currency=USD`).expect(200)).body;
     expect(draft.doc.number).toBe("Draft");
     expect(draft.issued).toBe(false);

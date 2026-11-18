@@ -67,9 +67,9 @@ export class HistoryService {
       await this.customers.get(user, q.id);
       return [{ entityType: "customer", ids: [q.id] }];
     }
-    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factories.");
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see suppliers.");
     const f = await db.party.findFirst({ where: { ...isSupplier, id: q.id }, select: { id: true } });
-    if (!f) throw new NotFoundError("Factory");
+    if (!f) throw new NotFoundError("Supplier");
     return [{ entityType: "factory", ids: [f.id] }];
   }
 

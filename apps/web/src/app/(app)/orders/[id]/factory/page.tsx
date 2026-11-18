@@ -26,7 +26,7 @@ import { fieldsAction } from "../../light-actions";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
 
-export const generateMetadata = orderTitle("Factory order");
+export const generateMetadata = orderTitle("Purchase order");
 
 const SMALL = "h-8 px-2.5 text-[13px]";
 
@@ -79,7 +79,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
     for (const x of xs) by.set(x.currency, (by.get(x.currency) ?? 0) + Number(x.amount));
     return by.size ? [...by].map(([cur, v]) => money(v.toFixed(2), cur)).join(" + ") : money(0, plans[0]?.currency ?? o.currency);
   };
-  const sub = `${o.refNo} · ${(flow?.factory.factories ?? []).map((f) => f.name).join(", ") || "the factory"}`;
+  const sub = `${o.refNo} · ${(flow?.factory.factories ?? []).map((f) => f.name).join(", ") || "the supplier"}`;
   const pay = (label: string, main: boolean, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null }) =>
     canPay ? (
       <PayFactoryWindow
@@ -99,7 +99,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   // factory" only for a factory owed money with no part left to pay it on (prices changed since the plan).
   const onAPart = (f: { factory: { id: string }; currency: string }) =>
     plans.some((p) => p.factory.id === f.factory.id && p.currency === f.currency && p.rows.some((r) => r.status !== "paid" && Number(r.open) > 0));
-  const payAny = owing.some((f) => !onAPart(f)) ? pay("Pay the factory", true) : null;
+  const payAny = owing.some((f) => !onAPart(f)) ? pay("Pay the supplier", true) : null;
   const editPlan = (plan: (typeof plans)[number], label: string) =>
     m.factories?.canPlan &&
     d.open && (
@@ -136,10 +136,10 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         ? "Type it on Production once the drawings are approved"
         : r.readyOn
           ? r.by === "advance"
-            ? `Worked out: the advance went ${dayMonth(r.on!)}`
+            ? `Worked out: the deposit went ${dayMonth(r.on!)}`
             : `Worked out: ${a.leadDays} days after we ordered`
           : r.by === "advance"
-            ? "Worked out once the advance is paid"
+            ? "Worked out once the deposit is paid"
             : "Worked out once we order";
     const invoices = plan ? theirInvoices(plan) : [];
     const from = po.offer ? (po.offer.reference ?? `their offer of ${date(po.offer.receivedOn)}`) : null;
@@ -147,7 +147,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       <Section
         key={`agreed-${po.id}`}
         id={many ? undefined : "factory-agreed"}
-        title={many ? `Agreed with the factory · ${po.supplier.name}` : "Agreed with the factory"}
+        title={many ? `Agreed with the supplier · ${po.supplier.name}` : "Agreed with the supplier"}
         actions={
           <>
             {from && <span className="text-xs text-text-2 max-sm:hidden">From their offer {from}</span>}
@@ -181,7 +181,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         }
       >
         <div className="grid gap-3 px-[18px] pt-1 pb-3.5 md:grid-cols-2">
-          <Group title="Delivery" big={a.basis ? `${a.basis}${a.basisPlace ? ` ${a.basisPlace}` : ""}` : "Basis not said"}>
+          <Group title="Delivery" big={a.basis ? `${a.basis}${a.basisPlace ? ` ${a.basisPlace}` : ""}` : "Incoterm not said"}>
             <Fact label="Lead time">{a.leadTime}</Fact>
             <Fact label="Ready by">{r && "readyOn" in r && r.readyOn ? date(r.readyOn) : null}</Fact>
             {readyNote && <p className="text-xs text-text-2">{readyNote}</p>}
@@ -232,17 +232,17 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           tone={po.sentOn ? (po.sentEarlyReason ? "warn" : "ok") : "neutral"}
           cols={3}
           rows={[
-            { label: "PO no.", value: <RefCode>{po.number}</RefCode> },
+            { label: "Purchase order no.", value: <RefCode>{po.number}</RefCode> },
             {
-              label: "Factory",
+              label: "Supplier",
               value: (
-                <Link href={`/factories/${po.supplier.id}`} className="text-primary hover:underline">
+                <Link href={`/suppliers/${po.supplier.id}`} className="text-primary hover:underline">
                   {po.supplier.name}
                 </Link>
               ),
             },
             ...(seesMoney ? [{ label: "Total", value: po.total && po.currency ? money(po.total, po.currency) : null }] : []),
-            ...(seesMoney ? [{ label: "Price basis", value: po.offer?.basis ? `${po.offer.basis}${po.offer.basisPlace ? ` ${po.offer.basisPlace}` : ""}` : basis }] : []),
+            ...(seesMoney ? [{ label: "Incoterm", value: po.offer?.basis ? `${po.offer.basis}${po.offer.basisPlace ? ` ${po.offer.basisPlace}` : ""}` : basis }] : []),
             { label: "Sent on", value: po.sentOn ? `${date(po.sentOn)}${po.sentBy ? ` · ${po.sentBy.name}` : ""}` : null },
             { label: "Their order no.", value: po.supplierRef ?? orderNo },
             ...(po.offer
@@ -276,7 +276,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                   size="sm"
                   className={SMALL}
                   icon={<Mail aria-hidden />}
-                  label="Send to the factory"
+                  label="Send to the supplier"
                   title={`Send ${po.number} to ${po.supplier.name}`}
                   description={[po.total && po.currency && seesMoney ? money(po.total, po.currency) : null, po.readyOn ? `ready by ${date(po.readyOn)}` : null].filter(Boolean).join(" · ") || undefined}
                   panelClassName="md:w-[760px]"
@@ -289,7 +289,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         />,
         agreedOf(po, (pos?.items.length ?? 0) > 1),
       ])}
-      {pos && pos.items.length === 0 && <EmptySection title="Purchase order" text="No line of this order was quoted from a factory, so there is no purchase order." />}
+      {pos && pos.items.length === 0 && <EmptySection title="Purchase order" text="No item of this order was quoted from a supplier, so there is no purchase order." />}
 
       {plans.map((plan, n) => {
         const owed = m.factories!.rows.find((r) => r.factory.id === plan.factory.id && r.currency === plan.currency);
@@ -378,7 +378,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         ))}
 
       {priced.length > 0 && (
-        <Section title="Lines to the factory" state={`${priced.length} line${priced.length === 1 ? "" : "s"}`}>
+        <Section title="Items to the supplier" state={`${priced.length} item${priced.length === 1 ? "" : "s"}`}>
           <div className="px-[18px] pb-3.5">
             <div className="max-md:hidden">
               <OrderLines set="factory" orderId={o.id} lines={priced} canEdit={false} today={now} />

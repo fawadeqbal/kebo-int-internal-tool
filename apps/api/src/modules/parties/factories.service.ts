@@ -126,7 +126,7 @@ export class FactoriesService {
         },
       },
     });
-    if (!f) throw new NotFoundError("Factory");
+    if (!f) throw new NotFoundError("Supplier");
     const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
     const quotes = f.quotes.map(({ lines, options, ...q }) => {
       // Where the offer went: the quotation that used it (won when the customer accepted that revision).
@@ -181,14 +181,14 @@ export class FactoriesService {
 
   private async assertUniqueName(name: string, exceptId?: string) {
     const clash = await this.prisma.db.party.findFirst({ where: { ...isSupplier, deletedAt: null, name: { equals: name, mode: "insensitive" }, ...(exceptId ? { id: { not: exceptId } } : {}) } });
-    if (clash) throw new ConflictError(`A factory called "${clash.name}" already exists.`);
+    if (clash) throw new ConflictError(`A supplier called "${clash.name}" already exists.`);
   }
 
   /** The person must be an active member of the team. */
   private async assertOwner(ownerId: string | null | undefined) {
     if (!ownerId) return;
     const u = await this.prisma.db.user.findFirst({ where: { id: ownerId, isActive: true } });
-    if (!u) throw new DomainError("Choose an active person to look after this factory.");
+    if (!u) throw new DomainError("Choose an active person to look after this supplier.");
   }
 
   private fields(input: FactoryInput) {
@@ -214,7 +214,7 @@ export class FactoriesService {
     return this.prisma.tx(async (tx) => {
       const made = await tx.party.create({ data: newSupplier({ ...this.fields(input), createdById: user.id }), omit: customerOnly });
       await this.setMainContact(tx, made.id, made.name, input);
-      await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: made.id, summary: `Added factory ${made.name}` });
+      await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: made.id, summary: `Added supplier ${made.name}` });
       return withContact(await tx.party.findUniqueOrThrow({ where: { id: made.id }, omit: customerOnly, include: { contacts: mainContact } }));
     });
   }
@@ -229,7 +229,7 @@ export class FactoriesService {
     for (const f of input.factories) {
       const key = f.name.trim().toLowerCase();
       if (known.has(key)) {
-        skipped.push({ name: f.name, reason: "already a factory" });
+        skipped.push({ name: f.name, reason: "already a supplier" });
         continue;
       }
       known.add(key);
@@ -240,7 +240,7 @@ export class FactoriesService {
       for (const f of fresh) {
         const row = await tx.party.create({ data: newSupplier({ ...this.fields(f), createdById: user.id }) });
         await this.setMainContact(tx, row.id, row.name, f);
-        await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: row.id, summary: `Added factory ${row.name}${from}` });
+        await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: row.id, summary: `Added supplier ${row.name}${from}` });
       }
     });
     return { added: fresh.length, skipped };
@@ -254,7 +254,7 @@ export class FactoriesService {
     // Renaming, or handing the factory from one person to another, says why.
     const renamed = before.name !== input.name;
     const handedOver = before.ownerId !== null && before.ownerId !== ownerId;
-    const reason = renamed || handedOver ? requireReason(input.reason, "factoryDetails", renamed ? "the factory's name changes" : "another person looks after this factory") : input.reason;
+    const reason = renamed || handedOver ? requireReason(input.reason, "factoryDetails", renamed ? "the supplier's name changes" : "another person looks after this supplier") : input.reason;
     return this.prisma.tx(async (tx) => {
       const saved = await tx.party.update({ where: { ...isSupplier, id }, data: this.fields(input), omit: customerOnly, include: { owner: ownerSelect } });
       await this.setMainContact(tx, id, saved.name, input);
@@ -264,7 +264,7 @@ export class FactoriesService {
         action: "update",
         entityType: "factory",
         entityId: id,
-        summary: `Edited factory ${f.name}`,
+        summary: `Edited supplier ${f.name}`,
         oldValues: { name: before.name, contactPerson: before.contactPerson, phone: before.phone, wechat: before.wechat, email: before.email, address: before.address, bankDetails: before.bankDetails, lookedAfterBy: before.owner?.name ?? null },
         newValues: { name: f.name, contactPerson: f.contactPerson, phone: f.phone, wechat: f.wechat, email: f.email, address: f.address, bankDetails: f.bankDetails, lookedAfterBy: f.owner?.name ?? null },
         reason,
@@ -275,11 +275,11 @@ export class FactoriesService {
 
   /** Hidden from lists and pickers; its past prices stay on their deals. */
   async remove(user: SessionUser, id: string) {
-    if (!can(user, "inquiries.updateAny")) throw new ForbiddenError("Only a manager can remove a factory.");
+    if (!can(user, "inquiries.updateAny")) throw new ForbiddenError("Only a manager can remove a supplier.");
     const f = await this.get(id);
     await this.prisma.tx(async (tx) => {
       await tx.party.update({ where: { ...isSupplier, id }, data: { deletedAt: new Date() } });
-      await this.audit.record(tx, { userId: user.id, action: "delete", entityType: "factory", entityId: id, summary: `Removed factory ${f.name}` });
+      await this.audit.record(tx, { userId: user.id, action: "delete", entityType: "factory", entityId: id, summary: `Removed supplier ${f.name}` });
     });
   }
 }

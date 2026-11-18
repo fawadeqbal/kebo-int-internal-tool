@@ -88,7 +88,7 @@ const PAIRS: [string, string, string, number][] = [
   ["money words on their badge", "--money", "--money-soft", 4.5],
   ["teal words on their badge", "--trust", "--trust-soft", 4.5],
   ["the note's words", "--note-fg", "--note", 4.5],
-  ["the note's second line", "--note-sub", "--note", 4.5],
+  ["the note's second item", "--note-sub", "--note", 4.5],
   ["the note's Undo and links", "--note-link", "--note", 4.5],
   ["chart 1 on cards", "--chart-1", "--surface", 3],
   ["chart 2 on cards", "--chart-2", "--surface", 3],

@@ -15,16 +15,16 @@ export async function saveFactoryAction(id: string | null, version: string | nul
   );
   if (!r.ok) return r;
   const savedId = id ?? (r.data as { id: string }).id;
-  revalidatePath("/factories");
-  revalidatePath(`/factories/${savedId}`, "layout");
+  revalidatePath("/suppliers");
+  revalidatePath(`/suppliers/${savedId}`, "layout");
   return { ok: true, data: { id: savedId, name: (body.name ?? "").trim() } };
 }
 
 export async function removeFactoryAction(id: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/factories/${id}`));
   if (!r.ok) return r;
-  revalidatePath("/factories");
-  redirect(`/factories?toast=${encodeURIComponent("Factory removed.")}`);
+  revalidatePath("/suppliers");
+  redirect(`/suppliers?toast=${encodeURIComponent("Supplier removed.")}`);
 }
 
 /** New factories from an uploaded Excel file (checked on the page; the API checks again and leaves out any already there). */
@@ -34,10 +34,10 @@ export async function importFactoriesAction(
 ): Promise<{ ok: true; result: ImportResult } | { ok: false; message: string }> {
   try {
     const result = await api.post<ImportResult>("/factories/import", { factories: items, fileName });
-    revalidatePath("/factories");
+    revalidatePath("/suppliers");
     return { ok: true, result };
   } catch (e) {
-    if (e instanceof ApiError) return { ok: false, message: e.status === 403 ? "You cannot add factories." : e.message };
+    if (e instanceof ApiError) return { ok: false, message: e.status === 403 ? "You cannot add suppliers." : e.message };
     throw e;
   }
 }

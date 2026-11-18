@@ -26,7 +26,7 @@ export class FactoryRequestsService {
 
   private async must(user: SessionUser) {
     await this.limits.require("factory_requests");
-    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot ask factories for prices.");
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot ask suppliers for prices.");
   }
 
   private async inquiry(user: SessionUser, id: string) {
@@ -125,7 +125,7 @@ export class FactoryRequestsService {
       if (!i) throw new NotFoundError("Inquiry");
       if (i.stage === "won" || i.stage === "lost") throw new DomainError("This deal is closed.");
       const factories = await tx.party.findMany({ where: { ...isSupplier, id: { in: ids }, deletedAt: null }, select: { id: true, name: true } });
-      if (factories.length !== ids.length) throw new DomainError("One of the factories is not in your list any more.");
+      if (factories.length !== ids.length) throw new DomainError("One of the suppliers is not in your list any more.");
       const already = new Set((await tx.factoryRequest.findMany({ where: { inquiryId, factoryId: { in: ids } }, select: { factoryId: true } })).map((r) => r.factoryId));
       const fresh = factories.filter((f) => !already.has(f.id));
       if (!fresh.length) return;
@@ -145,7 +145,7 @@ export class FactoryRequestsService {
         action: "update",
         entityType: "inquiry",
         entityId: inquiryId,
-        summary: `${i.refNo}: asked ${fresh.length === 1 ? fresh[0].name : `${fresh.length} factories`} for a price`,
+        summary: `${i.refNo}: asked ${fresh.length === 1 ? fresh[0].name : `${fresh.length} suppliers`} for a price`,
         newValues: { factories: fresh.map((f) => f.name), replyBy: input.replyBy },
       });
     });
@@ -159,7 +159,7 @@ export class FactoryRequestsService {
     const i = await this.inquiry(user, r.inquiryId);
     if (input.factoryQuoteId) {
       const q = await this.prisma.db.factoryQuote.findFirst({ where: { id: input.factoryQuoteId, inquiryId: r.inquiryId, factoryId: r.factoryId, deletedAt: null } });
-      if (!q) throw new DomainError("That offer is not this factory's offer on this inquiry.");
+      if (!q) throw new DomainError("That offer is not this supplier's offer on this inquiry.");
     }
     await this.prisma.tx(async (tx) => {
       await tx.factoryRequest.update({

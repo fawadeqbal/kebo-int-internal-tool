@@ -25,7 +25,7 @@ export async function askFactories(d: DealDetail, me: Me, variant: "ghost" | "se
     "Hello, please quote the attached list:",
     ...d.items.map((i) => `${i.parentId ? "   " : ""}${i.no}. ${i.description.split("\n")[0]}${i.model ? ` (${i.model})` : ""} — ${qty(i.quantity)} ${i.unit}`),
     "",
-    "Please give the price basis (EXW or FOB), the lead time and how long the price is valid.",
+    "Please give the Incoterm (EXW or FOB), the lead time and how long the price is valid.",
     `Our reference: ${d.refNo}`,
   ].join("\n");
   return {
@@ -35,9 +35,9 @@ export async function askFactories(d: DealDetail, me: Me, variant: "ghost" | "se
         variant={variant}
         size={opts.size ?? "md"}
         icon={variant === "ghost" ? undefined : variant === "primary" || opts.label ? <Factory aria-hidden /> : <Send aria-hidden />}
-        label={opts.label ?? "Ask factories"}
-        title="Ask factories for prices"
-        description={`${d.refNo} · ${d.title}. Each factory gets its own request you can follow.`}
+        label={opts.label ?? "Ask suppliers"}
+        title="Ask suppliers for prices"
+        description={`${d.refNo} · ${d.title}. Each supplier gets its own request you can follow.`}
         panelClassName="md:w-[820px]"
         body={<AskWindow data={requests} ask={askFactoriesAction.bind(null, d.id)} message={message} excelHref={excel ? `/sheets/export/factory-list?id=${d.id}` : null} today={today()} />}
       />

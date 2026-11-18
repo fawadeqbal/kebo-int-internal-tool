@@ -138,7 +138,7 @@ export default async function QuotationOwnPage({
             danger: true as const,
             confirm: {
               title: `Delete draft R${r.number}?`,
-              body: `Draft R${r.number} and the prices set in it are removed. The factory offers stay as they are.${r.number > 1 ? ` R${r.number - 1} stays as it is.` : ""}`,
+              body: `Draft R${r.number} and the prices set in it are removed. The supplier offers stay as they are.${r.number > 1 ? ` R${r.number - 1} stays as it is.` : ""}`,
               confirmLabel: "Delete the draft",
             },
             action: deleteDraftAction.bind(null, d.id, x.id, r.id),
@@ -274,12 +274,12 @@ export default async function QuotationOwnPage({
           <section aria-labelledby="q-lines" className="flex flex-col gap-2">
             <div className="flex min-h-8 items-center gap-2">
               <h2 id="q-lines" className="text-[15px] font-semibold">
-                Lines
+                Items
               </h2>
               <span className="text-xs text-text-2">
-                {r.options.length > 1 ? `${r.options.length} options` : `${o?.lines.length ?? 0} line${o?.lines.length === 1 ? "" : "s"}`}
+                {r.options.length > 1 ? `${r.options.length} options` : `${o?.lines.length ?? 0} item${o?.lines.length === 1 ? "" : "s"}`}
               </span>
-              <span className="ml-auto">{editButton("lines", "lines", "Edit lines")}</span>
+              <span className="ml-auto">{editButton("lines", "lines", "Edit items")}</span>
             </div>
             <QuoteLines r={r} />
           </section>
@@ -352,7 +352,7 @@ function QuoteSide({
             if (!o.factoryQuoteId) return <Fragment key={o.id}>{row(`${prefix}Prices`, "Own prices")}</Fragment>;
             return (
               <Fragment key={o.id}>
-                {row(`${prefix}Factory`, o.factory?.name ?? "—")}
+                {row(`${prefix}Supplier`, o.factory?.name ?? "—")}
                 {offer && row("Received", date(offer.receivedOn))}
                 {offer?.leadTime && row("Lead time", offer.leadTime)}
               </Fragment>
@@ -393,12 +393,12 @@ function draftChecks(r: RevisionView): string[] {
     const who = many ? `Option ${o.letter}` : "The quotation";
     const out: string[] = [];
     const unpriced = o.lines.filter((l) => !(Number(l.unitPrice) > 0)).length;
-    if (unpriced) out.push(`${who}: ${unpriced} line${unpriced === 1 ? "" : "s"} without a price.`);
+    if (unpriced) out.push(`${who}: ${unpriced} item${unpriced === 1 ? "" : "s"} without a price.`);
     if (o.factory && o.coverage.missing.length)
       out.push(`${who} does not include item${o.coverage.missing.length === 1 ? "" : "s"} ${o.coverage.missing.join(", ")}; the customer will see ${o.coverage.missing.length === 1 ? "it" : "them"} missing.`);
     // People who see costs: the costs to reach our basis (freight…) are part of the price, so a missing one makes the margin look better than it is.
     if (o.costing && o.factory) {
-      if (o.factoryBasis === null) out.push(`${who}: the factory's price basis is not said, so the costs to reach ${r.incoterm} are not in its cost.`);
+      if (o.factoryBasis === null) out.push(`${who}: the supplier's Incoterm is not said, so the costs to reach ${r.incoterm} are not in its cost.`);
       else if (o.gap) {
         const have = new Set((o.costs ?? []).map((c) => c.step));
         const asLine = (step: BasisStep) => o.lines.some((l) => l.type === "charge" && l.description.toLowerCase().startsWith(BASIS_STEP_LABEL[step].toLowerCase().split(" ")[0]!));

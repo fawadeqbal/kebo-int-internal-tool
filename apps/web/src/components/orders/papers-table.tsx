@@ -62,7 +62,7 @@ function fromOf(r: PaperRow): { label: string; tone: "primary" | "info" | "neutr
 
 const GROUPS: { label: string; steps: FlowStep[] }[] = [
   { label: "Payment", steps: ["payment"] },
-  { label: "Factory order and production", steps: ["factory", "production"] },
+  { label: "Purchase order and production", steps: ["factory", "production"] },
   { label: "Shipping and the bank", steps: ["shipping", "documents"] },
   { label: "Delivery", steps: ["delivery"] },
 ];
@@ -129,7 +129,7 @@ export function PapersTable({
   const setKeys = (tab === "bank" ? bank : shown).filter((r) => paperDone(r.state) || r.live);
   const tabs: { key: PapersTab; label: string; n: number }[] = [
     { key: "bank", label: "For the bank", n: bank.length },
-    { key: "all", label: "All papers", n: rows.length },
+    { key: "all", label: "All documents", n: rows.length },
     { key: "missing", label: "Missing", n: missing.length },
   ];
 
@@ -153,11 +153,11 @@ export function PapersTable({
 
   return (
     <Card id="papers" data-target="papers" data-target-card="" className="scroll-mt-24">
-      <CardHeader title="Papers" description={description} />
+      <CardHeader title="Documents" description={description} />
       <div className="flex flex-col px-4 pt-3 pb-3.5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <nav
-            aria-label="Papers"
+            aria-label="Documents"
             className="inline-flex max-w-full overflow-x-auto rounded-lg border border-line bg-surface-2 p-0.5 [scrollbar-width:none]"
           >
             {tabs.map((t) => (
@@ -175,9 +175,9 @@ export function PapersTable({
               </Link>
             ))}
           </nav>
-          <span className="hidden text-xs text-muted sm:inline">Every paper of the order, once.</span>
+          <span className="hidden text-xs text-muted sm:inline">Every document of the order, once.</span>
         </div>
-        <div role="table" aria-label="Papers" className="text-sm">
+        <div role="table" aria-label="Documents" className="text-sm">
           <div
             role="row"
             className="hidden grid-cols-[28px_minmax(0,1.35fr)_minmax(0,1fr)_120px_minmax(0,1.25fr)_190px] gap-x-3 border-b border-line px-2 py-2 text-xs font-medium text-text-2 md:grid"
@@ -185,7 +185,7 @@ export function PapersTable({
             <span role="columnheader" className="sr-only">
               Done
             </span>
-            <span role="columnheader">Paper</span>
+            <span role="columnheader">Document</span>
             <span role="columnheader">Number · date</span>
             <span role="columnheader">From</span>
             <span role="columnheader">File</span>
@@ -195,7 +195,7 @@ export function PapersTable({
           </div>
           {!shown.length && (
             <p className="px-2 py-4 text-sm text-muted">
-              {tab === "missing" ? "Nothing is missing." : tab === "bank" ? "No papers for the bank on this route." : "No papers yet."}
+              {tab === "missing" ? "Nothing is missing." : tab === "bank" ? "No documents for the bank on this route." : "No documents yet."}
             </p>
           )}
           {tab === "all"
@@ -260,10 +260,10 @@ export function PapersTable({
                   aria-expanded={makeMenu}
                   onClick={() => setMakeMenu((o) => !o)}
                 >
-                  <Plus aria-hidden /> Make a paper
+                  <Plus aria-hidden /> Make a document
                 </button>
                 {makeMenu && (
-                  <FloatingMenu anchor={() => makeRef.current} onClose={() => setMakeMenu(false)} label="Make a paper" width={260}>
+                  <FloatingMenu anchor={() => makeRef.current} onClose={() => setMakeMenu(false)} label="Make a document" width={260}>
                     {makeable.map((r) => (
                       <Link
                         key={r.key}
@@ -663,7 +663,7 @@ export function PaperMenu({
             paperDone(r.state) &&
             item(r.doc?.file ? "Replace the signed scan" : "Attach the signed scan", () => document.getElementById(scanId)?.click())}
           {make && r.version !== null && item("Versions", () => router.push(make), String(r.version))}
-          {!onRecord && recordable && r.source === "upload" && (r.state === "miss" || r.state === "draft") && item("Upload…", () => record("upload"), "in Papers")}
+          {!onRecord && recordable && r.source === "upload" && (r.state === "miss" || r.state === "draft") && item("Upload…", () => record("upload"), "in Documents")}
           {recordable && r.state !== "else" && r.source === "upload" && item(onRecord ? "Kept elsewhere instead" : "Kept elsewhere…", () => record("elsewhere"))}
           {recordable && r.state === "else" && item("Upload it instead", () => record("upload"))}
           {canMake && r.draft && r.paperId && !ownDoc(r) && (

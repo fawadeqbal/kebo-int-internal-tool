@@ -14,7 +14,7 @@ import { CompaniesService } from "../src/common/company/companies.service";
  * through the banks, delivery, SAT and claims. Each part is a module the
  * platform admin can switch off for a company, and each change a permission.
  */
-describe("order flow: from asking factories to SAT", () => {
+describe("order flow: from asking suppliers to SAT", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let sana: string;
@@ -53,7 +53,7 @@ describe("order flow: from asking factories to SAT", () => {
     await app?.close();
   });
 
-  it("sends the spec to several factories and sees who answered", async () => {
+  it("sends the spec to several suppliers and sees who answered", async () => {
     // Before asking: every factory is offered, none asked here yet.
     const before = (await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body;
     expect(before.items).toEqual([]);
@@ -88,7 +88,7 @@ describe("order flow: from asking factories to SAT", () => {
 
     // The history of the deal says who was asked.
     const history = (await api(app, sana).get(`/history?type=deal&id=${inquiryId}`)).body;
-    expect(JSON.stringify(history)).toMatch(/asked 2 factories for a price/);
+    expect(JSON.stringify(history)).toMatch(/asked 2 suppliers for a price/);
   });
 
   it("accepting makes an order whose flow starts at Payment, with every module", async () => {
@@ -111,7 +111,7 @@ describe("order flow: from asking factories to SAT", () => {
     await api(app, bilal).get(`/orders/${orderId}/flow`).expect(404);
   });
 
-  it("the payment route decides the papers and the bank chain; the LC is kept with the order", async () => {
+  it("the payment route decides the documents and the bank chain; the LC is kept with the order", async () => {
     await api(app, sana).put(`/orders/${orderId}/bank-contract`, { number: "LC-1" }).expect(400); // no bank route yet
     await api(app, sana).patch(`/orders/${orderId}/route`, { route: "letter_of_credit" }).expect(200);
     const f = (
@@ -145,14 +145,14 @@ describe("order flow: from asking factories to SAT", () => {
     expect(stepState(await flow())).toMatchObject({ payment: "done", factory: "current" });
   });
 
-  it("factory order and production", async () => {
+  it("purchase order and production", async () => {
     await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: "2099-01-01" }).expect(400);
     let f = (await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: day(-15) }).expect(200)).body;
     expect(stepState(f)).toMatchObject({ factory: "done", production: "current" });
     // The order's stage follows: ordered from the factory → In production, said in its history.
     const moved = (await api(app, sana).get(`/orders/${orderId}`)).body;
     expect(moved.stage).toBe("in_production");
-    expect(moved.history.at(-1)).toMatchObject({ from: "confirmed", to: "in_production", note: "ordered from the factory" });
+    expect(moved.history.at(-1)).toMatchObject({ from: "confirmed", to: "in_production", note: "ordered from the supplier" });
 
     // Production has the ready date, the factory test and the goods from the factory; no timeline to tick.
     await api(app, sana).put(`/orders/${orderId}/production`, { steps: [] }).expect(404);
@@ -305,7 +305,7 @@ describe("order flow: from asking factories to SAT", () => {
     await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: day(-9) }).expect(400);
     await api(app, sana).put(`/orders/${orderId}/sat`, { checks: f.delivery.sat.map((c: { id: string; item: string }, i: number) => ({ id: c.id, item: c.item, result: i === 0 ? "not_applicable" : "pass" })) }).expect(200);
 
-    f = (await api(app, sana).post(`/orders/${orderId}/claims`, { title: "Dented guard door", detail: "Arrived bent; factory to send a new one." }).expect(201)).body;
+    f = (await api(app, sana).post(`/orders/${orderId}/claims`, { title: "Dented guard door", detail: "Arrived bent; supplier to send a new one." }).expect(201)).body;
     const claim = f.delivery.claims[0];
     expect(claim).toMatchObject({ status: "open", title: "Dented guard door", amount: null, bearer: null });
     // What it costs and who pays: the amount is in the order's currency.
@@ -321,7 +321,7 @@ describe("order flow: from asking factories to SAT", () => {
     await api(app, sana).patch(`/orders/${orderId}/delivery`, { warrantyMonths: 999 }).expect(422);
     expect(stepState(f).delivery).toBe("current"); // the claim is still open
     await api(app, sana).patch(`/claims/${claim.id}`, { status: "resolved" }).expect(400); // how was it settled?
-    f = (await api(app, sana).patch(`/claims/${claim.id}`, { status: "resolved", resolution: "Factory sent a new door by air; fitted." }).expect(200)).body;
+    f = (await api(app, sana).patch(`/claims/${claim.id}`, { status: "resolved", resolution: "Supplier sent a new door by air; fitted." }).expect(200)).body;
     expect(f.delivery.claims[0]).toMatchObject({ status: "resolved", resolvedOn: expect.any(String) });
     expect(f.steps.every((s: { state: string }) => s.state === "done")).toBe(true);
     // A signed-off SAT cannot be reopened silently.
@@ -330,7 +330,7 @@ describe("order flow: from asking factories to SAT", () => {
     const history = JSON.stringify((await api(app, sana).get(`/orders/${orderId}`)).body);
     expect(history.length).toBeGreaterThan(0);
     const audit = JSON.stringify((await api(app, admin).get(`/history?type=order&id=${orderId}`)).body);
-    for (const text of ["payment route LC", "LC added", "ordered from the factory", "shipment added", "Couriered to the customer's bank", "SAT signed off", "claim opened"]) expect(audit).toContain(text);
+    for (const text of ["payment route LC", "LC added", "ordered from the supplier", "shipment added", "Couriered to the customer's bank", "SAT signed off", "claim opened"]) expect(audit).toContain(text);
   });
 
   it("the board shows each open order at its current step", async () => {

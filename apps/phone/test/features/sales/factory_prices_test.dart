@@ -95,16 +95,16 @@ void main() {
     expect(find.textContaining('CNY 281,000.00'), findsOneWidget);
   });
 
-  testWidgets('ask another factory', (t) async {
+  testWidgets('ask another supplier', (t) async {
     final server = await _open(t);
-    await _tap(t, 'Ask factories');
+    await _tap(t, 'Ask suppliers');
     expect(find.text('Shanghai Pharma Machinery'), findsWidgets); // in the list behind
     await _tap(t, 'Ruian Machinery');
-    await _tap(t, 'Ask 1 factory');
+    await _tap(t, 'Ask 1 supplier');
     expect(server.sent('POST', '/api/inquiries/$_id/factory-requests')?['factoryIds'], ['f3']);
   });
 
-  testWidgets('a waiting factory declined', (t) async {
+  testWidgets('a waiting supplier declined', (t) async {
     final server = await _open(t);
     await _tap(t, 'Wenzhou Pack');
     await _tap(t, 'They declined');
@@ -114,7 +114,7 @@ void main() {
   testWidgets('an offer with a price per item', (t) async {
     final server = await _open(t);
     await _tap(t, 'Add an offer');
-    await _tap(t, 'Choose the factory');
+    await _tap(t, 'Choose the supplier');
     await _tap(t, 'Ruian Machinery');
     await t.enterText(find.widgetWithText(KTextField, '1 Rotary tablet press'), '265000');
     await _tap(t, 'Save the offer');

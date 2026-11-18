@@ -26,7 +26,7 @@ export const paperFixInput = z
     value: z.string().trim().max(120),
     lineId: optionalId,
   })
-  .refine((v) => v.field !== "hs" || !!v.lineId, { message: "Choose the line", path: ["lineId"] })
+  .refine((v) => v.field !== "hs" || !!v.lineId, { message: "Choose the item", path: ["lineId"] })
   .refine((v) => !["etd", "eta", "readyOn", "shipBy"].includes(v.field) || v.value === "" || /^\d{4}-\d{2}-\d{2}$/.test(v.value), {
     message: "Use a valid date",
     path: ["value"],

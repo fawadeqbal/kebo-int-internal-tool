@@ -57,8 +57,8 @@ test("a new inquiry: New › Inquiry, the customer, what they need, saved", asyn
   // Items: typed in the sheet (the first one, then its quantity), saved with the inquiry.
   await expect(rail.getByRole("button", { name: /: Items/ })).toHaveAttribute("aria-current", "step");
   await window.getByRole("textbox", { name: "New item: Description" }).fill("Bottle filling machine, 2,000 bph");
-  await window.getByRole("textbox", { name: "New item: Qty" }).fill("1");
-  await window.getByRole("textbox", { name: "New item: Qty" }).press("Enter");
+  await window.getByRole("textbox", { name: "New item: Quantity" }).fill("1");
+  await window.getByRole("textbox", { name: "New item: Quantity" }).press("Enter");
   await expect(window.getByRole("grid").getByRole("row", { name: "Item 1" })).toContainText("Bottle filling machine");
   await expect(rail.getByRole("button", { name: /: Items/ })).toContainText("1 item");
   await window.getByRole("button", { name: /^Next/ }).click();

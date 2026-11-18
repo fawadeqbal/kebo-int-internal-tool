@@ -39,7 +39,7 @@ function sheetCol(c: LineColumn): SheetCol {
   };
 }
 
-const NO_COL: SheetCol = { header: "No.", width: 7, note: "1, 2, 3 for lines; 1.1, 1.2 for the parts of line 1" };
+const NO_COL: SheetCol = { header: "No.", width: 7, note: "1, 2, 3 for items; 1.1, 1.2 for the parts of item 1" };
 const valueText = (c: LineColumn, v: string) => {
   const choices = sheetChoicesOf(c);
   return choices ? (choices.find((o) => o.value === v)?.text ?? v) : v;
@@ -115,10 +115,12 @@ function matchHeaders(headers: string[], columns: LineColumn[]) {
   headers.forEach((h, i) => {
     const k = headerKey(h);
     if (!k) return;
-    let col = byKey.get(k);
+    // "Price CNY", "Total USD": a heading may end in its currency (our own templates did, before "Unit price CNY").
+    let col = byKey.get(k) ?? (k.length > 3 ? byKey.get(k.slice(0, -3)) : undefined);
+    const bare = !col && k.length > 3 ? k.slice(0, -3) : null;
     if (!col)
       for (const [key, names] of Object.entries(ALIASES))
-        if ((key === "no" || columns.some((c) => c.input && c.key === key)) && names.includes(k)) {
+        if ((key === "no" || columns.some((c) => c.input && c.key === key)) && (names.includes(k) || (bare !== null && names.includes(bare)))) {
           col = key;
           break;
         }

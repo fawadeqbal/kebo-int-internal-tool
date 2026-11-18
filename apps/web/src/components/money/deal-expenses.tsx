@@ -81,7 +81,7 @@ export async function DealExpensesCard({
           {live.length ? (
             <>
               What it cost us to try: <strong className="text-text tabular">{money(total, main)}</strong>. It counts for {deal.customer.name}
-              {deal.assignee ? `, for ${deal.assignee.name}` : ""} and under lost deals in Reports.
+              {deal.assignee ? `, for ${deal.assignee.name}` : ""} and under lost inquiries in Reports.
             </>
           ) : (
             "Nothing was spent on it."

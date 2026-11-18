@@ -68,7 +68,7 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
         label: "See every inquiry",
         hint: "Without it, they see only the inquiries they handle or started, and those inquiries' customers and orders. They also get the managers' reminders.",
       },
-      { permission: "inquiries.updateAny", label: "Change anyone's inquiries", hint: "Work on inquiries handled by others, and remove factories." },
+      { permission: "inquiries.updateAny", label: "Change anyone's inquiries", hint: "Work on inquiries handled by others, and remove suppliers." },
       {
         permission: "inquiries.assign",
         label: "Hand inquiries to others",
@@ -97,12 +97,12 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
     ],
   },
   {
-    title: "Factories and quotations",
+    title: "Suppliers and quotations",
     items: [
       {
         permission: "sourcing.manage",
-        label: "Factories, factory prices, costs and margins",
-        hint: "Factory offers, what we pay, profit per line. Needed to quote a factory's offer.",
+        label: "Suppliers, supplier prices, costs and margins",
+        hint: "Supplier offers, what we pay, profit per line. Needed to quote a supplier's offer.",
       },
       { permission: "quotations.manage", label: "Make and send quotations" },
     ],
@@ -123,13 +123,13 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
         hint: "With the bank slip or receipt photo. It counts once a manager approves it. Who records payments or expenses approves them.",
       },
       { permission: "shipping.manage", label: "Shipping", hint: "Book shipments, packing, bill of lading or air waybill, shipping costs." },
-      { permission: "documents.manage", label: "Papers, documents and bank", hint: "Make the papers (contract, invoices, reports), the document set and its steps through the banks." },
+      { permission: "documents.manage", label: "Documents and bank", hint: "Make the documents (contract, invoices, reports), the document set and its steps through the banks." },
       { permission: "delivery.manage", label: "Delivery and SAT", hint: "Arrival, customs, delivery, site acceptance and claims." },
-      { permission: "expenses.manage", label: "Expenses, factory payments and profit & loss" },
+      { permission: "expenses.manage", label: "Expenses, supplier payments and profit & loss" },
       {
         permission: "ledger.view",
         label: "Ledger",
-        hint: "Every money record as posted from its document, each customer's, factory's and person's ledger, statements and ageing.",
+        hint: "Every money record as posted from its document, each customer's, supplier's and person's ledger, statements and ageing.",
       },
     ],
   },

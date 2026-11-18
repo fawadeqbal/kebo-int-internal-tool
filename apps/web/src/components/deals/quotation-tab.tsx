@@ -202,7 +202,7 @@ function NewQuotationsForm({
                         <label htmlFor="offer-own" className="block cursor-pointer font-semibold">
                           Own prices
                         </label>
-                        <span className="block text-xs text-text-2">No factory offer: the items they asked for, priced by hand</span>
+                        <span className="block text-xs text-text-2">No supplier offer: the items they asked for, priced by hand</span>
                       </td>
                     </tr>
                   </tbody>

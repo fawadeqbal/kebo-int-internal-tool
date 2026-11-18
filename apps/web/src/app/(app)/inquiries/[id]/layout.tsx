@@ -47,7 +47,7 @@ export default async function DealLayout({ children, params }: { children: React
   ].filter(Boolean);
   const tabs: InquiryTab[] = [
     { href: base, label: "Overview" },
-    ...(facts ? [{ href: `${base}/sourcing`, label: "Factory offers", tag: facts.offers || facts.asked ? String(Math.max(facts.offers, facts.asked)) : undefined }] : []),
+    ...(facts ? [{ href: `${base}/sourcing`, label: "Supplier offers", tag: facts.offers || facts.asked ? String(Math.max(facts.offers, facts.asked)) : undefined }] : []),
     { href: `${base}/quotation`, label: "Quotations", tag: d.quotation?.revisions.length ? quotationStatus(d) : undefined },
     ...(managers ? [{ href: `${base}/costs`, label: "Costs" }] : []),
     { href: `${base}/history`, label: "History" },

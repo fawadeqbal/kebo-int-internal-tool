@@ -1346,7 +1346,7 @@ export class OrdersService {
    * it: final papers, the issued proforma included, keep the buyer they were printed with.
    */
   async refreshBuyer(user: SessionUser, id: string, reason: string) {
-    if (!can(user, "documents.manage") && !can(user, "orders.update")) throw new ForbiddenError("You cannot change the papers of orders.");
+    if (!can(user, "documents.manage") && !can(user, "orders.update")) throw new ForbiddenError("You cannot change the documents of orders.");
     await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
@@ -1365,7 +1365,7 @@ export class OrdersService {
         action: "order.buyer",
         entityType: "order",
         entityId: id,
-        summary: `${o.refNo}: buyer on the papers refreshed from the customer (${changed.length ? changed.join(", ") : "nothing changed"}) — ${reason}`,
+        summary: `${o.refNo}: buyer on the documents refreshed from the customer (${changed.length ? changed.join(", ") : "nothing changed"}) — ${reason}`,
         oldValues: { buyer: was },
         newValues: { buyer: now, step: "documents" },
         reason,
@@ -1389,7 +1389,7 @@ export class OrdersService {
 
   /** POST /orders/:id/quoted-terms — print the quotation's own payment text although the route now differs (or stop). */
   async setQuotedTerms(user: SessionUser, id: string, print: boolean) {
-    if (!can(user, "documents.manage") && !can(user, "orders.update")) throw new ForbiddenError("You cannot change the papers of orders.");
+    if (!can(user, "documents.manage") && !can(user, "orders.update")) throw new ForbiddenError("You cannot change the documents of orders.");
     await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
@@ -1400,7 +1400,7 @@ export class OrdersService {
         action: "update",
         entityType: "order",
         entityId: id,
-        summary: `${o.refNo}: the quotation's payment text ${print ? "printed on the papers too" : "left off the papers"} (the route differs from it)`,
+        summary: `${o.refNo}: the quotation's payment text ${print ? "printed on the documents too" : "left off the documents"} (the route differs from it)`,
         oldValues: { printQuotedTerms: o.printQuotedTerms },
         newValues: { printQuotedTerms: print, step: "payment" },
       });
@@ -1417,8 +1417,8 @@ export class OrdersService {
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
     const byId = new Map(o.lines.filter((l) => l.type === "goods").map((l) => [l.id, l]));
     for (const lineId of lineIds)
-      if (!byId.has(lineId)) throw new DomainError("Only the goods lines of this order can be received or packed.");
-    if (new Set(lineIds).size !== lineIds.length) throw new DomainError("Each line can appear only once.");
+      if (!byId.has(lineId)) throw new DomainError("Only the items of this order can be received or packed.");
+    if (new Set(lineIds).size !== lineIds.length) throw new DomainError("Each item can appear only once.");
     return { o, byId };
   }
 
@@ -1455,7 +1455,7 @@ export class OrdersService {
           action: "goods_received",
           entityType: "order",
           entityId: o.id,
-          summary: `${o.refNo}: received from the factory (${on}): ${changes.join("; ")}`,
+          summary: `${o.refNo}: received from the supplier (${on}): ${changes.join("; ")}`,
         });
     });
     return this.get(user, id);
@@ -1501,7 +1501,7 @@ export class OrdersService {
         action: "packing_list",
         entityType: "order",
         entityId: o.id,
-        summary: `${o.refNo}: packing list ${complete ? "saved" : "saved (not complete: some lines have no packages)"}`,
+        summary: `${o.refNo}: packing list ${complete ? "saved" : "saved (not complete: some items have no packages)"}`,
       });
     });
     return this.get(user, id);
@@ -1528,7 +1528,7 @@ export class OrdersService {
     const orderId = await this.prisma.tx(async (tx) => {
       // Another company's line, or a line that does not exist, is not found (row-level security).
       const found = await tx.orderLine.findFirst({ where: { id: lineId }, select: { orderId: true } });
-      if (!found) throw new NotFoundError("Line");
+      if (!found) throw new NotFoundError("Item");
       const { o, byId } = await this.goodsLinesFor(tx, user, found.orderId, [lineId]);
       const line = byId.get(lineId)!;
       const name = line.description.split("\n")[0]!.slice(0, 40);
@@ -1552,7 +1552,7 @@ export class OrdersService {
         await tx.orderLine.update({ where: { id: line.id }, data: { receivedQty: got, receivedOn: toDbDateOrNull(on) } });
         const what =
           got !== was.receivedQty ? `${name} ${trimQty(line.receivedQty)} → ${got}` : `${name} received on ${was.receivedOn ?? "—"} → ${on}`;
-        await record("goods_received", `${o.refNo}: received from the factory (${on ?? "nothing in"}): ${what}`, { lineId, ...was }, { lineId, receivedQty: got, receivedOn: on });
+        await record("goods_received", `${o.refNo}: received from the supplier (${on ?? "nothing in"}): ${what}`, { lineId, ...was }, { lineId, receivedQty: got, receivedOn: on });
         return o.id;
       }
 
@@ -1588,7 +1588,7 @@ export class OrdersService {
         };
         await record(
           "packing_list",
-          `${o.refNo}: packing list, ${name}: ${changed.map((k) => `${label[k]} ${was[k] ?? "—"} → ${next[k] ?? "—"}`).join(", ")}${complete ? "" : " (not complete: some lines have no packages)"}`,
+          `${o.refNo}: packing list, ${name}: ${changed.map((k) => `${label[k]} ${was[k] ?? "—"} → ${next[k] ?? "—"}`).join(", ")}${complete ? "" : " (not complete: some items have no packages)"}`,
           { lineId, ...Object.fromEntries(changed.map((k) => [k, was[k]])) },
           { lineId, ...Object.fromEntries(changed.map((k) => [k, next[k]])) },
         );

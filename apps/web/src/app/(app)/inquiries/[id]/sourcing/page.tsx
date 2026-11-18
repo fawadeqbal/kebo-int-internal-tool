@@ -21,7 +21,7 @@ import { removeFileAction } from "../../actions";
 import { getSettings } from "@/lib/loaders";
 import { inquiryTitle } from "@/lib/titles";
 
-export const generateMetadata = inquiryTitle("Factory offers");
+export const generateMetadata = inquiryTitle("Supplier offers");
 
 
 /**
@@ -51,7 +51,7 @@ export default async function SourcingPage({
   const canEdit = d.allowed.source;
   const base = `/inquiries/${d.id}/sourcing`;
   const today = companyToday();
-  const ask = await askFactories(d, me, "secondary", { label: "Ask more factories", size: "sm" });
+  const ask = await askFactories(d, me, "secondary", { label: "Ask more suppliers", size: "sm" });
   const compare = sp.view === "compare";
   const cheapest = cheapestComplete(s.quotes);
   // Which quotation option each offer is, on the newest revision (a draft when one is open).
@@ -103,8 +103,8 @@ export default async function SourcingPage({
   const notice = !canEdit && (
     <Alert tone="info">
       {d.stage === "won" || d.stage === "lost"
-        ? "This inquiry is closed, so its factory prices can no longer change."
-        : "Only the person handling this inquiry (or a manager) can change its factory prices."}
+        ? "This inquiry is closed, so its supplier prices can no longer change."
+        : "Only the person handling this inquiry (or a manager) can change its supplier prices."}
     </Alert>
   );
 
@@ -121,7 +121,7 @@ export default async function SourcingPage({
             <strong>
               {requests.counts.quoted} of {requests.counts.asked} replied.
             </strong>{" "}
-            {requests.counts.waiting ? `${requests.counts.waiting} still to answer.` : "Every factory asked has answered."}
+            {requests.counts.waiting ? `${requests.counts.waiting} still to answer.` : "Every supplier asked has answered."}
           </Alert>
         )}
         <CompareView view={s} dealId={d.id} />
@@ -131,7 +131,7 @@ export default async function SourcingPage({
   // The next thing to do here (an offer to enter, factories to ask): its button is the orange one.
   const next = inquiryNext(d, await offerFactsOf(id));
   const ownNext = next?.tab === "sourcing" && canEdit;
-  const firstAsk = !ownNext || waiting.length > 0 || s.quotes.length > 0 ? ask : await askFactories(d, me, "primary", { label: "Ask factories", size: "sm" });
+  const firstAsk = !ownNext || waiting.length > 0 || s.quotes.length > 0 ? ask : await askFactories(d, me, "primary", { label: "Ask suppliers", size: "sm" });
 
   // One line per factory: its offer once it is in, or that it was asked and has not answered. Others asked and closed (declined, no reply) come last.
   const others = (requests?.items ?? []).filter((r) => !r.factoryQuoteId);
@@ -146,7 +146,7 @@ export default async function SourcingPage({
       {notice}
       <Card className="overflow-clip">
         <CardHeader
-          title="Factory offers"
+          title="Supplier offers"
           description={asked > 0 ? `${asked} asked · ${answered} answered` : "Nobody was asked yet."}
           actions={
             <span className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -171,7 +171,7 @@ export default async function SourcingPage({
         ) : (
           <>
             <div aria-hidden className={cn("hidden items-center gap-x-4 border-b border-line bg-surface-2/60 px-5 py-2 text-xs font-medium text-text-2 md:grid", COLS)}>
-              <span>Factory</span>
+              <span>Supplier</span>
               <span className="text-right">Offer total</span>
               <span>Covers</span>
               <span>Lead time</span>
@@ -183,7 +183,7 @@ export default async function SourcingPage({
                 const cover = coverOf(x, s.items);
                 const letters = usedIn.get(x.id) ?? [];
                 const tax = offerTaxTag(x.taxRate, x.taxIncluded) ?? (x.lines.length ? "no tax" : null);
-                const covers = !x.lines.length ? "No lines yet" : cover ? (cover.all ? (cover.of === 1 ? "The 1 item" : `All ${cover.of} items`) : `${cover.n} of ${cover.of} items`) : plural(x.lines.length, "line");
+                const covers = !x.lines.length ? "No items yet" : cover ? (cover.all ? (cover.of === 1 ? "The 1 item" : `All ${cover.of} items`) : `${cover.n} of ${cover.of} items`) : plural(x.lines.length, "item");
                 return (
                   <li key={x.id} className="border-b border-line last:border-b-0">
                     <Link
@@ -232,7 +232,7 @@ export default async function SourcingPage({
               {others.map((r) => (
                 <li key={r.id} className={cn("grid grid-cols-[minmax(0,1fr)_auto_32px] items-start gap-x-4 gap-y-1 border-b border-line px-5 py-3 text-[13px] last:border-b-0", COLS)}>
                   <span className="min-w-0">
-                    <Link href={`/factories/${r.factory.id}`} className="block font-semibold text-text [overflow-wrap:anywhere] hover:text-primary">
+                    <Link href={`/suppliers/${r.factory.id}`} className="block font-semibold text-text [overflow-wrap:anywhere] hover:text-primary">
                       {r.factory.name}
                     </Link>
                     <span className="block text-xs text-text-2">
@@ -275,12 +275,12 @@ function NoOffers({ items }: { items: SourcingView["items"] }) {
     <div>
       <EmptyState
         icon={Factory}
-        title="No factory asked yet"
-        description="Send the customer's list to two or three factories. Each one shows here as a line; when it replies, enter its offer: the customer's items are listed with a price box each."
+        title="No supplier asked yet"
+        description="Send the customer's list to two or three suppliers. Each one shows here as a charge; when it replies, enter its offer: the customer's items are listed with a price box each."
       />
       {items.length > 0 && (
         <div className="border-t border-line px-5 py-4">
-          <h3 className="text-sm font-semibold">What the factories quote on</h3>
+          <h3 className="text-sm font-semibold">What the suppliers quote on</h3>
           <ul className="mt-1 flex flex-col divide-y divide-line">
             {items.map((it) => (
               <li key={it.id} className={cn("flex items-baseline justify-between gap-3 py-2 text-sm", it.parentId && "pl-5")}>
@@ -307,9 +307,9 @@ function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
   if (offers.length < 2)
     return (
       <Card className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-        <h2 className="text-base font-semibold">{offers.length === 0 ? "No offer has lines yet" : "Only one offer so far"}</h2>
+        <h2 className="text-base font-semibold">{offers.length === 0 ? "No offer has items yet" : "Only one offer so far"}</h2>
         <p className="max-w-md text-sm text-text-2">
-          Comparing needs at least two offers with their lines. Ask another factory and add its offer
+          Comparing needs at least two offers with their items. Ask another supplier and add its offer
           {offers.length === 1 ? `; you can still make a quotation from ${offers[0]!.factory.name} alone.` : "."}
         </p>
         <ButtonLink href={base} variant="secondary" size="sm">
@@ -328,7 +328,7 @@ function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
         {q.factory.name}
       </Link>
       <span className="block text-xs font-normal text-muted normal-case">
-        {[q.basis ? basisText(q.basis, q.basisPlace) : "Basis not said", q.leadTime].filter(Boolean).join(" · ")}
+        {[q.basis ? basisText(q.basis, q.basisPlace) : "Incoterm not said", q.leadTime].filter(Boolean).join(" · ")}
       </span>
     </Th>
   );
@@ -360,8 +360,8 @@ function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
           <Table className="min-w-[640px]">
             <THead>
               <tr>
-                <Th className="sticky left-0 z-10 min-w-36 bg-surface-2 sm:min-w-48">{view.items.length ? "Customer's item" : "Product"}</Th>
-                <Th className="hidden text-right sm:table-cell">Qty</Th>
+                <Th className="sticky left-0 z-10 min-w-36 bg-surface-2 sm:min-w-48">{view.items.length ? "Customer's item" : "Item"}</Th>
+                <Th className="hidden text-right sm:table-cell">Quantity</Th>
                 {offers.map(head)}
               </tr>
             </THead>
@@ -446,7 +446,7 @@ function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
                   ))}
                 </SummaryRow>
               )}
-              <SummaryRow label="Lines without a price">
+              <SummaryRow label="Items without a price">
                 {offers.map((q) => (
                   <Td key={q.id} className={cn("border-l border-line text-right text-sm", q.unpriced ? "font-medium text-warn" : "text-muted")}>
                     {q.unpriced || "None"}
@@ -460,7 +460,7 @@ function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
                   </Td>
                 ))}
               </SummaryRow>
-              <SummaryRow label="Factory's quotation file">
+              <SummaryRow label="Supplier's quotation file">
                 {offers.map((q) => (
                   <Td key={q.id} className={cn("border-l border-line text-right text-sm font-medium", q.files.length ? "text-ok" : "text-warn")}>
                     {q.files.length ? "Attached" : "Missing"}
@@ -486,9 +486,9 @@ function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
           <tbody>
             {(
               [
-                ["Basis", (q: FactoryQuoteView) => (q.basis ? basisText(q.basis, q.basisPlace) : "—")],
+                ["Incoterm", (q: FactoryQuoteView) => (q.basis ? basisText(q.basis, q.basisPlace) : "—")],
                 ["Lead time", (q: FactoryQuoteView) => q.leadTime ?? "—"],
-                ["Payment", (q: FactoryQuoteView) => q.paymentTerms ?? (q.advancePercent !== null ? `${q.advancePercent}% advance` : "—")],
+                ["Payment", (q: FactoryQuoteView) => q.paymentTerms ?? (q.advancePercent !== null ? `${q.advancePercent}% deposit` : "—")],
                 ["Valid until", (q: FactoryQuoteView) => (q.validUntil ? date(q.validUntil) : "—")],
                 ["Their ref.", (q: FactoryQuoteView) => q.reference ?? "—"],
               ] as const

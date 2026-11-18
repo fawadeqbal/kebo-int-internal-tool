@@ -8,8 +8,8 @@ export function PapersCard({ value }: { value: Settings["papers"] }) {
   return (
     <Card>
       <CardHeader
-        title="Papers we use"
-        description="Switch off the papers your company never uses: they leave the Papers lists, the counts and the warnings. Papers already made stay on their orders. Each switch saves at once."
+        title="Documents we use"
+        description="Switch off the documents your company never uses: they leave the Documents lists, the counts and the warnings. Documents already made stay on their orders. Each switch saves at once."
       />
       <PapersEditor off={value.off} action={savePapersAction} />
     </Card>

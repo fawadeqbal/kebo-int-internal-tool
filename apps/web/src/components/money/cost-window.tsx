@@ -610,14 +610,14 @@ export function CostForm({
             <div className="grid gap-3 sm:grid-cols-2">
               {asksFactory ? (
                 <Field
-                  label={bearer === "factory" ? "Which factory" : "Factory visited"}
+                  label={bearer === "factory" ? "Which supplier" : "Supplier visited"}
                   htmlFor="cost-factory"
                   optional={bearer !== "factory"}
                   error={st.errors?.factoryId}
                   
                 >
                   <Select id="cost-factory" name="factoryId" value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
-                    <option value="">{bearer === "factory" ? "Choose the factory…" : "None"}</option>
+                    <option value="">{bearer === "factory" ? "Choose the supplier…" : "None"}</option>
                     {factories.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.name}

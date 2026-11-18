@@ -222,7 +222,7 @@ class _Body extends ConsumerWidget {
               ],
               const SizedBox(height: KSpace.s6),
               KSection(
-                title: 'Lines',
+                title: 'Items',
                 caption: '${o.lines.length}',
                 children: [
                   KCard(
@@ -230,8 +230,8 @@ class _Body extends ConsumerWidget {
                     child: o.lines.isEmpty
                         ? const KEmptyState(
                             icon: KIcons.box,
-                            title: 'No lines',
-                            message: 'The lines come from the accepted quotation.',
+                            title: 'No items',
+                            message: 'The items come from the accepted quotation.',
                           )
                         : Column(
                             children: [
@@ -265,15 +265,15 @@ class _Body extends ConsumerWidget {
               ),
               const SizedBox(height: KSpace.s6),
               KSection(
-                title: 'Papers',
+                title: 'Documents',
                 children: [
                   KCard(
                     padding: EdgeInsets.zero,
                     child: o.papers.isEmpty
                         ? const KEmptyState(
                             icon: KIcons.file,
-                            title: 'No papers yet',
-                            message: 'Contracts, invoices and shipping papers show here as they are made or uploaded.',
+                            title: 'No documents yet',
+                            message: 'Contracts, invoices and shipping documents show here as they are made or uploaded.',
                           )
                         : Column(
                             children: [
@@ -502,7 +502,7 @@ class _DeliveryFormState extends ConsumerState<_DeliveryForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          sat ? 'Every SAT check is marked passed.' : 'Every line is marked delivered in full and in good condition.',
+          sat ? 'Every SAT check is marked passed.' : 'Every item is marked delivered in full and in good condition.',
           style: KType.callout.copyWith(color: context.k.inkMuted),
         ),
         const SizedBox(height: KSpace.s4),

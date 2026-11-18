@@ -11,7 +11,7 @@ describe("closing the books", () => {
   let latest = "";
   let today = "";
   const tag = Date.now().toString(36);
-  const expense = (spentOn: string, extra: object = {}) => ({ category: "office", description: `Paper ${tag}`, amount: 120, currency: "USD", spentOn, ...extra });
+  const expense = (spentOn: string, extra: object = {}) => ({ category: "office", description: `Document ${tag}`, amount: 120, currency: "USD", spentOn, ...extra });
   const closed = /^The books are closed through \d{2} \w{3} \d{4}: money dated then stays as it was reported\. Date it later, or reopen the month in Settings › Closed months\.$/;
 
   beforeAll(async () => {

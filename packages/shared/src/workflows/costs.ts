@@ -21,7 +21,7 @@ export const BASIS_STEP_OF_CATEGORY: Partial<Record<ExpenseCategory, BasisStep>>
 export const EXPENSE_BEARER_LABEL: Record<ExpenseBearer, string> = {
   us: "Us",
   customer: "The customer",
-  factory: "The factory",
+  factory: "The supplier",
 };
 
 /** The line under each choice on the expense form. */

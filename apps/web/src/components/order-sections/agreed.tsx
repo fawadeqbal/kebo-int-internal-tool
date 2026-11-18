@@ -196,7 +196,7 @@ export function sideBySide(o: OrderView, m: OrderMoney | null): SideTable[] {
     const rows: SideRow[] = [
       {
         key: "basis",
-        label: "Delivery basis",
+        label: "Incoterm",
         ours: ourBasis,
         theirs: theirBasis,
         check: !theirBasis

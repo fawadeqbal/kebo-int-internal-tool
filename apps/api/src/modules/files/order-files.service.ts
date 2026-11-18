@@ -250,7 +250,7 @@ export class OrderFilesService {
         note: a.note,
         attachedTo:
           link === "paper"
-            ? { link, label: `Paper · ${paper!.label}`, href: `${base}/documents?tab=all#papers` }
+            ? { link, label: `Document · ${paper!.label}`, href: `${base}/documents?tab=all#papers` }
             : link === "section"
                 ? { link, label: ORDER_SECTION_LABEL[section!], href: `${base}/${ORDER_SECTION_TAB[section!] === "overview" ? "" : ORDER_SECTION_TAB[section!]}`.replace(/\/$/, "") }
               : link === "step"
@@ -292,7 +292,7 @@ export class OrderFilesService {
         note: a.note,
         attachedTo: {
           link: "offer",
-          label: `Factory offer · ${offers.find((q) => q.id === a.factoryQuoteId)?.factory.name ?? "factory"}`,
+          label: `Supplier offer · ${offers.find((q) => q.id === a.factoryQuoteId)?.factory.name ?? "factory"}`,
           href: `/inquiries/${inquiry.id}/sourcing`,
         },
         step: null,
@@ -348,7 +348,7 @@ export class OrderFilesService {
         id: `factory_payment:${p.id}`,
         source: "factory_payment",
         sourceId: p.id,
-        name: p.fileName ?? "factory payment",
+        name: p.fileName ?? "supplier payment",
         size: p.fileSize ?? 0,
         type,
         kind: null,
@@ -539,7 +539,7 @@ export class OrderFilesService {
       if (input.target.startsWith("doc:")) {
         const docId = input.target.slice(4);
         const doc = await this.prisma.db.orderDocument.findFirst({ where: { id: docId, orderId } });
-        if (!doc) throw new NotFoundError("Paper");
+        if (!doc) throw new NotFoundError("Document");
         await this.flow.updateDocument(user, docId, {
           attachmentId: fileId,
           ...(doc.status === "missing" || doc.status === "draft" ? { status: "ready" as const, keptWhere: null } : {}),
@@ -548,7 +548,7 @@ export class OrderFilesService {
         step = STEPS_OF_DOC[doc.kind] ?? "documents";
       } else {
         const kind = input.target as OrderDocumentKind;
-        if (!(ORDER_DOCUMENT_KINDS as readonly string[]).includes(kind)) throw new DomainError("Choose a paper of this order.");
+        if (!(ORDER_DOCUMENT_KINDS as readonly string[]).includes(kind)) throw new DomainError("Choose a document of this order.");
         const existing = await this.prisma.db.orderDocument.findFirst({ where: { orderId, kind }, orderBy: { updatedAt: "desc" } });
         if (existing)
           await this.flow.updateDocument(user, existing.id, {
@@ -717,7 +717,7 @@ export class OrderFilesService {
     const files = all.files.filter((f) => input.files.includes(f.id));
     if (files.length !== new Set(input.files).size) throw new NotFoundError("File");
     const papers = input.papers.length ? (await this.papers.list(user, orderId)).papers.filter((p) => input.papers.includes(p.key)) : [];
-    if (papers.length !== new Set(input.papers).size) throw new NotFoundError("Paper");
+    if (papers.length !== new Set(input.papers).size) throw new NotFoundError("Document");
     const o = await this.orders.load(user, orderId);
     const names = [...papers.map((p) => [p.label, p.number].filter(Boolean).join(" ")), ...files.map((f) => f.name)];
     const steps = new Set([...files.map((f) => f.step), ...papers.map((p) => p.step)].filter(Boolean));

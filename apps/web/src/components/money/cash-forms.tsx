@@ -134,7 +134,7 @@ export function MoveMoney({ accounts, today, startOpen = false }: { accounts: Ac
       <ActionForm action={transferAction} onDone={() => setOpen(false)} className={framed} keepFields>
         {(s: ActionState) => (
           <>
-            <p className="text-sm font-medium">Move money between our accounts</p>
+            <p className="text-sm font-medium">Move money between our bank accounts</p>
             <p className="text-xs text-muted">Cash paid into the bank, dollars changed into rupees… It is not money earned or spent.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="From" htmlFor="tr-from" error={s.errors?.fromAccountId}>

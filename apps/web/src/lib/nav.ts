@@ -56,7 +56,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     icon: "purchasing",
     pages: [
       { href: "/operations/purchase-orders", label: "Purchase orders" },
-      { href: "/factories", label: "Suppliers" },
+      { href: "/suppliers", label: "Suppliers" },
     ],
   },
   {
@@ -201,7 +201,7 @@ export function buildModules({
     "/audit": can("audit.view") && feature("audit_log"),
     // The company's own web address and its website form's key are the admin's (managers run the rest of Company settings).
     "/settings/website-form": settings && security,
-    "/factories": sourcing,
+    "/suppliers": sourcing,
     "/operations/purchase-orders": sourcing,
     "/money/company-costs": sourcing && managers && feature("expenses"),
     "/finance/cash-book": sourcing && managers && feature("cash_book"),

@@ -119,7 +119,7 @@ export default async function OrderDocuments({ params, searchParams }: { params:
   const canPrint = can(me, "orders.update") && open;
   const howPrint = (
     <Section
-      title="How the papers print"
+      title="How the documents print"
       cols={4}
       rows={[
         { label: "Heading over the items", value: o.documentTitle || <span className="font-normal text-text-2">{o.inquiry.title} (the inquiry’s title)</span> },
@@ -147,10 +147,10 @@ export default async function OrderDocuments({ params, searchParams }: { params:
         canPrint && (
           <FieldsWindow
             button={{ label: "Edit" }}
-            title="How the papers print"
+            title="How the documents print"
             sub={sub}
             action={papersPrintAction.bind(null, o.id)}
-            whats={["Papers made final keep what they said; the next ones use what is set here."]}
+            whats={["Documents made final keep what they said; the next ones use what is set here."]}
             fields={[
               { name: "documentTitle", label: "Heading over the items", value: o.documentTitle, placeholder: o.inquiry.title, wide: true },
               ...(pp?.conditionsChoice
@@ -165,7 +165,7 @@ export default async function OrderDocuments({ params, searchParams }: { params:
                         { value: "yes", label: "Print them too" },
                       ],
                       wide: true,
-                      hint: `The route is no longer the one accepted; the papers word the payment from the route. Agreed: “${agreedConditions.split(/\r?\n/)[0]}”`,
+                      hint: `The route is no longer the one accepted; the documents word the payment from the route. Agreed: “${agreedConditions.split(/\r?\n/)[0]}”`,
                     },
                   ]
                 : []),

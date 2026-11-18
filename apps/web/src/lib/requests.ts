@@ -25,7 +25,7 @@ export function requestWords(r: {
   const dayMonth = (iso: string) => formatDayMonth(iso, style);
   if (r.state === "cancelled") return "Cancelled";
   // A bank route's balance is asked for with the papers: until they go to our bank it waits for them.
-  if (r.state === "not_sent" && r.through === "bank") return "Papers not at the bank yet";
+  if (r.state === "not_sent" && r.through === "bank") return "Documents not at the bank yet";
   if (r.state !== "sent") return REQUEST_STATE_LABEL[r.state];
   if (r.with === "proforma") return "Sent with the proforma";
   if (r.with === "bank") return `At the bank${r.sentOn ? ` since ${dayMonth(r.sentOn)}` : ""}`;

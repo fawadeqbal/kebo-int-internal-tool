@@ -184,7 +184,7 @@ describe("order v4: light steps", () => {
     expect(leadDays(null)).toBeNull();
   });
 
-  it("All delivered OK: every line in full and good, the delivery dated; who received them", async () => {
+  it("All delivered OK: every item in full and good, the delivery dated; who received them", async () => {
     await api(app, sana).post(`/orders/${second}/delivery/all-good`, {}).expect(200);
     const o = (await api(app, sana).get(`/orders/${second}`)).body;
     const goods = o.lines.filter((l: { type: string }) => l.type === "goods");

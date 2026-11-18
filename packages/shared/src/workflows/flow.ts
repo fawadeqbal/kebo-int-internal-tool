@@ -90,7 +90,7 @@ export const documentDone = (status: OrderDocumentStatus | string) => status ===
 export const BANK_STEP_LABEL: Record<BankStepKind, string> = {
   sent_to_our_bank: "Documents handed to our bank",
   couriered_to_customer_bank: "Couriered to the customer's bank",
-  customer_bank_received: "Papers reached their bank",
+  customer_bank_received: "Documents reached their bank",
   copies_to_customer: "Copies sent to the customer",
   customer_paid_bank: "Customer paid their bank",
   bank_paid_us: "Money reached us",
@@ -121,7 +121,7 @@ export function deliveryConditionOf(
 export const SAT_RESULT_LABEL: Record<SatResult, string> = { pending: "Not checked", pass: "Pass", fail: "Fail", not_applicable: "N/A" };
 export const SAT_RESULT_TONE: Record<SatResult, Tone> = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" };
 
-export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = { open: "Open", with_factory: "With the factory", resolved: "Resolved", rejected: "Rejected" };
+export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = { open: "Open", with_factory: "With the supplier", resolved: "Resolved", rejected: "Rejected" };
 export const CLAIM_STATUS_TONE: Record<ClaimStatus, Tone> = { open: "bad", with_factory: "warn", resolved: "ok", rejected: "neutral" };
 
 /** What a site acceptance test usually checks; a new order's SAT list starts from these. */
@@ -160,7 +160,7 @@ export type FlowStep = (typeof FLOW_STEPS)[number];
 
 export const FLOW_STEP_LABEL: Record<FlowStep, string> = {
   payment: "Payment",
-  factory: "Factory order",
+  factory: "Purchase order",
   production: "Production",
   shipping: "Shipping",
   documents: "Documents & bank",
@@ -227,7 +227,7 @@ export function flowSteps(f: FlowFacts, features: readonly string[] | null): Flo
   };
   const sub: Record<FlowStep, string> = {
     payment: f.depositIn ? (f.route === null ? "Deposit received · route not chosen" : "Deposit received") : f.route === null ? "Choose how the customer pays" : "Waiting for the deposit",
-    factory: f.factoryOrderedOn ? `Ordered ${f.factoryOrderedOn}` : "Place the order with the factory",
+    factory: f.factoryOrderedOn ? `Ordered ${f.factoryOrderedOn}` : "Place the order with the supplier",
     production: f.production.lines > 0 && f.production.received === f.production.lines ? "Goods received" : f.readyOn ? `Ready ${f.readyOn}` : "No ready date yet",
     shipping: f.shipments.total
       ? f.shipments.arrived === f.shipments.total
@@ -238,7 +238,7 @@ export function flowSteps(f: FlowFacts, features: readonly string[] | null): Flo
       : shippedStage
         ? "Shipped"
         : "Not booked yet",
-    documents: `${f.documents.ready} of ${f.documents.required} papers · ${f.bankSteps.done} of ${f.bankSteps.required} bank steps`,
+    documents: `${f.documents.ready} of ${f.documents.required} documents · ${f.bankSteps.done} of ${f.bankSteps.required} bank steps`,
     delivery: f.openClaims
       ? `${f.openClaims} open claim${f.openClaims === 1 ? "" : "s"}`
       : f.sat.doneOn

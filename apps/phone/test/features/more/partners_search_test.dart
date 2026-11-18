@@ -69,11 +69,11 @@ Future<FakeServer> _open(WidgetTester t, String at) async {
 }
 
 void main() {
-  testWidgets('partners: customers and factories, a customer page', (t) async {
+  testWidgets('partners: customers and suppliers, a customer page', (t) async {
     await _open(t, '/partners');
     expect(find.text('Kabul Medical Supplies'), findsOneWidget);
     expect(find.text('2 open deals · 1 open orders'), findsOneWidget);
-    await t.tap(find.text('Factories'));
+    await t.tap(find.text('Suppliers'));
     await t.pumpAndSettle();
     expect(find.text('Shanghai Pharma Machinery'), findsOneWidget);
     await t.tap(find.text('Customers'));

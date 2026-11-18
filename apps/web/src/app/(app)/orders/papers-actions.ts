@@ -19,7 +19,7 @@ const DONE: Record<PaperOp, string> = {
   final: "Made final.",
   again: "Version started as a draft.",
   fix: "Saved.",
-  buyer: "Buyer refreshed from the customer: papers made from now on print it.",
+  buyer: "Buyer refreshed from the customer: documents made from now on print it.",
   quotedTerms: "Saved.",
 };
 

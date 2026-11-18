@@ -20,13 +20,13 @@ export const metadata = { title: "Activity log" };
 const ENTITY_LABEL: Record<string, string> = {
   inquiry: "Inquiry",
   customer: "Customer",
-  factory: "Factory",
-  factory_quote: "Factory prices",
+  factory: "Supplier",
+  factory_quote: "Supplier prices",
   quotation: "Quotation",
   order: "Order",
   payment: "Payment",
   // Entries written before orders were simplified (Oct 2026).
-  factory_order: "Factory order (old)",
+  factory_order: "Purchase order (old)",
   invoice: "Invoice (old)",
   shipment: "Shipment (old)",
   attachment: "File",
@@ -45,7 +45,7 @@ function entityHref(r: AuditRow, canUsers: boolean): string | null {
     case "customer":
       return `/customers/${r.entityId}`;
     case "factory":
-      return `/factories/${r.entityId}`;
+      return `/suppliers/${r.entityId}`;
     case "order":
       return `/orders/${r.entityId}`;
     case "user":

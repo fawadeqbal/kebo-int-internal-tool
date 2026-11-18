@@ -87,7 +87,7 @@ export function editedMark(card: EditCard | null | undefined, key: string): Reac
  * `n` is the edit this save will be ("Edit 3").
  */
 export function ReasonDialog({
-  title = "Why are you changing these lines?",
+  title = "Why are you changing these items?",
   n,
   note,
   changes,

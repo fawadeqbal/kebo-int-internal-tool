@@ -551,7 +551,7 @@ export function expensePlan(e: ExpenseDoc, ctx: RuleCtx): DocPlan {
       const m = expenseIn({ amountMinor: e.amountMinor, currency: e.currency, rate: String(e.rate) }, target, per);
       if (m !== null && m > 0) {
         lines.push({ account: acc.factory(e.factoryId), side: "debit", minor: m, currency: target, rate: per, takesRest: true }, recovered);
-        memo += " (the factory bears it)";
+        memo += " (the supplier bears it)";
       }
     }
   }
@@ -619,7 +619,7 @@ export function transferPlan(t: TransferDoc, ctx: RuleCtx): DocPlan {
         date: t.on,
         type: "transfer",
         ref: "",
-        memo: t.note ?? "Moved between our accounts",
+        memo: t.note ?? "Moved between our bank accounts",
         dims: NO_DIMS,
         // A currency without a Settings rate takes the other side's value (the rate the money was changed at).
         lines: [

@@ -12,7 +12,7 @@ type Offer = { id: string; lines: Line[]; files: { id: string; fileName: string;
  * another factory's offer can start from the same lines. Each offer keeps its
  * own files as evidence.
  */
-describe("factory offer lines, one change at a time", () => {
+describe("supplier offer items, one change at a time", () => {
   let app: INestApplication;
   let sana: string;
   let bilal: string;
@@ -53,7 +53,7 @@ describe("factory offer lines, one change at a time", () => {
     expect(d.title).toBe("Complete water bottling plant, 6000 bph");
   });
 
-  it("starts an offer without lines, then adds, edits, moves and removes lines one by one", async () => {
+  it("starts an offer without items, then adds, edits, moves and removes items one by one", async () => {
     offerA = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `Jiangsu Water ${tag}`, receivedOn: "2026-10-26", currency: "CNY" })
@@ -110,7 +110,7 @@ describe("factory offer lines, one change at a time", () => {
     await api(app, bilal).patch(`/factory-lines/${filler.id}`, { unitPrice: 1 }).expect(404);
   });
 
-  it("starts another factory's offer from the same lines and compares them product by product", async () => {
+  it("starts another supplier's offer from the same items and compares them product by product", async () => {
     offerB = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `Zhangjiagang ${tag}`, receivedOn: "2026-10-27", currency: "CNY" })
@@ -132,14 +132,14 @@ describe("factory offer lines, one change at a time", () => {
     await api(app, sana).post(`/factory-quotes/${offerB}/copy-lines`, { fromQuoteId: offerB }).expect(400);
   });
 
-  it("keeps the factory's quotation and screenshots on the offer, apart from the deal's documents", async () => {
+  it("keeps the supplier's quotation and screenshots on the offer, apart from the deal's documents", async () => {
     const file = (
       await request(app.getHttpServer())
         .post(`/api/inquiries/${inquiryId}/files`)
         .set("authorization", `Bearer ${sana}`)
         .field("kind", "factory_quote")
         .field("factoryQuoteId", offerA)
-        .attach("file", Buffer.from("%PDF-1.4 factory quote"), { filename: "Jiangsu quote.pdf", contentType: "application/pdf" })
+        .attach("file", Buffer.from("%PDF-1.4 supplier offer"), { filename: "Jiangsu quote.pdf", contentType: "application/pdf" })
         .expect(201)
     ).body;
     const a: Offer = (await api(app, sana).get(`/factory-quotes/${offerA}`).expect(200)).body;
@@ -158,7 +158,7 @@ describe("factory offer lines, one change at a time", () => {
       .expect(400);
   });
 
-  it("asks why before changing the price of a line a quotation uses; an offer without lines cannot be offered", async () => {
+  it("asks why before changing the price of an item a quotation uses; an offer without items cannot be offered", async () => {
     const empty = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `Empty ${tag}`, receivedOn: "2026-10-27", currency: "CNY" })
@@ -174,7 +174,7 @@ describe("factory offer lines, one change at a time", () => {
     const r = await api(app, sana).patch(`/factory-lines/${used.id}`, { unitPrice: 1 }).expect(409);
     expect(r.body.code).toBe("reason_needed");
     await api(app, sana).patch(`/factory-lines/${used.id}`, { model: "renamed" }).expect(200); // wording: quotations keep their own copy
-    await api(app, sana).patch(`/factory-lines/${used.id}`, { unitPrice: 1, reason: "Factory corrected the price" }).expect(200);
+    await api(app, sana).patch(`/factory-lines/${used.id}`, { unitPrice: 1, reason: "Supplier corrected the price" }).expect(200);
     await api(app, sana).delete(`/factory-lines/${used.id}`).expect(409);
   });
 });

@@ -91,13 +91,13 @@ export async function VaultOverview({ today }: { today: string }) {
         })}
       </StatRow>
       {open.length === 0 ? (
-        <EmptyState framed title="No accounts yet" description="Add the office cash box, each bank account and wallet, with what is in it today." />
+        <EmptyState framed title="No bank accounts yet" description="Add the office cash box, each bank account and wallet, with what is in it today." />
       ) : (
         <Card className="overflow-clip p-0">
           <CardHeader
             title={
               <>
-                Accounts <span className="text-xs font-normal text-text-2">· {open.length}</span>
+                Bank accounts <span className="text-xs font-normal text-text-2">· {open.length}</span>
               </>
             }
           />
@@ -222,13 +222,13 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
   const open = accounts.filter((a) => !a.archived);
   const byCurrency = new Map<string, number>();
   for (const a of open) byCurrency.set(a.currency, (byCurrency.get(a.currency) ?? 0) + Number(a.balance));
-  const kindOf = (k: CashRow["kind"]) => (k === "in" ? "From a customer" : k === "factory" ? "To a factory" : k === "expense" ? "Expense" : "Between our accounts");
+  const kindOf = (k: CashRow["kind"]) => (k === "in" ? "From a customer" : k === "factory" ? "To a supplier" : k === "expense" ? "Expense" : "Between our accounts");
 
   return (
     <div className="flex flex-col gap-5">
       <Card>
         <CardHeader
-          title="Our accounts"
+          title="Our bank accounts"
           description={
             open.length
               ? `Balance today: ${[...byCurrency.entries()].map(([c, v]) => money(v, c)).join(" · ")}`
@@ -309,7 +309,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
             <StatTile label={`Opened ${date(one.openingOn)}`} value={money(book.opening ?? "0", one.currency)} sub="Balance it started with" />
           )}
           <StatTile label="In" value={money(book.totals[0]?.in ?? "0", one.currency)} sub="Customers and moves in" />
-          <StatTile label="Out" value={money(book.totals[0]?.out ?? "0", one.currency)} sub="Factories, expenses, moves out" />
+          <StatTile label="Out" value={money(book.totals[0]?.out ?? "0", one.currency)} sub="Suppliers, expenses, moves out" />
           <StatTile label={`On ${date(pr.to)}`} value={money(book.closing ?? "0", one.currency)} sub="Check it against the statement" />
         </div>
       ) : (
@@ -332,7 +332,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
               ? "Like a bank statement: the balance after each line."
               : acct === "none"
                 ? "Choose the account each amount went through, so the balances match the bank and the cash box."
-                : "Money in from customers and out to factories and expenses. Moves between our accounts are shown but not counted."
+                : "Money in from customers and out to suppliers and expenses. Moves between our bank accounts are shown but not counted."
           }
           actions={book.rows.length > 0 ? <ExportLink what="cash-book" query={{ from: pr.from, to: pr.to, account: acct, currency: acct && acct !== "none" ? undefined : cur }} /> : undefined}
         />
@@ -441,7 +441,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
       </Card>
       {book.rows.some((r) => r.kind === "transfer_out") && (
         <Card>
-          <CardHeader title="Moves between our accounts" description="Remove one typed by mistake." />
+          <CardHeader title="Moves between our bank accounts" description="Remove one typed by mistake." />
           <ul className="flex flex-col divide-y divide-line">
             {book.rows
               .filter((r) => r.kind === "transfer_out" && !r.voided)

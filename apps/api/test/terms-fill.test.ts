@@ -32,7 +32,7 @@ describe("old records take the terms they were agreed on, once", () => {
     await app?.close();
   });
 
-  it("an old order and a purchase order sent before: the same on every screen and paper, now their own", async () => {
+  it("an old order and a purchase order sent before: the same on every screen and document, now their own", async () => {
     // An order with three parts, a warranty from the site test, conditions; its purchase order sent.
     const me = (await api(app, sana).get("/auth/me")).body.id;
     const customer = (
@@ -55,7 +55,7 @@ describe("old records take the terms they were agreed on, once", () => {
         leadDays: 30,
         leadFrom: "after_payment",
         paymentParts: [
-          { label: "Advance 30%", percent: 30, rule: "on_order" },
+          { label: "Deposit 30%", percent: 30, rule: "on_order" },
           { label: "Balance 70%", percent: 70, rule: "on_ready" },
         ],
         paymentTerms: "By T/T to their account in Jinan.",

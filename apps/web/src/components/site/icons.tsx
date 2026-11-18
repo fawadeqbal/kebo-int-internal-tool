@@ -20,7 +20,7 @@ import type { SiteIcon } from "@kebo/shared";
 /** The icons a feature block may use (the editor offers the same list). */
 export const SITE_ICON: Record<SiteIcon, { icon: LucideIcon; label: string }> = {
   inbox: { icon: Inbox, label: "Inbox" },
-  factory: { icon: Factory, label: "Factory" },
+  factory: { icon: Factory, label: "Supplier" },
   calculator: { icon: Calculator, label: "Calculator" },
   "file-text": { icon: FileText, label: "Document" },
   truck: { icon: Truck, label: "Truck" },

@@ -200,8 +200,8 @@ describe("platform: overview, settings, log and client inquiries", () => {
       followUpOn: "2026-12-01",
       status: "contacted",
     });
-    const need = (await plat().patch(`/leads/${lead.id}`, { message: "Quotes and LC papers" }).expect(200)).body;
-    expect(need.message).toBe("Quotes and LC papers");
+    const need = (await plat().patch(`/leads/${lead.id}`, { message: "Quotes and LC documents" }).expect(200)).body;
+    expect(need.message).toBe("Quotes and LC documents");
     // Lost needs a reason.
     await plat().patch(`/leads/${lead.id}`, { status: "lost" }).expect(400);
     expect((await plat().patch(`/leads/${lead.id}`, { status: "lost", lostReason: "Too dear" }).expect(200)).body).toMatchObject({

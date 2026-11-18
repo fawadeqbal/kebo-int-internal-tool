@@ -131,7 +131,7 @@ export default async function CustomerOverview({
               { label: "Country", value: countryKnown ? countryName(c.country) : null },
               { label: "Default currency", value: c.defaultCurrency },
               { label: "Address", value: c.address && <span className="whitespace-pre-line">{c.address}</span>, wide: true },
-              { label: "Initials on papers", value: c.initials },
+              { label: "Initials on documents", value: c.initials },
               { label: "Tax no.", value: c.taxNo },
               { label: "Registration no.", value: c.regNo },
               { label: "Notes", value: c.notes && <span className="whitespace-pre-line">{c.notes}</span>, wide: true },

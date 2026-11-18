@@ -110,7 +110,7 @@ function madeByTheApp(kind: OrderDocumentKind) {
       : kind === "packing_list"
         ? "fill in the packing on Shipping; it is final once the order ships"
         : "make it final on its page"
-  }. A signed or stamped copy goes to its paper or the order's files.`;
+  }. A signed or stamped copy goes to its document or the order's files.`;
 }
 
 /** A paper of the shipment's set is in: recorded as done, or the order's own proforma / packing list made. */
@@ -574,7 +574,7 @@ export class FlowService {
         lcTerms: lc ? (input.lcTerms ?? was.lcTerms ?? "at_sight") : (input.lcTerms ?? was.lcTerms),
         lcDays: input.lcDays ?? was.lcDays,
       };
-      if (lc && t.lcTerms === "deferred" && !t.lcDays) throw new DomainError("Say after how many days the deferred LC pays (counted from the day the papers reach their bank).");
+      if (lc && t.lcTerms === "deferred" && !t.lcDays) throw new DomainError("Say after how many days the deferred LC pays (counted from the day the documents reach their bank).");
       if (was.route === t.route && was.balanceWhen === t.balanceWhen && was.lcTerms === t.lcTerms && was.lcDays === t.lcDays) return;
       // The balance terms stay on the order as accepted: the papers word the terms from the route itself.
       const terms = { route: t.route, balanceWhen: t.balanceWhen, lcTerms: t.lcTerms, lcDays: t.lcDays };
@@ -633,7 +633,7 @@ export class FlowService {
   async setFactoryOrder(user: SessionUser, id: string, input: FactoryOrderInput) {
     await this.must(user, "orders.update", null, "change orders");
     if (input.factoryOrderedOn && input.factoryOrderedOn > this.clock.today())
-      throw new DomainError("The factory order date cannot be in the future.");
+      throw new DomainError("The purchase order date cannot be in the future.");
     const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       const was = { factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn), factoryOrderNo: o.factoryOrderNo };
@@ -653,8 +653,8 @@ export class FlowService {
       const parts = [
         input.factoryOrderedOn !== undefined
           ? input.factoryOrderedOn
-            ? `ordered from the factory on ${input.factoryOrderedOn}`
-            : "factory order date cleared"
+            ? `ordered from the supplier on ${input.factoryOrderedOn}`
+            : "purchase order date cleared"
           : null,
         input.factoryOrderNo !== undefined && input.factoryOrderNo !== was.factoryOrderNo
           ? input.factoryOrderNo
@@ -662,9 +662,9 @@ export class FlowService {
             : "their order no. cleared"
           : null,
       ].filter(Boolean);
-      await this.log(tx, user, id, "factory_order", `${o.refNo}: ${parts.join(", ") || "factory order saved"}`, was, input);
+      await this.log(tx, user, id, "factory_order", `${o.refNo}: ${parts.join(", ") || "purchase order saved"}`, was, input);
       // Ordered from the factory: the order is in production.
-      return input.factoryOrderedOn && ordered ? this.orders.followFlow(tx, user, id, "in_production", "ordered from the factory") : null;
+      return input.factoryOrderedOn && ordered ? this.orders.followFlow(tx, user, id, "in_production", "ordered from the supplier") : null;
     });
     await this.orders.announce(event);
     return this.get(user, id);
@@ -1145,7 +1145,7 @@ export class FlowService {
     if (attachmentId) {
       const a = await tx.attachment.findFirst({ where: { id: attachmentId, inquiryId: order.inquiryId, deletedAt: null } });
       if (!a) throw new DomainError("That file is not on this deal. Upload it to the deal's files first.");
-      if (a.factoryQuoteId) throw new DomainError("That file is a factory offer's evidence; upload the document itself.");
+      if (a.factoryQuoteId) throw new DomainError("That file is a supplier offer's evidence; upload the document itself.");
     }
   }
 
@@ -1168,7 +1168,7 @@ export class FlowService {
     if (s?.blNo === number) return;
     if (s?.blNo)
       throw new DomainError(
-        `The ${kind === "airway_bill" ? "AWB" : "B/L"} number is the shipment's (${s.blNo}): change it on the shipment, and this paper prints it.`,
+        `The ${kind === "airway_bill" ? "AWB" : "B/L"} number is the shipment's (${s.blNo}): change it on the shipment, and this document prints it.`,
       );
     if (s) await tx.shipment.update({ where: { id: s.id }, data: { blNo: number } });
     else await onPrimaryShipment(tx, o, { blNo: number });
@@ -1485,7 +1485,7 @@ export class FlowService {
         user,
         id,
         "delivery",
-        `${o.refNo}: all delivered in good condition on ${deliveredOn} (${lines.length} line${lines.length === 1 ? "" : "s"})`,
+        `${o.refNo}: all delivered in good condition on ${deliveredOn} (${lines.length} item${lines.length === 1 ? "" : "s"})`,
         { deliveredOn: fromDbDateOrNull(was?.deliveredOn) },
         { deliveredOn, condition: "good", lines: lines.length, allGood: true },
       );

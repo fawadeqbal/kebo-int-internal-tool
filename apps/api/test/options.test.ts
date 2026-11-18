@@ -10,7 +10,7 @@ type Line = { no: string; description: string; model?: string | null; type: stri
  * A quotation offers whole factory offers as options A, B…; the customer
  * accepts exactly one, and the order is that option's lines.
  */
-describe("quotation options from factory offers", () => {
+describe("quotation options from supplier offers", () => {
   let app: INestApplication;
   let sana: string;
   let bilal: string;
@@ -59,7 +59,7 @@ describe("quotation options from factory offers", () => {
       .post("/inquiries", {
         ...base,
         items: [
-          { description: "Line", quantity: 1, unit: "set" },
+          { description: "Item", quantity: 1, unit: "set" },
           { description: "Filler", quantity: 1, unit: "set", partOf: 0 },
           { description: "Nozzle", quantity: 1, unit: "set", partOf: 1 },
         ],
@@ -102,7 +102,7 @@ describe("quotation options from factory offers", () => {
     expect(by("Glue unit").parentId).toBe(by("Labeller").id);
   });
 
-  it("keeps each factory's own lines, models and parts, and says which items an offer covers", async () => {
+  it("keeps each supplier's own items, models and parts, and says which items an offer covers", async () => {
     const [boiler, line] = await items();
     const x = {
       newFactoryName: `Zhangjiagang Complete ${tag}`,
@@ -140,7 +140,7 @@ describe("quotation options from factory offers", () => {
     offerY = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/factory-quotes`, {
-          newFactoryName: `Guangzhou Lines ${tag}`,
+          newFactoryName: `Guangzhou Items ${tag}`,
           receivedOn: "2026-10-21",
           currency: "CNY",
           // 13% tax on top of its prices.
@@ -175,7 +175,7 @@ describe("quotation options from factory offers", () => {
     expect(draft.options[0].prices).toHaveLength(4);
   });
 
-  it("offers two factories as Option A and B; lines come from the offers and cannot be changed in the quotation", async () => {
+  it("offers two suppliers as Option A and B; items come from the offers and cannot be changed in the quotation", async () => {
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     const offers = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body;
     const y = offers.offers.find((o: { factoryQuoteId: string }) => o.factoryQuoteId === offerY);
@@ -257,7 +257,7 @@ describe("quotation options from factory offers", () => {
     // We owe only the factory of the chosen option.
     const m = (await api(app, sana).get(`/orders/${order.id}/money`).expect(200)).body;
     expect(m.factories.rows.map((f: { factory: { name: string }; owed: string }) => `${f.factory.name} ${f.owed}`)).toEqual([
-      `Guangzhou Lines ${tag} 282500.00`,
+      `Guangzhou Items ${tag} 282500.00`,
     ]);
     await api(app, bilal).get(`/revisions/${revisionId}`).expect(404);
   });
@@ -288,7 +288,7 @@ describe("quotation options from factory offers", () => {
     expect((await api(app, sana).get(`/orders/${id}/documents/packing-list`).expect(200)).body.number).toMatch(/^PL-\d{4}-\d{4}$/);
   });
 
-  it("keeps the chosen factory's quotation with the order", async () => {
+  it("keeps the chosen supplier's quotation with the order", async () => {
     await request(app.getHttpServer())
       .post(`/api/inquiries/${inquiryId}/files`)
       .set("authorization", `Bearer ${sana}`)
@@ -306,6 +306,6 @@ describe("quotation options from factory offers", () => {
     const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
     const order = (await api(app, sana).get(`/orders/${deal.orders[0].id}`).expect(200)).body;
     // Only the offer the order was made from (option B), not the one the customer did not choose.
-    expect(order.factoryFiles.map((f: { fileName: string; factory: string }) => `${f.factory}: ${f.fileName}`)).toEqual([`Guangzhou Lines ${tag}: Guangzhou PI.pdf`]);
+    expect(order.factoryFiles.map((f: { fileName: string; factory: string }) => `${f.factory}: ${f.fileName}`)).toEqual([`Guangzhou Items ${tag}: Guangzhou PI.pdf`]);
   });
 });

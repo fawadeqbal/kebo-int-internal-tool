@@ -133,7 +133,7 @@ describe("security: roles, two-step per role, sessions, sign-ins", () => {
           })
           .expect(403)
       ).body.error,
-    ).toBe("You can only give what your own role allows. Not yours: Expenses, factory payments and profit & loss.");
+    ).toBe("You can only give what your own role allows. Not yours: Expenses, supplier payments and profit & loss.");
   });
 
   it("makes everyone in a role set up two-step sign-in before anything else", async () => {

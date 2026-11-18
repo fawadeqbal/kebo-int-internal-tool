@@ -32,13 +32,13 @@ describe("old URLs open the side panel", () => {
     const { default: Page } = await import("@/app/(app)/customers/new/page");
     expect(await where(() => Page())).toBe("/customers?panel=new-customer");
   });
-  it("/factories/new → the list with New factory open", async () => {
-    const { default: Page } = await import("@/app/(app)/factories/new/page");
-    expect(await where(() => Page())).toBe("/factories?panel=new-factory");
+  it("/suppliers/new → the list with New factory open", async () => {
+    const { default: Page } = await import("@/app/(app)/suppliers/new/page");
+    expect(await where(() => Page())).toBe("/suppliers?panel=new-factory");
   });
-  it("/factories/:id/edit → the factory with Edit open", async () => {
-    const { default: Page } = await import("@/app/(app)/factories/[id]/edit/page");
-    expect(await where(() => Page(id))).toBe("/factories/c1?panel=edit-factory&id=c1");
+  it("/suppliers/:id/edit → the factory with Edit open", async () => {
+    const { default: Page } = await import("@/app/(app)/suppliers/[id]/edit/page");
+    expect(await where(() => Page(id))).toBe("/suppliers/c1?panel=edit-factory&id=c1");
   });
   it("/users/new → the list with Add a person open", async () => {
     const { default: Page } = await import("@/app/(app)/users/new/page");

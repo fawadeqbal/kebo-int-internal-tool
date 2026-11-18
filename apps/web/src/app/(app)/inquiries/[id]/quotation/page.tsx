@@ -111,7 +111,7 @@ export default async function QuotationPage({
           <CardBody>
             <p className="text-sm text-text-2">
               {manage
-                ? "None yet. New quotations makes one draft for each factory offer you tick, or one priced by hand."
+                ? "None yet. New quotations makes one draft for each supplier offer you tick, or one priced by hand."
                 : (q.whyNotStart ?? "The person handling this inquiry makes the quotations.")}
             </p>
           </CardBody>

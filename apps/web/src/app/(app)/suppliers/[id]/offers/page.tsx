@@ -57,7 +57,7 @@ export default async function FactoryOffers({
       (!sp.result || result(x).key === sp.result),
   );
   const filtered = !!(q || sp.inquiry || sp.result);
-  const base = `/factories/${f.id}/offers`;
+  const base = `/suppliers/${f.id}/offers`;
   // A page at a time, like every list.
   const page = toPage(sp.page);
   const shown = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -81,7 +81,7 @@ export default async function FactoryOffers({
             description={
               filtered
                 ? "Try another word, inquiry or result."
-                : "Prices are recorded on an inquiry, under Factory offers. Open an inquiry that needs prices and ask this supplier."
+                : "Prices are recorded on an inquiry, under Supplier offers. Open an inquiry that needs prices and ask this supplier."
             }
             action={
               filtered ? (
@@ -105,7 +105,7 @@ export default async function FactoryOffers({
                     key={x.id}
                     href={`/inquiries/${x.inquiry.id}/sourcing`}
                     title={x.inquiry.refNo}
-                    line={[date(x.receivedOn), basis(x), `${x._count.lines} lines`].join(" · ")}
+                    line={[date(x.receivedOn), basis(x), `${x._count.lines} items`].join(" · ")}
                     status={<StatusBadge meaning={r.meaning}>{r.label}</StatusBadge>}
                     figure={whole(x.total, x.currency)}
                   />
@@ -119,8 +119,8 @@ export default async function FactoryOffers({
                     <Th>Their ref.</Th>
                     <Th>Received</Th>
                     <Th>Valid until</Th>
-                    <Th>Basis</Th>
-                    <Th className="text-right">Lines</Th>
+                    <Th>Incoterm</Th>
+                    <Th className="text-right">Items</Th>
                     <Th className="text-right">Total</Th>
                     <Th>Lead time</Th>
                     <Th>Used in</Th>

@@ -302,7 +302,7 @@ export class LeaksService {
     for (const s of stuck.filter((x) => x.days >= LIMITS.stuckDays))
       warnings.push({
         level: "warn",
-        text: `${s.refNo}: ${show(s.stuckMinor, s.currency)} paid to the factory ${s.days} days ago is not back from ${s.customer.name} yet.`,
+        text: `${s.refNo}: ${show(s.stuckMinor, s.currency)} paid to the supplier ${s.days} days ago is not back from ${s.customer.name} yet.`,
         href: `/orders/${s.id}/payment`,
       });
 

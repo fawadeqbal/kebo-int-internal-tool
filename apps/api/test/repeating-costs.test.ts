@@ -36,7 +36,7 @@ describe("the company's costs that come every month", () => {
     expect(rent).toMatchObject({ repeats: true });
     expect(rent.repeatKey).toMatch(/^[0-9a-f-]{36}$/);
     // One that does not repeat is not proposed.
-    await add({ description: `Paper ${tag}`, category: "office", amount: 25 }).expect(201);
+    await add({ description: `Document ${tag}`, category: "office", amount: 25 }).expect(201);
     const w = await mine();
     expect(w).toHaveLength(1);
     expect(w[0]).toMatchObject({ key: rent.repeatKey, description: `Office rent ${tag}`, amount: "1000.00", currency: "USD", day: 3, on: `${month}-03`, last: { on: lastMonth, amount: "1000.00" } });

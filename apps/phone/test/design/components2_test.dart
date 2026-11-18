@@ -202,7 +202,7 @@ void main() {
             const KStatTile(label: 'To collect', value: 'USD 19,280'),
             const KProgress(value: 0.6, label: 'Paid'),
             KListItem(title: 'Herat Pharma', subtitle: 'Blister line', onPressed: () {}),
-            const KEmptyState(icon: KIcons.file, title: 'No papers', message: 'None yet.'),
+            const KEmptyState(icon: KIcons.file, title: 'No documents', message: 'None yet.'),
           ],
         ),
         dark: true,

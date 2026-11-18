@@ -39,7 +39,7 @@ const VIEWS = [
   { key: "all", label: "All entries" },
   { key: "accounts", label: "By account" },
   { key: "customers", label: "Customers" },
-  { key: "factories", label: "Factories" },
+  { key: "factories", label: "Suppliers" },
   { key: "staff", label: "Staff" },
   { key: "orders", label: "Orders" },
 ] as const;
@@ -264,7 +264,7 @@ const WHO = [
   { key: "all", label: "All", icon: List },
   { key: "customer", label: "Customers", icon: Users },
   { key: "supplier", label: "Suppliers", icon: Factory },
-  { key: "account", label: "Accounts", icon: Landmark },
+  { key: "account", label: "Bank accounts", icon: Landmark },
   { key: "person", label: "People", icon: User },
 ] as const;
 
@@ -419,7 +419,7 @@ async function Accounts({ period }: { period: { to: string } }) {
 async function Parties({ side }: { side: "receivable" | "payable" | "staff" }) {
   const a = await api.get<LedgerAgeing>("/ledger/ageing", { side });
   const kind = side === "receivable" ? "customer" : side === "payable" ? "factory" : "staff";
-  const what = side === "receivable" ? "Customers owe us" : side === "payable" ? "We owe factories" : "We owe staff back";
+  const what = side === "receivable" ? "Customers owe us" : side === "payable" ? "We owe suppliers" : "We owe staff back";
   return (
     <div className="flex flex-col gap-4">
       <AgeingTiles buckets={a.buckets} currency={a.mainCurrency} label={`${what}, by how late`} />
@@ -434,7 +434,7 @@ async function Parties({ side }: { side: "receivable" | "payable" | "staff" }) {
           <DataTable label={what}>
             <THead>
               <tr>
-                <Th>{side === "receivable" ? "Customer" : side === "payable" ? "Factory" : "Person"}</Th>
+                <Th>{side === "receivable" ? "Customer" : side === "payable" ? "Supplier" : "Person"}</Th>
                 <Th className="text-right">Open</Th>
                 {a.buckets.map((b) => (
                   <Th key={b.bucket} className="text-right">

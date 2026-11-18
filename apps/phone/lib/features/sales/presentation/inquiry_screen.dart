@@ -108,7 +108,7 @@ class InquiryScreen extends ConsumerWidget {
           KListItem(
             leading: KIcon(KIcons.globe, color: ctx.k.inkMuted),
             title: 'Open on the web',
-            subtitle: 'Factory prices and the quotation editor',
+            subtitle: 'Supplier prices and the quotation editor',
             divider: false,
             chevron: false,
             onPressed: () => Navigator.pop(ctx, 'web'),
@@ -268,7 +268,7 @@ class _Body extends ConsumerWidget {
                   KDetail('Came by', Channel.labels[i.channel] ?? i.channel),
                   KDetail('Priority', Priority.labels[i.priority]),
                   KDetail('Needed by', i.requiredBy == null ? null : fmtDate(DateTime.tryParse(i.requiredBy!))),
-                  KDetail('Handled by', i.assignee),
+                  KDetail('Responsible person', i.assignee),
                   KDetail('Received', fmtDate(i.createdAt)),
                 ],
               ),
@@ -295,7 +295,7 @@ class _Body extends ConsumerWidget {
                         ? const KEmptyState(
                             icon: KIcons.box,
                             title: 'No items yet',
-                            message: 'The lines are made when factory prices come in.',
+                            message: 'The items are made when supplier prices come in.',
                           )
                         : Column(
                             children: [
@@ -320,7 +320,7 @@ class _Body extends ConsumerWidget {
               ),
               const SizedBox(height: KSpace.s4),
               KButton(
-                'Factory prices',
+                'Supplier prices',
                 icon: KIcons.factory,
                 variant: KButtonVariant.secondary,
                 fullWidth: true,
@@ -354,7 +354,7 @@ class _Body extends ConsumerWidget {
                           child: KEmptyState(
                             icon: KIcons.file,
                             title: 'Not quoted yet',
-                            message: value.whyNotStart ?? 'Make it from the factory offers with Make the quotation.',
+                            message: value.whyNotStart ?? 'Make it from the supplier offers with Make the quotation.',
                           ),
                         ),
                         QuoteActions(inquiryId: i.id, latest: null, canStart: value.canStart, onChanged: onChanged),

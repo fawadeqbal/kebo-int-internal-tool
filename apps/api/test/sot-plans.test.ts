@@ -187,7 +187,7 @@ describe("plans follow the dates", () => {
     expect((await plan(o.id))[1]).toMatchObject({ dueRule: "on_ship_plus_days", dueDays: 7, dueOn: day(4) });
   });
 
-  it("an LC instalment is due from the day the papers reach the customer's bank, and moves when that does", async () => {
+  it("an LC instalment is due from the day the documents reach the customer's bank, and moves when that does", async () => {
     const o = await newOrder({ balanceTerms: "letter_of_credit" });
     const f = await flow(o.id);
     // From the quotation: the LC route, at sight.
@@ -237,23 +237,23 @@ describe("plans follow the dates", () => {
     ]);
   });
 
-  it("the factory offer's advance % seeds the factory's plan and is printed on the PO", async () => {
+  it("the supplier offer's deposit % seeds the supplier's plan and is printed on the PO", async () => {
     const o = await newOrder({ advancePercent: 50 });
     // Not saved yet: the default shown is the offer's 50%, not Settings' 30%.
     let m = await money(o.id);
     expect(m.factories.plans[0].rows.map((r: { label: string; amount: string }) => [r.label, r.amount])).toEqual([
-      ["Advance 50%", "6000.00"],
+      ["Deposit 50%", "6000.00"],
       ["Balance 50%", "6000.00"],
     ]);
     await api(app, sana).patch(`/orders/${o.id}/factory-order`, { factoryOrderedOn: day(-3) }).expect(200);
     m = await money(o.id);
     expect(m.factories.plans[0]).toMatchObject({ saved: true });
-    expect(m.factories.plans[0].rows[0]).toMatchObject({ label: "Advance 50%", amount: "6000.00", dueRule: "on_order" });
-    expect(JSON.stringify((await poDoc(o.id, o.factoryId)).bullets)).toMatch(/Payment: Advance 50%, CNY 6,000\.00, when we order/);
+    expect(m.factories.plans[0].rows[0]).toMatchObject({ label: "Deposit 50%", amount: "6000.00", dueRule: "on_order" });
+    expect(JSON.stringify((await poDoc(o.id, o.factoryId)).bullets)).toMatch(/Payment: Deposit 50%, CNY 6,000\.00, when we order/);
     // An offer that says nothing takes the company's default (30%), stored on the offer.
     const d = await newOrder();
     m = await money(d.id);
-    expect(m.factories.plans[0].rows[0]).toMatchObject({ label: "Advance 30%", amount: "3600.00" });
+    expect(m.factories.plans[0].rows[0]).toMatchObject({ label: "Deposit 30%", amount: "3600.00" });
     const inquiryId = (await order(d.id)).inquiry.id;
     const offers = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body.quotes;
     expect(offers[0]).toMatchObject({ advancePercent: 30 });

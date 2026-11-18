@@ -90,7 +90,7 @@ export function CashSection({ r, p }: { r: CashReport; p: Period }) {
       </Card>
 
       <Card className="overflow-hidden">
-        <CardHeader title="By account" description="each in its own currency · moves between our accounts count here, not in the months above" />
+        <CardHeader title="By account" description="each in its own currency · moves between our bank accounts count here, not in the months above" />
         {r.accounts.length === 0 ? (
           <p className="p-4 text-sm text-muted">
             No account yet.{" "}

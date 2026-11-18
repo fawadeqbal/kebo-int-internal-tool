@@ -164,7 +164,7 @@ describe("order costs", () => {
       .expect(400);
   });
 
-  it("takes an expense the factory bears off what we owe it", async () => {
+  it("takes an expense the supplier bears off what we owe it", async () => {
     const owed = (await money()).factories.rows[0];
     expect(owed).toMatchObject({ currency: "CNY", owed: "11300.00", toPay: "11300.00" });
     // The factory must be said, and be on the order.

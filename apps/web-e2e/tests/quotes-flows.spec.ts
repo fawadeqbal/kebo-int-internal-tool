@@ -91,7 +91,7 @@ test("each quotation and each offer has its own page: the lists open them, â€¹ â
   await expect(page.getByRole("heading", { level: 1, name: b!.refNo })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Inquiry" })).toHaveCount(0);
   // Every Edit has its word and says what it edits.
-  await expect(page.getByRole("button", { name: "Edit lines" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit items" })).toBeVisible();
   for (const part of ["delivery", "payment", "warranty and conditions"]) await expect(page.getByRole("button", { name: `Edit ${part}` })).toBeVisible();
   // Beside it: its revisions, the offer it came from, who it goes to.
   await expect(page.getByRole("region", { name: "Revisions" }).getByRole("link", { name: /R1/ })).toHaveAttribute("aria-current", "page");
@@ -111,7 +111,7 @@ test("each quotation and each offer has its own page: the lists open them, â€¹ â
   await expect(page.getByRole("region", { name: "Quoted in" }).getByRole("link", { name: new RegExp(b!.refNo) })).toBeVisible();
   expect(await accessibilityProblems(page), "an offer's page meets WCAG 2.2 AA").toEqual([]);
   // The offers tab shows each offer's tax, and opens its page.
-  await page.getByRole("link", { name: /Factory offers/ }).last().click();
+  await page.getByRole("link", { name: /Supplier offers/ }).last().click();
   await expect(page).toHaveURL((u) => u.pathname === `/inquiries/${deal.id}/sourcing`);
   await expect(page.getByText("tax incl. 13%", { exact: true }).filter({ visible: true }).first()).toBeVisible();
   // An old link to an offer opened in place lands on its page.

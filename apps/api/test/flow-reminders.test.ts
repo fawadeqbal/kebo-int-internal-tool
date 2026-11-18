@@ -8,7 +8,7 @@ import { PrismaService } from "../src/database/prisma.service";
  * answered, a ready date passed with the goods not in, the LC's last day to ship, and
  * an open claim. The factory's page shows how it answers and what it is making.
  */
-describe("order flow on Home and the factory page", () => {
+describe("order flow on Home and the supplier page", () => {
   let app: INestApplication;
   let sana: string;
   let bilal: string;
@@ -42,7 +42,7 @@ describe("order flow on Home and the factory page", () => {
     await app?.close();
   });
 
-  it("a factory that has not answered for days is on Home; one that answered is not", async () => {
+  it("a supplier that has not answered for days is on Home; one that answered is not", async () => {
     const t = await titles(sana);
     expect(t.some((x) => x.includes(`Slow Works ${tag} hasn't answered`))).toBe(true);
     expect(t.some((x) => x.includes(`Ruian Pack ${tag} hasn't answered`))).toBe(false);
@@ -69,7 +69,7 @@ describe("order flow on Home and the factory page", () => {
     expect(t).toEqual(expect.arrayContaining([expect.stringMatching(/Goods were to be ready .*: 0 of 1 received/), expect.stringContaining(`must ship by ${ago(-2)} under LC LC-${tag}`), expect.stringContaining('claim "Wrong voltage"')]));
   });
 
-  it("the factory page shows how it answers and what it is making", async () => {
+  it("the supplier page shows how it answers and what it is making", async () => {
     const f = (await api(app, sana).get(`/factories/${factoryId}`).expect(200)).body;
     expect(f.record).toMatchObject({ asked: 1, answered: 1, avgDaysToAnswer: 3, lateSteps: 1 });
     expect(f.record.openOrders.map((o: { id: string }) => o.id)).toContain(orderId);

@@ -153,9 +153,9 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
 
         <H2>Estimated profit</H2>
         <p className="text-[8pt] text-[#64748b]">
-          On {t.orders} order{t.orders === 1 ? "" : "s"} made in the period, from the costs recorded on their lines (sales after discount).
+          On {t.orders} order{t.orders === 1 ? "" : "s"} made in the period, from the costs recorded on their items (sales after discount).
           {t.coveragePercent !== null && t.coveragePercent < 100
-            ? ` Only ${t.coveragePercent}% of sales have a cost; lines without one are left out of profit and margin.`
+            ? ` Only ${t.coveragePercent}% of sales have a cost; items without one are left out of profit and margin.`
             : ""}
           {r.missingRates.length > 0
             ? ` There is no exchange rate for ${r.missingRates.join(", ")} in Settings, so amounts in ${r.missingRates.length === 1 ? "it are" : "them are"} left out.`

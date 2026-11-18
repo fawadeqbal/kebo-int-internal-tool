@@ -194,16 +194,16 @@ export function FactoriesSection({
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader
-          title={`Factories · ${p.name}`}
-          description={`click a factory for its page${d.shipped?.withDate ? ` · orders shipped on time: ${percent(d.shipped.percent)} (${d.shipped.onTime} of ${d.shipped.withDate})` : ""}`}
+          title={`Suppliers · ${p.name}`}
+          description={`click a supplier for its page${d.shipped?.withDate ? ` · orders shipped on time: ${percent(d.shipped.percent)} (${d.shipped.onTime} of ${d.shipped.withDate})` : ""}`}
         />
         {d.rows.length === 0 ? (
-          <p className="p-4 text-sm text-muted">No factory ordered from or asked for prices {p.name}.</p>
+          <p className="p-4 text-sm text-muted">No supplier ordered from or asked for prices {p.name}.</p>
         ) : (
-          <DataTable label="Factories">
+          <DataTable label="Suppliers">
             <THead>
               <tr>
-                <Th>Factory</Th>
+                <Th>Supplier</Th>
                 <Th className="text-right">Orders</Th>
                 {d.seeMoney && <Th className="text-right">Spend {c}</Th>}
                 <Th className="text-right">Ready on time</Th>
@@ -217,9 +217,9 @@ export function FactoriesSection({
               {shown.map((r) => {
                 const late = r.ready.percent !== null && r.ready.percent < 80;
                 return (
-                  <DataRow key={r.id} href={`/factories/${r.id}`}>
+                  <DataRow key={r.id} href={`/suppliers/${r.id}`}>
                     <Td>
-                      <Link href={`/factories/${r.id}`} className="font-semibold group-hover:text-primary">
+                      <Link href={`/suppliers/${r.id}`} className="font-semibold group-hover:text-primary">
                         {r.name}
                       </Link>
                     </Td>
@@ -299,7 +299,7 @@ export function PeopleSection({
               <tr>
                 <Th>Person</Th>
                 <Th className="text-right">Inquiries</Th>
-                <Th className="text-right">Time to first quote</Th>
+                <Th className="text-right">Time to first quotation</Th>
                 <Th className="text-right">Win rate</Th>
                 <Th className="text-right">Sales {c}</Th>
                 <Th className="min-w-40">Target this month</Th>
@@ -372,7 +372,7 @@ export function FunnelSection({ d, p }: { d: Awaited<ReturnType<typeof loadFunne
   const stages = [
     { label: "Inquiries in", count: f.inquiries, value: null, share: f.inquiries ? "100%" : "—" },
     {
-      label: "Got factory prices",
+      label: "Got supplier prices",
       count: f.gotPrices,
       value: null,
       share: f.inquiries ? `${percent(Math.round((f.gotPrices / f.inquiries) * 100))} of inquiries` : "—",
@@ -413,7 +413,7 @@ export function FunnelSection({ d, p }: { d: Awaited<ReturnType<typeof loadFunne
             ))}
           </ol>
           <p className="text-xs text-muted">
-            Lost {f.lost} · open {f.open} · median days: to first quote {f.medianDaysToFirstQuote ?? "—"}, to decision{" "}
+            Lost {f.lost} · open {f.open} · median days: to first quotation {f.medianDaysToFirstQuote ?? "—"}, to decision{" "}
             {f.medianDaysToClose ?? "—"}
           </p>
         </div>

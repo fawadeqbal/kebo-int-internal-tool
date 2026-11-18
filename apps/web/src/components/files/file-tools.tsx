@@ -787,7 +787,7 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
   if (dialog.kind === "attach" || dialog.kind === "attach-many") {
     const files = dialog.kind === "attach" ? [dialog.file] : dialog.files.filter((f) => f.can.attach);
     const groups: [string, AttachTarget[]][] = [
-      ["Papers", tools.targets.filter((t) => t.to === "paper")],
+      ["Documents", tools.targets.filter((t) => t.to === "paper")],
       ["A stage's files", tools.targets.filter((t) => t.to === "step")],
     ];
     return (
@@ -796,7 +796,7 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
         description={
           files.length === 1
             ? `${files[0]!.name} · now: ${files[0]!.attachedTo.label}`
-            : "Only the deal's own files move; payments' proofs stay with their payment."
+            : "Only the inquiry's own files move; payments' proofs stay with their payment."
         }
         onClose={onClose}
       >
@@ -927,9 +927,9 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
 
 /** The message prepared for a share: the order, the papers, the vessel and ETA. */
 export function shareMessage(ctx: ShareContext, names: string[]) {
-  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "the papers");
+  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "the documents");
   const ship = [ctx.vessel && `Vessel ${ctx.vessel}`, ctx.eta && `ETA ${ctx.eta}`].filter(Boolean).join(", ");
-  return `${ctx.greeting ? `${ctx.greeting}, please` : "Please"} find the papers for ${ctx.refNo}: ${list}.${ship ? ` ${ship}.` : ""}`;
+  return `${ctx.greeting ? `${ctx.greeting}, please` : "Please"} find the documents for ${ctx.refNo}: ${list}.${ship ? ` ${ship}.` : ""}`;
 }
 
 /**
@@ -975,7 +975,7 @@ function ShareDialog({
         try {
           const blobs = await Promise.all(
             (papers.length && !files.length
-              ? [{ href: downloadUrl, name: `${tools.share.refNo} papers.pdf` }]
+              ? [{ href: downloadUrl, name: `${tools.share.refNo} documents.pdf` }]
               : files.map((f) => ({ href: f.href, name: f.name }))
             ).map(async (f) => {
               const res = await fetch(f.href);

@@ -165,7 +165,7 @@ export function CustomerForm({
             />
           </Field>
           <Field
-            label="Initials on papers"
+            label="Initials on documents"
             htmlFor="initials"
             error={s.errors?.initials}
             hint={`1–6 letters. Empty: ${customerLetters(draft.name || "Customer")}`}

@@ -155,7 +155,7 @@ const asOptions = (v: Prisma.JsonValue): PaperOptions =>
  */
 @Injectable()
 export class PapersService implements OnModuleInit {
-  private readonly logger = new Logger("Papers");
+  private readonly logger = new Logger("Documents");
 
   constructor(
     private readonly prisma: PrismaService,
@@ -194,7 +194,7 @@ export class PapersService implements OnModuleInit {
   private async mayRead(user: SessionUser, kind: PaperKind, o: WithTerms) {
     const f = PAPER_FEATURE[kind];
     if (f) await this.limits.require(f as PlanFeature);
-    if (FACTORY_PRICE_PAPERS.includes(kind) && !can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
+    if (FACTORY_PRICE_PAPERS.includes(kind) && !can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier prices.");
     if (!this.applies(kind, o, null))
       throw new DomainError(
         `The ${PAPER_LABEL[kind].toLowerCase()} is only for orders paid ${PAPER_ROUTES[kind]!.includes("bank_contract") ? "through the banks" : "by LC"}.`,
@@ -203,7 +203,7 @@ export class PapersService implements OnModuleInit {
 
   private async mayMake(user: SessionUser, kind: PaperKind, o: WithTerms & { status: string }) {
     await this.mayRead(user, kind, o);
-    if (!can(user, "documents.manage")) throw new ForbiddenError("You cannot make papers.");
+    if (!can(user, "documents.manage")) throw new ForbiddenError("You cannot make documents.");
     if (LIVE_PAPERS.includes(kind))
       throw new DomainError(`The ${PAPER_LABEL[kind].toLowerCase()} is printed from the data whenever it is opened.`);
     if (SENT_PAPERS.includes(kind))
@@ -307,7 +307,7 @@ export class PapersService implements OnModuleInit {
   private refOf(kind: PaperKind, o: PaperOrder, ref: string | null | undefined) {
     if (PER_FACTORY_PAPERS.includes(kind)) {
       const factories = factoriesOf(o);
-      if (ref && !factories.some((f) => f.id === ref)) throw new NotFoundError("Factory on this order");
+      if (ref && !factories.some((f) => f.id === ref)) throw new NotFoundError("Supplier on this order");
       return ref || factories[0]?.id || "";
     }
     // A receipt without a ref is the last payment's.
@@ -499,7 +499,7 @@ export class PapersService implements OnModuleInit {
         paperId: pi.latest?.id ?? null,
         draft: pi.draft,
         sub: !o.proformaNo
-          ? "order lines, buyer, payment terms, bank details"
+          ? "order items, buyer, payment terms, bank details"
           : pi.draft
             ? `version ${pi.latest!.version} · draft: issue it to make it final`
             : `issued ${o.proformaIssuedOn ? companyDay(fromDbDateOrNull(o.proformaIssuedOn)!) : ""}${(pi.latest?.version ?? 1) > 1 ? ` · version ${pi.latest!.version}` : ""}${pi.rebuilt}`.trim(),
@@ -929,7 +929,7 @@ export class PapersService implements OnModuleInit {
    */
   async final(user: SessionUser, paperId: string, input: { options?: PaperOptions }) {
     const p = await this.prisma.db.orderPaper.findUnique({ where: { id: paperId } });
-    if (!p) throw new NotFoundError("Paper");
+    if (!p) throw new NotFoundError("Document");
     const kind = p.kind as PaperKind;
     const before = await this.order(user, p.orderId);
     await this.mayMake(user, kind, before);
@@ -967,7 +967,7 @@ export class PapersService implements OnModuleInit {
     await this.prisma.tx(async (tx) => {
       const o = await this.lock(tx, user, orderId);
       const latest = this.rowsOf(o, kind, ref).at(-1);
-      if (!latest) throw new DomainError("Make the paper first.");
+      if (!latest) throw new DomainError("Make the document first.");
       if (latest.status !== "final") throw new DomainError(`Version ${latest.version} is still a draft: change it and make it final.`);
       await makeAgain(tx, latest, user.id);
       await this.log(tx, user, o, "again", kind, `${PAPER_LABEL[kind]} ${latest.number} made again (version ${latest.version + 1})`, {
@@ -981,14 +981,14 @@ export class PapersService implements OnModuleInit {
   /** DELETE /papers/:id — a draft only (a final version stays as it was printed); the earlier final version, if any, is the paper again. */
   async removeDraft(user: SessionUser, paperId: string) {
     const p = await this.prisma.db.orderPaper.findUnique({ where: { id: paperId } });
-    if (!p) throw new NotFoundError("Paper");
+    if (!p) throw new NotFoundError("Document");
     const kind = p.kind as PaperKind;
     const before = await this.order(user, p.orderId);
     await this.mayMake(user, kind, before);
     await this.prisma.tx(async (tx) => {
       const o = await this.lock(tx, user, p.orderId);
       const row = o.papers.find((x) => x.id === paperId);
-      if (!row) throw new NotFoundError("Paper");
+      if (!row) throw new NotFoundError("Document");
       if (row.status !== "draft")
         throw new DomainError(`Version ${row.version} is final: it stays as it was printed. Make it again for a new version.`);
       await deleteDraft(tx, row);
@@ -1064,13 +1064,13 @@ export class PapersService implements OnModuleInit {
         await this.orders.setDetails(user, orderId, orderDetailsInput.parse({ [input.field]: v }));
         break;
       case "hs": {
-        if (!can(user, "documents.manage")) throw new ForbiddenError("You cannot make papers.");
+        if (!can(user, "documents.manage")) throw new ForbiddenError("You cannot make documents.");
         if (v && !/^[0-9][0-9. ]{3,18}$/.test(v)) throw new DomainError("An HS code is digits, e.g. 8422.40.");
         await this.prisma.tx(async (tx) => {
           const locked = await this.lock(tx, user, orderId);
           if (locked.status === "cancelled") throw new DomainError("This order is cancelled.");
           const line = locked.lines.find((l) => l.id === input.lineId);
-          if (!line) throw new NotFoundError("Line");
+          if (!line) throw new NotFoundError("Item");
           await tx.orderLine.update({ where: { id: line.id }, data: { hsCode: v || null } });
           await this.log(tx, user, locked, "hs", kind, `HS code of "${line.description.split(/\r?\n/)[0]}" set to ${v || "none"}`, {
             lineId: line.id,

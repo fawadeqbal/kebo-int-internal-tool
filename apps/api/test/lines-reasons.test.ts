@@ -28,7 +28,7 @@ type Entry = {
  * deal, the quotation and the order), a reason for every change that reaches
  * someone else, each record's history, and the deal's URS & documents.
  */
-describe("lines, reasons and history", () => {
+describe("items, reasons and history", () => {
   let app: INestApplication;
   let sana: string;
   let bilal: string;
@@ -60,7 +60,7 @@ describe("lines, reasons and history", () => {
     bilalId = (await api(app, bilal).get("/auth/me")).body.id;
     customerId = (
       await api(app, sana)
-        .post("/customers", { name: `Lines Co ${tag}`, country: "KE", contacts: [{ name: "Wanjiru", email: `w-${tag}@lines.test` }] })
+        .post("/customers", { name: `Items Co ${tag}`, country: "KE", contacts: [{ name: "Wanjiru", email: `w-${tag}@lines.test` }] })
         .expect(201)
     ).body.id;
     inquiryId = (
@@ -120,7 +120,7 @@ describe("lines, reasons and history", () => {
     expect(items.map((i) => i.no)).toEqual(["1", "2", "2.1", "2.2", "2.3"]);
   });
 
-  it("asks why once a factory has priced the item, and keeps the reason in the history", async () => {
+  it("asks why once a supplier has priced the item, and keeps the reason in the history", async () => {
     const created = await api(app, sana)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
         newFactoryName: `Zhangjiagang Fill ${tag}`,
@@ -160,7 +160,7 @@ describe("lines, reasons and history", () => {
     expect(h[0]!.summary).toMatch(/Boiler/);
   });
 
-  it("keeps another spec of a line as a choice beside it, left out of the offer's total", async () => {
+  it("keeps another spec of an item as a choice beside it, left out of the offer's total", async () => {
     const created = await api(app, sana)
       .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `Spec Works ${tag}`, receivedOn: "2026-10-21", currency: "CNY" })
       .expect(201);
@@ -217,10 +217,10 @@ describe("lines, reasons and history", () => {
     const cheaper = { ...quoteBody, lines: quoteBody.lines.map((l, n) => (n === 0 ? { ...l, unitPrice: 48000 } : l)) };
     expect((await api(app, sana).put(`/factory-quotes/${quoteId}`, cheaper).expect(409)).body).toMatchObject({
       code: "reason_needed",
-      choices: expect.arrayContaining(["Factory changed its price"]),
+      choices: expect.arrayContaining(["Supplier changed its price"]),
     });
     await api(app, sana)
-      .put(`/factory-quotes/${quoteId}`, { ...cheaper, reason: "Factory changed its price" })
+      .put(`/factory-quotes/${quoteId}`, { ...cheaper, reason: "Supplier changed its price" })
       .expect(200);
     // Notes and other changes that leave the prices alone are not asked.
     await api(app, sana)
@@ -229,7 +229,7 @@ describe("lines, reasons and history", () => {
     expect((await api(app, sana).delete(`/factory-quotes/${quoteId}`).expect(409)).body.code).toBe("reason_needed");
 
     const h = await history("deal", inquiryId);
-    expect(h.find((e) => e.reason === "Factory changed its price")?.summary).toMatch(/Boiler: 50000\.00 → 48000\.00/);
+    expect(h.find((e) => e.reason === "Supplier changed its price")?.summary).toMatch(/Boiler: 50000\.00 → 48000\.00/);
   });
 
   it("asks why a deal is put on hold or handed to someone else", async () => {
@@ -291,7 +291,7 @@ describe("lines, reasons and history", () => {
   it("asks why a customer's name or country changes", async () => {
     const c = (await api(app, sana).get(`/customers/${customerId}`).expect(200)).body;
     const body = {
-      name: `Lines Company ${tag}`,
+      name: `Items Company ${tag}`,
       country: c.country,
       contacts: c.contacts.map((x: Record<string, unknown>) => ({ id: x.id, name: x.name, email: x.email })),
     };
@@ -308,12 +308,12 @@ describe("lines, reasons and history", () => {
     const h = await history("customer", customerId);
     expect(h[1]).toMatchObject({
       reason: "Company renamed",
-      changes: expect.arrayContaining([{ field: "name", from: `Lines Co ${tag}`, to: `Lines Company ${tag}` }]),
+      changes: expect.arrayContaining([{ field: "name", from: `Items Co ${tag}`, to: `Items Company ${tag}` }]),
     });
     expect(h[0]!.reason).toBeNull();
   });
 
-  it("gives each factory a person who looks after it, and lists my factories", async () => {
+  it("gives each supplier a person who looks after it, and lists my suppliers", async () => {
     const f = (
       await api(app, sana)
         .post("/factories", { name: `Owned Works ${tag}`, ownerId: me })
@@ -331,11 +331,11 @@ describe("lines, reasons and history", () => {
       "reason_needed",
     );
     await api(app, sana)
-      .put(`/factories/${f.id}`, { name: f.name, ownerId: bilalId, reason: "Another person handles this factory" })
+      .put(`/factories/${f.id}`, { name: f.name, ownerId: bilalId, reason: "Another person handles this supplier" })
       .expect(200);
     const h = await history("factory", f.id);
     expect(h[0]).toMatchObject({
-      reason: "Another person handles this factory",
+      reason: "Another person handles this supplier",
       changes: expect.arrayContaining([expect.objectContaining({ field: "lookedAfterBy", to: "Bilal" })]),
     });
     await api(app, sana)

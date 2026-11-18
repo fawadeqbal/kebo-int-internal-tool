@@ -15,8 +15,8 @@ export const metadata = { title: "Inquiry pipeline" };
 
 type Params = Record<string, string | undefined>;
 const COLUMNS: { key: InquiryStage; note: string }[] = [
-  { key: "new", note: "Not asked factories yet" },
-  { key: "sourcing", note: "Getting factory prices" },
+  { key: "new", note: "Not asked suppliers yet" },
+  { key: "sourcing", note: "Getting supplier prices" },
   { key: "quoted", note: "Waiting for the customer" },
   { key: "won", note: "The latest won" },
   { key: "lost", note: "The latest lost" },

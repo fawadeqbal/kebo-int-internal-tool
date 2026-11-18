@@ -19,7 +19,7 @@ Future<bool> openPayFactory(BuildContext context, Json payable) async {
   Json? order = orders.length == 1 ? orders.first : null;
   order ??= await showKSheet<Json>(
     context,
-    title: 'Pay ${payable.at('factory.name') ?? 'the factory'} for',
+    title: 'Pay ${payable.at('factory.name') ?? 'the supplier'} for',
     builder: (ctx) => Column(
       children: [
         for (final (i, o) in orders.indexed)
@@ -130,7 +130,7 @@ class _PayFactoryState extends ConsumerState<_PayFactory> {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: KSpace.s8),
         child: Center(
-          child: SuccessCheck(label: 'Payment to the factory recorded', onDone: () => Navigator.of(context).pop(true)),
+          child: SuccessCheck(label: 'Payment to the supplier recorded', onDone: () => Navigator.of(context).pop(true)),
         ),
       );
     }
@@ -146,7 +146,7 @@ class _PayFactoryState extends ConsumerState<_PayFactory> {
         KSegmented<String>(
           value: _kind,
           onChanged: (v) => setState(() => _kind = v),
-          segments: const [('deposit', 'Advance'), ('balance', 'Balance'), ('other', 'Other')],
+          segments: const [('deposit', 'Deposit'), ('balance', 'Balance'), ('other', 'Other')],
         ),
         const SizedBox(height: KSpace.s4),
         KTextField(
@@ -198,7 +198,7 @@ class _PayFactoryState extends ConsumerState<_PayFactory> {
         const SizedBox(height: KSpace.s4),
         ProofField(
           label: 'Bank slip',
-          help: 'The transfer slip or the factory\'s receipt.',
+          help: 'The transfer slip or the supplier\'s receipt.',
           onChanged: (f) => _slip = f,
         ),
         const SizedBox(height: KSpace.s4),

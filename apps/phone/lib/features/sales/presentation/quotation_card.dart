@@ -85,7 +85,7 @@ class _QuotationCardState extends State<QuotationCard> {
                   Expanded(child: KDetail('Lead time', r.strOrNull('leadTime'))),
                 ],
               ),
-              KDetail('Price basis and advance', terms),
+              KDetail('Incoterm and deposit', terms),
               KDetail('Payment terms', r.strOrNull('paymentTerms')),
               if (r.strOrNull('sentOn') != null) KDetail('Sent', fmtDate(DateTime.tryParse(r.str('sentOn')))),
               for (final o in options) ...[

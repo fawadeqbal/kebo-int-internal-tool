@@ -32,7 +32,7 @@ const dash = <span className="text-muted">—</span>;
 type GoodsState = "waiting" | "partly" | "in";
 const stateOf = (got: number, of: number): GoodsState => (got >= of && of > 0 ? "in" : got > 0 ? "partly" : "waiting");
 const STATE: Record<GoodsState, { label: string; tone: "neutral" | "warn" | "ok" }> = {
-  waiting: { label: "At the factory", tone: "neutral" },
+  waiting: { label: "At the supplier", tone: "neutral" },
   partly: { label: "Partly in", tone: "warn" },
   in: { label: "All in", tone: "ok" },
 };
@@ -109,7 +109,7 @@ function columnsOf(set: LineSet): LineColumn[] {
         </>
       ),
     },
-    { key: "quantity", label: "Qty", width: "4.75rem", align: "right", format: (v, r) => `${n(v.quantity)} ${r.values.unit}` },
+    { key: "quantity", label: "Quantity", width: "4.75rem", align: "right", format: (v, r) => `${n(v.quantity)} ${r.values.unit}` },
   ];
   const number = (key: string, label: string, width: string, digits = 2, phoneHidden = false): LineColumn => ({
     key,
@@ -126,15 +126,15 @@ function columnsOf(set: LineSet): LineColumn[] {
     case "factory":
       return [
         ...base,
-        { key: "factory", label: "Factory", width: "9rem", phoneHidden: true },
+        { key: "factory", label: "Supplier", width: "9rem", phoneHidden: true },
         {
           key: "factoryPrice",
-          label: "Factory price",
+          label: "Supplier price",
           width: "8.5rem",
           align: "right",
           format: (_v, r) => (r.values.factoryPrice ? formatMinor(toMinor(r.values.factoryPrice), r.values.factoryCurrency || "") : dash),
         },
-        { key: "taxRate", label: "Tax %", width: "4.5rem", align: "right", phoneHidden: true, format: (v) => (v.factoryPrice ? n(v.taxRate) : dash) },
+        { key: "taxRate", label: "Tax", width: "4.5rem", align: "right", phoneHidden: true, format: (v) => (v.factoryPrice ? n(v.taxRate) : dash) },
       ];
     case "received":
       return [
@@ -213,7 +213,7 @@ function bodyOf(set: LineSet, values: LineValues, today: string): Record<string,
 
 const FIXED: LineResult = {
   ok: false,
-  message: "The order's lines come from the accepted quotation: they are not added, removed or moved here.",
+  message: "The order's items come from the accepted quotation: they are not added, removed or moved here.",
 };
 const fixed = async () => FIXED;
 
@@ -276,14 +276,14 @@ export function OrderLines({
       <LineTable
         rows={rows}
         columns={columns}
-        noun="line"
+        noun="item"
         readOnly={readOnly}
         onAdd={fixed}
         onRemove={fixed}
         onMove={fixed}
         onEdit={onEdit}
         footer={<Totals set={set} lines={shown} extra={footer} />}
-        empty="No goods lines on this order."
+        empty="No items on this order."
       />
       {!readOnly && (
         <p className="text-xs text-muted">
@@ -340,12 +340,12 @@ export function OrderLinesEditor({
       <BatchLines
         rows={rows}
         columns={columns}
-        noun="line"
+        noun="item"
         handlers={{ onEdit, onAdd: fixed, onRemove: fixed, onMove: fixed }}
         edit={edit}
         card={card}
         askOnAdd={false}
-        empty="No goods lines on this order."
+        empty="No items on this order."
         below={
           <p className="text-xs text-muted">
             Click a cell and type: Enter keeps it and goes down, Esc cancels. Nothing is saved until Save changes.
@@ -373,7 +373,7 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
       if (!p?.currency) continue;
       totals.set(p.currency, (totals.get(p.currency) ?? 0) + multiplyMinor(factoryUnitCostMinor(toMinor(p.unitPrice), p.taxRate, p.taxIncluded), l.quantity));
     }
-    body = totals.size ? item("Factory total", [...totals].map(([c, m]) => formatMinor(m, c)).join(" + ")) : null;
+    body = totals.size ? item("Supplier total", [...totals].map(([c, m]) => formatMinor(m, c)).join(" + ")) : null;
   } else if (set === "received") {
     const done = lines.filter((l) => stateOf(Number(l.receivedQty), Number(l.quantity)) === "in").length;
     body = item("Received", `${done} of ${lines.length}`);
@@ -394,7 +394,7 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
         {item("Delivered", `${done} of ${lines.length}`)}
         {problems > 0 && (
           <span className="font-medium text-bad">
-            {problems} line{problems === 1 ? "" : "s"} not in good order
+            {problems} item{problems === 1 ? "" : "s"} not in good order
           </span>
         )}
       </>
@@ -414,9 +414,9 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
  * OrderV4Phone): the number and name, then the step's figure.
  */
 export function PhoneLines({ set, lines }: { set: LineSet; lines: OrderLineView[] }) {
-  if (!lines.length) return <p className="text-sm text-muted">No goods lines on this order.</p>;
+  if (!lines.length) return <p className="text-sm text-muted">No items on this order.</p>;
   return (
-    <ul className="flex flex-col divide-y divide-line" aria-label="Lines">
+    <ul className="flex flex-col divide-y divide-line" aria-label="Items">
       {lines.map((l) => (
         <li key={l.id} className={cn("py-2.5", l.no.includes(".") && "pl-3")}>
           <p className="text-sm font-medium">

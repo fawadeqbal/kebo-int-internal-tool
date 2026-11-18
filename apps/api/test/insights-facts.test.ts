@@ -22,7 +22,7 @@ import { api, signIn, startApp } from "./app";
  * queue the database triggers fill); the nightly check finds, logs and fixes a planted difference; an
  * empty company is fine; companies stay apart; money is only for people who may see it.
  */
-describe("Insights data: order, inquiry and factory facts", () => {
+describe("Insights data: order, inquiry and supplier facts", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let facts: FactsService;
@@ -105,7 +105,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
     await app?.close();
   });
 
-  describe("agrees with the shared rules for every demo order, inquiry and order × factory", () => {
+  describe("agrees with the shared rules for every demo order, inquiry and order × supplier", () => {
     it("has one row per order and per inquiry kept", async () => {
       expect(await db().orderFact.count()).toBe(await db().order.count());
       expect(await db().inquiryFact.count()).toBe(await db().inquiry.count({ where: { deletedAt: null } }));
@@ -157,7 +157,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
       expect(groups.rows[0]?.orders ?? 0).toBe(report.profit.total.orders);
     });
 
-    it("what we owe each factory is factoryPosition's (the SQL twin)", async () => {
+    it("what we owe each supplier is factoryPosition's (the SQL twin)", async () => {
       const s = await settings();
       const sql = await factoryPositionsSql(db(), fxOf(s, true));
       const rows = await db().factoryOrderFact.findMany({ where: { status: { not: "cancelled" } } });
@@ -201,7 +201,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
       o = await makeOrder();
     });
 
-    it("a new order has its row, its factory's row, and its inquiry is won", async () => {
+    it("a new order has its row, its supplier's row, and its inquiry is won", async () => {
       expect(await row(o.orderId)).toMatchObject({ sales: "10000.00", received: "0.00", due: "10000.00", channel: "whatsapp", country: "KE", status: "open" });
       expect(await factoryRow(o.orderId)).toMatchObject({ factoryId: o.factoryId, currency: "CNY", offersSent: 1, offerWon: true, claims: 0 });
       expect(Number((await factoryRow(o.orderId)).owed)).toBe(10000);
@@ -245,7 +245,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
       expect(owed.rows).toContainEqual({ partyId: o.customerId, total: "9000.00", overdue: "2000.00" });
     });
 
-    it("a factory payment", async () => {
+    it("a supplier payment", async () => {
       await api(app, manager).post(`/orders/${o.orderId}/factory-payments`, { factoryId: o.factoryId, kind: "deposit", amount: 3000, currency: "CNY", paidOn: today }).expect(201);
       const f = await factoryRow(o.orderId);
       expect([Number(f.owed), Number(f.paid), Number(f.toPay)]).toEqual([10000, 3000, 7000]);
@@ -405,7 +405,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
       viaPlatform: false,
     });
 
-    it("shows sales and gross profit, hides costs, expected profit, expenses, factory money and cash out", async () => {
+    it("shows sales and gross profit, hides costs, expected profit, expenses, supplier money and cash out", async () => {
       const reader = person(["reports.view"]);
       const g = (await inKebo(() => read.orderGroups(reader, { period: "all", by: "company" }))).rows[0]!;
       expect(g.sales).not.toBeNull();

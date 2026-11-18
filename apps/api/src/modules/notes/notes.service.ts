@@ -101,7 +101,7 @@ export class NotesService {
   private async checkContact(target: RecordRef, contactId: string | null | undefined) {
     if (!contactId) return;
     const bad = (message: string) => new z.ZodError([{ code: "custom", path: ["contactId"], message, input: contactId }]);
-    if (!target.customerId) throw bad("Factories have no contacts to choose; say who it was with in the note.");
+    if (!target.customerId) throw bad("Suppliers have no contacts to choose; say who it was with in the note.");
     const found = await this.prisma.db.contact.count({ where: { id: contactId, partyId: target.customerId, deletedAt: null } });
     if (!found) throw bad("Choose one of the customer's contacts.");
   }

@@ -79,10 +79,10 @@ function packingSheet(lines: GoodsLine[], rows: PackRow[], template: boolean): S
     name: template ? "Packing list - template" : "Packing list",
     title: "Packing list",
     columns: [
-      { header: "No.", width: 7, note: "the order's line number: keep it as it is" },
+      { header: "No.", width: 7, note: "the order's item number: keep it as it is" },
       { header: "Goods", width: 48 },
       { header: "Model", width: 16 },
-      { header: "Qty", kind: "number", width: 10 },
+      { header: "Quantity", kind: "number", width: 10 },
       { header: "Unit", width: 9 },
       ...FIELDS.map((f) => ({
         header: f.label,
@@ -99,8 +99,8 @@ function packingSheet(lines: GoodsLine[], rows: PackRow[], template: boolean): S
     template: template
       ? {
           help: [
-            "Packing list: fill in the packing for each line of the order.",
-            "Keep the No., Goods, Qty and Unit columns as they are: lines are matched by their No.",
+            "Packing list: fill in the packing for each item of the order.",
+            "Keep the No., Goods, Quantity and Unit columns as they are: items are matched by their No.",
             "Fill in Packages, Package type, Net kg, Gross kg and CBM, then upload the file with Excel › Upload a filled file.",
             "The packing list is filled in from the file to check; nothing is saved until you press Save the packing list.",
           ],
@@ -129,7 +129,7 @@ function packingFromSheet(read: ReadSheet, lines: GoodsLine[]): { fill: Map<stri
   ) as Record<keyof typeof PACK_HEADINGS, number>;
   const fill = new Map<string, Partial<PackRow>>();
   const problems: string[] = [];
-  if (noAt < 0) return { fill, problems, error: "No “No.” column in the file: lines are matched by their number. Download the template from Excel › Download a template." };
+  if (noAt < 0) return { fill, problems, error: "No “No.” column in the file: items are matched by their number. Download the template from Excel › Download a template." };
   if (Object.values(at).every((i) => i < 0)) return { fill, problems, error: "No packing columns (Packages, Net kg, Gross kg, CBM) in the file." };
   const byNo = new Map(lines.map((l) => [l.no, l]));
   read.rows.forEach((cells, r) => {
@@ -138,7 +138,7 @@ function packingFromSheet(read: ReadSheet, lines: GoodsLine[]): { fill: Map<stri
     if (!values.length) return;
     const line = byNo.get(no);
     if (!line) {
-      problems.push(`Row ${r + 2}: no line ${no || "(empty No.)"} on this order`);
+      problems.push(`Row ${r + 2}: no item ${no || "(empty No.)"} on this order`);
       return;
     }
     const got: Partial<PackRow> = {};
@@ -147,7 +147,7 @@ function packingFromSheet(read: ReadSheet, lines: GoodsLine[]): { fill: Map<stri
       if (f.mode === "text") got[f.key] = t.slice(0, 40);
       else {
         const v = sheetNumber(t);
-        if (v === null || Number(v) < 0 || (f.mode === "numeric" && !Number.isInteger(Number(v)))) problems.push(`Row ${r + 2}, line ${no}: ${f.label} “${t}” is not ${f.mode === "numeric" ? "a whole number" : "a number"}`);
+        if (v === null || Number(v) < 0 || (f.mode === "numeric" && !Number.isInteger(Number(v)))) problems.push(`Row ${r + 2}, item ${no}: ${f.label} “${t}” is not ${f.mode === "numeric" ? "a whole number" : "a number"}`);
         else got[f.key] = v;
       }
     }
@@ -252,10 +252,10 @@ export function PackingCard({
         description={description}
         actions={
           <>
-            <EditsChip card={edits?.cards["lines.packing"]} title="Packing lines" />
+            <EditsChip card={edits?.cards["lines.packing"]} title="Packing list" />
             {badge}
             <FileActions excel={excel} viewHref={links?.view} pdfHref={links?.pdf} />
-            {canEdit && <EditButton label="Edit lines" onClick={() => setEditing(true)} />}
+            {canEdit && <EditButton label="Edit items" onClick={() => setEditing(true)} />}
           </>
         }
       />
@@ -267,7 +267,7 @@ export function PackingCard({
               <p className="text-bad">{fromFile.error}</p>
             ) : (
               <p className="text-text-2">
-                {fromFile.filled} line{fromFile.filled === 1 ? "" : "s"} filled in from the file. Save them to the packing list?
+                {fromFile.filled} item{fromFile.filled === 1 ? "" : "s"} filled in from the file. Save them to the packing list?
               </p>
             )}
             {fromFile.problems.length > 0 && (
@@ -287,7 +287,7 @@ export function PackingCard({
                     value={JSON.stringify({ shippingMarks, lines: fromFile.rows })}
                   />
                   <SubmitButton size="xs" pendingText="Saving…">
-                    Save {fromFile.filled} line{fromFile.filled === 1 ? "" : "s"}
+                    Save {fromFile.filled} item{fromFile.filled === 1 ? "" : "s"}
                   </SubmitButton>
                 </ActionForm>
               )}
@@ -324,7 +324,7 @@ export function PackingCard({
         </div>
         {editing && canEdit && (
           <SidePanel
-            title="Edit packing lines"
+            title="Edit packing list"
             description="Packed in, packages, weights and volume of each line. Nothing is saved until Save changes."
             onClose={closeEditor}
             className="md:w-[1180px]"

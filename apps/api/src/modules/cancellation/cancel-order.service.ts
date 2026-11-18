@@ -131,7 +131,7 @@ export class CancelOrderService {
         action: "cancel",
         entityType: "order",
         entityId: id,
-        summary: `Cancelled order ${o.refNo}${customerMoney ? ` · ${o.currency} ${fromMinor(inMinor)} received: ${customerMoney === "credit" ? "kept as credit" : customerMoney === "fee" ? "kept as a fee" : money.refundNow ? "refunded" : "to refund"}` : ""}${factoryMoney ? ` · paid to the factory: ${factoryMoney === "loss" ? "a loss" : "refund expected"}` : ""}`,
+        summary: `Cancelled order ${o.refNo}${customerMoney ? ` · ${o.currency} ${fromMinor(inMinor)} received: ${customerMoney === "credit" ? "kept as credit" : customerMoney === "fee" ? "kept as a fee" : money.refundNow ? "refunded" : "to refund"}` : ""}${factoryMoney ? ` · paid to the supplier: ${factoryMoney === "loss" ? "a loss" : "refund expected"}` : ""}`,
         reason,
         oldValues: { status: o.status },
         newValues: { status: "cancelled", customerMoney, factoryMoney },

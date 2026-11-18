@@ -72,7 +72,7 @@ describe("saves check the version they started from", () => {
     await api(app, manager).post(`/payments/${id}/void`, { reason: "A test payment" }).expect(200);
 
     // A cost of the company.
-    const cost = { category: "office", description: `Paper ${tag}`, amount: 5, currency: "USD", spentOn: today };
+    const cost = { category: "office", description: `Document ${tag}`, amount: 5, currency: "USD", spentOn: today };
     const made = (await api(app, manager).post("/expenses", cost).expect(201)).body as { id: string; updatedAt: string };
     await api(app, manager)
       .patch(`/expenses/${made.id}`, { ...cost, amount: 6, reason: "It was 6" })

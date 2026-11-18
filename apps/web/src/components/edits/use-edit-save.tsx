@@ -79,7 +79,7 @@ export function useEditSave({ edit, card, what = "lines" }: { edit?: EditRef; ca
     <ReasonDialog
       // A new question starts empty (the reason picked for the edit is not the reason for going ahead).
       key={asking.anyway ? "anyway" : "why"}
-      title={asking.anyway ? "Check before saving" : `Why are you changing ${what === "lines" ? "these lines" : what === "steps" ? "the steps" : "what was saved"}?`}
+      title={asking.anyway ? "Check before saving" : `Why are you changing ${what === "lines" ? "these items" : what === "steps" ? "the steps" : "what was saved"}?`}
       sub={asking.anyway ? "Go back and fix it, or save it anyway and say why. The reason is kept in the history." : undefined}
       saveLabel={asking.anyway ? "Save anyway" : undefined}
       cancelLabel={asking.anyway ? "Go back and fix" : undefined}

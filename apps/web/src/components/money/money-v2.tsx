@@ -424,7 +424,7 @@ function ReceiptFields({
         <>
           <div className="-mx-3 -mt-3 border-b border-line px-3 py-2.5 sm:-mx-4 sm:-mt-4 sm:px-4">
             <p className="font-semibold">One transfer, several orders</p>
-            <p className="text-xs text-text-2">Oldest due first is filled in for you; change any line. The rest is kept as {customer}&apos;s credit.</p>
+            <p className="text-xs text-text-2">Oldest due first is filled in for you; change any amount. The rest is kept as {customer}&apos;s credit.</p>
           </div>
           <input type="hidden" name="currency" value={currency} />
           <input type="hidden" name="receivedCurrency" value={a.received} />

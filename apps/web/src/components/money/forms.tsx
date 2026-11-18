@@ -314,11 +314,11 @@ export function FactoryPaymentForm({
     <ActionForm action={save} onDone={done} className={bare ? "flex flex-col gap-3" : framed}>
       {(s) => (
         <>
-          {!bare && <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.factory.name}` : "Payment to a factory"}</p>}
+          {!bare && <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.factory.name}` : "Payment to a supplier"}</p>}
           <input type="hidden" name="factoryId" value={chosen?.factory.id ?? payment?.factory.id ?? ""} />
           <div className="grid gap-3 sm:grid-cols-3">
             <Field
-              label="Factory"
+              label="Supplier"
               htmlFor="fp-factory"
               error={s.errors?.factoryId}
               hint={owedIn && chosen ? (Number(chosen.toPay) > 0 ? `Owed in ${owedIn}: ${money(chosen.toPay, owedIn)} left to pay` : `Owed in ${owedIn}: paid in full`) : undefined}
@@ -407,7 +407,7 @@ export function FactoryPaymentForm({
                 We owe {chosen!.factory.name} in {owedIn}, so a payment in {m.currency} would not count against it.
               </p>
               <p className="mt-0.5 text-text-2">
-                Record the payment in {owedIn}: if you sent {m.currency}, enter the {owedIn} amount the factory received (on their receipt or the bank advice).
+                Record the payment in {owedIn}: if you sent {m.currency}, enter the {owedIn} amount the supplier received (on their receipt or the bank advice).
               </p>
               <Button type="button" size="xs" variant="secondary" className="mt-2" onClick={() => m.setCurrency(owedIn!)}>
                 Pay in {owedIn}
@@ -468,7 +468,7 @@ export function FactoryPaymentForm({
 
 /** "Record a payment to a factory" button that opens the form. */
 export function NewFactoryPayment({
-  label = "Record a payment to a factory",
+  label = "Record a payment to a supplier",
   quiet,
   startOpen = false,
   ...props

@@ -36,7 +36,7 @@ describe("warranty and how a quotation was sent", () => {
 
   const offer = async () => (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body.quotes.find((q: { id: string }) => q.id === offerId);
 
-  it("keeps the factory's warranty on its offer, and leaves it alone when a save does not say it", async () => {
+  it("keeps the supplier's warranty on its offer, and leaves it alone when a save does not say it", async () => {
     const [item] = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items as { id: string }[];
     const body = {
       newFactoryName: `Jiangsu Fill ${tag}`,

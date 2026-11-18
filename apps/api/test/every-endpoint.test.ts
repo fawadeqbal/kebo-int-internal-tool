@@ -55,7 +55,7 @@ describe("every read endpoint answers for every record", () => {
     }
   });
 
-  it("every customer and factory", async () => {
+  it("every customer and supplier", async () => {
     for (const c of (await ok(manager, "/customers?pageSize=100")).rows as { id: string }[]) {
       await ok(manager, `/customers/${c.id}`);
       await ok(manager, `/customers/${c.id}/credit`);
@@ -126,7 +126,7 @@ describe("every read endpoint answers for every record", () => {
     for (const path of ["/ledger/entries", "/ledger/accounts", "/ledger/ageing"]) expect((await api(app, staff).get(path)).status).toBe(403);
   }, 120_000);
 
-  it("an order's money (plan, factory plans, credit) for the latest orders", async () => {
+  it("an order's money (plan, supplier plans, credit) for the latest orders", async () => {
     const orders = [...(await ok(manager, "/orders")), ...(await ok(manager, "/orders?status=cancelled"))] as { id: string }[];
     for (const o of orders.slice(0, 25)) await ok(manager, `/orders/${o.id}/money`);
   });

@@ -117,10 +117,10 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader
-        crumbs={crumbsFor("/factories")}
+        crumbs={crumbsFor("/suppliers")}
         icon={Factory}
-        title={labelFor("/factories")}
-        summary="Factories you buy from"
+        title={labelFor("/suppliers")}
+        summary="Suppliers you buy from"
         papers={
           <>
             <PartyExcel kind="factories" importAction={importFactoriesAction} />
@@ -142,7 +142,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
           label="Suppliers"
           value={all.total}
           sub={mine.total ? `${mine.total} looked after by you` : "nobody's yet"}
-          href={mine.total ? "/factories?show=mine" : undefined}
+          href={mine.total ? "/suppliers?show=mine" : undefined}
         />
         {owed && (
           <StatTile
@@ -154,7 +154,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
             sub={
               overdueTotal > 0.005
                 ? `${short(overdueTotal, owed.currency)} past its date`
-                : `to ${plural(owed.rows.length, "factory", "factories")}`
+                : `to ${plural(owed.rows.length, "supplier", "suppliers")}`
             }
             href="/money/due?side=suppliers"
           />
@@ -179,22 +179,22 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         label="Which suppliers"
         className="mb-4"
         tabs={[
-          { href: buildHref("/factories", keep, { status: undefined, show: undefined, page: undefined }), label: <><List aria-hidden /> All</>, count: data.counts?.all, active: !status && !mineTab },
-          { href: buildHref("/factories", keep, { status: "offers", show: undefined, page: undefined }), label: <><FileText aria-hidden /> Offers in</>, count: data.counts?.offers, active: status === "offers" && !mineTab },
-          { href: buildHref("/factories", keep, { status: "none", show: undefined, page: undefined }), label: <><Clock aria-hidden /> No offers yet</>, count: data.counts?.none, active: status === "none" && !mineTab },
-          { href: buildHref("/factories", keep, { status: undefined, show: "mine", page: undefined }), label: <><UserRound aria-hidden /> Mine</>, count: data.counts?.mine, active: mineTab },
+          { href: buildHref("/suppliers", keep, { status: undefined, show: undefined, page: undefined }), label: <><List aria-hidden /> All</>, count: data.counts?.all, active: !status && !mineTab },
+          { href: buildHref("/suppliers", keep, { status: "offers", show: undefined, page: undefined }), label: <><FileText aria-hidden /> Offers in</>, count: data.counts?.offers, active: status === "offers" && !mineTab },
+          { href: buildHref("/suppliers", keep, { status: "none", show: undefined, page: undefined }), label: <><Clock aria-hidden /> No offers yet</>, count: data.counts?.none, active: status === "none" && !mineTab },
+          { href: buildHref("/suppliers", keep, { status: undefined, show: "mine", page: undefined }), label: <><UserRound aria-hidden /> Mine</>, count: data.counts?.mine, active: mineTab },
         ]}
       />
 
       <FilterCard
         count={countOf(data.total, "supplier")}
-        search="Search factory, person, WeChat…"
+        search="Search supplier, person, WeChat…"
         value={sp.q}
         keep={{ status, show: keep.show }}
-        clearHref={buildHref("/factories", keep, { q: undefined })}
+        clearHref={buildHref("/suppliers", keep, { q: undefined })}
         selects={[
           { name: "city", label: "City", value: keep.city, options: data.cities.map((c) => ({ value: c, label: c })) },
-          { name: "owner", label: "Owner", value: keep.owner, options: [{ value: "none", label: "Nobody yet" }, ...people_] },
+          { name: "owner", label: "Responsible person", value: keep.owner, options: [{ value: "none", label: "Nobody yet" }, ...people_] },
         ]}
       />
 
@@ -206,11 +206,11 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
             description={
               filtered
                 ? "Try another name or filter, or clear the filters."
-                : "Add the factories you buy from: their offers, orders and what we owe them show here."
+                : "Add the suppliers you buy from: their offers, orders and what we owe them show here."
             }
             action={
               filtered ? (
-                <ButtonLink href="/factories">
+                <ButtonLink href="/suppliers">
                   <X aria-hidden /> Clear filters
                 </ButtonLink>
               ) : (
@@ -226,7 +226,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
               {data.rows.map((f) => (
                 <PhoneRow
                   key={f.id}
-                  href={`/factories/${f.id}`}
+                  href={`/suppliers/${f.id}`}
                   flash={sp.saved === f.id}
                   title={f.name}
                   line={[f.city, f.owner?.name, plural(f._count.quotes, "offer")].filter(Boolean).join(" · ")}
@@ -241,7 +241,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                   <Th>Code</Th>
                   <Th>Supplier</Th>
                   <Th>City</Th>
-                  <Th>Owner</Th>
+                  <Th>Responsible person</Th>
                   {groups && <Th className="text-right">Orders</Th>}
                   <Th className="text-right">Offers</Th>
                   {groups && <Th className="text-right">Bought</Th>}
@@ -253,10 +253,10 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                 {data.rows.map((f) => {
                   const g = bought.get(f.id);
                   return (
-                    <DataRow key={f.id} href={`/factories/${f.id}`} flash={sp.saved === f.id}>
+                    <DataRow key={f.id} href={`/suppliers/${f.id}`} flash={sp.saved === f.id}>
                       <Td>{f.supplierCode ? <RefCode>{f.supplierCode}</RefCode> : "—"}</Td>
                       <Td>
-                        <Link href={`/factories/${f.id}`} className="font-semibold hover:text-primary">
+                        <Link href={`/suppliers/${f.id}`} className="font-semibold hover:text-primary">
                           {f.name}
                         </Link>
                         <span className="block text-xs text-text-2">{reach(f) || "No contact details"}</span>
@@ -284,7 +284,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
           </>
         )}
       </Card>
-      <Pager base="/factories" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
+      <Pager base="/suppliers" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
 
       {panel && (panel === "new-factory" || editing) && (
         <FactoryPanel

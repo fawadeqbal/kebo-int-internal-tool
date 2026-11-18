@@ -43,7 +43,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       {rows.map((r) => {
         const fid = r.factory?.id ?? null;
         const of = many && r.factory ? ` · ${r.factory.name}` : "";
-        const sub = `${o.refNo} · ${r.factory?.name ?? "the factory"}`;
+        const sub = `${o.refNo} · ${r.factory?.name ?? "the supplier"}`;
         const left = r.readyOn ? Math.round((Date.parse(r.readyOn) - Date.parse(now)) / DAY) : null;
         const allIn = o.goods.allReceived;
         const readyWindow = (kind: "edit" | "main") =>
@@ -55,7 +55,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               action={readyDateAction.bind(null, o.id, fid, r.readyOn)}
               files={d.canFiles ? { orderId: o.id, section: "ready_date" } : undefined}
               fields={[
-                { name: "readyOn", label: "Factory says ready on", type: "date", value: r.readyOn, hint: defaults.leadTime ? `Lead time on the quote: ${defaults.leadTime.text}` : undefined },
+                { name: "readyOn", label: "Supplier says ready on", type: "date", value: r.readyOn, hint: defaults.leadTime ? `Lead time on the quotation: ${defaults.leadTime.text}` : undefined },
                 { name: "readyToldOn", label: "Told on", type: "date", value: r.readyToldOn, max: now },
                 { name: "readyToldVia", label: "How", type: "select", value: r.readyToldVia ?? "", options: [{ value: "", label: "Not said" }, ...REQUEST_CHANNELS.map((c) => ({ value: c, label: REQUEST_CHANNEL_LABEL[c] }))] },
                 { name: "readyNote", label: "Note", type: "textarea", value: r.readyNote, wide: true },
@@ -90,7 +90,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
                 tone={!r.readyOn ? "neutral" : allIn ? "ok" : left! < 0 ? "bad" : "ok"}
                 cols={4}
                 rows={[
-                  { label: "Factory says ready", value: r.readyOn ? date(r.readyOn) : null },
+                  { label: "Supplier says ready", value: r.readyOn ? date(r.readyOn) : null },
                   { label: allIn ? "Goods in" : "Days left", value: allIn ? (lastIn ? date(lastIn) : "Yes") : left === null ? null : left < 0 ? `${-left} late` : String(left) },
                   { label: "Ship by", value: o.shipBy ? date(o.shipBy) : null },
                   { label: "Told on", value: r.readyToldOn ? `${date(r.readyToldOn)}${r.readyToldVia ? ` · ${REQUEST_CHANNEL_LABEL[r.readyToldVia]}` : ""}` : r.readyToldVia ? REQUEST_CHANNEL_LABEL[r.readyToldVia] : null },
@@ -100,7 +100,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
                 files={fid === first ? <SectionFiles orderId={o.id} section="ready_date" canAdd={d.canFiles} /> : undefined}
               />
             ) : (
-              <EmptySection title={`Ready date${of}`} text="No ready date from the factory yet." action={readyWindow("main")} />
+              <EmptySection title={`Ready date${of}`} text="No ready date from the supplier yet." action={readyWindow("main")} />
             )}
             {hasFat ? (
               <Section
@@ -127,7 +127,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
 
       {goodsLines.length > 0 && (
         <Section
-          title="Goods from the factory"
+          title="Goods from the supplier"
           state={o.goods.allReceived ? `${o.goods.received} of ${o.goods.lines} received` : o.goods.received > 0 ? `${o.goods.received} of ${o.goods.lines} received` : "Not received yet"}
           tone={o.goods.allReceived ? "ok" : o.goods.received > 0 ? "warn" : "neutral"}
           rows={o.goods.received > 0 || place ? [{ label: "Received on", value: lastIn ? date(lastIn) : null }, { label: "Received at", value: place }] : undefined}
@@ -137,19 +137,19 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
                 <PanelButton
                   size="sm"
                   className={SMALL}
-                  label="Edit lines"
-                  title="Goods from the factory"
-                  description="What has come in on each line, and when. Nothing is saved until Save changes."
+                  label="Edit items"
+                  title="Goods from the supplier"
+                  description="What has come in on each item, and when. Nothing is saved until Save changes."
                   panelClassName="md:w-[1180px]"
                   body={<OrderLinesEditor set="received" orderId={o.id} lines={goodsLines} today={now} edit={{ type: "order", id: o.id, card: "lines.received" }} card={edits.cards["lines.received"]} />}
                 />
                 {!o.goods.allReceived && (
-                  <AllReceivedWindow sub={`${o.refNo} · ${o.goods.lines} line${o.goods.lines === 1 ? "" : "s"}`} action={goodsReceivedAction.bind(null, o.id, first, true)} today={now} place={place} lines={o.goods.lines} />
+                  <AllReceivedWindow sub={`${o.refNo} · ${o.goods.lines} item${o.goods.lines === 1 ? "" : "s"}`} action={goodsReceivedAction.bind(null, o.id, first, true)} today={now} place={place} lines={o.goods.lines} />
                 )}
                 {o.goods.allReceived && (
                   <FieldsWindow
                     button={{ label: "Edit" }}
-                    title="Goods from the factory"
+                    title="Goods from the supplier"
                     sub={`${o.refNo} · where they were received`}
                     plain
                     action={goodsReceivedAction.bind(null, o.id, first, false)}

@@ -348,7 +348,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       {packGoods.length > 0 && (
         <PackingCard
           title="Packing"
-          badge={o.goods.totals.packages > 0 ? <Badge tone="ok">{`${o.goods.totals.packages.toLocaleString("en-US")} package${o.goods.totals.packages === 1 ? "" : "s"}`}</Badge> : <Badge tone="neutral">No packing lines yet</Badge>}
+          badge={o.goods.totals.packages > 0 ? <Badge tone="ok">{`${o.goods.totals.packages.toLocaleString("en-US")} package${o.goods.totals.packages === 1 ? "" : "s"}`}</Badge> : <Badge tone="neutral">No packing list yet</Badge>}
           orderId={o.id}
           lines={o.lines.filter((l) => l.type === "goods")}
           goods={packGoods}

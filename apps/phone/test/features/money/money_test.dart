@@ -162,7 +162,7 @@ void main() {
     await _inSheet(t, 'Add expense');
     expect(find.text('Choose what it was.'), findsOneWidget);
     await _inSheet(t, 'Travel');
-    await t.enterText(find.widgetWithText(KTextField, 'For'), 'Taxi to the factory');
+    await t.enterText(find.widgetWithText(KTextField, 'For'), 'Taxi to the supplier');
     await t.enterText(find.widgetWithText(KTextField, 'Amount'), '35');
     await _inSheet(t, 'Add expense');
     expect(server.sent('POST', '/api/expenses'), containsPair('category', 'travel'));
@@ -170,7 +170,7 @@ void main() {
     await t.pumpAndSettle();
   });
 
-  testWidgets('pay a factory for an order, with the slip, from the right account', (t) async {
+  testWidgets('pay a supplier for an order, with the slip, from the right account', (t) async {
     final (_, server) = await _open(t);
     await t.scrollUntilVisible(find.text('Pay'), 300, scrollable: find.byType(Scrollable).first);
     await _inSheet(t, 'Pay');

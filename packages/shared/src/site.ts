@@ -97,10 +97,10 @@ export type SiteContent = z.infer<typeof siteContent>;
 /** What the page says until the platform admin publishes their own words. */
 export const DEFAULT_SITE: SiteContent = {
   hero: {
-    eyebrow: "For trading companies that source from factories",
+    eyebrow: "For trading companies that source from suppliers",
     title: "Every RFQ, quotation and order in one place",
     subtitle:
-      "RFQ Desk takes a customer's request from the first message to the shipped order: factory prices, your margin, the quotation, the proforma, payments and profit. Your whole team works from one screen.",
+      "RFQ Desk takes a customer's request from the first message to the shipped order: supplier prices, your margin, the quotation, the proforma, payments and profit. Your whole team works from one screen.",
     primary: "Request a demo",
     secondary: "See the plans",
   },
@@ -115,8 +115,8 @@ export const DEFAULT_SITE: SiteContent = {
       },
       {
         icon: "factory",
-        title: "Factory prices side by side",
-        text: "Ask several factories, compare their offers and keep every price for next time.",
+        title: "Supplier prices side by side",
+        text: "Ask several suppliers, compare their offers and keep every price for next time.",
       },
       {
         icon: "calculator",
@@ -131,7 +131,7 @@ export const DEFAULT_SITE: SiteContent = {
       {
         icon: "wallet",
         title: "Payments and profit per order",
-        text: "Deposits, balances, factory payments and costs, so you see what each order really earned.",
+        text: "Deposits, balances, supplier payments and costs, so you see what each order really earned.",
       },
       { icon: "chart", title: "Insights for the owner", text: "Sales, margins, targets and who is winning, without building a report." },
     ],
@@ -140,7 +140,7 @@ export const DEFAULT_SITE: SiteContent = {
     title: "Up and running in a day",
     items: [
       { title: "Request a demo", text: "We set up a demo with sample inquiries and orders so you can try everything." },
-      { title: "Bring your team", text: "Add your people, choose what each one may see, and import customers and factories from Excel." },
+      { title: "Bring your team", text: "Add your people, choose what each one may see, and import customers and suppliers from Excel." },
       { title: "Work from one place", text: "New RFQs, quotations and orders go through RFQ Desk, on the web and on the phone." },
     ],
   },
@@ -162,7 +162,7 @@ export const DEFAULT_SITE: SiteContent = {
       },
       { q: "Does it work on the phone?", a: "Yes, there is a phone app for Android and iPhone on the plans that include it." },
       {
-        q: "Can we bring our existing customers and factories?",
+        q: "Can we bring our existing customers and suppliers?",
         a: "Yes. Upload them from an Excel file; the template shows what goes where.",
       },
     ],
@@ -172,7 +172,7 @@ export const DEFAULT_SITE: SiteContent = {
   seo: {
     title: "RFQ Desk: RFQs, quotations and orders for trading companies",
     description:
-      "Every RFQ, factory price, quotation, order, payment and profit in one place. For trading companies that source from factories.",
+      "Every RFQ, supplier price, quotation, order, payment and profit in one place. For trading companies that source from suppliers.",
     image: null,
   },
 };

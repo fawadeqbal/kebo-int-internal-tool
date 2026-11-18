@@ -1312,7 +1312,7 @@ function NewCustomerForm({
           <Field label="Currency" htmlFor="qc-currency" error={err("defaultCurrency")}>
             <CurrencySelect id="qc-currency" value={q.defaultCurrency ?? "USD"} onChange={(e) => set("defaultCurrency", e.target.value)} />
           </Field>
-          <Field label="Initials on papers" htmlFor="qc-initials" optional error={err("initials")}>
+          <Field label="Initials on documents" htmlFor="qc-initials" optional error={err("initials")}>
             <Input id="qc-initials" value={q.initials} onChange={(e) => set("initials", e.target.value.toUpperCase())} maxLength={6} />
           </Field>
         </div>

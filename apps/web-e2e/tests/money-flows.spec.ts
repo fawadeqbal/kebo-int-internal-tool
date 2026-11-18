@@ -16,13 +16,13 @@ async function orderWith(page: Page, tab: string, has: (page: Page) => Locator, 
   throw new Error(`No order has what this check needs on ${tab}`);
 }
 
-test("Factory order: what was agreed with the factory, the plan with Pay on the next part, and the payments made, as the customer's are", async ({ page }) => {
+test("Purchase order: what was agreed with the supplier, the plan with Pay on the next part, and the payments made, as the customer's are", async ({ page }) => {
   const errors = watchErrors(page);
   // A part paid (its Receipt) and one still to pay (its Pay).
   await orderWith(page, "factory", (p) => p.getByRole("region", { name: /^Payment plan/ }).filter({ has: p.getByRole("link", { name: /^Receipt/ }) }).getByRole("button", { name: "Pay", exact: true }));
 
   // Its payment is in what was agreed with the factory (the "How we pay them" card went there: design "terms that travel").
-  const how = page.getByRole("region", { name: /^Agreed with the factory/ }).first();
+  const how = page.getByRole("region", { name: /^Agreed with the supplier/ }).first();
   await expect(how).toContainText(/\d+ parts?/);
   await expect(how).toContainText("Their invoices");
 
@@ -35,7 +35,7 @@ test("Factory order: what was agreed with the factory, the plan with Pay on the 
 
   // Pay is on the part that is next, and opens the payment with what is left on it.
   await plan.getByRole("button", { name: "Pay", exact: true }).click();
-  const form = page.getByRole("dialog", { name: "Pay the factory" });
+  const form = page.getByRole("dialog", { name: "Pay the supplier" });
   await expect(form.getByRole("textbox", { name: "Amount" })).not.toHaveValue("");
   await form.getByRole("button", { name: "Cancel" }).click();
   await expect(form).toBeHidden();
@@ -97,7 +97,7 @@ test("Edit plan, a supplier's: a paid part stays, the bar adds up, Save checks i
   await expect(form).toBeHidden();
   await expect(plan).toContainText("45 days after shipping");
   await expect(plan).toContainText("Their invoice INV-E2E-45");
-  await expect(page.getByRole("region", { name: /^Agreed with the factory/ }).first()).toContainText("INV-E2E-45");
+  await expect(page.getByRole("region", { name: /^Agreed with the supplier/ }).first()).toContainText("INV-E2E-45");
   expect(errors).toEqual([]);
 });
 

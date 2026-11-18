@@ -14,7 +14,7 @@ import { titled } from "@/lib/titles";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; kind: string }> }) {
   const { id, kind } = await params;
-  return titled((await orderOf(id)).refNo, isPaperKind(kind) ? PAPER_LABEL[kind] : "Paper");
+  return titled((await orderOf(id)).refNo, isPaperKind(kind) ? PAPER_LABEL[kind] : "Document");
 }
 
 /** The shipping advice's message to the customer: the shipment in a few lines (sent by email or WhatsApp, no mail server needed). */

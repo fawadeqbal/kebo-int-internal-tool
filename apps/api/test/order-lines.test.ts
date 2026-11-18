@@ -12,7 +12,7 @@ import { CompaniesService } from "../src/common/company/companies.service";
  * the packing, what reached the customer. Same rules and history as the whole
  * lists, each set behind its own permission (and Delivery & SAT behind its module).
  */
-describe("order lines, one at a time", () => {
+describe("order items, one at a time", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let sana: string;
@@ -23,7 +23,7 @@ describe("order lines, one at a time", () => {
   let moulds: { id: string };
   let freight: { id: string };
   const tag = Date.now().toString(36);
-  const password = "Lines@12345678";
+  const password = "Items@12345678";
   const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 
   type Line = {
@@ -52,7 +52,7 @@ describe("order lines, one at a time", () => {
     const me = (await api(app, sana).get("/auth/me")).body.id;
     const customerId = (
       await api(app, sana)
-        .post("/customers", { name: `Lines Pharma ${tag}`, country: "PK", contacts: [{ name: "Imran", email: `imran-${tag}@lines.test` }] })
+        .post("/customers", { name: `Items Pharma ${tag}`, country: "PK", contacts: [{ name: "Imran", email: `imran-${tag}@lines.test` }] })
         .expect(201)
     ).body.id;
     const inquiry = (
@@ -71,7 +71,7 @@ describe("order lines, one at a time", () => {
     const items = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items as { id: string }[];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        newFactoryName: `Wenzhou Lines ${tag}`,
+        newFactoryName: `Wenzhou Items ${tag}`,
         receivedOn: day(-3),
         currency: "CNY",
         lines: [
@@ -121,7 +121,7 @@ describe("order lines, one at a time", () => {
 
     const changes = await history("production");
     expect(changes.filter((c) => c.action === "goods_received").map((c) => c.summary)).toEqual(
-      expect.arrayContaining([expect.stringMatching(/received from the factory .*DPP-260 1 → 2$/)]),
+      expect.arrayContaining([expect.stringMatching(/received from the supplier .*DPP-260 1 → 2$/)]),
     );
 
     // Back to nothing: no date either.
@@ -130,7 +130,7 @@ describe("order lines, one at a time", () => {
     await patch(moulds.id, { set: "received", receivedQty: 4 }).expect(200);
   });
 
-  it("fills in the packing line by line; the list is made once every line has its packages", async () => {
+  it("fills in the packing line by item; the list is made once every item has its packages", async () => {
     const one = (await patch(machine.id, { set: "packing", packages: "2", grossWeightKg: "4320", netWeightKg: "3900", cbm: "18.4" }).expect(200)).body;
     expect(one.line.packing).toEqual({ packages: 2, packageType: "Carton", netWeightKg: "3900.00", grossWeightKg: "4320.00", cbm: "18.400" });
     expect(one.goods.packed).toBe(false);
@@ -161,7 +161,7 @@ describe("order lines, one at a time", () => {
     expect((await history("shipping")).some((c) => /container and shipping marks changed/.test(c.summary))).toBe(true);
   });
 
-  it("records what reached the customer, line by line", async () => {
+  it("records what reached the customer, item by item", async () => {
     const r = (await patch(machine.id, { set: "delivered", deliveredQty: 2, condition: "good" }).expect(200)).body;
     expect(r.line.delivered).toEqual({ qty: "2", condition: "good", note: null });
     const m = (await patch(moulds.id, { set: "delivered", deliveredQty: "3", condition: "missing", note: "One set short" }).expect(200)).body;
@@ -179,7 +179,7 @@ describe("order lines, one at a time", () => {
     );
   });
 
-  it("delivered lines need the Delivery & SAT module", async () => {
+  it("delivered items need the Delivery & SAT module", async () => {
     await modulesOff(["delivery_sat"]);
     try {
       const refused = await patch(machine.id, { set: "delivered", deliveredQty: 1 }).expect(403);
@@ -226,8 +226,8 @@ describe("order lines, one at a time", () => {
     expect((await order(sana)).lines.find((l) => l.id === machine.id)).toMatchObject({ factoryPrice: { unitPrice: "130000.00", currency: "CNY" } });
   });
 
-  it("another company's line is not found, and its rows stay out of reach", async () => {
-    const company = await prisma.platform.company.create({ data: { slug: `ln-${tag}`.slice(0, 30), name: `Lines other ${tag}` } });
+  it("another company's item is not found, and its rows stay out of reach", async () => {
+    const company = await prisma.platform.company.create({ data: { slug: `ln-${tag}`.slice(0, 30), name: `Items other ${tag}` } });
     const email = `boss@ln-${tag}.test`;
     await seedCompanyBase(prisma.company(company.id), {
       admin: { email, name: "Boss", role: "admin", passwordHash: await bcrypt.hash(password, 10) },
@@ -243,7 +243,7 @@ describe("order lines, one at a time", () => {
     expect((await order()).lines.find((l) => l.id === machine.id)).toMatchObject({ receivedQty: "2", packing: { packages: 2 } });
   });
 
-  it("a cancelled order's lines do not change", async () => {
+  it("a cancelled order's items do not change", async () => {
     const manager = await signIn(app, "manager@example.com", "Manager@12345");
     await api(app, manager).post(`/orders/${orderId}/cancel`, { reason: "Customer cancelled (test)" }).expect(200);
     const r = await patch(machine.id, { set: "packing", packages: 3 }).expect(400);

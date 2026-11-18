@@ -77,7 +77,7 @@ describe("money sent for approval", () => {
     api(app, who).post("/submissions", {
       kind: "expense",
       orderId,
-      body: { category: "travel", description: "Taxi to the factory", currency: "USD", spentOn: today, ...body },
+      body: { category: "travel", description: "Taxi to the supplier", currency: "USD", spentOn: today, ...body },
     });
   const modulesOff = async (off: string[]) => {
     await prisma.platform.company.update({ where: { id: FIRST_COMPANY_ID }, data: { featuresOff: off } });
@@ -340,12 +340,12 @@ describe("money sent for approval", () => {
       currency: "USD",
       spentOn: today,
       category: "travel",
-      description: "Taxi to the factory",
+      description: "Taxi to the supplier",
     });
     expect(spent.order).toMatchObject({ id: orderId });
     // Nothing spent yet.
     expect(await prisma.company(FIRST_COMPANY_ID).expense.count({ where: { orderId } })).toBe(0);
-    expect((await notes(manager)).some((n) => n.type === "approval.waiting" && n.title === `To approve: expense USD 25, Taxi to the factory (${refNo})`)).toBe(true);
+    expect((await notes(manager)).some((n) => n.type === "approval.waiting" && n.title === `To approve: expense USD 25, Taxi to the supplier (${refNo})`)).toBe(true);
 
     const accountsList = (await api(app, accounts).get("/submissions").expect(200)).body as List;
     expect(accountsList.approves).toEqual(["payment"]);
@@ -366,7 +366,7 @@ describe("money sent for approval", () => {
     const e = await prisma
       .company(FIRST_COMPANY_ID)
       .expense.findUniqueOrThrow({ where: { id: done.createdId }, include: { files: { where: { deletedAt: null } } } });
-    expect(e).toMatchObject({ orderId, description: "Taxi to the factory", currency: "USD" });
+    expect(e).toMatchObject({ orderId, description: "Taxi to the supplier", currency: "USD" });
     // The photo moved to the expense as its receipt (the same file row, no copy).
     expect(e.files.map((f) => f.fileName)).toEqual(["taxi.pdf"]);
     expect(e.amount.toFixed(2)).toBe("25.00");

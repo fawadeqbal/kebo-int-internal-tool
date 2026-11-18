@@ -16,7 +16,7 @@ export const BASIS_STEP_LABEL: Record<BasisStep, string> = {
 };
 
 export const BASIS_STEP_HINT: Record<BasisStep, string> = {
-  to_port: "Inland transport from the factory and export clearance",
+  to_port: "Inland transport from the supplier and export clearance",
   freight: "Main carriage to the destination port",
   insurance: "Cargo insurance for the voyage",
   delivery: "Destination port charges and transport to the named place",

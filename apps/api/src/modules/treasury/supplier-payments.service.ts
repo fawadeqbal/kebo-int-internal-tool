@@ -67,7 +67,7 @@ export class SupplierPaymentsService {
     const owedIn = [...new Set(lines.map((l) => l.factoryCurrency).filter((c): c is string => !!c))];
     if (owedIn.length && !owedIn.includes(currency)) {
       throw new DomainError(
-        `We owe ${factory.name} in ${owedIn.join(" and ")}. Record the payment in ${owedIn[0]}: a payment in ${currency} would not count against what we owe. If you sent ${currency}, enter the ${owedIn[0]} amount the factory received.`,
+        `We owe ${factory.name} in ${owedIn.join(" and ")}. Record the payment in ${owedIn[0]}: a payment in ${currency} would not count against what we owe. If you sent ${currency}, enter the ${owedIn[0]} amount the supplier received.`,
       );
     }
   }
@@ -80,7 +80,7 @@ export class SupplierPaymentsService {
   ) {
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
     const f = await this.prisma.db.party.findFirst({ where: { ...isSupplier, id: input.factoryId, deletedAt: null } });
-    if (!f) throw new DomainError("That factory was removed. Choose another one.");
+    if (!f) throw new DomainError("That supplier was removed. Choose another one.");
     await this.checkFactoryCurrency(o.id, f, input.currency, keepCurrency);
     return {
       factoryId: f.id,

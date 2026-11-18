@@ -110,7 +110,7 @@ export class SectionsService {
     if (o.status !== "open") throw new DomainError(o.status === "closed" ? "This order is closed." : "This order is cancelled.");
     const ids = [...new Set(o.lines.flatMap((l) => (l.factoryId ? [l.factoryId] : [])))];
     const factoryId = input.factoryId ?? (ids.length === 1 ? ids[0]! : null);
-    if (factoryId ? !ids.includes(factoryId) : ids.length > 0) throw new DomainError("Choose a factory of this order.");
+    if (factoryId ? !ids.includes(factoryId) : ids.length > 0) throw new DomainError("Choose a supplier of this order.");
     if (input.fatAttendedById && !(await this.prisma.db.user.findFirst({ where: { id: input.fatAttendedById }, select: { id: true } }))) throw new DomainError("Choose a person of the company.");
     const name = o.lines.find((l) => l.factoryId === factoryId)?.factory?.name ?? null;
 

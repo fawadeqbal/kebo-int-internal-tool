@@ -75,7 +75,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
         {r.borneBy === "customer" ? (
           <Badge tone="info">The customer pays</Badge>
         ) : r.borneBy === "factory" ? (
-          <Badge tone="info">Off the factory</Badge>
+          <Badge tone="info">Off the supplier</Badge>
         ) : r.kind === "goods" && r.state !== "paid" && r.state !== "estimate" ? (
           <Link href={`${base}/factory`} className={ROW_LINK}>
             {ORDER_TAB_LABEL.factory} →
@@ -139,7 +139,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
           />
         )}
         {Number(sheet.uncosted) > 0 && (
-          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">{money(sheet.uncosted, c)} of the order is on lines without a cost: left out of the profit.</p>
+          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">{money(sheet.uncosted, c)} of the order is on items without a cost: left out of the profit.</p>
         )}
       </Section>
 

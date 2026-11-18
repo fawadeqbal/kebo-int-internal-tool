@@ -74,14 +74,14 @@ describe("the tabs and sections of an order", () => {
 });
 
 describe("where each stage stands", () => {
-  it("a new order: nothing in, not sent, not started, not booked, not yet, 1 of 5 papers", () => {
+  it("a new order: nothing in, not sent, not started, not booked, not yet, 1 of 5 documents", () => {
     const w = stageWords(fresh(), TODAY);
     expect(w.payment).toEqual({ word: "Nothing in", tone: "warn", tab: "nothing in" });
     expect(w.factory).toEqual({ word: "Not sent", tone: "neutral", tab: "not sent" });
     expect(w.production).toEqual({ word: "Not started", tone: "neutral", tab: "" });
     expect(w.shipping).toEqual({ word: "Not booked", tone: "neutral", tab: "" });
     expect(w.delivery).toEqual({ word: "Not yet", tone: "neutral", tab: "" });
-    expect(w.documents).toEqual({ word: "1 of 5 papers", tone: "neutral", tab: "1 of 5" });
+    expect(w.documents).toEqual({ word: "1 of 5 documents", tone: "neutral", tab: "1 of 5" });
   });
 
   it("in production: deposit in, PO sent, ready 5 Dec, booked", () => {
@@ -120,7 +120,7 @@ describe("where each stage stands", () => {
     expect(stageWords(fresh({ shipMode: "air", shipments: [{ ...one, mode: "air" }] }), TODAY).shipping.tab).toBe("left");
   });
 
-  it("paid in full, factory paid, delivered, SAT signed", () => {
+  it("paid in full, supplier paid, delivered, SAT signed", () => {
     const w = stageWords(
       fresh({
         depositIn: true,
@@ -138,11 +138,11 @@ describe("where each stage stands", () => {
     expect(stageWords(fresh({ deliveredOn: "2027-01-26", satDoneOn: "2027-02-04" }), TODAY).delivery).toEqual({ word: "SAT signed 4 Feb", tone: "ok", tab: "signed off" });
   });
 
-  it("a person who may not see factory money still reads PO sent", () => {
+  it("a person who may not see supplier money still reads PO sent", () => {
     expect(stageWords(fresh({ factoryOrderedOn: "2026-11-16", factories: null }), TODAY).factory.word).toBe("PO sent");
   });
 
-  it("by LC: the open LC is the word until the money is in; the papers are seven", () => {
+  it("by LC: the open LC is the word until the money is in; the documents are seven", () => {
     const lc = fresh({
       route: "letter_of_credit",
       depositIn: true,
@@ -171,7 +171,7 @@ describe("the Overview's lines", () => {
 
   it("come in the tabs' order with their label and word", () => {
     const all = stageStands(fresh(), TODAY);
-    expect(all.map((s) => s.label)).toEqual(["Payment", "Factory order", "Production", "Shipping", "Delivery & SAT", "Documents"]);
+    expect(all.map((s) => s.label)).toEqual(["Payment", "Purchase order", "Production", "Shipping", "Delivery & SAT", "Documents"]);
     expect(all[0]).toMatchObject({ word: "Nothing in", tone: "warn", fact: "Bank transfer (T/T) · deposit 30% USD 55,260 to come", missing: "" });
     expect(all[1]!.fact).toBe("Jiangsu Filling Machinery · CNY 950,000");
     expect(all[2]!.fact).toBe("No ready date yet");
@@ -219,7 +219,7 @@ describe("the Overview's lines", () => {
     });
     expect(line(f, "payment").fact).toBe("Deposit 16 Nov · paid in full 10 Dec");
     expect(line(f, "factory").fact).toBe("Jiangsu · ordered 16 Nov · CNY 950,000 paid");
-    expect(line(f, "production").fact).toBe("Ready 5 Dec · factory test passed 3 Dec · 4 of 4 lines received");
+    expect(line(f, "production").fact).toBe("Ready 5 Dec · factory test passed 3 Dec · 4 of 4 items received");
     expect(line(f, "shipping")).toMatchObject({ fact: "Sino-Africa Logistics · MSC Aurora · B/L MEDUSH887120 · sailed 14 Dec · arrived 19 Jan", missing: "" });
     expect(line(f, "delivery")).toMatchObject({ fact: "Delivered 26 Jan · SAT signed 4 Feb by Mr Ade Bello · 1 claim settled", missing: "" });
   });
@@ -282,7 +282,7 @@ describe("the stages an order has, and the stage of a change", () => {
     // A card's edit: by the card.
     expect(STEP_OF_ACTION("card.edit", { card: "shipment:1b3d" })).toBe("shipping");
     expect(STEP_OF_ACTION("card.edit", { card: "lines.received" })).toBe("production");
-    expect(editCardLabel("lines.received")).toBe("Lines from the factory");
+    expect(editCardLabel("lines.received")).toBe("Items from the supplier");
     expect(STEP_OF_ACTION("update", { readyOn: "2026-12-03" })).toBe("production");
     expect(STEP_OF_ACTION("stage")).toBeNull();
     // What was ticked on the old checklist keeps its stage in the history.

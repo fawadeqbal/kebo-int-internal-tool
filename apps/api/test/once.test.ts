@@ -49,10 +49,10 @@ describe("money saves are done once per key", () => {
 
   it("two at the same moment: one save, and both get its answer", async () => {
     const key = `test-${tag}-2`;
-    const [a, b] = await Promise.all([send(expense(`Paper ${tag}`), key), send(expense(`Paper ${tag}`), key)]);
+    const [a, b] = await Promise.all([send(expense(`Document ${tag}`), key), send(expense(`Document ${tag}`), key)]);
     expect([a.status, b.status]).toEqual([201, 201]);
     expect(a.body).toEqual(b.body);
-    expect(await count(`Paper ${tag}`)).toBe(1);
+    expect(await count(`Document ${tag}`)).toBe(1);
   });
 
   it("the same key with other details is refused; a new key is a new save; without a key, as before", async () => {

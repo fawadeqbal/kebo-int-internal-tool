@@ -118,7 +118,7 @@ export async function factoryPaymentAction(
       paymentId
         ? api.patch(`/factory-payments/${paymentId}`, body, { version })
         : api.post(`/orders/${orderId}/factory-payments`, body, { once: onceOf(form) }),
-    paymentId ? "Payment changed." : "Payment to the factory recorded.",
+    paymentId ? "Payment changed." : "Payment to the supplier recorded.",
   );
   if (!r.ok) return r;
   refresh(orderId);
@@ -128,7 +128,7 @@ export async function factoryPaymentAction(
   const name = p?.factory?.name;
   const left = p?.after?.toPay && p.currency ? (Number(p.after.toPay) > 0 ? `${money(p.after.toPay, p.currency)} still to pay` : "nothing more to pay") : null;
   if (paymentId) return { ...r, message: name ? `Payment to ${name} changed` : r.message, detail: ["your reason is kept in History", left].filter(Boolean).join(" · ") };
-  return { ...r, message: `${money(body.amount, body.currency)} paid${name ? ` to ${name}` : " to the factory"}`, detail: left ?? undefined };
+  return { ...r, message: `${money(body.amount, body.currency)} paid${name ? ` to ${name}` : " to the supplier"}`, detail: left ?? undefined };
 }
 
 export async function voidFactoryPaymentAction(

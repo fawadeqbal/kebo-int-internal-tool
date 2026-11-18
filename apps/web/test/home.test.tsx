@@ -61,7 +61,7 @@ const h: HomeFigures = {
   inquiries: {
     open: 20,
     stages: [
-      { key: "new", label: "New", count: 6, value: null, note: "not asked from factories yet", level: null },
+      { key: "new", label: "New", count: 6, value: null, note: "not asked from suppliers yet", level: null },
       { key: "sourcing", label: "Waiting for prices", count: 9, value: null, note: "2 waiting more than 7 days", level: "warn" },
       { key: "quoted", label: "Quoted", count: 5, value: "280400.00", note: "2 sent more than 7 days ago", level: "warn" },
     ],
@@ -164,7 +164,7 @@ describe("Home: who owes, and thin orders", () => {
     totals: [{ currency: "USD", due: "207940.00", overdue: "56350.00" }],
   };
 
-  it("late customers first (the oldest first), then by the next date; four lines and a link to all", () => {
+  it("late customers first (the oldest first), then by the next date; four items and a link to all", () => {
     render(<CustomersOwe r={owed} />);
     const names = screen.getAllByRole("listitem").map((li) => li.querySelector("span span")!.textContent);
     expect(names).toEqual(["Karachi Builders", "Accra Water", "Kampala Juices", "Lagos Water"]);

@@ -442,7 +442,7 @@ export class InquiriesService {
       ? requireReason(
           input.reason,
           changes[0] === "moved to another customer" ? "customer" : "items",
-          "these items change after a factory priced them",
+          "these items change after a supplier priced them",
         )
       : (input.reason ?? null);
     await this.assertContact(input.customerId, input.contactId);
@@ -601,7 +601,7 @@ export class InquiriesService {
       if (!item) throw new NotFoundError("Item");
       if (item.parentId) throw new DomainError("This is already a part of another item. Split that item instead.");
       const reason = item._count.factoryLines
-        ? requireReason(input.reason, "split", "an item a factory has priced is split")
+        ? requireReason(input.reason, "split", "an item a supplier has priced is split")
         : (input.reason ?? null);
       const all = await tx.requestedItem.findMany({
         where: { inquiryId: id },
@@ -671,9 +671,9 @@ export class InquiriesService {
     await this.find(user, id);
     // Evidence for a factory offer: only for people who see factory prices, and only that deal's offers.
     if (meta.factoryQuoteId) {
-      if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
+      if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier prices.");
       const q = await this.prisma.db.factoryQuote.findFirst({ where: { id: meta.factoryQuoteId, inquiryId: id, deletedAt: null } });
-      if (!q) throw new DomainError("That factory offer is not on this inquiry any more.");
+      if (!q) throw new DomainError("That supplier offer is not on this inquiry any more.");
     }
     if (!this.storage.isAllowed(file.originalname))
       throw new DomainError("This kind of file is not allowed. Use PDF, Office, images, CAD drawings or zip files.");
@@ -702,7 +702,7 @@ export class InquiriesService {
           action: "upload",
           entityType: "attachment",
           entityId: row.id,
-          summary: meta.factoryQuoteId ? `Uploaded ${name} to a factory offer` : `Uploaded ${name}`,
+          summary: meta.factoryQuoteId ? `Uploaded ${name} to a supplier offer` : `Uploaded ${name}`,
         });
         return row;
       });

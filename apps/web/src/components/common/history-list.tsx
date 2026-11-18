@@ -27,10 +27,10 @@ const FIELD: Record<string, string> = {
   defaultDepositPercent: "Default deposit %",
   defaultBalanceTerms: "Balance terms",
   defaultPaymentTerms: "Payment terms",
-  defaultDeliveryTerms: "Delivery terms",
+  defaultDeliveryTerms: "Incoterm",
   warrantyTerms: "Warranty",
   paymentTerms: "Payment terms",
-  deliveryTerms: "Delivery terms",
+  deliveryTerms: "Incoterm",
   warranty: "Warranty",
   incotermPlace: "Place",
   leadTime: "Lead time",
@@ -48,12 +48,12 @@ const shown = (v: string | null) =>
   v === null ? "—" : v === "true" ? "yes" : v === "false" ? "no" : readableDates(v.length > 80 ? `${v.slice(0, 80)}…` : v);
 
 const AREA: Record<string, string> = {
-  factory_quote: "Factory prices",
+  factory_quote: "Supplier prices",
   quotation: "Quotation",
   attachment: "Files",
   order: "Order",
   customer: "Customer",
-  factory: "Factory",
+  factory: "Supplier",
 };
 
 /**

@@ -32,10 +32,10 @@ export function OrderWindow({
         const v = (k: keyof typeof values) => s.values?.[k] ?? values[k] ?? "";
         return (
           <FieldRow>
-            <Field label="Their PO no." htmlFor="ord-po" optional error={s.errors?.customerRef}>
+            <Field label="Customer's order no." htmlFor="ord-po" optional error={s.errors?.customerRef}>
               <Input id="ord-po" name="customerRef" maxLength={80} defaultValue={v("customerRef")} />
             </Field>
-            <Field label="PO date" htmlFor="ord-poOn" optional error={s.errors?.customerPoOn}>
+            <Field label="Customer's order date" htmlFor="ord-poOn" optional error={s.errors?.customerPoOn}>
               <Input id="ord-poOn" name="customerPoOn" type="date" max={today} defaultValue={v("customerPoOn")} />
             </Field>
           </FieldRow>
@@ -85,7 +85,7 @@ function AgreedFields({ state, values, shipHint, payment, paymentHref }: { state
   return (
     <>
       <p className="rounded-md bg-info-soft px-3 py-2 text-xs text-text">
-        The quotation stays exactly as it was sent. What you change here is what the order and its papers use from now on; a paper already made final keeps what it said.
+        The quotation stays exactly as it was sent. What you change here is what the order and its documents use from now on; a document already made final keeps what it said.
       </p>
       <input type="hidden" name="leadDays" value={leadDays.trim()} />
       <input type="hidden" name="leadFrom" value={leadDays.trim() ? leadFrom : ""} />
@@ -94,7 +94,7 @@ function AgreedFields({ state, values, shipHint, payment, paymentHref }: { state
       <input type="hidden" name="warranty" value={covers} />
 
       <PanelSection title="Delivery" sub="where we hand the goods over, and when" className="md:grid-cols-3" first>
-        <Field label="Delivery basis (Incoterm)" htmlFor="agr-incoterm">
+        <Field label="Incoterm" htmlFor="agr-incoterm">
           <Input id="agr-incoterm" value={values.incoterm} readOnly className="bg-surface-2 font-semibold" />
         </Field>
         <Field label="Place" htmlFor="agr-place" optional error={e.incotermPlace}>

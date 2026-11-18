@@ -112,7 +112,7 @@ class MoneyScreen extends ConsumerWidget {
                   if (payables != null) ...[
                     const SizedBox(height: KSpace.s6),
                     KSection(
-                      title: 'To pay factories',
+                      title: 'To pay suppliers',
                       children: [
                         KCard(
                           padding: EdgeInsets.zero,
@@ -122,7 +122,7 @@ class MoneyScreen extends ConsumerWidget {
                               const KEmptyState(
                                 icon: KIcons.factory,
                                 title: 'Nothing to pay now',
-                                message: 'What factories are owed on orders shows here.',
+                                message: 'What suppliers are owed on orders shows here.',
                               ),
                             AsyncValue(:final value?) => Column(
                               children: [
@@ -155,7 +155,7 @@ class MoneyScreen extends ConsumerWidget {
                   if ((accounts.value ?? const []).any((a) => a.balance != null)) ...[
                     const SizedBox(height: KSpace.s6),
                     KSection(
-                      title: 'Accounts',
+                      title: 'Bank accounts',
                       actionLabel: s.can('expenses.manage') && accounts.value!.length > 1 ? 'Move money' : null,
                       onAction: () async {
                         if (await openTransfer(context, accounts.value!)) reload();

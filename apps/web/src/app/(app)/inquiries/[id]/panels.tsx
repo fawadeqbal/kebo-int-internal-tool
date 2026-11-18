@@ -214,7 +214,7 @@ export function AssignForm({
         {(s) =>
           canAssignOthers ? (
             <>
-              <Field label="Handled by" htmlFor="assigneeId">
+              <Field label="Responsible person" htmlFor="assigneeId">
                 <Select id="assigneeId" name="assigneeId" defaultValue={s.values?.assigneeId ?? current ?? ""}>
                   <option value="">Nobody</option>
                   {people.map((p) => (

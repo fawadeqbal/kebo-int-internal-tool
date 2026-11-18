@@ -38,7 +38,7 @@ describe("customer account", () => {
     await app?.close();
   });
 
-  it("puts an expense on a deal (its customer is filled in) and on the factory visited", async () => {
+  it("puts an expense on a deal (its customer is filled in) and on the supplier visited", async () => {
     const trip = (await spend({ inquiryId: lostDeal, factoryId, description: `Trip to check the mill ${tag}`, amount: 400 }).expect(201)).body;
     expect(trip).toMatchObject({ deal: { id: lostDeal, stage: "lost" }, customer: { id: customerId }, factory: { id: factoryId }, order: null });
     await spend({ inquiryId: openDeal, category: "samples", description: "Bran samples", amount: 60 }).expect(201);
@@ -54,7 +54,7 @@ describe("customer account", () => {
     expect(atFactory.rows.some((r: { description: string }) => r.description === `Trip to check the mill ${tag}`)).toBe(true);
   });
 
-  it("shows the customer's account: lost deals' cost by reason, open deals, and the net", async () => {
+  it("shows the customer's account: lost inquiries' cost by reason, open deals, and the net", async () => {
     await api(app, sana).get(`/customers/${customerId}/account`).expect(403);
     const a = (await api(app, manager).get(`/customers/${customerId}/account`).expect(200)).body;
     expect(a.deals).toEqual({ total: 2, won: 0, lost: 1, open: 1 });

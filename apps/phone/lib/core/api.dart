@@ -97,7 +97,7 @@ String notKeptMessage(String path) {
     'orders' => 'This order',
     'inquiries' => 'This inquiry',
     'customers' => 'This customer',
-    'factories' => 'This factory',
+    'factories' => 'This supplier',
     _ => 'This',
   };
   return "$what isn't on the phone. Open it once while online.";

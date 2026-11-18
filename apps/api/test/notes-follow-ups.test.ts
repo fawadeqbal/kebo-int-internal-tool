@@ -272,7 +272,7 @@ describe("notes and follow-ups", () => {
   });
 
   it("customer notes: who manages customers adds them; who deletes customers removes anyone's", async () => {
-    const note = (await api(app, sana).post(`/customers/${customerId}/notes`, { body: "Asked for a second line next year", kind: "visit", contactId }).expect(201)).body as Note;
+    const note = (await api(app, sana).post(`/customers/${customerId}/notes`, { body: "Asked for a second item next year", kind: "visit", contactId }).expect(201)).body as Note;
     expect(note.target).toEqual({ type: "customer", id: customerId, label: customerName });
     expect((await api(app, sana).get(`/customers/${customerId}/notes`).expect(200)).body[0].id).toBe(note.id);
     await api(app, sana).post(`/customers/${customerId}/notes`, { body: "x", contactId: otherContactId }).expect(422);
@@ -295,7 +295,7 @@ describe("notes and follow-ups", () => {
     expect((await api(app, sana).post(`/factories/${factoryId}/notes`, { body: "x", contactId }).expect(422)).body.fieldErrors).toHaveProperty("contactId");
     expect(((await api(app, bilal).get(`/factories/${factoryId}/notes`).expect(200)).body as Note[])[0]).toMatchObject({ id: note.id, can: { edit: false, delete: false } });
     await api(app, bilal).delete(`/notes/${note.id}`).expect(403);
-    const noFactories = await person("No factories", ["dashboard.view", "inquiries.viewAll"]);
+    const noFactories = await person("No suppliers", ["dashboard.view", "inquiries.viewAll"]);
     await api(app, noFactories.token).get(`/factories/${factoryId}/notes`).expect(403);
     await api(app, noFactories.token).post(`/factories/${factoryId}/notes`, { body: "x" }).expect(403);
     await api(app, noFactories.token).delete(`/notes/${note.id}`).expect(404);
@@ -363,13 +363,13 @@ describe("notes and follow-ups", () => {
 
     // For someone else: they are told, with a link to the record (or to the list when it is on none).
     const forBilal = (
-      await api(app, sana).post("/follow-ups", { title: "Visit the factory with Ali", kind: "visit", dueOn: addDays(today, 1), dueAt: "14:00", place: "Wenzhou", orderId, assigneeId: bilalId }).expect(201)
+      await api(app, sana).post("/follow-ups", { title: "Visit the supplier with Ali", kind: "visit", dueOn: addDays(today, 1), dueAt: "14:00", place: "Wenzhou", orderId, assigneeId: bilalId }).expect(201)
     ).body as FollowUp;
     expect(forBilal.assignee).toEqual({ id: bilalId, name: "Bilal" });
-    const told = (await notificationsOf(bilalId, "followUp.assigned")).findLast((n) => n.title.includes("Visit the factory with Ali"));
+    const told = (await notificationsOf(bilalId, "followUp.assigned")).findLast((n) => n.title.includes("Visit the supplier with Ali"));
     expect(told).toMatchObject({ link: `/orders/${orderId}` });
-    expect(told!.title).toMatch(/^Sana gave you a follow-up: Visit the factory with Ali, \w{3} \d+ \w{3} 14:00$/);
-    expect(told!.body).toMatch(new RegExp(`^${refNo} · Visit the factory with Ali, .* 14:00 at Wenzhou\\. When done`));
+    expect(told!.title).toMatch(/^Sana gave you a follow-up: Visit the supplier with Ali, \w{3} \d+ \w{3} 14:00$/);
+    expect(told!.body).toMatch(new RegExp(`^${refNo} · Visit the supplier with Ali, .* 14:00 at Wenzhou\\. When done`));
     const general = (await api(app, bilal).post("/follow-ups", { title: "Send Sana the price list", dueOn: today, assigneeId: sanaId }).expect(201)).body as FollowUp;
     expect(general).toMatchObject({ target: null, link: "/follow-ups", kind: "other" });
     expect((await notificationsOf(sanaId, "followUp.assigned")).find((n) => n.title.startsWith("Bilal gave you a follow-up: Send Sana the price list"))?.link).toBe("/follow-ups");
@@ -508,7 +508,7 @@ describe("notes and follow-ups", () => {
     const add = async (title: string, dueAt?: string, extra: object = {}) =>
       (await api(app, manager).post("/follow-ups", { title, dueOn: day, assigneeId: me.id, ...(dueAt ? { dueAt } : {}), ...extra }).expect(201)).body as FollowUp;
     const allDay = await add("Call Kofi", undefined, { orderId });
-    const early = await add("Factory visit", "08:20", { place: "Wenzhou" });
+    const early = await add("Supplier visit", "08:20", { place: "Wenzhou" });
     const later = await add("Meet the bank", "09:00");
     const finished = await add("Already done");
     await api(app, me.token).post(`/follow-ups/${finished.id}/done`).expect(200);
@@ -522,10 +522,10 @@ describe("notes and follow-ups", () => {
     // (Others' missed follow-ups are reminded in the same run: only this person's are counted below.)
     expect(sent).toBeGreaterThanOrEqual(3);
     const first = await due();
-    expect(first.map((n) => n.title).sort()).toEqual(["At 08:20: Factory visit", "Today at 09:00: Meet the bank", "Today: Call Kofi"]);
+    expect(first.map((n) => n.title).sort()).toEqual(["At 08:20: Supplier visit", "Today at 09:00: Meet the bank", "Today: Call Kofi"]);
     expect(first.find((n) => n.title === "Today: Call Kofi")).toMatchObject({ link: `/orders/${orderId}`, body: `${refNo} · Call Kofi. When done, say what happened and set the next one.` });
     expect((first.find((n) => n.title === "Today: Call Kofi")!.message as { where: { title: string } }).where.title).toBe(customerName);
-    expect(first.find((n) => n.title === "At 08:20: Factory visit")).toMatchObject({ link: "/follow-ups", message: expect.objectContaining({ tag: "In 20 minutes", sentence: "Your follow-up is in 20 minutes, at Wenzhou." }) });
+    expect(first.find((n) => n.title === "At 08:20: Supplier visit")).toMatchObject({ link: "/follow-ups", message: expect.objectContaining({ tag: "In 20 minutes", sentence: "Your follow-up is in 20 minutes, at Wenzhou." }) });
     // Running again (the worker runs every few minutes, the hourly job too) sends nothing twice.
     expect(await run()).toBe(0);
     expect((await due()).length).toBe(3);

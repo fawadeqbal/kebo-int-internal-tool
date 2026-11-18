@@ -25,7 +25,7 @@ const CUSTOMER_FIELDS: Field[] = [
 ];
 
 const FACTORY_FIELDS: Field[] = [
-  { key: "name", header: "Factory name", names: ["factory", "factoryname", "supplier", "suppliername", "company", "companyname", "name", "vendor"], col: { width: 32, required: true } },
+  { key: "name", header: "Supplier name", names: ["factory", "factoryname", "supplier", "suppliername", "company", "companyname", "name", "vendor"], col: { width: 32, required: true } },
   { key: "contactPerson", header: "Contact person", names: ["contact", "contactperson", "contactname", "person"], col: { width: 22 } },
   { key: "phone", header: "Phone", names: ["phone", "tel", "telephone", "mobile", "cell"], col: { width: 18 } },
   { key: "email", header: "Email", names: ["email", "mail", "emailaddress"], col: { width: 26 } },
@@ -54,10 +54,10 @@ export const customersTemplate = () =>
   ]);
 
 export const factoriesTemplate = () =>
-  template("Factories", FACTORY_FIELDS, [
-    "Factories: one row per factory.",
-    "Upload the file with Excel › Upload a filled file. The factories are shown to check; nothing is saved until you add them.",
-    "Only new factories are added: a name already here is left out.",
+  template("Suppliers", FACTORY_FIELDS, [
+    "Suppliers: one row per supplier.",
+    "Upload the file with Excel › Upload a filled file. The suppliers are shown to check; nothing is saved until you add them.",
+    "Only new suppliers are added: a name already here is left out.",
   ]);
 
 /** Each field's column in the file (by the template's heading, or a usual other name). */
@@ -157,7 +157,7 @@ export function customersFromSheet(read: ReadSheet): PartyRead<CustomerInput> {
 
 export function factoriesFromSheet(read: ReadSheet): PartyRead<FactoryInput> {
   const { at, unused } = columnsOf(read.headers, FACTORY_FIELDS);
-  if (!at.has("name")) return { items: [], unused, error: "No “Factory name” column in the file. Download the template from Excel › Download a template, or rename the column." };
+  if (!at.has("name")) return { items: [], unused, error: "No “Supplier name” column in the file. Download the template from Excel › Download a template, or rename the column." };
   const cell = (cells: string[], key: string) => (at.has(key) ? (cells[at.get(key)!] ?? "").trim() : "");
   const seen = new Set<string>();
   const items: PartyRow<FactoryInput>[] = [];
@@ -175,9 +175,9 @@ export function factoriesFromSheet(read: ReadSheet): PartyRead<FactoryInput> {
     items.push(
       parsed.success
         ? { name, detail, rows: [r + 2], input: parsed.data, problem: null }
-        : { name: name || "(no factory name)", detail, rows: [r + 2], input: null, problem: firstIssue(parsed.error.issues) },
+        : { name: name || "(no supplier name)", detail, rows: [r + 2], input: null, problem: firstIssue(parsed.error.issues) },
     );
   });
-  if (!items.length) return { items, unused, error: "The file has headings but no factories." };
+  if (!items.length) return { items, unused, error: "The file has headings but no suppliers." };
   return { items, unused, error: null };
 }

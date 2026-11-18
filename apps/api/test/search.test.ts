@@ -54,7 +54,7 @@ describe("search everything", () => {
     await app?.close();
   });
 
-  it("finds the customer and the inquiry by name, a word of a line, or a phone number", async () => {
+  it("finds the customer and the inquiry by name, a word of an item, or a phone number", async () => {
     const r = await find(sana, tag);
     expect(group(r, "customers")).toMatchObject({ total: 1, items: [{ title: `Kabul ${tag} Medical`, href: `/customers/${customerId}` }] });
     expect(group(r, "customers")!.items[0]!.sub).toContain("Afghanistan");
@@ -70,7 +70,7 @@ describe("search everything", () => {
     expect((await find(sana, "RFQ-1999-9999")).exact).toBeNull();
   });
 
-  it("finds only what the person's lists show: not someone else's deal, suppliers only with factory money", async () => {
+  it("finds only what the person's lists show: not someone else's deal, suppliers only with supplier money", async () => {
     const other = await find(looker, tag);
     expect(group(other, "inquiries")).toBeUndefined();
     expect(group(other, "customers")).toBeUndefined();

@@ -152,8 +152,8 @@ export function RouteForm({
           />
           {lcTerms === "deferred" && (
             <span className="flex items-center gap-2 text-text-2">
-              <Input aria-label="Days after the papers reach their bank" inputMode="numeric" className="w-20 tabular" value={lcDays} onChange={(e) => setLcDays(e.target.value.replace(/\D/g, ""))} />
-              days after the papers reach their bank
+              <Input aria-label="Days after the documents reach their bank" inputMode="numeric" className="w-20 tabular" value={lcDays} onChange={(e) => setLcDays(e.target.value.replace(/\D/g, ""))} />
+              days after the documents reach their bank
             </span>
           )}
         </div>

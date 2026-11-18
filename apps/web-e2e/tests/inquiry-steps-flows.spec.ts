@@ -47,7 +47,7 @@ test("the Items card's Edit opens only the items; nothing changed is nothing to 
   // A wrong quantity: one change, and why is asked in the window (Save waits for it); then the save is refused and says which item.
   await sheet.getByRole("row", { name: "Item 2" }).getByRole("gridcell").nth(2).click();
   await page.keyboard.press("Enter");
-  await page.getByLabel("Item 2: Qty").fill("0");
+  await page.getByLabel("Item 2: Quantity").fill("0");
   await page.keyboard.press("Enter");
   await expect(win.getByRole("button", { name: "Save 1 change" })).toBeDisabled();
   await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Other…" }).click();
@@ -60,7 +60,7 @@ test("the Items card's Edit opens only the items; nothing changed is nothing to 
   // Fixed: saved with the reason already given; the window closes and the card shows it.
   await sheet.getByRole("row", { name: "Item 2" }).getByRole("gridcell").nth(2).click();
   await page.keyboard.press("Enter");
-  await page.getByLabel("Item 2: Qty").fill("3");
+  await page.getByLabel("Item 2: Quantity").fill("3");
   await page.keyboard.press("Enter");
   await win.getByRole("button", { name: "Save 1 change" }).click();
   await expect(win).toBeHidden();
@@ -158,7 +158,7 @@ test("the Customer step: recent customers, Came by as buttons, and a customer no
   expect(errors).toEqual([]);
 });
 
-test("the Items step: Add item first, + Part under a line, a possible duplicate tagged, ticked lines acted on together", async ({ page }) => {
+test("the Items step: Add item first, + Part under an item, a possible duplicate tagged, ticked items acted on together", async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   await page.goto("/inquiries?panel=new-inquiry");
@@ -168,7 +168,7 @@ test("the Items step: Add item first, + Part under a line, a possible duplicate 
   await win.getByRole("button", { name: /^Next/ }).click();
   const desc = win.getByRole("textbox", { name: "New item: Description" });
   const model = win.getByRole("textbox", { name: "New item: Model / part no." });
-  const qty = win.getByRole("textbox", { name: "New item: Qty" });
+  const qty = win.getByRole("textbox", { name: "New item: Quantity" });
   await expect(win.getByRole("button", { name: "Add item", exact: true })).toBeVisible();
   await desc.fill("Tablet press machine");
   await model.fill("ZP-35D");
@@ -194,7 +194,7 @@ test("the Items step: Add item first, + Part under a line, a possible duplicate 
   // A clean table: no tick boxes until Select; tick 3 and delete it with the bar (asked first); the rest stays.
   await expect(win.getByRole("checkbox", { name: "Select Item 3" })).toHaveCount(0);
   await win.getByRole("button", { name: "Select", exact: true }).click();
-  await expect(win.getByRole("toolbar", { name: "Select lines" })).toContainText("Tick the items to work on");
+  await expect(win.getByRole("toolbar", { name: "Select items" })).toContainText("Tick the items to work on");
   await win.getByRole("checkbox", { name: "Select Item 3" }).check();
   const bar = win.getByRole("toolbar", { name: "1 selected" });
   await bar.getByRole("button", { name: "Delete" }).click();
@@ -220,7 +220,7 @@ test("the Details step: a title offered from the items, Priority as buttons, one
   await win.getByText(/^Al-Shifa Pharma Ltd/).first().click();
   await win.getByRole("button", { name: /^Next/ }).click();
   const desc = win.getByRole("textbox", { name: "New item: Description" });
-  const qty = win.getByRole("textbox", { name: "New item: Qty" });
+  const qty = win.getByRole("textbox", { name: "New item: Quantity" });
   for (const x of ["Tablet press machine", "Punches and dies", "Dust extractor"]) {
     await desc.fill(x);
     await qty.fill("1");
@@ -303,12 +303,12 @@ test("history: each box's clock shows only its changes with who, when and why; a
   const items = page.getByRole("dialog", { name: "Edit items" });
   await items.getByRole("grid").getByRole("row", { name: "Item 2" }).getByRole("gridcell").nth(2).click();
   await page.keyboard.press("Enter");
-  await page.getByLabel("Item 2: Qty").fill("3");
+  await page.getByLabel("Item 2: Quantity").fill("3");
   await page.keyboard.press("Enter");
   await items.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Customer changed the quantity" }).click();
   await items.getByRole("button", { name: "Save 1 change" }).click();
   await expect(items).toBeHidden();
-  await page.locator("#items").getByRole("button", { name: "History of line 2" }).click();
-  await expect(page.getByRole("dialog", { name: "Line 2 · history" })).toContainText("Qty 2 → 3");
+  await page.locator("#items").getByRole("button", { name: "History of item 2" }).click();
+  await expect(page.getByRole("dialog", { name: "Item 2 · history" })).toContainText("Quantity 2 → 3");
   expect(errors).toEqual([]);
 });

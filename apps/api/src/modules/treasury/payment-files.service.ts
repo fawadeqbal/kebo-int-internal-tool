@@ -96,7 +96,7 @@ export class PaymentFilesService {
           action: "payment_file",
           entityType: row.orderId ? "order" : "payment",
           entityId: row.orderId ?? row.id,
-          summary: `${ref}: ${row.fileKey ? "replaced" : "added"} the proof of a payment ${side === "in" ? "from the customer" : "to a factory"} (${name})`,
+          summary: `${ref}: ${row.fileKey ? "replaced" : "added"} the proof of a payment ${side === "in" ? "from the customer" : "to a supplier"} (${name})`,
         });
         return set.id;
       });
@@ -127,7 +127,7 @@ export class PaymentFilesService {
         action: "payment_file",
         entityType: row.orderId ? "order" : "payment",
         entityId: row.orderId ?? row.id,
-        summary: `${ref}: removed the proof of a payment ${side === "in" ? "from the customer" : "to a factory"} (${row.fileName})`,
+        summary: `${ref}: removed the proof of a payment ${side === "in" ? "from the customer" : "to a supplier"} (${row.fileName})`,
       });
     });
     await this.storage.delete(row.fileKey).catch(() => undefined);

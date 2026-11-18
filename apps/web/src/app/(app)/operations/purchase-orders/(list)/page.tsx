@@ -63,11 +63,11 @@ export default async function PurchaseOrdersPage({
         }
       />
       <StatRow className="mb-4">
-        <StatTile label="Open POs" value={tiles.open} />
+        <StatTile label="Open purchase orders" value={tiles.open} />
         <StatTile
           icon={ShoppingCart}
           iconColor={2}
-          label="We owe factories"
+          label="We owe suppliers"
           value={tiles.owe.length ? short(tiles.owe[0]!.amount, tiles.owe[0]!.currency) : money(0, main)}
           sub={tiles.owe.length > 1 ? tiles.owe.slice(1).map((o) => short(o.amount, o.currency)).join(" · ") : undefined}
         />
@@ -133,7 +133,7 @@ export default async function PurchaseOrdersPage({
           <Table className="min-w-[900px]">
             <THead>
               <tr>
-                <Th>PO</Th>
+                <Th>Purchase order</Th>
                 <Th>Supplier · for</Th>
                 <Th className="text-right">Total</Th>
                 <Th className="text-right">Paid</Th>
@@ -151,7 +151,7 @@ export default async function PurchaseOrdersPage({
                     </Link>
                   </Td>
                   <Td>
-                    <Link href={`/factories/${r.supplier.id}`} className="inline-block py-1 font-semibold hover:text-primary">
+                    <Link href={`/suppliers/${r.supplier.id}`} className="inline-block py-1 font-semibold hover:text-primary">
                       {r.supplier.name}
                     </Link>
                     <span className="block text-xs text-muted">
