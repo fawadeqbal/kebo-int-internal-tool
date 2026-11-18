@@ -2,13 +2,14 @@ import { ArrowRight, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { countryName } from "@/lib/countries";
 import { can, MANUAL_MOVES } from "@kebo/shared";
-import { Banner, ButtonLink, cn, PageHeader, PriorityBadge } from "@kebo/ui";
+import { Banner, ButtonLink, cn, PriorityBadge } from "@kebo/ui";
 import { companyToday } from "@/lib/format";
 import { requireUser, hasFeature } from "@/lib/session";
 import { dealOf } from "@/lib/deal-data";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { InquiryNextButton, InquiryTabs, type InquiryTab } from "@/components/deals/inquiry-nav";
 import { DealBody, DealChrome } from "@/components/deals/deal-chrome";
+import { RecordTop } from "@/components/records/record-page";
 import { holdAction, moveStageAction } from "../actions";
 import { offerFactsOf } from "./facts";
 import { DecisionWindows } from "./panels";
@@ -68,46 +69,48 @@ export default async function DealLayout({ children, params }: { children: React
   return (
     <div>
       <DealChrome>
-        <PageHeader
-          phoneStack
-          crumbs={[{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }]}
-          icon={MessageSquareText}
-          title={d.title ? d.title : <span className="tabular">{d.refNo}</span>}
-          summary={
-            <p className="min-w-0">
-              {meta.map((m, i) => (
-                <span key={i}>
-                  {i > 0 && (
-                    <span aria-hidden className="px-1.5 text-muted">
-                      ·
-                    </span>
-                  )}
-                  {m}
-                </span>
-              ))}
-            </p>
+        <RecordTop
+          header={{
+            crumbs: [{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }],
+            icon: MessageSquareText,
+            title: d.title ? d.title : <span className="tabular">{d.refNo}</span>,
+            summary: (
+              <p className="min-w-0">
+                {meta.map((m, i) => (
+                  <span key={i}>
+                    {i > 0 && (
+                      <span aria-hidden className="px-1.5 text-muted">
+                        ·
+                      </span>
+                    )}
+                    {m}
+                  </span>
+                ))}
+              </p>
+            ),
+            primary:
+              order && d.stage === "won" ? (
+                <ButtonLink href={`/orders/${order.id}`} variant="primary">
+                  Go to the order <ArrowRight aria-hidden />
+                </ButtonLink>
+              ) : next?.href && next.label ? (
+                <InquiryNextButton base={base} tab={next.tab} href={next.href} label={next.label} />
+              ) : undefined,
+            more: <MoreMenu label={`More for ${d.refNo}`} items={more} />,
+          }}
+          notice={
+            d.customer.country === "ZZ" && (
+              <Banner meaning="warn" className="mt-3">
+                This customer&apos;s country is not set.{" "}
+                <Link href={`/customers/${d.customer.id}?panel=edit-customer&id=${d.customer.id}`} className="font-medium underline">
+                  Add it
+                </Link>{" "}
+                — it decides shipping.
+              </Banner>
+            )
           }
-          primary={
-            order && d.stage === "won" ? (
-              <ButtonLink href={`/orders/${order.id}`} variant="primary">
-                Go to the order <ArrowRight aria-hidden />
-              </ButtonLink>
-            ) : next?.href && next.label ? (
-              <InquiryNextButton base={base} tab={next.tab} href={next.href} label={next.label} />
-            ) : undefined
-          }
-          more={<MoreMenu label={`More for ${d.refNo}`} items={more} />}
+          tabs={<InquiryTabs base={base} tabs={tabs} order={order && d.stage === "won" ? { href: `/orders/${order.id}`, refNo: order.refNo } : null} />}
         />
-        {d.customer.country === "ZZ" && (
-          <Banner meaning="warn" className="mt-3">
-            This customer&apos;s country is not set.{" "}
-            <Link href={`/customers/${d.customer.id}?panel=edit-customer&id=${d.customer.id}`} className="font-medium underline">
-              Add it
-            </Link>{" "}
-            — it decides shipping.
-          </Banner>
-        )}
-        <InquiryTabs base={base} tabs={tabs} order={order && d.stage === "won" ? { href: `/orders/${order.id}`, refNo: order.refNo } : null} />
       </DealChrome>
       <DealBody>{children}</DealBody>
       <DecisionWindows
