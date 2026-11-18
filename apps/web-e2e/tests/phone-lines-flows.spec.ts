@@ -358,6 +358,50 @@ test.describe("the smallest phone (320 × 568)", () => {
     expect(errors).toEqual([]);
   });
 
+  test("a quotation's prices: the item line with its price box, the total and margin beside Save, every figure in a sheet", async ({ page }) => {
+    test.setTimeout(120_000);
+    const errors = watchErrors(page);
+    const t = tag();
+    const deal = await newInquiry(page, t);
+    const full = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
+    await post(page, `/inquiries/${deal.id}/factory-quotes`, {
+      newFactoryName: `Quote Works ${t}`,
+      receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
+      currency: "USD",
+      basis: "FOB",
+      basisPlace: "Shanghai",
+      lines: [{ description: "Tablet press", quantity: 1, unit: "set", unitPrice: 50000, requestedItemId: full.items[0].id }],
+    });
+    await page.goto(`/inquiries/${deal.id}/quotation`);
+    await page.getByRole("button", { name: "New quotations" }).first().click();
+    const make = page.getByRole("dialog", { name: "New quotations" });
+    await make.getByRole("button", { name: /Make the draft/ }).click();
+    await expect(make).toBeHidden();
+    await page.getByRole("button", { name: "Edit prices" }).filter({ visible: true }).first().click();
+    const win = page.getByRole("dialog", { name: /^Prices · QUO-/ });
+    // The item line, its price box in it (pricing is the work here); nothing wider than the screen.
+    const items = win.getByRole("list", { name: "Option A prices" });
+    await expect(items).toContainText("Tablet press");
+    const price = items.getByLabel("Unit price for 1");
+    // (The box selects its figure as it takes focus; then the price is typed over it.)
+    await price.click();
+    await page.waitForTimeout(150);
+    await price.pressSequentially("60000");
+    await price.blur();
+    await expect(items).toContainText("60,000.00");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    // The total and margin in the footer beside Save; a tap shows every figure, the discount with them.
+    const footer = win.locator("[data-window-footer]");
+    await expect(footer.getByRole("button", { name: /Total/ })).toContainText("60,000.00");
+    await footer.getByRole("button", { name: /Total/ }).click();
+    const sheet = page.getByRole("dialog", { name: "Totals" });
+    await expect(sheet.getByLabel("Discount")).toBeVisible();
+    expect(await accessibilityProblems(page), "the quotation's totals on a phone meet WCAG 2.2 AA").toEqual([]);
+    await sheet.getByRole("button", { name: "Close" }).click();
+    expect(await accessibilityProblems(page), "the quotation's prices on the smallest phone meet WCAG 2.2 AA").toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
   test("a record's page: the same item line read only, a tap shows the item, its button opens the window", async ({ page }) => {
     test.setTimeout(120_000);
     const errors = watchErrors(page);

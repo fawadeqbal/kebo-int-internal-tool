@@ -94,7 +94,7 @@ export function QuoteStepsPanel({
   step: QuoteStep;
   /** With `only`: another step in the same window (Delivery & payment). */
   also?: QuoteStep;
-  /** Only that part (Edit on one part); "All steps" calls onAllSteps. */
+  /** Only that part (Edit on one part); when something to fix is in another part, onAllSteps opens every step. */
   only?: boolean;
   onAllSteps?: () => void;
 }) {
@@ -128,8 +128,8 @@ const PART_TITLE: Record<QuoteBox, string> = { lines: "Prices", delivery: "Deliv
 
 /**
  * Edit, with its word, on the draft (design 17 Nov, edit one part): `only` opens just that part, sized to it,
- * with Cancel and Save; "All steps" turns the window into the whole steps at that part. Without `only`
- * (Edit at the top): the steps.
+ * with Cancel and Save (something to fix in another part turns the window into every step). Without `only`
+ * (Edit all in ⋯): the steps.
  */
 export function QuoteEdit({
   label,

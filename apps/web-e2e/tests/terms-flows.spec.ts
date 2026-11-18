@@ -75,7 +75,7 @@ test("the offer and the quotation in four groups; the quotation checked against 
   expect(await accessibilityProblems(page), "New quotations meets WCAG 2.2 AA").toEqual([]);
   await make.getByRole("button", { name: /Make the draft/ }).click();
   await expect(make).toBeHidden();
-  // Edit on Delivery & payment opens only that box (design 17 Nov); All steps, below, opens the rest of the draft.
+  // Edit on Delivery & payment opens only that box (design 17 Nov): no steps, no "All steps"; Edit all (⋯) has every step.
   await page.getByRole("button", { name: "Edit delivery and payment" }).click();
   const part = page.getByRole("dialog", { name: /^Delivery & payment · QUO-\d{4}-\d{4}-A R1/ });
   await expect(part.getByRole("navigation", { name: "Steps" })).toHaveCount(0);
@@ -87,11 +87,16 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await expect(leads.getByText(/needs 30 days after the deposit: 5 days more than we promise/).filter({ visible: true })).toBeVisible();
   await leads.getByLabel("Option A lead time", { exact: true }).fill("45");
   expect(await accessibilityProblems(page), "one part of the quotation meets WCAG 2.2 AA").toEqual([]);
-  await part.getByRole("button", { name: "All steps" }).click();
+  await expect(part.getByRole("button", { name: "All steps" })).toHaveCount(0);
+  await part.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(part).toBeHidden();
+  await page.getByRole("button", { name: /^More for QUO-/ }).filter({ visible: true }).first().click();
+  await page.getByRole("menuitem", { name: "Edit all" }).click();
   const form = page.getByRole("dialog", { name: /Edit · QUO-\d{4}-\d{4}-A R1/ });
   const steps = form.getByRole("navigation", { name: "Steps" });
+  await steps.getByRole("button", { name: /Delivery/ }).click();
   await expect(steps.getByRole("button", { name: /Delivery/ })).toHaveAttribute("aria-current", "step");
-  // What was typed in the part is still there.
+  // What was saved in the part is there.
   await expect(form.getByLabel("Option A lead time", { exact: true })).toHaveValue("45");
   await steps.getByRole("button", { name: /Payment/ }).click();
   await form.getByRole("button", { name: "30 · 60 · 10 after the site test" }).click();

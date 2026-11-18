@@ -4,6 +4,7 @@ import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, cn, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
+import { FooterTotal } from "./panel";
 
 /*
  * Editing in steps (design "one way, any number"; side bar 18 Nov): one window, the steps listed on the left like a
@@ -190,7 +191,9 @@ export function StepsFooter({
   onCancel?: () => void;
 }) {
   return (
-    <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
+    <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4 max-sm:flex-wrap">
+      {/* A phone: the items' total on its own line above the buttons (design "Items on a small phone"). */}
+      <FooterTotal line />
       {first ? (
         onCancel && (
           <Button type="button" variant="secondary" onClick={onCancel}>
@@ -216,27 +219,21 @@ export function StepsFooter({
 }
 
 /**
- * The buttons of one part on its own: "All steps" (the same window with every step, at this part) on the
- * left; Cancel and Save on the right.
+ * The buttons of one part on its own: Cancel and Save on the right (no "All steps": a part's window is that part;
+ * Edit all in ⋯ has every step). On a phone the items' total sits beside Save.
  */
 export function OnePartFooter({
-  onAllSteps,
   onCancel,
   canSave = true,
   saveLabel = "Save",
 }: {
-  onAllSteps?: () => void;
   onCancel?: () => void;
   canSave?: boolean;
   saveLabel?: string;
 }) {
   return (
     <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
-      {onAllSteps && (
-        <Button type="button" variant="ghost" onClick={onAllSteps} className="px-2 text-primary hover:text-primary">
-          All steps <ChevronRight aria-hidden />
-        </Button>
-      )}
+      <FooterTotal />
       <span className="flex-1" />
       {onCancel && (
         <Button type="button" variant="ghost" onClick={onCancel} className="max-md:hidden">
