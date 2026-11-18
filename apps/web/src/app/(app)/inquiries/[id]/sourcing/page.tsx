@@ -183,7 +183,7 @@ export default async function SourcingPage({
                 const cover = coverOf(x, s.items);
                 const letters = usedIn.get(x.id) ?? [];
                 const tax = offerTaxTag(x.taxRate, x.taxIncluded) ?? (x.lines.length ? "no tax" : null);
-                const covers = !x.lines.length ? "No items yet" : cover ? (cover.all ? (cover.of === 1 ? "The 1 item" : `All ${cover.of} items`) : `${cover.n} of ${cover.of} items`) : plural(x.lines.length, "line");
+                const covers = !x.lines.length ? "No items yet" : cover ? (cover.all ? (cover.of === 1 ? "The 1 item" : `All ${cover.of} items`) : `${cover.n} of ${cover.of} items`) : plural(x.lines.length, "item");
                 return (
                   <li key={x.id} className="border-b border-line last:border-b-0">
                     <Link

@@ -90,15 +90,15 @@ describe("order stages", () => {
     const goods = { short: ["Maize sheller: 60 of 100 pcs"], lines: 2, received: 1, packed: false };
     const ship = checkMove("in_production", "shipped", "open", { ...money, receivedMinor: 10_000_00, goods });
     expect(ship.ok && ship.warnings.map((w) => w.code)).toEqual(["not_received", "no_packing_list"]);
-    expect(ship.ok && ship.warnings[0]!.message).toBe("Not everything has come in from the factory (Maize sheller: 60 of 100 pcs).");
+    expect(ship.ok && ship.warnings[0]!.message).toBe("Not everything has come in from the supplier (Maize sheller: 60 of 100 pcs).");
     const ready = checkMove("in_production", "shipped", "open", { ...money, receivedMinor: 10_000_00, goods: { short: [], lines: 2, received: 2, packed: true } });
     expect(ready.ok && ready.warnings).toEqual([]);
   });
 
   it("guides production: goods coming in, then the packing list, then shipping", () => {
     const base: OrderFacts = { ...money, receivedMinor: 3_000_00, stage: "in_production", status: "open", stageSince: "2026-10-01", readyOn: "2026-11-01", shippedOn: null };
-    expect(orderNeeds({ ...base, goods: { short: ["x"], lines: 2, received: 0, packed: false } }, "2026-10-20")!.title).toBe("Goods due from the factory");
-    expect(orderNeeds({ ...base, goods: { short: ["x"], lines: 2, received: 1, packed: false } }, "2026-10-20")!.title).toBe("Goods coming in from the factory (1 of 2 items complete)");
+    expect(orderNeeds({ ...base, goods: { short: ["x"], lines: 2, received: 0, packed: false } }, "2026-10-20")!.title).toBe("Goods due from the supplier");
+    expect(orderNeeds({ ...base, goods: { short: ["x"], lines: 2, received: 1, packed: false } }, "2026-10-20")!.title).toBe("Goods coming in from the supplier (1 of 2 items complete)");
     expect(orderNeeds({ ...base, goods: { short: [], lines: 2, received: 2, packed: false } }, "2026-10-20")!.title).toBe("All goods are in: make the packing list");
     expect(orderNeeds({ ...base, goods: { short: [], lines: 2, received: 2, packed: true } }, "2026-11-02")).toEqual({ title: "Packed and ready: mark as shipped", due: "2026-11-01", late: true });
   });
@@ -121,8 +121,8 @@ describe("order stages", () => {
     expect(orderNeeds({ ...base, receivedMinor: 3_000_00 }, "2026-10-05")).toMatchObject({ title: "Deposit is in: start production", late: false });
     expect(orderNeeds({ ...base, receivedMinor: 3_000_00 }, "2026-10-09")).toMatchObject({ late: true }); // never waits forever
     expect(orderNeeds({ ...base, depositPercent: 0 }, "2026-10-09")).toEqual({ title: "Start production (no deposit on these terms)", due: "2026-10-08", late: true });
-    expect(orderNeeds({ ...base, stage: "in_production", readyOn: "2026-11-01" }, "2026-11-02")).toEqual({ title: "Goods due from the factory", due: "2026-11-01", late: true });
-    expect(orderNeeds({ ...base, stage: "in_production" }, "2026-10-09")).toMatchObject({ title: "Ask the factory for the ready date", due: "2026-11-15" });
+    expect(orderNeeds({ ...base, stage: "in_production", readyOn: "2026-11-01" }, "2026-11-02")).toEqual({ title: "Goods due from the supplier", due: "2026-11-01", late: true });
+    expect(orderNeeds({ ...base, stage: "in_production" }, "2026-10-09")).toMatchObject({ title: "Ask the supplier for the ready date", due: "2026-11-15" });
     expect(orderNeeds({ ...base, stage: "shipped", shippedOn: "2026-10-20", receivedMinor: 3_000_00 }, "2026-11-04")).toEqual({ title: "Get the balance (USD 7,000.00)", due: "2026-11-03", late: true });
     expect(orderNeeds({ ...base, stage: "shipped", shippedOn: "2026-10-20", receivedMinor: 10_000_00 }, "2026-11-02")).toMatchObject({ title: "Paid in full: close the order", late: false });
     expect(orderNeeds({ ...base, stage: "shipped", shippedOn: "2026-10-20", receivedMinor: 10_000_00 }, "2026-11-04")!.late).toBe(true);

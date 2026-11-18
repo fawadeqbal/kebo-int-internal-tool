@@ -502,7 +502,7 @@ function OfferWindow({
               <WhatHappens
                 lines={[
                   q.lines.length
-                    ? `The offer, its ${q.lines.length === 1 ? "line" : `${q.lines.length} items`} and its files are removed from this inquiry.`
+                    ? `The offer, its ${q.lines.length === 1 ? "item" : `${q.lines.length} items`} and its files are removed from this inquiry.`
                     : "The offer and its files are removed from this inquiry.",
                   "If the supplier was asked, its item goes back to “Waiting”; if not, it leaves the list.",
                   used ? "The quotation made from it keeps its own copy of the items and prices." : null,

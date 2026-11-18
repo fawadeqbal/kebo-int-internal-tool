@@ -334,7 +334,7 @@ class _AskState extends ConsumerState<_Ask> {
         KTextField(label: 'Note', controller: _note, optional: true),
         const SizedBox(height: KSpace.s6),
         KButton(
-          _picked.isEmpty ? 'Ask' : 'Ask ${_picked.length} factor${_picked.length == 1 ? 'y' : 'ies'}',
+          _picked.isEmpty ? 'Ask' : 'Ask ${_picked.length} supplier${_picked.length == 1 ? '' : 's'}',
           fullWidth: true,
           loading: _busy,
           onPressed: _send,

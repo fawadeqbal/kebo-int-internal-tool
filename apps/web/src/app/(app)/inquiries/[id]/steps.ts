@@ -118,7 +118,7 @@ export function inquiryNext(d: DealDetail, f: OfferFacts | null): { tab: NextTab
     return {
       tab: "sourcing",
       title: `Enter ${w.name}'s offer when it comes`,
-      meta: `${plural(f.waiting.length, "factory", "factories")} asked${w.replyBy ? ` · answer due ${date(w.replyBy)}` : ""}`,
+      meta: `${plural(f.waiting.length, "supplier", "suppliers")} asked${w.replyBy ? ` · answer due ${date(w.replyBy)}` : ""}`,
       href: `${base}/sourcing?add=1`,
       label: "Enter an offer",
     };

@@ -154,7 +154,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
             sub={
               overdueTotal > 0.005
                 ? `${short(overdueTotal, owed.currency)} past its date`
-                : `to ${plural(owed.rows.length, "factory", "factories")}`
+                : `to ${plural(owed.rows.length, "supplier", "suppliers")}`
             }
             href="/money/due?side=suppliers"
           />

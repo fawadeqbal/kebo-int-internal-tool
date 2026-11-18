@@ -401,9 +401,9 @@ export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
       ? `factory test planned ${dayMonth(test.plannedOn)}`
       : null;
   const left = f.readyOn ? daysBetween(today, f.readyOn) : 0;
-  const goods = f.goods.lines > 0 && f.goods.received > 0 ? `${f.goods.received} of ${many(f.goods.lines, "line")} received` : null;
+  const goods = f.goods.lines > 0 && f.goods.received > 0 ? `${f.goods.received} of ${many(f.goods.lines, "item")} received` : null;
   const production = received
-    ? join(f.readyOn ? `Ready ${dayMonth(f.readyOn)}` : null, fat, `${f.goods.received} of ${many(f.goods.lines, "line")} received`)
+    ? join(f.readyOn ? `Ready ${dayMonth(f.readyOn)}` : null, fat, `${f.goods.received} of ${many(f.goods.lines, "item")} received`)
     : f.readyOn
       ? join(left > 0 ? `${many(left, "day")} left` : left === 0 ? "ready today" : `${many(-left, "day")} late`, fat, goods)
       : join("No ready date yet", fat);

@@ -152,7 +152,7 @@ describe("money v2: the route builds the plan", () => {
     expect(routeFromTerms("after_arrival").route).toBeNull();
   });
 
-  it("gives each factory its ready date; the order's is the latest, once all have one", () => {
+  it("gives each supplier its ready date; the order's is the latest, once all have one", () => {
     const rows = [
       { factoryId: "a", readyOn: "2027-03-01" },
       { factoryId: "b", readyOn: "2027-04-01" },
@@ -170,7 +170,7 @@ describe("money v2: the route builds the plan", () => {
     expect(routeSummary({ ...informal, balanceWhen: "against_bl_copy" })).toBe("Informal, against the B/L copy");
     expect(planHow("balance", lc90)).toBe("LC, deferred 90 days");
     expect(planHow("deposit", lc90)).toBe("T/T");
-    expect(planWhen({ part: "balance", dueRule: "after_papers", dueDays: 90 }, lc90)).toBe("90 days after the papers");
+    expect(planWhen({ part: "balance", dueRule: "after_papers", dueDays: 90 }, lc90)).toBe("90 days after the documents");
     expect(balanceTermsOf(lc90, "before_shipment")).toBe("letter_of_credit");
     expect(balanceTermsOf({ ...informal, balanceWhen: "against_bl_copy" }, "letter_of_credit")).toBe("against_bl_copy");
     expect(balanceTermsOf({ route: "bank_contract", balanceWhen: null, lcTerms: null, lcDays: null }, "letter_of_credit")).toBe("against_bl_copy");
@@ -182,7 +182,7 @@ describe("money v2: LC checks", () => {
   it("checks amount, currency, ship-by and expiry", () => {
     const checks = lcChecks({ ...base, lc: { amount: "44100.00", currency: "USD", latestShipOn: "2027-01-05", expiresOn: "2027-02-10" } });
     expect(Object.fromEntries(checks.map((c) => [c.key, c.ok]))).toEqual({ amount: true, currency: true, ship_by: false, expiry: true });
-    expect(checks.find((c) => c.key === "ship_by")!.detail).toBe("LC ship by 2027-01-05 · factory ready 2027-01-07 · ask for an amendment");
+    expect(checks.find((c) => c.key === "ship_by")!.detail).toBe("LC ship by 2027-01-05 · supplier ready 2027-01-07 · ask for an amendment");
     expect(lcChecksLine(checks)).toBe("3 of 4 match");
     // Expiry: ETA + courier days must be on or before it.
     expect(lcChecks({ ...base, lc: { amount: "44100", currency: "USD", latestShipOn: "2027-01-10", expiresOn: "2027-02-09" } }).find((c) => c.key === "expiry")!.ok).toBe(false);
@@ -238,10 +238,10 @@ describe("money v2: one transfer, credit", () => {
   });
 });
 
-describe("money v2: the factory payment plan", () => {
-  it("starts with an advance when ordered and the balance on the ready date", () => {
+describe("money v2: the supplier payment plan", () => {
+  it("starts with a deposit when ordered and the balance on the ready date", () => {
     expect(defaultFactoryPlan(36_736_300, 30)).toEqual([
-      { label: "Advance 30%", percent: 30, amountMinor: 11_020_890, dueRule: "on_order", dueOn: null },
+      { label: "Deposit 30%", percent: 30, amountMinor: 11_020_890, dueRule: "on_order", dueOn: null },
       { label: "Balance 70%", percent: 70, amountMinor: 25_715_410, dueRule: "on_ready", dueOn: null },
     ]);
     expect(defaultFactoryPlan(1000, 0)).toEqual([{ label: "Payment", percent: 100, amountMinor: 1000, dueRule: "on_ready", dueOn: null }]);
@@ -271,7 +271,7 @@ describe("money v2: the factory payment plan", () => {
   });
 });
 
-describe("customerMoney: what the person paying the factory sees of the customer's side", () => {
+describe("customerMoney: what the person paying the supplier sees of the customer's side", () => {
   const at = (receivedMinor: number, depositMinor: number, route: "informal" | "bank_contract" | "letter_of_credit" | null = "informal") =>
     customerMoney({ totalMinor: 1_000_000, receivedMinor, depositMinor, route });
   it("warns while the deposit is not in, or only part of it", () => {
