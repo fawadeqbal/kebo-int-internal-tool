@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
-import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
+import { REQUEST_CHANNEL_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
 import { ButtonLink, RevisionBadge } from "@kebo/ui";
-import { MoreMenu } from "@/components/common/more-menu";
+import { recordActions } from "@/components/records/actions";
 import { requirePermission } from "@/lib/session";
 import { companyToday, date } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
@@ -100,27 +100,33 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
         back: { href: `${base}/sourcing`, label: `${d.refNo} · Supplier offers` },
         title: x.factory.name,
         summary: summary.length ? <p className="min-w-0">{summary.join(" · ")}</p> : undefined,
-        primary:
-          d.allowed.quote && x.lines.length > 0 ? (
-            <ButtonLink href={`${base}/quotation?start=1&offer=${x.id}`} variant="primary" size="sm">
-              <Plus aria-hidden /> Quote this offer
-            </ButtonLink>
-          ) : undefined,
-        // One strong button (design rules 2 and 3): Edit offer is in ⋯ with the rest.
-        more: (
-          <MoreMenu
-            label={`More for ${x.factory.name}’s offer`}
-            items={[
-              ...(canEdit ? [{ label: "Edit offer", href: `${base}/offers/${x.id}?panel=edit-offer` }] : []),
-              { label: `Open the supplier ${x.factory.name}`, href: `/suppliers/${x.factory.id}` },
-              { label: "Compare the offers side by side", href: `${base}/sourcing?view=compare` },
-              { label: "Copy link to this offer", copy: `${base}/offers/${x.id}` },
-            ]}
-          />
-        ),
+        // One strong button (design rules 2 and 3), the rest in ⋯ (canvas board "Actions: one list per record type").
+        ...recordActions(`More for ${x.factory.name}’s offer`, [
+          {
+            id: "quote",
+            place: "primary",
+            when: d.allowed.quote && x.lines.length > 0,
+            node: (
+              <ButtonLink href={`${base}/quotation?start=1&offer=${x.id}`} variant="primary" size="sm">
+                <Plus aria-hidden /> Quote this offer
+              </ButtonLink>
+            ),
+          },
+          { id: "edit", place: "more", when: canEdit, label: "Edit offer", href: `${base}/offers/${x.id}?panel=edit-offer` },
+          { id: "supplier", place: "more", label: `Open the supplier ${x.factory.name}`, href: `/suppliers/${x.factory.id}` },
+          { id: "compare", place: "more", label: "Compare the offers side by side", href: `${base}/sourcing?view=compare` },
+          { id: "link", place: "more", label: "Copy link to this offer", copy: `${base}/offers/${x.id}` },
+        ]),
       }}
       panel={{
         label: "About this offer",
+        // The bar on a phone: where it is quoted, and when it was asked.
+        summary: [
+          quotedIn.length ? quotedIn.map((y) => `${y.refNo} R${y.number} ${REVISION_STATUS_LABEL[y.status].toLowerCase()}`).join(", ") : "Not quoted yet",
+          asked ? `asked ${date(asked.sentOn)}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
         sections: [
           {
             id: "o-quoted",

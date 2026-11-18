@@ -2,11 +2,12 @@ import { ArrowRight, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { countryName } from "@/lib/countries";
 import { can, MANUAL_MOVES } from "@kebo/shared";
-import { Banner, ButtonLink, cn, PriorityBadge } from "@kebo/ui";
+import { ButtonLink, cn, PriorityBadge } from "@kebo/ui";
 import { companyToday } from "@/lib/format";
 import { requireUser, hasFeature } from "@/lib/session";
 import { dealOf } from "@/lib/deal-data";
-import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
+import { recordActions, type RecordAction } from "@/components/records/actions";
+import { Notice } from "@/components/records/notice";
 import { InquiryNextButton, InquiryTabs, type InquiryTab } from "@/components/deals/inquiry-nav";
 import { DealBody, DealChrome } from "@/components/deals/deal-chrome";
 import { RecordTop } from "@/components/records/record-page";
@@ -56,15 +57,30 @@ export default async function DealLayout({ children, params }: { children: React
   // The decisions (hold, lost, start, reopen) are in ⋯; each opens its window on the tab it is on.
   const canHold = d.canWork && d.allowed.hold;
   const moves = d.canWork ? MANUAL_MOVES[d.stage].filter((m) => !m.reopen || d.allowed.reopen) : [];
-  const more: MenuEntry[] = [
-    ...(d.allowed.edit ? [{ label: "Edit inquiry", href: `${base}?panel=edit-request` }] : []),
-    ...(canHold ? [{ label: d.onHold ? "Take off hold" : "Put on hold", panel: "hold-inquiry" }] : []),
-    ...moves.filter((m) => m.to !== "lost").map((m) => ({ label: m.label, panel: "move-inquiry", id: m.to })),
-    { label: "All files", href: `${base}/files` },
-    { label: `Open the customer ${d.customer.name}`, href: `/customers/${d.customer.id}` },
-    { label: "Copy link to this inquiry", copy: base },
-    ...(moves.some((m) => m.to === "lost") ? ([{ separator: true }, { label: "Mark lost…", panel: "move-inquiry", id: "lost", danger: true }] satisfies MenuEntry[]) : []),
-  ];
+  // The inquiry's list of actions (canvas board "Actions: one list per record type"): the next step, the rest in ⋯.
+  const actions = recordActions(`More for ${d.refNo}`, [
+    {
+      id: "next",
+      place: "primary",
+      node:
+        order && d.stage === "won" ? (
+          <ButtonLink href={`/orders/${order.id}`} variant="primary">
+            Go to the order <ArrowRight aria-hidden />
+          </ButtonLink>
+        ) : next?.href && next.label ? (
+          <InquiryNextButton base={base} tab={next.tab} href={next.href} label={next.label} />
+        ) : undefined,
+    },
+    { id: "edit", place: "more", when: d.allowed.edit, label: "Edit inquiry", href: `${base}?panel=edit-request` },
+    { id: "hold", place: "more", when: canHold, label: d.onHold ? "Take off hold" : "Put on hold", panel: "hold-inquiry" },
+    ...moves
+      .filter((m) => m.to !== "lost")
+      .map((m): RecordAction => ({ id: `move-${m.to}`, place: "more", label: m.label, panel: "move-inquiry", panelId: m.to })),
+    { id: "files", place: "more", label: "All files", href: `${base}/files` },
+    { id: "customer", place: "more", label: `Open the customer ${d.customer.name}`, href: `/customers/${d.customer.id}` },
+    { id: "link", place: "more", label: "Copy link to this inquiry", copy: base },
+    { id: "lost", place: "more", when: moves.some((m) => m.to === "lost"), label: "Mark lost…", panel: "move-inquiry", panelId: "lost", danger: true },
+  ]);
 
   return (
     <div>
@@ -88,25 +104,14 @@ export default async function DealLayout({ children, params }: { children: React
                 ))}
               </p>
             ),
-            primary:
-              order && d.stage === "won" ? (
-                <ButtonLink href={`/orders/${order.id}`} variant="primary">
-                  Go to the order <ArrowRight aria-hidden />
-                </ButtonLink>
-              ) : next?.href && next.label ? (
-                <InquiryNextButton base={base} tab={next.tab} href={next.href} label={next.label} />
-              ) : undefined,
-            more: <MoreMenu label={`More for ${d.refNo}`} items={more} />,
+            ...actions,
           }}
           notice={
             d.customer.country === "ZZ" && (
-              <Banner meaning="warn" className="mt-3">
-                This customer&apos;s country is not set.{" "}
-                <Link href={`/customers/${d.customer.id}?panel=edit-customer&id=${d.customer.id}`} className="font-medium underline">
-                  Add it
-                </Link>{" "}
-                — it decides shipping.
-              </Banner>
+              <Notice tone="todo" title="This customer’s country is not set." className="mt-3">
+                It decides shipping.{" "}
+                <Link href={`/customers/${d.customer.id}?panel=edit-customer&id=${d.customer.id}`}>Add it</Link>
+              </Notice>
             )
           }
           tabs={<InquiryTabs base={base} tabs={tabs} order={order && d.stage === "won" ? { href: `/orders/${order.id}`, refNo: order.refNo } : null} />}

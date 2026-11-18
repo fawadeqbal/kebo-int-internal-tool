@@ -82,6 +82,7 @@ export function QuoteStepsPanel({
   action,
   step,
   only = false,
+  also,
   onAllSteps,
 }: {
   number: number;
@@ -91,6 +92,8 @@ export function QuoteStepsPanel({
   showCosts: boolean;
   action: Action;
   step: QuoteStep;
+  /** With `only`: another step in the same window (Delivery & payment). */
+  also?: QuoteStep;
   /** Only that part (Edit on one part); "All steps" calls onAllSteps. */
   only?: boolean;
   onAllSteps?: () => void;
@@ -109,6 +112,7 @@ export function QuoteStepsPanel({
         requireChanges
         stepsAt={step}
         only={only}
+        also={also}
         onAllSteps={onAllSteps}
         onDone={(state) => close(state)}
         onCancel={() => close()}
@@ -117,8 +121,10 @@ export function QuoteStepsPanel({
   );
 }
 
-/** A part's name in its window's title ("Delivery · Q-2611-0007"). */
-const PART_TITLE: Record<QuoteStep, string> = { lines: "Items", delivery: "Delivery", payment: "Payment", warranty: "Warranty & conditions" };
+/** A box of the quotation's page: a step, or Delivery & payment (the two steps in one window). */
+export type QuoteBox = QuoteStep | "terms";
+/** A part's name in its window's title ("Delivery & payment · Q-2611-0007"). */
+const PART_TITLE: Record<QuoteBox, string> = { lines: "Prices", delivery: "Delivery", payment: "Payment", terms: "Delivery & payment", warranty: "Warranty & conditions" };
 
 /**
  * Edit, with its word, on the draft (design 17 Nov, edit one part): `only` opens just that part, sized to it,
@@ -131,14 +137,17 @@ export function QuoteEdit({
   step,
   only = false,
   size = "xs",
+  variant = "secondary",
   className,
   ...editor
 }: {
   label: ReactNode;
   quoteRef: string;
-  step: QuoteStep;
+  step: QuoteBox;
   only?: boolean;
   size?: "xs" | "sm";
+  /** A box's Edit is the quiet green one (ghost). */
+  variant?: "secondary" | "ghost";
   className?: string;
   number: number;
   initial: RevisionDraft;
@@ -150,14 +159,15 @@ export function QuoteEdit({
   const [open, setOpen] = useState(false);
   const [one, setOne] = useState(only);
   const width = !one || step === "lines" ? "md:w-[1180px]" : step === "warranty" ? "md:w-[680px]" : "md:w-[820px]";
+  const at: QuoteStep = step === "terms" ? "delivery" : step;
   return (
     <>
-      <Button size={size} variant="secondary" onClick={() => (setOne(only), setOpen(true))} className={className}>
+      <Button size={size} variant={variant} onClick={() => (setOne(only), setOpen(true))} className={className}>
         <Pencil aria-hidden /> {label}
       </Button>
       {open && (
         <SidePanel title={one ? `${PART_TITLE[step]} · ${quoteRef}` : `Edit · ${quoteRef}`} description="Draft" onClose={() => setOpen(false)} className={width}>
-          <QuoteStepsPanel {...editor} step={step} only={one} onAllSteps={() => setOne(false)} />
+          <QuoteStepsPanel {...editor} step={at} also={step === "terms" ? "payment" : undefined} only={one} onAllSteps={() => setOne(false)} />
         </SidePanel>
       )}
     </>

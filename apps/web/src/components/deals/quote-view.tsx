@@ -1,19 +1,20 @@
-import type { ReactNode } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toMinor } from "@kebo/money";
-import { isWarrantyFrom, LINE_TYPE_LABEL, partsWords, partWhen, percentText, termsChecks, warrantyLine, type PaymentRoute, type TermsCheck, type WarrantyFrom } from "@kebo/shared";
+import { isWarrantyFrom, LINE_TYPE_LABEL, partsWords, partWhen, percentText, termsChecks, warrantyLine, type TermsCheck, type WarrantyFrom } from "@kebo/shared";
 import { Badge, cn } from "@kebo/ui";
 import { money, qty } from "@/lib/format";
 import type { OptionView, RevisionView } from "@/lib/types-deals";
+import type { LineColumn, LineRow } from "@/components/lines/line-table";
+import type { ItemsPhoneRow } from "@/components/records/items-box";
+import { Totals } from "@/components/records/totals";
 import { shortName } from "./offer-facts";
 
 /*
- * One quotation as the Quotations tab shows it, read only (design "one way, any number"): its lines in the app's
- * clean table and its terms in three groups (Delivery · Payment · Warranty & conditions), each with its pencil
- * on a draft. Server-safe: no state of its own.
+ * One quotation read only, from the record pieces (canvas board "The quotation, from the pieces"): its prices in the
+ * one items box with the totals under them, its checks against the supplier's offer, and the facts the
+ * Quotations tab lists. Server-safe: no state of its own.
  */
 
-const ROUTE: Record<PaymentRoute, string> = { informal: "Informal", bank_contract: "Bank contract", letter_of_credit: "Letter of credit" };
 const two = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** The option that speaks for the revision: the accepted one, else the first. */
@@ -54,221 +55,127 @@ export function termsFacts(r: RevisionView) {
   };
 }
 
-/** A pencil-headed group of facts (Delivery, Payment, Warranty & conditions). */
-function Group({ title, edit, children }: { title: string; edit?: ReactNode; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="flex min-w-0 flex-col gap-1 px-4 py-3 text-[13px] leading-relaxed text-text-2 max-md:border-b max-md:border-line max-md:last:border-b-0 md:border-l md:border-line md:first:border-l-0">
-      <h3 className="flex min-h-8 items-center justify-between gap-2 text-xs font-bold tracking-wide text-text uppercase">
-        {title}
-        {edit}
-      </h3>
-      {children}
-    </section>
-  );
+/** "2 items, 3 parts": a quotation's lines, parts (2.1) apart. */
+export function quoteCount(o: OptionView) {
+  const parts = o.lines.filter((l) => l.no.includes(".")).length;
+  const items = o.lines.length - parts;
+  return [`${items} item${items === 1 ? "" : "s"}`, parts ? `${parts} part${parts === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
 }
 
-/** The three groups of terms; `edit(group)` gives a group's pencil on a draft that can change. */
-export function QuoteTerms({ r, showChecks, edit }: { r: RevisionView; showChecks: boolean; edit?: (group: "delivery" | "payment" | "warranty") => ReactNode }) {
-  const o = optionOf(r);
-  const checks = showChecks ? checksOf(r, o) : [];
-  const check = (key: TermsCheck["key"]) => checks.find((c) => c.key === key);
-  const total = Number(o?.total ?? r.total);
-  const lead = o?.leadTime ?? r.leadTime;
-  const c = { lead: check("lead"), payment: check("payment"), warranty: check("warranty") };
-  return (
-    <div className="grid overflow-hidden rounded-xl border border-line bg-surface md:grid-cols-3">
-      <Group title="Delivery" edit={edit?.("delivery")}>
-        <span className="font-medium text-text">
-          {r.incoterm}
-          {r.incotermPlace ? ` ${r.incotermPlace}` : ""}
-        </span>
-        {r.portOfDischarge && <span>Port of discharge: {r.portOfDischarge}</span>}
-        {lead && <span>{lead}</span>}
-        {c.lead && <CheckChip check={c.lead} />}
-        {r.deliveryTerms && <span className="line-clamp-3 whitespace-pre-line">{r.deliveryTerms}</span>}
-      </Group>
-      <Group title="Payment" edit={edit?.("payment")}>
-        <span className="font-medium text-text">{r.paymentRoute ? ROUTE[r.paymentRoute] : "How they pay: not decided"}</span>
-        {r.paymentParts.map((p, i) => (
-          <span key={i} className="tabular">
-            {percentText(p.percent)}% {partWhen(p, "customer")}
-            {total > 0 && <> · {money((total * p.percent) / 100, r.currency)}</>}
-          </span>
-        ))}
-        {c.payment && <CheckChip check={c.payment} />}
-        {r.paymentTerms && <span className="line-clamp-3 whitespace-pre-line">{r.paymentTerms}</span>}
-      </Group>
-      <Group title="Warranty & conditions" edit={edit?.("warranty")}>
-        <span className="font-medium text-text">{warrantyLine(r)?.replace(/\.$/, "") ?? "No warranty said"}</span>
-        {c.warranty && <CheckChip check={c.warranty} />}
-        {r.notes && <span className="line-clamp-4 whitespace-pre-line">{r.notes}</span>}
-      </Group>
-    </div>
-  );
+/** An option's name over its prices when the quotation offers several ("Option A · Jinan · accepted"). */
+export function optionTitle(o: OptionView) {
+  return `Option ${o.letter}${o.factory ? ` · ${shortName(o.factory.name)}` : ""}${o.status === "accepted" ? " · accepted" : o.status === "not_chosen" ? " · not chosen" : ""}`;
 }
 
-/** One option's lines in the app's clean table, with its totals (cost, profit and margin for people who see costs). */
-function OptionTable({ o, currency, title }: { o: OptionView; currency: string; title?: string }) {
+const marginOf = (price: string, cost: string | null | undefined) => {
+  const p = Number(price);
+  const k = cost === null || cost === undefined || cost === "" ? NaN : Number(cost);
+  return p > 0 && Number.isFinite(k) ? ((p - k) / p) * 100 : null;
+};
+const marginTone = (m: number | null) => (m === null ? "text-text-2" : m < 0 ? "text-bad" : m < 5 ? "text-warn" : undefined);
+const dash = <span className="text-muted">—</span>;
+
+/**
+ * An option's prices for the one items box (canvas board "The quotation, from the pieces"): the columns from the one
+ * set — our cost and the margin shaded, for people who see costs — its rows (parts as 2.1), its phone rows, its
+ * totals (with our cost, profit and margin in the "Ours only" strip) and plain columns for its Excel file.
+ */
+export function quotePrices(o: OptionView, currency: string) {
   const costs = !!o.costing;
-  const marginOf = (price: string, cost: string | null | undefined) => {
-    const p = Number(price);
-    const k = cost === null || cost === undefined ? NaN : Number(cost);
-    return p > 0 && Number.isFinite(k) ? ((p - k) / p) * 100 : null;
-  };
-  const cell = "border-b border-line px-3 py-2 align-top";
-  const num = cn(cell, "text-right whitespace-nowrap tabular");
-  return (
-    <div className="flex flex-col gap-2">
-      {title && <p className="text-[13px] font-semibold">{title}</p>}
-      {/* A phone: one line per row, nothing wider than the screen. */}
-      <ul aria-label={title ?? "Items"} className="flex flex-col divide-y divide-line rounded-xl border border-line bg-surface sm:hidden">
-        {o.lines.map((l) => {
-          const part = l.no.includes(".");
-          const m = costs ? marginOf(l.unitPrice, l.unitCost) : null;
-          return (
-            <li key={l.id} className={cn("flex flex-col gap-1 px-3 py-2.5 text-[13px]", part && "pl-6")}>
-              <span className="flex gap-2">
-                <span className="w-7 shrink-0 text-text-2 tabular">{l.no}</span>
-                <span className="min-w-0 flex-1">
-                  <span className={cn("block whitespace-pre-line text-text [overflow-wrap:anywhere]", !part && "font-semibold")}>{l.description}</span>
-                  {(l.model || l.type !== "goods") && (
-                    <span className="flex flex-wrap items-center gap-1.5 text-xs text-text-2">
-                      {l.type !== "goods" && <Badge tone="outline">{LINE_TYPE_LABEL[l.type]}</Badge>}
-                      {l.model}
-                    </span>
-                  )}
-                </span>
-              </span>
-              <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-9 text-text-2 tabular">
-                <span>
-                  {qty(l.quantity)} {l.unit} × {two(l.unitPrice)}
-                </span>
-                <span className="font-semibold text-text">{two(l.lineTotal)}</span>
-              </span>
-              {costs && (
-                <span className="pl-9 text-xs text-text-2 tabular">
-                  cost {l.unitCost ? two(l.unitCost) : "—"}
-                  {m !== null && <span className={cn(m < 0 ? "text-bad" : m < 5 ? "text-warn" : undefined)}> · margin {m.toFixed(1)}%</span>}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      {/* It can scroll sideways, so Tab stops on it. */}
-      <div tabIndex={0} role="region" aria-label={title ?? "Items"} className="overflow-x-auto rounded-xl border border-line bg-surface focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none max-sm:hidden">
-        <table className="w-full border-collapse text-[13px]">
-          <thead>
-            <tr className="bg-surface-2 text-left text-xs text-text-2">
-              <th scope="col" className="w-12 border-b border-line px-3 py-2 font-medium">
-                No.
-              </th>
-              <th scope="col" className="border-b border-line px-3 py-2 font-medium">
-                Item
-              </th>
-              <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium">
-                Quantity
-              </th>
-              {costs && (
-                <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium max-md:hidden">
-                  Cost
-                </th>
-              )}
-              <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium">
-                Unit price
-              </th>
-              {costs && (
-                <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium max-md:hidden">
-                  Margin
-                </th>
-              )}
-              <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium">
-                Total
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {o.lines.map((l) => {
-              const part = l.no.includes(".");
-              const m = costs ? marginOf(l.unitPrice, l.unitCost) : null;
-              return (
-                <tr key={l.id} className="last:[&>td]:border-b-0">
-                  <td className={cn(cell, "text-text-2 tabular", part && "pl-5")}>{l.no}</td>
-                  <td className={cn(cell, "min-w-48", part && "pl-7")}>
-                    <span className={cn("block whitespace-pre-line text-text", !part && "font-semibold")}>{l.description}</span>
-                    {(l.model || l.type !== "goods") && (
-                      <span className="flex flex-wrap items-center gap-1.5 text-xs text-text-2">
-                        {l.type !== "goods" && <Badge tone="outline">{LINE_TYPE_LABEL[l.type]}</Badge>}
-                        {l.model}
-                      </span>
-                    )}
-                  </td>
-                  <td className={num}>
-                    {qty(l.quantity)} {l.unit}
-                  </td>
-                  {costs && (
-                    <td className={cn(num, "text-text-2 max-md:hidden")}>
-                      {l.unitCost ? two(l.unitCost) : "—"}
-                    </td>
-                  )}
-                  <td className={num}>{two(l.unitPrice)}</td>
-                  {costs && <td className={cn(num, "max-md:hidden", m === null ? "text-text-2" : m < 0 ? "text-bad" : m < 5 ? "text-warn" : "text-text-2")}>{m === null ? "—" : `${m.toFixed(1)}%`}</td>}
-                  <td className={cn(num, "font-semibold")}>{two(l.lineTotal)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-line bg-surface-2/50 px-4 py-3 text-xs sm:grid-cols-3 lg:grid-cols-6">
-        <div>
-          <dt className="text-text-2">Subtotal</dt>
-          <dd className="text-sm font-semibold tabular">{two(o.subtotal)}</dd>
-        </div>
-        <div>
-          <dt className="text-text-2">Discount</dt>
-          <dd className="text-sm font-semibold tabular">{two(o.discount)}</dd>
-        </div>
-        <div>
-          <dt className="text-text-2">Total</dt>
-          <dd className="text-sm font-semibold tabular">{money(o.total, currency)}</dd>
-        </div>
-        {o.costing && (
-          <>
-            <div>
-              <dt className="text-text-2">Cost</dt>
-              <dd className="text-sm font-semibold tabular">{two(o.costing.cost)}</dd>
-            </div>
-            <div>
-              <dt className="text-text-2">Profit</dt>
-              <dd className={cn("text-sm font-semibold tabular", Number(o.costing.profit) < 0 && "text-bad")}>{two(o.costing.profit)}</dd>
-            </div>
-            <div>
-              <dt className="text-text-2">Margin</dt>
-              <dd className={cn("text-sm font-semibold tabular", o.costing.marginPercent !== null && o.costing.marginPercent < 0 && "text-bad")}>
-                {o.costing.marginPercent === null ? "—" : `${o.costing.marginPercent.toFixed(1)}%`}
-              </dd>
-            </div>
-          </>
-        )}
-      </dl>
-    </div>
+  const rows: LineRow[] = o.lines.map((l) => ({
+    key: l.id,
+    parentKey: l.no.includes(".") ? l.no.split(".")[0]! : null,
+    values: { description: l.description, model: l.model ?? "", quantity: l.quantity, unit: l.unit, unitCost: l.unitCost ?? "", unitPrice: l.unitPrice, lineTotal: l.lineTotal },
+    badge:
+      l.type !== "goods" ? (
+        <span className="ml-1.5 align-middle">
+          <Badge tone="outline">{LINE_TYPE_LABEL[l.type]}</Badge>
+        </span>
+      ) : undefined,
+  }));
+  const plain: LineColumn[] = [
+    { key: "description", label: "Description", width: "minmax(0,1fr)" },
+    ...(o.lines.some((l) => l.model) ? [{ key: "model", label: "Model / part no.", width: "8rem" }] : []),
+    { key: "quantity", label: "Quantity", width: "4rem", align: "right" },
+    { key: "unit", label: "Unit", width: "4rem" },
+    { key: "unitPrice", label: `Unit price ${currency}`, width: "6.5rem", align: "right" },
+    { key: "lineTotal", label: `Amount ${currency}`, width: "7.5rem", align: "right" },
+  ];
+  const columns: LineColumn[] = plain.flatMap((c): LineColumn[] => {
+    if (c.key === "quantity") return [{ ...c, format: (v) => qty(v.quantity!) }];
+    if (c.key === "unitPrice")
+      return [
+        ...(costs ? [{ key: "unitCost", label: "Our cost", width: "6.5rem", align: "right" as const, shade: true, format: (v: LineRow["values"]) => (Number(v.unitCost) > 0 ? two(v.unitCost!) : dash) }] : []),
+        { ...c, format: (v) => (Number(v.unitPrice) > 0 ? two(v.unitPrice!) : dash) },
+        ...(costs
+          ? [
+              {
+                key: "margin",
+                label: "Margin",
+                width: "4.5rem",
+                align: "right" as const,
+                shade: true,
+                format: (v: LineRow["values"]) => {
+                  const m = marginOf(v.unitPrice!, v.unitCost);
+                  return <span className={marginTone(m)}>{m === null ? "—" : `${m.toFixed(1)}%`}</span>;
+                },
+              },
+            ]
+          : []),
+      ];
+    if (c.key === "lineTotal") return [{ ...c, format: (v) => (Number(v.lineTotal) > 0 ? <span className="font-semibold">{two(v.lineTotal!)}</span> : dash) }];
+    return [c];
+  });
+  const phone: ItemsPhoneRow[] = o.lines.map((l) => {
+    const m = costs ? marginOf(l.unitPrice, l.unitCost) : null;
+    return {
+      key: l.id,
+      no: l.no,
+      part: l.no.includes("."),
+      title: l.description.split("\n")[0],
+      badge: rows.find((r) => r.key === l.id)?.badge,
+      sub: Number(l.unitPrice) > 0 ? `${qty(l.quantity)} ${l.unit} × ${two(l.unitPrice)}` : `${qty(l.quantity)} ${l.unit} · no price`,
+      amount: Number(l.lineTotal) > 0 ? two(l.lineTotal) : undefined,
+      more: costs ? (
+        <>
+          cost {Number(l.unitCost) > 0 ? two(l.unitCost!) : "—"}
+          {m !== null && <span className={marginTone(m)}> · margin {m.toFixed(1)}%</span>}
+        </>
+      ) : undefined,
+    };
+  });
+  const discount = Number(o.discount);
+  const totals = (
+    <Totals
+      ours={
+        o.costing
+          ? [
+              { label: "Our cost", value: money(o.costing.cost, currency) },
+              { label: "Profit", value: money(o.costing.profit, currency), bad: Number(o.costing.profit) < 0 },
+              { label: "Margin", value: o.costing.marginPercent === null ? "—" : `${o.costing.marginPercent.toFixed(1)}%`, bad: o.costing.marginPercent !== null && o.costing.marginPercent < 0 },
+            ]
+          : null
+      }
+      rows={[
+        ...(discount ? [{ label: "Subtotal", value: money(o.subtotal, currency) }, { label: "Discount", value: money(o.discount, currency) }] : []),
+        { label: "Total", value: money(o.total, currency), big: true },
+      ]}
+    />
   );
+  return { rows, columns, plain, numbers: o.lines.map((l) => l.no), phone, totals };
 }
 
-/** The revision's lines: one table (an older quotation offering several options: one per option). */
-export function QuoteLines({ r }: { r: RevisionView }) {
-  if (r.options.length === 1) return <OptionTable o={r.options[0]!} currency={r.currency} />;
+/** A quotation's payment, a part a line: "30% with the order", its amount under it. */
+export function PaymentParts({ r, total }: { r: RevisionView; total: number }) {
+  if (!r.paymentParts.length) return null;
   return (
-    <div className="flex flex-col gap-4">
-      {r.options.map((o) => (
-        <OptionTable
-          key={o.id}
-          o={o}
-          currency={r.currency}
-          title={`Option ${o.letter}${o.factory ? ` · ${shortName(o.factory.name)}` : ""}${o.status === "accepted" ? " · accepted" : o.status === "not_chosen" ? " · not chosen" : ""}`}
-        />
+    <span className="flex flex-col gap-1">
+      {r.paymentParts.map((p, i) => (
+        <span key={i} className="tabular">
+          {percentText(p.percent)}% {partWhen(p, "customer")}
+          {total > 0 && <span className="block text-xs font-normal text-text-2">{money((total * p.percent) / 100, r.currency)}</span>}
+        </span>
       ))}
-    </div>
+    </span>
   );
 }

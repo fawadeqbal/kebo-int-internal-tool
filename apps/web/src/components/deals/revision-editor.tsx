@@ -70,7 +70,7 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 /** The steps of a quotation's window (design "one way, any number"). */
 export type QuoteStep = "lines" | "delivery" | "payment" | "warranty";
 export const QUOTE_STEPS: { key: QuoteStep; label: string }[] = [
-  { key: "lines", label: "Items" },
+  { key: "lines", label: "Prices" },
   { key: "delivery", label: "Delivery" },
   { key: "payment", label: "Payment" },
   { key: "warranty", label: "Warranty & conditions" },
@@ -442,8 +442,11 @@ export function RevisionEditor({
   footNote,
   stepsAt,
   only = false,
+  also,
   onAllSteps,
 }: {
+  /** With `only`: another step shown with it, in the same window (the quotation's Delivery & payment box). */
+  also?: QuoteStep;
   /** In the steps window (design "one way, any number"): the step it opens on; one Save sends every step. */
   stepsAt?: QuoteStep;
   /** Only the step it opens on (Edit on one part, design 17 Nov): no rail, Cancel and Save, and "All steps". */
@@ -488,7 +491,9 @@ export function RevisionEditor({
   const [step, setStep] = useState<QuoteStep | null>(stepsAt ?? null);
   const [active, setActive] = useState(0);
   // Which sections each step holds (the offers to quote are not a step: a quotation is one offer's).
-  const show = (section: Section) => !step || (section !== "options" && SECTION_STEP[section] === step);
+  // `only` with `also` (Delivery & payment): both steps' sections, one under the other.
+  const shownSteps = only && also && step === stepsAt ? [step, also] : [step];
+  const show = (section: Section) => !step || (section !== "options" && shownSteps.includes(SECTION_STEP[section]));
   const stepAt = step ? QUOTE_STEPS.findIndex((x) => x.key === step) : 0;
   const dirty = JSON.stringify(s) !== saved;
   const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => setS((st) => ({ ...st, [k]: v }));
@@ -670,8 +675,8 @@ export function RevisionEditor({
       beforeSend={() => {
         if (!partsBad) return true;
         setPartsTried(true);
-        if (step) setStep("payment");
-        if (only && step !== "payment") onAllSteps?.();
+        if (step && !shownSteps.includes("payment")) setStep("payment");
+        if (only && !shownSteps.includes("payment")) onAllSteps?.();
         document.getElementById(`parts-${number}`)?.scrollIntoView?.({ block: "center" });
         return false;
       }}

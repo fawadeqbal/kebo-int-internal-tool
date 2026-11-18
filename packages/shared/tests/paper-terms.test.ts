@@ -37,8 +37,37 @@ describe("papers", () => {
     expect(PAPER.text(PAPER.ofOffer({ ...offer, basis: null }), "incoterm")).toBeNull();
   });
 
-  it("label every row an offer shows", () => {
-    for (const r of PAPER.kinds.offer.terms) expect(PAPER.rows.terms[r]).toBeTruthy();
-    for (const r of PAPER.kinds.offer.conditions) expect(PAPER.rows.conditions[r]).toBeTruthy();
+  it("label every row each paper shows; the Incoterm row is called Incoterm", () => {
+    for (const k of ["offer", "quotation"] as const) {
+      for (const r of PAPER.kinds[k].terms) expect(PAPER.rows.terms[r]).toBeTruthy();
+      for (const r of PAPER.kinds[k].conditions) expect(PAPER.rows.conditions[r]).toBeTruthy();
+    }
+    expect(PAPER.rows.terms.incoterm).toBe("Incoterm");
+  });
+
+  it("read a quotation: what we promise, in the customer's words", () => {
+    const p = PAPER.ofRevision({
+      incoterm: "CIF",
+      incotermPlace: "Karachi",
+      portOfDischarge: null,
+      leadTime: "45 days after the deposit",
+      deliveryTerms: "",
+      paymentRoute: "letter_of_credit",
+      paymentParts: offer.paymentParts,
+      paymentTerms: null,
+      warranty: null,
+      warrantyMonths: 12,
+      warrantyFrom: "sat",
+      notes: "Prices in USD.",
+    });
+    expect(p.side).toBe("customer");
+    const rows = Object.fromEntries([...PAPER.kinds.quotation.terms, ...PAPER.kinds.quotation.conditions].map((r) => [r, PAPER.text(p, r)]));
+    expect(rows.incoterm).toBe("CIF Karachi");
+    expect(rows.port).toBeNull();
+    expect(rows.deliveryNote).toBeNull();
+    expect(rows.route).toBe("LC");
+    expect(rows.payment).toContain("30%");
+    expect(rows.notes).toBe("Prices in USD.");
+    expect(PAPER.optional).toContain("port");
   });
 });

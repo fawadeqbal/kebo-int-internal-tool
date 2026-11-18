@@ -68,8 +68,10 @@ test("the Items card's Edit opens only the items; nothing changed is nothing to 
   await expect(page.locator("#items")).toContainText("3 sets");
   const after = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
   expect(after.items.map((i: { quantity: string }) => Number(i.quantity))).toEqual([1, 3]);
-  // Kept as an edit of the items, with its reason.
-  await expect(page.locator("#items").getByRole("button", { name: /Edited 1×/ })).toBeVisible();
+  // Kept as an edit of the items, with its reason: on the Items box's clock, like every box's.
+  await page.locator("#items").getByRole("button", { name: "History of items" }).click();
+  await expect(page.getByRole("dialog", { name: "Items · history" })).toContainText("The customer wants three sets");
+  await page.keyboard.press("Escape");
   expect(errors).toEqual([]);
 });
 

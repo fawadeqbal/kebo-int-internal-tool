@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { PAPER, type PaperTerms, type PaperTermsBox, type PaperTermsKind } from "@kebo/shared";
+import { PAPER, type PaperTerms, type PaperTermsBox, type PaperTermsKind, type PaperTermsRow } from "@kebo/shared";
 import { BoxFacts } from "@/components/common/record-box";
 
 /** Rows typed at length are clamped in a box (their window holds the whole text). */
@@ -7,13 +7,30 @@ const CLAMP: Record<string, string> = { paymentNote: "line-clamp-3", notes: "lin
 
 /**
  * A paper box's facts (canvas "RFQ Desk — the pieces", board "Papers"): the rows this kind of paper shows, in
- * order, each said the same way on every paper (PAPER in @kebo/shared); nothing said is —.
+ * order, each said the same way on every paper (PAPER in @kebo/shared); nothing said is — (a row only some papers
+ * have, like the port of discharge, is left out). `values` says a row its own way (a quotation's payment, with
+ * each part's amount); `after` adds under a row's words (how it compares with the supplier's offer).
  */
-export function PaperFacts({ terms, kind, box }: { terms: PaperTerms; kind: PaperTermsKind; box: PaperTermsBox }) {
+export function PaperFacts({
+  terms,
+  kind,
+  box,
+  values,
+  after,
+}: {
+  terms: PaperTerms;
+  kind: PaperTermsKind;
+  box: PaperTermsBox;
+  values?: Partial<Record<PaperTermsRow, ReactNode>>;
+  after?: Partial<Record<PaperTermsRow, ReactNode>>;
+}) {
   const labels = PAPER.rows[box] as Record<string, string>;
-  const rows = (PAPER.kinds[kind][box] as readonly string[]).map((r): [string, ReactNode] => {
-    const words = PAPER.text(terms, r as Parameters<typeof PAPER.text>[1]);
-    return [labels[r]!, words && CLAMP[r] ? <span className={`${CLAMP[r]} whitespace-pre-line`}>{words}</span> : words];
+  const rows = (PAPER.kinds[kind][box] as readonly PaperTermsRow[]).flatMap((r): [string, ReactNode][] => {
+    const words = PAPER.text(terms, r);
+    if (!words && PAPER.optional.includes(r)) return [];
+    const said = values?.[r] ?? (words && CLAMP[r] ? <span className={`${CLAMP[r]} whitespace-pre-line`}>{words}</span> : words);
+    const more = after?.[r];
+    return [[labels[r]!, more ? <span className="flex flex-col items-start gap-0.5">{said ?? <span className="font-normal text-muted">—</span>}{more}</span> : said]];
   });
   return <BoxFacts rows={rows} />;
 }
