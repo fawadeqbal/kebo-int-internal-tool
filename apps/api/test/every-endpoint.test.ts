@@ -86,7 +86,8 @@ describe("every read endpoint answers for every record", () => {
       await ok(manager, `/follow-ups/${f.id}`);
       await ok(staff, `/follow-ups/${f.id}`);
     }
-  });
+    // Hundreds of reads one after another (every record, two people): 20 s was too close on a busy CI machine.
+  }, 60_000);
 
   it("every money submission and its photo", async () => {
     const all = (await ok(manager, "/submissions?status=all&pageSize=200")) as { rows: { id: string; file: { id: string } | null }[] };
