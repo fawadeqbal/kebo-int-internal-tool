@@ -206,12 +206,12 @@ export function PanelSection({
   /** It takes the rest of the window on a laptop (a long list that scrolls inside itself). */
   fill?: boolean;
 }) {
-  const inner = <div className={cn("grid grid-cols-1 gap-x-3 gap-y-3.5 sm:grid-cols-2", className, fill && "md:flex md:flex-1 md:flex-col")}>{children}</div>;
+  const inner = <div className={cn("grid grid-cols-1 gap-x-3 gap-y-3.5 sm:grid-cols-2", className, fill && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>{children}</div>;
   // A fieldset will not let its content shrink to the window (its content box keeps its full height), so a section
   // that fills the window is a labelled group instead.
   if (fill)
     return (
-      <div role="group" aria-label={title} className={cn("flex min-w-0 flex-col gap-3 md:flex-1", !first && !quiet && "border-t border-line pt-5")}>
+      <div role="group" aria-label={title} className={cn("flex min-w-0 flex-col gap-3 md:min-h-0 md:flex-1", !first && !quiet && "border-t border-line pt-5")}>
         {title && !quiet && <p className="text-sm font-bold text-text">{title}</p>}
         {inner}
       </div>

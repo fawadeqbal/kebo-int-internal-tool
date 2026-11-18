@@ -1234,12 +1234,16 @@ export function LineTable({
 
   const toolsShown = (rows.length > 8 || anyParts || tools || !readOnly || sheet) && !(selecting && !phone);
   return (
-    <div className={cn("flex flex-col gap-2", fill && "md:flex-1")}>
+    // Fill: the table grows with its items up to the window's height, then only the rows scroll (the window and the
+    // boxes around it may shrink: min-h-0). It never gets shorter than 20rem (tools, head, about four rows, the
+    // totals): a window shorter than that scrolls as a whole instead of squeezing the rows away.
+    <div className={cn("flex flex-col gap-2", fill && "md:min-h-80 md:flex-1")}>
       <div
         className={cn(
           "flex flex-col gap-2 empty:hidden",
-          // A phone: Add and the count stay on top while the window scrolls.
-          fill && phone && "sticky top-0 z-20 -mx-4 -mt-1 bg-surface px-4 pt-1 pb-2 shadow-[0_1px_0_var(--color-line)]",
+          // A phone: Add and the count stay on top while the window scrolls, flush with its top edge (-top-5: over the
+          // window's own 20px padding, so no row shows above them).
+          fill && phone && "sticky -top-5 z-20 -mx-4 -mt-1 bg-surface px-4 pt-1 pb-2 shadow-[0_1px_0_var(--color-line)]",
         )}
       >
       {toolsShown && (
@@ -1273,7 +1277,7 @@ export function LineTable({
               </Button>
             ))}
           {rows.length > 8 && (
-            <div className="relative min-w-0 flex-1 basis-48">
+            <div className="relative min-w-0 flex-1 basis-36">
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
               <Input
                 value={query}
@@ -1420,14 +1424,16 @@ export function LineTable({
       {phone ? (
         phoneList
       ) : (
-      <div className={cn("overflow-hidden rounded-lg border border-line bg-surface", fill && "md:flex md:flex-1 md:flex-col")}>
+      <div className={cn("overflow-hidden rounded-lg border border-line bg-surface", fill && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
         {/* Read-only lines have nothing to tab to inside, so the table itself takes the keyboard (arrow keys scroll
             it sideways); editable lines are reached through their cells. */}
         <div
           ref={gridRef}
           tabIndex={readOnly ? 0 : -1}
           onKeyDown={gridKeyDown}
-          className={cn("relative overflow-x-auto", fill && "md:min-h-44 md:flex-1 md:overflow-auto", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
+          // Fill (design rules: the tools and the head stay, only the items scroll): the rows take what the window has left
+          // and scroll inside; the table as a whole keeps its least height (min-h-80 below).
+          className={cn("relative overflow-x-auto", fill && "md:min-h-0 md:flex-1 md:overflow-auto", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
           aria-label={`${noun[0]!.toUpperCase()}${noun.slice(1)}s`}
           role="region"
         >

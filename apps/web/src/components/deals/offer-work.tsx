@@ -379,7 +379,7 @@ function OfferWindow({
           const columns = offerColumns(q?.lines ?? [], h.currency || mainCurrency, h.taxRate, q?.taxRate ?? taxDefault?.rate ?? 0);
           const empty = batch.rows.length === 0;
           return (
-            <div className="flex flex-col gap-3 md:flex-1">
+            <div className="flex flex-col gap-3 md:min-h-0 md:flex-1">
               {used && (
                 <p className="flex shrink-0 items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
                   <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />

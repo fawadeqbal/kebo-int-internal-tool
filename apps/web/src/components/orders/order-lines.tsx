@@ -334,6 +334,8 @@ export function OrderLinesEditor({
         "flex min-h-0 flex-1 flex-col",
         // The line table's tools for adding, pasting and moving lines (and its help on them) do not apply here.
         "[&_tr[aria-label^='New_']]:hidden [&_[role=toolbar]]:hidden [&_button:has(>.lucide-clipboard-paste)]:hidden [&_div:has(>details)]:hidden",
+        // Add item (laptop and phone) and the phone's other ways to add: an order's items come from its quotation.
+        "[&_button:has(>.lucide-plus)]:hidden [&_button[aria-label='More_ways_to_add']]:hidden",
         "[&_tbody_tr>td:last-child:not(:first-child)]:hidden [&_thead_tr>th:last-child:not(:first-child)]:hidden [&_colgroup>col:last-child]:hidden",
       )}
     >
