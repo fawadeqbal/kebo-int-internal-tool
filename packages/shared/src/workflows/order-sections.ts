@@ -513,7 +513,7 @@ export const EDIT_CARDS: Record<string, { label: string; step?: FlowStep }> = {
   "offer.factory": { label: "Supplier" },
   "offer.prices": { label: "Prices" },
   "offer.terms": { label: "Delivery & payment" },
-  "offer.conditions": { label: "Conditions" },
+  "offer.conditions": { label: "Warranty & conditions" },
   factory: { label: "Purchase order", step: "factory" },
   production: { label: "Production", step: "production" },
   "lines.received": { label: "Items from the supplier", step: "production" },

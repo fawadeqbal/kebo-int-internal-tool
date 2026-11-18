@@ -193,10 +193,11 @@ test.describe("a narrow phone (320 px, WCAG reflow)", () => {
     await page.goto(`/inquiries/${deal.id}/offers/${offer.id}`);
     // The page: nothing wider than the screen; the lines stack (no table to scroll sideways).
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
-    await page.getByRole("button", { name: "Edit offer" }).click();
+    await page.getByRole("button", { name: /^More for .*offer/ }).click();
+    await page.getByRole("menuitem", { name: "Edit offer" }).click();
     const win = page.getByRole("dialog", { name: "Edit offer" });
     const body = win.locator("[data-step-body]");
-    for (const [n, step] of ["Supplier", "Prices", "Delivery & payment", "Conditions", "Changes"].entries()) {
+    for (const [n, step] of ["Supplier", "Prices", "Delivery & payment", "Warranty & conditions", "Changes"].entries()) {
       if (n > 0) {
         await win.getByRole("button", { name: /^Next/ }).click();
         await expect(win.getByRole("heading", { name: `${step}, step ${n + 1} of 5` })).toBeFocused();

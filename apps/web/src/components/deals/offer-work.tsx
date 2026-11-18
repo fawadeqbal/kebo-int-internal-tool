@@ -8,7 +8,7 @@ import { ATTACHMENT_KIND_LABEL, basisText, lineNumbers, offerTaxText, partsWords
 import { Button, cn, Field, RULES, Select, Textarea } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
-import { PanelBody, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PanelBody, SidePanel, useClosePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
 import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
 import { recordEditAction } from "@/lib/edit-actions";
@@ -105,7 +105,7 @@ export function OfferPanel({ kit, q, step, only = false, onClose }: { kit: Offer
 
 /**
  * Edit with its word (never a pencil alone): opens the offer's window on `step` (Factory · Prices · Delivery &
- * payment · Conditions), only that part when `only`. `what` finishes its name for screen readers ("Edit prices").
+ * payment · Warranty & conditions), only that part when `only`. `what` finishes its name for screen readers ("Edit prices").
  */
 export function OfferEdit({
   kit,
@@ -140,6 +140,13 @@ export function OfferEdit({
       {open && <OfferPanel kit={kit} q={q} step={step} only={only} onClose={() => setOpen(false)} />}
     </>
   );
+}
+
+/** Edit offer from the page's ⋯ (?panel=edit-offer): every part, in steps, as the Edit offer button opened it. */
+export function OfferUrlWindow({ kit, q }: { kit: OfferKit; q: FactoryQuoteView }) {
+  const panel = useSidePanel("edit-offer");
+  if (!panel.open) return null;
+  return <OfferPanel kit={kit} q={q} step="factory" onClose={() => panel.close()} />;
 }
 
 /**
@@ -822,7 +829,7 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
 
 /**
  * The offer's page (design 18 Nov, the inquiry's rules): the same boxes as its steps — Factory and Delivery &
- * payment side by side, then Prices, then Conditions — each with its own history clock and Edit (that part only),
+ * payment side by side, then Prices, then Warranty & conditions — each with its own history clock and Edit (that part only),
  * each fact once.
  */
 export function OfferBoxes({
@@ -949,7 +956,7 @@ export function OfferBoxes({
         )}
       </RecordBox>
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <RecordBox title="Conditions" what="the conditions" canEdit={canEdit} edit={edit("conditions", "the conditions")} history={history(["offer.conditions"], "Conditions")}>
+        <RecordBox title="Warranty & conditions" what="the warranty and conditions" canEdit={canEdit} edit={edit("conditions", "the warranty and conditions")} history={history(["offer.conditions"], "Warranty & conditions")}>
           <BoxFacts
             rows={[
               ["Warranty", warrantyLine(q)?.replace(/\.$/, "") ?? null],
@@ -966,7 +973,7 @@ export function OfferBoxes({
 /* ---------------------------------------------------------------- add an offer */
 
 /**
- * "Enter an offer": the New factory offer window (design 18 Nov): Factory · Prices · Delivery & payment · Conditions,
+ * "Enter an offer": the New factory offer window (design 18 Nov): Factory · Prices · Delivery & payment · Warranty & conditions,
  * then Review and Confirm and save. The factories asked for this inquiry come first in its picker.
  */
 export function AddOfferButton({
