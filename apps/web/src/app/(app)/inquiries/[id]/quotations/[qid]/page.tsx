@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Fragment, type ReactNode } from "react";
 import { AlertTriangle, ChevronRight, Download, Eye, Send } from "lucide-react";
 import { BASIS_STEP_LABEL, can, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, type BasisStep } from "@kebo/shared";
-import { buttonClass, cn, PageHeader, RevisionBadge, StatusBadge } from "@kebo/ui";
+import { buttonClass, cn, PageHeader, RevisionBadge, RULES, StatusBadge } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { api } from "@/lib/api";
@@ -256,7 +256,7 @@ export default async function QuotationOwnPage({
         />
       </PageHeader>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className={cn("grid items-start gap-4", RULES.page.withPanel)}>
         <div className="flex min-w-0 flex-col gap-4">
           {checks.length > 0 && (
             <div role="status" className="flex items-start gap-2 rounded-xl border border-warn/30 bg-warn-soft/60 px-4 py-3 text-sm">

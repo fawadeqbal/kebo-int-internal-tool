@@ -36,3 +36,5 @@ export * from "./workflows/tracking";
 export * from "./messages";
 export * from "./dev-tools";
 export * from "./workflows/search";
+export * from "./records/types";
+export * from "./records/inquiry";

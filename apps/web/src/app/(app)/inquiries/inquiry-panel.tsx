@@ -2,6 +2,7 @@
 
 import { useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
+import { RULES } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { SidePanel, useSidePanel } from "@/components/common/panel";
 import { DealForm, type RequestStep } from "@/components/deals/deal-form";
@@ -28,7 +29,7 @@ export function InquiryPanel({ refNo, customerName, inquiryTitle, numberHint, ..
       title={one ? `Edit ${PART_TITLE[form.startStep ?? "customer"]}` : edit ? "Edit inquiry" : "New inquiry"}
       description={edit ? [refNo, inquiryTitle ?? customerName].filter(Boolean).join(" · ") : `The number is given on save · ${numberHint ?? "RFQ"}-…`}
       onClose={() => panel.close()}
-      className={one && form.startStep !== "items" ? "md:w-[640px]" : "md:w-[1180px]"}
+      className={one && form.startStep !== "items" ? RULES.window.part : RULES.window.items}
     >
       <DealForm
         {...form}

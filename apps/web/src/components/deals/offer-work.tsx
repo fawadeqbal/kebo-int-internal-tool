@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Copy, Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { factoryTaxMinor, formatMinor, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, basisText, lineNumbers, offerTaxText, partsWords, warrantyLine, type AttachmentKind } from "@kebo/shared";
-import { Button, cn, Field, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, RULES, Select, Textarea } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { PanelBody, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
@@ -96,7 +96,7 @@ export function OfferPanel({ kit, q, step, only = false, onClose }: { kit: Offer
       description={[q.factory.name, kit.refNo].filter(Boolean).join(" · ")}
       onClose={onClose}
       // The payment's parts need a little more room than 640.
-      className={!one || part === "prices" ? "md:w-[1180px]" : part === "terms" ? "md:w-[720px]" : "md:w-[640px]"}
+      className={!one || part === "prices" ? RULES.window.items : part === "terms" ? RULES.window.wideRows : RULES.window.part}
     >
       <OfferWindow {...kit} q={q} startStep={step} only={one} />
     </SidePanel>

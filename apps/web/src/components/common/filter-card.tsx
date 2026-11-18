@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
-import { cn } from "@kebo/ui";
+import { cn, RULES } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "./floating";
 
 export interface FilterSelect {
@@ -67,7 +67,7 @@ function Choice({ label, on, onPick }: { label: string; on: boolean; onPick: () 
 }
 
 /** A long list of choices (people, customers, suppliers) starts with a box to type in. */
-const LONG = 8;
+const LONG = RULES.choices.list;
 
 /** One filter: its name, or (chosen) green with the choice and × to take it off. Its choices open under it (a sheet on a phone). */
 function FilterButton({ s, onPick }: { s: FilterSelect; onPick: (name: string, value: string | undefined) => void }) {
