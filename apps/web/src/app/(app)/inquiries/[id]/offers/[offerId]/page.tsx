@@ -28,7 +28,7 @@ import {
   searchFactoriesAction,
 } from "../../sourcing/actions";
 
-export const generateMetadata = inquiryTitle("Factory offer");
+export const generateMetadata = inquiryTitle("Supplier offer");
 
 /**
  * One factory offer on its own page (design 17 Nov: each on its own page). Its top: the factory, its reference,
@@ -81,13 +81,13 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
   const next = at < s.quotes.length - 1 ? s.quotes[at + 1]! : null;
   // What it covers; its reference, dates, currency and tax are in Details beside (each said once).
   const summary = [
-    !x.lines.length ? "no lines yet" : cover ? (cover.all ? (cover.of === 1 ? "covers the 1 item" : `covers all ${cover.of} items`) : `covers ${cover.n} of ${cover.of} items`) : null,
+    !x.lines.length ? "no items yet" : cover ? (cover.all ? (cover.of === 1 ? "covers the 1 item" : `covers all ${cover.of} items`) : `covers ${cover.n} of ${cover.of} items`) : null,
   ].filter(Boolean);
 
   return (
     <div className="relative">
       <OwnPagerTop
-        label={`Factory offers of ${d.refNo}`}
+        label={`Supplier offers of ${d.refNo}`}
         what="offer"
         at={at}
         of={s.quotes.length}
@@ -97,7 +97,7 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
       <PageHeader
         phoneStack
         crumbs={[{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo, href: base }, { label: x.factory.name }]}
-        back={{ href: `${base}/sourcing`, label: `${d.refNo} · Factory offers` }}
+        back={{ href: `${base}/sourcing`, label: `${d.refNo} · Supplier offers` }}
         title={x.factory.name}
         summary={summary.length ? <p className="min-w-0">{summary.join(" · ")}</p> : undefined}
         actions={canEdit ? <OfferEdit kit={kit} q={x} step="factory" words="Edit offer" size="sm" /> : undefined}
@@ -112,7 +112,7 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
           <MoreMenu
             label={`More for ${x.factory.name}’s offer`}
             items={[
-              { label: `Open the factory ${x.factory.name}`, href: `/factories/${x.factory.id}` },
+              { label: `Open the supplier ${x.factory.name}`, href: `/suppliers/${x.factory.id}` },
               { label: "Compare the offers side by side", href: `${base}/sourcing?view=compare` },
               { label: "Copy link to this offer", copy: `${base}/offers/${x.id}` },
             ]}
@@ -120,7 +120,7 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
         }
       >
         <OwnPagerUnder
-          label={`Factory offers of ${d.refNo}`}
+          label={`Supplier offers of ${d.refNo}`}
           what="offer"
           at={at}
           of={s.quotes.length}

@@ -111,7 +111,7 @@ export function PaymentPlanTable({
         {receipts(i)}
         {open && r.through === "bank" && r.state === "not_sent" ? (
           <Link href={`/orders/${orderId}/documents`} className={ROW_LINK}>
-            Bank papers
+            Bank documents
           </Link>
         ) : (
           open &&

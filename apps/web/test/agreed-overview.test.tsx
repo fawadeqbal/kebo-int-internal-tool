@@ -54,7 +54,7 @@ const factoryTerms = (t: Partial<NonNullable<OrderView["factoryTerms"]>[number]>
     leadDays: 30,
     leadFrom: "after_payment",
     parts: [
-      { label: "Advance 30%", percent: 30, rule: "on_order", days: null },
+      { label: "Deposit 30%", percent: 30, rule: "on_order", days: null },
       { label: "Balance 70%", percent: 70, rule: "on_ready", days: null },
     ],
     warrantyMonths: 12,
@@ -85,13 +85,13 @@ const item = (label: string, amount: string, part: string | null, dueRule: Item[
 const money = (items: Item[]) => ({ route: { route: "informal", summary: null }, plan: { items } }) as unknown as OrderMoney;
 const THREE = money([item("Deposit 30%", "9037.50", "deposit", "fixed", null, "2026-11-20"), item("Before shipment 60%", "18075.00", null, "on_ready"), item("After the site test 10%", "3012.50", null, "after_sat", 15)]);
 
-describe("the customer and the factory, side by side", () => {
+describe("the customer and the supplier, side by side", () => {
   it("the basis, the lead time, the payment and the warranty, each checked", () => {
     const [t] = sideBySide(order(), THREE);
     expect(t!.factory).toBe("Jinan Pharma");
     expect(t!.rows.map((r) => [r.key, r.ours, r.theirs, r.check?.ok, r.check?.word])).toEqual([
       ["basis", "FOB Qingdao", "FOB Qingdao", true, "The same"],
-      ["lead", "45 days after the deposit", "30 days after the advance", true, "15 days to spare"],
+      ["lead", "45 days after the deposit", "30 days after the deposit", true, "15 days to spare"],
       ["payment", "30% with the order · 60% before shipment · 10% 15 days after the site acceptance test (SAT)", "30% when we order · 70% when ready", true, "Covered"],
       ["warranty", "12 months from the site test (SAT)", "12 months from shipment", false, "2 months not covered"],
     ]);
@@ -102,7 +102,7 @@ describe("the customer and the factory, side by side", () => {
     expect(t!.look).toBe(1);
   });
 
-  it("the plan as it stands now: a balance after shipping means we may pay the factory first", () => {
+  it("the plan as it stands now: a balance after shipping means we may pay the supplier first", () => {
     const late = money([item("Deposit 30%", "9037.50", "deposit", "fixed", null, "2026-11-20"), item("Balance", "21087.50", "balance", "on_ship_plus_days", 14)]);
     const pay = sideBySide(order(), late)[0]!.rows.find((r) => r.key === "payment")!;
     expect(pay.check).toMatchObject({ ok: false, word: "We may pay first" });
@@ -118,7 +118,7 @@ describe("the customer and the factory, side by side", () => {
     expect(none[0]!.rows.map((r) => r.key)).not.toContain("warranty");
   });
 
-  it("nothing for people who do not see the factory's terms", () => {
+  it("nothing for people who do not see the supplier's terms", () => {
     expect(sideBySide(order({ factoryTerms: [] }), THREE)).toEqual([]);
   });
 });
@@ -167,7 +167,7 @@ describe("Change what we agreed with the customer", () => {
   it("Delivery, Payment (its plan, linked), Warranty and Conditions, filled with what the order keeps", () => {
     const d = open();
     expect(within(d).getByRole("heading", { name: "What we agreed with Al-Shifa Pharma Ltd" })).toBeTruthy();
-    expect((within(d).getByLabelText("Delivery basis (Incoterm)") as HTMLInputElement).readOnly).toBe(true);
+    expect((within(d).getByLabelText("Incoterm") as HTMLInputElement).readOnly).toBe(true);
     expect((d.querySelector("#agr-place") as HTMLInputElement).value).toBe("Qingdao");
     expect((d.querySelector("#agr-pod") as HTMLInputElement).value).toBe("Karachi");
     expect((d.querySelector("#agr-shipBy") as HTMLInputElement).value).toBe("2026-12-31");
@@ -192,7 +192,7 @@ describe("Change what we agreed with the customer", () => {
   });
 });
 
-describe("Change what we agreed with the factory", () => {
+describe("Change what we agreed with the supplier", () => {
   const open = (sent: boolean) => {
     render(
       <FactoryAgreedWindow
@@ -212,7 +212,7 @@ describe("Change what we agreed with the factory", () => {
           moq: "1 set",
           notes: null,
         }}
-        payment="Advance 30%, paid · Balance 70%"
+        payment="Deposit 30%, paid · Balance 70%"
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /Change/ }));
@@ -222,11 +222,11 @@ describe("Change what we agreed with the factory", () => {
 
   it("Delivery, the payment's note, Warranty and Conditions, filled with what the purchase order keeps", () => {
     const d = open(true);
-    expect((within(d).getByLabelText(/Delivery basis/) as HTMLSelectElement).value).toBe("FOB");
+    expect((within(d).getByLabelText(/Incoterm/) as HTMLSelectElement).value).toBe("FOB");
     expect((d.querySelector("#fac-place") as HTMLInputElement).value).toBe("Qingdao");
     expect((d.querySelector("#fac-note") as HTMLTextAreaElement).value).toBe("By T/T to their account in Jinan.");
     expect((d.querySelector("#fac-moq") as HTMLInputElement).value).toBe("1 set");
-    expect(within(d).getByText("Advance 30%, paid · Balance 70%")).toBeTruthy();
+    expect(within(d).getByText("Deposit 30%, paid · Balance 70%")).toBeTruthy();
     expect(hidden("leadDays")).toBe("30");
     expect(hidden("warrantyFrom")).toBe("shipment");
     fireEvent.change(d.querySelector("#fac-lead") as HTMLInputElement, { target: { value: "35" } });
@@ -234,7 +234,7 @@ describe("Change what we agreed with the factory", () => {
     expect(within(d).getByText(/differs from their offer asks why/)).toBeTruthy();
   });
 
-  it("not sent yet: it says what goes to the factory, and asks no why", () => {
+  it("not sent yet: it says what goes to the supplier, and asks no why", () => {
     const d = open(false);
     expect(within(d).getByText(/Not sent yet/)).toBeTruthy();
     expect(within(d).queryByText(/asks why/)).toBeNull();

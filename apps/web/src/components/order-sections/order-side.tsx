@@ -29,7 +29,7 @@ export async function OrderSide({ id }: { id: string }) {
     ["Order total", whole(o.money.total, o.currency)],
     ["Received", whole(o.money.received, o.currency)],
     ["They still owe", whole(o.money.due, o.currency)],
-    ...paid.map((r) => [paid.length > 1 ? `Paid to ${r.factory.name}` : "Paid to factory", whole(r.paid, r.currency)] as [string, string]),
+    ...paid.map((r) => [paid.length > 1 ? `Paid to ${r.factory.name}` : "Paid to supplier", whole(r.paid, r.currency)] as [string, string]),
   ];
   const latest = (notes ?? []).slice(0, 3);
   return (

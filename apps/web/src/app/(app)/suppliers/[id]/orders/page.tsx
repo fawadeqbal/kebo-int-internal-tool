@@ -37,7 +37,7 @@ export default async function FactoryOrders({ params }: { params: Promise<{ id: 
       {rows.length === 0 ? (
         <EmptyState
           title="Nothing in production here"
-          description="An order shows here while it has lines from this supplier, with the day it should be ready."
+          description="An order shows here while it has items from this supplier, with the day it should be ready."
         />
       ) : (
         <>

@@ -83,7 +83,7 @@ describe("treasury: every payment in one list", () => {
       .expect(201);
     expenseId = (
       await api(app, manager)
-        .post("/expenses", { category: "office", description: `Paper ${tag}`, amount: 25, currency: "USD", spentOn: today, orderId })
+        .post("/expenses", { category: "office", description: `Document ${tag}`, amount: 25, currency: "USD", spentOn: today, orderId })
         .expect(201)
     ).body.id;
     const accounts = await Promise.all(

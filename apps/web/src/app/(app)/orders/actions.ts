@@ -111,7 +111,7 @@ export async function factoryTermsAction(orderId: string, poId: string, _prev: A
   const v = formValues(form);
   const body: Record<string, string | null> = {};
   for (const k of FACTORY_TERMS_FIELDS) if (k in v) body[k] = v[k]?.trim() || null;
-  const r = await attempt(form, () => api.patch(`/orders/${orderId}/purchase-orders/${poId}/terms`, { ...body, reason: reasonOf(form) }), "What was agreed with the factory is saved.");
+  const r = await attempt(form, () => api.patch(`/orders/${orderId}/purchase-orders/${poId}/terms`, { ...body, reason: reasonOf(form) }), "What was agreed with the supplier is saved.");
   if (r.ok) refresh(orderId);
   return { ...r, data: undefined };
 }

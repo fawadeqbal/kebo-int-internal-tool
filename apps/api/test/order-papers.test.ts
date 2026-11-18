@@ -14,7 +14,7 @@ import { CompaniesService } from "../src/common/company/companies.service";
  * "Make again" starts version 2. Making needs documents.manage; bank papers need
  * their module and route; the purchase order needs sourcing.manage.
  */
-describe("order papers", () => {
+describe("order documents", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let sana: string;
@@ -77,7 +77,7 @@ describe("order papers", () => {
     customerId = (
       await api(app, sana)
         .post("/customers", {
-          name: `Papers Pharma ${tag}`,
+          name: `Documents Pharma ${tag}`,
           country: "PK",
           address: "Sundar Industrial Estate, Lahore",
           contacts: [{ name: "Ali", email: `ali-${tag}@pp.test` }],
@@ -86,7 +86,7 @@ describe("order papers", () => {
     ).body.id;
     factoryId = (
       await api(app, sana)
-        .post("/factories", { name: `Papers Works ${tag}`, address: "Ningbo" })
+        .post("/factories", { name: `Documents Works ${tag}`, address: "Ningbo" })
         .expect(201)
     ).body.id;
     const inquiry = (
@@ -130,7 +130,7 @@ describe("order papers", () => {
     expect(STEP_OF_ACTION("paper.final", { step: "shipping" })).toBe("shipping");
   });
 
-  it("lists the order's papers with where each stands", async () => {
+  it("lists the order's documents with where each stands", async () => {
     const l = await list();
     expect(l.canMake).toBe(true);
     const ci = l.papers.find((p) => p.kind === "commercial-invoice")!;
@@ -223,7 +223,7 @@ describe("order papers", () => {
     await api(app, sana).post(`/orders/${orderId}/papers/commercial-invoice`, { options: {} }).expect(400);
   });
 
-  it("a final paper keeps its snapshot when the order changes; Make again starts version 2", async () => {
+  it("a final document keeps its snapshot when the order changes; Make again starts version 2", async () => {
     const before = await doc("commercial-invoice");
     expect(before).toMatchObject({ final: true, watermark: null });
     await api(app, sana).post(`/orders/${orderId}/papers/commercial-invoice/fix`, { field: "blNo", value: "COSU-NEW-1" }).expect(200);
@@ -247,7 +247,7 @@ describe("order papers", () => {
     expect(await prisma.company(FIRST_COMPANY_ID).orderDocument.count({ where: { orderId, kind: "commercial_invoice" } })).toBe(1);
   });
 
-  it("every paper renders for the order (or says why not)", async () => {
+  it("every document renders for the order (or says why not)", async () => {
     await api(app, manager)
       .post(`/orders/${orderId}/payments`, {
         kind: "deposit",
@@ -272,7 +272,7 @@ describe("order papers", () => {
       expect(c.status, kind).toBe(200);
     }
     const po = await doc("purchase-order");
-    expect(po.doc.party.name).toBe(`Papers Works ${tag}`);
+    expect(po.doc.party.name).toBe(`Documents Works ${tag}`);
     expect(po.doc.number).toBe(l.papers.find((p) => p.kind === "purchase-order")!.number);
     expect(po.doc.total).toMatchObject({ currency: "CNY", amount: "300000.00" });
     // The tax follows the prices frozen on the order: 0% says nothing about tax.
@@ -312,7 +312,7 @@ describe("order papers", () => {
     const invoiceNow = await doc("commercial-invoice", "?opts=prices,advance");
     const invoiceTotal = Number(invoiceNow.doc.total.amount);
     expect(invoiceNow.doc.under).toEqual([
-      { label: "Less: advance received", value: { money: "-1000.00", currency: invoiceNow.doc.total.currency } },
+      { label: "Less: deposit received", value: { money: "-1000.00", currency: invoiceNow.doc.total.currency } },
       { label: "Balance payable", value: { money: (invoiceTotal - 1000).toFixed(2), currency: invoiceNow.doc.total.currency } },
     ]);
     expect((await doc("commercial-invoice", "?opts=prices")).doc.under).toEqual([]);
@@ -326,11 +326,11 @@ describe("order papers", () => {
     // A role without documents.manage or sourcing.manage sees papers but makes none, and never the purchase order.
     const role = (
       await api(app, admin)
-        .post("/roles", { name: `Papers viewer ${tag}`, permissions: ["dashboard.view", "inquiries.viewAll"] })
+        .post("/roles", { name: `Documents viewer ${tag}`, permissions: ["dashboard.view", "inquiries.viewAll"] })
         .expect(201)
     ).body;
     const email = `papers-${tag}@example.com`;
-    await api(app, admin).post("/users", { name: "Papers viewer", email, role: role.key, password }).expect(201);
+    await api(app, admin).post("/users", { name: "Documents viewer", email, role: role.key, password }).expect(201);
     const viewer = await signIn(app, email, password);
     const l = await list(viewer);
     expect(l.canMake).toBe(false);
@@ -365,7 +365,7 @@ describe("order papers", () => {
     await api(app, sana).patch(`/orders/${orderId}/route`, { route: "letter_of_credit" }).expect(200);
   });
 
-  it("papers others issue can be kept elsewhere, and count as done", async () => {
+  it("documents others issue can be kept elsewhere, and count as done", async () => {
     await api(app, sana).post(`/orders/${orderId}/document-set`, { kind: "certificate_of_origin", status: "elsewhere" }).expect(400);
     await api(app, sana)
       .post(`/orders/${orderId}/document-set`, {
@@ -394,7 +394,7 @@ describe("order papers", () => {
     expect(before).toEqual(
       expect.arrayContaining(["bill-of-exchange", "beneficiary-certificate", "bank-cover-letter", "insurance", "customer-statement", "commercial-invoice", "certificate_of_origin"]),
     );
-    const papersOf = async () => Number(/of (\d+) papers/.exec((await papersStand()).word)![1]);
+    const papersOf = async () => Number(/of (\d+) documents/.exec((await papersStand()).word)![1]);
     const countedBefore = await papersOf();
     const flow = async () =>
       (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body as {
@@ -402,7 +402,7 @@ describe("order papers", () => {
         documents: { set: { kind: string; required: boolean }[] } | null;
       };
     const papersLine = async () => (await flow()).steps.find((x) => x.key === "documents")!.sub;
-    const requiredBefore = Number(/of (\d+) papers/.exec(await papersLine())![1]);
+    const requiredBefore = Number(/of (\d+) documents/.exec(await papersLine())![1]);
 
     // Only people with settings.manage switch papers.
     await api(app, sana).put("/settings/papers", { off: ["insurance"] }).expect(403);
@@ -425,7 +425,7 @@ describe("order papers", () => {
       // Where it stands: the switched-off paper that is not in is no longer counted; the ones in stay.
       expect(await papersOf()).toBe(countedBefore - 1);
       // The step's numbers: one paper fewer to wait for.
-      expect(Number(/of (\d+) papers/.exec(await papersLine())![1])).toBe(requiredBefore - 1);
+      expect(Number(/of (\d+) documents/.exec(await papersLine())![1])).toBe(requiredBefore - 1);
       expect((await flow()).documents!.set.find((d) => d.kind === "insurance")?.required ?? false).toBe(false);
       // The papers stay reachable for whoever opens one directly (and for older apps).
       await api(app, sana).get(`/orders/${orderId}/papers/bill-of-exchange/doc`).expect(200);

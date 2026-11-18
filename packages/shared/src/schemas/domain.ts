@@ -87,7 +87,7 @@ export const customerInput = z.object({
 export type CustomerInput = z.infer<typeof customerInput>;
 
 export const factoryInput = z.object({
-  name: text(200, "Enter the factory's name"),
+  name: text(200, "Enter the supplier's name"),
   contactPerson: optionalText(120),
   phone,
   wechat: optionalText(80),
@@ -109,7 +109,7 @@ export const customerImport = z.object({
 export type CustomerImport = z.infer<typeof customerImport>;
 
 export const factoryImport = z.object({
-  factories: z.array(factoryInput).min(1, "No factories to add").max(500, "Up to 500 factories at once"),
+  factories: z.array(factoryInput).min(1, "No suppliers to add").max(500, "Up to 500 suppliers at once"),
   fileName: optionalText(200),
 });
 export type FactoryImport = z.infer<typeof factoryImport>;
@@ -239,11 +239,11 @@ export const factoryQuoteLineInput = z.object({
   partOf: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().min(0).nullable()).default(null),
   /** Another spec of an earlier line of this offer (its position in `lines`): a choice beside it, left out of the total. */
   specOf: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().min(0).nullable()).default(null),
-  description: text(2000, "Each line needs a description"),
+  description: text(2000, "Each item needs a description"),
   model: optionalText(120),
   quantity,
   unit: z.string().trim().max(20).default("pcs"),
-  unitPrice: amount("Enter the factory's price"),
+  unitPrice: amount("Enter the supplier's price"),
   /** This item's tax %; left out: the offer's tax %. Added on top of the price, or included in it, as the offer says. */
   taxRate: optionalPercent,
 });
@@ -301,7 +301,7 @@ export const factoryQuoteInput = z
     convertPrices: bool.default(false),
     reason: reasonField,
   })
-  .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a factory or type a new one", path: ["factoryId"] });
+  .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a supplier or type a new one", path: ["factoryId"] });
 export type FactoryQuoteInput = z.infer<typeof factoryQuoteInput>;
 
 /**
@@ -309,7 +309,7 @@ export type FactoryQuoteInput = z.infer<typeof factoryQuoteInput>;
  * end), at the same level as that line or as parts of `parentId`.
  */
 export const factoryLinesInput = z.object({
-  lines: z.array(factoryQuoteLineInput.omit({ id: true })).min(1, "Add a line").max(1000),
+  lines: z.array(factoryQuoteLineInput.omit({ id: true })).min(1, "Add an item").max(1000),
   /** Insert after this line (and its parts); empty = at the end. */
   afterId: optionalId,
   /** All new lines become parts of this line (pasting under a line). */
@@ -321,11 +321,11 @@ export type FactoryLinesInput = z.infer<typeof factoryLinesInput>;
 /** One line changed in place (only the fields sent). */
 export const factoryLinePatch = z.object({
   requestedItemId: optionalId.optional(),
-  description: text(2000, "Each line needs a description").optional(),
+  description: text(2000, "Each item needs a description").optional(),
   model: optionalText(120).optional(),
   quantity: quantity.optional(),
   unit: z.string().trim().min(1).max(20).optional(),
-  unitPrice: amount("Enter the factory's price").optional(),
+  unitPrice: amount("Enter the supplier's price").optional(),
   taxRate: percentOr(DEFAULT_TAX_RATE).optional(),
   /** Another spec of this line of the same offer (empty: a line of its own, counted in the total). */
   alternativeOfId: optionalId.optional(),
@@ -345,7 +345,7 @@ export type CopyLinesInput = z.infer<typeof copyLinesInput>;
 /* ---------------------------------------------------------------- quotations */
 
 /** Our selling price for one line of an option: a factory line, or (without factory prices) one of the customer's items. */
-export const optionPriceInput = z.object({ lineId: id("Unknown line"), unitPrice: amount("Enter a price") });
+export const optionPriceInput = z.object({ lineId: id("Unknown item"), unitPrice: amount("Enter a price") });
 
 /** An extra the factory does not supply: sea freight, inspection, insurance… (our own price and, if known, cost). */
 export const chargeInput = z.object({
@@ -583,7 +583,7 @@ export const receiptInput = z.object({
   lines: z
     .array(
       z.object({
-        lineId: id("Each line must come from the order"),
+        lineId: id("Each item must come from the order"),
         receivedQty: z.preprocess((v) => (v === "" || v === null ? 0 : v), z.coerce.number().min(0, "Cannot be negative").max(10_000_000).refine((n) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6, "Use at most 2 decimals")),
       }),
     )
@@ -601,7 +601,7 @@ export const packingInput = z.object({
   lines: z
     .array(
       z.object({
-        lineId: id("Each line must come from the order"),
+        lineId: id("Each item must come from the order"),
         packages: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), z.coerce.number().int("Whole packages only").min(0).max(1_000_000).nullable()),
         packageType: z.string().trim().max(40).default("Carton").transform((v) => v || "Carton"),
         netWeightKg: measure(10_000_000),
@@ -766,7 +766,7 @@ export type CreditRefundInput = z.infer<typeof creditRefundInput>;
 
 /** The factory's payment plan on an order: its parts in order (they add up to what we owe it). */
 export const factoryPlanInput = z.object({
-  factoryId: id("Choose the factory"),
+  factoryId: id("Choose the supplier"),
   items: z
     .array(
       z.object({
@@ -838,7 +838,7 @@ export type PaymentPlanInput = z.infer<typeof paymentPlanInput>;
  * per USD), so profit can be worked out; it starts from Settings.
  */
 export const factoryPaymentInput = z.object({
-  factoryId: id("Choose the factory"),
+  factoryId: id("Choose the supplier"),
   kind: z.enum(PAYMENT_KINDS).default("deposit"),
   amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
   currency,

@@ -70,7 +70,7 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 /** The steps of a quotation's window (design "one way, any number"). */
 export type QuoteStep = "lines" | "delivery" | "payment" | "warranty";
 export const QUOTE_STEPS: { key: QuoteStep; label: string }[] = [
-  { key: "lines", label: "Lines" },
+  { key: "lines", label: "Items" },
   { key: "delivery", label: "Delivery" },
   { key: "payment", label: "Payment" },
   { key: "warranty", label: "Warranty & conditions" },
@@ -624,7 +624,7 @@ export function RevisionEditor({
     if (key === "lines") {
       const n = shownTotals.lines.length;
       const priced = shownTotals.lines.every((l) => valid(shown.prices[l.id] ?? "") && Number(numberText(shown.prices[l.id]!)) > 0);
-      return { key, label, summary: `${n} line${n === 1 ? "" : "s"} · ${fmt(shownTotals.totals.total)}`, done: n > 0 && priced };
+      return { key, label, summary: `${n} item${n === 1 ? "" : "s"} · ${fmt(shownTotals.totals.total)}`, done: n > 0 && priced };
     }
     if (key === "delivery") {
       const lead = shown.leadDays.trim() ? `${shown.leadDays.trim()} days` : shown.leadTime.trim() || null;
@@ -682,7 +682,7 @@ export function RevisionEditor({
           <>
             {show("options") && (
             <PanelSection quiet={!!step} title="Options: which offers to quote" first className="sm:grid-cols-1">
-              <ul className="flex flex-col divide-y divide-line rounded-xl border border-line" aria-label="Factory offers">
+              <ul className="flex flex-col divide-y divide-line rounded-xl border border-line" aria-label="Supplier offers">
                 {listed.map((off) => {
                   const i = s.options.findIndex((o) => o.factoryQuoteId === off.factoryQuoteId);
                   const on = i >= 0;
@@ -691,7 +691,7 @@ export function RevisionEditor({
                   const last = on && s.options.length === 1;
                   const facts = [
                     none
-                      ? "No lines yet: add its lines on Factory offers to quote it"
+                      ? "No items yet: add its items on Supplier offers to quote it"
                       : off.coverage.missing.length
                         ? `Does not include item ${off.coverage.missing.join(", ")}`
                         : "Covers every item",
@@ -747,7 +747,7 @@ export function RevisionEditor({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block font-semibold">The customer&rsquo;s items, priced by hand</span>
-                        <span className="block text-xs text-text-2">No factory prices: the items as the customer asked for them</span>
+                        <span className="block text-xs text-text-2">No supplier prices: the items as the customer asked for them</span>
                       </span>
                     </label>
                   </li>
@@ -764,7 +764,7 @@ export function RevisionEditor({
                       value={margin}
                       onChange={(e) => priceEveryOffer(e.target.value)}
                     />
-                    <span>% on our cost. Each price can be changed after, in Edit lines.</span>
+                    <span>% on our cost. Each price can be changed after, in Edit items.</span>
                   </p>
                   {pricedAt !== null && marginOk && (
                     <p role="status" className="text-text">
@@ -820,7 +820,7 @@ export function RevisionEditor({
             {show("delivery") && (
             <PanelSection quiet={!!step} title="Delivery" sub="where we hand the goods over, and when" className="md:grid-cols-3">
               <Field
-                label="Delivery basis (Incoterm)"
+                label="Incoterm"
                 htmlFor={`inco-${number}`}
                 error={st.errors?.incoterm}
                 hint={fromLast && s.incoterm === initial.incoterm ? lastWords : undefined}
@@ -870,7 +870,7 @@ export function RevisionEditor({
                     <tr className="text-left text-xs text-text-2">
                       <th className="pb-1.5 font-medium max-md:hidden">Option</th>
                       <th className="pb-1.5 font-medium">Lead time we promise</th>
-                      <th className="pb-1.5 font-medium max-md:hidden">{showCosts ? "The factory gives" : ""}</th>
+                      <th className="pb-1.5 font-medium max-md:hidden">{showCosts ? "The supplier gives" : ""}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1136,14 +1136,14 @@ export function BasisCosts({
         <h4 className="flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
           Getting it to {ours}
           <span className="text-xs font-normal text-muted">
-            the factory&apos;s price is {factoryBasis ? basisText(factoryBasis, factoryPlace) : "on a basis not said"} · internal
+            the supplier&apos;s price is {factoryBasis ? basisText(factoryBasis, factoryPlace) : "on an Incoterm not said"} · internal
           </span>
         </h4>
       )}
       {!gap ? (
         <p className="flex items-start gap-1.5 rounded-md bg-warn-soft px-3 py-2 text-xs text-text">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
-          The offer does not say its price basis (EXW, FOB…), so the costs to reach {selling} cannot be worked out. Set it on Factory offers
+          The offer does not say its Incoterm (EXW, FOB…), so the costs to reach {selling} cannot be worked out. Set it on Supplier offers
           (the offer's Edit), or add freight and the like as charges.
         </p>
       ) : (
@@ -1175,7 +1175,7 @@ export function BasisCosts({
                       aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} cost`}
                       inputMode="decimal"
                       className="h-8 text-right tabular"
-                      placeholder={asLine(step) ? "as a line" : "0.00"}
+                      placeholder={asLine(step) ? "as a charge" : "0.00"}
                       value={c.amount}
                       onChange={(e) => onChange(step, { amount: e.target.value })}
                     />
@@ -1210,14 +1210,14 @@ export function BasisCosts({
                               size="xs"
                               variant="ghost"
                               onClick={() => onAsLine(step, minor)}
-                              title="Show it to the customer as its own line (a charge) instead of inside the prices"
+                              title="Show it to the customer as a charge of its own instead of inside the prices"
                             >
-                              As a line
+                              As a charge
                             </Button>
                           </>
                         )
                       ) : asLine(step) ? (
-                        <span className="text-muted">Shown as a line below</span>
+                        <span className="text-muted">Shown as a charge below</span>
                       ) : (
                         <span className="text-warn">Not entered yet</span>
                       )}
@@ -1232,7 +1232,7 @@ export function BasisCosts({
               {extra.minor > 0 ? (
                 <>
                   <span className="font-medium text-text">{fmt(extra.minor)}</span> added to Option {letter}&apos;s cost. &ldquo;Price all
-                  at … %&rdquo; spreads it over the lines, so the prices cover it.
+                  at … %&rdquo; spreads it over the items, so the prices cover it.
                 </>
               ) : (
                 "Enter what each step costs (a forwarder's quote is fine): it is added to the cost and spread over the prices."
@@ -1240,7 +1240,7 @@ export function BasisCosts({
               {extra.noRate && <span className="ml-1 text-warn">There is no exchange rate for {extra.noRate} in Settings.</span>}
               {gap.needed.some((x) => asLine(x)) && (
                 <span className="mt-1 block text-warn">
-                  A cost shown as its own line is no longer spread into the prices: price Option {letter} again (&ldquo;Price all at …
+                  A cost shown as a charge of its own is no longer spread into the prices: price Option {letter} again (&ldquo;Price all at …
                   %&rdquo;) if you priced before moving it.
                 </span>
               )}

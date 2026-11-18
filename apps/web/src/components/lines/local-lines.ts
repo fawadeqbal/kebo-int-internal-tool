@@ -38,7 +38,7 @@ export function moveLine<T extends Row>(rows: T[], key: string, to: LineMove): T
   const row = rows[i]!;
   if (to === "indent") {
     if (row.parentKey) return "It is a part already.";
-    if (rows.some((r) => r.parentKey === key)) return "A line with parts cannot become a part. Move its parts out first.";
+    if (rows.some((r) => r.parentKey === key)) return "An item with parts cannot become a part. Move its parts out first.";
     const above = [...rows.slice(0, i)].reverse().find((r) => !r.parentKey);
     if (!above) return "There is no line above to make it a part of.";
     return rows.map((r, n) => (n === i ? { ...r, parentKey: above.key } : r));
@@ -58,7 +58,7 @@ export function moveLine<T extends Row>(rows: T[], key: string, to: LineMove): T
   }
   const tops = rows.map((r, n) => (r.parentKey ? -1 : n)).filter((n) => n >= 0);
   const other = tops[tops.indexOf(i) + by];
-  if (other === undefined) return to === "up" ? "It is the first line already." : "It is the last line already.";
+  if (other === undefined) return to === "up" ? "It is the first line already." : "It is the last item already.";
   const [a, b] = by < 0 ? [other, i] : [i, other];
   return [...rows.slice(0, a), ...rows.slice(b, blockEnd(rows, b)), ...rows.slice(a, blockEnd(rows, a)), ...rows.slice(blockEnd(rows, b))];
 }

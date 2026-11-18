@@ -52,7 +52,7 @@ class _PatternsScreenState extends State<PatternsScreen> {
               company: 'Kebo International',
               title: greeting(DateTime.now(), 'Fawad'),
               eyebrow: 'Monday 16 November',
-              summary: '12 open inquiries · 3 need factory prices',
+              summary: '12 open inquiries · 3 need supplier prices',
               sync: const KSyncState.synced('9:41'),
               userName: 'Fawad Iqbal',
               userRole: 'Owner',
@@ -66,7 +66,7 @@ class _PatternsScreenState extends State<PatternsScreen> {
             child: KAppHeader(
               company: 'Kebo International',
               title: 'Orders',
-              summary: '8 in progress · 2 waiting for papers',
+              summary: '8 in progress · 2 waiting for documents',
               sync: KSyncState.offline('8:42'),
               userName: 'Fawad Iqbal',
               userRole: 'Owner',
@@ -147,9 +147,9 @@ class _PatternsScreenState extends State<PatternsScreen> {
                         const KDetail('Customer', 'Kabul Medical Supplies'),
                         const KDetail('Valid until', '30 Nov 2026'),
                         const KDetail('Price (CIF Karachi)', 'USD 48,200', emphasis: true),
-                        const KDetail('Payment terms', '30% advance, 70% against B/L'),
+                        const KDetail('Payment terms', '30% deposit, 70% against B/L'),
                         if (_view == _View.internal) ...const [
-                          KDetail('Factory cost', 'USD 39,600', internal: true),
+                          KDetail('Supplier cost', 'USD 39,600', internal: true),
                           KDetail('Margin', '17.8%', internal: true),
                         ],
                         const KDetail('Customer reference', null),
@@ -187,7 +187,7 @@ class _PatternsScreenState extends State<PatternsScreen> {
                           KListItem(
                             leading: const KAvatar('Kabul Medical Supplies'),
                             title: 'Kabul Medical Supplies',
-                            subtitle: 'Tablet press, 35 stations · 2 lines',
+                            subtitle: 'Tablet press, 35 stations · 2 items',
                             meta: 'INQ-2026-0218 · 2 days ago',
                             status: const KBadge('Needs prices', tone: KTone.warning),
                             onPressed: () {},
@@ -208,7 +208,7 @@ class _PatternsScreenState extends State<PatternsScreen> {
                     const KCard(
                       child: KEmptyState(
                         icon: KIcons.file,
-                        title: 'No papers yet',
+                        title: 'No documents yet',
                         message: 'The bank needs the B/L and certificate of origin before it releases the balance.',
                       ),
                     ),
@@ -323,7 +323,7 @@ class _PatternsScreenState extends State<PatternsScreen> {
     final ok = await showKConfirm(
       context,
       title: 'Cancel order SO-2026-0035?',
-      message: 'USD 28,920 was received. Cancelling starts a refund and tells the factory to stop.',
+      message: 'USD 28,920 was received. Cancelling starts a refund and tells the supplier to stop.',
       confirmLabel: 'Cancel order',
       cancelLabel: 'Keep order',
       destructive: true,

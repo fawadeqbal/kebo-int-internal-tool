@@ -47,7 +47,7 @@ class FactoryPricesScreen extends ConsumerWidget {
     final counts = req.value?.objAt('counts');
     return Scaffold(
       backgroundColor: context.k.bg,
-      appBar: const KTopBar(title: 'Factory prices'),
+      appBar: const KTopBar(title: 'Supplier prices'),
       body: RefreshIndicator(
         onRefresh: () async => reload(),
         child: ListView(
@@ -75,13 +75,13 @@ class FactoryPricesScreen extends ConsumerWidget {
             const SizedBox(height: KSpace.s6),
             KSection(
               title: 'Asked',
-              actionLabel: 'Ask factories',
+              actionLabel: 'Ask suppliers',
               onAction: req.value == null
                   ? null
                   : () async {
                       if (await showKSheet<bool>(
                             context,
-                            title: 'Ask factories for a price',
+                            title: 'Ask suppliers for a price',
                             builder: (_) =>
                                 _Ask(inquiryId: inquiryId, suggestions: req.value!.list('suggestions', (m) => m)),
                           ) ==
@@ -95,8 +95,8 @@ class FactoryPricesScreen extends ConsumerWidget {
                   child: switch (req) {
                     AsyncValue(:final value?) when value.list('items', (m) => m).isEmpty => const KEmptyState(
                       icon: KIcons.factory,
-                      title: 'No factory asked yet',
-                      message: 'Ask a few factories for their price; their offers come here.',
+                      title: 'No supplier asked yet',
+                      message: 'Ask a few suppliers for their price; their offers come here.',
                     ),
                     AsyncValue(:final value?) => Column(
                       children: [
@@ -158,13 +158,13 @@ class FactoryPricesScreen extends ConsumerWidget {
                     AsyncValue(:final value?) when value.list('quotes', (m) => m).isEmpty => const KEmptyState(
                       icon: KIcons.file,
                       title: 'No offers yet',
-                      message: 'When a factory answers, add its prices here.',
+                      message: 'When a supplier answers, add its prices here.',
                     ),
                     AsyncValue(:final value?) => Column(
                       children: [
                         for (final (i, q) in value.list('quotes', (m) => m).indexed)
                           KListItem(
-                            title: q.at('factory.name') ?? 'Factory',
+                            title: q.at('factory.name') ?? 'Supplier',
                             subtitle: [
                               fmtMoney(q.strOrNull('factoryTotal'), q.strOrNull('currency')),
                               if (q.strOrNull('basis') != null)
@@ -205,7 +205,7 @@ class FactoryPricesScreen extends ConsumerWidget {
   Future<void> _answered(BuildContext context, Api api, Json r, VoidCallback reload) async {
     final pick = await showKSheet<String>(
       context,
-      title: r.at('factory.name') ?? 'Factory',
+      title: r.at('factory.name') ?? 'Supplier',
       builder: (ctx) => Column(
         children: [
           KListItem(title: 'They declined', chevron: false, onPressed: () => Navigator.pop(ctx, 'declined')),
@@ -259,7 +259,7 @@ class _AskState extends ConsumerState<_Ask> {
 
   Future<void> _send() async {
     if (_picked.isEmpty) {
-      setState(() => _error = 'Choose at least one factory.');
+      setState(() => _error = 'Choose at least one supplier.');
       return;
     }
     setState(() {
@@ -375,7 +375,7 @@ class _OfferState extends ConsumerState<_Offer> {
 
   Future<void> _save() async {
     if (_factory == null) {
-      setState(() => _error = 'Choose the factory.');
+      setState(() => _error = 'Choose the supplier.');
       return;
     }
     final lines = [
@@ -421,14 +421,14 @@ class _OfferState extends ConsumerState<_Offer> {
       children: [
         if (_error != null) ...[KBanner(_error!, tone: KTone.danger), const SizedBox(height: KSpace.s3)],
         KSelectField(
-          label: 'Factory',
+          label: 'Supplier',
           value: _factory?.name,
-          placeholder: 'Choose the factory',
+          placeholder: 'Choose the supplier',
           icon: KIcons.search,
           onTap: () async {
             final f = await showPickSheet(
               context,
-              title: 'Factory',
+              title: 'Supplier',
               choices: [
                 for (final f in widget.factories)
                   Choice(f.str('id'), f.str('name'), f.boolean('askedHere') ? 'Asked on this inquiry' : null),
@@ -476,7 +476,7 @@ class _OfferState extends ConsumerState<_Offer> {
         ),
         const SizedBox(height: KSpace.s2),
         if (widget.inquiry.items.isEmpty)
-          const KBanner('This inquiry has no items yet. Add the lines on the web.', tone: KTone.warning),
+          const KBanner('This inquiry has no items yet. Add the items on the web.', tone: KTone.warning),
         for (final it in widget.inquiry.items) ...[
           KTextField(
             label: '${it.no ?? ''} ${it.description}'.trim(),
@@ -488,13 +488,13 @@ class _OfferState extends ConsumerState<_Offer> {
           const SizedBox(height: KSpace.s3),
         ],
         const SizedBox(height: KSpace.s2),
-        KTextField(label: 'Lead time', controller: _lead, optional: true, hint: '45 days after advance'),
+        KTextField(label: 'Lead time', controller: _lead, optional: true, hint: '45 days after deposit'),
         const SizedBox(height: KSpace.s4),
         KTextField(
           label: 'Payment terms',
           controller: _terms,
           optional: true,
-          hint: '30% advance, 70% before shipment',
+          hint: '30% deposit, 70% before shipment',
         ),
         const SizedBox(height: KSpace.s4),
         KTextField(label: 'Their reference', controller: _ref, optional: true),

@@ -46,7 +46,7 @@ Map<String, Object?> _answers() => {
     'incotermPlace': 'Karachi',
     'depositPercent': 30,
     'validUntil': '2026-12-15',
-    'paymentTerms': '30% advance',
+    'paymentTerms': '30% deposit',
     'options': [
       {
         'factoryQuoteId': 'q1',
@@ -109,7 +109,7 @@ void main() {
     final server = await _open(t, '/sales/inquiry/$_id/quote');
     await t.scrollUntilVisible(find.textContaining('cost USD 39,600.00 (Internal)'), 300, scrollable: find.byType(Scrollable).hitTestable().first);
     expect(find.textContaining('1 set · cost USD 39,600.00 (Internal) · margin 12.0%'), findsOneWidget);
-    await t.enterText(find.widgetWithText(KTextField, 'Margin for every line'), '20');
+    await t.enterText(find.widgetWithText(KTextField, 'Margin for every item'), '20');
     await _tap(t, 'Apply');
     expect(find.textContaining('(Internal) · margin 20.0%'), findsOneWidget);
     await _tap(t, 'Save as draft');
@@ -119,7 +119,7 @@ void main() {
       'lineId': 'l1',
       'unitPrice': '49500.00',
     });
-    expect(body['paymentTerms'], '30% advance');
+    expect(body['paymentTerms'], '30% deposit');
   });
 
   testWidgets('the customer accepted: the order is made, with a moment', (t) async {

@@ -36,7 +36,7 @@ export function inquiryNew(i: InquiryFacts, by: string | null): Message {
     people: rowsOf([
       ["Customer", i.customer],
       ["Contact", i.contact],
-      ["Handled by", i.handler ?? "Nobody yet"],
+      ["Responsible person", i.handler ?? "Nobody yet"],
     ]),
     next: i.handler ? `${i.handler} replies to the customer within a day.` : "Give it to someone, so the customer gets an answer within a day.",
     button: "Open the inquiry",
@@ -57,7 +57,7 @@ export function inquiryYours(i: InquiryFacts, by: string | null): Message {
       ["Contact", i.contact],
       ["Given by", by],
     ]),
-    next: "Reply to the customer today, then ask two or three factories for prices.",
+    next: "Reply to the customer today, then ask two or three suppliers for prices.",
     button: "Open the inquiry",
     link: paths.inquiry(i.id),
   };
@@ -76,7 +76,7 @@ export function inquiryLost(i: InquiryFacts, by: string | null, lastQuoted: stri
     where: where(i),
     people: rowsOf([
       ["Customer", i.customer],
-      ["Handled by", i.handler],
+      ["Responsible person", i.handler],
       ["Marked by", by],
     ]),
     money: rowsOf([["Last quoted", lastQuoted]]),
@@ -123,7 +123,7 @@ export function quotationAccepted(i: InquiryFacts, r: RevisionFacts, o: OrderFac
     people: rowsOf([
       ["Customer", i.customer],
       ["Contact", i.contact],
-      ["Handled by", i.handler],
+      ["Responsible person", i.handler],
       ["Marked by", by],
     ]),
     money: o
@@ -150,7 +150,7 @@ export function quotationRejected(i: InquiryFacts, r: RevisionFacts, by: string 
     people: rowsOf([
       ["Customer", i.customer],
       ["Contact", i.contact],
-      ["Handled by", i.handler],
+      ["Responsible person", i.handler],
       ["Marked by", by],
     ]),
     money: rowsOf(optionRows(r)),
@@ -173,14 +173,14 @@ export function paymentIn(o: OrderFacts, amount: string, by: string | null, paid
     people: rowsOf([
       ["Customer", o.customer],
       ["Recorded by", by],
-      ["Handled by", o.handler],
+      ["Responsible person", o.handler],
     ]),
     money: rowsOf([
       ["Received", amount],
       ["Paid so far", o.paidSoFar],
       ["Still to come", o.dueMinor > 0 ? (o.nextLine ?? money(o.dueMinor, o.currency)) : "Nothing: paid in full"],
     ]),
-    next: o.stage === "confirmed" ? "Send the purchase order to the factory and pay its advance." : o.dueMinor > 0 ? "Nothing now: the next payment is reminded when it is due." : "Paid in full: the goods can be shipped.",
+    next: o.stage === "confirmed" ? "Send the purchase order to the supplier and pay its deposit." : o.dueMinor > 0 ? "Nothing now: the next payment is reminded when it is due." : "Paid in full: the goods can be shipped.",
     button: "Open the order's money",
     link: paths.orderMoney(o.id),
   };
@@ -200,16 +200,16 @@ export function purchaseOrderSent(
     sentence: `${po.by ?? "Someone"} sent purchase order ${po.number} to ${po.factory} for ${o.refNo} (${o.customerName}).${po.early ? `\nSent before the customer's deposit was verified: “${po.early}”` : ""}`,
     where: { ref: po.number, title: `for ${o.refNo} · ${o.customerName} · ${o.title}` },
     people: rowsOf([
-      ["Factory", [po.factory, po.contact].filter(Boolean).join(" · ")],
+      ["Supplier", [po.factory, po.contact].filter(Boolean).join(" · ")],
       ["Customer", o.customer],
       ["Sent by", po.by],
     ]),
     money: rowsOf([
-      ["Order to the factory", po.amount],
-      ["Advance", po.advance],
+      ["Order to the supplier", po.amount],
+      ["Deposit", po.advance],
       ["Customer has paid", o.paidSoFar],
     ]),
-    next: "Pay the factory's advance and ask them for the ready date.",
+    next: "Pay the supplier's deposit and ask them for the ready date.",
     button: "Open the purchase order",
     link: paths.factory(o.id),
   };
@@ -231,7 +231,7 @@ export function shipped(
       ["Customer", o.customer],
       ["Contact", o.contact],
       ["Forwarder", s.forwarder],
-      ["Handled by", o.handler],
+      ["Responsible person", o.handler],
     ]),
     money: rowsOf([
       ["Customer paid", o.paidSoFar],
@@ -256,22 +256,22 @@ export function inquiryWaiting(i: InquiryFacts, why: "new" | "sourcing", days: n
     tag: "Inquiry waiting",
     subject: isNew
       ? `${i.refNo} from ${i.customerName} is still new after ${days} day${days === 1 ? "" : "s"}${i.handler ? "" : " — nobody handles it"}`
-      : `${i.refNo} from ${i.customerName}: asking factories for ${days} days, no quotation yet`,
+      : `${i.refNo} from ${i.customerName}: asking suppliers for ${days} days, no quotation yet`,
     sentence: isNew
-      ? `The inquiry from ${i.customerName} came in ${days} day${days === 1 ? "" : "s"} ago and no factory has been asked yet.`
-      : `Factories are being asked for prices for ${days} days${offers && offers.asked ? `: ${offers.in} of ${offers.asked} have sent an offer` : offers?.in ? `: ${offers.in} offer${offers.in === 1 ? "" : "s"} in` : ""}. The customer has no quotation yet.`,
+      ? `The inquiry from ${i.customerName} came in ${days} day${days === 1 ? "" : "s"} ago and no supplier has been asked yet.`
+      : `Suppliers are being asked for prices for ${days} days${offers && offers.asked ? `: ${offers.in} of ${offers.asked} have sent an offer` : offers?.in ? `: ${offers.in} offer${offers.in === 1 ? "" : "s"} in` : ""}. The customer has no quotation yet.`,
     where: where(i),
     people: rowsOf([
       ["Customer", i.customer],
       ["Contact", i.contact],
-      ["Handled by", i.handler ?? "Nobody yet"],
+      ["Responsible person", i.handler ?? "Nobody yet"],
     ]),
     next: isNew
       ? i.handler
-        ? "Ask factories for prices, or tell the customer when they will hear from you."
+        ? "Ask suppliers for prices, or tell the customer when they will hear from you."
         : "Give it to someone, so the customer gets an answer."
       : "Send the quotation with the offers you have, or tell the customer where it stands.",
-    button: isNew ? "Open the inquiry" : "Open the factory offers",
+    button: isNew ? "Open the inquiry" : "Open the supplier offers",
     link: isNew ? paths.inquiry(i.id) : paths.sourcing(i.id),
   };
 }
@@ -290,7 +290,7 @@ export function neededBy(i: InquiryFacts, passed: boolean): Message {
     people: rowsOf([
       ["Customer", i.customer],
       ["Contact", i.contact],
-      ["Handled by", i.handler ?? "Nobody yet"],
+      ["Responsible person", i.handler ?? "Nobody yet"],
     ]),
     next: passed ? "Tell the customer where it stands and agree a new date." : "Make sure the quotation goes before that day.",
     button: "Open the inquiry",
@@ -313,7 +313,7 @@ export function quotationEnding(i: InquiryFacts, r: RevisionFacts, ended: boolea
     people: rowsOf([
       ["Customer", i.customer],
       ["Contact", i.contact],
-      ["Handled by", i.handler],
+      ["Responsible person", i.handler],
     ]),
     money: rowsOf(optionRows(r)),
     next: ended ? "Ask the customer once more, make a new revision, or mark the inquiry lost." : "Call the customer before it ends, or make a new revision with a later date.",
@@ -327,8 +327,8 @@ export function quotationEnding(i: InquiryFacts, r: RevisionFacts, ended: boolea
 function needAction(title: string) {
   if (/^Get the deposit/.test(title)) return { tag: "Deposit late", next: "Ask the customer for the deposit and send the proforma invoice again.", where: "money" as const };
   if (/^Get the balance/.test(title)) return { tag: "Balance late", next: "Ask the customer for the balance. Do not hand over the documents before it is in.", where: "money" as const };
-  if (/ready date/.test(title)) return { tag: "Ready date missing", next: "Ask the factory when the goods will be ready and enter the date.", where: "production" as const };
-  if (/^Goods (due|coming)/.test(title)) return { tag: "Goods late", next: "Call the factory for a new date, then tell the customer.", where: "production" as const };
+  if (/ready date/.test(title)) return { tag: "Ready date missing", next: "Ask the supplier when the goods will be ready and enter the date.", where: "production" as const };
+  if (/^Goods (due|coming)/.test(title)) return { tag: "Goods late", next: "Call the supplier for a new date, then tell the customer.", where: "production" as const };
   if (/packing list|mark as shipped/.test(title)) return { tag: "Ready to ship", next: "Make the packing list and book the shipment.", where: "shipping" as const };
   if (/close the order/.test(title)) return { tag: "Order to close", next: "Everything is paid: close the order.", where: "order" as const };
   return { tag: "Order waiting", next: "Open the order and move it on.", where: "order" as const };
@@ -347,8 +347,8 @@ export function orderWaiting(o: OrderFacts, need: { title: string; due: string; 
     people: rowsOf([
       ["Customer", o.customer],
       ["Contact", o.contact],
-      ["Factory", o.factories.join(", ") || null],
-      ["Handled by", o.handler],
+      ["Supplier", o.factories.join(", ") || null],
+      ["Responsible person", o.handler],
     ]),
     money: rowsOf([
       ["Order value", o.value],
@@ -393,7 +393,7 @@ export function paymentDue(o: OrderFacts, part: { label: string; openMinor: numb
         people: rowsOf([
           ["Customer", o.customer],
           ["Contact", o.contact],
-          ["Handled by", o.handler],
+          ["Responsible person", o.handler],
         ]),
         money: rowsOf([
           ["Late", `${amount} · ${late(lateBy)}`],
@@ -414,7 +414,7 @@ export function paymentDue(o: OrderFacts, part: { label: string; openMinor: numb
         people: rowsOf([
           ["Customer", o.customer],
           ["Contact", o.contact],
-          ["Handled by", o.handler],
+          ["Responsible person", o.handler],
         ]),
         money: rowsOf([
           ["Due", `${amount} on ${day(part.dueOn)}`],
@@ -438,22 +438,22 @@ export function factoryPayment(
   return {
     kind: row.lateBy !== null ? "reminder.factoryLate" : "reminder.factoryDue",
     group: "orders",
-    tag: "Pay the factory",
+    tag: "Pay the supplier",
     subject: `Pay ${f.factory}: ${amount} ${what} (${o.refNo}) — ${when}`,
     sentence: `The ${what} we owe ${f.factory} for ${o.refNo} (${o.customerName}) is ${row.lateBy !== null ? `${late(row.lateBy)}` : `due on ${day(row.due)}`} and not paid yet.`,
     where: orderWhere(o),
     people: rowsOf([
-      ["Factory", [f.factory, f.contact].filter(Boolean).join(" · ")],
+      ["Supplier", [f.factory, f.contact].filter(Boolean).join(" · ")],
       ["Customer", o.customer],
-      ["Handled by", o.handler],
+      ["Responsible person", o.handler],
     ]),
     money: rowsOf([
       ["To pay", `${amount} · ${what}`],
-      ["Paid to the factory", `${money(toMinorText(f.paid), f.currency)} of ${money(toMinorText(f.owed), f.currency)}`],
+      ["Paid to the supplier", `${money(toMinorText(f.paid), f.currency)} of ${money(toMinorText(f.owed), f.currency)}`],
       ["Customer has paid", o.paidSoFar],
     ]),
-    next: "Pay the factory, or record the payment if it is already made.",
-    button: "Pay the factory",
+    next: "Pay the supplier, or record the payment if it is already made.",
+    button: "Pay the supplier",
     link: paths.factory(o.id),
     urgent: row.lateBy !== null,
   };
@@ -470,7 +470,7 @@ export function yourDay(name: string, sections: { title: string; rows: MessageLi
     [count("Follow-ups today"), "follow-up", "follow-ups"],
     [count("Missed"), "missed", "missed"],
     [count("Money to collect"), "payment to collect", "payments to collect"],
-    [count("Pay the factory"), "factory payment", "factory payments"],
+    [count("Pay the supplier"), "supplier payment", "supplier payments"],
     [count("Orders waiting on you"), "order waiting", "orders waiting"],
     [count("Quotations ending"), "quotation ending", "quotations ending"],
     [count("Inquiries waiting"), "inquiry waiting", "inquiries waiting"],

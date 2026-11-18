@@ -147,7 +147,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                 KEmptyState(
                   icon: KIcons.bell,
                   title: _onlyUnread ? "You're all caught up" : 'No alerts yet',
-                  message: 'Payments, approvals, papers and dates that need you show here.',
+                  message: 'Payments, approvals, documents and dates that need you show here.',
                 ),
               ...rows,
               if (_loading)

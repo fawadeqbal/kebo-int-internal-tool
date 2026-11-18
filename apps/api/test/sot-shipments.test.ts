@@ -155,7 +155,7 @@ describe("the shipment is the shipment", () => {
     expect(await shipments(o.id)).toHaveLength(1);
   });
 
-  it("papers and the order page agree after a B/L correction; the final packing list keeps what it printed", async () => {
+  it("documents and the order page agree after a B/L correction; the final packing list keeps what it printed", async () => {
     const o = await newOrder("FOB", "Ningbo");
     await packed(o.id);
     await api(app, sana).post(`/orders/${o.id}/stage`, { to: "shipped", confirm: true, shippedOn: day(-40), blNo: "MEDU123" }).expect(200);

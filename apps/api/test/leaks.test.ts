@@ -21,7 +21,7 @@ describe("where we lose money", () => {
     await app?.close();
   });
 
-  it("is for managers, and adds up lost deals, profit kept and the year's trend", async () => {
+  it("is for managers, and adds up lost inquiries, profit kept and the year's trend", async () => {
     await api(app, staff).get("/reports/leaks").expect(403);
     const r = await report();
     expect(r.range).toEqual({ from: `${year}-01-01`, to: today });

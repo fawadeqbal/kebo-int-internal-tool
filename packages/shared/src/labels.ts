@@ -57,7 +57,7 @@ export const PRIORITY_LABEL: Record<Priority, string> = { low: "Low", normal: "N
 export const LOST_REASON_LABEL: Record<LostReason, string> = {
   price_too_high: "Price too high",
   no_reply: "No reply from customer",
-  factory_cannot_supply: "Factory can't make it or meet the date",
+  factory_cannot_supply: "Supplier can't make it or meet the date",
   bought_elsewhere: "Customer bought elsewhere",
   customer_cancelled: "Customer cancelled",
   duplicate_or_spam: "Duplicate or spam",
@@ -84,7 +84,7 @@ export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   not_chosen: "Not chosen",
 };
 
-export const ATTACHMENT_KIND_LABEL: Record<AttachmentKind, string> = { urs: "URS", drawing: "Drawing", photo: "Photo", specification: "Specification", factory_quote: "Factory quotation", other: "Other" };
+export const ATTACHMENT_KIND_LABEL: Record<AttachmentKind, string> = { urs: "URS", drawing: "Drawing", photo: "Photo", specification: "Specification", factory_quote: "Supplier offer", other: "Other" };
 
 export const LINE_TYPE_LABEL: Record<LineType, string> = { goods: "Goods", service: "Service", charge: "Charge (freight, fees)" };
 
@@ -105,7 +105,7 @@ export const ORDER_STAGE_LABEL: Record<OrderStage, string> = {
 /** One line under each stage: what the order is waiting for. */
 export const ORDER_STAGE_HINT: Record<OrderStage, string> = {
   confirmed: "The customer accepted. Waiting for the deposit.",
-  in_production: "The deposit came in and the factory is making the goods.",
+  in_production: "The deposit came in and the supplier is making the goods.",
   shipped: "The goods are on their way. Waiting for the balance.",
   done: "Fully paid and delivered.",
 };

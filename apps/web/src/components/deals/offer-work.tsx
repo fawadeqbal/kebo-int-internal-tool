@@ -259,7 +259,7 @@ function OfferWindow({
       if (!r.ok) {
         router.refresh();
         setStep("prices");
-        setError(`The offer was saved, but its lines were not: ${r.message} Save again to send the rest.`);
+        setError(`The offer was saved, but its items were not: ${r.message} Save again to send the rest.`);
         return;
       }
       if (saved.reason || !linesCard?.first)
@@ -360,7 +360,7 @@ function OfferWindow({
       parentId: it.parentId,
       values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(taxRate) },
     }));
-  const count = batch.rows.length ? linesCount(batch.rows) : "no lines yet";
+  const count = batch.rows.length ? linesCount(batch.rows) : "no items yet";
 
   return (
     <PanelBody fill>
@@ -383,17 +383,17 @@ function OfferWindow({
               {used && (
                 <p className="flex shrink-0 items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
                   <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
-                  <span>A quotation is priced from this offer. Its own copy of the lines and prices stays as it was.</span>
+                  <span>A quotation is priced from this offer. Its own copy of the items and prices stays as it was.</span>
                 </p>
               )}
               <LineTable
                 rows={batch.rows}
                 columns={columns}
-                noun="line"
+                noun="item"
                 fill
                 partButton={false}
                 sheet={{
-                  name: `Prices from ${q?.factory.name ?? "the factory"}`,
+                  name: `Prices from ${q?.factory.name ?? "the supplier"}`,
                   upload: !used,
                   templateRows: items.map((it) => ({ no: it.no, values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(h.taxRate) } })),
                 }}
@@ -408,7 +408,7 @@ function OfferWindow({
                     {empty && others.length > 0 && (
                       <Select
                         compact
-                        aria-label="Copy another offer’s lines"
+                        aria-label="Copy another offer’s items"
                         value={copyFrom}
                         onChange={(e) => {
                           const o = others.find((x) => x.id === e.target.value);
@@ -450,7 +450,7 @@ function OfferWindow({
               />
               {h.errors.length > 0 && (
                 <div role="alert" className="flex shrink-0 flex-col gap-0.5 rounded-xl border border-bad/30 bg-bad-soft px-3 py-2.5 text-sm text-bad">
-                  <span className="font-semibold">Nothing was saved yet: fix {h.errors.length === 1 ? "this line" : "these lines"} first.</span>
+                  <span className="font-semibold">Nothing was saved yet: fix {h.errors.length === 1 ? "this item" : "these items"} first.</span>
                   {h.errors.map((e) => (
                     <span key={e}>{e}</span>
                   ))}
@@ -502,10 +502,10 @@ function OfferWindow({
               <WhatHappens
                 lines={[
                   q.lines.length
-                    ? `The offer, its ${q.lines.length === 1 ? "line" : `${q.lines.length} lines`} and its files are removed from this inquiry.`
+                    ? `The offer, its ${q.lines.length === 1 ? "line" : `${q.lines.length} items`} and its files are removed from this inquiry.`
                     : "The offer and its files are removed from this inquiry.",
-                  "If the factory was asked, its line goes back to “Waiting”; if not, it leaves the list.",
-                  used ? "The quotation made from it keeps its own copy of the lines and prices." : null,
+                  "If the supplier was asked, its item goes back to “Waiting”; if not, it leaves the list.",
+                  used ? "The quotation made from it keeps its own copy of the items and prices." : null,
                 ]}
               />
             ) : (
@@ -528,12 +528,12 @@ function OfferWindow({
 function linesCount(rows: { parentKey: string | null }[]) {
   const parts = rows.filter((r) => r.parentKey).length;
   const lines = rows.length - parts;
-  return [`${lines} line${lines === 1 ? "" : "s"}`, parts ? `${parts} part${parts === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
+  return [`${lines} item${lines === 1 ? "" : "s"}`, parts ? `${parts} part${parts === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
 }
 
 /** The lines in Review (a new offer): number, what, how many, the line's total. */
 function LinesReview({ rows, currency, tax }: { rows: LineRow[]; currency: string; tax: Omit<Parameters<typeof OfferTotals>[0], "rows" | "currency"> }) {
-  if (!rows.length) return <p className="px-4 py-3 text-sm text-text-2">No lines yet.</p>;
+  if (!rows.length) return <p className="px-4 py-3 text-sm text-text-2">No items yet.</p>;
   const numbers = lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey })));
   return (
     <>
@@ -675,7 +675,7 @@ export function OfferTotals({
     rates.length > 1 ? (
       <>
         Tax · {how}
-        <span className="block text-xs text-muted">{rates.map((r) => `${r}% on ${byRate.get(r)!.lines} line${byRate.get(r)!.lines === 1 ? "" : "s"}`).join(" · ")}</span>
+        <span className="block text-xs text-muted">{rates.map((r) => `${r}% on ${byRate.get(r)!.lines} item${byRate.get(r)!.lines === 1 ? "" : "s"}`).join(" · ")}</span>
       </>
     ) : (
       `Tax ${rates[0] ?? taxRate}% · ${how}`
@@ -746,14 +746,14 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
       label: "Description",
       width: "minmax(0,1fr)",
       input: "textarea",
-      required: "Each line needs a description",
+      required: "Each item needs a description",
     },
-    { key: "model", label: "Model", width: "5.5rem", input: "text", maxLength: 120, placeholder: "Model" },
-    { key: "quantity", label: "Qty", width: "3.75rem", input: "number", align: "right", initial: "1", required: "Enter a quantity" },
+    { key: "model", label: "Model / part no.", width: "5.5rem", input: "text", maxLength: 120, placeholder: "Model" },
+    { key: "quantity", label: "Quantity", width: "4.25rem", input: "number", align: "right", initial: "1", required: "Enter a quantity" },
     { key: "unit", label: "Unit", width: "4.75rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
     {
       key: "unitPrice",
-      label: `Price ${currency}`,
+      label: `Unit price ${currency}`,
       width: "6.5rem",
       input: "number",
       align: "right",
@@ -804,7 +804,7 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
             phoneHidden: true,
             format: (v: LineValues) =>
               v.alternativeOfId ? (
-                <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn" title="Another spec of that line: a choice, left out of the total">
+                <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn" title="Another spec of that item: a choice, left out of the total">
                   of {numberOf(v.alternativeOfId)}
                 </span>
               ) : (
@@ -813,7 +813,7 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
           },
         ]
       : []),
-    { key: "total", label: `Total ${currency}`, width: "7rem", align: "right", format: lineTotal },
+    { key: "total", label: `Amount ${currency}`, width: "7rem", align: "right", format: lineTotal },
   ];
   return columns;
 }
@@ -877,10 +877,10 @@ export function OfferBoxes({
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <RecordBox title="Factory" what="the factory" canEdit={canEdit} edit={edit("factory", "the factory")} history={history(["offer.factory"], "Factory")}>
+        <RecordBox title="Supplier" what="the supplier" canEdit={canEdit} edit={edit("factory", "the supplier")} history={history(["offer.factory"], "Supplier")}>
           <BoxFacts
             rows={[
-              ["Factory", q.factory.name],
+              ["Supplier", q.factory.name],
               ["Received on", dateText(q.receivedOn)],
               ["Valid until", q.validUntil ? dateText(q.validUntil) : null],
               ["Their reference", q.reference || null],
@@ -903,7 +903,7 @@ export function OfferBoxes({
           <BoxFacts
             rows={[
               ["Delivery", q.basis ? basisText(q.basis, q.basisPlace) : null],
-              ["Ready in", q.leadTime || null],
+              ["Lead time", q.leadTime || null],
               ["Payment", q.paymentParts.length ? partsWords(q.paymentParts, "factory") : null],
               ["Payment note", q.paymentTerms ? <span className="line-clamp-3 whitespace-pre-line">{q.paymentTerms}</span> : null],
             ]}
@@ -915,7 +915,7 @@ export function OfferBoxes({
         count={[q.lines.length ? linesCount(offerRows(q.lines)) : null, q.currency, Number(q.taxRate) > 0 ? offerTaxText(q.taxRate, q.taxIncluded) : "no tax"].filter(Boolean).join(" · ")}
         what="prices"
         canEdit={canEdit}
-        edit={<OfferEdit kit={kit} q={q} step="prices" what="prices" words={q.lines.length ? undefined : "Add lines"} only variant="ghost" />}
+        edit={<OfferEdit kit={kit} q={q} step="prices" what="prices" words={q.lines.length ? undefined : "Add items"} only variant="ghost" />}
         tools={<LinesExcel name={`Prices from ${q.factory.name}`} rows={rows} columns={columns} numbers={numbers} />}
         history={history(["lines", "offer.prices"], "Prices")}
       >
@@ -945,7 +945,7 @@ export function OfferBoxes({
             <div className="border-t border-line sm:hidden">{footer}</div>
           </>
         ) : (
-          <p className="px-5 py-4 text-sm text-muted max-sm:px-4">No lines yet.</p>
+          <p className="px-5 py-4 text-sm text-muted max-sm:px-4">No items yet.</p>
         )}
       </RecordBox>
       <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -1023,7 +1023,7 @@ export function AddOfferButton({
       {open && (
         <SidePanel
           key={round}
-          title="New factory offer"
+          title="New supplier offer"
           description={refNo ? `For ${[refNo, inquiryTitle].filter(Boolean).join(" · ")}` : "Internal, never shown to the customer."}
           className="md:w-[1180px]"
           onClose={() => setOpen(false)}

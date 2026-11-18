@@ -604,7 +604,7 @@ export class QuotationsService {
     const seen = await this.inquiries.find(user, inquiryId);
     const first = await this.firstTerms(seen, settings);
     const available = await this.offers(user, inquiryId, input.currency);
-    if (input.offers.some((id) => id) && !can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see factory prices can quote a factory's offer.");
+    if (input.offers.some((id) => id) && !can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see supplier prices can quote a supplier's offer.");
     const made = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from inquiries where id = ${inquiryId}::uuid for update`;
       const inquiry = await this.inquiries.findWorkable(user, inquiryId, tx);
@@ -616,7 +616,7 @@ export class QuotationsService {
       const out: { id: string; refNo: string; letter: string; revisionId: string; number: number }[] = [];
       for (const offerId of input.offers) {
         const offer = offerId ? available.offers.find((o) => o.factoryQuoteId === offerId) : null;
-        if (offerId && !offer) throw new DomainError("One of the offers is no longer on this inquiry, or has no lines yet. Reload the page.");
+        if (offerId && !offer) throw new DomainError("One of the offers is no longer on this inquiry, or has no items yet. Reload the page.");
         const values: RevisionInput = {
           ...first.terms,
           currency: input.currency as Currency,
@@ -699,14 +699,14 @@ export class QuotationsService {
       const lines: Omit<Prisma.QuoteLineCreateManyInput, "revisionId" | "optionId" | "lineTotal">[] = [];
       let basis: { factoryBasis: Incoterm | null; factoryBasisPlace: string | null } = { factoryBasis: null, factoryBasisPlace: null };
       if (o.factoryQuoteId) {
-        if (!can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see factory prices can quote a factory's offer.");
-        if (seen.has(o.factoryQuoteId)) throw new DomainError("Each option must be a different factory's offer.");
+        if (!can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see supplier prices can quote a supplier's offer.");
+        if (seen.has(o.factoryQuoteId)) throw new DomainError("Each option must be a different supplier's offer.");
         seen.add(o.factoryQuoteId);
         const q = await tx.factoryQuote.findFirst({
           where: { id: o.factoryQuoteId, inquiryId, deletedAt: null },
           include: { lines: { orderBy: { sortOrder: "asc" } } },
         });
-        if (!q) throw new DomainError(`Option ${letter}: that factory offer is no longer on this inquiry. Reload the page.`);
+        if (!q) throw new DomainError(`Option ${letter}: that supplier offer is no longer on this inquiry. Reload the page.`);
         basis = { factoryBasis: q.basis, factoryBasisPlace: q.basisPlace };
         const rate = fxRate(q.currency, input.currency, sales.currency, sales.exchangeRates);
         for (const l of q.lines) {
@@ -750,7 +750,7 @@ export class QuotationsService {
       // Costs between the factory's basis and ours, in the quotation's currency at today's rate.
       const costs: Omit<Prisma.OptionCostCreateManyInput, "optionId">[] = [];
       for (const c of o.costs.filter((x) => Number(x.amount) > 0)) {
-        if (!can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see factory prices can enter costs.");
+        if (!can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see supplier prices can enter costs.");
         if (costs.some((x) => x.step === c.step)) throw new DomainError(`Option ${letter}: ${BASIS_STEP_LABEL[c.step]} is entered twice.`);
         const rate = fxRate(c.currency, input.currency, sales.currency, sales.exchangeRates);
         if (rate === null) throw new DomainError(`Option ${letter}: there is no exchange rate for ${c.currency} in Settings, so ${BASIS_STEP_LABEL[c.step].toLowerCase()} cannot be turned into ${input.currency}.`);
@@ -761,7 +761,7 @@ export class QuotationsService {
         o.discount,
       );
       // A draft can wait for its prices (own prices start at 0); sending needs them (see move).
-      if (totals.total < 0) throw new DomainError(`Option ${letter}: the discount is more than the lines.`);
+      if (totals.total < 0) throw new DomainError(`Option ${letter}: the discount is more than the items.`);
       if (totals.total > MAX_TOTAL_MINOR) throw new DomainError(`Option ${letter}: the total is too large.`);
       built.push({
         option: {
@@ -1056,7 +1056,7 @@ export class QuotationsService {
       if (to === "sent") {
         if (r.number !== latestRevision(refs)!.number) throw new GateError("Only the newest revision can be sent.", "not_latest");
         if (r.options.some((o) => !(Number(o.total) > 0)))
-          throw new DomainError(r.options.length > 1 ? "Price every option before sending: one of them comes to 0." : "Price the lines before sending: the quotation comes to 0.");
+          throw new DomainError(r.options.length > 1 ? "Price every option before sending: one of them comes to 0." : "Price the items before sending: the quotation comes to 0.");
         if (!canQuote(inquiry.stage)) throw new DomainError("This inquiry is closed. Reopen it to quote again.");
         const settings = await this.settings.get();
         await tx.quotationRevision.update({

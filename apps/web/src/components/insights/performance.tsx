@@ -175,7 +175,7 @@ async function figures(kind: Kind, id: string, span: { from?: string; to?: strin
   return [
     { label: "Inquiries", value: String(q?.inquiries ?? 0), sub: q ? `${q.open} open · ${q.won} won · ${q.lost} lost` : "none yet" },
     {
-      label: "Days to first quote",
+      label: "Days to first quotation",
       value: q?.medianDaysToFirstQuote === null || q?.medianDaysToFirstQuote === undefined ? "—" : String(q.medianDaysToFirstQuote),
       sub: "median, from the inquiry",
     },

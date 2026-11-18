@@ -47,13 +47,13 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
   let filledChanged = false;
   for (const [key, { r, no }] of was)
     if (!now.has(key)) {
-      changes.push(`Removed ${no} · ${firstLine(r.values.description) || "a line"}`);
+      changes.push(`Removed ${no} · ${firstLine(r.values.description) || "an item"}`);
       filledChanged = true;
     }
   for (const [i, r] of after.entries()) {
     const old = was.get(r.key);
     if (!old) {
-      changes.push(`Added ${noAfter[i]} · ${firstLine(r.values.description) || "a line"}`);
+      changes.push(`Added ${noAfter[i]} · ${firstLine(r.values.description) || "an item"}`);
       continue;
     }
     const diffs: string[] = [];
@@ -78,7 +78,7 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
       .map((r) => `${r.key}<${r.parentKey ?? ""}`)
       .join("|");
   if (kept(before) !== kept(after)) {
-    changes.push("The order of the lines changed");
+    changes.push("The order of the items changed");
     filledChanged = true;
     for (const r of after) {
       const old = was.get(r.key);

@@ -118,7 +118,7 @@ export function QuoteStepsPanel({
 }
 
 /** A part's name in its window's title ("Delivery · Q-2611-0007"). */
-const PART_TITLE: Record<QuoteStep, string> = { lines: "Lines", delivery: "Delivery", payment: "Payment", warranty: "Warranty & conditions" };
+const PART_TITLE: Record<QuoteStep, string> = { lines: "Items", delivery: "Delivery", payment: "Payment", warranty: "Warranty & conditions" };
 
 /**
  * Edit, with its word, on the draft (design 17 Nov, edit one part): `only` opens just that part, sized to it,
@@ -231,7 +231,7 @@ export function AcceptForm({
                       {o.factory ? ` · ${o.factory.name}` : ""}
                     </strong>
                     <span className="block text-xs text-muted">
-                      {[`${o.lines.length} line${o.lines.length === 1 ? "" : "s"}`, o.leadTime, o.costing?.marginPercent != null ? `margin ${o.costing.marginPercent.toFixed(1)}%` : null].filter(Boolean).join(" · ")}
+                      {[`${o.lines.length} item${o.lines.length === 1 ? "" : "s"}`, o.leadTime, o.costing?.marginPercent != null ? `margin ${o.costing.marginPercent.toFixed(1)}%` : null].filter(Boolean).join(" · ")}
                     </span>
                   </span>
                   <strong className="text-base whitespace-nowrap tabular">{money(o.total, currency)}</strong>
@@ -242,7 +242,7 @@ export function AcceptForm({
               <Field label="Accepted on" htmlFor="accept-on" required error={s.errors?.on}>
                 <Input id="accept-on" name="on" type="date" max={today} defaultValue={s.values?.on ?? today} />
               </Field>
-              <Field label="Their PO / reference" htmlFor="accept-ref" error={s.errors?.customerRef}>
+              <Field label="Customer's order no. / reference" htmlFor="accept-ref" error={s.errors?.customerRef}>
                 <Input id="accept-ref" name="customerRef" maxLength={80} defaultValue={s.values?.customerRef ?? ""} />
               </Field>
               <Field label="Payment route" htmlFor="accept-route" error={s.errors?.route}>
@@ -259,7 +259,7 @@ export function AcceptForm({
               <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">
                 <strong className="block text-text">What happens</strong>
                 <span className="block">
-                  · Sales order <strong className="text-text">SO-{today.slice(0, 4)}-…</strong> is made with Option {chosen.letter}&apos;s lines, prices and terms.
+                  · Sales order <strong className="text-text">SO-{today.slice(0, 4)}-…</strong> is made with Option {chosen.letter}&apos;s items, prices and terms.
                 </span>
                 {factories.length > 0 && (
                   <span className="block">

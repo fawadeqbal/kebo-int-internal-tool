@@ -4,7 +4,7 @@ import { StatTile } from "@kebo/ui";
 
 // The one tile for a headline figure: dashboard, reports, records and the platform all draw this.
 describe("StatTile", () => {
-  it("shows the label, the value and one line of context", () => {
+  it("shows the label, the value and one item of context", () => {
     render(<StatTile label="Receivable" value="USD 119,390.68" sub="USD 8,670.00 overdue" />);
     expect(screen.getByText("Receivable")).toBeTruthy();
     expect(screen.getByText("USD 119,390.68").getAttribute("title")).toBe("USD 119,390.68");
@@ -17,7 +17,7 @@ describe("StatTile", () => {
     expect(screen.getByRole("link", { name: /Failed sign-ins/ }).getAttribute("href")).toBe("/access/sign-ins?failed=1");
   });
 
-  it("colours the line under the value by meaning (board), and draws the bad share as a bar with words", () => {
+  it("colours the item under the value by meaning (board), and draws the bad share as a bar with words", () => {
     render(<StatTile label="Receivable" value="USD 100" sub="USD 40 late" tone="bad" meter={{ percent: 140, label: "USD 40 of it overdue" }} />);
     expect(screen.getByText("USD 100").className).not.toContain("text-bad");
     expect(screen.getByText("USD 40 late").className).toContain("text-bad");

@@ -36,28 +36,28 @@ test("a new offer: Factory, Prices, Delivery & payment, Conditions, Review; a wr
   const deal = await newInquiry(page);
   await page.goto(`/inquiries/${deal.id}/sourcing`);
   await page.getByRole("button", { name: "Enter an offer" }).first().click();
-  const win = page.getByRole("dialog", { name: "New factory offer" });
+  const win = page.getByRole("dialog", { name: "New supplier offer" });
   const rail = win.getByRole("navigation", { name: "Steps" });
-  for (const step of ["Factory", "Prices", "Delivery & payment", "Conditions", "Review"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
-  await expect(rail.getByRole("button", { name: /Factory/ })).toHaveAttribute("aria-current", "step");
+  for (const step of ["Supplier", "Prices", "Delivery & payment", "Conditions", "Review"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
+  await expect(rail.getByRole("button", { name: /Supplier/ })).toHaveAttribute("aria-current", "step");
 
   // Who: a factory not on the list yet.
   const factory = `Wuxi Steps ${deal.tag}`;
-  await win.getByRole("combobox", { name: /Factory/ }).fill(factory);
-  await win.getByRole("option", { name: `New factory “${factory}”` }).click();
-  await expect(win.getByText("New factory — added when you save")).toBeVisible();
+  await win.getByRole("combobox", { name: /Supplier/ }).fill(factory);
+  await win.getByRole("option", { name: `New supplier “${factory}”` }).click();
+  await expect(win.getByText("New supplier — added when you save")).toBeVisible();
   await win.getByRole("button", { name: /^Next/ }).click();
 
   // Prices: the customer's items copied with the other ways in (never inside the table); prices typed in the sheet.
   await expect(rail.getByRole("button", { name: /Prices/ })).toHaveAttribute("aria-current", "step");
   await win.getByRole("button", { name: /Copy customer’s items/ }).click();
   const sheet = win.getByRole("grid");
-  await expect(sheet.getByRole("row", { name: "Line 1" })).toContainText("Capsule filling machine");
-  await expect(sheet.getByRole("row", { name: "Line 2" })).toContainText("Change parts");
+  await expect(sheet.getByRole("row", { name: "Item 1" })).toContainText("Capsule filling machine");
+  await expect(sheet.getByRole("row", { name: "Item 2" })).toContainText("Change parts");
   await expect(sheet.getByRole("columnheader", { name: "For item" })).toHaveCount(0);
-  await sheet.getByRole("row", { name: "Line 1" }).getByRole("gridcell").nth(4).click();
+  await sheet.getByRole("row", { name: "Item 1" }).getByRole("gridcell").nth(4).click();
   await page.keyboard.press("Enter");
-  await page.getByLabel("Line 1: Price CNY").fill("120000");
+  await page.getByLabel("Item 1: Unit price CNY").fill("120000");
   await page.keyboard.press("Enter");
   const totals = win.getByRole("group", { name: "Totals" });
   await expect(totals).toContainText("120,000.00");
@@ -67,7 +67,7 @@ test("a new offer: Factory, Prices, Delivery & payment, Conditions, Review; a wr
   await win.getByLabel("Tax %", { exact: true }).fill("13");
   await expect(tax.getByRole("radio", { name: "Included" })).toHaveAttribute("aria-checked", "true");
   await expect(sheet.getByRole("columnheader", { name: "Tax", exact: true })).toBeVisible();
-  await expect(sheet.getByRole("row", { name: "Line 1" })).toContainText("13%");
+  await expect(sheet.getByRole("row", { name: "Item 1" })).toContainText("13%");
   await expect(totals).toContainText("Before tax");
   await expect(totals).toContainText("Tax 13% · included");
   await expect(totals).toContainText("13,805.31");
@@ -75,23 +75,23 @@ test("a new offer: Factory, Prices, Delivery & payment, Conditions, Review; a wr
   expect(await accessibilityProblems(page), "the offer's Prices step meets WCAG 2.2 AA").toEqual([]);
 
   // A wrong line: the quantity of line 2 is 0. Nothing is saved; the window opens Prices and says which line.
-  await sheet.getByRole("row", { name: "Line 2" }).getByRole("gridcell").nth(2).click();
+  await sheet.getByRole("row", { name: "Item 2" }).getByRole("gridcell").nth(2).click();
   await page.keyboard.press("Enter");
-  await page.getByLabel("Line 2: Qty").fill("0");
+  await page.getByLabel("Item 2: Quantity").fill("0");
   await page.keyboard.press("Enter");
   await win.getByRole("button", { name: "Review", exact: true }).click();
   await expect(win.getByRole("region", { name: "Prices" })).toContainText("Capsule filling machine");
   expect(await accessibilityProblems(page), "the offer's Review step meets WCAG 2.2 AA").toEqual([]);
   await win.getByRole("button", { name: "Confirm and save" }).click();
   await expect(rail.getByRole("button", { name: /Prices/ })).toHaveAttribute("aria-current", "step");
-  await expect(win.getByRole("alert").filter({ hasText: "Nothing was saved yet" })).toContainText("Line 2:");
+  await expect(win.getByRole("alert").filter({ hasText: "Nothing was saved yet" })).toContainText("Item 2:");
   const before = await (await page.request.get(`/api/inquiries/${deal.id}/sourcing`)).json();
   expect(before.quotes, "nothing was saved").toHaveLength(0);
 
   // Fixed, saved from Review: the offer opens on its own page with both lines.
-  await sheet.getByRole("row", { name: "Line 2" }).getByRole("gridcell").nth(2).click();
+  await sheet.getByRole("row", { name: "Item 2" }).getByRole("gridcell").nth(2).click();
   await page.keyboard.press("Enter");
-  await page.getByLabel("Line 2: Qty").fill("2");
+  await page.getByLabel("Item 2: Quantity").fill("2");
   await page.keyboard.press("Enter");
   await rail.getByRole("button", { name: /Review/ }).click();
   await win.getByRole("button", { name: "Confirm and save" }).click();
@@ -100,7 +100,7 @@ test("a new offer: Factory, Prices, Delivery & payment, Conditions, Review; a wr
   await expect(page.getByRole("heading", { level: 1, name: factory })).toBeVisible();
   await expect(page.getByText(`Offer from ${factory} added`)).toBeVisible();
   // The page: the same boxes as the steps.
-  for (const box of ["Factory", "Delivery & payment", "Prices", "Conditions"]) await expect(page.getByRole("region", { name: box, exact: true })).toBeVisible();
+  for (const box of ["Supplier", "Delivery & payment", "Prices", "Conditions"]) await expect(page.getByRole("region", { name: box, exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Prices", exact: true })).toContainText("Change parts");
   await expect(page.getByRole("region", { name: "Prices", exact: true })).toContainText("120,000.00");
   const saved = (await (await page.request.get(`/api/inquiries/${deal.id}/sourcing`)).json()).quotes[0];
@@ -147,7 +147,7 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   await win.locator("#leadDays").fill("45");
   await expect(win.getByText(/Changed · was/)).toBeVisible();
   await expect(win.getByRole("button", { name: "Save 1 change" })).toBeDisabled();
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Factory changed its terms" }).click();
+  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Supplier changed its terms" }).click();
   await win.getByRole("button", { name: "Save 1 change" }).click();
   await expect(win).toBeHidden();
   await expect(page.getByRole("region", { name: "Delivery & payment", exact: true })).toContainText("45 days");
@@ -159,11 +159,11 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   await expect(win.getByRole("textbox", { name: "Their reference" })).toHaveCount(0);
   await expect(win.getByText(/A quotation is priced from this offer/)).toBeVisible();
   const sheet = win.getByRole("grid");
-  await sheet.getByRole("row", { name: "Line 2" }).getByRole("gridcell").nth(4).click();
+  await sheet.getByRole("row", { name: "Item 2" }).getByRole("gridcell").nth(4).click();
   await page.keyboard.press("Enter");
-  await page.getByLabel("Line 2: Price CNY").fill("4500");
+  await page.getByLabel("Item 2: Unit price CNY").fill("4500");
   await page.keyboard.press("Enter");
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Factory changed its price" }).click();
+  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Supplier changed its price" }).click();
   await win.getByRole("button", { name: "Save 1 change" }).click();
   await expect(win).toBeHidden();
   await expect(page.getByRole("region", { name: "Prices", exact: true })).toContainText("9,000.00");
@@ -172,9 +172,9 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   await page.getByRole("button", { name: "Edit offer" }).click();
   win = page.getByRole("dialog", { name: "Edit offer" });
   const rail = win.getByRole("navigation", { name: "Steps" });
-  await expect(rail.getByRole("button", { name: /Factory/ })).toHaveAttribute("aria-current", "step");
+  await expect(rail.getByRole("button", { name: /Supplier/ })).toHaveAttribute("aria-current", "step");
   await win.getByRole("textbox", { name: "Their reference" }).fill(`HS-${deal.tag}`);
-  await expect(rail.getByRole("button", { name: /Factory/ })).toContainText("1");
+  await expect(rail.getByRole("button", { name: /Supplier/ })).toContainText("1");
   await win.getByRole("button", { name: /^Changes · 1/ }).click();
   const list = win.getByRole("table", { name: "What changed" });
   await expect(list.getByRole("row").filter({ hasText: "Their reference" }).getByRole("cell").nth(3)).toHaveText(`HS-${deal.tag}`);
@@ -182,13 +182,13 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Typed wrong" }).click();
   await win.getByRole("button", { name: "Save 1 change" }).click();
   await expect(win).toBeHidden();
-  await expect(page.getByRole("region", { name: "Factory", exact: true })).toContainText(`HS-${deal.tag}`);
+  await expect(page.getByRole("region", { name: "Supplier", exact: true })).toContainText(`HS-${deal.tag}`);
 
   // Each box's clock: only its own changes, with why.
   await page.getByRole("button", { name: "History of delivery & payment" }).click();
   const hist = page.getByRole("dialog", { name: "Delivery & payment · history" });
-  await expect(hist).toContainText("Ready in");
-  await expect(hist).toContainText("Factory changed its terms");
+  await expect(hist).toContainText("Lead time");
+  await expect(hist).toContainText("Supplier changed its terms");
   await expect(hist).not.toContainText("Their reference");
 
   const saved = await (await page.request.get(`/api/inquiries/${deal.id}/sourcing`)).json();

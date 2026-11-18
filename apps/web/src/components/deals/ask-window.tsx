@@ -63,9 +63,9 @@ export function AskWindow({
           <div data-panel-body className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 *:shrink-0 sm:px-6">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[13px] font-semibold">
-                Factories<span className="text-bad"> *</span> <span className="font-normal text-muted">· {picked.length} chosen</span>
+                Suppliers<span className="text-bad"> *</span> <span className="font-normal text-muted">· {picked.length} chosen</span>
               </span>
-              <Link href="/factories?panel=new-factory" className={buttonClass("secondary", "sm")}>
+              <Link href="/suppliers?panel=new-factory" className={buttonClass("secondary", "sm")}>
                 <Plus aria-hidden /> New supplier
               </Link>
             </div>
@@ -266,7 +266,7 @@ export function RequestMore({
             run(remove, {})();
           }}
         >
-          <WhatHappens lines={["The line leaves this inquiry. Nothing else changes.", `${name} stays in Partners.`]} />
+          <WhatHappens lines={["The item leaves this inquiry. Nothing else changes.", `${name} stays in Partners.`]} />
         </ConfirmDialog>
       )}
     </>

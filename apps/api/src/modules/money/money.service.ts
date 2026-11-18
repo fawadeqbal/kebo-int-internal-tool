@@ -608,16 +608,16 @@ export class MoneyService {
     }
     if (input.factoryId) {
       const f = await this.prisma.db.party.findFirst({ where: { ...isSupplier, id: input.factoryId, deletedAt: null }, select: { id: true } });
-      if (!f) throw new DomainError("That factory is not in the system any more.");
+      if (!f) throw new DomainError("That supplier is not in the system any more.");
     }
     // On an order: its step (left out on a change: kept; on a new one: the usual step of its kind) and who bears it.
     const step = order ? (input.step === undefined ? (before ? before.step : (STEP_OF_CATEGORY[input.category] ?? null)) : input.step) : null;
     const borneBy = input.borneBy ?? (before?.borneBy as ExpenseBearer | undefined) ?? "us";
-    if (borneBy !== "us" && !order) throw new DomainError("Only an order's expense can be charged to the customer or the factory.");
+    if (borneBy !== "us" && !order) throw new DomainError("Only an order's expense can be charged to the customer or the supplier.");
     if (borneBy === "factory") {
-      if (!input.factoryId) throw new DomainError("Choose the factory that bears it.");
+      if (!input.factoryId) throw new DomainError("Choose the supplier that bears it.");
       const onOrder = await this.prisma.db.orderLine.count({ where: { orderId: order!.id, factoryId: input.factoryId } });
-      if (!onOrder) throw new DomainError("That factory has nothing on this order, so nothing can be taken off what we owe it.");
+      if (!onOrder) throw new DomainError("That supplier has nothing on this order, so nothing can be taken off what we owe it.");
     }
     const ownMoney = input.ownMoney ?? before?.ownMoney ?? false;
     if (ownMoney && !input.paidById) throw new DomainError("Say who paid it from their own money.");

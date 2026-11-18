@@ -87,7 +87,7 @@ describe("the period", () => {
   });
 });
 
-describe("one line of All entries", () => {
+describe("one item of All entries", () => {
   it("says the day, the type, the reference (opening the entry), who, the order, debit → credit and the amount", () => {
     render(<Line r={row()} />);
     expect(screen.getByText("04 Nov")).toBeTruthy();

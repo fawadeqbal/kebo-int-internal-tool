@@ -49,19 +49,19 @@ describe("card edits", () => {
 
   it("keeps the first save plain, and asks a reason for an edit", async () => {
     await api(app, sana).post("/edits", { type: "inquiry", id: inquiryId, card: "needs", kind: "first", changes: ["Added 1 · Boiler"] }).expect(201);
-    await api(app, sana).post("/edits", { type: "inquiry", id: inquiryId, card: "needs", kind: "edit", changes: ["1 · Qty 1 → 2"], keys: ["a"] }).expect(400);
+    await api(app, sana).post("/edits", { type: "inquiry", id: inquiryId, card: "needs", kind: "edit", changes: ["1 · Quantity 1 → 2"], keys: ["a"] }).expect(400);
     const c = (await cards()).needs!;
     expect(c.count).toBe(0);
     expect(c.first?.by).toBeTruthy();
   });
 
-  it("counts each edit of a card and of each line, newest first", async () => {
+  it("counts each edit of a card and of each item, newest first", async () => {
     const one = await api(app, sana)
-      .post("/edits", { type: "inquiry", id: inquiryId, card: "needs", kind: "edit", reason: "Customer changed the quantity", changes: ["1 · Qty 1 → 2"], keys: ["line-a"] })
+      .post("/edits", { type: "inquiry", id: inquiryId, card: "needs", kind: "edit", reason: "Customer changed the quantity", changes: ["1 · Quantity 1 → 2"], keys: ["line-a"] })
       .expect(201);
     expect(one.body.n).toBe(1);
     const two = await api(app, sana)
-      .post("/edits", { type: "inquiry", id: inquiryId, card: "needs", kind: "edit", reason: "Typed wrong", changes: ["1 · Qty 2 → 3", "Added 2 · Pump"], keys: ["line-a"] })
+      .post("/edits", { type: "inquiry", id: inquiryId, card: "needs", kind: "edit", reason: "Typed wrong", changes: ["1 · Quantity 2 → 3", "Added 2 · Pump"], keys: ["line-a"] })
       .expect(201);
     expect(two.body.n).toBe(2);
     // Another card counts on its own.
@@ -82,7 +82,7 @@ describe("card edits", () => {
     const edits = h.filter((e) => e.action === "card.edit");
     expect(edits.map((e) => e.reason)).toContain("Typed wrong");
     // In people's words (the card's name, not its key), and the first save is not a line of its own.
-    expect(edits.map((e) => e.summary)).toContain("Items edited (edit 2): 1 · Qty 2 → 3, and 1 more");
+    expect(edits.map((e) => e.summary)).toContain("Items edited (edit 2): 1 · Quantity 2 → 3, and 1 more");
     expect(h.some((e) => e.action === "card.first")).toBe(false);
   });
 

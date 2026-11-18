@@ -47,7 +47,7 @@ describe("every money write path posts to the ledger", () => {
         const body = lines.slice(at.i, end).join("\n");
         found += 1;
         if (body.includes("ledger.post(") || FILE_ONLY[`${rel}:${at.name}`]) return;
-        missing.push(`${rel}:${at.name} (line ${i + 1}: ${m[1]}.${m[2]})`);
+        missing.push(`${rel}:${at.name} (item ${i + 1}: ${m[1]}.${m[2]})`);
       });
     }
     expect(found).toBeGreaterThan(20);

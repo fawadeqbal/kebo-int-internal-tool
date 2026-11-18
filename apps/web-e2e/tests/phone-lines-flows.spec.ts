@@ -25,7 +25,7 @@ async function newInquiry(page: Page, t: string) {
   }) as Promise<{ id: string; refNo: string }>;
 }
 
-test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹¯ and Undo, saved with the inquiry", async ({ page }) => {
+test("inquiry items on a phone: a list, Add & next, an item in its own window, â‹¯ and Undo, saved with the inquiry", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   const deal = await newInquiry(page, tag());
@@ -41,7 +41,7 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   await expect(two).toContainText("1 item so far");
   await expect(two.getByLabel("Description")).toBeFocused();
   await two.getByLabel("Description").fill("Blister packing machine");
-  await two.getByLabel("Qty").fill("2");
+  await two.getByLabel("Quantity").fill("2");
   // Unit (design 18 Nov): one dropdown â€” the units used here first, every unit, Otherâ€¦ to type your own.
   await two.getByRole("button", { name: "Unit" }).click();
   const units = page.getByRole("menu", { name: "Unit" });
@@ -49,7 +49,7 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   await units.getByRole("menuitemradio", { name: "sets" }).click();
   await expect(units).toBeHidden();
   await expect(two.getByRole("button", { name: "Unit" })).toContainText("sets");
-  expect(await accessibilityProblems(page), "a line's window meets WCAG 2.2 AA").toEqual([]);
+  expect(await accessibilityProblems(page), "an item's window meets WCAG 2.2 AA").toEqual([]);
   await two.getByRole("button", { name: /Add & next/ }).click();
   const three = page.getByRole("dialog", { name: "New item 3" });
   await expect(three.getByRole("status")).toContainText("Added 2 Â· Blister packing machine");
@@ -65,7 +65,7 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   await list.getByRole("button", { name: /^Item 1 Tablet press/ }).click();
   const one = page.getByRole("dialog", { name: "Item 1" });
   await expect(one).toContainText("1 of 2");
-  await one.getByLabel("Qty").fill("3");
+  await one.getByLabel("Quantity").fill("3");
   await one.getByRole("button", { name: "Save & next" }).click();
   const second = page.getByRole("dialog", { name: "Item 2" });
   await expect(second.getByLabel("Description")).toHaveValue("Blister packing machine");
@@ -79,7 +79,7 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   await expect(part.getByRole("combobox")).toHaveCount(0);
   await expect(part.getByRole("radiogroup")).toHaveCount(0);
   await part.getByLabel("Description").fill("Upper punch, 12 mm round");
-  await part.getByLabel("Qty").fill("35");
+  await part.getByLabel("Quantity").fill("35");
   // A unit not in the list: Otherâ€¦ turns the box into one to type in.
   await part.getByRole("button", { name: "Unit" }).click();
   await page.getByRole("menu", { name: "Unit" }).getByRole("menuitem", { name: "Otherâ€¦" }).click();
@@ -104,7 +104,7 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   await expect(sheet).toContainText("2 Â· Blister packing machine");
   await expect(sheet.getByRole("menuitem", { name: /^Add a part/ })).toContainText("2.1");
   await expect(sheet.getByRole("menuitem", { name: "Edit" })).toBeVisible();
-  expect(await accessibilityProblems(page), "a line's sheet meets WCAG 2.2 AA").toEqual([]);
+  expect(await accessibilityProblems(page), "an item's sheet meets WCAG 2.2 AA").toEqual([]);
   await sheet.getByRole("menuitem", { name: "Delete" }).click();
   await expect(list.getByRole("button", { name: /^Item 2/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Undo" }).click();
@@ -114,9 +114,9 @@ test("inquiry items on a phone: a list, Add & next, a line in its own window, â‹
   await win.getByRole("button", { name: "More ways to add" }).click();
   const ways = page.getByRole("menu", { name: "More ways to add" });
   await expect(ways.getByRole("menuitem", { name: /^Import Excel/ })).toBeVisible();
-  await ways.getByRole("menuitem", { name: /^Paste rows/ }).click();
+  await ways.getByRole("menuitem", { name: /^Paste items/ }).click();
   await expect(ways).toBeHidden();
-  const paste = win.getByRole("region", { name: "Paste rows" });
+  const paste = win.getByRole("region", { name: "Paste items" });
   await expect(paste).toBeVisible();
   await paste.getByRole("button", { name: "Close" }).click();
 
@@ -151,20 +151,20 @@ test("offer lines on a phone: what a line still needs is marked and can be shown
   await page.goto(`/inquiries/${deal.id}/offers/${offer.id}`);
   await page.getByRole("button", { name: "Edit prices" }).click();
   const win = page.getByRole("dialog", { name: "Edit prices" });
-  const list = win.getByRole("list", { name: "Lines" });
-  await expect(list.getByRole("button", { name: /^Line 2 Punches and dies/ })).toContainText("No price");
+  const list = win.getByRole("list", { name: "Items" });
+  await expect(list.getByRole("button", { name: /^Item 2 Punches and dies/ })).toContainText("No price");
   await win.getByRole("button", { name: /Needs something/ }).click();
   await expect(list.getByRole("button")).toHaveCount(2); // the line and its â‹¯
-  await list.getByRole("button", { name: /^Line 2 Punches and dies/ }).click();
-  const line = page.getByRole("dialog", { name: "Line 2" });
-  await line.getByLabel("Price CNY").fill("4500");
+  await list.getByRole("button", { name: /^Item 2 Punches and dies/ }).click();
+  const line = page.getByRole("dialog", { name: "Item 2" });
+  await line.getByLabel("Unit price CNY").fill("4500");
   await line.getByRole("button", { name: "Save", exact: true }).click();
   await expect(line).toBeHidden();
   // Nothing needs anything now: the filter goes, every line shows.
   await expect(win.getByRole("button", { name: /Needs something/ })).toHaveCount(0);
-  await expect(list.getByRole("button", { name: /^Line 2 Punches and dies/ })).toContainText(/4,?500/);
+  await expect(list.getByRole("button", { name: /^Item 2 Punches and dies/ })).toContainText(/4,?500/);
   // A change asks why (design rules 18 Nov), then the save counts it.
-  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Factory changed its price" }).click();
+  await win.getByRole("radiogroup", { name: "Why the change?" }).getByRole("radio", { name: "Supplier changed its price" }).click();
   await win.getByRole("button", { name: "Save 1 change" }).click();
   await expect(win).toBeHidden();
   const saved = (await (await page.request.get(`/api/inquiries/${deal.id}/sourcing`)).json()).quotes.find((q: { id: string }) => q.id === offer.id);
@@ -196,7 +196,7 @@ test.describe("a narrow phone (320 px, WCAG reflow)", () => {
     await page.getByRole("button", { name: "Edit offer" }).click();
     const win = page.getByRole("dialog", { name: "Edit offer" });
     const body = win.locator("[data-step-body]");
-    for (const [n, step] of ["Factory", "Prices", "Delivery & payment", "Conditions", "Changes"].entries()) {
+    for (const [n, step] of ["Supplier", "Prices", "Delivery & payment", "Conditions", "Changes"].entries()) {
       if (n > 0) {
         await win.getByRole("button", { name: /^Next/ }).click();
         await expect(win.getByRole("heading", { name: `${step}, step ${n + 1} of 5` })).toBeFocused();

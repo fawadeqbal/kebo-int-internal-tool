@@ -14,11 +14,11 @@ export function AllReceivedWindow({ sub, action, today, place, lines }: { sub: s
   return (
     <SectionWindow
       button={{ label: "All received", kind: "plain" }}
-      title="Goods from the factory"
+      title="Goods from the supplier"
       sub={sub}
       action={action}
       submit="Mark all received"
-      whats={[`${lines === 1 ? "The line is" : `All ${lines} lines are`} marked received in full on that day.`, "A line that came short or damaged is changed in “Edit lines”."]}
+      whats={[`${lines === 1 ? "The item is" : `All ${lines} items are`} marked received in full on that day.`, "An item that came short or damaged is changed in “Edit items”."]}
     >
       {(s) => (
         <FieldRow>

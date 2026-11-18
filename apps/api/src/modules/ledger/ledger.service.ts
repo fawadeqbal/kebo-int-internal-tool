@@ -37,7 +37,7 @@ const GROUP_ORDER = [
   "Money",
   "Customers",
   "Customer credit",
-  "Factories",
+  "Suppliers",
   "Staff (to repay)",
   "Sales",
   "Goods cost",
@@ -136,11 +136,11 @@ export class LedgerService {
   /** Who a row is with: the factory, else the person (own money), else the customer. */
   private withOf(r: Pick<Row, "account" | "customerId" | "factoryId" | "userId">, n: Awaited<ReturnType<LedgerService["names"]>>) {
     const a = parseLedgerAccount(r.account);
-    if (a.kind === "factory" && a.id) return { kind: "factory" as const, id: a.id, name: n.factory.get(a.id) ?? "Factory" };
+    if (a.kind === "factory" && a.id) return { kind: "factory" as const, id: a.id, name: n.factory.get(a.id) ?? "Supplier" };
     if (a.kind === "staff" && a.id) return { kind: "staff" as const, id: a.id, name: n.user.get(a.id) ?? "Staff" };
     if ((a.kind === "customer" || a.kind === "credit") && a.id)
       return { kind: "customer" as const, id: a.id, name: n.customer.get(a.id) ?? "Customer" };
-    if (r.factoryId) return { kind: "factory" as const, id: r.factoryId, name: n.factory.get(r.factoryId) ?? "Factory" };
+    if (r.factoryId) return { kind: "factory" as const, id: r.factoryId, name: n.factory.get(r.factoryId) ?? "Supplier" };
     if (r.userId) return { kind: "staff" as const, id: r.userId, name: n.user.get(r.userId) ?? "Staff" };
     if (r.customerId) return { kind: "customer" as const, id: r.customerId, name: n.customer.get(r.customerId) ?? "Customer" };
     return null;
@@ -490,7 +490,7 @@ export class LedgerService {
           type === "order"
             ? `Order ${o.refNo}`
             : type === "purchase_order"
-              ? `What we owe the factory on ${o.refNo}`
+              ? `What we owe the supplier on ${o.refNo}`
               : `Exchange difference on ${o.refNo}`,
         removed: o.status === "cancelled" && o.cancellation ? { at: o.cancellation.cancelledAt, reason: o.cancellation.reason } : null,
       };
@@ -578,7 +578,7 @@ export class LedgerService {
         : kind === "factory"
           ? await db.party.findFirst({ where: { ...isSupplier, id }, select: { id: true, name: true } })
           : await db.user.findFirst({ where: { id }, select: { id: true, name: true } });
-    if (!party) throw new NotFoundError(kind === "customer" ? "Customer" : kind === "factory" ? "Factory" : "Person");
+    if (!party) throw new NotFoundError(kind === "customer" ? "Customer" : kind === "factory" ? "Supplier" : "Person");
     const account = partyAccount(kind, id);
     const sign = partySign(kind);
     const today = this.clock.today();
@@ -804,7 +804,7 @@ export class LedgerService {
         : kind === "factory"
           ? await this.prisma.db.party.count({ where: { ...isSupplier, id } })
           : await this.prisma.db.user.count({ where: { id } });
-    if (!exists) throw new NotFoundError(kind === "customer" ? "Customer" : kind === "factory" ? "Factory" : "Person");
+    if (!exists) throw new NotFoundError(kind === "customer" ? "Customer" : kind === "factory" ? "Supplier" : "Person");
     const no = await nextCount(this.prisma.db, `statement-${kind}-${id}-${year}`.slice(0, 50));
     const letter = kind === "customer" ? "C" : kind === "factory" ? "F" : "S";
     return { no, number: `ST-${letter}-${year}-${String(no).padStart(4, "0")}` };
@@ -1196,7 +1196,7 @@ export class LedgerService {
           });
         } else
           this.log.log(
-            `${c.slug}: the ledger agrees with today's figures (${result.checked.orders} orders, ${result.checked.factoryParts} factory parts, ${result.checked.accounts} accounts)`,
+            `${c.slug}: the ledger agrees with today's figures (${result.checked.orders} orders, ${result.checked.factoryParts} supplier parts, ${result.checked.accounts} accounts)`,
           );
       }).catch((e) => this.log.error(`the nightly ledger run for ${c.slug} failed: ${(e as Error).stack ?? e}`));
   }

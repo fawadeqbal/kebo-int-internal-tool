@@ -6,7 +6,7 @@ import { api, signIn, startApp } from "./app";
  * Step 3: a factory's price basis (EXW, FOB…) and the costs between it and
  * the basis we sell on, part of each option's cost so the margin is true.
  */
-describe("factory price basis", () => {
+describe("supplier's Incoterm", () => {
   let app: INestApplication;
   let sana: string;
   let inquiryId: string;
@@ -98,7 +98,7 @@ describe("factory price basis", () => {
     expect(b.costing).toMatchObject({ cost: "12000.00", extraCost: "0.00" });
   });
 
-  it("carries the costs into the next revision, and says when a factory's price pays for more than we sell", async () => {
+  it("carries the costs into the next revision, and says when a supplier's price pays for more than we sell", async () => {
     await api(app, sana).post(`/revisions/${revisionId}/status`, { to: "sent" }).expect(200);
     const next = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     expect(next.options[0].costs).toEqual([

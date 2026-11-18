@@ -476,7 +476,7 @@ const CUSTOMER_RULES: PlanRule[] = [
   { value: "fixed", label: "On a date", needs: "date" },
   { value: "on_ready", label: "On the ready date" },
   { value: "on_ship_plus_days", label: "Days after shipping", needs: "days", days: 14 },
-  { value: "after_papers", label: "After the papers (LC)", needs: "days", days: 0 },
+  { value: "after_papers", label: "After the documents (LC)", needs: "days", days: 0 },
   { value: "after_sat", label: "After the site test (SAT)", needs: "days", days: 0 },
   { value: "", label: "No date yet" },
 ];
@@ -514,7 +514,7 @@ export function CustomerPlanWindow({
           : r.with === "request" && r.sentOn
             ? { text: `Request sent on ${date(r.sentOn)}. If you change it, send it again (R${(r.revision ?? 1) + 1}).`, warn: true }
             : r.through === "bank"
-              ? { text: "Asked for with the shipping papers through the banks, not with a request." }
+              ? { text: "Asked for with the shipping documents through the banks, not with a request." }
               : null;
     return {
       key: i.id,
@@ -575,7 +575,7 @@ export function CustomerPlanWindow({
             : p.rule === "on_ship_plus_days"
               ? `${Number(p.dueDays) || 0} days after the goods leave${after(d.shippedOn, p.dueDays)}: when shipping moves, so does the due day.`
               : p.rule === "after_papers"
-                ? `${Number(p.dueDays) || 0} days after the papers reach their bank${after(d.papersOn, p.dueDays)}.`
+                ? `${Number(p.dueDays) || 0} days after the documents reach their bank${after(d.papersOn, p.dueDays)}.`
                 : p.rule === "after_sat"
                   ? `${Number(p.dueDays) || 0} days after the site test is done${after(d.satOn ?? null, p.dueDays)}: dated once it is.`
                   : p.rule === ""
@@ -671,14 +671,14 @@ export function SupplierPlanWindow({
           {
             label: "30% when we order · 70% when ready",
             parts: [
-              { name: "Advance", share: 30, rule: "on_order" },
+              { name: "Deposit", share: 30, rule: "on_order" },
               { name: "Balance", share: 70, rule: "on_ready" },
             ],
           },
           {
             label: "50 / 50",
             parts: [
-              { name: "Advance", share: 50, rule: "on_order" },
+              { name: "Deposit", share: 50, rule: "on_order" },
               { name: "Balance", share: 50, rule: "on_ready" },
             ],
           },

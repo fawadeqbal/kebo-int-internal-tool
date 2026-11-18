@@ -67,7 +67,7 @@ export default async function AppLayout({ children, window: win }: { children: R
   const newItems: NewItem[] = [
     has("inquiries.create") && { href: "/inquiries?panel=new-inquiry", label: "Inquiry" },
     has("customers.manage") && { href: "/customers?panel=new-customer", label: "Customer" },
-    has("sourcing.manage") && { href: "/factories?panel=new-factory", label: "Supplier" },
+    has("sourcing.manage") && { href: "/suppliers?panel=new-factory", label: "Supplier" },
     has("payments.record") && { href: "/payments/new", label: "Payment received" },
     has("expenses.manage") && feature("expenses") && { href: "/payments/new?kind=expense", label: "Expense" },
   ].filter((x): x is NewItem => !!x);

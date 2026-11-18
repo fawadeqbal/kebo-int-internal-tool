@@ -55,17 +55,17 @@ export const how = {
    */
   profit: (s: Span, c: string, marginBefore?: string) =>
     [
-      `The orders with an order date ${s.days}: what they were sold for, less what they cost as known today (the factories' prices, freight and insurance to the basis they were sold on, bank charges and each order's other costs).`,
+      `The orders with an order date ${s.days}: what they were sold for, less what they cost as known today (the suppliers' prices, freight and insurance to the Incoterm they were sold on, bank charges and each order's other costs).`,
       `Then less the company's own costs spent in the same days: every cost on no order (rent, salaries, the office, and what was spent on customers and inquiries before an order), each at the rate it was paid at.`,
-      `The % is that profit against what was sold on lines with a cost; a line with no cost yet is left out of the profit until it has one. ${ORDER_RATE(c)}`,
+      `The % is that profit against what was sold on items with a cost; an item with no cost yet is left out of the profit until it has one. ${ORDER_RATE(c)}`,
       marginBefore ? `Beside the %: ${marginBefore}'s, for the whole month.` : ARROW(s),
     ].join("\n"),
 
   /** profit_quote_main: what was sold less the goods and the basis costs on the quotation, for people who do not see costs. */
   grossProfit: (s: Span, c: string, marginBefore?: string) =>
     [
-      `The orders with an order date ${s.days}: what they were sold for, less the goods (the factories' prices) and the freight and insurance they were sold with. The orders' other costs and the company's own costs are not taken off: you do not see costs.`,
-      `The % is that profit against what was sold on lines with a cost. ${ORDER_RATE(c)}`,
+      `The orders with an order date ${s.days}: what they were sold for, less the goods (the suppliers' prices) and the freight and insurance they were sold with. The orders' other costs and the company's own costs are not taken off: you do not see costs.`,
+      `The % is that profit against what was sold on items with a cost. ${ORDER_RATE(c)}`,
       marginBefore ? `Beside the %: ${marginBefore}'s, for the whole month.` : ARROW(s),
     ].join("\n"),
 
@@ -80,8 +80,8 @@ export const how = {
 
   costsOfOrders: (s: Span, c: string) =>
     [
-      `What the orders with an order date ${s.days} cost, as known today: the factories' prices, freight and insurance to the basis they were sold on, bank charges and each order's other costs (as on each order's Costs tab).`,
-      `Only lines with a cost are counted. ${ORDER_RATE(c)}`,
+      `What the orders with an order date ${s.days} cost, as known today: the suppliers' prices, freight and insurance to the Incoterm they were sold on, bank charges and each order's other costs (as on each order's Costs tab).`,
+      `Only items with a cost are counted. ${ORDER_RATE(c)}`,
     ].join("\n"),
 
   companyCosts: (s: Span) =>
@@ -93,7 +93,7 @@ export const how = {
   profitOfReport: (s: Span, c: string) =>
     [
       `Sold, less the costs of the orders, less company costs: what the company made on the orders dated ${s.days}.`,
-      `The % is that profit against what was sold on lines with a cost; a line with no cost yet is left out until it has one. ${ORDER_RATE(c)}`,
+      `The % is that profit against what was sold on items with a cost; an item with no cost yet is left out until it has one. ${ORDER_RATE(c)}`,
       ARROW(s),
     ].join("\n"),
 
@@ -170,7 +170,7 @@ export const how = {
   nextWeeks: (c: string) =>
     [
       `It starts from cash now. Coming in: what customers still owe, each part in the week it is due (a part already late counts in this week; a part with no date yet is not counted).`,
-      `Going out: what we owe factories, each part in the week it is due; the company's monthly costs on their usual day; and bills and people to pay back, all in this week.`,
+      `Going out: what we owe suppliers, each part in the week it is due; the company's monthly costs on their usual day; and bills and people to pay back, all in this week.`,
       `"Cash after" is what would be left if everyone paid on their date. In ${c}: orders at their own rate, costs at the rate they were recorded with, cash at today's rate in Settings.`,
     ].join("\n"),
 
@@ -187,7 +187,7 @@ export const how = {
   ordersNow: (c: string) =>
     [
       `The open orders, by the stage each is at now, with what they were sold for. "Late to pay": an order with a part past its due date and not paid.`,
-      `"Past the ready date": goods the factory promised for a day that has gone, not ready yet. ${ORDER_RATE(c)}`,
+      `"Past the ready date": goods the supplier promised for a day that has gone, not ready yet. ${ORDER_RATE(c)}`,
     ].join("\n"),
 
   inquiriesNow:
@@ -198,14 +198,14 @@ export const how = {
 
   /** Reports › Overview: the factories' parts late or due within 7 days (billing/to-pay), and the bills that wait (money/bills). */
   toPaySoon:
-    "What we owe factories with a part late or due in the next 7 days, and every bill and person to pay back that waits now, each in its own currency. The most days late first.",
+    "What we owe suppliers with a part late or due in the next 7 days, and every bill and person to pay back that waits now, each in its own currency. The most days late first.",
 
   /** Reports › Overview: orders of the period still open, margin under 10 (lib/insights-data.ts loadOverview). */
   thinOfPeriod: (s: Span) =>
-    `The orders dated ${s.days} that are still open, whose profit now is under 10% of what was sold on lines with a cost, the lowest first. Profit now: what the order was sold for, less what it costs as known today (as on its Costs tab).`,
+    `The orders dated ${s.days} that are still open, whose profit now is under 10% of what was sold on items with a cost, the lowest first. Profit now: what the order was sold for, less what it costs as known today (as on its Costs tab).`,
 
   thinProfit:
-    "Open orders whose profit now is under 10% of what was sold on lines with a cost, the lowest first. Profit now: what the order was sold for, less what it costs as known today (as on its Costs tab).",
+    "Open orders whose profit now is under 10% of what was sold on items with a cost, the lowest first. Profit now: what the order was sold for, less what it costs as known today (as on its Costs tab).",
 };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

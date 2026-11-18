@@ -8,10 +8,10 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: 
 
 const { fromDraft, marginOf, optionTotals, pricedAll, startMargin } = await import("@/components/deals/revision-editor");
 
-const line = (id: string, quantity: string, unitCost: string | null) => ({ id, no: id, parentId: null, requestedItemId: null, answersNo: null, description: `Line ${id}`, model: null, quantity, unit: "pcs", unitCost });
+const line = (id: string, quantity: string, unitCost: string | null) => ({ id, no: id, parentId: null, requestedItemId: null, answersNo: null, description: `Item ${id}`, model: null, quantity, unit: "pcs", unitCost });
 const offer = (factoryQuoteId: string, lines: ReturnType<typeof line>[], basis: "FOB" | "EXW" = "FOB") => ({
   factoryQuoteId,
-  factory: { id: `f-${factoryQuoteId}`, name: `Factory ${factoryQuoteId}` },
+  factory: { id: `f-${factoryQuoteId}`, name: `Supplier ${factoryQuoteId}` },
   currency: "USD",
   basis,
   basisPlace: "Shanghai",
@@ -68,7 +68,7 @@ describe("the margin a quotation window starts with", () => {
 describe("a margin typed in the window prices every ticked offer", () => {
   const before = fromDraft(draft([option("A", { a1: 100, a2: 625 }), option("B", { b1: 112.5, b2: 40 }), option(null, { i1: 300 })]));
 
-  it("every line that has a cost gets the price that leaves that margin", () => {
+  it("every item that has a cost gets the price that leaves that margin", () => {
     const after = { ...before, options: pricedAll(before, offers, 25) };
     // 80 / (1 − 0.25) = 106.67; 500 / 0.75 = 666.67; 90 / 0.75 = 120.
     expect(after.options[0]!.prices).toEqual({ a1: "106.67", a2: "666.67" });
@@ -76,7 +76,7 @@ describe("a margin typed in the window prices every ticked offer", () => {
     expect(marginOfOption(after, 0)).toBeCloseTo(25, 1);
   });
 
-  it("a line without a cost, and an option priced by hand, keep their prices", () => {
+  it("an item without a cost, and an option priced by hand, keep their prices", () => {
     const after = pricedAll(before, offers, 25);
     expect(after[1]!.prices.b2).toBe("40.00");
     expect(after[2]!.prices).toEqual({ i1: "300.00" });

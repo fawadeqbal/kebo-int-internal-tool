@@ -92,7 +92,7 @@ export default async function QuotationPrint({
     ? [
         no,
         description,
-        { label: "Qty.", width: 58, render: (l) => docQty(l.quantity, l.unit) },
+        { label: "Quantity", width: 58, render: (l) => docQty(l.quantity, l.unit) },
         ...(costs
           ? ([
               { label: landed ? "Landed cost" : "Unit cost", width: 62, align: "right", render: (l) => (l.unitCost != null ? docMoney(l.unitCost, c) : "") },
@@ -102,7 +102,7 @@ export default async function QuotationPrint({
         { label: "Unit price", width: 66, align: "right", render: (l) => docMoney(l.unitPrice, c) },
         { label: "Amount", width: 74, align: "right", render: (l) => docMoney(l.lineTotal, c) },
       ]
-    : [no, description, { label: "Qty.", width: 71.4, render: (l) => docQty(l.quantity, l.unit) }];
+    : [no, description, { label: "Quantity", width: 71.4, render: (l) => docQty(l.quantity, l.unit) }];
 
   // Each option: its lines and its own total. Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
   const groups = options.map((o) => ({
@@ -164,20 +164,20 @@ export default async function QuotationPrint({
               title="Costing (internal)"
               head={single ? undefined : ["", ...options.map((o) => `Option ${o.letter}`)]}
               rows={[
-                ["Factory", ...options.map((o) => o.factory?.name ?? "—")],
-                ["Factory price basis", ...options.map((o) => basisText(o.factoryBasis ?? null, o.factoryBasisPlace ?? null) ?? "—")],
+                ["Supplier", ...options.map((o) => o.factory?.name ?? "—")],
+                ["Supplier's Incoterm", ...options.map((o) => basisText(o.factoryBasis ?? null, o.factoryBasisPlace ?? null) ?? "—")],
                 ["Sales (after discount)", ...options.map((o) => (o.costing ? docMoney(o.costing.sales, c) : "—"))],
                 ...(options.some((o) => o.costing && o.costing.extraCostMinor > 0)
                   ? [
-                      ["Factory cost", ...options.map((o) => (o.costing ? docMoney(fromMinor(o.costing.costMinor - o.costing.extraCostMinor), c) : "—"))],
+                      ["Supplier cost", ...options.map((o) => (o.costing ? docMoney(fromMinor(o.costing.costMinor - o.costing.extraCostMinor), c) : "—"))],
                       [`Costs to reach ${r.incoterm}`, ...options.map((o) => (o.costing ? docMoney(o.costing.extraCost, c) : "—"))],
                       ["Total cost", ...options.map((o) => (o.costing ? docMoney(o.costing.cost, c) : "—"))],
                     ]
-                  : [["Factory cost", ...options.map((o) => (o.costing ? docMoney(o.costing.cost, c) : "—"))]]),
+                  : [["Supplier cost", ...options.map((o) => (o.costing ? docMoney(o.costing.cost, c) : "—"))]]),
                 ["Profit", ...options.map((o) => (o.costing ? docMoney(o.costing.profit, c) : "—"))],
                 ["Margin", ...options.map((o) => (o.costing?.marginPercent == null ? "—" : `${o.costing.marginPercent}%`))],
               ]}
-              note={options.some((o) => o.costing?.uncostedLines) ? "Lines without a factory cost are left out." : null}
+              note={options.some((o) => o.costing?.uncostedLines) ? "Items without a supplier cost are left out." : null}
             />
           ) : internal ? (
             <span />

@@ -72,7 +72,7 @@ async function main() {
           differences += r.differences.length;
           const k = r.checked;
           console.log(
-            `${c.slug}: ${r.differences.length} difference(s) — checked ${k.orders} orders, ${k.factoryParts} factory parts, ${k.accounts} money accounts, ${k.staff} people to repay, ${k.credits} customer credits, ${k.groups} postings`,
+            `${c.slug}: ${r.differences.length} difference(s) — checked ${k.orders} orders, ${k.factoryParts} supplier parts, ${k.accounts} money accounts, ${k.staff} people to repay, ${k.credits} customer credits, ${k.groups} postings`,
           );
           for (const d of r.differences.slice(0, 30))
             console.log(`  ${d.kind} ${d.key} (${d.currency}): ledger ${d.ledger}, today's figures ${d.expected}`);

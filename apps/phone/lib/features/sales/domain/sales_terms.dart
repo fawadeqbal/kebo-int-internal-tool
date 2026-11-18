@@ -21,7 +21,7 @@ abstract final class LostReason {
   static const labels = {
     'price_too_high': 'Our price was too high',
     'no_reply': 'No reply from the customer',
-    'factory_cannot_supply': 'No factory can supply it',
+    'factory_cannot_supply': 'No supplier can supply it',
     'bought_elsewhere': 'They bought elsewhere',
     'customer_cancelled': 'The customer cancelled',
     'duplicate_or_spam': 'Duplicate or spam',

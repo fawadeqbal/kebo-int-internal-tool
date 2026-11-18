@@ -21,7 +21,7 @@ export function KeyDates({ o, flow, now }: { o: OrderView; flow: OrderFlow | nul
   // [label, the day, it has happened]
   const rows: [string, string | null, boolean][] = [
     ["Ordered", o.orderedOn, true],
-    ["Factory ordered", flow?.factory.orderedOn ?? null, true],
+    ["Supplier ordered", flow?.factory.orderedOn ?? null, true],
     ["Goods ready", ready, goodsIn || !!sailed],
     ["Ship by", o.shipBy, !!sailed],
     [sailed ? "Sailed" : "Sails", sailed ?? ship?.etd ?? null, !!sailed],
@@ -64,7 +64,7 @@ export function OrderPeople({ o, flow, first }: { o: OrderView; flow: OrderFlow 
     // The customer is named in the header: here, who to talk to there.
     ...(o.contactName ? [{ role: "Contact", name: o.contactName, href: `/customers/${o.customer.id}` }] : []),
     ...(o.inquiry.assignee ? [{ role: "Responsible person", name: o.inquiry.assignee.name }] : []),
-    ...factories.map((x) => ({ role: "Factory", name: x.name, sub: flow?.factory.orderNo ? `their order ${flow.factory.orderNo}` : null, href: `/factories/${x.id}` })),
+    ...factories.map((x) => ({ role: "Supplier", name: x.name, sub: flow?.factory.orderNo ? `their order ${flow.factory.orderNo}` : null, href: `/suppliers/${x.id}` })),
     ...(ship?.forwarder
       ? [{ role: "Forwarder", name: ship.forwarder, sub: [ship.forwarderContact, ship.forwarderPhone].filter(Boolean).join(" · ") || (ship.bookingNo ? `booking ${ship.bookingNo}` : null) }]
       : []),

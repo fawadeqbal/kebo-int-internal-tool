@@ -75,7 +75,7 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     const prisma = app.get(PrismaService);
     const bilal = await prisma.company(FIRST_COMPANY_ID).user.findFirstOrThrow({ where: { email: "bilal@example.com" } });
     const late = await prisma.company(FIRST_COMPANY_ID).notification.findFirst({ where: { userId: bilal.id, type: "reminder.order" } });
-    expect(late?.title).toMatch(/Goods due from the factory|Get the|orders need you/);
+    expect(late?.title).toMatch(/Goods due from the supplier|Get the|orders need you/);
     await api(app, staff).post("/admin/reminders/run").expect(403);
   });
 

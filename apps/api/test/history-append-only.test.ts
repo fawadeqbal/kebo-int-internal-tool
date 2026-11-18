@@ -120,7 +120,7 @@ describe("history is written once", () => {
     expect(await db().orderStageChange.count({ where: { orderId } })).toBe(moves + 1);
   });
 
-  it("a final paper stays as printed; a draft still changes and goes", async () => {
+  it("a final document stays as printed; a draft still changes and goes", async () => {
     const { orderId } = await newOrder();
     await api(app, manager).post(`/orders/${orderId}/proforma`).expect(200);
     const final = await db().orderPaper.findFirstOrThrow({ where: { orderId, kind: "proforma", version: 1 } });

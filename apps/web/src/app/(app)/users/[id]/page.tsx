@@ -207,7 +207,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
                   action={inquiries.total > ROWS && <AllLink href={`/inquiries?assignee=${u.id}`}>All {inquiries.total}</AllLink>}
                   empty={
                     <RecordEmpty title="No open inquiries">
-                      Inquiries they handle show here while they are open. Choose them under &ldquo;Handled by&rdquo; on an inquiry.
+                      Inquiries they handle show here while they are open. Choose them under &ldquo;Responsible person&rdquo; on an inquiry.
                     </RecordEmpty>
                   }
                 >

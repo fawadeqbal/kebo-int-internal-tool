@@ -112,7 +112,7 @@ describe("the arrow beside the title", () => {
   it("can be left out (back={false}) or pointed elsewhere", () => {
     const { rerender } = render(<PageHeader crumbs={[{ label: "Money" }, { label: "Payments", href: "/payments" }, { label: "PAY-1" }]} title="PAY-1" back={false} />);
     expect(backLinks()).toHaveLength(0);
-    rerender(<PageHeader title="A paper" back={{ href: "/orders/abc/papers", label: "SO-2026-0004" }} />);
+    rerender(<PageHeader title="A document" back={{ href: "/orders/abc/papers", label: "SO-2026-0004" }} />);
     expect(backLinks()[0]?.getAttribute("aria-label")).toBe("Back to SO-2026-0004");
   });
 });

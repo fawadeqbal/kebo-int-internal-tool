@@ -118,16 +118,16 @@ describe("agreed with the customer: the quotation's terms in the order", () => {
     expect((await order(id)).shipBy).toBe(addDays(today, 40));
   });
 
-  it("the order's papers print the parts, the lead time, the warranty and the conditions agreed", async () => {
+  it("the order's documents print the parts, the lead time, the warranty and the conditions agreed", async () => {
     const doc = (await contract(threeId)).doc as { bullets: string[] };
     const text = doc.bullets.join("\n");
-    expect(text).toContain("Our usual payment is made by 30% Advance deposit, 60% before shipment and 10% 15 days after the site acceptance test (SAT).");
+    expect(text).toContain("Our usual payment is made by 30% deposit, 60% before shipment and 10% 15 days after the site acceptance test (SAT).");
     expect(text).toContain("Delivery: 45 days after the deposit.");
     expect(text).toContain("Warranty: 12 months from the site acceptance test (SAT), parts and service.");
     expect(text).toContain("Export wooden cases.");
   });
 
-  it("the order shows what was agreed and what the factory gives; a change from the quotation asks why", async () => {
+  it("the order shows what was agreed and what the supplier gives; a change from the quotation asks why", async () => {
     const o = await order(threeId);
     expect(o.agreed).toMatchObject({ copied: true, leadDays: 45, leadFrom: "after_payment", leadTime: "45 days after the deposit", warrantyMonths: 12, warrantyFrom: "sat", deliveryConditions: "Export wooden cases." });
     expect(o.agreed.warrantyLine).toBe("12 months from the site acceptance test (SAT), parts and service.");
@@ -139,7 +139,7 @@ describe("agreed with the customer: the quotation's terms in the order", () => {
     const saved = (await api(app, sana).patch(`/orders/${threeId}/agreed`, { portOfDischarge: "Port Qasim", reason: "Agreed a new port" }).expect(200)).body;
     expect(saved.agreed).toMatchObject({ portOfDischarge: "Port Qasim", quoted: { portOfDischarge: null } });
     // The lead time from the order: ship by follows it, unless typed (it was typed above).
-    await api(app, sana).patch(`/orders/${threeId}/agreed`, { shipBy: null, leadDays: 50, leadFrom: "after_order", reason: "Factory changed its lead time" }).expect(200);
+    await api(app, sana).patch(`/orders/${threeId}/agreed`, { shipBy: null, leadDays: 50, leadFrom: "after_order", reason: "Supplier changed its lead time" }).expect(200);
     const after = await order(threeId);
     expect(after.shipBy).toBe(addDays(after.orderedOn, 50));
     expect(after.agreed.shipByTyped).toBe(false);
@@ -215,6 +215,6 @@ describe("agreed with the customer: the quotation's terms in the order", () => {
     const m = await money(id);
     expect(m.plan.items.map((i: { label: string; part: string | null }) => i.label)).toEqual(["Deposit 30%", "Balance against B/L copy"]);
     const text = ((await contract(id)).doc as { bullets: string[] }).bullets.join("\n");
-    expect(text).toContain("Our usual payment is made by 30% Advance deposit and 70% against B/L copy.");
+    expect(text).toContain("Our usual payment is made by 30% deposit and 70% against B/L copy.");
   });
 });

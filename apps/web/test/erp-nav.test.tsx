@@ -96,7 +96,7 @@ describe("the groups", () => {
         "/customers",
         "/follow-ups",
         "/operations/purchase-orders",
-        "/factories",
+        "/suppliers",
         "/money/due",
         "/payments",
         "/finance/cash-book",
@@ -168,7 +168,7 @@ describe("the groups", () => {
     expect(pages(recorder, "reports")).toEqual(["Reports"]);
   });
 
-  it("keep the thin line between a group's two kinds of page, whatever is hidden", () => {
+  it("keep the thin item between a group's two kinds of page, whatever is hidden", () => {
     // Money and Company settings are pages of one kind: no line. Admin settings has two: the people, and the record.
     expect(lines(everything(), "money")).toEqual([]);
     expect(lines(everything(), "company")).toEqual([]);
@@ -195,10 +195,10 @@ describe("the groups", () => {
     expect(moduleOf("/money/due", all)).toBe("money");
     expect(moduleOf("/audit", all)).toBe("admin");
     expect(moduleOf("/settings/sales", all)).toBe("company");
-    expect(crumbsFor("/factories")).toEqual([{ label: "Purchasing" }, { label: "Suppliers" }]);
+    expect(crumbsFor("/suppliers")).toEqual([{ label: "Purchasing" }, { label: "Suppliers" }]);
     expect(pageOf("/operations/purchase-orders/0b6c/9a1b", flat)?.label).toBe("Purchase orders");
     expect(crumbsFor("/users")).toEqual([{ label: "Admin settings" }, { label: "People" }]);
-    expect(moduleOf("/factories/9a1b", all)).toBe("purchasing");
+    expect(moduleOf("/suppliers/9a1b", all)).toBe("purchasing");
     expect(moduleOf("/dashboard", all)).toBeUndefined();
     // The path above a page's title: the group, then the page. Two levels.
     expect(crumbsFor("/finance/cash-book")).toEqual([{ label: "Money" }, { label: "Cash & bank" }]);

@@ -25,7 +25,7 @@ export function WhereMoneyWent({ a }: { a: CustomerAccount }) {
   const lines: { label: string; value: number; strong?: boolean; sub?: boolean }[] = [
     { label: `Sold, ${orders} order${orders === 1 ? "" : "s"}`, value: sales },
     { label: "Goods, shipping and the orders' own costs", value: -(sales - Number(t.uncostedRevenue) - Number(t.profit)), sub: true },
-    { label: "Sold on lines with no cost yet (left out of profit)", value: -Number(t.uncostedRevenue), sub: true },
+    { label: "Sold on items with no cost yet (left out of profit)", value: -Number(t.uncostedRevenue), sub: true },
     { label: "Profit on their orders (as on each order)", value: Number(t.profit), strong: true },
     { label: "Before the orders, on the inquiries we won", value: -Number(t.beforeSale), sub: true },
     { label: `On ${a.deals.lost} inquir${a.deals.lost === 1 ? "y" : "ies"} they did not buy`, value: -Number(t.lostDeals), sub: true },

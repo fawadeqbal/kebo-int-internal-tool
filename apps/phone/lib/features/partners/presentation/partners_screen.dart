@@ -41,11 +41,11 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
           KSegmented<bool>(
             value: _factories,
             onChanged: (v) => setState(() => _factories = v),
-            segments: const [(false, 'Customers'), (true, 'Factories')],
+            segments: const [(false, 'Customers'), (true, 'Suppliers')],
           ),
           const SizedBox(height: KSpace.s3),
           KSearchField(
-            hint: _factories ? 'Search factories' : 'Search customers',
+            hint: _factories ? 'Search suppliers' : 'Search customers',
             onChanged: (v) {
               _typing?.cancel();
               _typing = Timer(const Duration(milliseconds: 350), () => setState(() => _q = v));

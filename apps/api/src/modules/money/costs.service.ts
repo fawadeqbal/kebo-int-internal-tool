@@ -193,7 +193,7 @@ export class CostsService {
         kind: "goods",
         label: "Goods",
         category: null,
-        owedTo: factoryNames.get(r.factoryId) ?? "The factory",
+        owedTo: factoryNames.get(r.factoryId) ?? "The supplier",
         from: "factory",
         amount: fromMinor(r.owedMinor),
         currency: r.currency,
@@ -279,7 +279,7 @@ export class CostsService {
       rows.push({
         key: "estimate",
         kind: "estimate",
-        label: plan.rows.filter((r) => r.plannedMinor !== null && (r.status === "not_spent" || r.status === "within")).map((r) => r.label).join(", ") || "Costs to reach the price basis",
+        label: plan.rows.filter((r) => r.plannedMinor !== null && (r.status === "not_spent" || r.status === "within")).map((r) => r.label).join(", ") || "Costs to reach the Incoterm",
         category: null,
         owedTo: null,
         from: "quotation",

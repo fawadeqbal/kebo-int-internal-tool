@@ -29,7 +29,7 @@ const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) =>
 
 /** Send the inquiry's spec to these factories (one request each; a factory already asked is left as it is). */
 export const factoryRequestsInput = z.object({
-  factoryIds: z.array(id("Choose the factories to ask")).min(1, "Choose at least one factory").max(30),
+  factoryIds: z.array(id("Choose the suppliers to ask")).min(1, "Choose at least one supplier").max(30),
   channel: optionalEnum(REQUEST_CHANNELS).optional().transform((v) => v ?? null),
   sentOn: optionalDate,
   replyBy: optionalDate,

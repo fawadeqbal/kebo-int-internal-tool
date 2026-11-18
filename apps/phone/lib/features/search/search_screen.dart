@@ -52,7 +52,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (!mounted || ask != _ask) return;
     setState(() {
       _busy = false;
-      _hits = {'Inquiries': r[0], 'Orders': r[1], 'Customers': r[2], 'Factories': r[3]};
+      _hits = {'Inquiries': r[0], 'Orders': r[1], 'Customers': r[2], 'Suppliers': r[3]};
     });
   }
 
@@ -72,7 +72,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         padding: const EdgeInsets.all(KSpace.s4),
         children: [
           KSearchField(
-            hint: 'Inquiry, order, customer, factory',
+            hint: 'Inquiry, order, customer, supplier',
             autofocus: true,
             onChanged: (v) {
               _typing?.cancel();

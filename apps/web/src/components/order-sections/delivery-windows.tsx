@@ -21,7 +21,7 @@ export function AllDeliveredWindow({ sub, action, today, lines }: { sub: string;
       sub={sub}
       action={action}
       submit="All delivered OK"
-      whats={[`${lines === 1 ? "The line is" : `All ${lines} lines are`} marked delivered in full, in good condition.`, "A line that came short or damaged is changed in “Edit lines”.", "The order becomes “Delivered”."]}
+      whats={[`${lines === 1 ? "The item is" : `All ${lines} items are`} marked delivered in full, in good condition.`, "An item that came short or damaged is changed in “Edit items”.", "The order becomes “Delivered”."]}
     >
       {(s) => (
         <Field label="Delivered on" htmlFor="dl-on" error={s.errors?.deliveredOn}>

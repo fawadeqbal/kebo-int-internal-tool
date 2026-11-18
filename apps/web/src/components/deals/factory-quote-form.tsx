@@ -201,8 +201,8 @@ export function taxRateNote(lines: { taxRate: number }[], oldRate: number, newRa
   if (!lines.length || !Number.isFinite(next) || next === oldRate) return null;
   const follow = lines.filter((l) => Number(l.taxRate) === oldRate).length;
   const own = lines.length - follow;
-  if (!follow) return `No line is at ${oldRate}%, so no line changes: each keeps its own %.`;
-  return `${follow === lines.length ? `All ${follow}` : follow} line${follow === 1 ? "" : "s"} at ${oldRate}% change to ${next}%${own ? `; ${own} with ${own === 1 ? "its" : "their"} own % stay${own === 1 ? "s" : ""} as ${own === 1 ? "it is" : "they are"}` : ""}.`;
+  if (!follow) return `No item is at ${oldRate}%, so no item changes: each keeps its own %.`;
+  return `${follow === lines.length ? `All ${follow}` : follow} item${follow === 1 ? "" : "s"} at ${oldRate}% change to ${next}%${own ? `; ${own} with ${own === 1 ? "its" : "their"} own % stay${own === 1 ? "s" : ""} as ${own === 1 ? "it is" : "they are"}` : ""}.`;
 }
 
 /** What each basis means for us, in a few words. */
@@ -330,14 +330,14 @@ const OFFER_PRESETS: PartsPreset[] = [
   {
     label: "30% when we order · 70% when ready",
     parts: [
-      { name: "Advance", share: 30, rule: "on_order" },
+      { name: "Deposit", share: 30, rule: "on_order" },
       { name: "Balance", share: 70, rule: "on_ready" },
     ],
   },
   {
     label: "50 / 50",
     parts: [
-      { name: "Advance", share: 50, rule: "on_order" },
+      { name: "Deposit", share: 50, rule: "on_order" },
       { name: "Balance", share: 50, rule: "on_ready" },
     ],
   },
@@ -408,7 +408,7 @@ export function FactoryPicker({
         <Factory className="size-4 shrink-0 text-muted" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{value.name}</p>
-          <p className="truncate text-xs text-text-2">{!value.id ? "New factory — added when you save" : (known?.note ?? known?.contactPerson ?? "")}</p>
+          <p className="truncate text-xs text-text-2">{!value.id ? "New supplier — added when you save" : (known?.note ?? known?.contactPerson ?? "")}</p>
         </div>
         <Button size="xs" variant="ghost" onClick={() => onChange(null)}>
           Change
@@ -459,7 +459,7 @@ export function FactoryPicker({
         aria-invalid={!!error || undefined}
         autoComplete="off"
         value={q}
-        placeholder="Search factories"
+        placeholder="Search suppliers"
         className={cn(controlClass, "h-10 pr-9 pl-9 max-sm:h-11 max-sm:text-base")}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
@@ -480,12 +480,12 @@ export function FactoryPicker({
         <ul
           id={`${id}-list`}
           role="listbox"
-          aria-label="Factories"
+          aria-label="Suppliers"
           className="absolute top-full right-0 left-0 z-30 mt-1 max-h-80 overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-pop"
         >
           {askedShown.length > 0 && group("Asked for this inquiry")}
           {askedShown.map((f) => option(f, f.note))}
-          {others.length > 0 && group(typed ? `Results for “${typed}”` : "Other factories")}
+          {others.length > 0 && group(typed ? `Results for “${typed}”` : "Other suppliers")}
           {others.map((f) => option(f))}
           {typed && !exact && (
             <li
@@ -500,10 +500,10 @@ export function FactoryPicker({
               <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-primary-soft">
                 <Plus className="size-4" />
               </span>
-              <span className="truncate text-sm">New factory “{typed}”</span>
+              <span className="truncate text-sm">New supplier “{typed}”</span>
             </li>
           )}
-          {!loading && !askedShown.length && !others.length && !typed && <li className="px-2.5 py-3 text-sm text-muted">No factories yet: type the name of the first one.</li>}
+          {!loading && !askedShown.length && !others.length && !typed && <li className="px-2.5 py-3 text-sm text-muted">No suppliers yet: type the name of the first one.</li>}
         </ul>
       )}
     </div>
@@ -519,7 +519,7 @@ export function FactoryPicker({
 export type OfferStep = "factory" | "prices" | "terms" | "conditions" | "review" | "changes";
 /** The offer's parts: the steps that hold its fields, and its page's boxes. */
 export type OfferPart = Exclude<OfferStep, "review" | "changes">;
-export const OFFER_PART_LABEL: Record<OfferPart, string> = { factory: "Factory", prices: "Prices", terms: "Delivery & payment", conditions: "Conditions" };
+export const OFFER_PART_LABEL: Record<OfferPart, string> = { factory: "Supplier", prices: "Prices", terms: "Delivery & payment", conditions: "Conditions" };
 const STEP_ICON: Record<OfferStep, typeof Factory> = {
   factory: Factory,
   prices: Tag,
@@ -544,15 +544,15 @@ export function offerChanges(a: QuoteState, b: QuoteState): OfferChange[] {
   const plan = (x: QuoteState) => (x.parts.length ? x.parts.map((p) => `${p.share}%`).join(" / ") : "none");
   const warranty = (x: QuoteState) => (x.warrantyMonths.trim() ? `${x.warrantyMonths.trim()} months from ${WARRANTY_FROM_LABEL[x.warrantyFrom]}` : "none");
   const all: (OfferChange & { same: boolean })[] = [
-    { key: "factory", label: "Factory", from: a.factory?.name ?? "none", to: b.factory?.name ?? "none", part: "factory", same: (a.factory?.id ?? a.factory?.name) === (b.factory?.id ?? b.factory?.name) },
+    { key: "factory", label: "Supplier", from: a.factory?.name ?? "none", to: b.factory?.name ?? "none", part: "factory", same: (a.factory?.id ?? a.factory?.name) === (b.factory?.id ?? b.factory?.name) },
     { key: "receivedOn", label: "Received on", from: day(a.receivedOn), to: day(b.receivedOn), part: "factory", same: a.receivedOn === b.receivedOn },
     { key: "validUntil", label: "Valid until", from: day(a.validUntil), to: day(b.validUntil), part: "factory", same: a.validUntil === b.validUntil },
     { key: "reference", label: "Their reference", from: short(a.reference), to: short(b.reference), part: "factory", same: a.reference.trim() === b.reference.trim() },
     { key: "currency", label: "Currency", from: a.currency.toUpperCase(), to: b.currency.toUpperCase(), part: "prices", same: a.currency.trim().toUpperCase() === b.currency.trim().toUpperCase() },
     { key: "tax", label: "Tax", from: tax(a), to: tax(b), part: "prices", same: tax(a) === tax(b) },
-    { key: "basis", label: "Delivery basis", from: a.basis || "none", to: b.basis || "none", part: "terms", same: a.basis === b.basis },
+    { key: "basis", label: "Incoterm", from: a.basis || "none", to: b.basis || "none", part: "terms", same: a.basis === b.basis },
     { key: "basisPlace", label: b.basis === "EXW" ? "Town" : "Port", from: short(a.basisPlace), to: short(b.basisPlace), part: "terms", same: a.basisPlace.trim() === b.basisPlace.trim() },
-    { key: "lead", label: "Ready in", from: lead(a), to: lead(b), part: "terms", same: lead(a) === lead(b) },
+    { key: "lead", label: "Lead time", from: lead(a), to: lead(b), part: "terms", same: lead(a) === lead(b) },
     { key: "parts", label: "Payment", from: plan(a), to: plan(b), part: "terms", same: JSON.stringify(partsPayload(a.parts, "factory")) === JSON.stringify(partsPayload(b.parts, "factory")) },
     { key: "paymentTerms", label: "Payment note", from: short(a.paymentTerms), to: short(b.paymentTerms), part: "terms", same: a.paymentTerms.trim() === b.paymentTerms.trim() },
     { key: "warrantyMonths", label: "Warranty", from: warranty(a), to: warranty(b), part: "conditions", same: warranty(a) === warranty(b) },
@@ -722,8 +722,8 @@ export function OfferHeaderForm({
   const reportLost = useReportLost();
   const lost = create
     ? [
-        s.factory ? `Factory: ${s.factory.name}` : null,
-        linesCount && linesCount !== "no lines yet" ? `Lines: ${linesCount}` : null,
+        s.factory ? `Supplier: ${s.factory.name}` : null,
+        linesCount && linesCount !== "no lines yet" ? `Items: ${linesCount}` : null,
         filesAdded.length ? `Files: ${filesAdded.join(", ")}` : null,
       ].filter((x): x is string => !!x)
     : [...fieldChanges.map((c) => `${c.label}: ${c.from} → ${c.to}`), ...linesChanges.slice(0, 4), ...filesAdded.map((f) => `File to add: ${f}`)];
@@ -866,7 +866,7 @@ export function OfferHeaderForm({
             {step === "factory" && (
               <PanelSection quiet title="Who sent it, and when" first className={grid}>
                 <Field
-                  label="Factory"
+                  label="Supplier"
                   htmlFor="factory"
                   required
                   error={st.errors?.factoryId ?? st.errors?.newFactoryName}
@@ -946,7 +946,7 @@ export function OfferHeaderForm({
                     </fieldset>
                   )}
                 </PanelSection>
-                <PanelSection quiet title="Lines" fill className="sm:grid-cols-1">
+                <PanelSection quiet title="Items" fill className="sm:grid-cols-1">
                   {lines({ ...h, errors: lineErrors(st.errors) })}
                 </PanelSection>
               </>
@@ -955,7 +955,7 @@ export function OfferHeaderForm({
             {step === "terms" && (
               <>
                 <PanelSection title="Delivery" first className={grid}>
-                  <Field label="Delivery basis" htmlFor="basis" error={st.errors?.basis} className={changedField("basis")}>
+                  <Field label="Incoterm" htmlFor="basis" error={st.errors?.basis} className={changedField("basis")}>
                     <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")}>
                       <option value="">Not said</option>
                       {INCOTERMS.map((t) => (
@@ -973,7 +973,7 @@ export function OfferHeaderForm({
                   </Field>
                   <LeadField
                     id="leadDays"
-                    label="Ready in"
+                    label="Lead time"
                     className={cn("md:col-span-2", changedField("lead"))}
                     side="factory"
                     days={s.leadDays}
@@ -1056,10 +1056,10 @@ export function OfferHeaderForm({
             {step === "review" && (
               <div className="flex flex-col gap-3.5">
                 <div className="grid gap-3.5 md:grid-cols-2 md:items-start">
-                  <ReviewBox title="Factory" onEdit={() => setStep("factory")}>
+                  <ReviewBox title="Supplier" onEdit={() => setStep("factory")}>
                     <Facts
                       rows={[
-                        ["Factory", s.factory?.name ?? <span className="font-semibold text-bad">Not chosen yet</span>],
+                        ["Supplier", s.factory?.name ?? <span className="font-semibold text-bad">Not chosen yet</span>],
                         ["Received on", day(s.receivedOn)],
                         ["Valid until", day(s.validUntil)],
                         ["Their reference", s.reference.trim() || "—"],
@@ -1071,7 +1071,7 @@ export function OfferHeaderForm({
                     <Facts
                       rows={[
                         ["Delivery", s.basis ? basisText(s.basis, s.basisPlace) : "—"],
-                        ["Ready in", daysTyped ? leadWords(Number(s.leadDays) || 0, s.leadFrom, "factory") : s.leadTime || "—"],
+                        ["Lead time", daysTyped ? leadWords(Number(s.leadDays) || 0, s.leadFrom, "factory") : s.leadTime || "—"],
                         ["Payment", s.parts.length ? s.parts.map((p) => `${p.share}%`).join(" / ") : "—"],
                         ["Payment note", s.paymentTerms.trim() || "—"],
                       ]}
@@ -1149,7 +1149,7 @@ export function OfferHeaderForm({
                           {linesChanges.length > 8 && <span className="text-text-2">and {linesChanges.length - 8} more</span>}
                         </span>
                         <span role="cell" className="text-right">
-                          <Button type="button" size="xs" variant="ghost" onClick={() => onUndoLines?.()} className="text-primary hover:text-primary" aria-label="Undo the changes to the lines">
+                          <Button type="button" size="xs" variant="ghost" onClick={() => onUndoLines?.()} className="text-primary hover:text-primary" aria-label="Undo the changes to the items">
                             Undo
                           </Button>
                         </span>
@@ -1158,10 +1158,10 @@ export function OfferHeaderForm({
                     {filesAdded.length > 0 && (
                       <div role="row" className={CHANGE_ROW}>
                         <span role="cell" className="text-text-2 max-sm:hidden">
-                          Factory
+                          Supplier
                         </span>
                         <span role="cell" className="min-w-0 sm:col-span-3">
-                          <span className="text-text-2 sm:hidden">Factory · </span>
+                          <span className="text-text-2 sm:hidden">Supplier · </span>
                           {filesAdded.length} to add: {filesAdded.join(", ")}
                         </span>
                         <span role="cell" className="text-right">
@@ -1223,7 +1223,7 @@ function TaxChoice({ id, included, rate, onChange }: { id: string; included: boo
 }
 
 const OFFER_STEPS: { key: OfferStep; label: string }[] = [
-  { key: "factory", label: "Factory" },
+  { key: "factory", label: "Supplier" },
   { key: "prices", label: "Prices" },
   { key: "terms", label: "Delivery & payment" },
   { key: "conditions", label: "Conditions" },
@@ -1263,7 +1263,7 @@ function lineErrors(errors: ActionState["errors"]): string[] {
   for (const [key, list] of Object.entries(errors ?? {})) {
     if (!list?.length || (key !== "lines" && !key.startsWith("lines."))) continue;
     const n = Number(key.split(".")[1]);
-    const say = Number.isInteger(n) ? `Line ${n + 1}: ${list[0]}` : list[0]!;
+    const say = Number.isInteger(n) ? `Item ${n + 1}: ${list[0]}` : list[0]!;
     if (!out.includes(say)) out.push(say);
   }
   return out;

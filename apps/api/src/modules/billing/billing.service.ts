@@ -171,19 +171,19 @@ export class BillingService {
    * ready date (it moves with it) or on a fixed day.
    */
   async setFactoryPlan(user: SessionUser, orderId: string, input: FactoryPlanInput) {
-    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot change what we pay the factories.");
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot change what we pay the suppliers.");
     await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
       const o = await this.orderFor(user, orderId, tx);
       if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
       const f = await tx.party.findFirst({ where: { ...isSupplier, id: input.factoryId } });
-      if (!f) throw new DomainError("Choose a factory of this order.");
+      if (!f) throw new DomainError("Choose a supplier of this order.");
       const lines = await tx.orderLine.findMany({
         where: { orderId, factoryId: f.id },
         include: { factory: { select: { id: true, name: true } } },
       });
       const owed = [...owedByFactory(lines).values()][0];
-      if (!owed) throw new DomainError(`${f.name} has no lines with a price on this order.`);
+      if (!owed) throw new DomainError(`${f.name} has no items with a price on this order.`);
       const sum = input.items.reduce((t, i) => t + toMinor(i.amount), 0);
       if (sum !== owed.owedMinor)
         throw new DomainError(
@@ -239,7 +239,7 @@ export class BillingService {
 
   /** What we still owe each factory across all orders that are not cancelled (people who see costs). */
   async payables(user: SessionUser, mine: boolean, factoryId?: string) {
-    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier costs.");
     // Only orders where a factory may still be owed (worked out in the database, the same rule), not every order ever;
     // `factoryId`: only that supplier's (its own page).
     const s = await this.settings.get();
@@ -760,7 +760,7 @@ export class BillingService {
         }
       }
     } else {
-      if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
+      if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier costs.");
       const orders = await this.prisma.db.order.findMany({
         where: { status: { not: "cancelled" }, id: { in: await ordersOwingFactories(this.prisma, fx) } },
         select: { id: true, refNo: true, lines: { select: { factory: { select: { id: true, owner: person } } } } },
@@ -823,7 +823,7 @@ export class BillingService {
    * it: the parts are the supplier's plan (factoryPlansOf), the customer's side the order's position.
    */
   async toPay(user: SessionUser, mine: boolean, dueBy?: ISODate) {
-    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier costs.");
     const today = this.clock.today();
     const s = await this.settings.get();
     const fx = fxOf(s, await this.limits.allows("expenses"));

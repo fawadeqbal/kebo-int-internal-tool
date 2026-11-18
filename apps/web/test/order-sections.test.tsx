@@ -31,7 +31,7 @@ describe("the order's tabs", () => {
     expect(links.map((l) => l.textContent)).toEqual([
       "Overview",
       "Paymentdeposit in",
-      "Factory orderPO sent",
+      "Purchase orderPO sent",
       "Productionready 5 Dec",
       "Shippingbooked",
       "Delivery & SAT",

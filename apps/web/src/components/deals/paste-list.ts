@@ -17,8 +17,8 @@ const UNITS =
   "pcs|pc|pieces?|sets?|units?|nos?|kg|kgs|tons?|t|mt|m|meters?|m2|m²|sqm|m3|m³|cbm|rolls?|cartons?|ctns?|boxes|box|pairs?|lots?|litres?|liters?|l|bags?|drums?";
 const NUM = "(\\d+(?:[.,]\\d+)?)";
 /** "… 200 pcs", "… - 200 pcs", "… x 200": a unit makes any separator enough; a bare number needs a clear one (so "Flange PN 16" keeps its 16). */
-const TAIL_UNIT = new RegExp(`(?:[,;:\\s\\-–—]+|\\s*[x×]\\s*|\\s+qty[:.]?\\s*)${NUM}\\s*(${UNITS})\\.?\\s*$`, "i");
-const TAIL_BARE = new RegExp(`(?:\\s*[,;:\\-–—]\\s*|\\s+[x×]\\s*|\\s+qty[:.]?\\s*)${NUM}\\s*$`, "i");
+const TAIL_UNIT = new RegExp(`(?:[,;:\\s\\-–—]+|\\s*[x×]\\s*|\\s+quantity[:.]?\\s*)${NUM}\\s*(${UNITS})\\.?\\s*$`, "i");
+const TAIL_BARE = new RegExp(`(?:\\s*[,;:\\-–—]\\s*|\\s+[x×]\\s*|\\s+quantity[:.]?\\s*)${NUM}\\s*$`, "i");
 const QTY_FIRST = new RegExp(`^(\\d+(?:[.,]\\d+)?)\\s*(${UNITS})\\s+(?:of\\s+|x\\s+)?(.+)$`, "i");
 const NUMBERED = /^\s*(?:(\d+)\.(\d+)[.)]?|\d+[.)]|[-•*–])\s+/;
 

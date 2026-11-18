@@ -113,7 +113,7 @@ export function NewCompanyForm({ plans, prefill }: { plans: Plan[]; prefill: Pre
             <Checkbox name="sampleData" defaultChecked={kind === "demo"} key={kind} className="mt-0.5" />
             <span>
               <span className="font-medium">Fill with sample data</span>
-              <span className="block text-xs text-muted">Customers, factories, inquiries, quotations and orders to try things with.</span>
+              <span className="block text-xs text-muted">Customers, suppliers, inquiries, quotations and orders to try things with.</span>
             </span>
           </label>
           <Field label="Notes" htmlFor="notes" optional error={s.errors?.notes}>

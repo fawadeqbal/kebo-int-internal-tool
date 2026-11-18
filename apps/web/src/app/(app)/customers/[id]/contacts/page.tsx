@@ -28,7 +28,7 @@ export default async function CustomerContacts({ params }: { params: Promise<{ i
         <Card>
           <EmptyState
             title="No contacts yet"
-            description="Add the people you deal with there: how to reach them shows on their papers and in Overview."
+            description="Add the people you deal with there: how to reach them shows on their documents and in Overview."
           />
         </Card>
       ) : (

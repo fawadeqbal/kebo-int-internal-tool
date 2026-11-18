@@ -98,7 +98,7 @@ describe("messages", () => {
     expect(created!.message!.people).toEqual([
       { label: "Customer", value: `${customer} · Nigeria` },
       { label: "Contact", value: `Ade Bello · ${phone} · ade-${tag}@lw.test` },
-      { label: "Handled by", value: "Sana" },
+      { label: "Responsible person", value: "Sana" },
     ]);
     expect(created!.body).toBe(`${inquiry.refNo} · Sana replies to the customer within a day.`);
     const mail = mailTo(managerEmail, /^New inquiry from Lagos Water/);
@@ -172,15 +172,15 @@ describe("messages", () => {
     expect(lateMoney).toMatchObject({ tag: "Payment late", urgent: true, subject: "Late: Lagos Water has not paid USD 83,650 (balance, SO-2026-0412)", link: "/orders/o1/payment" });
     expect(lateMoney.sentence).toBe("The balance of SO-2026-0412 was due on 05 Dec 2026. It is 4 days late.");
     expect(paymentDue(o, { label: "Balance", openMinor: 8365000, dueOn: "2026-12-05" }, null).subject).toBe("Lagos Water owes USD 83,650 (balance, SO-2026-0412) by 05 Dec 2026");
-    const pay = factoryPayment(o, { factory: "Jiangsu Filling", contact: "Mr Wang · WeChat wang88", currency: "CNY", owed: "760000.00", paid: "0.00" }, { label: "Advance", open: "304000.00", due: "2026-11-14", lateBy: null });
-    expect(pay).toMatchObject({ tag: "Pay the factory", subject: "Pay Jiangsu Filling: CNY 304,000 advance (SO-2026-0412) — due 14 Nov 2026", button: "Pay the factory", link: "/orders/o1/factory" });
-    expect(pay.money).toContainEqual({ label: "Paid to the factory", value: "CNY 0 of CNY 760,000" });
-    const ready = orderWaiting(o, { title: "Ask the factory for the ready date", due: "2026-11-10", lateBy: 4 });
-    expect(ready).toMatchObject({ tag: "Ready date missing", next: "Ask the factory when the goods will be ready and enter the date.", link: "/orders/o1/production", urgent: true });
+    const pay = factoryPayment(o, { factory: "Jiangsu Filling", contact: "Mr Wang · WeChat wang88", currency: "CNY", owed: "760000.00", paid: "0.00" }, { label: "Deposit", open: "304000.00", due: "2026-11-14", lateBy: null });
+    expect(pay).toMatchObject({ tag: "Pay the supplier", subject: "Pay Jiangsu Filling: CNY 304,000 deposit (SO-2026-0412) — due 14 Nov 2026", button: "Pay the supplier", link: "/orders/o1/factory" });
+    expect(pay.money).toContainEqual({ label: "Paid to the supplier", value: "CNY 0 of CNY 760,000" });
+    const ready = orderWaiting(o, { title: "Ask the supplier for the ready date", due: "2026-11-10", lateBy: 4 });
+    expect(ready).toMatchObject({ tag: "Ready date missing", next: "Ask the supplier when the goods will be ready and enter the date.", link: "/orders/o1/production", urgent: true });
     const day = yourDay("Sana Khan", [
       { title: "Missed", rows: [{ ref: "RFQ-1", party: "Lagos Water", what: "Call Ade", when: "missed 2 days", late: true }] },
       { title: "Money to collect", rows: [{ ref: "SO-1", party: "Lagos Water", what: "Balance USD 83,650", when: "due 2026-12-05" }, { ref: "SO-2", party: "Plan Foods", what: "Balance USD 41,000", when: "9 days late", late: true }] },
-      { title: "Pay the factory", rows: [] },
+      { title: "Pay the supplier", rows: [] },
     ]);
     expect(day).toMatchObject({ tag: "Your day", subject: "Good morning Sana: 1 missed, 2 payments to collect" });
     expect(day.tiles).toEqual([

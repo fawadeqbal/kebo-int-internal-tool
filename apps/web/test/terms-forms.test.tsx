@@ -24,14 +24,14 @@ const offers: QuoteOffers = {
       basisPlace: "Qingdao",
       receivedOn: "2026-11-12",
       validUntil: null,
-      leadTime: "30 days after the advance",
+      leadTime: "30 days after the deposit",
       leadDays: 30,
       leadFrom: "after_payment",
       terms: {
         leadDays: 30,
         leadFrom: "after_payment",
         parts: [
-          { label: "Advance 30%", percent: 30, rule: "on_order", days: null },
+          { label: "Deposit 30%", percent: 30, rule: "on_order", days: null },
           { label: "Balance 70%", percent: 70, rule: "on_ready", days: null },
         ],
         warrantyMonths: 12,
@@ -69,7 +69,7 @@ const show = (d = draft()) =>
 const sent = () => JSON.parse((document.querySelector('input[name="payload"]') as HTMLInputElement).value);
 
 describe("the quotation's form, in the four groups", () => {
-  it("has the groups in their order, each option's lead time beside the factory's, and the warranty checked", () => {
+  it("has the groups in their order, each option's lead time beside the supplier's, and the warranty checked", () => {
     show();
     const legends = [...document.querySelectorAll("legend")].map((l) => l.firstChild?.textContent);
     expect(legends.filter((t) => ["Options: which offers to quote", "The quotation", "Delivery", "Payment", "Warranty", "Conditions"].includes(t ?? ""))).toEqual([
@@ -82,9 +82,9 @@ describe("the quotation's form, in the four groups", () => {
     ]);
     const leads = screen.getByRole("table", { name: "Lead time of each option" });
     expect(within(leads).getByLabelText("Option A lead time")).toHaveProperty("value", "45");
-    expect(within(leads).getAllByText(/Jinan Pharma gives 30 days after the advance · 15 days to spare/).length).toBeGreaterThan(0);
+    expect(within(leads).getAllByText(/Jinan Pharma gives 30 days after the deposit · 15 days to spare/).length).toBeGreaterThan(0);
     // 12 months from the site test against 12 from shipment: the last 2 are not the factory's.
-    expect(screen.getByText(/the last 2 months of ours are not covered by the factory: ask Jinan Pharma for 14 months/)).toBeTruthy();
+    expect(screen.getByText(/the last 2 months of ours are not covered by the supplier: ask Jinan Pharma for 14 months/)).toBeTruthy();
     // The payment covers what Jinan asks before the goods leave.
     expect(screen.getByText(/^Covered: the customer pays USD 9,037.50 with the order/)).toBeTruthy();
   });

@@ -85,7 +85,7 @@ export function ProfitSection({
       </StatRow>
       {t.uncosted > 0.005 && (
         <p className="text-xs text-text-2">
-          {bigMoney(t.uncosted, c)} of what was sold has no cost yet (no factory price), so it is in Sold and not in the profit.
+          {bigMoney(t.uncosted, c)} of what was sold has no cost yet (no supplier price), so it is in Sold and not in the profit.
         </p>
       )}
 

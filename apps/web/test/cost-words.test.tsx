@@ -12,6 +12,6 @@ describe("the cost sheet's words", () => {
   });
 
   it("names where each cost comes from", () => {
-    expect(COST_FROM).toEqual({ factory: "Factory order", shipment: "Shipping", payment: "Payment", quotation: "Quotation", typed: "Added here" });
+    expect(COST_FROM).toEqual({ factory: "Purchase order", shipment: "Shipping", payment: "Payment", quotation: "Quotation", typed: "Added here" });
   });
 });

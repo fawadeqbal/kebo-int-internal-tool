@@ -98,7 +98,7 @@ describe("orders: four stages", () => {
     const moved = (await move(sana, { to: "in_production", confirm: true, readyOn: day(20), note: "Customer sent the swift copy" }).expect(200)).body;
     expect(moved).toMatchObject({ stage: "in_production", readyOn: day(20), back: { to: "confirmed" }, next: { to: "shipped" } });
     expect(moved.history.at(-1)).toMatchObject({ from: "confirmed", to: "in_production", confirmed: true, note: "Customer sent the swift copy", by: { name: expect.any(String) } });
-    expect(moved.needs).toMatchObject({ title: "Goods due from the factory", due: day(20) });
+    expect(moved.needs).toMatchObject({ title: "Goods due from the supplier", due: day(20) });
   });
 
   it("moves back one stage once told why, and forward again", async () => {
@@ -133,7 +133,7 @@ describe("orders: four stages", () => {
     expect((await order()).money).toMatchObject({ received: deposit.toFixed(2), depositDue: "0.00" });
   });
 
-  it("tracks what came in from the factory, line by line", async () => {
+  it("tracks what came in from the supplier, item by item", async () => {
     const o = await order();
     const goods = o.lines.find((l: { type: string }) => l.type === "goods");
     const charge = o.lines.find((l: { type: string }) => l.type === "charge");
@@ -142,7 +142,7 @@ describe("orders: four stages", () => {
     // Shipping now would warn about both.
     // The order lines are the factory's lines (its wording), not the customer's request.
     const early = await move(sana, { to: "shipped" }).expect(409);
-    expect(early.body.error).toMatch(/Not everything has come in from the factory \(Maize sheller: 0 of 100 pcs\)\. The packing list is not filled in yet\./);
+    expect(early.body.error).toMatch(/Not everything has come in from the supplier \(Maize sheller: 0 of 100 pcs\)\. The packing list is not filled in yet\./);
     await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 101 }] }).expect(400);
     await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: charge.id, receivedQty: 1 }] }).expect(400);
     await api(app, bilal).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 1 }] }).expect(404);
@@ -204,17 +204,17 @@ describe("orders: four stages", () => {
     expect(paymentTermsOf(30, "against_bl_copy")).toBe("30% deposit, balance against B/L copy"); // "B/L" is not lowered
     expect(paymentTermsOf(0, "letter_of_credit")).toBe("Letter of credit");
     // As Kebo writes it on its proforma invoices.
-    expect(pi.paymentSentence).toBe("Our usual payment is made by 30% Advance deposit and 70% before shipment.");
-    expect(paymentSentenceOf(30, "against_bl_copy")).toBe("Our usual payment is made by 30% Advance deposit and 70% against B/L copy.");
+    expect(pi.paymentSentence).toBe("Our usual payment is made by 30% deposit and 70% before shipment.");
+    expect(paymentSentenceOf(30, "against_bl_copy")).toBe("Our usual payment is made by 30% deposit and 70% against B/L copy.");
     expect(paymentSentenceOf(0, "letter_of_credit")).toBe("Payment: Letter of credit.");
     expect(pi.company).toMatchObject({ nameLocal: "山东科波国际贸易有限公司", taxNo: "91370811MAK4PH5B1N" }); // Kebo's details until changed in Settings
     // For the internal copy: every payment, and each line's cost for people who may see costs (staff source, so they do).
     expect(pi.payments).toEqual(expect.arrayContaining([expect.objectContaining({ kind: expect.any(String), amount: expect.any(String), paidOn: expect.any(String) })]));
     expect(pi.lines[0].unitCost).toEqual(expect.any(String));
     // The heading over the lines and the port of discharge, set on the order.
-    await api(app, sana).patch(`/orders/${orderId}/details`, { documentTitle: "Complete maize shelling line", portOfDischarge: "Lagos, Nigeria" }).expect(200);
+    await api(app, sana).patch(`/orders/${orderId}/details`, { documentTitle: "Complete maize shelling item", portOfDischarge: "Lagos, Nigeria" }).expect(200);
     const pi2 = (await api(app, sana).get(`/orders/${orderId}/documents/proforma`).expect(200)).body;
-    expect(pi2.order).toMatchObject({ documentTitle: "Complete maize shelling line", portOfDischarge: "Lagos, Nigeria", incoterm: expect.any(String) });
+    expect(pi2.order).toMatchObject({ documentTitle: "Complete maize shelling item", portOfDischarge: "Lagos, Nigeria", incoterm: expect.any(String) });
     // The proforma is the one invoice: once shipped it carries the B/L, and it knows what was received.
     expect(pi.order.blNo).toBe("QDLOS-77");
     expect(pi.totals).toMatchObject({ received: o.total, due: "0.00" });

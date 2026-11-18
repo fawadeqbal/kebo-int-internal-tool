@@ -32,7 +32,7 @@ async function newDeal(page: Page, more: object = {}) {
   return { id: inquiry.id as string, offer: offer.id as string, customer: customer.name as string };
 }
 
-test("the offer and the quotation in four groups; the quotation checked against the factory; the paper prints the parts", async ({ page }) => {
+test("the offer and the quotation in four groups; the quotation checked against the supplier; the document prints the parts", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   const deal = await newDeal(page);
@@ -45,23 +45,23 @@ test("the offer and the quotation in four groups; the quotation checked against 
   const offer = page.getByRole("dialog", { name: "Edit offer" });
   // The offer in steps (design 18 Nov): Factory · Prices · Delivery & payment · Conditions, then Changes.
   const rail = offer.getByRole("navigation", { name: "Steps" });
-  for (const step of ["Factory", "Prices", "Delivery & payment", "Conditions", "Changes"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
-  await expect(rail.getByRole("button", { name: /Factory/ })).toHaveAttribute("aria-current", "step");
+  for (const step of ["Supplier", "Prices", "Delivery & payment", "Conditions", "Changes"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
+  await expect(rail.getByRole("button", { name: /Supplier/ })).toHaveAttribute("aria-current", "step");
   await rail.getByRole("button", { name: /Prices/ }).click();
   await expect(offer.getByRole("grid")).toContainText("DPP-260");
   await offer.getByRole("button", { name: /^Next/ }).click();
-  await offer.getByLabel("Ready in").fill("30");
+  await offer.getByLabel("Lead time").fill("30");
   await offer.getByRole("button", { name: "50 / 50" }).click();
   await expect(offer.getByText("Adds up: 100%")).toBeVisible();
   await offer.getByRole("button", { name: /^Next/ }).click();
   await offer.getByLabel("Months").fill("12");
   expect(await accessibilityProblems(page), "the offer's form meets WCAG 2.2 AA").toEqual([]);
   await offer.getByRole("button", { name: /^Next/ }).click();
-  await offer.getByRole("radiogroup", { name: /Why these changes/ }).getByRole("radio", { name: "Factory changed its terms" }).click();
+  await offer.getByRole("radiogroup", { name: /Why these changes/ }).getByRole("radio", { name: "Supplier changed its terms" }).click();
   await offer.getByRole("button", { name: /^Save \d+ changes/ }).click();
   await expect(offer).toBeHidden();
   // The offer's page: a box per part, the same as its steps.
-  await expect(page.getByRole("region", { name: "Delivery & payment", exact: true })).toContainText("30 days after the advance");
+  await expect(page.getByRole("region", { name: "Delivery & payment", exact: true })).toContainText("30 days after the deposit");
   await expect(page.getByRole("region", { name: "Delivery & payment", exact: true })).toContainText("50% when we order · 50% when ready");
   await expect(page.getByRole("region", { name: "Conditions", exact: true })).toContainText("12 months from shipment");
 
@@ -81,9 +81,9 @@ test("the offer and the quotation in four groups; the quotation checked against 
   const leads = part.getByRole("table", { name: "Lead time of each option" });
   await expect(leads.getByLabel("Option A lead time", { exact: true })).toHaveValue("30");
   // (On a wide screen the check is in its own column; on a phone under the boxes.)
-  await expect(leads.getByText(/gives 30 days after the advance · nothing to spare/).filter({ visible: true })).toBeVisible();
+  await expect(leads.getByText(/gives 30 days after the deposit · nothing to spare/).filter({ visible: true })).toBeVisible();
   await leads.getByLabel("Option A lead time", { exact: true }).fill("25");
-  await expect(leads.getByText(/needs 30 days after the advance: 5 days more than we promise/).filter({ visible: true })).toBeVisible();
+  await expect(leads.getByText(/needs 30 days after the deposit: 5 days more than we promise/).filter({ visible: true })).toBeVisible();
   await leads.getByLabel("Option A lead time", { exact: true }).fill("45");
   expect(await accessibilityProblems(page), "one part of the quotation meets WCAG 2.2 AA").toEqual([]);
   await part.getByRole("button", { name: "All steps" }).click();
@@ -96,7 +96,7 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await form.getByRole("button", { name: "30 · 60 · 10 after the site test" }).click();
   await steps.getByRole("button", { name: /Warranty & conditions/ }).click();
   await form.getByLabel("Counted from").selectOption("sat");
-  await expect(form.getByText(/the last 2 months of ours are not covered by the factory/)).toBeVisible();
+  await expect(form.getByText(/the last 2 months of ours are not covered by the supplier/)).toBeVisible();
   expect(await accessibilityProblems(page), "the quotation's form meets WCAG 2.2 AA").toEqual([]);
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(form).toBeHidden();
@@ -111,7 +111,7 @@ test("the offer and the quotation in four groups; the quotation checked against 
   // The paper prints the parts and the warranty.
   const quotation = await (await page.request.get(`/api/inquiries/${deal.id}/quotation`)).json();
   await page.goto(`/print/revisions/${quotation.revisions[0].id}`);
-  await expect(page.getByText("Our usual payment is made by 30% Advance deposit, 60% before shipment and 10% after the site acceptance test (SAT).")).toBeVisible();
+  await expect(page.getByText("Our usual payment is made by 30% deposit, 60% before shipment and 10% after the site acceptance test (SAT).")).toBeVisible();
   await expect(page.getByText(/Warranty: 12 months from the site acceptance test \(SAT\)/)).toBeVisible();
   await expect(page.getByText("Delivery: 45 days after the deposit")).toBeVisible();
   expect(errors).toEqual([]);
@@ -124,7 +124,7 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
     leadDays: 30,
     leadFrom: "after_payment",
     paymentParts: [
-      { label: "Advance 30%", percent: 30, rule: "on_order" },
+      { label: "Deposit 30%", percent: 30, rule: "on_order" },
       { label: "Balance 70%", percent: 70, rule: "on_ready" },
     ],
     warrantyMonths: 12,
@@ -165,7 +165,7 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(agreed.getByText("Worked out once the deposit is in")).toBeVisible();
   await expect(agreed.getByText("12 months", { exact: true })).toBeVisible();
   // The customer beside the factory is hidden for now (16 Nov 2026).
-  await expect(page.getByRole("region", { name: "The customer and the factory, side by side" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "The customer and the supplier, side by side" })).toHaveCount(0);
   expect(await accessibilityProblems(page), "the order's Overview meets WCAG 2.2 AA").toEqual([]);
 
   // Change: a new port differs from the quotation, so it asks why; the reason goes with it.
@@ -188,25 +188,25 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(instructions.locator("dd", { hasText: deal.customer })).toBeVisible();
   await expect(instructions.getByText("Karachi")).toBeVisible();
   await page.goto(`/orders/${orderId}/documents`);
-  await expect(page.getByRole("region", { name: "How the papers print" }).getByText("Agreed payment conditions")).toBeVisible();
+  await expect(page.getByRole("region", { name: "How the documents print" }).getByText("Agreed payment conditions")).toBeVisible();
 
   // The factory's side, in the same groups: its offer's terms until the purchase order is sent.
   await page.goto(`/orders/${orderId}/factory`);
   await expect(page.getByRole("region", { name: "Purchase order" }).getByText("Made from their offer")).toBeVisible();
-  const factory = page.getByRole("region", { name: "Agreed with the factory" });
-  await expect(factory.getByText("30 days after the advance")).toBeVisible();
+  const factory = page.getByRole("region", { name: "Agreed with the supplier" });
+  await expect(factory.getByText("30 days after the deposit")).toBeVisible();
   await expect(factory.getByText("12 months", { exact: true })).toBeVisible();
-  expect(await accessibilityProblems(page), "the factory order meets WCAG 2.2 AA").toEqual([]);
+  expect(await accessibilityProblems(page), "the purchase order meets WCAG 2.2 AA").toEqual([]);
   await factory.getByRole("button", { name: "Change", exact: true }).click();
   const terms = page.getByRole("dialog", { name: /What we agreed with Jinan Terms/ });
   await expect(terms.getByText(/Not sent yet/)).toBeVisible();
-  expect(await accessibilityProblems(page), "the factory's Change window meets WCAG 2.2 AA").toEqual([]);
+  expect(await accessibilityProblems(page), "the supplier's Change window meets WCAG 2.2 AA").toEqual([]);
   await terms.locator("#fac-lead").fill("35");
   await terms.getByRole("button", { name: "Save", exact: true }).click();
   await expect(terms).toBeHidden();
-  await expect(factory.getByText("35 days after the advance")).toBeVisible();
+  await expect(factory.getByText("35 days after the deposit")).toBeVisible();
   // The purchase order's paper prints it.
   await page.goto(`/print/orders/${orderId}/purchase-order`);
-  await expect(page.getByText("Delivery: FOB Qingdao, ready 35 days after our advance.")).toBeVisible();
+  await expect(page.getByText("Delivery: FOB Qingdao, ready 35 days after our deposit.")).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -8,7 +8,7 @@ import { api, signIn, startApp } from "./app";
  * as months from a moment — with the words they print worked out from them. An older client that sends only
  * the words, the advance % or the deposit and balance is understood as before, and nothing it leaves out is lost.
  */
-describe("terms in four groups: the factory offer and the quotation", () => {
+describe("terms in four groups: the supplier offer and the quotation", () => {
   let app: INestApplication;
   let sana: string;
   let inquiryId: string;
@@ -39,7 +39,7 @@ describe("terms in four groups: the factory offer and the quotation", () => {
 
   const offer = async () => (await api(app, sana).get(`/factory-quotes/${offerId}`).expect(200)).body;
 
-  it("a factory offer keeps its lead time as days from a moment, its payment as parts and its warranty as months", async () => {
+  it("a supplier offer keeps its lead time as days from a moment, its payment as parts and its warranty as months", async () => {
     offerId = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/factory-quotes`, {
@@ -52,7 +52,7 @@ describe("terms in four groups: the factory offer and the quotation", () => {
           leadDays: 30,
           leadFrom: "after_payment",
           paymentParts: [
-            { label: "Advance 30%", percent: 30, rule: "on_order" },
+            { label: "Deposit 30%", percent: 30, rule: "on_order" },
             { label: "Balance 70%", percent: 70, rule: "on_ready" },
           ],
           warrantyMonths: 12,
@@ -65,7 +65,7 @@ describe("terms in four groups: the factory offer and the quotation", () => {
     ).body.id;
     const q = await offer();
     expect(q).toMatchObject({
-      leadTime: "30 days after the advance",
+      leadTime: "30 days after the deposit",
       leadDays: 30,
       leadFrom: "after_payment",
       advancePercent: 30,
@@ -74,21 +74,21 @@ describe("terms in four groups: the factory offer and the quotation", () => {
       warrantyFrom: "shipment",
     });
     expect(q.paymentParts).toEqual([
-      { label: "Advance 30%", percent: 30, rule: "on_order", days: null },
+      { label: "Deposit 30%", percent: 30, rule: "on_order", days: null },
       { label: "Balance 70%", percent: 70, rule: "on_ready", days: null },
     ]);
     // Parts that do not add up are refused, saying so.
     const refused = await api(app, sana)
-      .put(`/factory-quotes/${offerId}`, { factoryId: q.factory.id, receivedOn: q.receivedOn, currency: "CNY", paymentParts: [{ label: "Advance", percent: 50, rule: "on_order" }] })
+      .put(`/factory-quotes/${offerId}`, { factoryId: q.factory.id, receivedOn: q.receivedOn, currency: "CNY", paymentParts: [{ label: "Deposit", percent: 50, rule: "on_order" }] })
       .expect(422);
     expect(JSON.stringify(refused.body)).toMatch(/add up to 100%/);
   });
 
-  it("an older form that leaves the new terms out keeps them; one that sends only the advance % replaces the parts", async () => {
+  it("an older form that leaves the new terms out keeps them; one that sends only the deposit % replaces the parts", async () => {
     const q = await offer();
     const head = { factoryId: q.factory.id, receivedOn: q.receivedOn, currency: "CNY", basis: "FOB", basisPlace: "Qingdao", moq: "1 set", leadTime: q.leadTime };
     await api(app, sana).put(`/factory-quotes/${offerId}`, head).expect(200);
-    expect(await offer()).toMatchObject({ leadDays: 30, leadTime: "30 days after the advance", warrantyMonths: 12, warrantyFrom: "shipment", advancePercent: 30 });
+    expect(await offer()).toMatchObject({ leadDays: 30, leadTime: "30 days after the deposit", warrantyMonths: 12, warrantyFrom: "shipment", advancePercent: 30 });
     expect((await offer()).paymentParts).toHaveLength(2);
     await api(app, sana).put(`/factory-quotes/${offerId}`, { ...head, advancePercent: 40 }).expect(200);
     const after = await offer();
@@ -96,7 +96,7 @@ describe("terms in four groups: the factory offer and the quotation", () => {
     expect(after.paymentParts.map((p: { percent: number; rule: string }) => `${p.percent} ${p.rule}`)).toEqual(["40 on_order", "60 on_ready"]);
     // Back to 30/70 for what follows; and a lead time cleared keeps its words only when there are no days.
     await api(app, sana)
-      .put(`/factory-quotes/${offerId}`, { ...head, paymentParts: [{ label: "Advance 30%", percent: 30, rule: "on_order" }, { label: "Balance 70%", percent: 70, rule: "on_ready" }] })
+      .put(`/factory-quotes/${offerId}`, { ...head, paymentParts: [{ label: "Deposit 30%", percent: 30, rule: "on_order" }, { label: "Balance 70%", percent: 70, rule: "on_ready" }] })
       .expect(200);
     expect((await offer()).advancePercent).toBe(30);
   });
@@ -117,7 +117,7 @@ describe("terms in four groups: the factory offer and the quotation", () => {
     expect(offers.offers[0].terms.parts).toHaveLength(2);
   });
 
-  it("a quotation's parts give its deposit and balance; its route, port and warranty are kept; the paper's facts come back", async () => {
+  it("a quotation's parts give its deposit and balance; its route, port and warranty are kept; the document's facts come back", async () => {
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     const r = (
       await api(app, sana)

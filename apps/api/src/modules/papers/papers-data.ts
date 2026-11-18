@@ -197,7 +197,7 @@ const COL = {
   no: { key: "no", label: "Item", width: 32 } satisfies PaperColumn,
   item: { key: "item", label: "Description" } satisfies PaperColumn,
   hs: { key: "hs", label: "HS code", width: 58 } satisfies PaperColumn,
-  qty: { key: "qty", label: "Qty", width: 56 } satisfies PaperColumn,
+  qty: { key: "qty", label: "Quantity", width: 56 } satisfies PaperColumn,
   price: { key: "price", label: "Unit price", width: 70, align: "right" } satisfies PaperColumn,
   amount: { key: "amount", label: "Amount", width: 80, align: "right" } satisfies PaperColumn,
 };
@@ -312,7 +312,7 @@ function hsOf(c: PaperCtx) {
   const chk = check(
     "hs",
     "HS codes",
-    withHs === goods.length ? "on every line" : `${withHs} of ${goods.length} lines`,
+    withHs === goods.length ? "on every item" : `${withHs} of ${goods.length} items`,
     withHs === goods.length,
     { fix: "hs" },
   );
@@ -325,7 +325,7 @@ function hsOf(c: PaperCtx) {
 
 const buyerCheck = (c: PaperCtx) => check("buyer", "Buyer and address", c.customer.name, !!c.customer.name, { required: true });
 const linesCheck = (c: PaperCtx, n = c.o.lines.length) =>
-  check("lines", "Lines", `from the order's line table · ${n} line${n === 1 ? "" : "s"}`, n > 0, { required: true });
+  check("lines", "Items", `from the order's item table · ${n} item${n === 1 ? "" : "s"}`, n > 0, { required: true });
 
 function totalsOf(c: PaperCtx) {
   const t = linesOf(c);
@@ -414,7 +414,7 @@ function salesContract(c: PaperCtx): Built {
         ...(leadTime ? [`Delivery: ${leadTime}.`.replace(/\.\.$/, ".")] : []),
         has(c, "delivery_sat")
           ? "Inspection: FAT at the factory before shipment; SAT at the buyer's site."
-          : "Inspection: FAT at the factory before shipment.",
+          : "Inspection: FAT at the supplier before shipment.",
         ...bullets(warrantyOf(c)),
         ...bullets(agreedOf(c.o).deliveryConditions),
       ],
@@ -444,7 +444,7 @@ function commercialInvoice(c: PaperCtx): Built {
   const under =
     c.options.advance !== false && prices && advanceMinor > 0
       ? [
-          { label: "Less: advance received", value: money(fromMinor(-advanceMinor), c.o.currency) },
+          { label: "Less: deposit received", value: money(fromMinor(-advanceMinor), c.o.currency) },
           { label: "Balance payable", value: money(fromMinor(invoiceMinor - advanceMinor), c.o.currency) },
         ]
       : [];
@@ -520,7 +520,7 @@ export function poTax(lines: { factoryUnitPrice: Prisma.Decimal | null; factoryT
   );
   const rates = [...new Set(taxed.map((l) => Number(l.factoryTaxRate)))].sort((a, b) => a - b);
   const rate = rates.length === 1 ? rates[0]! : null;
-  const pct = rate === null ? `${rates.join("% or ")}% (by line)` : `${rate}%`;
+  const pct = rate === null ? `${rates.join("% or ")}% (by item)` : `${rate}%`;
   const included = taxed.length > 0 && taxed.every((l) => l.factoryTaxIncluded);
   const added = taxed.some((l) => !l.factoryTaxIncluded);
   const sentence = !taxed.length ? null : included ? `Prices include ${pct} tax.` : `Prices are without tax; ${pct} tax is added on top.`;
@@ -561,7 +561,7 @@ function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMi
 }
 
 /** What the factory said in a PO paper's words: the lead time counts from our advance, our order, or the drawings. */
-const PO_LEAD_FROM: Record<string, string> = { after_payment: "after our advance", after_order: "after our order", after_drawings: "after the drawings are approved" };
+const PO_LEAD_FROM: Record<string, string> = { after_payment: "after our deposit", after_order: "after our order", after_drawings: "after the drawings are approved" };
 
 /**
  * What was agreed with the factory, as its purchase order prints it (design "terms that travel", step 3): the offer
@@ -611,14 +611,14 @@ function purchaseOrder(c: PaperCtx): Built {
   return {
     n: factories.length > 1 && f ? factories.indexOf(f) + 1 : null,
     checks: [
-      check("factory", "Factory", f?.name ?? "no line has a factory", !!f, { required: true, href: "factory" }),
-      check("lines", "Factory lines", `${mine.length} line${mine.length === 1 ? "" : "s"} from the order's line table`, mine.length > 0, {
+      check("factory", "Supplier", f?.name ?? "no item has a supplier", !!f, { required: true, href: "factory" }),
+      check("lines", "Supplier items", `${mine.length} item${mine.length === 1 ? "" : "s"} from the order's item table`, mine.length > 0, {
         required: true,
       }),
       check(
         "prices",
-        "Factory prices",
-        !currency ? "no currency on the lines" : priced.length === mine.length ? `in ${currency}` : `${mine.length - priced.length} line(s) without a price`,
+        "Supplier prices",
+        !currency ? "no currency on the items" : priced.length === mine.length ? `in ${currency}` : `${mine.length - priced.length} item(s) without a price`,
         mine.length > 0 && priced.length === mine.length && !!currency,
         {
           required: true,
@@ -628,7 +628,7 @@ function purchaseOrder(c: PaperCtx): Built {
       check("readyOn", "Ready date", readyOn ? paperDateText(readyOn) : "not set", !!readyOn, { fix: "readyOn" }),
     ],
     doc: {
-      party: { name: f?.name ?? "Factory", address: f?.address ?? null },
+      party: { name: f?.name ?? "Supplier", address: f?.address ?? null },
       date: fromDbDateOrNull(c.o.factoryOrderedOn) ?? c.today,
       meta: [
         { label: "Our order", value: c.o.refNo },
@@ -658,7 +658,7 @@ function purchaseOrder(c: PaperCtx): Built {
       foot: null,
       boxTitle: "Terms",
       bullets: [
-        offer?.delivery ?? (readyOn ? { label: "Ready by:", value: date(readyOn) } : "Ready date: to be confirmed by the factory."),
+        offer?.delivery ?? (readyOn ? { label: "Ready by:", value: date(readyOn) } : "Ready date: to be confirmed by the supplier."),
         ...(tax.sentence ? [tax.sentence] : []),
         ...(terms ? [terms] : []),
         ...(offer?.note ? [offer.note] : []),
@@ -667,12 +667,12 @@ function purchaseOrder(c: PaperCtx): Built {
         // Expenses the factory bears come off what we owe it (as on the order's money).
         ...borne.map((e) => ({ label: `Charged to you on ${paperDateText(fromDbDate(e.spentOn))}:`, value: money(e.amount.toString(), e.currency) })),
         ...(position && (paid.length || borne.length) ? [{ label: "Still to pay:", value: money(fromMinor(position.toPayMinor), position.currency) }] : []),
-        `Please quote our order number ${c.o.refNo} on every paper and on the packing.`,
+        `Please quote our order number ${c.o.refNo} on every document and on the packing.`,
         ...(c.o.shippingMarks ? [{ label: "Shipping marks:", value: `\n${c.o.shippingMarks}` }] : []),
         ...(offer?.notes ? [offer.notes] : []),
       ],
       bank: null,
-      signatures: { left: `For the buyer · ${c.company.name}`, right: `For the factory · ${f?.name ?? ""}` },
+      signatures: { left: `For the buyer · ${c.company.name}`, right: `For the supplier · ${f?.name ?? ""}` },
     },
   };
 }
@@ -935,7 +935,7 @@ function fatReport(c: PaperCtx, t: NonNullable<ReturnType<typeof fatOf>>): Built
       boxTitle: "Factory acceptance test",
       bullets: [
         ...(day ? [{ label: "Date:", value: date(day) }] : []),
-        ...(t.factory?.name ? [{ label: "Factory:", value: t.factory.name }] : []),
+        ...(t.factory?.name ? [{ label: "Supplier:", value: t.factory.name }] : []),
         ...(t.fatAttendedBy ? [{ label: "Attended by:", value: t.fatAttendedBy.name }] : []),
         ...(t.fatRemarks ? [t.fatRemarks] : []),
       ],
@@ -976,7 +976,7 @@ function deliveryNote(c: PaperCtx): Built {
   return {
     checks: [
       check("delivered", "Delivered on", on ? paperDateText(on) : "not recorded", !!on, { required: true, href: "delivery" }),
-      check("condition", "Condition", condition ? `${condition} (from the lines)` : "not recorded on the lines", !!condition, { href: "delivery" }),
+      check("condition", "Condition", condition ? `${condition} (from the items)` : "not recorded on the items", !!condition, { href: "delivery" }),
       linesCheck(c, c.o.lines.filter((l) => l.type === "goods").length),
     ],
     doc: {
@@ -1243,7 +1243,7 @@ function coverLetter(c: PaperCtx): Built {
   ];
   const a = lcAmount(c);
   return {
-    checks: [...lcChecks(c, ["lcNo", "ourBank"]), ...lcAmountCheck(c), check("set", "The paper set", `${papers.length} papers`, papers.length > 0)],
+    checks: [...lcChecks(c, ["lcNo", "ourBank"]), ...lcAmountCheck(c), check("set", "The document set", `${papers.length} documents`, papers.length > 0)],
     doc: {
       party: { name: b?.ourBank ?? "Our bank" },
       date: c.today,

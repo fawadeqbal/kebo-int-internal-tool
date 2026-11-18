@@ -241,7 +241,7 @@ class _NewInquiryScreenState extends ConsumerState<NewInquiryScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Optional. Often the customer sends only requirements; the lines are made at factory prices.',
+                        'Optional. Often the customer sends only requirements; the items are made at supplier prices.',
                         style: KType.callout.copyWith(color: c.inkMuted),
                       ),
                       const SizedBox(height: KSpace.s3),
@@ -311,7 +311,7 @@ class _NewInquiryScreenState extends ConsumerState<NewInquiryScreen> {
                     onEdit: () => goTo(2),
                     items: [
                       KDetail(
-                        'Lines',
+                        'Items',
                         _lines.isEmpty
                             ? null
                             : _lines.map((l) => '${l.quantity} ${l.unit}  ${l.description}').join('\n'),

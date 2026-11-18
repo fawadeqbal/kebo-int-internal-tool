@@ -57,7 +57,7 @@ export default async function FactoryOverview({
   const { id } = await params;
   const sp = await searchParams;
   const old = sp.tab ? TAB_OF[sp.tab] : sp.offers === "all" ? "offers" : sp.panel === "history" ? "notes" : undefined;
-  if (old) redirect(`/factories/${id}/${old}`);
+  if (old) redirect(`/suppliers/${id}/${old}`);
   const me = await requirePermission("sourcing.manage");
   const editing = sp.panel === "edit-factory";
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
@@ -102,7 +102,7 @@ export default async function FactoryOverview({
                   </a>
                 ),
               },
-              { label: "Owner", value: f.owner?.name },
+              { label: "Responsible person", value: f.owner?.name },
               { label: "Address", value: f.address && <span className="whitespace-pre-line">{f.address}</span> },
               { label: "Bank details", value: f.bankDetails && <span className="whitespace-pre-line">{f.bankDetails}</span>, wide: true },
               { label: "Notes", value: f.notes && <span className="whitespace-pre-line">{f.notes}</span>, wide: true },
@@ -113,7 +113,7 @@ export default async function FactoryOverview({
             <CardHeader
               title="Purchase orders"
               actions={
-                <ButtonLink href={`/factories/${f.id}/orders`} variant="link" size="sm">
+                <ButtonLink href={`/suppliers/${f.id}/orders`} variant="link" size="sm">
                   <ArrowRight aria-hidden /> All
                 </ButtonLink>
               }
@@ -152,7 +152,7 @@ export default async function FactoryOverview({
               ) : (
                 <EmptyState
                   title="No purchase orders yet"
-                  description="When an order buys from this factory, it shows here with what we owe and paid."
+                  description="When an order buys from this supplier, it shows here with what we owe and paid."
                 />
               )
             ) : r.openOrders.length ? (
@@ -177,7 +177,7 @@ export default async function FactoryOverview({
                 </tbody>
               </Table>
             ) : (
-              <EmptyState title="Nothing in production" description="Orders this factory makes for us show here." />
+              <EmptyState title="Nothing in production" description="Orders this supplier makes for us show here." />
             )}
           </Card>
           {canRemove && (
@@ -200,7 +200,7 @@ export default async function FactoryOverview({
             <CardHeader
               title="Money"
               actions={
-                <ButtonLink href={`/factories/${f.id}/costs`} variant="link" size="sm">
+                <ButtonLink href={`/suppliers/${f.id}/costs`} variant="link" size="sm">
                   <FileText aria-hidden /> Statement
                 </ButtonLink>
               }

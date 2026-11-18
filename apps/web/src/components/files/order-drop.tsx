@@ -93,7 +93,7 @@ export function OrderDrop({ orderId, refNo }: { orderId: string; refNo: string }
             <p className="text-base font-semibold text-primary tabular">Drop to add to {refNo}</p>
             <p className="mt-0.5 text-xs text-text-2">
               {over.label === "kept with this step's files" || over.label === "kept with the order's files"
-                ? `Dropped on a paper, it's attached there; here it is ${over.label}.`
+                ? `Dropped on a document, it's attached there; here it is ${over.label}.`
                 : `It will be ${over.label}.`}
             </p>
           </div>

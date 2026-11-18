@@ -336,7 +336,7 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
     if (o.word === "Shipped") return ["At sea", "info"];
     if (o.word === "Arrived" || o.word === "Delivered") return [o.word, "info"];
     const cur = at.get(o.id);
-    if (o.word === "Confirmed") return cur?.key === "payment" ? ["Deposit", Number(o.received) > 0 ? "warn" : "neutral"] : ["PO", "warn"];
+    if (o.word === "Confirmed") return cur?.key === "payment" ? ["Deposit", Number(o.received) > 0 ? "warn" : "neutral"] : ["Purchase order", "warn"];
     return [cur?.label ?? "Production", "info"];
   };
   const line = (o: OrderRow) => {

@@ -69,7 +69,7 @@ describe("money", () => {
     await app?.close();
   });
 
-  it("starts the order with a plan from its terms, and shows what we owe the factory", async () => {
+  it("starts the order with a plan from its terms, and shows what we owe the supplier", async () => {
     const m = await money();
     expect(m).toMatchObject({ currency: "USD", total: "2000.00" });
     expect(m.plan.items.map((i: { label: string; amount: string; status: string }) => [i.label, i.amount, i.status])).toEqual([
@@ -159,7 +159,7 @@ describe("money", () => {
     expect(after.received).toBe("650.00");
   });
 
-  it("records what we pay the factory: paid by the person who looks after it, at the Settings rate", async () => {
+  it("records what we pay the supplier: paid by the person who looks after it, at the Settings rate", async () => {
     const pay = { factoryId, kind: "deposit", amount: 3390, currency: "CNY", paidOn: today, reference: "FP-1" };
     await api(app, sana).post(`/orders/${orderId}/factory-payments`, pay).expect(403);
     // We owe the factory in CNY: a payment in USD would not count against it, so it is refused.

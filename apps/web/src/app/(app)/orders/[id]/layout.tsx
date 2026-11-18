@@ -64,7 +64,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const proforma = o.documents.find((d) => d.kind === "proforma");
   const pdf = proforma ? docHref(o, proforma) : null;
   // On a phone the paper buttons fold into ⋯ (design system: page header).
-  const paperItems: MenuEntry[] = [{ label: "Papers", href: `${base}/documents` }];
+  const paperItems: MenuEntry[] = [{ label: "Documents", href: `${base}/documents` }];
   const proformaItems: MenuEntry[] = pdf
     ? [
         { label: "View / Print the proforma", href: pdf.view, newTab: true },

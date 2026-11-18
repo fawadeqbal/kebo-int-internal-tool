@@ -118,7 +118,7 @@ describe("payment files", () => {
     });
   });
 
-  it("keeps the proof with a payment to a factory", async () => {
+  it("keeps the proof with a payment to a supplier", async () => {
     const orders = (await api(app, manager).get("/orders?status=open").expect(200)).body as OrderRow[];
     let found: { orderId: string; pay: Pay } | null = null;
     for (const o of orders) {

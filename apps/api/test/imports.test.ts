@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaService } from "../src/database/prisma.service";
 import { api, signIn, startApp } from "./app";
 
-describe("customers and factories from an Excel file", () => {
+describe("customers and suppliers from an Excel file", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let manager: string;
@@ -50,7 +50,7 @@ describe("customers and factories from an Excel file", () => {
     expect(await prisma.company(FIRST_COMPANY_ID).party.count({ where: { ...isCustomer, name: `Good ${tag}` } })).toBe(0);
   });
 
-  it("adds new factories and leaves out names already there", async () => {
+  it("adds new suppliers and leaves out names already there", async () => {
     const existing = await prisma.company(FIRST_COMPANY_ID).party.findFirstOrThrow({ where: { ...isSupplier, deletedAt: null } });
     const res = await api(app, manager)
       .post("/factories/import", {
@@ -58,7 +58,7 @@ describe("customers and factories from an Excel file", () => {
         factories: [{ name: `Ningbo Valves ${tag}`, contactPerson: "Mr Li", phone: "+86 574 1234 5678" }, { name: ` ${existing.name.toLowerCase()} ` }],
       })
       .expect(200);
-    expect(res.body).toEqual({ added: 1, skipped: [{ name: existing.name.toLowerCase(), reason: "already a factory" }] });
+    expect(res.body).toEqual({ added: 1, skipped: [{ name: existing.name.toLowerCase(), reason: "already a supplier" }] });
     const f = await prisma.company(FIRST_COMPANY_ID).party.findFirstOrThrow({ where: { ...isSupplier, name: `Ningbo Valves ${tag}` } });
     expect(f.ownerId).toBeNull();
   });

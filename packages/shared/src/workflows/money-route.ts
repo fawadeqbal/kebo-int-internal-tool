@@ -69,7 +69,7 @@ export const PLAN_DUE_RULE_LABEL: Record<PlanDueRule, string> = {
   fixed: "On a date",
   on_ready: "On the ready date",
   on_ship_plus_days: "Days after shipping",
-  after_papers: "After the papers (LC)",
+  after_papers: "After the documents (LC)",
   after_sat: "After the site test (SAT)",
 };
 /** The rules a row keeps days for, and the days a new one starts with when none are given. */
@@ -118,7 +118,7 @@ export function dueRuleWords(item: { dueRule: string | null; dueDays: number | n
     case "on_ship_plus_days":
       return days ? `${days} day${days === 1 ? "" : "s"} after shipping` : "when the goods leave";
     case "after_papers":
-      return days ? `${days} days after the papers` : "when the papers reach their bank";
+      return days ? `${days} days after the documents` : "when the documents reach their bank";
     case "after_sat":
       return days ? `${days} day${days === 1 ? "" : "s"} after the site test` : "after the site test";
     default:
@@ -206,7 +206,7 @@ export function planWhen(item: { part: string | null; dueRule: string | null; du
   if (words) return words;
   if (item.dueRule === "fixed") return "";
   if (item.part === "balance") {
-    if (t.route === "bank_contract") return "when the banks present the papers";
+    if (t.route === "bank_contract") return "when the banks present the documents";
     if (t.route === "informal" && t.balanceWhen === "against_bl_copy") return "against the B/L copy";
     if (t.route === "informal") return "before shipment";
   }
@@ -389,7 +389,7 @@ export function routePaymentSentence(depositPercent: number, t: RouteTerms, acce
       : "through the banks against the shipping documents";
   if (depositPercent <= 0) return `Payment: 100% ${how}.`;
   if (depositPercent >= 100) return "Our usual payment is made by 100% Advance payment.";
-  return `Our usual payment is made by ${depositPercent}% Advance deposit and ${100 - depositPercent}% ${how}.`;
+  return `Our usual payment is made by ${depositPercent}% deposit and ${100 - depositPercent}% ${how}.`;
 }
 
 /** The route's terms an order starts with from its balance terms (an informal order "against B/L copy"). */
@@ -450,16 +450,16 @@ export function lcChecks(i: {
   const ship = lc?.latestShipOn ?? null;
   checks.push({
     key: "ship_by",
-    label: "Ship-by date is after the factory's ready date",
+    label: "Ship-by date is after the supplier's ready date",
     ok: ship && i.readyOn ? ship >= i.readyOn : null,
     detail:
       ship && i.readyOn
         ? ship >= i.readyOn
-          ? `LC ship by ${ship} · factory ready ${i.readyOn}`
-          : `LC ship by ${ship} · factory ready ${i.readyOn} · ask for an amendment`
+          ? `LC ship by ${ship} · supplier ready ${i.readyOn}`
+          : `LC ship by ${ship} · supplier ready ${i.readyOn} · ask for an amendment`
         : !ship
           ? "needs the LC's latest ship date"
-          : "needs the factory's ready date",
+          : "needs the supplier's ready date",
   });
   if (i.shipBy)
     checks.push({
@@ -476,7 +476,7 @@ export function lcChecks(i: {
   const reach = from ? addDays(from, i.courierDays) : null;
   checks.push({
     key: "expiry",
-    label: "Papers can reach the bank before the LC expires",
+    label: "Documents can reach the bank before the LC expires",
     ok: lc?.expiresOn && reach ? reach <= lc.expiresOn : null,
     detail:
       lc?.expiresOn && reach
@@ -546,7 +546,7 @@ export const CANCEL_CUSTOMER_MONEY_LABEL: Record<CancelCustomerMoney, string> = 
 export const CANCEL_FACTORY_MONEY = ["refund_due", "loss"] as const;
 export type CancelFactoryMoney = (typeof CANCEL_FACTORY_MONEY)[number];
 export const CANCEL_FACTORY_MONEY_LABEL: Record<CancelFactoryMoney, string> = {
-  refund_due: "Refund expected from the factory",
+  refund_due: "Refund expected from the supplier",
   loss: "A loss on this order",
 };
 
@@ -602,7 +602,7 @@ export function defaultFactoryPlan(owedMinor: Minor, advancePercent: number): Fa
   const p = Math.min(Math.max(advancePercent, 0), 100);
   const advance = percentOfMinor(owedMinor, p);
   const rows: FactoryPlanRow[] = [];
-  if (advance > 0) rows.push({ label: `Advance ${p}%`, percent: p, amountMinor: advance, dueRule: "on_order", dueOn: null });
+  if (advance > 0) rows.push({ label: `Deposit ${p}%`, percent: p, amountMinor: advance, dueRule: "on_order", dueOn: null });
   if (owedMinor - advance > 0 || !rows.length)
     rows.push({ label: advance > 0 ? `Balance ${Math.round((100 - p) * 100) / 100}%` : "Payment", percent: advance > 0 ? 100 - p : 100, amountMinor: owedMinor - advance, dueRule: "on_ready", dueOn: null });
   return rows;

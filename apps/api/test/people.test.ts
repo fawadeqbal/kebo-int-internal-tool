@@ -148,7 +148,7 @@ describe("people: users, two-step sign-in, customers, factories", () => {
     expect(await ids(`city=Wenzhou${tag}&status=none`)).toEqual([f.body.id]);
   });
 
-  it("manages factories with unique names", async () => {
+  it("manages suppliers with unique names", async () => {
     const f = await api(app, staff).post("/factories", { name: `Ningbo Pumps ${tag}` }).expect(201);
     expect(f.body).not.toHaveProperty("vatRate"); // no tax setting on a factory
     await api(app, staff).post("/factories", { name: `ningbo pumps ${tag}` }).expect(409);

@@ -118,7 +118,7 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
         After saving, a payment recorded by someone who cannot verify waits in the <b>verification queue</b> until a manager checks it against the bank.
       </>
     ),
-    out: <>The payment is posted to the supplier&rsquo;s account and the order&rsquo;s factory money at once.</>,
+    out: <>The payment is posted to the supplier&rsquo;s account and the order&rsquo;s supplier money at once.</>,
     expense: <>The expense counts on its order or inquiry; one paid from someone&rsquo;s own money is owed back to them.</>,
     transfer: <>Both accounts change at once; a transfer between currencies keeps the rate you enter.</>,
   };

@@ -43,7 +43,7 @@ export function CostsExcel({ costs }: { costs: OrderCosts }) {
               inOrder: n2(r.inOrder),
               paid: n2(r.paidInOrder),
               toPay: n2(r.toPayInOrder),
-              state: r.borneBy === "customer" ? "Charged to the customer" : r.borneBy === "factory" ? "Taken off the factory" : costState(r),
+              state: r.borneBy === "customer" ? "Charged to the customer" : r.borneBy === "factory" ? "Taken off the supplier" : costState(r),
             },
           }));
           const numbers = lineNumbers(rows.map((r) => ({ key: r.key, parentKey: null })));

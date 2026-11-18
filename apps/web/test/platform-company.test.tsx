@@ -265,7 +265,7 @@ describe("company page: each element only where it can be used", () => {
     const { unmount } = render(<DetailsSection c={company()} />);
     for (const name of ["Edit company", "Edit main contact", "Edit web address", "Edit notes"])
       expect(screen.getByRole("button", { name })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Edit address and papers|Edit limits/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Edit address and documents|Edit limits/ })).toBeNull();
     // Missing and editable: + Add in place.
     expect(screen.getByRole("button", { name: "Add phone / whatsapp" })).toBeTruthy();
     expect(screen.getByText("Shandong Kebo International Trade Co., Ltd.")).toBeTruthy();

@@ -112,12 +112,12 @@ describe("the figures of Home and Reports", () => {
   });
 
   it("open from an ⓘ beside the tile, not inside its link", () => {
-    render(<StatTile label="Sold this month" value="USD 12,400" href="/reports/profit" how={"First line.\nSecond line."} />);
+    render(<StatTile label="Sold this month" value="USD 12,400" href="/reports/profit" how={"First item.\nSecond item."} />);
     const button = screen.getByRole("button", { name: "How Sold this month is worked out" });
     expect(button.closest("a")).toBeNull();
     const note = document.getElementById(button.getAttribute("popovertarget")!)!;
     expect(note.getAttribute("popover")).toBe("auto");
-    expect(note.textContent).toContain("First line.");
+    expect(note.textContent).toContain("First item.");
     expect(note.querySelectorAll("p").length).toBeGreaterThanOrEqual(4);
     // The tile is still one link with the figure in it.
     expect(screen.getByRole("link").textContent).toContain("USD 12,400");

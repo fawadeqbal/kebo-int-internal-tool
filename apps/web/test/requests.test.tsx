@@ -18,8 +18,8 @@ describe("payment requests in words", () => {
     expect(requestWords({ state: "sent", with: "bank", sentOn: "2026-11-03", revision: null })).toBe("At the bank since 03 Nov");
   });
 
-  it("a bank route's balance waits for the papers, not for a request", () => {
-    expect(requestWords({ ...base, state: "not_sent", through: "bank" })).toBe("Papers not at the bank yet");
+  it("a bank route's balance waits for the documents, not for a request", () => {
+    expect(requestWords({ ...base, state: "not_sent", through: "bank" })).toBe("Documents not at the bank yet");
     expect(requestWords({ ...base, state: "not_sent", through: "customer" })).toBe("Not sent");
   });
 

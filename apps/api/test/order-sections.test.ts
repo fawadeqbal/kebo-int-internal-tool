@@ -65,7 +65,7 @@ describe("order sections: files and reminders", () => {
       stands: { stage: string; label: string; word: string; tone: string; fact: string; missing: string }[];
     };
     expect(v.stages).toEqual(["payment", "factory", "production", "shipping", "delivery", "documents"]);
-    expect(v.stands.map((s) => s.label)).toEqual(["Payment", "Factory order", "Production", "Shipping", "Delivery & SAT", "Documents"]);
+    expect(v.stands.map((s) => s.label)).toEqual(["Payment", "Purchase order", "Production", "Shipping", "Delivery & SAT", "Documents"]);
     expect(v.stands[0]).toMatchObject({ word: "Nothing in", tone: "warn" });
     expect(v.stands[1]).toMatchObject({ word: "Not sent", tone: "neutral" });
     expect(v.stands[1]!.fact).toContain(`Sections Works ${tag}`);
@@ -110,7 +110,7 @@ describe("order sections: files and reminders", () => {
     expect(await byName(`Booking ${tag}.pdf`)).toMatchObject({ step: "delivery", section: null, attachedTo: { link: "step" } });
   });
 
-  it("keeps Production's facts per factory: how the ready date was told, the factory test, where the goods came in", async () => {
+  it("keeps Production's facts per supplier: how the ready date was told, the factory test, where the goods came in", async () => {
     type View = { production: { factory: { id: string; name: string } | null; readyToldOn: string | null; readyToldVia: string | null; fat: { plannedOn: string | null; doneOn: string | null; result: string | null; attendedBy: { name: string } | null; remarks: string | null }; goodsReceivedAt: string | null }[] };
     const before = (await api(app, sana).get(`/orders/${orderId}/sections`).expect(200)).body as View;
     expect(before.production).toHaveLength(1);

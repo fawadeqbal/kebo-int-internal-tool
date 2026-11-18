@@ -154,7 +154,7 @@ describe("order files", () => {
       .attach("file", pdf("bl"), { filename: "BL copy.pdf", contentType: "application/pdf" })
       .expect(201);
     const bl = (await byName("BL copy.pdf"))!;
-    expect(bl.attachedTo).toMatchObject({ link: "paper", label: "Paper · Bill of lading (B/L)" });
+    expect(bl.attachedTo).toMatchObject({ link: "paper", label: "Document · Bill of lading (B/L)" });
     expect(bl).toMatchObject({ step: "shipping", group: "shipping" });
     expect((await papers()).find((p) => p.kind === "bill_of_lading")).toMatchObject({ state: "up", doc: { file: { id: bl.sourceId } } });
 
@@ -257,13 +257,13 @@ describe("order files", () => {
       .expect(404);
     const ci = (await papers()).find((p) => p.kind === "commercial-invoice")!;
     await api(app, sana)
-      .post(`/orders/${orderId}/files/share`, { files: two, papers: [ci.key], via: "download", message: `Papers for ${refNo}` })
+      .post(`/orders/${orderId}/files/share`, { files: two, papers: [ci.key], via: "download", message: `Documents for ${refNo}` })
       .expect(200);
     const shared = (await history()).find((e) => e.action === "file.share")!;
     expect(shared.summary).toMatch(/shared 3 files .*downloaded to send/);
   });
 
-  it("each source keeps its own rule: payments for accounts, papers for documents, nothing for viewers", async () => {
+  it("each source keeps its own rule: payments for accounts, documents for documents, nothing for viewers", async () => {
     // A payment's proof shows under Money; only those who record payments change it.
     const currency = (await api(app, manager).get(`/orders/${orderId}`).expect(200)).body.currency as string;
     const pay = (
@@ -320,7 +320,7 @@ describe("order files", () => {
       .expect((r) => expect([403, 404]).toContain(r.status));
   });
 
-  it("deletes with the paper falling back to missing; a draft paper can be deleted, a final one cannot", async () => {
+  it("deletes with the document falling back to missing; a draft document can be deleted, a final one cannot", async () => {
     const v2 = (await byName("BL copy v2.pdf"))!;
     await api(app, sana).delete(`/orders/${orderId}/files/attachment/${v2.sourceId}`).expect(200);
     expect(await byName("BL copy v2.pdf")).toBeUndefined();

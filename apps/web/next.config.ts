@@ -39,6 +39,9 @@ const config: NextConfig = {
     return [
       { source: "/deals", destination: "/inquiries", permanent: true },
       { source: "/deals/:path*", destination: "/inquiries/:path*", permanent: true },
+      // Factories are called suppliers (Words, 18 Nov 2026): old links and bookmarks still open.
+      { source: "/factories", destination: "/suppliers", permanent: true },
+      { source: "/factories/:path*", destination: "/suppliers/:path*", permanent: true },
       // Security's tabs are pages under People & access (design page 33); the query (?panel=, ?person=…) goes along.
       { source: "/security", destination: "/access/roles", permanent: false },
       { source: "/security/:path*", destination: "/access/:path*", permanent: false },

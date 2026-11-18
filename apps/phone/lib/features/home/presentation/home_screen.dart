@@ -114,7 +114,7 @@ class _Body extends ConsumerWidget {
                   ? const KEmptyState(
                       icon: KIcons.success,
                       title: 'Nothing needs you right now',
-                      message: 'Late money, dates and papers show here.',
+                      message: 'Late money, dates and documents show here.',
                     )
                   : Column(
                       children: [for (final (i, n) in top.indexed) NeedRow(need: n, divider: i < top.length - 1)],
@@ -288,7 +288,7 @@ class NeedsScreen extends ConsumerWidget {
                     ? const KEmptyState(
                         icon: KIcons.success,
                         title: 'Nothing needs you',
-                        message: 'Late money, dates and papers show here.',
+                        message: 'Late money, dates and documents show here.',
                       )
                     : Column(
                         children: [for (final (i, n) in value.indexed) NeedRow(need: n, divider: i < value.length - 1)],

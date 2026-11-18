@@ -35,7 +35,7 @@ export async function ItemsCard({ id }: { id: string }) {
             <Th className="w-14">No.</Th>
             <Th>Item</Th>
             <Th>Model</Th>
-            <Th className="text-right">Qty</Th>
+            <Th className="text-right">Quantity</Th>
             <Th className="text-right">Target price</Th>
             {sourcing && <Th>Offers</Th>}
             <Th className="w-12">
@@ -68,7 +68,7 @@ export async function ItemsCard({ id }: { id: string }) {
                     const own = (needs?.edits ?? []).filter((e) => e.lines?.[i.id]?.length);
                     return own.length ? (
                       <HistoryButton
-                        title={`Line ${i.no}`}
+                        title={`Item ${i.no}`}
                         allHref={`/inquiries/${id}/history`}
                         entries={own.map((e) => ({ lines: e.lines![i.id]!, reason: e.reason, by: e.by, at: dateTime(e.at) }))}
                       />
@@ -98,7 +98,7 @@ export async function ItemsCard({ id }: { id: string }) {
             table
           ) : (
             <p className="px-5 py-6 text-sm text-text-2">
-              <strong className="text-text">No item list yet.</strong> That is fine: the items come from the factory offers, or add them here.
+              <strong className="text-text">No item list yet.</strong> That is fine: the items come from the supplier offers, or add them here.
             </p>
           )
         }

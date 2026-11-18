@@ -79,7 +79,7 @@ describe("cash book", () => {
   });
 
   it("lists what has no account yet, and puts it on one afterwards", async () => {
-    const e = (await api(app, manager).post("/expenses", { category: "office", description: `Paper ${tag}`, amount: 25, currency: "USD", spentOn: today }).expect(201)).body;
+    const e = (await api(app, manager).post("/expenses", { category: "office", description: `Document ${tag}`, amount: 25, currency: "USD", spentOn: today }).expect(201)).body;
     const none = await book("account=none");
     expect(none.rows.some((r: { id: string }) => r.id === e.id)).toBe(true);
     expect(none.unassigned).toBeGreaterThan(0);

@@ -4,36 +4,36 @@
  * does (see docs: "Reasons for edits"). People may also write their own words.
  */
 export const REASON_CHOICES = {
-  items: ["Customer changed the quantity", "Factory split it into parts", "Factory's minimum order", "Factory doesn't make this", "Mistake fixed"],
-  split: ["Factory quotes it in parts", "Customer asked for the parts separately", "Easier to compare factories"],
+  items: ["Customer changed the quantity", "Supplier split it into parts", "Supplier's minimum order", "Supplier doesn't make this", "Mistake fixed"],
+  split: ["Supplier offers it in parts", "Customer asked for the parts separately", "Easier to compare suppliers"],
   customer: ["Wrong customer was chosen", "Customer's other company is buying"],
   reassign: ["Workload", "Person is away", "Better fit for this product"],
-  hold: ["Customer is deciding", "Waiting for the factory", "Waiting for documents"],
+  hold: ["Customer is deciding", "Waiting for the supplier", "Waiting for documents"],
   reopen: ["Customer came back", "Marked lost by mistake"],
-  factoryPrice: ["Factory changed its price", "Factory changed its terms", "Mistake fixed"],
-  factoryChoice: ["Cheaper factory", "Better quality", "Faster delivery", "Factory can't make it"],
-  newRevision: ["Customer asked for a discount", "Quantities changed", "Factory price changed", "Terms changed"],
+  factoryPrice: ["Supplier changed its price", "Supplier changed its terms", "Mistake fixed"],
+  factoryChoice: ["Cheaper supplier", "Better quality", "Faster delivery", "Supplier can't make it"],
+  newRevision: ["Customer asked for a discount", "Quantities changed", "Supplier price changed", "Terms changed"],
   quoteAnswer: ["Price too high", "Customer bought elsewhere", "No reply from the customer", "Project cancelled"],
   orderBack: ["Moved forward by mistake", "Goods not ready after all", "Customer claim"],
   shipping: ["Ship date was wrong", "B/L number corrected", "Shipped on another vessel"],
   closeWithDue: ["Customer pays with the next order", "Agreed discount", "Written off"],
   customerDetails: ["Company renamed", "Spelling fixed", "Wrong country"],
-  factoryDetails: ["Factory renamed", "Spelling fixed", "Another person handles this factory"],
+  factoryDetails: ["Supplier renamed", "Spelling fixed", "Another person handles this supplier"],
   settings: ["New exchange rate", "New company policy", "Mistake fixed"],
   plan: ["Customer asked for more time", "Agreed a new schedule", "Order changed", "Mistake fixed"],
   /** Changing what was agreed with the customer after the quotation was accepted (design "terms that travel"). */
-  agreed: ["Customer asked for it", "Agreed a new port", "Factory changed its lead time", "Typed wrong", "Mistake fixed"],
+  agreed: ["Customer asked for it", "Agreed a new port", "Supplier changed its lead time", "Typed wrong", "Mistake fixed"],
   /** Changing what was agreed with a factory after its purchase order was sent (design "terms that travel"). */
-  factory_terms: ["The factory asked for it", "Agreed a new lead time", "Agreed a longer warranty", "Typed wrong", "Mistake fixed"],
+  factory_terms: ["The supplier asked for it", "Agreed a new lead time", "Agreed a longer warranty", "Typed wrong", "Mistake fixed"],
   /** Changing what a card already saved (lines or values): Save changes asks why. */
   /** Saving something the order's checks asked about (a date out of order). */
   anyway: ["It did happen, not recorded yet", "Agreed with the customer", "The other date is wrong"],
   /** Changing a card's saved values (dates, numbers, names). */
-  editValues: ["Customer asked for it", "Factory changed it", "The date moved", "Typed wrong", "Mistake fixed"],
-  edit: ["Customer changed the list", "Customer changed the quantity", "Factory changed the price", "Typed wrong", "Mistake fixed"],
+  editValues: ["Customer asked for it", "Supplier changed it", "The date moved", "Typed wrong", "Mistake fixed"],
+  edit: ["Customer changed the list", "Customer changed the quantity", "Supplier changed the price", "Typed wrong", "Mistake fixed"],
   /** Sending a payment request again (R2): the first one stays as it was sent. */
   requestAgain: ["Amount changed", "Due date changed", "Customer asked for a new copy", "Bank details changed", "Mistake fixed"],
-  payment: ["Wrong amount", "Wrong date", "Wrong order or factory", "Wrong exchange rate", "Mistake fixed"],
+  payment: ["Wrong amount", "Wrong date", "Wrong order or supplier", "Wrong exchange rate", "Mistake fixed"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type ReasonKind = keyof typeof REASON_CHOICES;

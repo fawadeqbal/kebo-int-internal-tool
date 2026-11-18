@@ -800,7 +800,7 @@ export function LineTable({
   const selectionBar = !readOnly && (pickedRows.length > 0 || (selecting && !phone)) && (
     <div
       role="toolbar"
-      aria-label={pickedRows.length ? pickedLabel : "Select lines"}
+      aria-label={pickedRows.length ? pickedLabel : "Select items"}
       className="sticky top-0 z-10 flex min-h-11 flex-wrap items-center gap-0.5 rounded-[10px] border border-primary-line bg-primary-soft px-2 py-1 text-text"
     >
       <span className="mr-2 inline-flex h-6 items-center border-r border-primary-line pr-3.5 pl-1.5 text-sm font-bold text-primary">
@@ -1287,7 +1287,7 @@ export function LineTable({
           )}
           {!readOnly && !phone && (
             <Button size="sm" variant="secondary" onClick={() => setPasteOpen((o) => !o)} aria-expanded={pasteOpen}>
-              <ClipboardPaste aria-hidden /> Paste rows
+              <ClipboardPaste aria-hidden /> Paste items
             </Button>
           )}
           {anyParts && !phone && (
@@ -1350,7 +1350,7 @@ export function LineTable({
               setPasteOpen(true);
             }}
           >
-            Paste rows
+            Paste items
           </MenuItem>
           {canUpload && excelAllowed && (
             <MenuItem
@@ -1465,7 +1465,7 @@ export function LineTable({
                   <th
                     key={c.key}
                     scope="col"
-                    className={cn("h-8 border border-t-0 border-line bg-surface-2 px-2 text-left text-xs font-medium whitespace-nowrap text-text-2", c.align === "right" && "text-right", fill && STICKY_HEAD)}
+                    className={cn("h-8 border border-t-0 border-line bg-surface-2 px-2 py-1 text-left text-xs leading-tight font-medium text-text-2", c.align === "right" && "text-right", fill && STICKY_HEAD)}
                   >
                     {c.label}
                   </th>
@@ -1686,7 +1686,7 @@ export function LineTable({
             {offer && (
               <div className="flex flex-wrap items-center gap-2 rounded-md bg-info-soft px-3 py-2 text-sm">
                 <span>
-                  {offer.items.length} lines pasted. Make them {offer.items.length} {noun}s?
+                  You pasted {offer.items.length} lines of text. Make them {offer.items.length} {noun}s?
                 </span>
                 <Button size="xs" variant="primary" onClick={() => void addPasted(offer.items).then(() => setEntry((v) => ({ ...v, description: offer.before })))}>
                   Add {offer.items.length} {noun}s
@@ -2153,10 +2153,10 @@ function PastePanel({
   const dups = items.map((_, n) => dupLabel(vals[n]!, vals.slice(0, n).map((v, k) => ({ no: nos[k]!, values: v }))));
   const dupCount = dups.filter(Boolean).length;
   return (
-    <div role="region" aria-label="Paste rows" className="flex flex-col gap-2 rounded-xl border border-line bg-surface-2 p-3">
+    <div role="region" aria-label="Paste items" className="flex flex-col gap-2 rounded-xl border border-line bg-surface-2 p-3">
       <div className="flex items-center justify-between gap-2">
         <label htmlFor="paste-lines" className="text-sm font-semibold">
-          Paste rows
+          Paste items
         </label>
         <Button size="icon-xs" variant="ghost" onClick={onCancel} aria-label="Close">
           <X aria-hidden />
@@ -2187,7 +2187,7 @@ function PastePanel({
                 {p.model && <span className="text-muted"> · {p.model}</span>}
                 {dups[n] && <span className="ml-1.5 rounded-full bg-warn-soft px-2 py-px text-xs font-semibold text-warn">{dups[n]}</span>}
               </span>
-              <span className="shrink-0 text-muted tabular">{p.quantity ? `${p.quantity} ${p.unit}`.trim() : "no qty"}</span>
+              <span className="shrink-0 text-muted tabular">{p.quantity ? `${p.quantity} ${p.unit}`.trim() : "no quantity"}</span>
             </li>
             );
           })}
@@ -2231,7 +2231,7 @@ function FilePanel({
   );
   const dupCount = dups.filter(Boolean).length;
   return (
-    <div role="region" aria-label={`Lines from ${file}`} className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary-soft/20 p-3">
+    <div role="region" aria-label={`Items from ${file}`} className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary-soft/20 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm">
           <b className="font-semibold">From your file: {file}</b>

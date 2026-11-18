@@ -24,7 +24,7 @@ export interface RecordRef {
 export const recordLink = (type: RecordType, id: string) =>
   ({ inquiry: `/inquiries/${id}`, order: `/orders/${id}`, customer: `/customers/${id}`, factory: `/factories/${id}` })[type];
 
-const NAMES: Record<RecordType, string> = { inquiry: "Inquiry", order: "Order", customer: "Customer", factory: "Factory" };
+const NAMES: Record<RecordType, string> = { inquiry: "Inquiry", order: "Order", customer: "Customer", factory: "Supplier" };
 
 type Db = PrismaService["db"];
 
@@ -55,7 +55,7 @@ export async function seeRecord(db: Db, user: SessionUser, type: RecordType, id:
     if (!c) throw new NotFoundError(NAMES[type]);
     return ref(c.name, id);
   }
-  if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factories.");
+  if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see suppliers.");
   const f = await db.party.findFirst({ where: { ...isSupplier, id, deletedAt: null }, select: { name: true } });
   if (!f) throw new NotFoundError(NAMES[type]);
   return ref(f.name, null);

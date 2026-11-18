@@ -12,7 +12,7 @@ import { rowKey } from "./form-bits";
 export const ITEM_COLUMNS: LineColumn[] = [
   { key: "description", label: "Description", width: "minmax(0,1fr)", input: "textarea", required: "Each item needs a description" },
   { key: "model", label: "Model / part no.", width: "8rem", input: "text", maxLength: 120, placeholder: "Model" },
-  { key: "quantity", label: "Qty", width: "5rem", input: "number", align: "right", required: "Enter a quantity", placeholder: "Qty" },
+  { key: "quantity", label: "Quantity", width: "5rem", input: "number", align: "right", required: "Enter a quantity", placeholder: "Quantity" },
   { key: "unit", label: "Unit", width: "5.5rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
   { key: "targetPrice", label: "Target price", width: "6.5rem", input: "number", align: "right", placeholder: "Target", phoneHidden: true },
 ];
@@ -50,7 +50,7 @@ const rowsOf = (list: ItemState[]): LineRow[] =>
     parentKey: it.parentKey,
     values: { description: it.description, model: it.model, quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice },
     badge: it.priced ? (
-      <span className="ml-1 align-middle" title="A factory has priced this: changing it will ask why">
+      <span className="ml-1 align-middle" title="A supplier has priced this: changing it will ask why">
         <Badge tone="info">Priced</Badge>
       </span>
     ) : undefined,

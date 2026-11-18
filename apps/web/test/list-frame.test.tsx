@@ -3,7 +3,7 @@ import { render } from "@testing-library/react";
 import { PageHeader, PhoneList, PhoneRow, StatusBadge } from "@kebo/ui";
 
 describe("list frame on a phone", () => {
-  it("draws a record as name, one line, status and the key number, the whole row a link", () => {
+  it("draws a record as name, one item, status and the key number, the whole row a link", () => {
     const { getByRole, getByText } = render(
       <PhoneList label="Orders">
         <PhoneRow href="/orders/1" title="Lahore Pharma" line="SO-2026-0043 · Get the balance" status={<StatusBadge meaning="bad">Late</StatusBadge>} figure="USD 24,200.00" />

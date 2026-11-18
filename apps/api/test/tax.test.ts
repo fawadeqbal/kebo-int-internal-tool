@@ -57,7 +57,7 @@ describe("tax", () => {
     expect(q.lines.map((l: Line) => [l.taxRate, l.costNote])).toEqual([[0, "CNY 100.00, no tax"]]);
   });
 
-  it("without tax: adds each line's tax % (the offer's unless it has its own) on top of its price", async () => {
+  it("without tax: adds each item's tax % (the offer's unless it has its own) on top of its price", async () => {
     const { inquiryId, items } = await deal("NG");
     const id = await offer(inquiryId, {
       newFactoryName: `Taizhou Pumps ${tag}`,
@@ -122,7 +122,7 @@ describe("tax", () => {
     expect(m.factories.rows.map((f: { owed: string; toPay: string }) => [f.owed, f.toPay])).toEqual([["11300.00", "11300.00"]]);
   });
 
-  it("changing the offer's % changes the lines that had it, not a line with its own; the audit says so", async () => {
+  it("changing the offer's % changes the items that had it, not an item with its own; the audit says so", async () => {
     const { inquiryId, items } = await deal("NG");
     const id = await offer(inquiryId, {
       newFactoryName: `Yuhuan Valves ${tag}`,
@@ -147,10 +147,10 @@ describe("tax", () => {
     expect(await quoteOf(inquiryId, id)).toMatchObject({ taxIncluded: true, taxRate: 13, leadTime: "30 days" });
     const log = (await api(app, admin).get(`/audit?entityType=factory_quote&entityId=${id}`).expect(200)).body;
     const summaries = (log.rows ?? log).map((r: { summary: string }) => r.summary).join("\n");
-    expect(summaries).toContain("tax 0% · added on top → 13% · included in the prices (1 line to 13%)");
+    expect(summaries).toContain("tax 0% · added on top → 13% · included in the prices (1 item to 13%)");
   });
 
-  it("leaves offers made before it as they were: without tax, at their lines' rate, the same costs", async () => {
+  it("leaves offers made before it as they were: without tax, at their items' rate, the same costs", async () => {
     // Offers as they were before tax was per offer: lines at 13% (or their own %), the tax added on top.
     const { inquiryId, items } = await deal("NG");
     const mixed = await offer(inquiryId, {

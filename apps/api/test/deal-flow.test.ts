@@ -109,7 +109,7 @@ describe("a whole deal through the API", () => {
     expect(edited.body.title).toBe("Gate valve DN100 PN16");
   });
 
-  it("records factory prices and works out the landed cost in USD", async () => {
+  it("records supplier prices and works out the landed cost in USD", async () => {
     const q = await api(app, staff)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
         newFactoryName: `Wenzhou Valve ${tag}`,

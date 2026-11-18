@@ -76,7 +76,7 @@ export function stageWarnings(to: OrderStage, m: MoveFacts): StageWarning[] {
   }
   if (to === "shipped" && m.goods && m.goods.short.length) {
     const list = m.goods.short.slice(0, 3).join("; ") + (m.goods.short.length > 3 ? `; and ${m.goods.short.length - 3} more` : "");
-    out.push({ code: "not_received", message: `Not everything has come in from the factory (${list}).` });
+    out.push({ code: "not_received", message: `Not everything has come in from the supplier (${list}).` });
   }
   if (to === "shipped" && m.goods && m.goods.lines > 0 && !m.goods.packed) {
     out.push({ code: "no_packing_list", message: "The packing list is not filled in yet." });
@@ -149,8 +149,8 @@ export function orderNeeds(o: OrderFacts, today: ISODate, days: OrderReminderDay
       const by = o.readyOn ?? addDays(o.stageSince, days.productionDays);
       const g = o.goods;
       if (g && g.lines > 0 && g.received === g.lines) return need(g.packed ? "Packed and ready: mark as shipped" : "All goods are in: make the packing list", o.readyOn ?? by);
-      if (g && g.received > 0) return need(`Goods coming in from the factory (${g.received} of ${g.lines} items complete)`, by);
-      return o.readyOn ? need("Goods due from the factory", o.readyOn) : need("Ask the factory for the ready date", by);
+      if (g && g.received > 0) return need(`Goods coming in from the supplier (${g.received} of ${g.lines} items complete)`, by);
+      return o.readyOn ? need("Goods due from the supplier", o.readyOn) : need("Ask the supplier for the ready date", by);
     }
     case "shipped":
       return need(due > 0 ? `Get the balance (${formatMinor(due, o.currency)})` : "Paid in full: close the order", balanceBy);

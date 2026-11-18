@@ -206,7 +206,7 @@ export default async function FollowUpsPage({
               description={
                 status === "done"
                   ? "Follow-ups ticked done show here, the latest first."
-                  : "Add a follow-up here, or on an order, a customer, a factory or an inquiry. It shows on the dashboard on its day, with a reminder."
+                  : "Add a follow-up here, or on an order, a customer, a supplier or an inquiry. It shows on the dashboard on its day, with a reminder."
               }
             />
           ) : (

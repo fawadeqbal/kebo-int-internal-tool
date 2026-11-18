@@ -484,10 +484,10 @@ export async function loadFactories(p: Period) {
   const data = { currency: c, seeMoney: period.seeMoney, total: count.total, rows, shipped: t?.shipped ?? null };
   const sheets: SheetSpec[] = [
     {
-      name: `Insights factories ${p.from} to ${p.to}`,
-      title: "Factories",
+      name: `Insights suppliers ${p.from} to ${p.to}`,
+      title: "Suppliers",
       columns: [
-        { header: "Factory", width: 30 },
+        { header: "Supplier", width: 30 },
         { header: "Orders", kind: "number" },
         ...(data.seeMoney ? [{ header: `Spend (${c})`, kind: "number" as const, width: 16 }] : []),
         { header: "Ready on time %", kind: "number" },
@@ -584,7 +584,7 @@ export async function loadPeople(p: Period, today: string) {
       columns: [
         { header: "Person", width: 24 },
         { header: "Inquiries", kind: "number" },
-        { header: "Days to first quote", kind: "number" },
+        { header: "Days to first quotation", kind: "number" },
         { header: "Win rate %", kind: "number" },
         { header: `Sales (${c})`, kind: "number", width: 16 },
         { header: `Target this month (${c})`, kind: "number", width: 18 },
@@ -680,7 +680,7 @@ export async function loadFunnel(p: Period) {
       ],
       rows: [
         ["Inquiries in", f.inquiries, null],
-        ["Got factory prices", f.gotPrices, null],
+        ["Got supplier prices", f.gotPrices, null],
         ["Quoted", f.quoted, xl(n(f.quotedValue))],
         ["Won", f.won, xl(n(f.wonValue))],
         ["Lost", f.lost, null],

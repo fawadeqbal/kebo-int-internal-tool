@@ -89,10 +89,10 @@ describe("the order's payment plan", () => {
     expect(within(row!).getByText("Changed since it was sent")).toBeTruthy();
   });
 
-  it("a bank route's balance points to the bank papers; without the right to record there is no payment button", () => {
+  it("a bank route's balance points to the bank documents; without the right to record there is no payment button", () => {
     table(plan([item({ request: request({ through: "bank" }) })]), false);
     const [row] = rows();
-    expect(within(row!).getByRole("link", { name: "Bank papers" }).getAttribute("href")).toBe("/orders/o1/documents");
+    expect(within(row!).getByRole("link", { name: "Bank documents" }).getAttribute("href")).toBe("/orders/o1/documents");
     expect(within(row!).queryByRole("button")).toBeNull();
   });
 });

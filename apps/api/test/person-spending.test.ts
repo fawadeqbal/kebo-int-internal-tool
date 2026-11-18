@@ -41,7 +41,7 @@ describe("person spending", () => {
   it("adds up what a person paid by kind and by what for; recorded with nobody named counts for who recorded it", async () => {
     ownId = (await spend({ inquiryId: lostDeal, category: "travel", description: `Train to see the press ${tag}`, amount: 100, ownMoney: true, paidById: sanaId }).expect(201)).body.id;
     await spend({ customerId, category: "meals", description: `Dinner ${tag}`, amount: 40, paidById: sanaId }).expect(201);
-    await spend({ category: "office", description: `Paper ${tag}`, amount: 25 }).expect(201); // nobody named: the manager's
+    await spend({ category: "office", description: `Document ${tag}`, amount: 25 }).expect(201); // nobody named: the manager's
 
     await api(app, sana).get(`/people/${sanaId}/spending?${range}`).expect(403);
     const s = (await api(app, manager).get(`/people/${sanaId}/spending?${range}`).expect(200)).body;
@@ -61,7 +61,7 @@ describe("person spending", () => {
     const m = (await api(app, manager).get(`/people/${managerId}/spending?${range}`).expect(200)).body;
     expect(m.byFor.company).toBe("25.00");
     expect(m.outside).toBe("0.00"); // the company's own costs are not taken off anyone's profit
-    expect(m.latest[0]).toMatchObject({ description: `Paper ${tag}`, recordedOnly: true });
+    expect(m.latest[0]).toMatchObject({ description: `Document ${tag}`, recordedOnly: true });
   });
 
   it("lists what is owed back to them, whenever it was spent, until it is paid back", async () => {
@@ -75,7 +75,7 @@ describe("person spending", () => {
     expect(again.latest.find((r: { id: string }) => r.id === ownId).paid).toBe("own_repaid");
   });
 
-  it("Reports › Spending: spent to sell, who spends, lost deals by reason, factory visits, and the company's own costs apart", async () => {
+  it("Reports › Spending: spent to sell, who spends, lost inquiries by reason, supplier visits, and the company's own costs apart", async () => {
     await api(app, sana).get(`/reports/spending?${range}`).expect(403);
     const r = (await api(app, manager).get(`/reports/spending?${range}`).expect(200)).body;
     // The train on the lost inquiry and the dinner with the customer are spent to sell; the paper is the company's.

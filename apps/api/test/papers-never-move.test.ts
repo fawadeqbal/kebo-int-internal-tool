@@ -18,7 +18,7 @@ import { formatDate } from "@kebo/utils";
  *  - the document set never takes hand-made rows of kinds the app makes;
  *  - proformas issued before snapshots were kept are rebuilt from the data, printing what they printed.
  */
-describe("papers that never move", () => {
+describe("documents that never move", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let sana: string;
@@ -163,7 +163,7 @@ describe("papers that never move", () => {
     await api(app, manager).post(`/orders/${o.id}/proforma`).expect(200);
     const issued = await proforma(o.id);
     expect(issued).toMatchObject({ draft: false, final: true, paper: { version: 1, status: "final" } });
-    expect(issued.paymentSentence).toBe("Our usual payment is made by 30% Advance deposit and 70% before shipment.");
+    expect(issued.paymentSentence).toBe("Our usual payment is made by 30% deposit and 70% before shipment.");
     expect(issued.paymentTermsText).toBe("By T/T within 7 days.");
 
     // The route changes: the issued PI still says what the customer received.
@@ -181,7 +181,7 @@ describe("papers that never move", () => {
     await api(app, manager).post(`/orders/${o.id}/documents/proforma/again`).expect(200);
     const v2 = await proforma(o.id);
     expect(v2).toMatchObject({ number: issued.number, draft: true, final: false, watermark: "DRAFT", paper: { version: 2, status: "draft" } });
-    expect(v2.paymentSentence).toBe("Our usual payment is made by 30% Advance deposit and 70% by irrevocable letter of credit at sight.");
+    expect(v2.paymentSentence).toBe("Our usual payment is made by 30% deposit and 70% by irrevocable letter of credit at sight.");
     expect(v2.paymentTermsText).toBeNull();
     await api(app, manager).post(`/orders/${o.id}/proforma`).expect(200);
     const final2 = await proforma(o.id);
@@ -212,8 +212,8 @@ describe("papers that never move", () => {
     expect((await proforma(o.id)).customer).toMatchObject({ address: "Plot 1, Old Industrial Area, Lahore" });
     const h = (await api(app, manager).get(`/history?type=order&id=${o.id}`).expect(200)).body;
     const items = (Array.isArray(h) ? h : h.items) as { summary: string; reason: string | null }[];
-    expect(items.find((x) => x.summary.includes("buyer on the papers refreshed"))).toMatchObject({ reason: "Moved to the new plant" });
-    expect(items.find((x) => x.summary.includes("buyer on the papers refreshed"))!.summary).toContain("address, tax no.");
+    expect(items.find((x) => x.summary.includes("buyer on the documents refreshed"))).toMatchObject({ reason: "Moved to the new plant" });
+    expect(items.find((x) => x.summary.includes("buyer on the documents refreshed"))!.summary).toContain("address, tax no.");
     await setCustomer({ address: "Plot 1, Old Industrial Area, Lahore", taxNo: null });
   });
 
@@ -222,17 +222,17 @@ describe("papers that never move", () => {
     const terms = async (kind = "sales-contract") => (await paperDoc(o.id, kind)).doc.bullets.filter((b: unknown) => typeof b === "string") as string[];
     // No route yet: as accepted, with the quotation's text.
     expect(await terms()).toEqual(
-      expect.arrayContaining(["Our usual payment is made by 30% Advance deposit and 70% before shipment.", "By T/T within 7 days."]),
+      expect.arrayContaining(["Our usual payment is made by 30% deposit and 70% before shipment.", "By T/T within 7 days."]),
     );
     await api(app, sana).patch(`/orders/${o.id}/route`, { route: "informal", balanceWhen: "against_bl_copy" }).expect(200);
-    expect(await terms()).toContain("Our usual payment is made by 30% Advance deposit and 70% against B/L copy.");
+    expect(await terms()).toContain("Our usual payment is made by 30% deposit and 70% against B/L copy.");
     expect(await terms()).not.toContain("By T/T within 7 days.");
     await api(app, sana).patch(`/orders/${o.id}/route`, { route: "letter_of_credit", lcTerms: "deferred", lcDays: 60 }).expect(200);
-    const lc = "Our usual payment is made by 30% Advance deposit and 70% by irrevocable letter of credit, payable 60 days after the documents reach the buyer's bank.";
+    const lc = "Our usual payment is made by 30% deposit and 70% by irrevocable letter of credit, payable 60 days after the documents reach the buyer's bank.";
     expect(await terms()).toContain(lc);
     expect(await terms("payment-request")).toContain(lc);
     await api(app, sana).patch(`/orders/${o.id}/route`, { route: "bank_contract" }).expect(200);
-    expect(await terms()).toContain("Our usual payment is made by 30% Advance deposit and 70% through the banks against the shipping documents.");
+    expect(await terms()).toContain("Our usual payment is made by 30% deposit and 70% through the banks against the shipping documents.");
 
     // The Make page's check, and the choice to print the quotation's text anyway.
     const checks = (await api(app, sana).get(`/orders/${o.id}/papers/sales-contract/checks`).expect(200)).body;

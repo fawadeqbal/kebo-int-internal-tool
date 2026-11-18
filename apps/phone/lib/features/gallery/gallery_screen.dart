@@ -198,7 +198,7 @@ class _GalleryScreenState extends ConsumerState<GalleryScreen> {
                     const KBanner(
                       "The bank won't release the balance until the certificate of origin is in.",
                       tone: KTone.danger,
-                      title: '1 paper is blocking',
+                      title: '1 document is blocking',
                     ),
                   ]),
                   const _Section('Loading', [

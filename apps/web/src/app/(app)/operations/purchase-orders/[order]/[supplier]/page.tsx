@@ -93,7 +93,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       />
     ) : null;
   // Pay is on the plan's next part; "Pay the factory" only when money is owed with no part left to pay it on.
-  const payAny = owing.some((f) => !plans.some((p) => p.currency === f.currency && p.rows.some((r) => r.status !== "paid" && Number(r.open) > 0))) ? pay("Pay the factory", true) : null;
+  const payAny = owing.some((f) => !plans.some((p) => p.currency === f.currency && p.rows.some((r) => r.status !== "paid" && Number(r.open) > 0))) ? pay("Pay the supplier", true) : null;
   const sent = po.sentOn ? (po.sentEarlyReason ? `Sent ${date(po.sentOn)} · before the deposit` : `Sent ${date(po.sentOn)}`) : "Not sent";
   const meta = [
     <span key="o">
@@ -151,9 +151,9 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             cols={3}
             rows={[
               {
-                label: "Factory",
+                label: "Supplier",
                 value: (
-                  <Link href={`/factories/${po.supplier.id}`} className="text-primary hover:underline">
+                  <Link href={`/suppliers/${po.supplier.id}`} className="text-primary hover:underline">
                     {po.supplier.name}
                   </Link>
                 ),
@@ -171,7 +171,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 ),
               },
               { label: "Their order no.", value: po.supplierRef ?? flow?.factory.orderNo ?? null },
-              { label: "Price basis", value: basis },
+              { label: "Incoterm", value: basis },
               { label: "Currency", value: po.currency },
               { label: "Tax", value: taxes.length ? taxes.join(", ") : null },
               { label: "Lead time", value: defaults.leadTime?.text ?? null },
@@ -183,7 +183,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           />
 
           {lines.length > 0 ? (
-            <Section title="Lines" state={`${lines.length} line${lines.length === 1 ? "" : "s"}`}>
+            <Section title="Items" state={`${lines.length} item${lines.length === 1 ? "" : "s"}`}>
               <div className="px-[18px] pb-3.5">
                 <div className="max-md:hidden">
                   <OrderLines set="factory" orderId={o.id} lines={lines} canEdit={false} today={now} />
@@ -194,7 +194,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               </div>
             </Section>
           ) : (
-            <EmptySection title="Lines" text="This factory's lines are on the order." />
+            <EmptySection title="Items" text="This supplier's items are on the order." />
           )}
 
           {plans.map((plan) => {
@@ -212,7 +212,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 <div className="flex flex-col gap-3 pb-3.5">
                   {plan.differs && (
                     <p className="mx-[18px] rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
-                      The parts do not add up to what we owe ({money(plan.differs, plan.currency)} {Number(plan.differs) > 0 ? "missing" : "too much"}): prices changed since. Open the order&apos;s Factory order and save the plan again.
+                      The parts do not add up to what we owe ({money(plan.differs, plan.currency)} {Number(plan.differs) > 0 ? "missing" : "too much"}): prices changed since. Open the order&apos;s Purchase order and save the plan again.
                     </p>
                   )}
                   <SupplierPlanTable
@@ -281,7 +281,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               {(
                 [
                   ["Order made", date(o.orderedOn)],
-                  ["Sent to the factory", po.sentOn ? date(po.sentOn) : "—"],
+                  ["Sent to the supplier", po.sentOn ? date(po.sentOn) : "—"],
                   ["Goods ready", po.readyOn ? date(po.readyOn) : "—"],
                 ] as [string, string][]
               ).map(([k, v]) => (
@@ -310,7 +310,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             <SideSection title="People">
               {(
                 [
-                  ["Factory", po.supplier.name],
+                  ["Supplier", po.supplier.name],
                   ["Customer", o.customer.name],
                   ["Responsible person", o.inquiry.assignee?.name ?? "—"],
                 ] as [string, string][]
@@ -324,7 +324,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             <SideSection title="Changed on the order">
               <li className="py-1 text-[13px]">
                 <Link href={orderHref} className="font-semibold text-primary hover:underline">
-                  Open {o.refNo} › Factory order
+                  Open {o.refNo} › Purchase order
                 </Link>
               </li>
             </SideSection>

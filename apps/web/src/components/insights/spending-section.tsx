@@ -45,9 +45,9 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
           sub="trips, samples, gifts, meals"
           how={how.spentToSell(span, c)}
         />
-        <StatTile label="On deals we won" value={bigMoney(Number(d.onWon), c)} sub="on their orders, or before them" how={how.onDealsWon(span)} />
+        <StatTile label="On inquiries we won" value={bigMoney(Number(d.onWon), c)} sub="on their orders, or before them" how={how.onDealsWon(span)} />
         <StatTile
-          label="What lost deals cost"
+          label="What lost inquiries cost"
           value={bigMoney(Number(d.lost.spent), c)}
           sub={`${d.lost.deals} lost inquir${d.lost.deals === 1 ? "y" : "ies"}`}
           how={how.lostDeals(span)}
@@ -85,7 +85,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
                 <Th>Person</Th>
                 <Th className="text-right">Spent {c}</Th>
                 <Th className="text-right">To sell</Th>
-                <Th className="text-right">On lost deals</Th>
+                <Th className="text-right">On lost inquiries</Th>
                 <Th className="text-right">Sold</Th>
                 <Th className="text-right">Per 100 sold</Th>
                 <Th className="text-right">Owed back</Th>
@@ -146,7 +146,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
                   <Th>Why we lost</Th>
                   <Th className="text-right">Deals</Th>
                   <Th className="text-right">Spent on them</Th>
-                  <Th className="text-right">Per deal</Th>
+                  <Th className="text-right">Per inquiry</Th>
                 </tr>
               </THead>
               <tbody>
@@ -206,14 +206,14 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
         )}
 
         <Card className="overflow-clip">
-          <CardHeader title="Factory visits" description="Trips, hotels, meals and checks with a factory named" />
+          <CardHeader title="Supplier visits" description="Trips, hotels, meals and checks with a supplier named" />
           {d.factories.length === 0 ? (
-            <p className="p-4 text-sm text-muted">No factory visit {p.name}.</p>
+            <p className="p-4 text-sm text-muted">No supplier visit {p.name}.</p>
           ) : (
             <Table>
               <THead>
                 <tr>
-                  <Th>Factory</Th>
+                  <Th>Supplier</Th>
                   <Th className="text-right">Costs</Th>
                   <Th className="text-right">Spent {c}</Th>
                 </tr>
@@ -222,7 +222,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
                 {d.factories.map((f) => (
                   <Tr key={f.factory.id}>
                     <Td className="font-semibold">
-                      <Link href={`/factories/${f.factory.id}`} className="hover:text-primary">
+                      <Link href={`/suppliers/${f.factory.id}`} className="hover:text-primary">
                         {f.factory.name}
                       </Link>
                     </Td>

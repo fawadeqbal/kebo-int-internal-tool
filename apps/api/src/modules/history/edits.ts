@@ -69,7 +69,7 @@ export class EditsService {
                   : null
                 : await db.party.findFirst({ where: { id }, select: { id: true } });
     if (!found) {
-      if ((type === "factory_quote" || type === "factory") && !can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
+      if ((type === "factory_quote" || type === "factory") && !can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier prices.");
       throw new NotFoundError("Record");
     }
   }

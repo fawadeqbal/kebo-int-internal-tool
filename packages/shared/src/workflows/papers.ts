@@ -46,7 +46,7 @@ export const PAPER_LABEL: Record<PaperKind, string> = {
   "payment-request": "Payment request",
   "payment-receipt": "Payment receipt",
   "customer-statement": "Customer statement",
-  "purchase-order": "Purchase order to the factory",
+  "purchase-order": "Purchase order to the supplier",
   "fat-report": "FAT report",
   "commercial-invoice": "Commercial invoice",
   "shipping-advice": "Shipping advice",
@@ -127,17 +127,17 @@ export const PAPER_STEP: Record<PaperKind, FlowStep> = {
 
 /** What each paper is made from (the catalogue's "Made from"). */
 export const PAPER_MADE_FROM: Record<PaperKind, string> = {
-  "sales-contract": "order lines + payment route, shipment, inspection, warranty",
+  "sales-contract": "order items + payment route, shipment, inspection, warranty",
   "payment-request": "the plan: what is due, by when, to which account",
   "payment-receipt": "the recorded payment",
   "customer-statement": "the customer's orders and payments",
-  "purchase-order": "the factory's prices, items, ready date",
+  "purchase-order": "the supplier's prices, items, ready date",
   "fat-report": "the factory test on Production: result, date, who attended",
-  "commercial-invoice": "order lines + B/L no., vessel, ports, LC no.",
+  "commercial-invoice": "order items + B/L no., vessel, ports, LC no.",
   "shipping-advice": "the shipment: vessel, B/L, ETD/ETA, container",
   "bill-of-exchange": "LC no., amount, banks",
   "beneficiary-certificate": "the LC clauses we certify",
-  "bank-cover-letter": "the paper set and the LC",
+  "bank-cover-letter": "the document set and the LC",
   "delivery-note": "goods, condition, received by",
   "sat-certificate": "SAT checks and results, signed by",
 };
@@ -264,7 +264,7 @@ export const PAPER_SWITCH_NOTE: Partial<Record<PaperSwitch, string>> = {
   "bill-of-exchange": "LC orders only",
   "beneficiary-certificate": "LC orders only",
   "bank-cover-letter": "LC and bank-contract orders only",
-  "purchase-order": "seen by people who see factory prices",
+  "purchase-order": "seen by people who see supplier prices",
   "fat-report": "when the order has a FAT",
   airway_bill: "orders going by air",
   insurance: "LC orders",
@@ -353,10 +353,10 @@ export type PaperOption = (typeof PAPER_OPTIONS)[number];
 export type PaperOptions = Partial<Record<PaperOption, boolean>>;
 
 export const PAPER_OPTION_LABEL: Record<PaperOption, string> = {
-  prices: "Line amounts",
+  prices: "Item amounts",
   showHs: "Show HS codes",
   lcStatement: "LC statement at the bottom",
-  advance: "Advance received and the balance",
+  advance: "Deposit received and the balance",
   stamp: "Stamp and signature",
 };
 
@@ -529,7 +529,7 @@ export const PAPER_FIX_LABEL: Record<PaperFixField, { label: string; type: "text
   readyOn: { label: "Ready date", type: "date", saves: "the order" },
   shipBy: { label: "Ship by", type: "date", saves: "the order" },
   portOfDischarge: { label: "Port of discharge", type: "text", saves: "the order" },
-  hs: { label: "HS code", type: "text", saves: "the order's line" },
+  hs: { label: "HS code", type: "text", saves: "the order's item" },
 };
 
 /* ---------------------------------------------------------------- text inside sentences */

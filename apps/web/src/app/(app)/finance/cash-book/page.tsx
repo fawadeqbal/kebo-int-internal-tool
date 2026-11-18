@@ -30,14 +30,14 @@ export default async function CashBookPage({ searchParams }: { searchParams: Pro
         crumbs={crumbs}
         icon={Landmark}
         title={labelFor("/finance/cash-book")}
-        summary={book ? "Every amount in and out: from customers, to factories, expenses and moves between our accounts." : "Every account and what is in it"}
+        summary={book ? "Every amount in and out: from customers, to suppliers, expenses and moves between our bank accounts." : "Every account and what is in it"}
         actions={<MoveMoney accounts={accounts} today={today} />}
         primary={<NewAccount today={today} />}
       />
       {book ? (
         <>
           <Link href="/finance/cash-book" className="mb-3 inline-block text-sm font-medium text-primary hover:underline">
-            ← All accounts
+            ← All bank accounts
           </Link>
           <CashBody sp={sp} today={today} />
         </>

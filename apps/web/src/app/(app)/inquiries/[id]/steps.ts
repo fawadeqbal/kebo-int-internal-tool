@@ -61,7 +61,7 @@ export function statusWords(d: DealDetail, f: OfferFacts | null, today: string):
   if (f) {
     if (f.asked > 0 && f.answered < f.asked) return { text: `${stage} · ${f.answered} of ${f.asked} offers in`, tone: "action" };
     if (f.offers > 0) return { text: `${stage} · ${plural(f.offers, "offer")} in`, tone: "action" };
-    return { text: `${stage} · no factory asked yet`, tone: "action" };
+    return { text: `${stage} · no supplier asked yet`, tone: "action" };
   }
   return { text: stage, tone: "action" };
 }
@@ -104,7 +104,7 @@ export function inquiryNext(d: DealDetail, f: OfferFacts | null): { tab: NextTab
       label: "Open the quotation",
     };
   if (!d.assignee) return { tab: "overview", title: "Assign someone", meta: "Nobody handles this inquiry yet. Choose the Responsible person, so the prices can be asked for." };
-  if (!f) return { tab: "quotation", title: "Make the quotation", meta: "Once the factory prices are in.", href: `${base}/quotation`, label: "Open Quotations" };
+  if (!f) return { tab: "quotation", title: "Make the quotation", meta: "Once the supplier prices are in.", href: `${base}/quotation`, label: "Open Quotations" };
   if (f.offers > 0)
     return {
       tab: "quotation",
@@ -123,7 +123,7 @@ export function inquiryNext(d: DealDetail, f: OfferFacts | null): { tab: NextTab
       label: "Enter an offer",
     };
   }
-  return { tab: "sourcing", title: "Ask factories for prices", meta: "Send the customer's list to two or three factories, then enter what they offer.", href: `${base}/sourcing`, label: "Open Factory offers" };
+  return { tab: "sourcing", title: "Ask suppliers for prices", meta: "Send the customer's list to two or three suppliers, then enter what they offer.", href: `${base}/sourcing`, label: "Open Supplier offers" };
 }
 
 export { plural };

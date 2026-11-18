@@ -58,7 +58,7 @@ class _PaperScreenState extends ConsumerState<PaperScreen> {
     return Scaffold(
       backgroundColor: context.k.bg,
       appBar: KTopBar(
-        title: p.value?.str('label') ?? 'Paper',
+        title: p.value?.str('label') ?? 'Document',
         actions: [
           KIconButton(
             KIcons.globe,
@@ -173,7 +173,7 @@ class _PaperScreenState extends ConsumerState<PaperScreen> {
               if ((_options ?? const {}).isNotEmpty) ...[
                 const SizedBox(height: KSpace.s6),
                 KSection(
-                  title: 'On the paper',
+                  title: 'On the document',
                   children: [
                     KCard(
                       child: Column(
@@ -360,7 +360,7 @@ class _FixFormState extends ConsumerState<_FixForm> {
     children: [
       if (widget.saves != null)
         Text(
-          'Saved on ${widget.saves}, so every paper uses it.',
+          'Saved on ${widget.saves}, so every document uses it.',
           style: KType.callout.copyWith(color: context.k.inkMuted),
         ),
       const SizedBox(height: KSpace.s4),

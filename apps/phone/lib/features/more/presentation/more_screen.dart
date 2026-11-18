@@ -94,7 +94,7 @@ class MoreScreen extends ConsumerWidget {
                       ),
                       KListItem(
                         leading: KIcon(KIcons.users, color: context.k.inkMuted),
-                        title: 'Customers and factories',
+                        title: 'Customers and suppliers',
                         subtitle: 'Who they are, how to reach them, their deals',
                         onPressed: () => context.push('/partners'),
                       ),

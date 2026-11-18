@@ -16,7 +16,7 @@ export function LinesView({
   columns,
   numbers,
   footer,
-  label = "The lines",
+  label = "The items",
 }: {
   rows: LineRow[];
   columns: LineColumn[];

@@ -20,7 +20,7 @@ export type OrderFileGroup = (typeof ORDER_FILE_GROUPS)[number];
 
 export const ORDER_FILE_GROUP_LABEL: Record<OrderFileGroup, string> = {
   customer: "Customer",
-  factory: "Factory",
+  factory: "Supplier",
   shipping: "Shipping",
   bank: "Bank",
   money: "Money",

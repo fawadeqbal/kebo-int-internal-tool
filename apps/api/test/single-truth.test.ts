@@ -107,7 +107,7 @@ describe("one money truth", () => {
       expect((await order(o.orderId)).money).toMatchObject({ total: "10000.00", received: "10000.00", due: "0.00", charged: "0.00", status: "paid" });
     });
 
-    it("counts USD 800 charged in still due on the order, the list, the money tab, payments, receivables and the papers", async () => {
+    it("counts USD 800 charged in still due on the order, the list, the money tab, payments, receivables and the documents", async () => {
       await api(app, manager)
         .post("/expenses", { orderId: o.orderId, category: "inspection", description: `Inspection ${tag}`, amount: 800, currency: "USD", spentOn: today, borneBy: "customer" })
         .expect(201);
@@ -207,7 +207,7 @@ describe("one money truth", () => {
     });
   });
 
-  describe("an expense the factory bears comes off what we owe it, everywhere", () => {
+  describe("an expense the supplier bears comes off what we owe it, everywhere", () => {
     let o: Awaited<ReturnType<typeof makeOrder>>;
     const owing = async () => {
       const f = await fx();
@@ -224,14 +224,14 @@ describe("one money truth", () => {
         .expect(201);
     });
 
-    it("shows the balance late before the factory bears anything", async () => {
+    it("shows the balance late before the supplier bears anything", async () => {
       const m = await money(o.orderId);
       expect(m.factories.rows[0]).toMatchObject({ owed: "11300.00", paid: "3390.00", toPay: "7910.00" });
       expect(m.factories.plans[0]).toMatchObject({ toPay: "7910.00", next: { status: "late", open: "7910.00" } });
       expect(await owing()).toBe(true);
     });
 
-    it("with a CNY 7,910 inspection charged to the factory: nothing left to pay, nothing late, on every screen and the PO", async () => {
+    it("with a CNY 7,910 inspection charged to the supplier: nothing left to pay, nothing late, on every screen and the PO", async () => {
       await api(app, manager)
         .post("/expenses", {
           orderId: o.orderId,
@@ -262,25 +262,25 @@ describe("one money truth", () => {
   });
 
   describe("the purchase order", () => {
-    it("states the payment terms from the factory's plan, not a fixed sentence", async () => {
+    it("states the payment terms from the supplier's plan, not a fixed sentence", async () => {
       const o = await makeOrder({ taxRate: 13, taxIncluded: true, factoryPrice: 1130 });
       let po = await doc(o.orderId, "purchase-order");
       // Tax included: the prices are the total (10 × 1,130); the default plan, 30% on order.
       expect(po.total).toMatchObject({ label: "Total", amount: "11300.00", currency: "CNY" });
       expect(po.rows[0]).toMatchObject({ price: { money: "1130.00", currency: "CNY" }, amount: { money: "11300.00", currency: "CNY" } });
-      expect(po.bullets).not.toContain("Balance before the goods leave the factory, after our inspection.");
-      expect(po.bullets).toContain("Payment: Advance 30%, CNY 3,390.00, when we order; Balance 70%, CNY 7,910.00, on the ready date.");
+      expect(po.bullets).not.toContain("Balance before the goods leave the supplier, after our inspection.");
+      expect(po.bullets).toContain("Payment: Deposit 30%, CNY 3,390.00, when we order; Balance 70%, CNY 7,910.00, on the ready date.");
       await api(app, manager)
         .put(`/orders/${o.orderId}/factory-plan`, {
           factoryId: o.factoryId,
           items: [
-            { label: "Advance", percent: 50, amount: 5650, dueRule: "on_order", dueOn: null },
+            { label: "Deposit", percent: 50, amount: 5650, dueRule: "on_order", dueOn: null },
             { label: "Balance", percent: 50, amount: 5650, dueRule: "fixed", dueOn: "2027-01-15" },
           ],
         })
         .expect(200);
       po = await doc(o.orderId, "purchase-order");
-      expect(po.bullets).toContain("Payment: Advance 50%, CNY 5,650.00, when we order; Balance 50%, CNY 5,650.00, by 15 Jan 2027.");
+      expect(po.bullets).toContain("Payment: Deposit 50%, CNY 5,650.00, when we order; Balance 50%, CNY 5,650.00, by 15 Jan 2027.");
     });
   });
 
@@ -346,7 +346,7 @@ describe("one money truth", () => {
       expect(positionOf(rows.find((r) => r.id === o.orderId)!, { ...(await fx()), expensesOn: false })).toMatchObject({ chargedMinor: 0, dueMinor: 7_000_00 });
     });
 
-    it("SQL factory positions equal factoryPositionOf on every order", async () => {
+    it("SQL supplier positions equal factoryPositionOf on every order", async () => {
       const rows = await db().order.findMany({
         where: { status: { not: "cancelled" } },
         include: { lines: true, supplierPaid: supplierPaidRelation, expenses: factoryBorneExpenses },

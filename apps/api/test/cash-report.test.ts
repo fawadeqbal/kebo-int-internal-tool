@@ -44,7 +44,7 @@ describe("the cash report", () => {
     a = await account("Report A", 1000);
     b = await account("Report B", 0);
     const cost = (amount: number, spentOn: string) =>
-      api(app, manager).post("/expenses", { category: "office", description: `Paper ${tag}`, amount, currency: "USD", spentOn, accountId: a }).expect(201);
+      api(app, manager).post("/expenses", { category: "office", description: `Document ${tag}`, amount, currency: "USD", spentOn, accountId: a }).expect(201);
     // Before the period: 100 left A. In the period: 200 left A for a cost, and 300 moved from A to B.
     await cost(100, day(-20));
     await cost(200, day(-2));
@@ -73,7 +73,7 @@ describe("the cash report", () => {
     expect(early.accounts.find((x) => x.id === a)).toMatchObject({ openedOn: day(-40), start: "1000.00", out: "600.00", end: "400.00" });
   });
 
-  it("each month's net is what came in less what went out, and a move between our accounts is in neither", async () => {
+  it("each month's net is what came in less what went out, and a move between our bank accounts is in neither", async () => {
     const r = await report();
     expect(r.months.map((m) => m.month)).toContain(today.slice(0, 7));
     for (const m of r.months) expect(cents(m.net)).toBe(cents(m.customers) - cents(m.suppliers) - cents(m.bills) - cents(m.company));

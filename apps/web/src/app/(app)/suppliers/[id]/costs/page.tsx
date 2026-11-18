@@ -134,7 +134,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
         {lines.length === 0 ? (
           <EmptyState
             title="Nothing bought yet"
-            description="What we buy from this factory and what we pay it show here, with what we owe after each."
+            description="What we buy from this supplier and what we pay it show here, with what we owe after each."
           />
         ) : (
           <DataTable label="Statement" tableClassName="min-w-[1000px] text-[13px]">

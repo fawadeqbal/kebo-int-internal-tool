@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: 
 
 const { OfferHeaderForm } = await import("@/components/deals/factory-quote-form");
 
-describe("a new factory offer starts fresh", () => {
+describe("a new supplier offer starts fresh", () => {
   const show = () =>
     render(
       <OfferHeaderForm
@@ -26,15 +26,15 @@ describe("a new factory offer starts fresh", () => {
     );
   const value = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
 
-  it("choosing a factory fills nothing from its last offer", async () => {
+  it("choosing a supplier fills nothing from its last offer", async () => {
     show();
     // The window is in steps (design 18 Nov): Factory · Prices · Delivery & payment · Conditions · Review.
     const step = (name: RegExp) =>
-      fireEvent.click(screen.getByRole("navigation", { name: "Steps" }).querySelectorAll("button")[["Factory", "Prices", "Delivery & payment", "Conditions", "Review"].findIndex((n) => name.test(n))]!);
+      fireEvent.click(screen.getByRole("navigation", { name: "Steps" }).querySelectorAll("button")[["Supplier", "Prices", "Delivery & payment", "Conditions", "Review"].findIndex((n) => name.test(n))]!);
     step(/Delivery/);
     fireEvent.change(document.getElementById("leadDays") as HTMLInputElement, { target: { value: "40" } });
-    step(/Factory/);
-    fireEvent.focus(screen.getByPlaceholderText(/search factories/i));
+    step(/Supplier/);
+    fireEvent.focus(screen.getByPlaceholderText(/search suppliers/i));
     fireEvent.mouseDown(await screen.findByText("Jiangsu Filling Machinery"));
     await waitFor(() => expect(screen.getAllByText("Jiangsu Filling Machinery").length).toBeGreaterThan(0));
     expect(screen.queryByText(/Filled from|last offer/)).toBeNull();

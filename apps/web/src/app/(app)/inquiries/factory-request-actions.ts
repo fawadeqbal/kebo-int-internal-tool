@@ -15,7 +15,7 @@ export async function askFactoriesAction(dealId: string, _prev: ActionState, for
   const r = await attempt(
     form,
     () => api.post(`/inquiries/${dealId}/factory-requests`, { factoryIds, channel: v.channel || null, sentOn: v.sentOn || null, replyBy: v.replyBy || null, note: v.note || null }),
-    factoryIds.length === 1 ? "Marked as asked." : `${factoryIds.length} factories marked as asked.`,
+    factoryIds.length === 1 ? "Marked as asked." : `${factoryIds.length} suppliers marked as asked.`,
   );
   if (!r.ok) return r;
   refresh(dealId);
@@ -24,8 +24,8 @@ export async function askFactoriesAction(dealId: string, _prev: ActionState, for
   const names = items.filter((i) => i.factory?.id && factoryIds.includes(i.factory.id)).map((i) => i.factory!.name!);
   return {
     ...r,
-    message: names.length === 1 ? `Asked ${names[0]} for a price` : `Asked ${factoryIds.length} factories for prices`,
-    detail: names.length > 1 ? `${names.slice(0, 3).join(", ")}${names.length > 3 ? ` and ${names.length - 3} more` : ""} · their prices go on Factory offers` : "Their price goes on Factory offers",
+    message: names.length === 1 ? `Asked ${names[0]} for a price` : `Asked ${factoryIds.length} suppliers for prices`,
+    detail: names.length > 1 ? `${names.slice(0, 3).join(", ")}${names.length > 3 ? ` and ${names.length - 3} more` : ""} · their prices go on Supplier offers` : "Their price goes on Supplier offers",
   };
 }
 

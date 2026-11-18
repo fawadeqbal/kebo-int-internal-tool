@@ -181,7 +181,7 @@ class FactoryScreen extends ConsumerWidget {
     final f = ref.watch(factoryProvider(id));
     return Scaffold(
       backgroundColor: context.k.bg,
-      appBar: const KTopBar(title: 'Factory'),
+      appBar: const KTopBar(title: 'Supplier'),
       body: switch (f) {
         AsyncValue(:final value?) => _factory(context, value),
         AsyncValue(:final error?) => Padding(
@@ -199,7 +199,7 @@ class FactoryScreen extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: KSpace.s16),
       children: [
         KRecordHeader(
-          type: 'Factory',
+          type: 'Supplier',
           number: p.strOrNull('initials') ?? '',
           title: p.str('name'),
           party: p.str('name'),
@@ -238,7 +238,7 @@ class FactoryScreen extends ConsumerWidget {
                         ? const KEmptyState(
                             icon: KIcons.file,
                             title: 'No offers yet',
-                            message: 'Prices this factory sends on inquiries show here.',
+                            message: 'Prices this supplier sends on inquiries show here.',
                           )
                         : Column(
                             children: [

@@ -35,7 +35,7 @@ export const isLeadFrom = (v: unknown): v is LeadFrom => LEAD_FROMS.includes(v a
 /** The moment in words: the customer pays a deposit, we pay the factory an advance. */
 export const LEAD_FROM_LABEL: Record<TermsSide, Record<LeadFrom, string>> = {
   customer: { after_payment: "after the deposit", after_order: "after the order", after_drawings: "after the drawings are approved" },
-  factory: { after_payment: "after the advance", after_order: "after the order", after_drawings: "after the drawings are approved" },
+  factory: { after_payment: "after the deposit", after_order: "after the order", after_drawings: "after the drawings are approved" },
 };
 
 /** "45 days after the deposit", "30 days after the advance": a lead time's words. */
@@ -235,7 +235,7 @@ export function quotePartsFrom(depositPercent: number, balanceTerms: BalanceTerm
 export function offerPartsFrom(advancePercent: number): TermPart[] {
   const a = Math.min(Math.max(round2(advancePercent), 0), 100);
   const parts: TermPart[] = [];
-  if (a > 0) parts.push({ label: a < 100 ? `Advance ${percentText(a)}%` : "Payment when we order", percent: a, rule: "on_order", days: null });
+  if (a > 0) parts.push({ label: a < 100 ? `Deposit ${percentText(a)}%` : "Payment when we order", percent: a, rule: "on_order", days: null });
   if (a < 100) parts.push({ label: a > 0 ? `Balance ${percentText(100 - a)}%` : "Payment", percent: round2(100 - a), rule: "on_ready", days: null });
   return parts;
 }
@@ -282,7 +282,8 @@ const listJoin = (bits: string[]) => (bits.length < 2 ? (bits[0] ?? "") : `${bit
  */
 export function quotePaymentSentence(parts: TermPart[]): string {
   if (plainQuoteParts(parts)) return paymentSentenceOf(depositOfParts(parts), balanceTermsOfParts(parts));
-  const bits = parts.map((p) => `${percentText(p.percent)}% ${p.rule === "on_order" ? "Advance deposit" : partWhen(p, "customer")}`);
+  // Inside a sentence: "30% deposit, 60% before shipment".
+  const bits = parts.map((p) => `${percentText(p.percent)}% ${p.rule === "on_order" ? "deposit" : partWhen(p, "customer").replace(/^Deposit$/, "deposit")}`);
   return `Our usual payment is made by ${listJoin(bits)}.`;
 }
 
@@ -423,7 +424,7 @@ export function warrantyCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | 
     key: "warranty",
     ok: false,
     word: `${plural(gap, "month")} not covered`,
-    text: `${theirs.factory} gives ${given}${why}, so the last ${plural(gap, "month")} of ours are not covered by the factory: ask ${theirs.factory} for ${theirs.warrantyMonths + gap} months, or keep it in mind.`,
+    text: `${theirs.factory} gives ${given}${why}, so the last ${plural(gap, "month")} of ours are not covered by the supplier: ask ${theirs.factory} for ${theirs.warrantyMonths + gap} months, or keep it in mind.`,
   };
 }
 
@@ -573,7 +574,7 @@ function rowWhen(r: { part: string | null; dueRule: string | null; dueDays: numb
     case "after_sat":
       return d ? `${plural(d, "day")} after the site acceptance test (SAT)` : "after the site acceptance test (SAT)";
     case "fixed":
-      return r.part === "deposit" ? "Advance deposit" : r.dueOn ? `by ${r.dueOn.split("-").reverse().join("/")}` : "";
+      return r.part === "deposit" ? "Deposit" : r.dueOn ? `by ${r.dueOn.split("-").reverse().join("/")}` : "";
     default:
       return "later";
   }
@@ -586,6 +587,6 @@ function rowWhen(r: { part: string | null; dueRule: string | null; dueDays: numb
  */
 export function planSentence(rows: { amountMinor: Minor; part: string | null; dueRule: string | null; dueDays: number | null; dueOn: ISODate | null }[], totalMinor: Minor): string {
   const pct = (m: Minor) => percentText(totalMinor > 0 ? (m * 100) / totalMinor : 0);
-  const bits = rows.filter((r) => r.amountMinor > 0).map((r) => `${pct(r.amountMinor)}% ${rowWhen(r)}`.trim());
+  const bits = rows.filter((r) => r.amountMinor > 0).map((r) => `${pct(r.amountMinor)}% ${rowWhen(r).replace(/^Deposit$/, "deposit")}`.trim());
   return `Our usual payment is made by ${listJoin(bits)}.`;
 }

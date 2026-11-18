@@ -422,7 +422,7 @@ export function LinesCard({
   edit,
   phone,
   actions,
-  editLabel = "Edit lines",
+  editLabel = "Edit items",
   target,
   panelTitle,
   panelDescription,
@@ -470,7 +470,7 @@ export function LinesCard({
     setOpen(false);
     if (window.location.hash === "#edit-lines") history.replaceState(null, "", window.location.pathname + window.location.search);
   };
-  const name = typeof title === "string" ? title : "the lines";
+  const name = typeof title === "string" ? title : "the items";
   return (
     <div ref={ref} id="lines" className="scroll-mt-24">
       <ViewCard

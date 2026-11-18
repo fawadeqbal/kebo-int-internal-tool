@@ -251,7 +251,7 @@ export class RemindersService {
             { label: r.label, open: r.open, due: r.due, lateBy },
           );
           await send(m, [{ ids: who.filter((u) => u === facts.handlerId), as: "who handles the order" }, { ids: who, as: "a manager" }], `fpay-${lateBy !== null ? "late" : "due"}:${id}:${f.factory.id}:${r.label}:${r.due}`);
-          book.add(who, "Pay the factory", { ref: facts.refNo, party: f.factory.name, what: `${r.label} ${formatMinor(Math.round(Number(r.open) * 100), f.currency)}`, when: lateBy !== null ? `${lateBy} days late` : r.due === today ? "due today" : `due ${dayShort(r.due)}`, late: lateBy !== null || r.due === today });
+          book.add(who, "Pay the supplier", { ref: facts.refNo, party: f.factory.name, what: `${r.label} ${formatMinor(Math.round(Number(r.open) * 100), f.currency)}`, when: lateBy !== null ? `${lateBy} days late` : r.due === today ? "due today" : `due ${dayShort(r.due)}`, late: lateBy !== null || r.due === today });
         }
     }
 

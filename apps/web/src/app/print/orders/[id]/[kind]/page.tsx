@@ -131,16 +131,16 @@ export default async function OrderDocumentPrint({
 
   const no: DocColumn<Line> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<Line> = {
-    label: packing ? "Description of Goods" : "Equipment Description",
+    label: packing ? "Description of goods" : "Equipment Description",
     render: (l) => docItem(l.description, l.model),
   };
-  const qty: DocColumn<Line> = { label: "Qty.", width: internal ? 58 : 71.4, render: (l) => docQty(l.quantity, l.unit) };
+  const qty: DocColumn<Line> = { label: "Quantity", width: internal ? 58 : 71.4, render: (l) => docQty(l.quantity, l.unit) };
 
   const columns: DocColumn<Line>[] = packing
     ? [
         no,
         description,
-        { label: "Qty.", width: 58, render: (l) => docQty(l.quantity, l.unit) },
+        { label: "Quantity", width: 58, render: (l) => docQty(l.quantity, l.unit) },
         {
           label: "Packages",
           width: 82,
@@ -234,14 +234,14 @@ export default async function OrderDocumentPrint({
             ...(costs
               ? [
                   [
-                    "Factory cost (lines with a cost)",
+                    "Supplier cost (items with a cost)",
                     docMoney(
                       d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.unitCost) * Number(l.quantity) : 0), 0),
                       c,
                     ),
                   ],
                   [
-                    "Margin on those lines",
+                    "Margin on those items",
                     marginOf(
                       d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.lineTotal ?? 0) : 0), 0),
                       d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.unitCost) * Number(l.quantity) : 0), 0),

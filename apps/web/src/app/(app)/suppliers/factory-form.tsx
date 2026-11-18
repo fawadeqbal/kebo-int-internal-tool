@@ -39,10 +39,10 @@ function FactoryForm({
           <PanelBody className={PANEL_FORM}>
             {/* Board "New supplier window": three columns. */}
             <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-3">
-              <Field label="Factory name" required htmlFor="name" error={s.errors?.name} className="sm:col-span-2">
+              <Field label="Supplier name" required htmlFor="name" error={s.errors?.name} className="sm:col-span-2">
                 <Input id="name" name="name" defaultValue={val("name")} autoComplete="organization" {...invalid("name")} />
               </Field>
-              <Field label="Owner" htmlFor="ownerId" error={s.errors?.ownerId}>
+              <Field label="Responsible person" htmlFor="ownerId" error={s.errors?.ownerId}>
                 <Select id="ownerId" name="ownerId" defaultValue={s.values?.ownerId ?? (factory ? (factory.ownerId ?? "") : meId)}>
                   <option value="">Nobody yet</option>
                   {people.map((p) => (
@@ -120,7 +120,7 @@ export function FactoryPanel({
     if (!d) return panel.close();
     toast({
       message: factory ? `${d.name} saved` : `Supplier ${d.name} added`,
-      action: onRecord ? undefined : { label: "Open", href: `/factories/${d.id}` },
+      action: onRecord ? undefined : { label: "Open", href: `/suppliers/${d.id}` },
     });
     panel.close({ saved: d.id });
   };
@@ -130,7 +130,7 @@ export function FactoryPanel({
       description={
         factory
           ? "Changes apply to new prices and orders; past ones keep what was agreed."
-          : "Opens from Suppliers, from “Ask factories”, and from “Factory → + New” when entering an offer"
+          : "Opens from Suppliers, from “Ask suppliers”, and from “Supplier → + New” when entering an offer"
       }
       onClose={() => panel.close()}
       className="md:w-[900px]"

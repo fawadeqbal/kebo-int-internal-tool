@@ -5,7 +5,7 @@ export const DAY_SECTIONS = [
   "Missed",
   "Follow-ups today",
   "Money to collect",
-  "Pay the factory",
+  "Pay the supplier",
   "Orders waiting on you",
   "Quotations ending",
   "Inquiries waiting",

@@ -86,7 +86,7 @@ export function CostSheetTable({
         {rows.map((r) => {
           const ours = r.borneBy === "us";
           const receipt = receiptOf(r);
-          const kind = r.kind === "goods" ? "Goods from the factory" : r.kind === "estimate" ? "Estimated on the quotation" : r.category && r.kind === "cost" ? costKind(r.category) : r.label;
+          const kind = r.kind === "goods" ? "Goods from the supplier" : r.kind === "estimate" ? "Estimated on the quotation" : r.category && r.kind === "cost" ? costKind(r.category) : r.label;
           const detail = r.kind === "cost" && r.label !== kind ? r.label : r.kind === "estimate" ? r.label : null;
           const how = howOf?.(r);
           return (

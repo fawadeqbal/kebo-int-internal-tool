@@ -193,7 +193,7 @@ export function OverviewSection({ c, today }: { c: CompanyDetail; today: ISODate
                 { label: "Inquiries", value: `${a.inquiries} · ${a.inquiriesLast30Days} in 30 days` },
                 { label: "Orders", value: `${a.orders} · ${a.openOrders} open` },
                 { label: "Sign-ins, 30 days", value: a.signInsLast30Days },
-                { label: "Customers · factories", value: `${a.customers} · ${a.factories}` },
+                { label: "Customers · suppliers", value: `${a.customers} · ${a.factories}` },
                 { label: "Modules on", value: modulesOn(c, planFeatureName) },
               ]}
             />

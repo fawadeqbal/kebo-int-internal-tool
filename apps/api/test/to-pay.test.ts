@@ -83,7 +83,7 @@ describe("payments: to pay suppliers", () => {
     expect(mine.map((r) => toMinor(r.open))).toEqual(plan.rows.filter((r) => toMinor(r.open) > 0).map((r) => toMinor(r.open)));
   });
 
-  it("is only for people who see factory costs", async () => {
+  it("is only for people who see supplier costs", async () => {
     const me = (await api(app, bilal).get("/auth/me").expect(200)).body as { permissions?: string[] };
     if (me.permissions?.includes("sourcing.manage")) return;
     await api(app, bilal).get("/billing/to-pay").expect(403);

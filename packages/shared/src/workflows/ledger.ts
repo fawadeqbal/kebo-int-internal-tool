@@ -102,7 +102,7 @@ export function ledgerAccountLabel(
     case "credit":
       return `Credit · ${names.customer?.get(a.id ?? "") ?? "customer"}`;
     case "factory":
-      return names.factory?.get(a.id ?? "") ?? "Factory";
+      return names.factory?.get(a.id ?? "") ?? "Supplier";
     case "staff":
       return `${names.user?.get(a.id ?? "") ?? "Staff"} (to repay)`;
     case "expense":
@@ -117,7 +117,7 @@ export const LEDGER_ACCOUNT_GROUP: Record<LedgerAccountKind, string> = {
   money: "Money",
   customer: "Customers",
   credit: "Customer credit",
-  factory: "Factories",
+  factory: "Suppliers",
   staff: "Staff (to repay)",
   expense: "Expenses",
   sales: "Sales",

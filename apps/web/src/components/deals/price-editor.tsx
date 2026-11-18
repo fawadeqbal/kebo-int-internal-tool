@@ -236,12 +236,12 @@ export function PriceSheet({
           </div>
 
           {/* The open option's lines. */}
-          <Card aria-label={`Option ${letter} lines`}>
+          <Card aria-label={`Option ${letter} items`}>
             <div className="border-b border-line px-4 py-3">
               <h3 className="text-sm font-semibold max-sm:hidden">
-                Option {letter} · {opt.factoryQuoteId ? (offer ? `lines from ${offer.factory.name}'s offer` : "an offer that was removed") : "the customer's items"}
+                Option {letter} · {opt.factoryQuoteId ? (offer ? `items from ${offer.factory.name}'s offer` : "an offer that was removed") : "the customer's items"}
               </h3>
-              <h3 className="text-sm font-semibold sm:hidden">Lines</h3>
+              <h3 className="text-sm font-semibold sm:hidden">Items</h3>
               <p className="mt-0.5 text-xs text-muted max-sm:hidden">
                 {offer?.coverage.missing.length ? (
                   <span className="inline-flex items-center gap-1 text-warn">
@@ -250,11 +250,11 @@ export function PriceSheet({
                 ) : (
                   `All ${topItems} customer item${topItems === 1 ? "" : "s"} covered`
                 )}
-                {offer ? ` · price basis ${offer.basis ? basisText(offer.basis, offer.basisPlace) : "not said"} → ${ours}` : ""}
+                {offer ? ` · Incoterm ${offer.basis ? basisText(offer.basis, offer.basisPlace) : "not said"} → ${ours}` : ""}
               </p>
             </div>
             {lines.length === 0 && opt.factoryQuoteId && !offer && (
-              <p className="m-4 rounded-md bg-warn-soft px-3 py-2 text-sm">This factory offer was removed from the inquiry. Remove this option or add another offer.</p>
+              <p className="m-4 rounded-md bg-warn-soft px-3 py-2 text-sm">This supplier offer was removed from the inquiry. Remove this option or add another offer.</p>
             )}
             {/* Wide: every column in view. */}
             <div className="p-4 max-sm:hidden">
@@ -272,11 +272,11 @@ export function PriceSheet({
                   <tr>
                     <th className={cn(TH, "text-left")}>No.</th>
                     <th className={cn(TH, "text-left")}>Description</th>
-                    <th className={cn(TH, "text-right")}>Qty</th>
+                    <th className={cn(TH, "text-right")}>Quantity</th>
                     {showCosts && <th className={cn(TH, "text-right")}>{extra.minor > 0 ? "Cost (landed)" : "Cost"}</th>}
                     <th className={cn(TH, "text-right")}>Unit price {currency}</th>
                     {showCosts && <th className={cn(TH, "text-right")}>Margin</th>}
-                    <th className={cn(TH, "text-right")}>Total</th>
+                    <th className={cn(TH, "text-right")}>Amount {currency}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -293,7 +293,7 @@ export function PriceSheet({
                         {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
                       </td>
                       {showCosts && (
-                        <td className="px-3 py-2 text-right align-middle whitespace-nowrap text-text-2 tabular" title={cost !== null && extra.minor > 0 && l.unitCost !== null ? `Factory ${fmt(toMinor(l.unitCost))} + its share of the costs to reach ${s.incoterm}` : undefined}>
+                        <td className="px-3 py-2 text-right align-middle whitespace-nowrap text-text-2 tabular" title={cost !== null && extra.minor > 0 && l.unitCost !== null ? `Supplier ${fmt(toMinor(l.unitCost))} + its share of the costs to reach ${s.incoterm}` : undefined}>
                           {cost === null ? "—" : amount2(Number(fromMinor(cost)))}
                         </td>
                       )}
@@ -352,7 +352,7 @@ export function PriceSheet({
                   <h3 className="text-sm font-semibold">Getting it to {ours}</h3>
                   <p className="mt-0.5 text-xs text-muted">
                     <Lock className="mr-1 inline size-3" aria-hidden />
-                    Internal: added to the cost of the lines above, never printed.
+                    Internal: added to the cost of the items above, never printed.
                   </p>
                 </div>
               </div>
@@ -360,7 +360,7 @@ export function PriceSheet({
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm">
                   {!gap ? (
                     <span className="flex items-center gap-1.5 text-warn">
-                      <AlertTriangle className="size-4" aria-hidden /> The offer does not say its price basis: set it on Factory offers, or add freight as a charge.
+                      <AlertTriangle className="size-4" aria-hidden /> The offer does not say its Incoterm: set it on Supplier offers, or add freight as a charge.
                     </span>
                   ) : gap.needed.length === 0 ? (
                     <span className="flex items-center gap-1.5 text-ok">
@@ -424,7 +424,7 @@ export function PriceSheet({
                 <h3 className="text-sm font-semibold">
                   Charges<span className="sm:hidden"> · {opt.charges.length}</span>
                 </h3>
-                <p className="mt-0.5 text-xs text-muted max-sm:hidden">Our own price lines (freight, inspection…): printed on the quotation.{showCosts ? " Cost is internal." : ""}</p>
+                <p className="mt-0.5 text-xs text-muted max-sm:hidden">Our own charges (freight, inspection…): printed on the quotation.{showCosts ? " Cost is internal." : ""}</p>
               </div>
               <Button size="xs" variant="ghost" className="max-sm:hidden" onClick={() => setPaste((v) => (v === null ? "" : null))} aria-expanded={paste !== null}>
                 <ClipboardPaste aria-hidden /> Paste a list
@@ -668,11 +668,11 @@ function ChargesTable({
           <tr>
             <th className={cn(TH, "text-left")}>No.</th>
             <th className={cn(TH, "text-left")}>Charge</th>
-            <th className={cn(TH, "text-right")}>Qty</th>
+            <th className={cn(TH, "text-right")}>Quantity</th>
             <th className={cn(TH, "text-left")}>Unit</th>
             {showCosts && <th className={cn(TH, "text-right")}>Our cost {currency}</th>}
-            <th className={cn(TH, "text-right")}>Price {currency}</th>
-            <th className={cn(TH, "text-right")}>Total</th>
+            <th className={cn(TH, "text-right")}>Unit price {currency}</th>
+            <th className={cn(TH, "text-right")}>Amount {currency}</th>
             <th className={TH}>
               <span className="sr-only">Remove</span>
             </th>
