@@ -449,8 +449,9 @@ export function RevisionEditor({
   also?: QuoteStep;
   /** In the steps window (design "one way, any number"): the step it opens on; one Save sends every step. */
   stepsAt?: QuoteStep;
-  /** Only the step it opens on (Edit on one part, design 17 Nov): no rail, Cancel and Save, and "All steps". */
+  /** Only the step it opens on (Edit on one part, design 17 Nov): no rail, Cancel and Save. */
   only?: boolean;
+  /** Every step, at this one (a part's window when something to fix is in another part). */
   onAllSteps?: () => void;
   /** The window of a first revision: every factory offer that has lines starts ticked. */
   tickAll?: boolean;
@@ -1031,7 +1032,7 @@ export function RevisionEditor({
                 single={only}
                 footer={
                   only ? (
-                    <OnePartFooter onAllSteps={onAllSteps} onCancel={onCancel} canSave={!requireChanges || dirty} />
+                    <OnePartFooter onCancel={onCancel} canSave={!requireChanges || dirty} />
                   ) : (
                   <StepsFooter
                     first={stepAt === 0}

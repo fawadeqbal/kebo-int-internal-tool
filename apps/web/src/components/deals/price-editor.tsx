@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardPaste, Lock, Plus, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronUp, ClipboardPaste, Lock, Plus, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { convertMinor, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import { basisText, BASIS_STEP_LABEL, leadWords, optionLetter } from "@kebo/shared";
 import { Badge, Button, Card, cn, Input, Select, Textarea } from "@kebo/ui";
 import { EditButton } from "@/components/common/edit-button";
+import { BottomSheet } from "@/components/common/bottom-sheet";
+import { useIsPhone } from "@/components/common/floating";
+import { useFooterSlot } from "@/components/common/panel";
 import { UNITS } from "@/components/lines/line-table";
 import type { QuoteOffers } from "@/lib/types-deals";
 import type { Fx } from "@/lib/fx";
@@ -315,32 +319,41 @@ export function PriceSheet({
                 </tbody>
               </table>
             </div>
-            {/* Phone: one row per line, its price box on the right. */}
-            <ul className="flex flex-col divide-y divide-line px-4 sm:hidden">
-              {lineView.map(({ l, i, price, cost, m, part }) => (
-                <li key={l.id} className={cn("flex items-center gap-3 py-2.5", part && "pl-3")}>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm">
-                      <span className="text-xs text-muted tabular">{l.no}</span> {l.description.split("\n")[0]}
+            {/* Phone (design "Items on a small phone"): the item line — number, name (two lines), model under it, a part in
+                line with its item — with the price box in it (pricing is the work here), the margin and the amount under it. */}
+            <ul aria-label={`Option ${letter} prices`} className="flex flex-col divide-y divide-line sm:hidden">
+              {lineView.map(({ l, i, price, cost, m, part }) => {
+                const amount = totals.lines[i]?.lineTotal ?? 0;
+                return (
+                  <li key={l.id} className="flex items-start gap-1.5 py-2.5 pr-3 pl-3">
+                    <span className={cn("w-[34px] shrink-0 pt-0.5 text-[13px] tabular", part ? "font-medium text-muted" : "font-semibold text-text-2")}>{l.no}</span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className={cn("line-clamp-2 text-[15px] leading-snug [overflow-wrap:anywhere]", part ? "font-medium" : "font-semibold")}>{l.description.split("\n")[0]}</span>
+                      {l.model && <span className="truncate text-xs text-muted">{l.model}</span>}
+                      <span className="mt-1.5 flex items-center justify-between gap-2">
+                        <span className="min-w-0 text-[13px] text-text-2 tabular">
+                          {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
+                          {showCosts && cost !== null && cost > 0 && <span className="block text-xs whitespace-nowrap">cost {amount2(Number(fromMinor(cost)))}</span>}
+                        </span>
+                        <PriceInput
+                          aria-label={`Unit price for ${l.no}`}
+                          data-price-m={`${at}:${i}`}
+                          className="h-11 w-36 shrink-0 text-base"
+                          value={price}
+                          placeholder="0.00"
+                          onChange={(v) => setPrice(l.id, v)}
+                          onKeyDown={priceKeys(i, "data-price-m")}
+                          onPaste={pricePaste(i)}
+                        />
+                      </span>
+                      <span className="mt-1 flex items-baseline justify-between gap-2 text-xs tabular">
+                        <span className={tone(m)}>{showCosts && m !== null ? `margin ${m.toFixed(1)}%` : ""}</span>
+                        <span className="text-sm font-bold text-text">{amount > 0 ? amount2(Number(fromMinor(amount))) : <span className="font-normal text-muted">—</span>}</span>
+                      </span>
                     </span>
-                    <span className="block text-xs text-text-2 tabular">
-                      {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
-                      {showCosts && cost !== null ? ` · cost ${Math.round(Number(fromMinor(cost))).toLocaleString("en-US")}` : ""}
-                      {showCosts && m !== null && <span className={tone(m)}> · {m.toFixed(1)}%</span>}
-                    </span>
-                  </span>
-                  <PriceInput
-                    aria-label={`Unit price for ${l.no}`}
-                    data-price-m={`${at}:${i}`}
-                    className="h-11 w-32 shrink-0 text-base"
-                    value={price}
-                    placeholder="0.00"
-                    onChange={(v) => setPrice(l.id, v)}
-                    onKeyDown={priceKeys(i, "data-price-m")}
-                    onPaste={pricePaste(i)}
-                  />
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </Card>
 
@@ -519,18 +532,21 @@ export function PriceTotals({
   const letter = optionLetter(at);
   const { totals, costing } = optionTotals(opt, offers, s.incoterm, currency);
   const setOption = (i: number, patch: Partial<OptionState>) => setS((st) => ({ ...st, options: st.options.map((o, n) => (n === i ? { ...o, ...patch } : o)) }));
-  if (inline)
-    return (
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-line bg-surface-2/50 px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
+  const phone = useIsPhone();
+  const slot = useFooterSlot();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  if (inline) {
+    const block = (sheet: boolean) => (
+      <dl className={cn("grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-6", sheet ? "px-4 py-3" : "rounded-xl border border-line bg-surface-2/50 px-4 py-3")}>
         <Fig label="Subtotal">{fmt(totals.subtotal)}</Fig>
         <div className="flex flex-col">
           <dt>
-            <label htmlFor={`disc-${opt.key}`} className="text-xs text-text-2">
+            <label htmlFor={`disc-${opt.key}${sheet ? "-sheet" : ""}`} className="text-xs text-text-2">
               Discount
             </label>
           </dt>
           <dd>
-            <PriceInput id={`disc-${opt.key}`} className="h-8 w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
+            <PriceInput id={`disc-${opt.key}${sheet ? "-sheet" : ""}`} className="h-8 w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
           </dd>
         </div>
         <Fig label={s.options.length > 1 ? `Option ${letter} total` : "Total"} strong>
@@ -549,6 +565,31 @@ export function PriceTotals({
         )}
       </dl>
     );
+    // A phone in a window (design "Items on a small phone"): the total (and margin) in the footer beside Save; a tap
+    // shows every figure, the discount box with them. Nothing floats over the items.
+    const phoneTotal = (
+      <button type="button" onClick={() => setSheetOpen(true)} aria-haspopup="dialog" className="flex min-w-0 flex-col items-start text-left">
+        <span className="flex items-center gap-1 text-xs text-text-2">
+          {showCosts ? "Total · margin" : "Total"} <ChevronUp className="size-3.5" aria-hidden />
+        </span>
+        <span className="max-w-full truncate text-[15px] font-bold tabular">
+          {fmt(totals.total)}
+          {showCosts && costing.marginPercent !== null && <span className={cn("font-semibold", tone(costing.marginPercent))}> · {costing.marginPercent.toFixed(1)}%</span>}
+        </span>
+      </button>
+    );
+    return (
+      <>
+        <div className={cn(phone && slot && "max-sm:hidden")}>{block(false)}</div>
+        {phone && slot && createPortal(phoneTotal, slot)}
+        {sheetOpen && (
+          <BottomSheet title={s.options.length > 1 ? `Option ${letter} · totals` : "Totals"} sub="from the prices as they are now" onClose={() => setSheetOpen(false)}>
+            {block(true)}
+          </BottomSheet>
+        )}
+      </>
+    );
+  }
   return (
     <>
             <dl className="ml-auto flex flex-wrap items-end gap-x-5 gap-y-2 max-sm:hidden">

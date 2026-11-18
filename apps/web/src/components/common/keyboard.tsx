@@ -16,6 +16,11 @@ function typesHere(el: Element | null): el is HTMLElement {
  * starts), which every full-screen window, sheet and confirm on a phone follows (FIT_VIEW). With the keyboard
  * open the page says so (data-keyboard="open"): a tall box gets shorter and the steps bar tighter, and the box
  * being typed in is brought into view between the window's title and its buttons.
+ *
+ * The values are kept only while something is typed in: with nothing to type in there is no keyboard, and the
+ * windows fill the screen (100dvh). (Safari on an iPhone can leave the last keyboard-open height and offset in
+ * place after the keyboard goes, which left a window as a band in the middle of the screen; the values are read
+ * again once the keyboard has finished moving.)
  */
 export function KeyboardWatch() {
   useEffect(() => {
@@ -39,31 +44,45 @@ export function KeyboardWatch() {
           tallest = vv.height;
         }
         tallest = Math.max(tallest, vv.height);
-        root.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
-        root.style.setProperty("--vvt", `${Math.round(vv.offsetTop)}px`);
-        const now = typesHere(document.activeElement) && vv.height < tallest - 120;
+        const typing = typesHere(document.activeElement);
+        if (typing) {
+          root.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
+          root.style.setProperty("--vvt", `${Math.round(vv.offsetTop)}px`);
+        } else {
+          root.style.removeProperty("--vvh");
+          root.style.removeProperty("--vvt");
+        }
+        const now = typing && vv.height < tallest - 120;
         if (now) root.dataset.keyboard = "open";
         else delete root.dataset.keyboard;
         if (now && !open) setTimeout(bring, 60);
         open = now;
       });
     };
+    // The keyboard takes a moment to open or close: read the screen again once it has.
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const settle = () => {
+      update();
+      timers.splice(0).forEach(clearTimeout);
+      timers.push(setTimeout(update, 350), setTimeout(update, 800));
+    };
     // Moving to another box with the keyboard up: that box comes into view too.
     const focused = () => {
       if (open) setTimeout(bring, 120);
-      update();
+      settle();
     };
     update();
-    vv.addEventListener("resize", update);
+    vv.addEventListener("resize", settle);
     vv.addEventListener("scroll", update);
     document.addEventListener("focusin", focused);
-    document.addEventListener("focusout", update);
+    document.addEventListener("focusout", settle);
     return () => {
       cancelAnimationFrame(frame);
-      vv.removeEventListener("resize", update);
+      timers.forEach(clearTimeout);
+      vv.removeEventListener("resize", settle);
       vv.removeEventListener("scroll", update);
       document.removeEventListener("focusin", focused);
-      document.removeEventListener("focusout", update);
+      document.removeEventListener("focusout", settle);
       delete root.dataset.keyboard;
     };
   }, []);
