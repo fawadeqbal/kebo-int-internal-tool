@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, isSupplier, newSupplier, Prisma, toDbDate, toDbDateOrNull } from "@kebo/database";
-import { convertAmount, convertMinor, factoryTaxMinor, factoryUnitCostMinor, fxRate, fromMinor, multiplyMinor } from "@kebo/money";
+import { convertAmount, convertMinor, factoryTaxMinor, factoryUnitCostMinor, fxRate, fromMinor, multiplyMinor, quoteUnitCostMinor } from "@kebo/money";
 import {
   can,
   coverage,
@@ -17,6 +17,7 @@ import {
   type FactoryLinesInput,
   type FactoryQuoteInput,
   type LineMoveInput,
+  unpricedItems,
 } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -92,7 +93,8 @@ export class SourcingService {
         const taxRate = Number(l.taxRate);
         const unitPriceMinor = decimalToMinor(l.unitPrice);
         const costInFactoryCurrency = factoryUnitCostMinor(unitPriceMinor, taxRate, q.taxIncluded);
-        const cost = rate ? convertMinor(costInFactoryCurrency, rate) : null;
+        // What it costs us (Ours only): with its tax, less the export VAT refund in Settings.
+        const cost = rate ? convertMinor(quoteUnitCostMinor(unitPriceMinor, taxRate, q.taxIncluded, sales.exportVatRefundPercent), rate) : null;
         // The line's total at the factory's prices, and the tax on top of it (without tax), in the factory's currency.
         const totalMinor = multiplyMinor(unitPriceMinor, l.quantity.toString());
         const taxMinor = q.taxIncluded ? 0 : multiplyMinor(costInFactoryCurrency, l.quantity.toString()) - totalMinor;
@@ -175,8 +177,8 @@ export class SourcingService {
         ),
         /** What the whole offer costs us in the selling currency (null when a rate is missing). */
         totalCost: rate === null ? null : fromMinor(lines.reduce((t, l) => t + (l.costMinor ?? 0), 0)),
-        /** Lines still without a price (a line priced in its parts does not count). */
-        unpriced: q.lines.filter((l) => Number(l.unitPrice) === 0 && !q.lines.some((p) => p.parentId === l.id)).length,
+        /** Items still without a price (a part is priced in its item; an item priced in its parts is priced). */
+        unpriced: unpricedItems(q.lines.map((l) => ({ id: l.id, parentId: l.parentId, price: l.unitPrice.toString() }))),
         /** Which of the customer's items it answers, and which it misses. */
         coverage: coverage(
           itemRefs,

@@ -67,6 +67,16 @@ export async function updateRevisionAction(dealId: string, revisionId: string, _
 }
 
 /**
+ * A draft whose supplier offer changed after it was made (canvas "From the supplier offer to the quotation"): its
+ * prices again at their margins on the new cost (update), or kept on it (keep). The notice then goes.
+ */
+export async function offerPricesAction(dealId: string, revisionId: string, mode: "update" | "keep", _prev: ActionState, _form: FormData): Promise<ActionState> {
+  const r = await attempt(null, () => api.post(`/revisions/${revisionId}/offer-prices`, { mode }), mode === "update" ? "Prices updated to the offer's new costs." : "The offer's new costs taken; the prices kept.");
+  if (r.ok) refresh(dealId);
+  return r;
+}
+
+/**
  * "Delete draft" on a quotation's own page: the draft goes, then the page shows the quotation's revision before it,
  * or (when it was its only one) the inquiry's list of quotations.
  */
