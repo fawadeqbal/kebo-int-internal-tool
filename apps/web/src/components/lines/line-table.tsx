@@ -9,15 +9,19 @@ import {
   ChevronRight,
   ClipboardPaste,
   Copy,
+  Download,
+  FileSpreadsheet,
   IndentDecrease,
   IndentIncrease,
   Loader2,
   ListPlus,
   MessageCircleQuestion,
   MoreHorizontal,
+  Pencil,
   Plus,
   Search,
   SquareCheck,
+  Table2,
   Trash2,
   X,
 } from "lucide-react";
@@ -26,8 +30,10 @@ import { ConfirmDialog } from "@/components/common/dialog";
 import { Button, cn, Input, Textarea } from "@kebo/ui";
 import { parseList, type PastedItem } from "@/components/deals/paste-list";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
-import { ExcelMenu } from "@/components/sheets/excel-menu";
+import { downloadSheet, ExcelMenu, useSheetPicker } from "@/components/sheets/excel-menu";
+import { useExcelAllowed } from "@/components/common/features";
 import { lineExport, linesFromSheet, lineTemplate, type SheetLines } from "@/components/sheets/line-sheets";
+import type { ReadSheet } from "@/lib/sheet-spec";
 import { UNITS } from "./units";
 import { LineWindow, lineNeeds, lineSummary, PhoneLineRow, type LineWindowThen } from "./phone-lines";
 
@@ -204,8 +210,9 @@ const STICKY_HEAD = "md:sticky md:top-0 md:z-[3] md:shadow-[inset_0_-1px_0_var(-
 type Pending = { run: (reason: string) => Promise<LineResult>; message: string; choices: string[] };
 type Removed = { label: string; lines: NewLine[]; at: { afterKey: string | null; parentKey: string | null } };
 /** Something that can be done to a row; `short` is the toolbar's label, `hint` its key. */
-type RowActionKey = "below" | "part" | "out" | "in" | "up" | "down" | "dup" | "del";
-type RowAction = { key: RowActionKey; icon: ReactNode; label: string; short: string; hint?: string; disabled?: boolean; danger?: boolean };
+type RowActionKey = "below" | "part" | "edit" | "out" | "in" | "up" | "down" | "dup" | "del";
+/** `note`: shown on the right in a phone's sheet too ("2.3", the number a new part gets). */
+type RowAction = { key: RowActionKey; icon: ReactNode; label: string; short: string; hint?: string; note?: string; disabled?: boolean; danger?: boolean };
 
 /**
  * Lines as a quick table for long lists (100+ lines). Saved lines are compact
@@ -502,6 +509,14 @@ export function LineTable({
   const anyParts = rows.some((r) => r.parentKey);
   /** Lines can come from an Excel file here (a template, then the filled file). */
   const canUpload = !!sheet && !readOnly && sheet.upload !== false;
+  const excelAllowed = useExcelAllowed();
+  /** A filled file's rows, shown to check before anything is added. */
+  const uploadLines = (read: ReadSheet, file: string) => {
+    setPasteOpen(false);
+    setFromFile({ file, read: linesFromSheet(read, { columns, flat, initial: (p) => initialValues(columns, p) }) });
+  };
+  // On a phone the file is picked from "More ways to add" (no Excel button there).
+  const phonePicker = useSheetPicker(canUpload ? uploadLines : undefined);
   const entryIndex = entryAt.afterKey ? rows.findIndex((r) => r.key === entryAt.afterKey) : -1;
   // An inline new row goes after its line (and the line's parts when it adds whole lines).
   const anchor = entryIndex < 0 ? null : entryAt.parentKey ? entryIndex : blockEnd(rows, entryIndex) - 1;
@@ -827,29 +842,50 @@ export function LineTable({
   const Noun = noun[0]!.toUpperCase() + noun.slice(1);
   const [editing, setEditing] = useState<{ key: string | null; at: { afterKey: string | null; parentKey: string | null }; n: number; added?: string } | null>(null);
   const [needsOnly, setNeedsOnly] = useState(false);
+  /** The lines just added in the window: lit in the list until another window opens. */
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
+  const [moreOpen, setMoreOpen] = useState(false);
+  /** The number a new line put here gets: "24", or "1.3" for a part (as in a sheet). */
+  const numberFor = (at: { afterKey: string | null; parentKey: string | null }) => {
+    if (at.parentKey) {
+      const kids = rows.filter((x) => x.parentKey === at.parentKey);
+      const after = at.afterKey === at.parentKey ? -1 : at.afterKey ? kids.findIndex((x) => x.key === at.afterKey) : kids.length - 1;
+      return `${parentLabel(at.parentKey)}.${after + 2}`;
+    }
+    const tops = rows.filter((x) => !x.parentKey);
+    if (at.afterKey) {
+      const a = rows.find((x) => x.key === at.afterKey);
+      const top = a?.parentKey ? rows.find((x) => x.key === a.parentKey) : a;
+      if (top) return String(tops.indexOf(top) + 2);
+    }
+    return String(tops.length + 1);
+  };
+  /** Where a new part of a line goes: after its last part. */
+  const partAt = (r: LineRow) => ({ afterKey: [...rows].reverse().find((x) => x.parentKey === r.key)?.key ?? r.key, parentKey: r.key });
+  const firstLine = (r: LineRow) => (valueOf(r, columns[0]!.key) ?? "").split("\n")[0]!.trim();
   const valuesOf = (r: LineRow) => Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)]));
   const needing = rows.filter((r) => lineNeeds(r.values, columns)).length;
   const phoneRows = needsOnly && needing ? visible.filter(({ r }) => lineNeeds(r.values, columns)) : visible;
   const editingRow = editing?.key ? (rows.find((r) => r.key === editing.key) ?? null) : null;
   const editingAt = editingRow ? phoneRows.findIndex(({ r }) => r.key === editingRow.key) : -1;
+  /** A new part's line (what it goes under). */
+  const editingParent = editing && !editing.key && editing.at.parentKey ? (rows.find((r) => r.key === editing.at.parentKey) ?? null) : null;
   const openLine = (key: string) => {
     setMenu(null);
     setMessage(null);
+    setFresh(new Set());
     setEditing((e) => ({ key, at: { afterKey: null, parentKey: null }, n: (e?.n ?? 0) + 1 }));
   };
   const openNew = (at: { afterKey: string | null; parentKey: string | null } = { afterKey: null, parentKey: null }) => {
     setMenu(null);
+    setMoreOpen(false);
     setCtx(null);
     setMessage(null);
+    setFresh(new Set());
     setEditing((e) => ({ key: null, at, n: (e?.n ?? 0) + 1 }));
   };
-  /** A new line on a phone: an item, or a part of one of the lines (what is typed stays). */
-  const setEditingKind = (parentKey: string | null) =>
-    setEditing((e) =>
-      e && !e.key
-        ? { ...e, at: parentKey ? { afterKey: [...rows].reverse().find((x) => x.parentKey === parentKey)?.key ?? parentKey, parentKey } : { afterKey: null, parentKey: null } }
-        : e,
-    );
+  /** A new part on a phone made an item of its own instead (what is typed stays): it goes at the end. */
+  const makeItem = () => setEditing((e) => (e && !e.key ? { ...e, at: { afterKey: null, parentKey: null } } : e));
   /** The line window's save: a saved line's changed values, or a new line; then close, or the next one. */
   const saveLine = (values: LineValues, then: LineWindowThen) => {
     if (!editing) return;
@@ -868,6 +904,7 @@ export function LineTable({
       return;
     }
     const at = editing.at;
+    const no = numberFor(at);
     if (isBlank(values, columns, at.parentKey)) {
       if (then === "close") setEditing(null);
       return;
@@ -876,20 +913,30 @@ export function LineTable({
       "entry",
       (reason) => onAdd([{ values, partOf: null }], at, reason),
       (ok) => {
+        if (ok.keys?.length) setFresh((f) => new Set([...f, ...ok.keys!]));
         if (then === "close") return setEditing(null);
         // The next one goes right after it (at the same level), or at the end.
         const last = ok.keys?.[ok.keys.length - 1];
         const next = last && (at.afterKey || at.parentKey) ? { afterKey: last, parentKey: at.parentKey } : at;
-        setEditing({ key: null, at: next, n, added: `Added “${(values[editable[0]!.key] ?? "").split("\n")[0]!.trim()}”` });
+        setEditing({ key: null, at: next, n, added: `Added ${no} · ${(values[editable[0]!.key] ?? "").split("\n")[0]!.trim()}` });
       },
     );
   };
+
+  // The window closed after adding: the last line added comes into view (lit; see `fresh`).
+  const windowOpen = !!editing;
+  useEffect(() => {
+    if (windowOpen || !fresh.size) return;
+    const last = [...fresh].at(-1)!;
+    document.querySelector(`[data-line="${CSS.escape(last)}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [windowOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Does a row action (from the ⋯ menu, the right-click menu or the toolbar). */
   const act = (key: RowActionKey, r: LineRow) => {
     // On a phone a new line is typed in its own window, where it goes.
     if (phone && key === "below") return openNew({ afterKey: r.key, parentKey: r.parentKey });
-    if (phone && key === "part") return openNew({ afterKey: [...rows].reverse().find((x) => x.parentKey === r.key)?.key ?? r.key, parentKey: r.key });
+    if (phone && key === "part") return openNew(partAt(r));
+    if (key === "edit") return openLine(r.key);
     if (key === "below") insertBelow(r);
     else if (key === "part") addPartTo(r);
     else if (key === "out") void move(r, "outdent");
@@ -939,6 +986,32 @@ export function LineTable({
     return list;
   };
 
+  /**
+   * A phone's ⋯ sheet (design 18 Nov): Add a part (with the number it gets), Edit, then the same moves as
+   * the table's. A new item comes from Add item at the top, so there is no "insert below".
+   */
+  const phoneActionsFor = (r: LineRow): RowAction[] => {
+    const list = actionsFor(r).filter((a) => a.key !== "below");
+    const k = list.findIndex((a) => a.key === "part");
+    if (k >= 0) list[k] = { ...list[k]!, label: "Add a part", note: numberFor(partAt(r)) };
+    list.splice(k >= 0 ? k + 1 : 0, 0, { key: "edit", icon: <Pencil />, label: "Edit", short: "Edit" });
+    return list;
+  };
+  /** The top of a line's sheet: its number and name, then how many and its parts ("2 sets · 2 parts"). */
+  const sheetHead = (r: LineRow, i: number) => {
+    const parts = rows.filter((p) => p.parentKey === r.key).length;
+    const qty = [valueOf(r, "quantity"), valueOf(r, "unit")].filter(Boolean).join(" ");
+    const sub = [qty, parts ? `${parts} part${parts === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
+    return (
+      <div className="px-2.5 pt-1 pb-2">
+        <p className="truncate text-base font-semibold">
+          {numbers[i]} · {firstLine(r) || "No description yet"}
+        </p>
+        {sub && <p className="text-[13px] text-text-2">{sub}</p>}
+      </div>
+    );
+  };
+
   /* ---------- what is shown */
 
   // Fixed widths stay; flexible ones (the description) take the rest, with a floor so the grid scrolls sideways on a phone like a sheet.
@@ -949,22 +1022,7 @@ export function LineTable({
   const cellBase = "h-9 border border-line px-2 align-middle text-sm";
 
   // The number the new row will get: "24", or "1.3" when it is a part (the number says it, as in a sheet).
-  const nextNo = (() => {
-    if (entryAt.parentKey) {
-      const kids = rows.filter((x) => x.parentKey === entryAt.parentKey);
-      const after = entryAt.afterKey === entryAt.parentKey ? -1 : entryAt.afterKey ? kids.findIndex((x) => x.key === entryAt.afterKey) : kids.length - 1;
-      return `${parentLabel(entryAt.parentKey)}.${after + 2}`;
-    }
-    const tops = rows.filter((x) => !x.parentKey);
-    if (entryAt.afterKey) {
-      const a = rows.find((x) => x.key === entryAt.afterKey);
-      const top = a?.parentKey ? rows.find((x) => x.key === a.parentKey) : a;
-      if (top) return String(tops.indexOf(top) + 2);
-    }
-    return String(tops.length + 1);
-  })();
-  // What the new line can be: an item, or a part of one of the lines here.
-  const kinds = flat ? [] : rows.map((r, i) => ({ key: r.key, no: numbers[i]!, top: !r.parentKey })).filter((k) => k.top);
+  const nextNo = numberFor(entryAt);
   const canBePart = !flat && (entryAt.parentKey !== null || lineAbove(rows, entryIndex >= 0 ? blockEnd(rows, entryIndex) : rows.length) !== null);
 
   const entryRow = readOnly ? null : (
@@ -1100,7 +1158,8 @@ export function LineTable({
                 name={(valueOf(r, columns[0]!.key) ?? "").split("\n")[0]!.trim()}
                 summary={lineSummary(r, columns, valuesOf(r))}
                 needs={lineNeeds(valuesOf(r), columns)}
-                parts={rows.filter((p) => p.parentKey === r.key).length}
+                fresh={fresh.has(r.key)}
+                lineKey={r.key}
                 badge={r.badge}
                 part={!!r.parentKey}
                 busy={busy === r.key}
@@ -1109,7 +1168,19 @@ export function LineTable({
                 onOpen={readOnly ? undefined : () => openLine(r.key)}
                 menu={
                   readOnly ? undefined : (
-                    <span className="flex items-center pr-1">
+                    <span className="flex items-center gap-0.5 pr-1">
+                      {/* + Part on an item's own line (design 18 Nov): the part window opens already under it. */}
+                      {!flat && !r.parentKey && partButton && (
+                        <Button
+                          size="xs"
+                          variant="secondary"
+                          onClick={() => act("part", r)}
+                          aria-label={`Add a part to ${rowLabel(i)}`}
+                          className="h-8 gap-1 px-2.5 text-[13px] text-primary shadow-none hover:text-primary pointer-coarse:h-8"
+                        >
+                          <Plus aria-hidden /> Part
+                        </Button>
+                      )}
                       <Button
                         id={`rowmenu-${menuId}-${r.key}`}
                         size="icon-sm"
@@ -1118,18 +1189,18 @@ export function LineTable({
                         aria-label={`More for ${rowLabel(i)}`}
                         aria-haspopup="menu"
                         aria-expanded={menu === r.key}
-                        className="size-9"
+                        className="h-10 w-9 max-sm:h-10 max-sm:w-9"
                       >
                         <MoreHorizontal aria-hidden />
                       </Button>
                       {menu === r.key && (
-                        <RowMenu onClose={closeMenu} anchorId={`rowmenu-${menuId}-${r.key}`} label={rowLabel(i)}>
-                          {actionsFor(r).map((a) => (
-                            <MenuItem key={a.key} icon={a.icon} onClick={() => act(a.key, r)} disabled={a.disabled} danger={a.danger}>
+                        <FloatingMenu anchor={() => document.getElementById(`rowmenu-${menuId}-${r.key}`)} onClose={closeMenu} label={rowLabel(i)} header={sheetHead(r, i)} width={240}>
+                          {phoneActionsFor(r).map((a) => (
+                            <MenuItem key={a.key} icon={a.icon} onClick={() => act(a.key, r)} disabled={a.disabled} danger={a.danger} note={a.note}>
                               {a.label}
                             </MenuItem>
                           ))}
-                        </RowMenu>
+                        </FloatingMenu>
                       )}
                     </span>
                   )
@@ -1162,11 +1233,33 @@ export function LineTable({
       {toolsShown && (
         <div className="flex flex-wrap items-center gap-2">
           {/* Add first (design rules 18 Nov): the main thing done here, then the other ways in. */}
-          {!readOnly && (
-            <Button variant="primary" onClick={phone ? () => openNew() : addLine} className="max-sm:w-full">
-              <Plus aria-hidden /> Add {noun}
-            </Button>
-          )}
+          {!readOnly &&
+            (phone ? (
+              // A phone (design 18 Nov): one big Add, and ⋯ beside it for the other ways in (paste, Excel).
+              <div className="flex w-full gap-2">
+                <Button variant="primary" onClick={() => openNew()} className="h-12 flex-1 text-[15px] max-sm:h-12 max-sm:text-[15px]">
+                  <Plus aria-hidden /> Add {noun}
+                </Button>
+                <Button
+                  id={`moreadd-${menuId}`}
+                  size="icon"
+                  variant="secondary"
+                  onClick={() => setMoreOpen((o) => !o)}
+                  aria-label="More ways to add"
+                  aria-haspopup="menu"
+                  aria-expanded={moreOpen}
+                  disabled={phonePicker.busy}
+                  className="size-12 max-sm:size-12"
+                >
+                  {phonePicker.busy ? <Loader2 className="animate-spin" aria-hidden /> : <MoreHorizontal aria-hidden />}
+                </Button>
+                {phonePicker.input}
+              </div>
+            ) : (
+              <Button variant="primary" onClick={addLine}>
+                <Plus aria-hidden /> Add {noun}
+              </Button>
+            ))}
           {rows.length > 8 && (
             <div className="relative min-w-0 flex-1 basis-48">
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
@@ -1180,12 +1273,12 @@ export function LineTable({
               />
             </div>
           )}
-          {!readOnly && (
-            <Button size="sm" variant="secondary" onClick={() => setPasteOpen((o) => !o)} aria-expanded={pasteOpen} className="max-sm:flex-1">
+          {!readOnly && !phone && (
+            <Button size="sm" variant="secondary" onClick={() => setPasteOpen((o) => !o)} aria-expanded={pasteOpen}>
               <ClipboardPaste aria-hidden /> Paste rows
             </Button>
           )}
-          {anyParts && (
+          {anyParts && !phone && (
             <Button
               size="xs"
               variant="ghost"
@@ -1195,7 +1288,7 @@ export function LineTable({
             </Button>
           )}
           {tools}
-          {sheet && (
+          {sheet && !phone && (
             <ExcelMenu
               className={cn(!(!readOnly && !phone && rows.length > 0) && "ml-auto")}
               noun={`${noun}s`}
@@ -1206,10 +1299,7 @@ export function LineTable({
               }
               onUpload={
                 canUpload
-                  ? (read, file) => {
-                      setPasteOpen(false);
-                      setFromFile({ file, read: linesFromSheet(read, { columns, flat, initial: (p) => initialValues(columns, p) }) });
-                    }
+                  ? uploadLines
                   : undefined
               }
               exportSheet={rows.length ? () => lineExport({ name: sheet.name, columns, rows, numbers }) : undefined}
@@ -1231,8 +1321,62 @@ export function LineTable({
           )}
         </div>
       )}
+      {phone && phonePicker.error && (
+        <p role="alert" className="text-xs text-bad">
+          {phonePicker.error}
+        </p>
+      )}
       {phone && phoneCount}
       </div>
+      {moreOpen && (
+        <FloatingMenu anchor={() => document.getElementById(`moreadd-${menuId}`)} onClose={() => setMoreOpen(false)} label="More ways to add" width={280}>
+          <MenuItem
+            icon={<ClipboardPaste />}
+            note="from Excel, WhatsApp, email"
+            onClick={() => {
+              setMoreOpen(false);
+              setPasteOpen(true);
+            }}
+          >
+            Paste rows
+          </MenuItem>
+          {canUpload && excelAllowed && (
+            <MenuItem
+              icon={<FileSpreadsheet />}
+              onClick={() => {
+                setMoreOpen(false);
+                phonePicker.pick();
+              }}
+            >
+              Import Excel
+            </MenuItem>
+          )}
+          {/* The rest of the Excel button: its template, and the lines as a file. */}
+          {sheet && excelAllowed && (canUpload || rows.length > 0) && <span role="separator" className="my-1 block h-px bg-line" />}
+          {sheet && canUpload && excelAllowed && (
+            <MenuItem
+              icon={<Download />}
+              onClick={() => {
+                setMoreOpen(false);
+                void downloadSheet(lineTemplate({ name: `${sheet.name} - template`, columns, noun, flat, rows: sheet.templateRows })).then(setMessage);
+              }}
+            >
+              Download the template
+            </MenuItem>
+          )}
+          {sheet && excelAllowed && rows.length > 0 && (
+            <MenuItem
+              icon={<Table2 />}
+              onClick={() => {
+                setMoreOpen(false);
+                void downloadSheet(lineExport({ name: sheet.name, columns, rows, numbers })).then(setMessage);
+              }}
+            >
+              Export to Excel
+            </MenuItem>
+          )}
+        </FloatingMenu>
+      )}
 
       {fromFile && (
         <FilePanel
@@ -1578,8 +1722,16 @@ export function LineTable({
       {/* Notices stay in view at the bottom of the screen: with 100+ lines the row may be far from the top. */}
       {editing && (
         <LineWindow
-          title={editingRow ? rowLabel(rows.indexOf(editingRow)) : editing.at.parentKey ? `New part of ${noun} ${parentLabel(editing.at.parentKey)}` : `New ${noun}`}
-          sub={editingRow ? `${editingAt + 1} of ${phoneRows.length}` : `${rows.length} ${noun}${rows.length === 1 ? "" : "s"} so far`}
+          title={editingRow ? rowLabel(rows.indexOf(editingRow)) : `New ${editing.at.parentKey ? "part" : noun} ${numberFor(editing.at)}`}
+          sub={
+            editingRow
+              ? `${editingAt + 1} of ${phoneRows.length}`
+              : editingParent
+                ? `Under ${parentLabel(editingParent.key)} · ${firstLine(editingParent)}`
+                : rows.length
+                  ? `${countWords(rows, noun)} so far`
+                  : undefined
+          }
           progress={editingRow ? (editingAt + 1) / Math.max(1, phoneRows.length) : undefined}
           columns={columns}
           start={editingRow ? valuesOf(editingRow) : initialValues(columns, editing.at.parentKey)}
@@ -1593,46 +1745,12 @@ export function LineTable({
           problem={message}
           reason={pending && <ReasonBox pending={pending} onCancel={() => setPending(null)} />}
           onSave={saveLine}
-          kind={
-            !editingRow && kinds.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                <div role="radiogroup" aria-label={`${Noun} or part`} className="grid grid-cols-2 rounded-xl bg-surface-3 p-1">
-                  {[
-                    { on: !editing.at.parentKey, label: Noun, to: null as string | null },
-                    { on: !!editing.at.parentKey, label: "Part", to: editing.at.parentKey ?? kinds.at(-1)!.key },
-                  ].map((o) => (
-                    <button
-                      key={o.label}
-                      type="button"
-                      role="radio"
-                      aria-checked={o.on}
-                      onClick={() => setEditingKind(o.to)}
-                      className={cn("flex h-10 items-center justify-center gap-1.5 rounded-lg text-[15px] font-semibold", o.on ? "bg-surface text-text shadow-card" : "text-text-2")}
-                    >
-                      {o.on && <Check aria-hidden className="size-4" />}
-                      {o.label}
-                    </button>
-                  ))}
-                </div>
-                {editing.at.parentKey && (
-                  <label className="grid gap-1.5 text-sm font-medium">
-                    Part of
-                    <select
-                      value={editing.at.parentKey}
-                      onChange={(e) => setEditingKind(e.target.value)}
-                      className="h-12 rounded-[10px] border border-line-strong bg-surface px-3 text-base"
-                    >
-                      {kinds.map((k) => (
-                        <option key={k.key} value={k.key}>
-                          {k.no} · {(rows.find((r) => r.key === k.key)?.values[editable[0]!.key] ?? "").split("\n")[0]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </div>
-            ) : undefined
+          partOf={
+            !editingRow && editingParent
+              ? { no: parentLabel(editingParent.key)!, name: firstLine(editingParent), onMakeItem: makeItem }
+              : undefined
           }
+          nextLabel={editingParent && !editingRow ? "Add & next part" : "Add & next"}
           onClose={() => {
             setEditing(null);
             setPending(null);
@@ -1904,6 +2022,7 @@ function MenuItem({
   disabled,
   danger,
   hint,
+  note,
 }: {
   icon: ReactNode;
   children: ReactNode;
@@ -1912,6 +2031,8 @@ function MenuItem({
   danger?: boolean;
   /** Its key, shown on the right as in a desktop menu. */
   hint?: string;
+  /** A word on the right on a phone too ("2.3", "from Excel, WhatsApp, email"). */
+  note?: string;
 }) {
   return (
     <button
@@ -1926,7 +2047,11 @@ function MenuItem({
     >
       {icon}
       <span className="flex-1 text-left">{children}</span>
-      {hint && <span className="ml-3 hidden text-xs text-muted sm:inline">{hint}</span>}
+      {note ? (
+        <span className="ml-3 shrink-0 text-[13px] text-muted">{note}</span>
+      ) : (
+        hint && <span className="ml-3 hidden text-xs text-muted sm:inline">{hint}</span>
+      )}
     </button>
   );
 }

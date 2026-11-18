@@ -60,14 +60,18 @@ export function lineSummary(row: LineRow, columns: LineColumn[], values: LineVal
   return out;
 }
 
-/** One line in the phone list: tap it to open it; ⋯ for what can be done to it. */
+/**
+ * One line in the phone list: tap it to open it; + Part (an item's) and ⋯ for what can be done to it.
+ * Its parts are listed right under it, so it does not count them.
+ */
 export function PhoneLineRow({
   no,
   kind,
   name,
   summary,
   needs,
-  parts,
+  fresh,
+  lineKey,
   badge,
   part,
   busy,
@@ -86,7 +90,10 @@ export function PhoneLineRow({
   name: string;
   summary: ReactNode[];
   needs: string | null;
-  parts: number;
+  /** Just added: lit until the next window opens. */
+  fresh?: boolean;
+  /** Its key, to bring it into view once added. */
+  lineKey?: string;
   badge?: ReactNode;
   part: boolean;
   busy: boolean;
@@ -106,7 +113,7 @@ export function PhoneLineRow({
         {no}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className={cn("truncate text-[15px] leading-snug", part ? "font-medium" : "font-semibold")}>{name || <span className="text-muted">No description yet</span>}</span>
+        <span className={cn("line-clamp-2 text-[15px] leading-snug [overflow-wrap:anywhere]", part ? "font-medium" : "font-semibold")}>{name || <span className="text-muted">No description yet</span>}</span>
         {summary.length > 0 && (
           <span className="line-clamp-2 text-[13px] text-text-2 [overflow-wrap:anywhere]">
             {summary.map((s, n) => (
@@ -117,15 +124,10 @@ export function PhoneLineRow({
             ))}
           </span>
         )}
-        {(needs || parts > 0 || badge || dup) && (
+        {(needs || badge || dup) && (
           <span className="mt-1 flex flex-wrap items-center gap-1.5">
             {dup && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">{dup}</span>}
             {needs && <span className="rounded-md bg-warn-soft px-1.5 py-0.5 text-xs font-semibold text-warn">{needs}</span>}
-            {parts > 0 && (
-              <span className="text-xs font-semibold text-primary">
-                {parts} part{parts === 1 ? "" : "s"}
-              </span>
-            )}
             {badge}
           </span>
         )}
@@ -134,7 +136,16 @@ export function PhoneLineRow({
     </>
   );
   return (
-    <li className={cn("flex items-stretch border-b border-line last:border-b-0", part && "bg-surface-2/50 pl-5", dup && !pick?.on && "bg-warn-soft/40", pick?.on && "bg-primary-soft/50")}>
+    <li
+      data-line={lineKey}
+      className={cn(
+        "flex scroll-mt-40 scroll-mb-24 items-stretch border-b border-line last:border-b-0",
+        part && "bg-surface-2/50 pl-5",
+        dup && !pick?.on && "bg-warn-soft/40",
+        pick?.on && "bg-primary-soft/50",
+        fresh && !pick && "bg-primary-soft/60 shadow-[inset_3px_0_0_var(--color-primary-solid)]",
+      )}
+    >
       {pick ? (
         <button type="button" role="checkbox" aria-checked={pick.on} onClick={pick.toggle} className="flex min-h-16 min-w-0 flex-1 items-start gap-2 px-3 py-2.5 text-left active:bg-surface-2">
           {body}
@@ -229,10 +240,16 @@ export function LineWindow({
   reason,
   onSave,
   onClose,
-  kind,
+  partOf,
+  nextLabel = "Add & next",
 }: {
-  /** A new line: Item or Part, and part of which (shown above its fields). */
-  kind?: ReactNode;
+  /**
+   * A new part (design 18 Nov): what it goes under, shown above its fields, and a way to make it an item
+   * instead. There is nothing to pick: + Part on a line opens it already under that line.
+   */
+  partOf?: { no: string; name: string; onMakeItem: () => void };
+  /** The strong button of a new line: "Add & next", "Add & next part". */
+  nextLabel?: string;
   title: string;
   sub?: string;
   /** How far through the lines (0–1): a thin bar under the title. */
@@ -302,10 +319,13 @@ export function LineWindow({
   const save = (then: LineWindowThen) => {
     if (busy) return;
     if (!changed) {
-      if (isNew && then === "next") {
+      if (isNew) {
         // Nothing typed yet: say what to fill in.
         const first = inputs.find((c) => c.required) ?? inputs[0];
-        if (first) setErrors({ [first.key]: first.required ?? "Type something first" });
+        if (first) {
+          setErrors({ [first.key]: first.required ?? "Type something first" });
+          document.getElementById(`${id}-${first.key}`)?.focus();
+        }
         return;
       }
       return onSave(v, then);
@@ -334,7 +354,7 @@ export function LineWindow({
       }}
       className="fixed inset-0 z-[100] flex animate-in flex-col bg-surface"
     >
-      <div className="flex min-h-14 items-center gap-1 border-b border-line py-1.5 pr-4 pl-1">
+      <div className="flex min-h-15 items-center gap-1.5 border-b border-line py-1.5 pr-4 pl-1">
         <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={close} disabled={busy} className="size-11 rounded-full [&_svg]:size-[22px]">
           <X aria-hidden />
         </Button>
@@ -352,11 +372,20 @@ export function LineWindow({
       )}
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 *:shrink-0">
         {added && (
-          <p role="status" className="rounded-lg bg-ok-soft px-3 py-2 text-sm font-medium text-ok">
-            {added}
+          <p role="status" className="flex items-center gap-2 rounded-[10px] bg-ok-soft px-3 py-2.5 text-sm font-semibold text-ok">
+            <Check aria-hidden className="size-4 shrink-0" strokeWidth={2.5} />
+            <span className="min-w-0 truncate">{added}</span>
           </p>
         )}
-        {kind}
+        {partOf && (
+          <div className="flex items-center gap-2.5 rounded-[10px] border border-line bg-surface-2 px-3 py-2.5 text-sm">
+            <span className="inline-flex h-[22px] shrink-0 items-center rounded-full bg-primary-soft px-2 text-xs font-bold text-primary">Part of {partOf.no}</span>
+            <span className="min-w-0 flex-1 truncate">{partOf.name}</span>
+            <button type="button" onClick={partOf.onMakeItem} className="-my-2 -mr-1.5 shrink-0 rounded-md px-1.5 py-2 text-[13.5px] font-semibold text-primary hover:bg-primary-soft">
+              Make it an item
+            </button>
+          </div>
+        )}
         {inputs.map((c) => (
           <LineField key={c.key} c={c} id={`${id}-${c.key}`} value={v[c.key] ?? ""} set={(x) => setV((s) => ({ ...s, [c.key]: x }))} error={errors[c.key]} />
         ))}
@@ -377,7 +406,7 @@ export function LineWindow({
         )}
         {reason}
       </div>
-      <div className="flex items-center gap-2 border-t border-line bg-surface px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="flex items-center gap-2.5 border-t border-line bg-surface px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {!isNew && (
           <>
             <Button variant="secondary" aria-label="Previous" onClick={() => save("prev")} disabled={!hasPrev || busy} className="size-10 px-0">
@@ -388,18 +417,19 @@ export function LineWindow({
             </Button>
           </>
         )}
-        <span className="flex-1" />
         {isNew ? (
+          // Add (adds it and closes) and the strong Add & next (the next one opens, ready to type), side by side.
           <>
-            <Button variant="secondary" onClick={() => save("close")} disabled={busy} className="h-10">
-              Done
+            <Button variant="soft" onClick={() => save("close")} disabled={busy} className="h-12 flex-1 text-[15px]">
+              Add
             </Button>
-            <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-10">
-              {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />} {busy ? "Adding…" : "Add & next"}
+            <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-12 flex-[1.4] text-[15px]">
+              {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />} {busy ? "Adding…" : nextLabel}
             </Button>
           </>
         ) : (
           <>
+            <span className="flex-1" />
             <Button variant={hasNext ? "secondary" : "primary"} onClick={() => save("close")} disabled={busy} className="h-10">
               {busy ? "Saving…" : "Save"}
             </Button>
