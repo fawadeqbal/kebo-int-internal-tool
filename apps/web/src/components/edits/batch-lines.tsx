@@ -223,6 +223,7 @@ export function BatchLines({
   below,
   saveLabel = "Save changes",
   note,
+  fill = true,
   ...table
 }: {
   rows: LineRow[];
@@ -243,6 +244,8 @@ export function BatchLines({
   saveLabel?: string;
   /** Beside the buttons (e.g. "The quotation keeps its own copy"). */
   note?: ReactNode;
+  /** The table takes the window's height: its tools and head stay, only the items scroll (default). */
+  fill?: boolean;
 } & Omit<LineTableProps, "rows" | "columns" | "onAdd" | "onEdit" | "onRemove" | "onMove" | "footer" | "readOnly">) {
   const close = useClosePanel();
   const { save, dialog, busy, error, setError } = useEditSave({ edit, card });
@@ -254,7 +257,7 @@ export function BatchLines({
   return (
     <PanelBody className="gap-3">
       {typeof above === "function" ? above({ rows, add }) : above}
-      <LineTable rows={rows} columns={columns} {...table} {...local} footer={footer?.(rows)} />
+      <LineTable rows={rows} columns={columns} {...table} {...local} fill={fill} footer={footer?.(rows)} />
       {below}
       {error && <Alert tone="error">{error}</Alert>}
       <PanelActions>
