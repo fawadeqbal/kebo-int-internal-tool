@@ -4,7 +4,7 @@ import { ConfirmDialog } from "@/components/common/dialog";
 import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Copy, FileSpreadsheet, Filter, Plus, Search } from "lucide-react";
+import { Check, Copy, FileSpreadsheet, Filter, MoreHorizontal, Plus, Search } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL, REQUEST_CHANNELS } from "@kebo/shared";
 import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
@@ -217,10 +217,11 @@ export function RequestMore({
         aria-expanded={open}
         aria-label={`More for ${name}`}
         disabled={pending}
-        className={buttonClass("ghost", "sm")}
+        // ⋯, the quiet end of a row (design "list pages" 18 Nov).
+        className={buttonClass("ghost", "sm", "size-8 px-0 text-text-2")}
         onClick={() => setOpen((o) => !o)}
       >
-        More <ChevronDown aria-hidden />
+        <MoreHorizontal aria-hidden />
       </button>
       {open && (
         <FloatingMenu anchor={() => ref.current} onClose={() => setOpen(false)} label={`${name}: request`} width={220}>

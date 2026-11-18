@@ -18,10 +18,16 @@ export interface SwitchView {
  * One of a few views of the same thing (an order's or a customer's money):
  * a segmented switch of links, so each view has its own address.
  */
-export function ViewSwitch({ label, views, current, compact }: { label: string; views: SwitchView[]; current: string; compact?: boolean }) {
+export function ViewSwitch({ label, views, current, compact }: { label: string; views: SwitchView[]; current: string; compact?: boolean | "sm" }) {
   return (
-    // compact: as tall as the header's buttons (40 px), beside them.
-    <nav aria-label={label} className={cn("inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-surface-3 p-1", compact && "h-10 [&>a]:h-8 [&_svg]:size-4")}>
+    // compact: as tall as the buttons beside it (the header's 40 px; "sm": a card's 36 px).
+    <nav
+      aria-label={label}
+      className={cn(
+        "inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-surface-3 p-1",
+        compact === "sm" ? "h-9 rounded-[10px] p-0.5 [&>a]:h-8 [&>a]:px-2.5 [&>a]:text-[13px] [&_svg]:size-4" : compact && "h-10 [&>a]:h-8 [&_svg]:size-4",
+      )}
+    >
       {views.map((v) => (
         <Link
           key={v.key}

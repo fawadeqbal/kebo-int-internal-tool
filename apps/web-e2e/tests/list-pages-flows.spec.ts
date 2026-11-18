@@ -77,7 +77,8 @@ test("the inquiries list on a phone: chips, one Filters button with a sheet, row
   await expect(row).toContainText("Urgent");
   await page.getByRole("button", { name: /^Filters/ }).click();
   const sheet = page.getByRole("dialog", { name: "Filters" });
-  await sheet.getByRole("button", { name: "Me", exact: true }).click();
+  // A chip, or a row once there are many people.
+  await sheet.getByText("Me", { exact: true }).click();
   await expect(page).toHaveURL(/assignee=me/);
   await expect(sheet.getByRole("button", { name: /^Show 2 inquiries$/ })).toBeVisible();
   await sheet.getByRole("button", { name: /^Show/ }).click();
@@ -90,5 +91,57 @@ test("the inquiries list on a phone: chips, one Filters button with a sheet, row
   for (const c of ["New", "Sourcing", "Quoted", "On hold", "Closed"]) await expect(column(c)).toBeVisible();
   // Given to someone at once, it starts in Sourcing.
   await expect(column("Sourcing")).toContainText(a.refNo);
+  expect(errors).toEqual([]);
+});
+
+test("an inquiry's supplier offers: asked and answered in one list, the Amount with tax, Waiting, then Compare with Lowest and Fastest", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  const tag = Date.now().toString(36);
+  const send = async (url: string, data: object, method: "post" | "patch" = "post") => {
+    const r = await page.request[method](`/api${url}`, { data });
+    expect(r.ok(), `${url}: ${await r.text()}`).toBe(true);
+    return r.json();
+  };
+  const me = await (await page.request.get("/api/auth/me")).json();
+  const customer = await send("/customers", { name: `Offers Pharma ${tag}`, country: "PK", contacts: [{ name: "Imran", email: `imran-${tag}@offers.test` }] });
+  const deal = await send("/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: me.id, items: [{ description: "Blister packing machine", quantity: 1, unit: "set" }] });
+  const item = (await (await page.request.get(`/api/inquiries/${deal.id}`)).json()).items[0];
+  const offer = (name: string, price: number, lead: number, included: boolean) =>
+    send(`/inquiries/${deal.id}/factory-quotes`, {
+      newFactoryName: `${name} ${tag}`,
+      receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
+      currency: "CNY",
+      taxIncluded: included,
+      taxRate: 13,
+      basis: "FOB",
+      basisPlace: "Qingdao",
+      leadDays: lead,
+      leadFrom: "after_payment",
+      lines: [{ description: "Blister packing machine", quantity: 1, unit: "set", unitPrice: price, requestedItemId: item.id }],
+    });
+  await offer("Jinan Scroll", 86_000, 35, false);
+  await offer("Ruian Scroll", 91_500, 25, true);
+  const suppliers = await (await page.request.get("/api/factories", { params: { pageSize: 1 } })).json();
+  await send(`/inquiries/${deal.id}/factory-requests`, { factoryIds: [suppliers.rows[0].id] });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/inquiries/${deal.id}/sourcing`);
+  const table = page.getByRole("table", { name: "Supplier offers" });
+  for (const h of ["Supplier", "Amount", "Covers", "Lead time", "Incoterm", "Deposit", "Status"]) await expect(table.getByRole("columnheader", { name: h })).toBeVisible();
+  // The Amount is with tax, and says how.
+  await expect(table.getByRole("row", { name: /Jinan Scroll/ })).toContainText("CNY 97,180.00");
+  await expect(table.getByRole("row", { name: /Jinan Scroll/ })).toContainText("with 13% tax added");
+  await expect(table.getByRole("row", { name: /Ruian Scroll/ })).toContainText("13% tax included");
+  await expect(table.getByRole("row", { name: new RegExp(suppliers.rows[0].name) })).toContainText("Waiting");
+  // The card's buttons are plain (the page's strong one is the header's).
+  await expect(page.getByRole("button", { name: "New supplier offer" })).toBeVisible();
+
+  await page.getByRole("navigation", { name: "Show the offers as" }).getByRole("link", { name: "Compare" }).click();
+  const grid = page.getByRole("group", { name: "Offers side by side" });
+  await expect(grid).toContainText("Total with tax");
+  await expect(grid).toContainText("Lowest");
+  await expect(grid).toContainText("Fastest");
+  await expect(page.getByText(/has not answered yet/)).toBeVisible();
   expect(errors).toEqual([]);
 });

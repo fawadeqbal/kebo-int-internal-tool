@@ -35,7 +35,7 @@ test("a new offer: Factory, Prices, Delivery & payment, Conditions, Review; a wr
   const errors = watchErrors(page);
   const deal = await newInquiry(page);
   await page.goto(`/inquiries/${deal.id}/sourcing`);
-  await page.getByRole("button", { name: "Enter an offer" }).first().click();
+  await page.getByRole("button", { name: "New supplier offer" }).first().click();
   const win = page.getByRole("dialog", { name: "New supplier offer" });
   const rail = win.getByRole("navigation", { name: "Steps" });
   for (const step of ["Supplier", "Prices", "Delivery & payment", "Conditions", "Review"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
