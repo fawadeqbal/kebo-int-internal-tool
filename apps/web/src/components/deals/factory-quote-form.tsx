@@ -635,7 +635,8 @@ export function OfferHeaderForm({
   linesChanges?: string[];
   onUndoLines?: () => void;
   /** More of the saved body (a new offer's lines go in the same save). */
-  extra?: Record<string, unknown>;
+  /** More to send with the offer (a new offer's lines); a function gets the currency and tax as they are now. */
+  extra?: Record<string, unknown> | ((h: { currency: string; taxRate: number; taxIncluded: boolean }) => Record<string, unknown>);
   /** Said above the buttons (what did not go up). */
   note?: ReactNode;
   /** Left of the buttons on the first step (Remove this offer). */
@@ -840,7 +841,7 @@ export function OfferHeaderForm({
     >
       {(st) => (
         <>
-          <input type="hidden" name="payload" value={JSON.stringify({ ...payload(s, canConvert), ...extra })} />
+          <input type="hidden" name="payload" value={JSON.stringify({ ...payload(s, canConvert), ...(typeof extra === "function" ? extra(h) : extra) })} />
           {needWhy && why.trim() && <input type="hidden" name="reason" value={why.trim()} />}
           {/* The factory's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
           <input type="hidden" name="factoryLabel" value={s.factory?.name ?? ""} />

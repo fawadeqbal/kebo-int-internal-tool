@@ -74,6 +74,8 @@ export interface LineColumn {
   required?: string;
   /** Hidden on phones in saved rows (shown when the row is opened). */
   phoneHidden?: boolean;
+  /** In a phone row's grey line: what to say (null: leave it out); without it, "Label value". */
+  summary?: (values: LineValues, row?: LineRow) => ReactNode | null;
   /** A choice column in an Excel file: each value as written there (by default each option's label). */
   sheetChoices?: { value: string; text: string }[];
 }
@@ -1018,7 +1020,9 @@ export function LineTable({
   const widthOf = (w: string) => (/fr|minmax|auto/.test(w) ? undefined : w);
   const flexible = columns.filter((c) => !widthOf(c.width)).length;
   const fixedRem = columns.reduce((t, c) => t + (widthOf(c.width) ? parseFloat(c.width) : 0), 0);
-  const minWidth = `${3 + fixedRem + flexible * 16 + (readOnly ? 0 : flat ? 4.5 : 7.5)}rem`;
+  // The description takes what is left, at least 10rem, so a priced table with a Tax column fits a 900 px window.
+  const actionsRem = readOnly ? 0 : flat || !partButton ? 5 : 7.75;
+  const minWidth = `${3 + fixedRem + flexible * 10 + actionsRem}rem`;
   const cellBase = "h-9 border border-line px-2 align-middle text-sm";
 
   // The number the new row will get: "24", or "1.3" when it is a part (the number says it, as in a sheet).
@@ -1026,32 +1030,37 @@ export function LineTable({
   const canBePart = !flat && (entryAt.parentKey !== null || lineAbove(rows, entryIndex >= 0 ? blockEnd(rows, entryIndex) : rows.length) !== null);
 
   const entryRow = readOnly ? null : (
-    <tr key="entry" aria-label={`New ${entryAt.parentKey ? `part of ${parentLabel(entryAt.parentKey)}` : noun}`} className={cn(inline ? "bg-primary-soft/30" : "bg-surface")}>
-      <td className={cn(cellBase, "bg-surface-2 px-1 text-center text-xs tabular")}>
+    // The new line (design 18 Nov): the same plain cells as the lines above, column words in grey; the cell being
+    // typed in has the same outline as a saved cell being changed.
+    <tr key="entry" aria-label={`New ${entryAt.parentKey ? `part of ${parentLabel(entryAt.parentKey)}` : noun}`} className={cn(inline ? "bg-primary-soft/30" : "bg-surface-2/30")}>
+      <td className={cn(cellBase, "bg-primary-soft/40 px-1 text-center text-xs font-semibold text-primary tabular")}>
         {canBePart ? (
           <button
             type="button"
             onClick={() => toPart(!entryAt.parentKey)}
-            className={cn("rounded px-1 font-medium hover:bg-primary-soft", entryAt.parentKey ? "text-primary" : "text-muted")}
+            className="rounded px-1 font-semibold text-primary hover:bg-primary-soft"
             title={entryAt.parentKey ? `Part ${nextNo}: click (or Shift+Tab) to make it ${an(noun)} of its own` : `New ${noun} ${nextNo}: click (or Tab) to make it a part of the ${noun} above`}
             aria-label={entryAt.parentKey ? `New part ${nextNo}; make it ${an(noun)} of its own` : `New ${noun} ${nextNo}; make it a part`}
           >
             {nextNo}
           </button>
         ) : (
-          <span className="text-muted">{nextNo}</span>
+          <span>{nextNo}</span>
         )}
       </td>
       {columns.map((c) => (
         <td
           key={c.key}
-          className={cn(cellBase, "h-auto p-1 align-top", sel?.row === "entry" && sel.col === c.key && "outline-2 -outline-offset-2 outline-primary has-[:focus]:outline-transparent")}
+          className={cn(
+            cellBase,
+            "p-0 align-top",
+            !c.input && "bg-surface-2/40",
+            sel?.row === "entry" && sel.col === c.key && "outline-2 -outline-offset-2 outline-primary has-[:focus]:outline-transparent",
+          )}
           onMouseDown={() => setSel({ row: "entry", col: c.key })}
         >
           {c.input ? (
-            <div className="flex items-start gap-1">
             <GridInput
-              boxed
               col={c}
               value={entry[c.key] ?? ""}
               onChange={(v) => setEntry((s) => ({ ...s, [c.key]: v }))}
@@ -1070,13 +1079,14 @@ export function LineTable({
               onPaste={c.input === "textarea" ? entryPaste : undefined}
               inputRef={ref(entryCell(c.key))}
               label={`New ${noun}: ${c.label}`}
-              placeholder={c.input === "textarea" ? (entryAt.parentKey ? `Part of ${parentLabel(entryAt.parentKey)}` : `New ${noun}`) : c.placeholder}
+              placeholder={c.input === "textarea" ? (entryAt.parentKey ? `Part of ${parentLabel(entryAt.parentKey)}` : c.label) : c.placeholder}
             />
-            </div>
-          ) : null}
+          ) : (
+            <span className={cn("block px-2 leading-9 text-muted", c.align === "right" && "text-right")}>—</span>
+          )}
         </td>
       ))}
-      <td className={cn(cellBase, "h-auto px-1 pt-1.5 text-center align-top")}>
+      <td className={cn(cellBase, "px-1 text-center")}>
         {busy === "entry" ? (
           <Loader2 className="mx-auto size-4 animate-spin text-muted" aria-label="Saving" />
         ) : (
@@ -1088,7 +1098,8 @@ export function LineTable({
               aria-label={`Add the ${noun}`}
               aria-keyshortcuts="Enter"
               disabled={isBlank(entry, columns, entryAt.parentKey)}
-              className="gap-1.5 pr-2 pl-2.5"
+              // Grey until something is typed (design 18 Nov), then the brand colour.
+              className="h-7 gap-1.5 pr-2 pl-2.5 disabled:bg-surface-3 disabled:text-muted disabled:opacity-100 disabled:shadow-none max-sm:h-7"
             >
               <Check aria-hidden /> Add
               {/* The key, drawn (not text): the button's name stays "Add the item". */}
@@ -1215,14 +1226,15 @@ export function LineTable({
               <Loader2 className="size-3.5 animate-spin" aria-hidden /> {(v[columns[0]!.key] ?? "").split("\n")[0]}
             </div>
           ))}
-        {footer && <div className="border-t border-line bg-surface">{footer}</div>}
       </div>
+      {/* The totals stay in view above the window's buttons while the lines scroll (design 18 Nov). */}
+      {footer && <div className={cn("rounded-lg border border-line bg-surface-2", fill && "sticky bottom-0 z-10 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.25)]")}>{footer}</div>}
     </div>
   );
 
   const toolsShown = (rows.length > 8 || anyParts || tools || !readOnly || sheet) && !(selecting && !phone);
   return (
-    <div className={cn("flex flex-col gap-2", fill && "md:min-h-0 md:flex-1")}>
+    <div className={cn("flex flex-col gap-2", fill && "md:flex-1")}>
       <div
         className={cn(
           "flex flex-col gap-2 empty:hidden",
@@ -1408,14 +1420,14 @@ export function LineTable({
       {phone ? (
         phoneList
       ) : (
-      <div className={cn("overflow-hidden rounded-lg border border-line bg-surface", fill && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
+      <div className={cn("overflow-hidden rounded-lg border border-line bg-surface", fill && "md:flex md:flex-1 md:flex-col")}>
         {/* Read-only lines have nothing to tab to inside, so the table itself takes the keyboard (arrow keys scroll
             it sideways); editable lines are reached through their cells. */}
         <div
           ref={gridRef}
           tabIndex={readOnly ? 0 : -1}
           onKeyDown={gridKeyDown}
-          className={cn("relative overflow-x-auto", fill && "md:min-h-0 md:flex-1 md:overflow-auto", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
+          className={cn("relative overflow-x-auto", fill && "md:min-h-44 md:flex-1 md:overflow-auto", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
           aria-label={`${noun[0]!.toUpperCase()}${noun.slice(1)}s`}
           role="region"
         >
@@ -1425,7 +1437,7 @@ export function LineTable({
               {columns.map((c) => (
                 <col key={c.key} style={{ width: widthOf(c.width) }} />
               ))}
-              {!readOnly && <col style={{ width: flat || !partButton ? "6rem" : "7.75rem" }} />}
+              {!readOnly && <col style={{ width: `${actionsRem}rem` }} />}
             </colgroup>
             <thead>
               <tr>
@@ -1745,6 +1757,7 @@ export function LineTable({
           problem={message}
           reason={pending && <ReasonBox pending={pending} onCancel={() => setPending(null)} />}
           onSave={saveLine}
+          usedUnits={[...new Set(rows.map((r) => r.values.unit ?? "").filter(Boolean))]}
           partOf={
             !editingRow && editingParent
               ? { no: parentLabel(editingParent.key)!, name: firstLine(editingParent), onMakeItem: makeItem }

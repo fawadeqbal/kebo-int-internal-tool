@@ -2,10 +2,12 @@
 
 import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, Loader2, Plus, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
+import { FloatingMenu } from "@/components/common/floating";
+import { UNITS } from "./units";
 import type { LineColumn, LineRow, LineValues } from "./line-table";
 
 /**
@@ -14,9 +16,6 @@ import type { LineColumn, LineRow, LineValues } from "./line-table";
  * or changed in a window of its own, one line at a time (Prev / Next, Save & next, Add & next). The same
  * onAdd / onEdit / onMove / onRemove as the sheet, so every lines screen gets it at once.
  */
-
-/** The units offered first as one-tap choices (any other can be typed). */
-const QUICK_UNITS = ["pcs", "sets", "set", "units", "kg", "m", "lot"];
 
 /** A line's price columns: an empty or 0 price is something the line still needs. */
 const PRICE_KEYS = new Set(["unitPrice", "factoryPrice"]);
@@ -42,6 +41,11 @@ export function lineSummary(row: LineRow, columns: LineColumn[], values: LineVal
     const raw = (values[c.key] ?? "").trim();
     if (c.key === "quantity") {
       if (raw) out.push(`${raw} ${values.unit ?? ""}`.trim());
+      continue;
+    }
+    if (c.summary) {
+      const said = c.summary(values, row);
+      if (said !== null && said !== undefined && said !== "") out.push(said);
       continue;
     }
     if (c.input && (!raw || (c.input === "number" && isZero(raw)))) continue;
@@ -163,31 +167,9 @@ export function PhoneLineRow({
 }
 
 /** One field of the line window, as big as a thumb needs (16 px text: a phone does not zoom in). */
-function LineField({ c, id, value, set, error }: { c: LineColumn; id: string; value: string; set: (v: string) => void; error?: string }) {
+function LineField({ c, id, value, set, error, used }: { c: LineColumn; id: string; value: string; set: (v: string) => void; error?: string; used?: string[] }) {
   const big = "h-12 text-base";
-  if (c.input === "unit") {
-    const quick = [...new Set([value, ...QUICK_UNITS].filter(Boolean))];
-    return (
-      <Field label={c.label} htmlFor={id} required={!!c.required} error={error}>
-        <span className="flex flex-col gap-2">
-          <span role="group" aria-label={`${c.label}: quick choices`} className="flex flex-wrap gap-1.5">
-            {quick.map((u) => (
-              <button
-                key={u}
-                type="button"
-                aria-pressed={value === u}
-                onClick={() => set(u)}
-                className="h-10 min-w-12 rounded-full border border-line bg-surface px-3.5 text-sm aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:font-semibold aria-pressed:text-primary"
-              >
-                {u}
-              </button>
-            ))}
-          </span>
-          <Input id={id} value={value} onChange={(e) => set(e.target.value)} maxLength={c.maxLength ?? 20} className={big} />
-        </span>
-      </Field>
-    );
-  }
+  if (c.input === "unit") return <UnitPicker c={c} id={id} value={value} set={set} error={error} used={used ?? []} />;
   return (
     <Field label={c.label} htmlFor={id} required={!!c.required} error={error}>
       {c.input === "textarea" ? (
@@ -211,6 +193,97 @@ function LineField({ c, id, value, set, error }: { c: LineColumn; id: string; va
           placeholder={c.placeholder}
           className={cn(big, c.input === "number" && "tabular")}
         />
+      )}
+    </Field>
+  );
+}
+
+/**
+ * The unit on a phone (design 18 Nov): one dropdown — a sheet with the units used here first, then every unit,
+ * and Other… at its foot. Other… turns the box into one to type your own; ▾ beside it goes back to the list.
+ */
+function UnitPicker({ c, id, value, set, error, used }: { c: LineColumn; id: string; value: string; set: (v: string) => void; error?: string; used: string[] }) {
+  const [open, setOpen] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const box = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (typing) box.current?.focus();
+  }, [typing]);
+  const here = [...new Set([...used, value].map((u) => u.trim()).filter(Boolean))];
+  const rest = UNITS.filter((u) => !here.includes(u));
+  const pick = (u: string) => {
+    set(u);
+    setTyping(false);
+    setOpen(false);
+    button.current?.focus();
+  };
+  const option = (u: string) => (
+    <button
+      key={u}
+      type="button"
+      role="menuitemradio"
+      aria-checked={value === u}
+      onClick={() => pick(u)}
+      className="flex min-h-12 items-center justify-between gap-3 rounded-md px-2.5 text-left text-base aria-checked:bg-primary-soft/60 aria-checked:font-semibold aria-checked:text-primary hover:bg-surface-2"
+    >
+      {u}
+      {value === u && <Check aria-hidden className="size-4" />}
+    </button>
+  );
+  const group = (title: string) => <p className="px-2.5 pt-2 pb-1 text-xs font-bold tracking-wide text-text-2 uppercase">{title}</p>;
+  return (
+    <Field label={c.label} htmlFor={id} required={!!c.required} error={error}>
+      {typing ? (
+        <span className="flex gap-2">
+          <Input ref={box} id={id} value={value} onChange={(e) => set(e.target.value)} maxLength={c.maxLength ?? 20} className="h-12 min-w-0 flex-1 text-base" />
+          <Button
+            ref={button}
+            variant="secondary"
+            aria-label="Pick from the list"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            className="size-12 shrink-0 px-0 max-sm:size-12"
+          >
+            <ChevronDown aria-hidden />
+          </Button>
+        </span>
+      ) : (
+        <button
+          ref={button}
+          id={id}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="flex h-12 w-full items-center justify-between gap-2 rounded-[10px] border border-line-strong bg-surface px-3 text-left text-base shadow-card focus-visible:border-primary-solid focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          <span className="min-w-0 truncate">{value || <span className="text-muted">—</span>}</span>
+          <ChevronDown aria-hidden className="size-4 shrink-0 text-muted" />
+        </button>
+      )}
+      {open && (
+        <FloatingMenu anchor={() => button.current} onClose={() => setOpen(false)} label={c.label} width={240}>
+          {here.length > 0 && group("Used here")}
+          {here.map(option)}
+          {group("All units")}
+          {rest.map(option)}
+          {/* Other… stays at the foot of the sheet, however far the list scrolls. */}
+          <div className="sticky -bottom-3 -mx-2 mt-1 border-t border-line bg-surface px-2 pt-1 pb-3">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                setTyping(true);
+              }}
+              className="flex min-h-12 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-base font-semibold text-primary hover:bg-primary-soft"
+            >
+              <Plus aria-hidden className="size-4" /> Other…
+            </button>
+          </div>
+        </FloatingMenu>
       )}
     </Field>
   );
@@ -242,7 +315,10 @@ export function LineWindow({
   onClose,
   partOf,
   nextLabel = "Add & next",
+  usedUnits,
 }: {
+  /** The units already used in these lines: first in the unit's list. */
+  usedUnits?: string[];
   /**
    * A new part (design 18 Nov): what it goes under, shown above its fields, and a way to make it an item
    * instead. There is nothing to pick: + Part on a line opens it already under that line.
@@ -386,9 +462,21 @@ export function LineWindow({
             </button>
           </div>
         )}
-        {inputs.map((c) => (
-          <LineField key={c.key} c={c} id={`${id}-${c.key}`} value={v[c.key] ?? ""} set={(x) => setV((s) => ({ ...s, [c.key]: x }))} error={errors[c.key]} />
-        ))}
+        {inputs.map((c, n) => {
+          const field = (x: LineColumn) => (
+            <LineField key={x.key} c={x} id={`${id}-${x.key}`} value={v[x.key] ?? ""} set={(val) => setV((s) => ({ ...s, [x.key]: val }))} error={errors[x.key]} used={usedUnits} />
+          );
+          // The quantity and its unit side by side (design 18 Nov).
+          if (c.key === "quantity" && inputs[n + 1]?.input === "unit")
+            return (
+              <div key={c.key} className="grid grid-cols-2 items-start gap-3">
+                {field(c)}
+                {field(inputs[n + 1]!)}
+              </div>
+            );
+          if (c.input === "unit" && inputs[n - 1]?.key === "quantity") return null;
+          return field(c);
+        })}
         {computed.length > 0 && row && (
           <dl className="flex flex-col gap-1.5 rounded-lg bg-surface-2 px-3 py-2.5 text-sm">
             {computed.map((c) => (

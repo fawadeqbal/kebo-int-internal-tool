@@ -73,7 +73,8 @@ export function StepsFrame<K extends string>({
   }, [single]);
   const body = cn(
     "flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto px-6 pt-5 pb-6 max-md:px-4",
-    fill ? "max-md:*:shrink-0 md:overflow-hidden md:pb-4" : "*:shrink-0",
+    // A short window: the step scrolls as a whole rather than squeezing the list to nothing (it keeps its least height).
+    fill ? "max-md:*:shrink-0 md:overflow-y-auto md:pb-4" : "*:shrink-0",
   );
   if (single)
     return (

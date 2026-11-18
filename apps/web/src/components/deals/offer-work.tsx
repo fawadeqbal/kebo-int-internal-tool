@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Info, Pencil, Plus, Trash2 } from "lucide-react";
-import { formatMinor, toMinor } from "@kebo/money";
+import { factoryTaxMinor, formatMinor, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, basisText, lineNumbers, offerTaxText, partsWords, warrantyLine, type AttachmentKind } from "@kebo/shared";
 import { Button, cn, Field, Select, Textarea } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
@@ -20,6 +20,7 @@ import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/action
 import { send, type Staged } from "./documents-panel";
 import { FileRow, FileZone } from "@/components/common/file-zone";
 import { fileSize } from "@/lib/format";
+import { convertText, type Fx } from "@/lib/fx";
 import { OFFER_PART_LABEL, OfferHeaderForm, type AskedFactory, type OfferPart, type OfferSaved, type OfferStep } from "./factory-quote-form";
 import { LinesExcel, LinesView } from "./lines-view";
 import { useBatchLines, type LineHandlers } from "@/components/edits/batch-lines";
@@ -375,10 +376,10 @@ function OfferWindow({
         filesAdded={files.map((f) => f.name)}
         onUndoFiles={() => setFiles([])}
         lines={(h) => {
-          const columns = offerColumns(q?.lines ?? [], h.currency || mainCurrency, h.taxRate, q?.taxRate ?? h.taxRate);
+          const columns = offerColumns(q?.lines ?? [], h.currency || mainCurrency, h.taxRate, q?.taxRate ?? taxDefault?.rate ?? 0);
           const empty = batch.rows.length === 0;
           return (
-            <div className="flex min-h-0 flex-col gap-3 md:flex-1">
+            <div className="flex flex-col gap-3 md:flex-1">
               {used && (
                 <p className="flex shrink-0 items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
                   <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
@@ -436,12 +437,14 @@ function OfferWindow({
                 {...batch.local}
                 footer={
                   batch.rows.length ? (
-                    <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 px-3 py-2.5 text-sm text-text-2">
-                      <span>
-                        Total <span className="font-semibold text-text tabular">{formatMinor(linesTotal(batch.rows), h.currency || mainCurrency)}</span>
-                      </span>
-                      <span>{h.taxIncluded ? `tax ${h.taxRate}% included` : h.taxRate > 0 ? `+ ${h.taxRate}% tax` : "no tax"}</span>
-                    </div>
+                    <OfferTotals
+                      rows={batch.rows}
+                      currency={h.currency || mainCurrency}
+                      taxRate={h.taxRate}
+                      savedRate={q?.taxRate ?? taxDefault?.rate ?? 0}
+                      included={h.taxIncluded}
+                      fx={{ main: mainCurrency, rates }}
+                    />
                   ) : null
                 }
               />
@@ -456,9 +459,16 @@ function OfferWindow({
             </div>
           );
         }}
-        linesReview={(h) => <LinesReview rows={batch.rows} currency={h.currency || mainCurrency} />}
+        linesReview={(h) => (
+          <LinesReview
+            rows={batch.rows}
+            currency={h.currency || mainCurrency}
+            tax={{ taxRate: h.taxRate, savedRate: q?.taxRate ?? taxDefault?.rate ?? 0, included: h.taxIncluded, fx: { main: mainCurrency, rates } }}
+          />
+        )}
         action={q ? saveAction : create}
-        extra={!q && batch.rows.length ? { lines: newOfferLines(batch.rows) } : undefined}
+        // A new offer's lines at the tax % they started with follow the offer's % as it is now.
+        extra={!q && batch.rows.length ? (h) => ({ lines: newOfferLines(batch.rows, h.taxRate, taxDefault?.rate ?? 0) }) : undefined}
         quote={q}
         today={today}
         mainCurrency={mainCurrency}
@@ -522,7 +532,7 @@ function linesCount(rows: { parentKey: string | null }[]) {
 }
 
 /** The lines in Review (a new offer): number, what, how many, the line's total. */
-function LinesReview({ rows, currency }: { rows: LineRow[]; currency: string }) {
+function LinesReview({ rows, currency, tax }: { rows: LineRow[]; currency: string; tax: Omit<Parameters<typeof OfferTotals>[0], "rows" | "currency"> }) {
   if (!rows.length) return <p className="px-4 py-3 text-sm text-text-2">No lines yet.</p>;
   const numbers = lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey })));
   return (
@@ -545,8 +555,8 @@ function LinesReview({ rows, currency }: { rows: LineRow[]; currency: string }) 
           })}
         </tbody>
       </table>
-      <div className="flex justify-end gap-2 border-t border-line bg-surface-2/50 px-4 py-2.5 text-sm text-text-2">
-        Total <span className="font-semibold text-text tabular">{formatMinor(linesTotal(rows), currency)}</span>
+      <div className="border-t border-line bg-surface-2/50 px-1">
+        <OfferTotals rows={rows} currency={currency} {...tax} />
       </div>
     </>
   );
@@ -592,10 +602,10 @@ function offerLineHandlers(id: string, q: FactoryQuoteView | null, lines: OfferL
 }
 
 /** A new offer's lines, in the same save as the offer: a part or another spec names its line by its place. */
-function newOfferLines(rows: LineRow[]) {
+function newOfferLines(rows: LineRow[], taxRate: number, startRate: number) {
   const at = new Map(rows.map((r, n) => [r.key, n]));
   return rows.map((r) => {
-    const { alternativeOfId, ...body } = toBody(r.values);
+    const { alternativeOfId, ...body } = toBody({ ...r.values, taxRate: String(lineRate(r.values.taxRate, taxRate, startRate)) });
     return { ...body, partOf: r.parentKey ? (at.get(r.parentKey) ?? null) : null, specOf: alternativeOfId ? (at.get(alternativeOfId) ?? null) : null };
   });
 }
@@ -606,16 +616,107 @@ function newLinesOf(src: { id: string; parentId: string | null; values: LineValu
   return src.map((l) => ({ values: l.values, partOf: l.parentId ? (at.get(l.parentId) ?? null) : null }));
 }
 
-/** The lines' total as typed (another spec is left out). */
-function linesTotal(list: LineRow[]) {
-  let t = 0;
-  for (const r of list) {
+/** 198,300.00: an amount without its currency (the column's name says it). */
+const plainAmount = (minor: number) => (minor / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * A line's tax % as it will be saved: a line at the offer's saved % follows the offer's % (it changes with it);
+ * a line at another % keeps its own.
+ */
+export function lineRate(raw: string | undefined, taxRate: number, savedRate = taxRate): number {
+  const r = Number(String(raw ?? "").replace(/,/g, ""));
+  if (String(raw ?? "").trim() === "" || !Number.isFinite(r)) return taxRate;
+  return r === Number(savedRate) ? taxRate : r;
+}
+
+/**
+ * Under the lines (design 18 Nov): Before tax · Tax (added, or the part included) · Total with tax, and the total
+ * in the main currency; no tax at all: "Total · no tax". From the lines as they are now (other specs left out).
+ */
+export function OfferTotals({
+  rows,
+  currency,
+  taxRate,
+  savedRate = taxRate,
+  included,
+  fx,
+  extra,
+}: {
+  rows: LineRow[];
+  currency: string;
+  taxRate: number;
+  savedRate?: number;
+  included: boolean;
+  fx?: Fx;
+  /** One more line at the bottom ("Our cost"). */
+  extra?: [string, ReactNode];
+}) {
+  const byRate = new Map<number, { amount: number; lines: number }>();
+  let sum = 0;
+  for (const r of rows) {
     if (r.values.alternativeOfId) continue;
     const p = Number((r.values.unitPrice ?? "").replace(/,/g, ""));
     const n = Number((r.values.quantity ?? "").replace(/,/g, ""));
-    if (Number.isFinite(p * n)) t += Math.round(toMinor(p) * n);
+    if (!Number.isFinite(p) || !Number.isFinite(n) || !p) continue;
+    const m = Math.round(toMinor(p) * n);
+    const rate = lineRate(r.values.taxRate, taxRate, savedRate);
+    const g = byRate.get(rate) ?? { amount: 0, lines: 0 };
+    byRate.set(rate, { amount: g.amount + m, lines: g.lines + 1 });
+    sum += m;
   }
-  return t;
+  const tax = [...byRate].reduce((t, [r, g]) => t + factoryTaxMinor(g.amount, r, included), 0);
+  const rates = [...byRate.keys()].sort((a, b) => b - a);
+  const noTax = rates.every((r) => r === 0) && taxRate === 0;
+  const total = included ? sum : sum + tax;
+  const main = fx && currency !== fx.main ? convertText(String(total / 100), currency, fx.main, fx) : null;
+  const money = (minor: number) => <span className="tabular">{formatMinor(minor, currency)}</span>;
+  const how = included ? "included" : "added";
+  const taxLabel =
+    rates.length > 1 ? (
+      <>
+        Tax · {how}
+        <span className="block text-xs text-muted">{rates.map((r) => `${r}% on ${byRate.get(r)!.lines} line${byRate.get(r)!.lines === 1 ? "" : "s"}`).join(" · ")}</span>
+      </>
+    ) : (
+      `Tax ${rates[0] ?? taxRate}% · ${how}`
+    );
+  const row = "flex items-baseline justify-between gap-4";
+  return (
+    <div role="group" aria-label="Totals" className="px-3 py-2.5">
+    <dl className="ml-auto flex w-full max-w-[22rem] flex-col gap-1 text-sm">
+      {!noTax && (
+        <>
+          <div className={row}>
+            <dt className="text-text-2">Before tax</dt>
+            <dd>{money(included ? sum - tax : sum)}</dd>
+          </div>
+          <div className={row}>
+            <dt className="text-text-2">{taxLabel}</dt>
+            <dd>{money(tax)}</dd>
+          </div>
+        </>
+      )}
+      <div className={cn(row, "font-bold text-text", !noTax && "mt-0.5 border-t border-line pt-1.5")}>
+        <dt>{noTax ? "Total · no tax" : "Total with tax"}</dt>
+        <dd className="text-[15px]">{money(total)}</dd>
+      </div>
+      {main && (
+        <div className="text-right text-xs text-text-2 tabular">
+          <dt className="sr-only">In {fx!.main}</dt>
+          <dd>
+            ≈ {fx!.main} {Number(main).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </dd>
+        </div>
+      )}
+      {extra && (
+        <div className={cn(row, "text-text-2")}>
+          <dt>{extra[0]}</dt>
+          <dd className="tabular">{extra[1]}</dd>
+        </div>
+      )}
+    </dl>
+    </div>
+  );
 }
 
 /**
@@ -627,13 +728,17 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
   const mains = lines.filter((l) => !l.parentId && !l.alternativeOfId);
   const numberOf = (id: string) => lines.find((l) => l.id === id)?.no ?? "";
 
+  // The currency is in the column's name ("Total CNY"), so the cells are plain numbers (design 18 Nov: it fits).
   const lineTotal = (v: LineValues) => {
     const p = Number((v.unitPrice ?? "").replace(/,/g, ""));
     const n = Number((v.quantity ?? "").replace(/,/g, ""));
     if (!Number.isFinite(p) || !Number.isFinite(n) || !p) return <span className="text-muted">—</span>;
-    const t = formatMinor(Math.round(toMinor(p) * n), currency);
+    const t = plainAmount(Math.round(toMinor(p) * n));
     return v.alternativeOfId ? <span className="text-muted" title="Another spec: not in the total">({t})</span> : t;
   };
+  // A line's tax % (design 18 Nov): on every line when the offer has tax; a line at its own % is marked.
+  const rateOf = (v: LineValues) => lineRate(v.taxRate, taxRate, savedRate);
+  const showTax = taxRate > 0 || lines.some((l) => lineRate(String(l.taxRate), taxRate, savedRate) !== taxRate);
 
   const columns: LineColumn[] = [
     {
@@ -643,9 +748,9 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
       input: "textarea",
       required: "Each line needs a description",
     },
-    { key: "model", label: "Model", width: "7rem", input: "text", maxLength: 120, placeholder: "Model" },
-    { key: "quantity", label: "Qty", width: "4.5rem", input: "number", align: "right", initial: "1", required: "Enter a quantity" },
-    { key: "unit", label: "Unit", width: "5.5rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
+    { key: "model", label: "Model", width: "5.5rem", input: "text", maxLength: 120, placeholder: "Model" },
+    { key: "quantity", label: "Qty", width: "3.75rem", input: "number", align: "right", initial: "1", required: "Enter a quantity" },
+    { key: "unit", label: "Unit", width: "4.75rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
     {
       key: "unitPrice",
       label: `Price ${currency}`,
@@ -660,16 +765,39 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
           <span className="text-muted">—</span>
         ),
     },
-    // A line's own tax % only when one has its own (design 18 Nov: the offer's tax is said once, above the lines).
-    ...(lines.some((l) => Number(l.taxRate) !== Number(savedRate))
-      ? [{ key: "taxRate", label: "Tax %", width: "3.5rem", input: "number" as const, align: "right" as const, initial: String(taxRate), phoneHidden: true }]
+    ...(showTax
+      ? [
+          {
+            key: "taxRate",
+            label: "Tax",
+            width: "4rem",
+            input: "number" as const,
+            align: "right" as const,
+            initial: String(taxRate),
+            phoneHidden: true,
+            // On a phone a line's tax is said only when it has its own (the offer's % is said above the lines).
+            summary: (v: LineValues) => (rateOf(v) === taxRate ? null : `Tax ${rateOf(v)}%`),
+            format: (v: LineValues, row?: LineRow) => {
+              if (row?.parentKey && !Number(v.unitPrice)) return <span className="text-muted">—</span>;
+              const r = rateOf(v);
+              return r === taxRate ? (
+                <span className="text-text-2">{r}%</span>
+              ) : (
+                <span className="font-bold text-text" title="Its own tax %">
+                  <span aria-hidden className="mr-1.5 inline-block size-1.5 rounded-full bg-action align-middle" />
+                  {r}%<span className="sr-only"> (its own)</span>
+                </span>
+              );
+            },
+          },
+        ]
       : []),
     ...(mains.length > 1 || lines.some((l) => l.alternativeOfId)
       ? [
           {
             key: "alternativeOfId",
             label: "Spec of",
-            width: "5rem",
+            width: "4.25rem",
             input: "select" as const,
             options: [{ value: "", label: "—" }, ...mains.map((l) => ({ value: l.id, label: `${l.no} ${l.description.split("\n")[0]!.slice(0, 30)}` }))],
             sheetChoices: [{ value: "", text: "" }, ...mains.map((l) => ({ value: l.id, text: l.no }))],
@@ -685,7 +813,7 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
           },
         ]
       : []),
-    { key: "total", label: "Total", width: "8.5rem", align: "right", format: lineTotal },
+    { key: "total", label: `Total ${currency}`, width: "7rem", align: "right", format: lineTotal },
   ];
   return columns;
 }
@@ -735,16 +863,15 @@ export function OfferBoxes({
   const viewColumns = columns
     .filter((c) => c.key !== "model" || q.lines.some((l) => l.model))
     .map((c) => (narrow[c.key] ? { ...c, width: narrow[c.key]! } : c));
-  const strong = (v: ReactNode) => <span className="font-semibold text-text tabular">{v}</span>;
   const footer =
     q.lines.length > 0 ? (
-      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 px-3 py-2.5 text-sm text-text-2">
-        <span>Total {strong(formatMinor(toMinor(q.factoryTotal), q.currency))}</span>
-        <span>
-          {q.taxIncluded ? "tax included" : "without tax"} · {q.taxIncluded ? "of which tax" : "tax"} {strong(formatMinor(toMinor(q.taxTotal), q.currency))}
-        </span>
-        {q.totalCost && <span>our cost {strong(amount(q.totalCost, mainCurrency))}</span>}
-      </div>
+      <OfferTotals
+        rows={rows}
+        currency={q.currency}
+        taxRate={Number(q.taxRate)}
+        included={q.taxIncluded}
+        extra={q.totalCost ? ["Our cost", amount(q.totalCost, mainCurrency)] : undefined}
+      />
     ) : undefined;
 
   return (
