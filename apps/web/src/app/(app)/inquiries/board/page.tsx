@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { NewInquiryWindow } from "../inquiry-windows";
 import { can, INQUIRY } from "@kebo/shared";
-import { Badge, buildHref, LinkTabs, RULES } from "@kebo/ui";
+import { Badge, buildHref, RULES } from "@kebo/ui";
+import { Board } from "@/components/lists/board";
 import { FilterCard } from "@/components/common/filter-card";
 import { FactLine, FollowUpDay, PriorityTag, Responsible } from "@/components/lists/list-parts";
 import { getPeople, getSettings } from "@/lib/loaders";
@@ -69,30 +70,6 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
   const phoneKey: Column = cols.some((c) => c.key === sp.stage) ? (sp.stage as Column) : "new";
   const listOf = (stage: string) => buildHref("/inquiries", {}, { ...keep, stage });
 
-  const column = (c: (typeof cols)[number], hideTitle = false) => (
-    <section key={c.key} aria-label={c.label} className="flex min-w-0 flex-col gap-2 rounded-xl bg-surface-3/70 p-2.5">
-      {!hideTitle && (
-        <h2 className="mx-0.5 flex items-center gap-2 text-[13.5px] font-bold">
-          <Badge tone={c.tone}>{c.label}</Badge>
-          <span className="text-[12.5px] font-semibold text-muted">{c.total}</span>
-        </h2>
-      )}
-      {c.rows.length ? (
-        <ul className="flex flex-col gap-2">
-          {c.rows.map((d) => (
-            <Card key={d.id} d={d} today={today} />
-          ))}
-        </ul>
-      ) : (
-        <p className="px-1 pt-1 pb-2 text-[13px] text-muted">{c.key === "on_hold" ? "Nothing on hold." : `No ${c.label.toLowerCase()} ${INQUIRY.name.many}.`}</p>
-      )}
-      {c.total > c.rows.length && (
-        <Link href={listOf(c.key)} className="px-1 text-[13px] font-semibold text-primary hover:underline">
-          Show {c.total - c.rows.length} more
-        </Link>
-      )}
-    </section>
-  );
   const closed = (
     <section aria-label="Closed" className="rounded-xl border border-dashed border-line-strong bg-surface p-3 text-[13px] leading-5">
       <h2 className="mb-1.5 text-[13.5px] font-bold">Closed</h2>
@@ -118,20 +95,14 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
         count={countOf(open, `open ${INQUIRY.name.one}`, `open ${INQUIRY.name.many}`)}
         selects={inquiryFilters(f, people, me.id, settings.sales.categories)}
       />
-      <div className="xl:hidden">
-        <LinkTabs
-          label="Stage"
-          look="tabs"
-          className="mb-4"
-          tabs={cols.map((c) => ({ href: buildHref("/inquiries/board", keep, { stage: c.key }), label: c.label, count: c.total, active: c.key === phoneKey }))}
-        />
-        {column(cols.find((c) => c.key === phoneKey)!, true)}
-        <div className="mt-3">{closed}</div>
-      </div>
-      <div className="hidden items-start gap-3 xl:grid xl:grid-cols-[repeat(4,minmax(0,1fr))_200px]">
-        {cols.map((c) => column(c))}
-        {closed}
-      </div>
+      <Board
+        columns={cols.map((c) => ({ ...c, empty: c.key === "on_hold" ? "Nothing on hold." : `No ${c.label.toLowerCase()} ${INQUIRY.name.many}.`, moreHref: listOf(c.key) }))}
+        card={(d) => <Card d={d} today={today} />}
+        rowKey={(d) => d.id}
+        closed={closed}
+        phoneKey={phoneKey}
+        phoneHref={(key) => buildHref("/inquiries/board", keep, { stage: key })}
+      />
 
       {sp.panel === "new-inquiry" && <NewInquiryWindow customerId={sp.for} />}
     </div>

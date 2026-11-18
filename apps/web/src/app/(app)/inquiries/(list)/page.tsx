@@ -3,12 +3,12 @@ import { OpenPanelButton } from "@/components/common/panel";
 import { NewInquiryWindow } from "../inquiry-windows";
 import { MessageSquareText, Plus, X } from "lucide-react";
 import { can, INQUIRY, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { buildHref, ButtonLink, Card, DataRow, EmptyState, LinkTabs, Pager, PhoneList, THead, Td, Th, toPage } from "@kebo/ui";
+import { buildHref, ButtonLink, LinkTabs, Pager, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
-import { FactLine, FollowUpDay, ListRow, PriorityTag, Responsible, Stands } from "@/components/lists/list-parts";
-import { SelectButton, SelectCell, SelectHead, SelectionFrame, WhenSelecting } from "@/components/lists/selection";
+import { FactLine, FollowUpDay, PriorityTag, Responsible, Stands } from "@/components/lists/list-parts";
+import { ListTable } from "@/components/lists/list-table";
+import { SelectButton, SelectionFrame, WhenSelecting } from "@/components/lists/selection";
 import { InquirySelectBar } from "./select-bar";
 import { hasFeature, requireUser } from "@/lib/session";
 import { companyToday, countOf, date, dayMonth, soonDay } from "@/lib/format";
@@ -103,86 +103,69 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
       />
       </WhenSelecting>
 
-      <Card className="overflow-clip p-0">
-        {data.rows.length === 0 ? (
-          <EmptyState
-            icon={MessageSquareText}
-            title={narrowed ? `No ${INQUIRY.name.many} match` : `No ${INQUIRY.name.many} yet`}
-            action={
-              narrowed ? (
-                <ButtonLink href="/inquiries">
-                  <X aria-hidden /> Clear filters
-                </ButtonLink>
-              ) : canCreate ? (
-                <OpenPanelButton panel="new-inquiry" variant="primary">
-                  <Plus aria-hidden /> New inquiry
-                </OpenPanelButton>
-              ) : undefined
-            }
-          />
-        ) : (
-          <>
-            <PhoneList label="Inquiries">
-              {data.rows.map((d) => (
-                <ListRow
-                  key={d.id}
-                  href={`/inquiries/${d.id}`}
-                  title={d.title}
-                  tag={<PriorityTag priority={d.priority} />}
-                  end={<FollowUpDay next={d.nextFollowUp} day={soonDay} />}
-                  line={`${d.customer.name} · ${d.refNo}`}
-                  stands={<Stands pill={<StagePill d={d} />} fact={whereItStands(d, today)} />}
-                  who={<Responsible name={d.assignee?.name} short />}
-                />
-              ))}
-            </PhoneList>
-            <DataTable label="Inquiries" className="max-sm:hidden" tableClassName="min-w-[960px] text-[13.5px]">
-              <THead>
-                <tr>
-                  <SelectHead />
-                  <Th>No.</Th>
-                  <Th>Inquiry</Th>
-                  <Th>Received</Th>
-                  <Th>Responsible person</Th>
-                  <Th>Where it stands</Th>
-                  <Th>Next follow-up</Th>
-                </tr>
-              </THead>
-              <tbody>
-                {data.rows.map((d) => (
-                  <DataRow key={d.id} href={`/inquiries/${d.id}`}>
-                    <SelectCell id={d.id} label={d.refNo} />
-                    <Td className="w-[124px] text-[13px] whitespace-nowrap text-muted tabular">{d.refNo}</Td>
-                    <Td>
-                      <span className="flex max-w-[26rem] items-baseline">
-                        <Link href={`/inquiries/${d.id}`} className="truncate font-semibold hover:text-primary">
-                          {d.title}
-                        </Link>
-                        <PriorityTag priority={d.priority} />
-                      </span>
-                      <span className="block max-w-[26rem] truncate text-[12.5px] text-text-2">
-                        {d.customer.name}
-                        {d.customer.country === UNKNOWN_COUNTRY && <span className="text-warn"> · country not set</span>}
-                      </span>
-                    </Td>
-                    <Td className="whitespace-nowrap">{dayMonth(d.createdAt)}</Td>
-                    <Td>
-                      <Responsible name={d.assignee?.name} />
-                    </Td>
-                    <Td>
-                      <Stands pill={<StagePill d={d} />} fact={whereItStands(d, today)} />
-                      {d.overdue && d.requiredBy && <span className="mt-0.5 block text-xs font-medium text-bad">needed by {date(d.requiredBy)}</span>}
-                    </Td>
-                    <Td>
-                      <FollowUpDay next={d.nextFollowUp} day={soonDay} />
-                    </Td>
-                  </DataRow>
-                ))}
-              </tbody>
-            </DataTable>
-          </>
-        )}
-      </Card>
+      <ListTable
+        label="Inquiries"
+        rows={data.rows}
+        rowKey={(d) => d.id}
+        href={(d) => `/inquiries/${d.id}`}
+        select={(d) => ({ id: d.id, label: d.refNo })}
+        tableClassName="min-w-[960px] text-[13.5px]"
+        empty={{
+          icon: MessageSquareText,
+          title: narrowed ? `No ${INQUIRY.name.many} match` : `No ${INQUIRY.name.many} yet`,
+          action: narrowed ? (
+            <ButtonLink href="/inquiries">
+              <X aria-hidden /> Clear filters
+            </ButtonLink>
+          ) : canCreate ? (
+            <OpenPanelButton panel="new-inquiry" variant="primary">
+              <Plus aria-hidden /> New inquiry
+            </OpenPanelButton>
+          ) : undefined,
+        }}
+        phone={(d) => ({
+          title: d.title,
+          tag: <PriorityTag priority={d.priority} />,
+          end: <FollowUpDay next={d.nextFollowUp} day={soonDay} />,
+          line: `${d.customer.name} · ${d.refNo}`,
+          stands: <Stands pill={<StagePill d={d} />} fact={whereItStands(d, today)} />,
+          who: <Responsible name={d.assignee?.name} short />,
+        })}
+        columns={[
+          { key: "no", header: "No.", className: "w-[124px] text-[13px] whitespace-nowrap text-muted tabular", cell: (d) => d.refNo },
+          {
+            key: "inquiry",
+            header: "Inquiry",
+            cell: (d) => (
+              <>
+                <span className="flex max-w-[26rem] items-baseline">
+                  <Link href={`/inquiries/${d.id}`} className="truncate font-semibold hover:text-primary">
+                    {d.title}
+                  </Link>
+                  <PriorityTag priority={d.priority} />
+                </span>
+                <span className="block max-w-[26rem] truncate text-[12.5px] text-text-2">
+                  {d.customer.name}
+                  {d.customer.country === UNKNOWN_COUNTRY && <span className="text-warn"> · country not set</span>}
+                </span>
+              </>
+            ),
+          },
+          { key: "received", header: "Received", className: "whitespace-nowrap", cell: (d) => dayMonth(d.createdAt) },
+          { key: "responsible", header: "Responsible person", cell: (d) => <Responsible name={d.assignee?.name} /> },
+          {
+            key: "stands",
+            header: "Where it stands",
+            cell: (d) => (
+              <>
+                <Stands pill={<StagePill d={d} />} fact={whereItStands(d, today)} />
+                {d.overdue && d.requiredBy && <span className="mt-0.5 block text-xs font-medium text-bad">needed by {date(d.requiredBy)}</span>}
+              </>
+            ),
+          },
+          { key: "follow-up", header: "Next follow-up", cell: (d) => <FollowUpDay next={d.nextFollowUp} day={soonDay} /> },
+        ]}
+      />
       </SelectionFrame>
       <Pager base="/inquiries" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
 
