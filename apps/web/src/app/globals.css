@@ -121,3 +121,11 @@
     padding-bottom: 0.5rem;
   }
 }
+
+/* Finding an item on a phone (design "Items on a small phone"): while typing in an items list's Find, the window's
+   footer steps away, so the matches have the room above the keyboard. */
+@media (width < 40rem) {
+  [role="dialog"]:has([data-items-find]:focus) [data-window-footer] {
+    display: none;
+  }
+}

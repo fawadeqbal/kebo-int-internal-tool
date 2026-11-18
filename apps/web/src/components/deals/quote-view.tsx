@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lock, Pencil } from "lucide-react";
 import { toMinor } from "@kebo/money";
 import { isWarrantyFrom, LINE_TYPE_LABEL, partsWords, partWhen, percentText, termsChecks, warrantyLine, type TermsCheck, type WarrantyFrom } from "@kebo/shared";
 import { Badge, cn } from "@kebo/ui";
@@ -7,6 +7,8 @@ import type { OptionView, RevisionView } from "@/lib/types-deals";
 import type { LineColumn, LineRow } from "@/components/lines/line-table";
 import type { ItemsPhoneRow } from "@/components/records/items-box";
 import { Totals } from "@/components/records/totals";
+import { SheetFact, SheetPart } from "@/components/records/phone-items";
+import { OpenPanelButton } from "@/components/common/panel";
 import { shortName } from "./offer-facts";
 
 /*
@@ -80,7 +82,7 @@ const dash = <span className="text-muted">—</span>;
  * set — our cost and the margin shaded, for people who see costs — its rows (parts as 2.1), its phone rows, its
  * totals (with our cost, profit and margin in the "Ours only" strip) and plain columns for its Excel file.
  */
-export function quotePrices(o: OptionView, currency: string) {
+export function quotePrices(o: OptionView, currency: string, phone: { edit?: boolean; locked?: boolean } = {}) {
   const costs = !!o.costing;
   const rows: LineRow[] = o.lines.map((l) => ({
     key: l.id,
@@ -126,22 +128,48 @@ export function quotePrices(o: OptionView, currency: string) {
     if (c.key === "lineTotal") return [{ ...c, format: (v) => (Number(v.lineTotal) > 0 ? <span className="font-semibold">{two(v.lineTotal!)}</span> : dash) }];
     return [c];
   });
-  const phone: ItemsPhoneRow[] = o.lines.map((l) => {
+  // A phone: the item line, read only; a tap shows its price, our cost and margin, and its one way to change.
+  const phoneRows: ItemsPhoneRow[] = o.lines.map((l) => {
     const m = costs ? marginOf(l.unitPrice, l.unitCost) : null;
+    const priced = Number(l.unitPrice) > 0;
     return {
       key: l.id,
       no: l.no,
       part: l.no.includes("."),
       title: l.description.split("\n")[0],
+      under: l.model || undefined,
       badge: rows.find((r) => r.key === l.id)?.badge,
-      sub: Number(l.unitPrice) > 0 ? `${qty(l.quantity)} ${l.unit} × ${two(l.unitPrice)}` : `${qty(l.quantity)} ${l.unit} · no price`,
+      sub: priced ? `${qty(l.quantity)} ${l.unit} × ${two(l.unitPrice)}` : `${qty(l.quantity)} ${l.unit}`,
       amount: Number(l.lineTotal) > 0 ? two(l.lineTotal) : undefined,
-      more: costs ? (
-        <>
-          cost {Number(l.unitCost) > 0 ? two(l.unitCost!) : "—"}
-          {m !== null && <span className={marginTone(m)}> · margin {m.toFixed(1)}%</span>}
-        </>
-      ) : undefined,
+      more: m !== null ? <span className={marginTone(m)}>margin {m.toFixed(1)}%</span> : undefined,
+      sheet: {
+        sub: [l.model, `${qty(l.quantity)} ${l.unit}`].filter(Boolean).join(" · "),
+        body: (
+          <>
+            <SheetPart>
+              <SheetFact label="Unit price">{priced ? money(l.unitPrice, currency) : "—"}</SheetFact>
+              <SheetFact label="Amount">{Number(l.lineTotal) > 0 ? money(l.lineTotal, currency) : "—"}</SheetFact>
+              {costs && (
+                <SheetFact label="Our cost · margin" ours>
+                  {Number(l.unitCost) > 0 ? money(l.unitCost!, currency) : "—"}
+                  {m !== null ? ` · ${m.toFixed(1)}%` : ""}
+                </SheetFact>
+              )}
+            </SheetPart>
+            {phone.edit ? (
+              <div className="px-4 pt-1 pb-2">
+                <OpenPanelButton panel="edit-quote" className="w-full">
+                  <Pencil aria-hidden /> Edit prices
+                </OpenPanelButton>
+              </div>
+            ) : phone.locked ? (
+              <p className="flex items-center gap-1.5 px-4 pt-1 pb-2 text-[13px] text-text-2">
+                <Lock className="size-3.5" aria-hidden /> Sent: a change needs a new revision.
+              </p>
+            ) : null}
+          </>
+        ),
+      },
     };
   });
   const discount = Number(o.discount);
@@ -162,7 +190,7 @@ export function quotePrices(o: OptionView, currency: string) {
       ]}
     />
   );
-  return { rows, columns, plain, numbers: o.lines.map((l) => l.no), phone, totals };
+  return { rows, columns, plain, numbers: o.lines.map((l) => l.no), phone: phoneRows, totals };
 }
 
 /** A quotation's payment, a part a line: "30% with the order", its amount under it. */

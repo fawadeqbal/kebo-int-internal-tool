@@ -24,7 +24,7 @@ import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
-import { PANEL_FORM, PanelSection, useReportDirty, useReportLost } from "@/components/common/panel";
+import { FooterTotal, PANEL_FORM, PanelSection, useReportDirty, useReportLost } from "@/components/common/panel";
 import { StepsFrame } from "@/components/common/steps-frame";
 import { ChoiceChips } from "@/components/common/choice-chips";
 import { ReasonChips } from "@/components/edits/reason-chips";
@@ -756,7 +756,9 @@ export function OfferHeaderForm({
     );
   const footer = create ? (
     // One strong button (design rules 18 Nov): Next is soft, Back and Review are words; ✕ closes, there is no Cancel.
-    <div className={bar}>
+    // On a phone the items' total is a line of its own above them (design "Items on a small phone").
+    <div data-window-footer="" className={cn(bar, "max-sm:flex-wrap")}>
+      <FooterTotal line />
       {back}
       <span className="flex-1" />
       {step === "review" ? (
@@ -789,8 +791,11 @@ export function OfferHeaderForm({
       {only && step === "prices" && needWhy && (
         <ReasonChips strip choices={OFFER_REASONS} value={why} onChange={setWhy} title={total === 1 ? "Why the change?" : "Why these changes?"} />
       )}
-      <div className={bar}>
+      <div data-window-footer="" className={cn(bar, !only && "max-sm:flex-wrap")}>
+        {/* On a phone the items' total: beside Save in one part, on its own line above the steps' buttons. */}
+        {!only && <FooterTotal line />}
         {back}
+        {only && <FooterTotal />}
         <span className="flex-1" />
         {only || step === "changes" ? (
           <SubmitButton variant="strong" size="lg" disabled={!canSave} pendingText="Saving…" className="max-md:flex-1">

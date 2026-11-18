@@ -413,7 +413,7 @@ export function DealForm({
               fill={step === "items"}
               footer={
                 step === "customer" && adding !== null ? (
-                  <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
+                  <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
                     <Button type="button" variant="ghost" onClick={() => setAdding(null)}>
                       <ChevronLeft aria-hidden /> Back to search
                     </Button>
@@ -440,7 +440,7 @@ export function DealForm({
                       title={total === 1 ? "Why the change?" : "Why these changes?"}
                     />
                   )}
-                  <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
+                  <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
                     {!only && at > 0 ? (
                       <Button
                         type="button"
@@ -480,7 +480,7 @@ export function DealForm({
                   </div>
                   </>
                 ) : (
-                  <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
+                  <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
                     {/* One strong button (design rules 18 Nov): Next is soft, Back and Review are words; ✕ closes, there is no Cancel. */}
                     {at > 0 ? (
                       <Button

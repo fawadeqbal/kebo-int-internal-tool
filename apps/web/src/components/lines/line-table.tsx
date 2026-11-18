@@ -1,18 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ClipboardEvent, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowDown,
   ArrowUp,
   Check,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   ClipboardPaste,
   Copy,
   Download,
   FileSpreadsheet,
   IndentDecrease,
   IndentIncrease,
+  Info,
   Loader2,
   ListPlus,
   MessageCircleQuestion,
@@ -35,7 +38,9 @@ import { useExcelAllowed } from "@/components/common/features";
 import { lineExport, linesFromSheet, lineTemplate, type SheetLines } from "@/components/sheets/line-sheets";
 import type { ReadSheet } from "@/lib/sheet-spec";
 import { UNITS } from "./units";
-import { LineWindow, lineNeeds, lineSummary, PhoneLineRow, type LineWindowThen } from "./phone-lines";
+import { LineWindow, lineNeeds, linePhoneParts, PhoneLineRow, type LineWindowThen } from "./phone-lines";
+import { BottomSheet } from "@/components/common/bottom-sheet";
+import { useFooterSlot } from "@/components/common/panel";
 
 /* ---------------------------------------------------------------- types */
 
@@ -130,6 +135,29 @@ export interface LineTableProps {
   fill?: boolean;
   /** "+ Part" on each line (on by default); off, adding a part is in the line's ⋯ menu (a narrow table, design 18 Nov). */
   partButton?: boolean;
+  /**
+   * On a phone (design "Items on a small phone"): the other ways in, in ⋯ beside + and on an empty list (Copy the
+   * customer's items…). The laptop shows `tools`.
+   */
+  ways?: LineWay[];
+  /** On a phone: after the count in the quiet line above the items ("CNY · 13% tax added"). */
+  caption?: ReactNode;
+  /** On a phone: one line at the top of the items (More opens the rest). */
+  notice?: ReactNode;
+  /** On a phone: one quiet line at the end of the items, with its button, only when it is true. */
+  suggest?: { text: ReactNode; label: string; onSelect: () => void } | null;
+  /** On a phone: the big total, in the window's footer beside Save; a tap there shows `footer` (every total). */
+  total?: { label: string; value: ReactNode } | null;
+}
+
+/** Another way to bring items in (on a phone, in ⋯ and on an empty list). */
+export interface LineWay {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  /** A word on the right ("11"). */
+  note?: string;
+  onSelect: () => void;
 }
 
 /* ---------------------------------------------------------------- helpers */
@@ -214,7 +242,7 @@ const STICKY_HEAD = "md:sticky md:top-0 md:z-[3] md:shadow-[inset_0_-1px_0_var(-
 type Pending = { run: (reason: string) => Promise<LineResult>; message: string; choices: string[] };
 type Removed = { label: string; lines: NewLine[]; at: { afterKey: string | null; parentKey: string | null } };
 /** Something that can be done to a row; `short` is the toolbar's label, `hint` its key. */
-type RowActionKey = "below" | "part" | "edit" | "out" | "in" | "up" | "down" | "dup" | "del";
+type RowActionKey = "below" | "part" | "edit" | "out" | "in" | "up" | "down" | "dup" | "pick" | "del";
 /** `note`: shown on the right in a phone's sheet too ("2.3", the number a new part gets). */
 type RowAction = { key: RowActionKey; icon: ReactNode; label: string; short: string; hint?: string; note?: string; disabled?: boolean; danger?: boolean };
 
@@ -244,6 +272,11 @@ export function LineTable({
   duplicates = false,
   fill = false,
   partButton = true,
+  ways = [],
+  caption,
+  notice,
+  suggest,
+  total,
 }: LineTableProps) {
   const numbers = useMemo(() => lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey }))), [rows]);
   const dupOf = useMemo(() => (duplicates ? sameAs(rows, numbers) : new Map<string, string>()), [duplicates, rows, numbers]);
@@ -799,7 +832,7 @@ export function LineTable({
     setPicked(new Set());
     setSelecting(false);
   };
-  const selectionBar = !readOnly && (pickedRows.length > 0 || (selecting && !phone)) && (
+  const selectionBar = !readOnly && !phone && (pickedRows.length > 0 || selecting) && (
     <div
       role="toolbar"
       aria-label={pickedRows.length ? pickedLabel : "Select items"}
@@ -844,11 +877,17 @@ export function LineTable({
   /* ---------- on a phone (design 16 Nov): a list, and one line at a time in a window of its own */
 
   const Noun = noun[0]!.toUpperCase() + noun.slice(1);
-  const [editing, setEditing] = useState<{ key: string | null; at: { afterKey: string | null; parentKey: string | null }; n: number; added?: string } | null>(null);
+  const [editing, setEditing] = useState<{ key: string | null; at: { afterKey: string | null; parentKey: string | null }; n: number; added?: string; start?: LineValues } | null>(null);
   const [needsOnly, setNeedsOnly] = useState(false);
   /** The lines just added in the window: lit in the list until another window opens. */
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [moreOpen, setMoreOpen] = useState(false);
+  const [finding, setFinding] = useState(false);
+  const findRef = useRef<HTMLInputElement>(null);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [totalsOpen, setTotalsOpen] = useState(false);
+  /** The note of what the window just added was closed (or its moment passed). */
+  const [noteGone, setNoteGone] = useState(false);
   /** The number a new line put here gets: "24", or "1.3" for a part (as in a sheet). */
   const numberFor = (at: { afterKey: string | null; parentKey: string | null }) => {
     if (at.parentKey) {
@@ -868,25 +907,28 @@ export function LineTable({
   const partAt = (r: LineRow) => ({ afterKey: [...rows].reverse().find((x) => x.parentKey === r.key)?.key ?? r.key, parentKey: r.key });
   const firstLine = (r: LineRow) => (valueOf(r, columns[0]!.key) ?? "").split("\n")[0]!.trim();
   const valuesOf = (r: LineRow) => Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)]));
-  const needing = rows.filter((r) => lineNeeds(r.values, columns)).length;
-  const phoneRows = needsOnly && needing ? visible.filter(({ r }) => lineNeeds(r.values, columns)) : visible;
+  const needing = rows.filter((r) => lineNeeds(r.values, columns, !!r.parentKey)).length;
+  const phoneRows = needsOnly && needing ? visible.filter(({ r }) => lineNeeds(r.values, columns, !!r.parentKey)) : visible;
   const editingRow = editing?.key ? (rows.find((r) => r.key === editing.key) ?? null) : null;
   const editingAt = editingRow ? phoneRows.findIndex(({ r }) => r.key === editingRow.key) : -1;
   /** A new part's line (what it goes under). */
   const editingParent = editing && !editing.key && editing.at.parentKey ? (rows.find((r) => r.key === editing.at.parentKey) ?? null) : null;
   const openLine = (key: string) => {
     setMenu(null);
+    setNoteGone(false);
     setMessage(null);
     setFresh(new Set());
     setEditing((e) => ({ key, at: { afterKey: null, parentKey: null }, n: (e?.n ?? 0) + 1 }));
   };
-  const openNew = (at: { afterKey: string | null; parentKey: string | null } = { afterKey: null, parentKey: null }) => {
+  const openNew = (at: { afterKey: string | null; parentKey: string | null } = { afterKey: null, parentKey: null }, start?: LineValues) => {
     setMenu(null);
     setMoreOpen(false);
     setCtx(null);
     setMessage(null);
     setFresh(new Set());
-    setEditing((e) => ({ key: null, at, n: (e?.n ?? 0) + 1 }));
+    setNoteGone(false);
+    findRef.current?.blur();
+    setEditing((e) => ({ key: null, at, n: (e?.n ?? 0) + 1, start }));
   };
   /** A new part on a phone made an item of its own instead (what is typed stays): it goes at the end. */
   const makeItem = () => setEditing((e) => (e && !e.key ? { ...e, at: { afterKey: null, parentKey: null } } : e));
@@ -934,6 +976,31 @@ export function LineTable({
     const last = [...fresh].at(-1)!;
     document.querySelector(`[data-line="${CSS.escape(last)}"]`)?.scrollIntoView({ block: "nearest" });
   }, [windowOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  // On a phone, for a moment once the window closes: what was added, with Undo.
+  const addedKeys = phone && !editing && !noteGone ? [...fresh].filter((k) => rows.some((r) => r.key === k)) : [];
+  const addedOne = addedKeys.length === 1 ? rows.find((r) => r.key === addedKeys[0]) : null;
+  const addedNote = addedKeys.length
+    ? { keys: addedKeys, label: addedOne ? `Added ${numbers[rows.indexOf(addedOne)]} · ${firstLine(addedOne)}` : `Added ${addedKeys.length} ${noun}s` }
+    : null;
+  const addedId = addedKeys.join(",");
+  useEffect(() => {
+    if (!addedId) return;
+    const t = setTimeout(() => setNoteGone(true), 8000);
+    return () => clearTimeout(t);
+  }, [addedId]);
+  /** Undo what the window just added (a part goes with its item). */
+  const undoAdded = async () => {
+    if (!addedNote) return;
+    const keys = addedNote.keys;
+    setNoteGone(true);
+    setFresh(new Set());
+    for (const k of [...keys].reverse()) {
+      const r = rows.find((x) => x.key === k);
+      if (!r || (r.parentKey && keys.includes(r.parentKey))) continue;
+      const res = await run(k, (reason) => onRemove(k, reason));
+      if (!res.ok) break;
+    }
+  };
 
   /** Does a row action (from the ⋯ menu, the right-click menu or the toolbar). */
   const act = (key: RowActionKey, r: LineRow) => {
@@ -941,6 +1008,11 @@ export function LineTable({
     if (phone && key === "below") return openNew({ afterKey: r.key, parentKey: r.parentKey });
     if (phone && key === "part") return openNew(partAt(r));
     if (key === "edit") return openLine(r.key);
+    if (key === "pick") {
+      setMenu(null);
+      setSelecting(true);
+      return setPicked(new Set([r.key]));
+    }
     if (key === "below") insertBelow(r);
     else if (key === "part") addPartTo(r);
     else if (key === "out") void move(r, "outdent");
@@ -991,27 +1063,40 @@ export function LineTable({
   };
 
   /**
-   * A phone's ⋯ sheet (design 18 Nov): Add a part (with the number it gets), Edit, then the same moves as
-   * the table's. A new item comes from Add item at the top, so there is no "insert below".
+   * A phone item's sheet (design "Items on a small phone"): Edit first, Add a part (with the number it gets), Up and
+   * Down side by side, make it a part or an item, Duplicate, Select more, then Delete last. A new item comes from +
+   * at the top, so there is no "insert below".
    */
   const phoneActionsFor = (r: LineRow): RowAction[] => {
-    const list = actionsFor(r).filter((a) => a.key !== "below");
-    const k = list.findIndex((a) => a.key === "part");
-    if (k >= 0) list[k] = { ...list[k]!, label: "Add a part", note: numberFor(partAt(r)) };
-    list.splice(k >= 0 ? k + 1 : 0, 0, { key: "edit", icon: <Pencil />, label: "Edit", short: "Edit" });
-    return list;
+    const all = actionsFor(r);
+    const pick = (k: RowActionKey) => all.filter((a) => a.key === k);
+    const part = pick("part").map((a) => ({ ...a, label: "Add a part", note: numberFor(partAt(r)) }));
+    return [
+      { key: "edit", icon: <Pencil />, label: "Edit", short: "Edit" },
+      ...part,
+      ...pick("up").map((a) => ({ ...a, label: "Up" })),
+      ...pick("down").map((a) => ({ ...a, label: "Down" })),
+      ...pick("in"),
+      ...pick("out"),
+      ...pick("dup"),
+      { key: "pick", icon: <SquareCheck />, label: "Select more", short: "Select" },
+      ...pick("del"),
+    ];
   };
-  /** The top of a line's sheet: its number and name, then how many and its parts ("2 sets · 2 parts"). */
+  /** The top of a line's sheet: its number and name, then how many × its price = its amount, and its parts. */
   const sheetHead = (r: LineRow, i: number) => {
     const parts = rows.filter((p) => p.parentKey === r.key).length;
-    const qty = [valueOf(r, "quantity"), valueOf(r, "unit")].filter(Boolean).join(" ");
-    const sub = [qty, parts ? `${parts} part${parts === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
+    const bits = linePhoneParts(r, columns, valuesOf(r));
     return (
       <div className="px-2.5 pt-1 pb-2">
-        <p className="truncate text-base font-semibold">
+        <p className="line-clamp-2 text-base leading-snug font-semibold">
           {numbers[i]} · {firstLine(r) || "No description yet"}
         </p>
-        {sub && <p className="text-[13px] text-text-2">{sub}</p>}
+        <p className="text-[13px] text-text-2 tabular">
+          {bits.line[0]}
+          {bits.amount ? <> = {bits.amount}</> : null}
+          {parts ? ` · ${parts} part${parts === 1 ? "" : "s"}` : r.parentKey ? ` · part of ${parentLabel(r.parentKey)}` : null}
+        </p>
       </div>
     );
   };
@@ -1118,31 +1203,179 @@ export function LineTable({
     </tr>
   );
 
-  const phoneCount = !readOnly && rows.length > 0 && (
-      <div className="flex items-center justify-between gap-2 text-[13px] text-text-2">
-        <span>{countWords(rows, noun)}</span>
+  /* ---------- on a phone (design "Items on a small phone"): one line of tools, the items, the total in the footer */
+
+  const footerSlot = useFooterSlot();
+  const matching = q ? rows.filter(matches).length : rows.length;
+  // What is missing, said once: "No price" when every item that needs something needs that, else "Needs something".
+  const needWords = [...new Set(rows.map((r) => lineNeeds(r.values, columns, !!r.parentKey)).filter(Boolean))];
+  const needLabel = needWords.length === 1 ? needWords[0]! : "Needs something";
+  const menuRow = menu ? (rows.find((r) => r.key === menu) ?? null) : null;
+  const rowDomId = (key: string) => `rowsheet-${menuId}-${key}`;
+
+  // Find, + and ⋯ (design: one line that stays on top); while typing, Done in place of + and ⋯.
+  const phoneTools = !readOnly && (
+    <div className="flex items-center gap-2">
+      {rows.length > 0 && (
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <Input
+            ref={findRef}
+            data-items-find=""
+            type="search"
+            enterKeyHint="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setFinding(true)}
+            onBlur={() => setFinding(false)}
+            placeholder={`Find in ${rows.length} ${noun}${rows.length === 1 ? "" : "s"}`}
+            aria-label={`Find ${an(noun)}`}
+            className={cn("h-10 pl-9 text-base [&::-webkit-search-cancel-button]:hidden", q && "pr-16")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                findRef.current?.blur();
+              }
+            }}
+          />
+          {q && (
+            <span aria-live="polite" className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-text-2 tabular">
+              {matching} of {rows.length}
+            </span>
+          )}
+        </div>
+      )}
+      {finding ? (
         <Button
-          size="sm"
+          type="button"
           variant="ghost"
-          onClick={() => {
-            setSelecting((x) => !x);
-            setPicked(new Set());
-          }}
-          className="text-primary hover:text-primary"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => findRef.current?.blur()}
+          className="h-10 shrink-0 px-2 text-[15px] font-bold text-primary hover:text-primary"
         >
-          {selecting ? "Done" : "Select"}
+          Done
         </Button>
-      </div>
+      ) : (
+        rows.length > 0 && (
+          <>
+            <Button type="button" variant="primary" onClick={() => openNew()} aria-label={`Add ${noun}`} className="h-10 w-11 shrink-0 px-0 max-sm:h-10 [&_svg]:size-[22px]">
+              <Plus aria-hidden strokeWidth={2.6} />
+            </Button>
+            <Button
+              id={`moreadd-${menuId}`}
+              type="button"
+              size="icon"
+              variant="secondary"
+              onClick={() => setMoreOpen((o) => !o)}
+              aria-label="More ways to add, and Select"
+              aria-haspopup="menu"
+              aria-expanded={moreOpen}
+              disabled={phonePicker.busy}
+              className="size-10 shrink-0 max-sm:size-10"
+            >
+              {phonePicker.busy ? <Loader2 className="animate-spin" aria-hidden /> : <MoreHorizontal aria-hidden />}
+            </Button>
+          </>
+        )
+      )}
+      {phonePicker.input}
+    </div>
   );
 
-  // On a phone: one line per row (tap to open it in its window), ⋯ for what can be done to it.
+  // Select on a phone: the top says how many, Done ends it; the bar of what to do takes the footer's place.
+  const phoneSelectTop = (
+    <div className="flex min-h-11 items-center justify-between gap-2 rounded-[10px] bg-primary-soft px-3 text-primary">
+      <span className="text-[15px] font-bold">{pickedRows.length ? pickedLabel : `Tap the ${noun}s to select them`}</span>
+      <Button type="button" variant="ghost" onClick={stopSelecting} className="h-10 px-2 text-[15px] font-bold text-primary hover:text-primary">
+        Done
+      </Button>
+    </div>
+  );
+  const phoneSelectBar = selecting && pickedRows.length > 0 && (
+    <div role="toolbar" aria-label={pickedLabel} className="fixed inset-x-0 bottom-0 z-[90] grid auto-cols-fr grid-flow-col border-t border-line bg-surface px-1 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop">
+      {!flat && pickedRows.some((r) => !r.parentKey) && (
+        <SelectBarButton onClick={() => void bulk("in")} disabled={busy !== null} icon={<IndentIncrease aria-hidden />}>
+          Make parts
+        </SelectBarButton>
+      )}
+      {!flat && pickedRows.some((r) => r.parentKey) && (
+        <SelectBarButton onClick={() => void bulk("out")} disabled={busy !== null} icon={<IndentDecrease aria-hidden />}>
+          Make {noun}s
+        </SelectBarButton>
+      )}
+      <SelectBarButton onClick={() => void bulk("up")} disabled={busy !== null} icon={<ArrowUp aria-hidden />}>
+        Up
+      </SelectBarButton>
+      <SelectBarButton onClick={() => void bulk("down")} disabled={busy !== null} icon={<ArrowDown aria-hidden />}>
+        Down
+      </SelectBarButton>
+      <SelectBarButton onClick={() => void bulk("dup")} disabled={busy !== null} icon={<Copy aria-hidden />}>
+        Duplicate
+      </SelectBarButton>
+      <SelectBarButton onClick={() => setAskDelete(true)} disabled={busy !== null} icon={<Trash2 aria-hidden />} danger>
+        Delete
+      </SelectBarButton>
+    </div>
+  );
+
+  // The total: in the window's footer beside Save (a tap shows every total); without a footer place, under the items.
+  const totalButton = footer && total && (
+    <button type="button" onClick={() => setTotalsOpen(true)} aria-haspopup="dialog" className="flex min-w-0 flex-col items-start text-left">
+      <span className="flex items-center gap-1 text-xs text-text-2">
+        {total.label} <ChevronUp className="size-3.5" aria-hidden />
+      </span>
+      <span className="max-w-full truncate text-[15px] font-bold tabular">{total.value}</span>
+    </button>
+  );
+  const totalsInFooter = phone && !!footerSlot && !!totalButton && !selecting;
+
+  // An empty list: the ways to start, Add first.
+  const phoneEmpty = (
+    <div className="flex flex-col gap-2.5 py-3">
+      <p className="text-base font-semibold">No {noun}s yet</p>
+      {empty ? <div className="text-sm text-text-2">{empty}</div> : <p className="text-sm text-text-2">Add them one by one, or bring them in at once.</p>}
+      {!readOnly && (
+        <>
+          <Button type="button" variant="primary" onClick={() => openNew()} className="h-12 text-[15px] max-sm:h-12">
+            <Plus aria-hidden /> Add {noun}
+          </Button>
+          {ways.map((w, n) => (
+            <Button key={w.key} type="button" variant={n === 0 ? "soft" : "secondary"} onClick={w.onSelect} className="h-12 text-[15px] max-sm:h-12">
+              {w.icon ?? <Copy aria-hidden />} {w.label}
+              {w.note ? ` · ${w.note}` : ""}
+            </Button>
+          ))}
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" variant="secondary" onClick={() => setPasteOpen(true)} className="h-12 max-sm:h-12">
+              <ClipboardPaste aria-hidden /> Paste items
+            </Button>
+            {canUpload && excelAllowed && (
+              <Button type="button" variant="secondary" onClick={() => phonePicker.pick()} className="h-12 max-sm:h-12">
+                <FileSpreadsheet aria-hidden /> Import Excel
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   const phoneList = (
     <div className="flex flex-col gap-2">
-      {needing > 0 && !readOnly && (
+      {notice && rows.length > 0 && (
+        <div className="flex items-start gap-2 rounded-[10px] border border-info/20 bg-info-soft px-3 py-2 text-[13px] text-text">
+          <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
+          <span className={cn("min-w-0 flex-1", !noticeOpen && "truncate")}>{notice}</span>
+          <button type="button" onClick={() => setNoticeOpen((o) => !o)} aria-expanded={noticeOpen} className="shrink-0 font-bold text-info underline underline-offset-2">
+            {noticeOpen ? "Less" : "More"}
+          </button>
+        </div>
+      )}
+      {needing > 0 && !readOnly && !selecting && (
         <div role="group" aria-label={`Show ${noun}s`} className="flex flex-wrap gap-1.5">
           {[
             { on: !needsOnly, label: "All", n: rows.length, set: false },
-            { on: needsOnly, label: "Needs something", n: needing, set: true },
+            { on: needsOnly, label: needLabel, n: needing, set: true },
           ].map((f) => (
             <button
               key={f.label}
@@ -1156,81 +1389,128 @@ export function LineTable({
           ))}
         </div>
       )}
-      <div className="overflow-hidden rounded-lg border border-line bg-surface">
-        {rows.length === 0 ? (
-          <p className="px-3 py-4 text-sm text-text-2">{empty ?? `No ${noun}s yet.`}</p>
-        ) : phoneRows.length === 0 ? (
-          <p className="px-3 py-4 text-sm text-text-2">{q ? <>Nothing matches &ldquo;{query}&rdquo;.</> : `Every ${noun} has what it needs.`}</p>
-        ) : (
-          <ul aria-label={`${Noun}s`}>
-            {phoneRows.map(({ r, i }) => (
-              <PhoneLineRow
-                key={r.key}
-                no={numbers[i]!}
-                kind={r.parentKey ? "Part" : Noun}
-                name={(valueOf(r, columns[0]!.key) ?? "").split("\n")[0]!.trim()}
-                summary={lineSummary(r, columns, valuesOf(r))}
-                needs={lineNeeds(valuesOf(r), columns)}
-                fresh={fresh.has(r.key)}
-                lineKey={r.key}
-                badge={r.badge}
-                part={!!r.parentKey}
-                busy={busy === r.key}
-                dup={dupOf.has(r.key) ? `Same as ${dupOf.get(r.key)}?` : null}
-                pick={selecting ? { on: picked.has(r.key), toggle: () => togglePick(r.key) } : undefined}
-                onOpen={readOnly ? undefined : () => openLine(r.key)}
-                menu={
-                  readOnly ? undefined : (
-                    <span className="flex items-center gap-0.5 pr-1">
-                      {/* + Part on an item's own line (design 18 Nov): the part window opens already under it. */}
-                      {!flat && !r.parentKey && partButton && (
-                        <Button
-                          size="xs"
-                          variant="secondary"
-                          onClick={() => act("part", r)}
-                          aria-label={`Add a part to ${rowLabel(i)}`}
-                          className="h-8 gap-1 px-2.5 text-[13px] text-primary shadow-none hover:text-primary pointer-coarse:h-8"
-                        >
-                          <Plus aria-hidden /> Part
-                        </Button>
-                      )}
-                      <Button
-                        id={`rowmenu-${menuId}-${r.key}`}
-                        size="icon-sm"
-                        variant="ghost"
-                        onClick={() => setMenu(menu === r.key ? null : r.key)}
-                        aria-label={`More for ${rowLabel(i)}`}
-                        aria-haspopup="menu"
-                        aria-expanded={menu === r.key}
-                        className="h-10 w-9 max-sm:h-10 max-sm:w-9"
-                      >
-                        <MoreHorizontal aria-hidden />
-                      </Button>
-                      {menu === r.key && (
-                        <FloatingMenu anchor={() => document.getElementById(`rowmenu-${menuId}-${r.key}`)} onClose={closeMenu} label={rowLabel(i)} header={sheetHead(r, i)} width={240}>
-                          {phoneActionsFor(r).map((a) => (
-                            <MenuItem key={a.key} icon={a.icon} onClick={() => act(a.key, r)} disabled={a.disabled} danger={a.danger} note={a.note}>
-                              {a.label}
-                            </MenuItem>
-                          ))}
-                        </FloatingMenu>
-                      )}
-                    </span>
-                  )
-                }
-              />
-            ))}
-          </ul>
-        )}
-        {adding.length > 0 &&
-          adding.map((v, n) => (
-            <div key={n} className="flex items-center gap-2 border-t border-line px-3 py-2 text-sm text-muted">
-              <Loader2 className="size-3.5 animate-spin" aria-hidden /> {(v[columns[0]!.key] ?? "").split("\n")[0]}
-            </div>
+      {rows.length > 0 && (
+        <p className="truncate text-[12.5px] text-text-2">
+          {q ? `${matching} of ${rows.length} match “${query.trim()}”` : selecting ? `Tap the ${noun}s to select them` : [countWords(rows, noun), caption].filter(Boolean).map((x, n) => (
+            <span key={n}>
+              {n > 0 && " · "}
+              {x}
+            </span>
           ))}
-      </div>
-      {/* The totals stay in view above the window's buttons while the lines scroll (design 18 Nov). */}
-      {footer && <div className={cn("rounded-lg border border-line bg-surface-2", fill && "sticky bottom-0 z-10 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.25)]")}>{footer}</div>}
+        </p>
+      )}
+      {rows.length === 0 ? (
+        phoneEmpty
+      ) : phoneRows.length === 0 ? (
+        <div className="flex flex-col gap-2 py-3">
+          {q ? (
+            <>
+              <p className="text-base font-semibold">Nothing matches “{query.trim()}”</p>
+              <p className="text-sm text-text-2">Look for a word of its name or its model.</p>
+              {!readOnly && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => openNew({ afterKey: null, parentKey: null }, { [columns[0]!.key]: query.trim() })}
+                  className="h-12 text-[15px] max-sm:h-12"
+                >
+                  <Plus aria-hidden /> Add “{query.trim()}” as {an(noun)}
+                </Button>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-text-2">Every {noun} has what it needs.</p>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <ul aria-label={`${Noun}s`}>
+            {phoneRows.map(({ r, i }) => {
+              const bits = linePhoneParts(r, columns, valuesOf(r));
+              return (
+                <PhoneLineRow
+                  key={r.key}
+                  no={numbers[i]!}
+                  kind={r.parentKey ? "Part" : Noun}
+                  name={(valueOf(r, columns[0]!.key) ?? "").split("\n")[0]!.trim()}
+                  under={bits.under}
+                  line={bits.line}
+                  amount={bits.amount}
+                  needs={lineNeeds(valuesOf(r), columns, !!r.parentKey)}
+                  fresh={fresh.has(r.key)}
+                  lineKey={r.key}
+                  rowId={rowDomId(r.key)}
+                  badge={r.badge}
+                  part={!!r.parentKey}
+                  busy={busy === r.key}
+                  dup={dupOf.has(r.key) ? `Same as ${dupOf.get(r.key)}?` : null}
+                  pick={selecting ? { on: picked.has(r.key), toggle: () => togglePick(r.key) } : undefined}
+                  open={menu === r.key}
+                  onOpen={readOnly ? undefined : () => setMenu(menu === r.key ? null : r.key)}
+                  onHold={
+                    readOnly
+                      ? undefined
+                      : () => {
+                          setMenu(null);
+                          setSelecting(true);
+                          setPicked(new Set([r.key]));
+                        }
+                  }
+                />
+              );
+            })}
+          </ul>
+          {adding.length > 0 &&
+            adding.map((v, n) => (
+              <div key={n} className="flex items-center gap-2 border-t border-line px-3 py-2 text-sm text-muted">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden /> {(v[columns[0]!.key] ?? "").split("\n")[0]}
+              </div>
+            ))}
+        </div>
+      )}
+      {suggest && !q && !selecting && rows.length > 0 && (
+        <div className="flex items-center gap-2 rounded-xl border-[1.5px] border-dashed border-line-strong px-3 py-2.5 text-[13px] text-text-2">
+          <span className="min-w-0 flex-1">{suggest.text}</span>
+          <button type="button" onClick={suggest.onSelect} className="shrink-0 font-bold text-primary">
+            {suggest.label}
+          </button>
+        </div>
+      )}
+      {/* The totals: in the window's footer (nothing floats over the items); without a footer place, under them. */}
+      {footer && rows.length > 0 && !totalsInFooter && <div className="rounded-lg border border-line bg-surface-2">{footer}</div>}
+      {totalsInFooter && createPortal(totalButton, footerSlot)}
+      {totalsOpen && footer && (
+        <BottomSheet title="Totals" sub={`${countWords(rows, noun)} · from the ${noun}s as they are now`} onClose={() => setTotalsOpen(false)}>
+          {footer}
+        </BottomSheet>
+      )}
+      {menuRow && !selecting && (
+        <FloatingMenu anchor={() => document.getElementById(rowDomId(menuRow.key))} onClose={closeMenu} label={rowLabel(rows.indexOf(menuRow))} header={sheetHead(menuRow, rows.indexOf(menuRow))} width={260}>
+          {(() => {
+            const list = phoneActionsFor(menuRow);
+            const item = (a: RowAction) => (
+              <MenuItem key={a.key} icon={a.icon} onClick={() => act(a.key, menuRow)} disabled={a.disabled} danger={a.danger} note={a.note} strong={a.key === "edit"}>
+                {a.label}
+              </MenuItem>
+            );
+            const up = list.find((a) => a.key === "up");
+            const down = list.find((a) => a.key === "down");
+            return list.map((a) =>
+              a.key === "up" && down ? (
+                // Up and Down side by side (design): one row.
+                <div key="updown" className="grid grid-cols-2 gap-1">
+                  {item(a)}
+                  {item(down)}
+                </div>
+              ) : a.key === "down" && up ? null : (
+                item(a)
+              ),
+            );
+          })()}
+        </FloatingMenu>
+      )}
+      {phoneSelectBar}
     </div>
   );
 
@@ -1240,6 +1520,20 @@ export function LineTable({
     // boxes around it may shrink: min-h-0). It never gets shorter than 20rem (tools, head, about four rows, the
     // totals): a window shorter than that scrolls as a whole instead of squeezing the rows away.
     <div className={cn("flex flex-col gap-2", fill && "md:min-h-80 md:flex-1")}>
+      {phone ? (
+        // A phone: Find · + · ⋯ (or Select's top) stay on top while the window scrolls, flush with its top edge
+        // (-top-5: over the window's own 20px padding, so no row shows above them).
+        (phoneTools || selecting || phonePicker.error) && (
+          <div className={cn("flex flex-col gap-2 empty:hidden", fill && "sticky -top-5 z-20 -mx-4 -mt-1 bg-surface px-4 pt-1 pb-2 shadow-[0_1px_0_var(--color-line)]")}>
+            {selecting ? phoneSelectTop : phoneTools}
+            {phonePicker.error && (
+              <p role="alert" className="text-xs text-bad">
+                {phonePicker.error}
+              </p>
+            )}
+          </div>
+        )
+      ) : (
       <div
         className={cn(
           "flex flex-col gap-2 empty:hidden",
@@ -1339,18 +1633,27 @@ export function LineTable({
           )}
         </div>
       )}
-      {phone && phonePicker.error && (
-        <p role="alert" className="text-xs text-bad">
-          {phonePicker.error}
-        </p>
-      )}
-      {phone && phoneCount}
       </div>
+      )}
       {moreOpen && (
-        <FloatingMenu anchor={() => document.getElementById(`moreadd-${menuId}`)} onClose={() => setMoreOpen(false)} label="More ways to add" width={280}>
+        <FloatingMenu anchor={() => document.getElementById(`moreadd-${menuId}`)} onClose={() => setMoreOpen(false)} label="More ways to add, and Select" width={280}>
+          {/* The record's own ways in first (Copy the customer's items…), then paste and Excel, then Select. */}
+          {ways.map((w) => (
+            <MenuItem
+              key={w.key}
+              icon={w.icon ?? <Copy />}
+              note={w.note}
+              onClick={() => {
+                setMoreOpen(false);
+                w.onSelect();
+              }}
+            >
+              {w.label}
+            </MenuItem>
+          ))}
           <MenuItem
             icon={<ClipboardPaste />}
-            note="from Excel, WhatsApp, email"
+            note={ways.length ? undefined : "from Excel, WhatsApp, email"}
             onClick={() => {
               setMoreOpen(false);
               setPasteOpen(true);
@@ -1392,6 +1695,21 @@ export function LineTable({
             >
               Export to Excel
             </MenuItem>
+          )}
+          {rows.length > 0 && (
+            <>
+              <span role="separator" className="my-1 block h-px bg-line" />
+              <MenuItem
+                icon={<SquareCheck />}
+                onClick={() => {
+                  setMoreOpen(false);
+                  setSelecting(true);
+                  setPicked(new Set());
+                }}
+              >
+                Select {noun}s
+              </MenuItem>
+            </>
           )}
         </FloatingMenu>
       )}
@@ -1754,7 +2072,7 @@ export function LineTable({
           }
           progress={editingRow ? (editingAt + 1) / Math.max(1, phoneRows.length) : undefined}
           columns={columns}
-          start={editingRow ? valuesOf(editingRow) : initialValues(columns, editing.at.parentKey)}
+          start={editingRow ? valuesOf(editingRow) : { ...initialValues(columns, editing.at.parentKey), ...editing.start }}
           row={editingRow}
           isNew={!editingRow}
           resetKey={String(editing.n)}
@@ -1779,7 +2097,7 @@ export function LineTable({
           }}
         />
       )}
-      {((pending && !editing) || (message && !editing) || removed) && (
+      {((pending && !editing) || (message && !editing) || removed || (addedNote && !editing)) && (
         <div className="fixed inset-x-0 bottom-20 z-40 flex justify-center px-4 lg:bottom-6 lg:pl-60">
           <div className="flex w-full max-w-2xl flex-col gap-2">
             {pending && !editing && (
@@ -1800,6 +2118,19 @@ export function LineTable({
               </p>
             )}
 
+            {addedNote && !editing && !removed && (
+              <div role="status" className="flex items-center justify-between gap-2 rounded-lg bg-text px-3 py-2 text-sm text-surface shadow-pop">
+                <span className="min-w-0 truncate">{addedNote.label}</span>
+                <span className="flex shrink-0 gap-1">
+                  <Button size="xs" variant="ghost" onClick={() => void undoAdded()} className="text-primary-soft hover:bg-white/10 hover:text-white">
+                    Undo
+                  </Button>
+                  <Button size="icon-xs" variant="ghost" onClick={() => setNoteGone(true)} aria-label="Close" className="text-surface hover:bg-white/10 hover:text-white">
+                    <X aria-hidden />
+                  </Button>
+                </span>
+              </div>
+            )}
             {removed && (
               <div role="status" className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm shadow-pop">
                 <span>Removed {removed.label}.</span>
@@ -2036,6 +2367,24 @@ function RowMenu({ children, onClose, anchorId, label }: { children: ReactNode; 
   );
 }
 
+/** One of the phone Select bar's buttons: its icon over its word. */
+function SelectBarButton({ icon, children, onClick, disabled, danger }: { icon: ReactNode; children: ReactNode; onClick: () => void; disabled?: boolean; danger?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[11.5px] font-semibold text-text active:bg-surface-2 disabled:opacity-40 [&_svg]:size-5",
+        danger && "text-bad",
+      )}
+    >
+      {icon}
+      <span className="max-w-full text-center leading-tight">{children}</span>
+    </button>
+  );
+}
+
 function MenuItem({
   icon,
   children,
@@ -2044,12 +2393,15 @@ function MenuItem({
   danger,
   hint,
   note,
+  strong,
 }: {
   icon: ReactNode;
   children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
+  /** The first thing in a phone item's sheet (Edit): bold, in the main colour. */
+  strong?: boolean;
   /** Its key, shown on the right as in a desktop menu. */
   hint?: string;
   /** A word on the right on a phone too ("2.3", "from Excel, WhatsApp, email"). */
@@ -2064,6 +2416,7 @@ function MenuItem({
       className={cn(
         "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40 max-sm:min-h-12 max-sm:gap-3 max-sm:text-[15px] [&_svg]:size-4 [&_svg]:text-muted max-sm:[&_svg]:size-5",
         danger && "border-t border-line text-bad hover:bg-bad-soft [&_svg]:text-bad",
+        strong && "font-bold text-primary [&_svg]:text-primary",
       )}
     >
       {icon}
