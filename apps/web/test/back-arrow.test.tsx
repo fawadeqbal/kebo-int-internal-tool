@@ -84,12 +84,22 @@ describe("the arrow beside the title", () => {
     const links = backLinks();
     expect(links).toHaveLength(2);
     for (const a of links) expect(a.getAttribute("href")).toBe("/inquiries");
-    expect(document.querySelector("[data-record-bar]")?.textContent).toContain("RFQ-2026-0001");
-    expect(document.querySelector("[data-page-label]")?.getAttribute("data-page-label")).toBe("RFQ-2026-0001");
+    // The phone's top bar says the record's name (never its number: canvas row "Every page's top on a phone") and,
+    // without a `record`, where ← goes; Back from the pages opened here says the name too.
+    expect(document.querySelector("[data-record-bar]")?.textContent).toContain("Bottling line");
+    expect(document.querySelector("[data-record-bar]")?.textContent).toContain("Inquiries");
+    expect(document.querySelector("[data-page-label]")?.getAttribute("data-page-label")).toBe("Bottling line");
     // The path's list link opens the list as it was left too.
     act(() => writeNav((m) => void (m.lists["/inquiries"] = "/inquiries?stage=new")));
     for (const a of backLinks()) expect(a.getAttribute("href")).toBe("/inquiries?stage=new");
     expect(screen.getByRole("link", { name: "Inquiries" }).getAttribute("href")).toBe("/inquiries?stage=new");
+  });
+
+  it("says under the name what the record is and its number, given `record`", () => {
+    render(
+      <PageHeader crumbs={[{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: "RFQ-2026-0001" }]} title="Bottling line" record={{ kind: "Inquiry", number: "RFQ-2026-0001" }} />,
+    );
+    expect(document.querySelector("[data-record-bar]")?.textContent).toBe("Bottling lineInquiry · RFQ-2026-0001");
   });
 
   it("is not on a list: a list is the top, its icon stays", () => {

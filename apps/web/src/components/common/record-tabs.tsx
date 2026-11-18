@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { cn, Pending } from "@kebo/ui";
+import { cn, Pending, ScrollFade } from "@kebo/ui";
 
 /**
  * A record's tabs, one look on every record (orders, inquiries, customers, suppliers): one row of names under
@@ -24,9 +24,10 @@ export interface TabRowItem {
 
 export function TabRow({ label, items, end, className = "mt-4" }: { label: string; items: TabRowItem[]; end?: ReactNode; className?: string }) {
   return (
-    <nav
+    <ScrollFade
+      as="nav"
       aria-label={label}
-      className={cn("no-print flex items-stretch gap-x-[22px] overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+      className={cn("no-print flex items-stretch gap-x-[22px] overflow-x-auto overflow-y-hidden border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
     >
       {items.map((t) => (
         <Link
@@ -39,13 +40,13 @@ export function TabRow({ label, items, end, className = "mt-4" }: { label: strin
         >
           {t.label}
           {t.tag !== undefined && t.tag !== null && t.tag !== "" && (
-            <span className={cn("text-xs font-semibold tabular", t.alert ? "rounded-md bg-bad-soft px-1.5 text-bad" : "text-text-2")}>{t.tag}</span>
+            <span className={cn("text-xs font-semibold tabular", t.alert ? "rounded-md bg-bad-soft px-1.5 text-bad" : "text-text-2 max-md:rounded-full max-md:bg-surface-2 max-md:px-1.5 max-md:leading-[17px]")}>{t.tag}</span>
           )}
           <Pending />
         </Link>
       ))}
       {end}
-    </nav>
+    </ScrollFade>
   );
 }
 

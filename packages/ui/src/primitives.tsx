@@ -293,6 +293,14 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
   "Admin settings": ShieldCheck,
 };
 
+/**
+ * A record's one strong button on a phone (canvas row "Every page's top on a phone", option A): pinned at the
+ * bottom, at the thumb, full width and 48 tall (design rule 10), in the place of the app's bottom bar, which steps
+ * aside while it is there (globals.css). With nothing in it (no next step) it is not there and the bar stays.
+ */
+const DOCK =
+  "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:flex max-md:gap-2 max-md:border-t max-md:border-line max-md:bg-surface max-md:px-3 max-md:pt-2 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-md:shadow-[0_-4px_12px_rgb(0_0_0/0.06)] max-md:[&:not(:has(a,button))]:hidden max-md:[&>*]:min-w-0 max-md:[&>*]:flex-1 max-md:[&_:is(a,button)]:h-12 max-md:[&_:is(a,button)]:w-full max-md:[&_:is(a,button)]:justify-center max-md:[&_:is(a,button)]:text-[15px]";
+
 export function PageHeader({
   title,
   icon,
@@ -309,8 +317,10 @@ export function PageHeader({
   back,
   crumbs,
   phoneStack,
+  record,
   children,
 }: {
+  /** The page's name: a record's is a name from its data, never its number (RECORD_TITLE in @kebo/shared). */
   title: ReactNode;
   /**
    * Where ← beside the title goes (a deeper page: a record, a page under one). By default the last link in the
@@ -323,6 +333,11 @@ export function PageHeader({
   crumbs?: { label: string; href?: string }[];
   /** On a phone, the buttons go under the title (record pages, whose names are long). */
   phoneStack?: boolean;
+  /**
+   * What the record is and its number ("Inquiry", "RFQ-2026-0010"): the small line under its name in the phone's
+   * top bar (canvas row "Every page's top on a phone"). Without it the bar says where ← goes.
+   */
+  record?: { kind: string; number?: string | null };
   /** The record's status (StatusBadge). */
   badge?: ReactNode;
   /** One line: who · what · how much · how paid · who handles it. */
@@ -349,8 +364,14 @@ export function PageHeader({
   // A deeper page goes up to the last link in its path (or where it says), with ← beside its title.
   const parent = trail?.slice(0, -1).reverse().find((c) => c.href);
   const up = back === false ? null : (back ?? (backHref ? { href: backHref, label: backLabel ?? "Back" } : parent?.href ? { href: parent.href, label: parent.label } : null));
-  // The page's name, as Back says it from the pages opened from here ("Back to Kabul Medical Supplies").
-  const name = trail?.at(-1)?.label ?? (typeof title === "string" ? title : undefined);
+  // The page's name in words (its title; a title that is not plain words falls back to the path's last part), as
+  // the phone's top bar says it and Back says it from the pages opened from here ("Back to Kabul Medical Supplies").
+  // (A list keeps its menu name for Back: "Back to Orders".)
+  const named = typeof title === "string" ? title : undefined;
+  const name = up ? (named ?? trail?.at(-1)?.label) : (trail?.at(-1)?.label ?? named);
+  // Phone: the top bar says the name, so the big title is only read out (still the page's heading).
+  const titleInBar = !!named && (!!up || !!trail);
+  const under = record ? [record.kind, record.number].filter(Boolean).join(" · ") : up?.label;
   return (
     <>
       {up && (
@@ -361,15 +382,26 @@ export function PageHeader({
             <BackArrow up={up.href} label={up.label} root={up.root} bar />
             <div className="min-w-0 flex-1 pl-0.5">
               <p className="truncate text-[16.5px] leading-5 font-bold text-text">{name ?? title}</p>
-              <p className="truncate text-[11.5px] leading-4 font-medium text-muted">{up.label}</p>
+              <p className="truncate text-[12px] leading-4 font-medium text-muted">{under}</p>
             </div>
             {/* ⋯ as a plain icon here, the size of ← (it is a bordered button in the header). */}
             {more && <div className="shrink-0 [&>button]:size-11 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
           </div>
         </>
       )}
+      {!up && titleInBar && (
+        // A top page (a list, a settings page) on a phone: its name in the app's top bar, where the app's name was
+        // (globals.css hides that while this is on the page), and its ⋯ at the bar's end; the menu, search and
+        // alerts stay around them.
+        <div data-page-title="" className="no-print pointer-events-none fixed top-0 right-36 left-14 z-30 flex h-14 items-center gap-1 md:hidden">
+          <span aria-hidden className="min-w-0 flex-1 truncate text-[17px] leading-5 font-bold text-text">
+            {named}
+          </span>
+          {more && <div className="pointer-events-auto shrink-0 [&>button]:size-10 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
+        </div>
+      )}
       <header className="mb-4" data-page-label={name}>
-        {trail && <Breadcrumb items={trail} className={up ? "max-md:hidden" : undefined} />}
+        {trail && <Breadcrumb items={trail} className={up || titleInBar ? "max-md:hidden" : undefined} />}
         {/* phoneStack: one column on a phone, each row the screen's width. (Not a wrapping column: some phone
             browsers then size the title to its text, so a long line runs past the screen and the page zooms out.) */}
         <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap", phoneStack && "max-sm:flex-col max-sm:flex-nowrap max-sm:items-stretch")}>
@@ -385,16 +417,21 @@ export function PageHeader({
             )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <h1 className={cn("font-bold text-text", framed ? "text-[22px] leading-7 sm:text-[26px] sm:leading-8" : "text-2xl leading-8 sm:text-[26px] sm:leading-8")}>{title}</h1>
+                <h1 className={cn("font-bold text-text", framed ? "text-[22px] leading-7 sm:text-[26px] sm:leading-8" : "text-2xl leading-8 sm:text-[26px] sm:leading-8", titleInBar && "max-md:sr-only")}>
+                  {title}
+                </h1>
                 {badge}
               </div>
-              {summary && <div className="mt-0.5 text-[13px] text-muted">{summary}</div>}
-              {description && <div className="mt-0.5 max-w-2xl text-[13px] text-muted">{description}</div>}
+              {/* A top page's plain sentence under its name is a help line: not on a phone (design rule 15). */}
+              {summary && <div className={cn("mt-0.5 text-[13px] text-muted", !up && titleInBar && typeof summary === "string" && "max-md:hidden")}>{summary}</div>}
+              {description && <div className={cn("mt-0.5 max-w-2xl text-[13px] text-muted", titleInBar && "max-md:hidden")}>{description}</div>}
             </div>
           </div>
           {/* Papers first, then the one primary, then ⋯: always top right. */}
           {right && (
-            <div className={cn("flex items-center gap-2", framed ? "shrink-0 sm:flex-wrap sm:justify-end" : "flex-wrap sm:justify-end")}>
+            // On a record's page on a phone the buttons leave this row (papers and ⋯ to the bar, the one strong
+            // button to the bottom), so the row itself makes no room.
+            <div className={cn("flex items-center gap-2", framed ? "shrink-0 sm:flex-wrap sm:justify-end" : "flex-wrap sm:justify-end", up && !actions && !views && "max-md:contents")}>
               {actions}
               {papers && (
                 <div data-slot="papers" className="flex items-center gap-2 max-sm:hidden">
@@ -402,8 +439,12 @@ export function PageHeader({
                 </div>
               )}
               {views}
-              {primary && <div data-slot="primary" className="contents">{primary}</div>}
-              {more && up ? <div className="contents max-md:hidden">{more}</div> : more}
+              {primary && (
+                <div data-slot="primary" data-record-dock={up ? "" : undefined} className={cn("contents", up && DOCK)}>
+                  {primary}
+                </div>
+              )}
+              {more && (up || titleInBar) ? <div className="contents max-md:hidden">{more}</div> : more}
             </div>
           )}
         </div>

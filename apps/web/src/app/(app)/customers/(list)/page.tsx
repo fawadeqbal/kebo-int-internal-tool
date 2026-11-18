@@ -180,7 +180,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <StatRow className="mb-4">
+      <StatRow className="mb-4" phone="line">
         <StatTile
           icon={Users}
           iconColor={1}

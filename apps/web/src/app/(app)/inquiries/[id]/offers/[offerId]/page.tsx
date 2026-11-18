@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
-import { REQUEST_CHANNEL_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
+import { RECORD_KIND, REQUEST_CHANNEL_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
 import { ButtonLink, RevisionBadge } from "@kebo/ui";
 import { recordActions } from "@/components/records/actions";
 import { requirePermission } from "@/lib/session";
@@ -99,6 +99,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
         crumbs: [{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo, href: base }, { label: x.factory.name }],
         back: { href: `${base}/sourcing`, label: `${d.refNo} · Supplier offers` },
         title: x.factory.name,
+        record: { kind: RECORD_KIND.offer, number: d.refNo },
         summary: summary.length ? <p className="min-w-0">{summary.join(" · ")}</p> : undefined,
         // One strong button (design rules 2 and 3), the rest in ⋯ (canvas board "Actions: one list per record type").
         ...recordActions(`More for ${x.factory.name}’s offer`, [

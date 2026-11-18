@@ -1,5 +1,5 @@
 import { Banknote, Factory, Pencil, Search } from "lucide-react";
-import { can } from "@kebo/shared";
+import { can, RECORD_KIND } from "@kebo/shared";
 import { ButtonLink, PageHeader, RefCode } from "@kebo/ui";
 import { requirePermission, hasFeature } from "@/lib/session";
 import { factoryOf } from "@/lib/party-data";
@@ -25,13 +25,15 @@ export default async function FactoryLayout({ children, params }: { children: Re
         icon={Factory}
         phoneStack
         title={f.name}
+        record={{ kind: RECORD_KIND.supplier, number: f.supplierCode }}
         summary={
           <>
             {f.supplierCode && (
-              <>
+              // On a phone the number is in the top bar, under the name.
+              <span className="max-md:hidden">
                 <RefCode>{f.supplierCode}</RefCode>
                 {" · "}
-              </>
+              </span>
             )}
             {[f.address?.split("\n")[0], f.owner ? `owner ${f.owner.name}` : "no owner yet"].filter(Boolean).join(" · ")}
           </>

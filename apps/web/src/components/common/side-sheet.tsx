@@ -42,11 +42,12 @@ export function SideSheet({ title, summary, children }: { title: string; summary
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-left shadow-card hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text lg:hidden"
+        className="flex h-11 w-full items-center gap-3 rounded-xl border border-line bg-surface pr-3 pl-4 text-left shadow-card hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text lg:hidden"
       >
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-text">{title}</span>
-          <span className="block truncate text-[13px] text-text-2">{summary}</span>
+        {/* One slim line (canvas row "Every page's top on a phone"): its name, then what it holds. */}
+        <span className="min-w-0 flex-1 truncate text-[13px] text-text-2">
+          <span className="font-semibold text-text">{title}</span>
+          {summary ? <> · {summary}</> : null}
         </span>
         <ChevronRight className="size-4 shrink-0 text-text-2" aria-hidden />
       </button>

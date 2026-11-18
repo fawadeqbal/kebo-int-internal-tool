@@ -5,7 +5,7 @@ import {
   EXPENSE_CATEGORY_LABEL,
   PAYMENT_KIND_LABEL,
   PAYMENT_METHOD_LABEL,
-  PAYMENT_RECORD_LABEL,
+  PAYMENT_TITLE,
   paperNumber,
   type ExpenseCategory,
   type PaymentDirection,
@@ -330,6 +330,7 @@ export class TreasuryService {
           : orders.length
             ? `One transfer for ${orders.map((o) => o.refNo).join(", ")}`
             : "Into the customer's credit",
+        name: PAYMENT_TITLE.received(m.party?.name, one ? PAYMENT_KIND_LABEL[one.kind as PaymentKind] : null),
         // What arrived, in the currency it arrived in (the bank statement's figure).
         amount: money(m.amount),
         currency: m.currency,
@@ -352,6 +353,7 @@ export class TreasuryService {
         on: fromDbDate(a.on),
         direction: "in",
         what: `${PAYMENT_KIND_LABEL[a.kind as PaymentKind]} from the customer's credit`,
+        name: PAYMENT_TITLE.fromCredit(a.movement.party?.name, PAYMENT_KIND_LABEL[a.kind as PaymentKind]),
         amount: money(a.amount),
         currency: a.movement.allocCurrency,
         party: customerLink(a.movement.party),
@@ -372,6 +374,7 @@ export class TreasuryService {
         on: fromDbDate(m.valueDate),
         direction: "out",
         what: `Credit refunded${m.note ? `: ${m.note}` : ""}`,
+        name: PAYMENT_TITLE.refund(m.party?.name),
         amount: money(m.amount),
         currency: m.currency,
         party: customerLink(m.party),
@@ -392,6 +395,7 @@ export class TreasuryService {
         on: fromDbDate(p.on),
         direction: "out",
         what: `${PAYMENT_KIND_LABEL[p.kind as PaymentKind]} to the supplier for ${p.purchaseOrder!.refNo}`,
+        name: PAYMENT_TITLE.paid(p.movement.party?.name, PAYMENT_KIND_LABEL[p.kind as PaymentKind]),
         amount: money(p.share),
         currency: p.movement.currency,
         party: supplierLink(p.movement.party!),
@@ -414,6 +418,7 @@ export class TreasuryService {
         on: fromDbDate(e.payLater && e.repaidOn ? e.repaidOn : e.spentOn),
         direction: "out",
         what: `${EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory] ?? e.category}: ${e.description}`,
+        name: PAYMENT_TITLE.expense(e.description, EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory] ?? e.category),
         amount: money(e.amount),
         currency: e.currency,
         party: e.factory ? supplierLink(e.factory) : customerLink(e.customer),
@@ -435,6 +440,7 @@ export class TreasuryService {
         on: fromDbDate(t.valueDate),
         direction: "move",
         what: `${t.account!.name} → ${t.toAccount!.name}${t.note ? `: ${t.note}` : ""}`,
+        name: PAYMENT_TITLE.transfer(t.account!.name, t.toAccount!.name),
         amount: money(t.amount),
         currency: t.currency,
         party: null,
@@ -460,6 +466,7 @@ export class TreasuryService {
         on,
         direction: m.kind === "payment" ? "in" : "out",
         what: m.kind === "payment" ? `Money received${m.order ? ` for ${m.order.refNo}` : ""}` : `Expense: ${String(b.description ?? "")}`,
+        name: m.kind === "payment" ? PAYMENT_TITLE.received(m.order?.customer?.name) : PAYMENT_TITLE.expense(typeof b.description === "string" ? b.description : null),
         amount: Number(amount).toFixed(2),
         currency,
         party: m.order ? customerLink(m.order.customer) : null,
@@ -516,7 +523,8 @@ export class TreasuryService {
     const detail = await this.detail(user, kind, id);
     return {
       ...row,
-      title: `${PAYMENT_RECORD_LABEL[kind]} · ${row.currency} ${Number(row.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      // Its name in words (design rule 3: a title is never a number).
+      title: row.name,
       ...detail,
       ledgerHref: posting ? `/finance/ledger?panel=entry&id=${posting.groupId}` : null,
     };

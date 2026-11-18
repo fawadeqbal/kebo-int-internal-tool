@@ -106,7 +106,7 @@ export default async function ApprovalsPage({
         primary={!mine && status === "pending" && list.rows.some((r) => r.can.approve) ? <VerifyChosen action={approveManyAction} /> : undefined}
       />
       {!mine && (
-        <StatRow className="mb-4">
+        <StatRow className="mb-4" phone="line">
           <StatTile
             icon={Clock}
             iconColor={2}

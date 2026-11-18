@@ -133,7 +133,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         }
       />
 
-      <StatRow className="mb-4">
+      <StatRow className="mb-4" phone="line">
         <StatTile icon={Package} iconColor={1} label="Open orders" value={c.open} href={href({ status: undefined, stage: undefined })} />
         <StatTile
           icon={FileText}

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Package, XCircle } from "lucide-react";
-import { can, dayMonth, ORDER_TABS, ORDER_WORD_TONE, type FlowStep, type OrderTab } from "@kebo/shared";
+import { can, dayMonth, ORDER_TABS, ORDER_WORD_TONE, RECORD_KIND, type FlowStep, type OrderTab } from "@kebo/shared";
 import { cn, PageHeader } from "@kebo/ui";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderOf, orderSectionsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date } from "@/lib/format";
+import { orderName } from "@/lib/titles";
 import { today } from "@/components/orders/today";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { ScrolledBar } from "@/components/orders/scrolled-bar";
@@ -105,7 +106,8 @@ export default async function OrderLayout({ children, params }: { children: Reac
           phoneStack
           crumbs={[{ label: "Sales" }, { label: "Orders", href: "/orders" }, { label: o.refNo }]}
           icon={Package}
-          title={o.inquiry.title || <span className="tabular">{o.refNo}</span>}
+          title={orderName(o)}
+          record={{ kind: RECORD_KIND.order, number: o.refNo }}
           summary={
             <p className="min-w-0">
               {meta.map((m, i) => (

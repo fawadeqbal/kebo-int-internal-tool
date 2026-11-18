@@ -54,7 +54,8 @@ test("Purchase order: what was agreed with the supplier, the plan with Pay on th
   await page.setViewportSize({ width: 1280, height: 900 });
   await made.getByRole("link", { name: "Receipt" }).first().click();
   await expect(page).toHaveURL(/\/payments\/supplier\//);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Supplier payment");
+  // Its title says what it was and who it went to (never its number).
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^(Deposit|Balance|Other|Payment) to \S/);
   expect(errors).toEqual([]);
 });
 

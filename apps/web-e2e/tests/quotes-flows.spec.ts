@@ -88,7 +88,12 @@ test("each quotation and each offer has its own page: the lists open them, ‹ �
   await page.goto(`/inquiries/${deal.id}/quotation`);
   await page.getByRole("link", { name: new RegExp(`^${b!.refNo}`) }).click();
   await expect(page).toHaveURL((u) => u.pathname === `/inquiries/${deal.id}/quotations/${b!.id}`);
-  await expect(page.getByRole("heading", { level: 1, name: b!.refNo })).toBeVisible();
+  // Its title is who it is for (a name, never a number: canvas row "Every page's top on a phone"); its number is in the path.
+  const isQuote = async (refNo: string) => {
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(`Quotation for ${deal.customer}`);
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText(refNo);
+  };
+  await isQuote(b!.refNo);
   await expect(page.getByRole("navigation", { name: "Inquiry" })).toHaveCount(0);
   // Every Edit has its word and says what it edits.
   // (The boxes of every paper: Customer | Delivery & payment, Prices, Warranty & conditions; canvas "The quotation, from the pieces".)
@@ -99,9 +104,9 @@ test("each quotation and each offer has its own page: the lists open them, ‹ �
   expect(await accessibilityProblems(page), "a quotation's page meets WCAG 2.2 AA").toEqual([]);
   // ‹ › through the inquiry's quotations.
   await page.getByRole("link", { name: `Previous quotation, ${a!.refNo}` }).click();
-  await expect(page.getByRole("heading", { level: 1, name: a!.refNo })).toBeVisible();
+  await isQuote(a!.refNo);
   await page.getByRole("link", { name: `Next quotation, ${b!.refNo}` }).click();
-  await expect(page.getByRole("heading", { level: 1, name: b!.refNo })).toBeVisible();
+  await isQuote(b!.refNo);
 
   // Its offer has its own page too: the tax, and the quotations made from it.
   await page.getByRole("region", { name: "From the offer" }).getByRole("link", { name: /Open the offer/ }).click();
