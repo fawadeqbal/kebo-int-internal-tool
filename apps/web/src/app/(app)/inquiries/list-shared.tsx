@@ -1,16 +1,13 @@
-import { LayoutGrid, List, Plus } from "lucide-react";
+import { LayoutGrid, List } from "lucide-react";
 import { can, CHANNEL_LABEL, INQUIRY, INQUIRY_CHANNELS, inquiryStateOf, LOST_REASON_LABEL, PRIORITIES, PRIORITY_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
-import { Badge, buildHref, PageHeader } from "@kebo/ui";
-import { OpenPanelButton } from "@/components/common/panel";
-import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
-import { ViewSwitch } from "@/components/common/view-switch";
+import { Badge, buildHref } from "@kebo/ui";
+import { ListHeader } from "@/components/lists/list-header";
 import type { FilterSelect } from "@/components/common/filter-card";
 import type { Fact } from "@/components/lists/list-parts";
 import { countOf, dayMonth, daysText, short } from "@/lib/format";
 import type { DealRow } from "@/lib/types";
 import type { Me } from "@/lib/session";
 import type { Funnel } from "@/lib/types-facts";
-import { crumbsFor, labelFor } from "@/lib/nav";
 
 /*
  * What the inquiries list and its Board share (design "RFQ Desk — list pages", 18 Nov 2026): the header, the facts
@@ -66,38 +63,23 @@ export function inquiryFacts(funnel: Funnel | null, lateFollowUps: number, curre
  * `query`: the filters on screen, for Export to Excel.
  */
 export function InquiriesHeader({ me, view, excel, query }: { me: Me; view: "list" | "board"; excel: boolean; query: Params }) {
-  const more: MenuEntry[] = [
-    ...(excel ? [{ label: "Export to Excel", href: buildHref("/sheets/export/inquiries", {}, query), download: true }] : []),
-    { label: "Order board", href: "/orders/board" },
-  ];
   return (
-    <PageHeader
-      crumbs={crumbsFor("/inquiries")}
-      icon={null}
-      title={labelFor("/inquiries")}
-      views={
-        <span className="max-sm:hidden">
-          <ViewSwitch
-            label="View"
-            current={view}
-            compact
-            views={[
-              { key: "list", label: "List", icon: <List aria-hidden />, href: buildHref("/inquiries", {}, { ...query, stage: undefined }) },
-              { key: "board", label: "Board", icon: <LayoutGrid aria-hidden />, href: buildHref("/inquiries/board", {}, { ...query, stage: undefined }) },
-            ]}
-          />
-        </span>
-      }
-      more={<MoreMenu label="More for inquiries" items={more} phoneItems={[view === "list" ? { label: "Board", href: "/inquiries/board" } : { label: "List", href: "/inquiries" }]} />}
-      primary={
-        can(me, "inquiries.create") && (
-          <span className="max-sm:hidden">
-            <OpenPanelButton panel="new-inquiry" variant="primary" label="New inquiry">
-              <Plus aria-hidden /> New inquiry
-            </OpenPanelButton>
-          </span>
-        )
-      }
+    <ListHeader
+      path="/inquiries"
+      create={can(me, "inquiries.create") ? { label: "New inquiry", panel: "new-inquiry" } : null}
+      views={{
+        current: view,
+        options: [
+          { key: "list", label: "List", icon: <List aria-hidden />, href: buildHref("/inquiries", {}, { ...query, stage: undefined }) },
+          { key: "board", label: "Board", icon: <LayoutGrid aria-hidden />, href: buildHref("/inquiries/board", {}, { ...query, stage: undefined }) },
+        ],
+      }}
+      moreLabel="More for inquiries"
+      more={[
+        ...(excel ? [{ label: "Export to Excel", href: buildHref("/sheets/export/inquiries", {}, query), download: true }] : []),
+        { label: "Order board", href: "/orders/board" },
+      ]}
+      phoneMore={[view === "list" ? { label: "Board", href: "/inquiries/board" } : { label: "List", href: "/inquiries" }]}
     />
   );
 }
