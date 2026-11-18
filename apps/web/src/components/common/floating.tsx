@@ -173,7 +173,7 @@ export function FloatingMenu({
   if (!mounted) return null;
   if (phone)
     return createPortal(
-      <div className="fixed inset-0 z-[110] flex flex-col justify-end">
+      <div className="fixed inset-x-0 top-[var(--vvt,0px)] z-[110] flex h-[var(--vvh,100dvh)] flex-col justify-end">
         <button
           type="button"
           aria-label="Close the menu"
