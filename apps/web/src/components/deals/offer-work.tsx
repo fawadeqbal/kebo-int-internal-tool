@@ -8,7 +8,8 @@ import { ATTACHMENT_KIND_LABEL, lineNumbers, offerTaxText, PAPER, type Attachmen
 import { Button, cn, Field, RULES, Select, Textarea } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
-import { PanelBody, SidePanel, useClosePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
+import { OpenPanelButton, PanelBody, SidePanel, useClosePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
+import { SheetFact, SheetPart } from "@/components/records/phone-items";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
 import { PaperFacts, PaperLayout } from "@/components/records/paper-boxes";
 import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
@@ -149,7 +150,9 @@ export function OfferEdit({
 export function OfferUrlWindow({ kit, q }: { kit: OfferKit; q: FactoryQuoteView }) {
   const panel = useSidePanel("edit-offer");
   if (!panel.open) return null;
-  return <OfferPanel kit={kit} q={q} step="factory" onClose={() => panel.close()} />;
+  // ?panel=edit-offer: every step; …&id=prices: that part only (an item's sheet on a phone opens it so).
+  const part = panel.id === "prices" || panel.id === "terms" || panel.id === "conditions" || panel.id === "factory" ? (panel.id as OfferPart) : null;
+  return <OfferPanel kit={kit} q={q} step={part ?? "factory"} only={!!part} onClose={() => panel.close()} />;
 }
 
 /**
@@ -391,7 +394,8 @@ function OfferWindow({
           return (
             <div className="flex flex-col gap-3 md:min-h-0 md:flex-1">
               {used && (
-                <p className="flex shrink-0 items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
+                // On a phone it is one line at the top of the items instead (LineTable's notice).
+                <p className="flex shrink-0 items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm max-sm:hidden">
                   <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
                   <span>A quotation is priced from this offer. Its own copy of the items and prices stays as it was.</span>
                 </p>
@@ -444,6 +448,40 @@ function OfferWindow({
                     )}
                   </>
                 }
+                // A phone (design "Items on a small phone"): the other ways in under ⋯, the notice in one line, the
+                // currency and tax in the caption, the customer's items this offer lacks at the end, the total in the footer.
+                ways={[
+                  ...(items.length > 0
+                    ? [{ key: "customer", label: "Copy the customer’s items", note: String(items.length), onSelect: () => batch.add(newLinesOf(fromItems(h.taxRate))) }]
+                    : []),
+                  ...others.map((o) => ({
+                    key: `offer-${o.id}`,
+                    label: `Copy ${o.factory.name}’s items`,
+                    note: String(o.lines.filter((l) => !l.alternativeOfId).length),
+                    onSelect: () =>
+                      batch.add(
+                        newLinesOf(
+                          o.lines
+                            .filter((l) => !l.alternativeOfId)
+                            .map((l) => ({ id: l.id, parentId: l.parentId, values: { description: l.description, model: l.model ?? "", requestedItemId: l.requestedItemId ?? "", quantity: l.quantity, unit: l.unit, unitPrice: "", taxRate: String(h.taxRate) } })),
+                        ),
+                      ),
+                  })),
+                ]}
+                notice={used ? "A quotation is priced from this offer. Its own copy of the items and prices stays as it was." : undefined}
+                caption={[h.currency || mainCurrency, h.taxRate > 0 ? offerTaxText(String(h.taxRate), h.taxIncluded) : "no tax"].join(" · ")}
+                suggest={(() => {
+                  // The customer's items this offer does not answer yet (only when it has some of its own).
+                  const answered = new Set(batch.rows.map((r) => r.values.requestedItemId).filter(Boolean));
+                  const lacking = items.filter((it) => !it.parentId && !answered.has(it.id));
+                  if (empty || !lacking.length || answered.size === 0) return null;
+                  return {
+                    text: `${lacking.length} of the customer’s items ${lacking.length === 1 ? "is" : "are"} not here yet.`,
+                    label: lacking.length === 1 ? "Copy it" : "Copy them",
+                    onSelect: () => batch.add(newLinesOf(fromItems(h.taxRate).filter((x) => lacking.some((it) => it.id === x.id) || lacking.some((it) => it.id === x.parentId)))),
+                  };
+                })()}
+                total={batch.rows.length ? offerTotalLine(batch.rows, h.currency || mainCurrency, h.taxRate, q?.taxRate ?? taxDefault?.rate ?? 0, h.taxIncluded) : null}
                 {...batch.local}
                 footer={
                   batch.rows.length ? (
@@ -643,6 +681,33 @@ export function lineRate(raw: string | undefined, taxRate: number, savedRate = t
  * Under the lines (design 18 Nov): Before tax · Tax (added, or the part included) · Total with tax, and the total
  * in the main currency; no tax at all: "Total · no tax". From the lines as they are now (other specs left out).
  */
+/** An offer's sums from its lines as they are now (other specs left out), in minor units, by tax rate. */
+export function offerSums(rows: LineRow[], taxRate: number, savedRate: number, included: boolean) {
+  const byRate = new Map<number, { amount: number; lines: number }>();
+  let sum = 0;
+  for (const r of rows) {
+    if (r.values.alternativeOfId) continue;
+    const p = Number((r.values.unitPrice ?? "").replace(/,/g, ""));
+    const n = Number((r.values.quantity ?? "").replace(/,/g, ""));
+    if (!Number.isFinite(p) || !Number.isFinite(n) || !p) continue;
+    const m = Math.round(toMinor(p) * n);
+    const rate = lineRate(r.values.taxRate, taxRate, savedRate);
+    const g = byRate.get(rate) ?? { amount: 0, lines: 0 };
+    byRate.set(rate, { amount: g.amount + m, lines: g.lines + 1 });
+    sum += m;
+  }
+  const tax = [...byRate].reduce((t, [r, g]) => t + factoryTaxMinor(g.amount, r, included), 0);
+  const rates = [...byRate.keys()].sort((a, b) => b - a);
+  const noTax = rates.every((r) => r === 0) && taxRate === 0;
+  return { byRate, sum, tax, rates, noTax, total: included ? sum : sum + tax };
+}
+
+/** The big line of an offer's totals, for a phone's footer: "Total with tax · CNY 110,740.00". */
+export function offerTotalLine(rows: LineRow[], currency: string, taxRate: number, savedRate: number, included: boolean) {
+  const t = offerSums(rows, taxRate, savedRate, included);
+  return { label: t.noTax ? "Total · no tax" : "Total with tax", value: formatMinor(t.total, currency) };
+}
+
 export function OfferTotals({
   rows,
   currency,
@@ -661,23 +726,7 @@ export function OfferTotals({
   /** Ours only, in the shaded strip above the totals ("Our cost"). */
   extra?: [string, ReactNode];
 }) {
-  const byRate = new Map<number, { amount: number; lines: number }>();
-  let sum = 0;
-  for (const r of rows) {
-    if (r.values.alternativeOfId) continue;
-    const p = Number((r.values.unitPrice ?? "").replace(/,/g, ""));
-    const n = Number((r.values.quantity ?? "").replace(/,/g, ""));
-    if (!Number.isFinite(p) || !Number.isFinite(n) || !p) continue;
-    const m = Math.round(toMinor(p) * n);
-    const rate = lineRate(r.values.taxRate, taxRate, savedRate);
-    const g = byRate.get(rate) ?? { amount: 0, lines: 0 };
-    byRate.set(rate, { amount: g.amount + m, lines: g.lines + 1 });
-    sum += m;
-  }
-  const tax = [...byRate].reduce((t, [r, g]) => t + factoryTaxMinor(g.amount, r, included), 0);
-  const rates = [...byRate.keys()].sort((a, b) => b - a);
-  const noTax = rates.every((r) => r === 0) && taxRate === 0;
-  const total = included ? sum : sum + tax;
+  const { byRate, sum, tax, rates, noTax, total } = offerSums(rows, taxRate, savedRate, included);
   const main = fx && currency !== fx.main ? convertText(String(total / 100), currency, fx.main, fx) : null;
   const money = (minor: number) => <span className="tabular">{formatMinor(minor, currency)}</span>;
   const how = included ? "included" : "added";
@@ -911,20 +960,57 @@ export function OfferBoxes({
           columns={viewColumns}
           numbers={numbers}
           totals={footer}
-          // A phone: one line per row, its quantity and price under its name, the amount on the right.
-          phone={q.lines.map((l) => ({
-            key: l.id,
-            no: l.no,
-            part: !!l.parentId,
-            title: l.description.split("\n")[0],
-            sub: (
-              <>
-                {Number(l.quantity).toLocaleString("en-US")} {l.unit}
-                {Number(l.unitPrice) ? <> × {Number(l.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</> : " · no price yet"}
-              </>
-            ),
-            amount: Number(l.unitPrice) > 0 ? formatMinor(Math.round(toMinor(l.unitPrice) * Number(l.quantity)), q.currency) : undefined,
-          }))}
+          // A phone: the item line, read only (its model under its name, how many × the price, the amount on the right);
+          // a tap shows the item, with Edit prices.
+          phone={q.lines.map((l) => {
+            const priced = Number(l.unitPrice) > 0;
+            const minor = priced ? Math.round(toMinor(l.unitPrice) * Number(l.quantity)) : null;
+            // The currency is said once, in the box's count and the totals; the sheet says it with each price.
+            const amount = minor !== null ? plainAmount(minor) : null;
+            const rate = lineRate(String(l.taxRate), Number(q.taxRate));
+            const forItem = l.requestedItemId ? kit.items.find((it) => it.id === l.requestedItemId) : null;
+            return {
+              key: l.id,
+              no: l.no,
+              part: !!l.parentId,
+              title: l.description.split("\n")[0],
+              under: l.model || undefined,
+              sub: (
+                <>
+                  {Number(l.quantity).toLocaleString("en-US")} {l.unit}
+                  {priced && <> × {Number(l.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</>}
+                </>
+              ),
+              amount: amount ?? (l.parentId ? undefined : <span className="rounded-md bg-warn-soft px-1.5 py-0.5 text-xs font-semibold text-warn">No price</span>),
+              sheet: {
+                sub: l.model || undefined,
+                body: (
+                  <>
+                    <SheetPart>
+                      <SheetFact label="Quantity">
+                        {Number(l.quantity).toLocaleString("en-US")} {l.unit}
+                      </SheetFact>
+                      <SheetFact label="Unit price">{priced ? formatMinor(toMinor(l.unitPrice), q.currency) : "—"}</SheetFact>
+                      {Number(q.taxRate) > 0 && (
+                        <SheetFact label="Tax">
+                          {rate}% · {q.taxIncluded ? "included" : "added"}
+                        </SheetFact>
+                      )}
+                      <SheetFact label="Amount">{minor !== null ? formatMinor(minor, q.currency) : "—"}</SheetFact>
+                      {forItem && <SheetFact label="For the customer’s">item {forItem.no}</SheetFact>}
+                    </SheetPart>
+                    {canEdit && (
+                      <div className="px-4 pt-1 pb-2">
+                        <OpenPanelButton panel="edit-offer" id="prices" className="w-full">
+                          <Pencil aria-hidden /> Edit prices
+                        </OpenPanelButton>
+                      </div>
+                    )}
+                  </>
+                ),
+              },
+            };
+          })}
           empty="No items yet."
         />
       }

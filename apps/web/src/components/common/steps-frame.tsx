@@ -190,7 +190,7 @@ export function StepsFooter({
   onCancel?: () => void;
 }) {
   return (
-    <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
+    <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
       {first ? (
         onCancel && (
           <Button type="button" variant="secondary" onClick={onCancel}>
@@ -231,7 +231,7 @@ export function OnePartFooter({
   saveLabel?: string;
 }) {
   return (
-    <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
+    <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4">
       {onAllSteps && (
         <Button type="button" variant="ghost" onClick={onAllSteps} className="px-2 text-primary hover:text-primary">
           All steps <ChevronRight aria-hidden />

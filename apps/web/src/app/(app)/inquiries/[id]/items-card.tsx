@@ -1,8 +1,8 @@
-import { Pencil } from "lucide-react";
+import { ChevronRight, Pencil } from "lucide-react";
 import { can } from "@kebo/shared";
 import { Badge } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
-import { dateTime, qty } from "@/lib/format";
+import { dateTime, money, qty } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { EditedMark } from "@/components/edits/edits";
 import { editsOf } from "@/lib/edit-data";
@@ -11,6 +11,7 @@ import { ITEM_COLUMNS } from "@/components/lines/item-columns";
 import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
 import { OpenPanelButton } from "@/components/common/panel";
 import { ItemsBox } from "@/components/records/items-box";
+import { SheetPart } from "@/components/records/phone-items";
 import type { LineColumn, LineRow } from "@/components/lines/line-table";
 import { itemsLine } from "./steps";
 
@@ -101,16 +102,75 @@ export async function ItemsCard({ id }: { id: string }) {
               }
             : undefined
         }
+        // A phone: the item line, read only; a tap shows the offers that price it and its own changes.
         phone={d.items.map((i) => {
           const n = offers.get(i.id) ?? 0;
+          const target = i.targetPrice ? price(i.targetPrice) : null;
+          const theirs = (sourcing?.quotes ?? []).flatMap((q) =>
+            q.lines.filter((l) => l.requestedItemId === i.id && !l.alternativeOfId).map((l) => ({ q, price: Number(l.unitPrice) })),
+          );
+          const sameMoney = theirs.length > 1 && theirs.every((t) => t.q.currency === theirs[0]!.q.currency);
+          const low = sameMoney ? Math.min(...theirs.filter((t) => t.price > 0).map((t) => t.price)) : null;
+          const mine = own(i.id);
           return {
             key: i.id,
             no: i.no,
             part: !!i.parentId,
             title: i.description.split("\n")[0],
+            under: i.model || undefined,
             badge: <EditedMark card={needs} k={i.id} />,
-            sub: [`${qty(i.quantity)} ${i.unit}`, i.model, sourcing ? (n ? offersWord(n) : "no offer") : null].filter(Boolean).join(" · "),
-            amount: i.targetPrice ? price(i.targetPrice) : undefined,
+            sub: [`${qty(i.quantity)} ${i.unit}`, sourcing && n ? offersWord(n) : null].filter(Boolean).join(" · "),
+            amount: sourcing && n === 0 ? <span className="rounded-md bg-warn-soft px-1.5 py-0.5 text-xs font-semibold text-warn">No offer</span> : undefined,
+            more: target ? `target ${target}` : undefined,
+            sheet: {
+              sub: [i.model, `${qty(i.quantity)} ${i.unit}`, target ? `target ${target}` : null].filter(Boolean).join(" · "),
+              body: (
+                <>
+                  {sourcing && (
+                    <SheetPart title="Offers for it">
+                      {theirs.length ? (
+                        <ul className="flex flex-col divide-y divide-line/60">
+                          {theirs.map((t, k) => (
+                            <li key={`${t.q.id}-${k}`}>
+                              <a href={`/inquiries/${id}/offers/${t.q.id}`} className="flex items-center gap-2 py-2 text-sm">
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate font-semibold">{t.q.factory.name}</span>
+                                  <span className="flex items-center gap-1.5 text-xs text-text-2">
+                                    {low !== null && t.price === low && <span className="rounded bg-ok-soft px-1 text-[10.5px] font-bold text-ok">Lowest</span>}
+                                    {t.q.leadTime ?? "lead time not said"}
+                                  </span>
+                                </span>
+                                <span className="shrink-0 font-bold tabular">{t.price > 0 ? money(String(t.price), t.q.currency) : "no price"}</span>
+                                <ChevronRight className="size-4 shrink-0 text-muted" aria-hidden />
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-text-2">No supplier offer has it yet.</p>
+                      )}
+                    </SheetPart>
+                  )}
+                  {mine.length > 0 && (
+                    <SheetPart title="Its changes">
+                      {mine.map((e, k) => (
+                        <p key={k} className="py-1 text-[13px]">
+                          {e.lines![i.id]!.join(" · ")}
+                          <span className="block text-xs text-text-2">{[e.reason, e.by, dateTime(e.at)].filter(Boolean).join(" · ")}</span>
+                        </p>
+                      ))}
+                    </SheetPart>
+                  )}
+                  {d.allowed.edit && (
+                    <div className="px-4 pt-1 pb-2">
+                      <OpenPanelButton panel="edit-request" id="items" className="w-full">
+                        <Pencil aria-hidden /> Edit items
+                      </OpenPanelButton>
+                    </div>
+                  )}
+                </>
+              ),
+            },
           };
         })}
         empty={

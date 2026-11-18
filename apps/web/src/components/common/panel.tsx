@@ -1,7 +1,7 @@
 "use client";
 
 import { lockScroll } from "@/lib/scroll-lock";
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buttonClass, cn, RULES, type ButtonSize, type ButtonVariant } from "@kebo/ui";
@@ -37,6 +37,21 @@ const PanelLost = createContext<(lost: LostInfo | null) => void>(() => {});
  * "Discard your change?" question. A window that says nothing gets the plain question.
  */
 export const useReportLost = () => useContext(PanelLost);
+
+/**
+ * The place in a window's footer, on a phone, for its items' total (design "Items on a small phone"): the footer
+ * puts a FooterTotal where the total goes (beside Save, or on its own line above the buttons), and a list of
+ * items inside the window shows its total there, so nothing floats over the items.
+ */
+const FooterSlot = createContext<{ el: HTMLElement | null; set: (el: HTMLElement | null) => void } | null>(null);
+/** The window footer's place for a total (null: none here; the list shows its totals under the items). */
+export const useFooterSlot = () => useContext(FooterSlot)?.el ?? null;
+
+/** Where a window's footer shows its items' total on a phone: beside Save, or (`line`) on its own line above the buttons. */
+export function FooterTotal({ line = false }: { line?: boolean }) {
+  const slot = useContext(FooterSlot);
+  return <span ref={slot?.set} data-footer-total="" className={cn("min-w-0 empty:hidden sm:hidden", line && "basis-full")} />;
+}
 
 const saved = (arg: CloseArg) => !!arg && typeof arg === "object" && "ok" in arg && (arg as { ok?: boolean }).ok === true;
 
@@ -84,6 +99,8 @@ export function SidePanel({
   const [lost, setLost] = useState<LostInfo | null>(null);
   const changes = useChanges(box);
   useFocusTrap(box, mounted);
+  const [slotEl, setSlotEl] = useState<HTMLElement | null>(null);
+  const footerSlot = useMemo(() => ({ el: slotEl, set: setSlotEl }), [slotEl]);
 
   const request = useCallback(
     (arg?: CloseArg) => {
@@ -105,7 +122,8 @@ export function SidePanel({
     if (!mounted || !box.current) return;
     const body = box.current.querySelector<HTMLElement>("[data-panel-body]") ?? box.current;
     // The first field that can be typed in (a read-only box is only there to be read).
-    const first = focusables(body).find((el) => el.matches("input:not([readonly]),select,textarea:not([readonly])"));
+    // (Not an items list's Find: on a phone that would open the keyboard over the list.)
+    const first = focusables(body).find((el) => el.matches("input:not([readonly]):not([data-items-find]),select,textarea:not([readonly])"));
     (first ?? head.current)?.focus({ preventScroll: true });
   }, [mounted]);
 
@@ -140,7 +158,9 @@ export function SidePanel({
         <WindowHead id={id} title={title} description={description} onClose={() => request()} headRef={head} />
         <PanelClose.Provider value={request}>
           <PanelDirty.Provider value={setReported}>
-            <PanelLost.Provider value={setLost}>{children}</PanelLost.Provider>
+            <PanelLost.Provider value={setLost}>
+              <FooterSlot.Provider value={footerSlot}>{children}</FooterSlot.Provider>
+            </PanelLost.Provider>
           </PanelDirty.Provider>
         </PanelClose.Provider>
       </div>
@@ -238,6 +258,7 @@ export function PanelSection({
 export function PanelActions({ children, end, className }: { children: ReactNode; end?: ReactNode; className?: string }) {
   return (
     <div
+      data-window-footer=""
       className={cn(
         "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6",
         // A phone: the buttons share the width, big, under the thumb.

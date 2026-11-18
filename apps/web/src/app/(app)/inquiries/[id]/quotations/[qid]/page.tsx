@@ -281,7 +281,7 @@ export default async function QuotationOwnPage({
         prices={
           <>
             {r.options.map((opt) => {
-              const p = quotePrices(opt, r.currency);
+              const p = quotePrices(opt, r.currency, { edit: !!editor, locked: !isDraft && manage });
               const many = r.options.length > 1;
               return (
                 <ItemsBox

@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, Plus, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Plus, X } from "lucide-react";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { FIT_VIEW, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
@@ -21,70 +21,93 @@ import type { LineColumn, LineRow, LineValues } from "./line-table";
 const PRICE_KEYS = new Set(["unitPrice", "factoryPrice"]);
 const isZero = (raw: string) => raw === "" || Number(raw.replace(/,/g, "")) === 0;
 
-/** What a line still needs ("No qty", "No price"), or null when it has what it must have. */
-export function lineNeeds(values: LineValues, columns: LineColumn[]): string | null {
+/**
+ * What a line still needs ("No qty", "No price"), or null when it has what it must have. A part without a price is
+ * fine (it is in its item's price).
+ */
+export function lineNeeds(values: LineValues, columns: LineColumn[], part = false): string | null {
   const c = columns.find((x) => x.required && !(values[x.key] ?? "").trim());
   if (c) return `No ${c.label.toLowerCase()}`;
-  return columns.some((x) => x.input && PRICE_KEYS.has(x.key) && isZero((values[x.key] ?? "").trim())) ? "No price" : null;
+  return !part && columns.some((x) => x.input && PRICE_KEYS.has(x.key) && isZero((values[x.key] ?? "").trim())) ? "No price" : null;
 }
 
+/** 1,850.00: a price as the phone row says it (up to 4 decimals when it has them). */
+const priceText = (raw: string) => {
+  const n = Number(raw.replace(/,/g, ""));
+  return Number.isFinite(n) ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : raw;
+};
+
 /**
- * The grey line under a line's name: the quantity and unit, the model, the prices and totals, then the
- * rest (what it answers, another spec of…) by name. Empty values and 0 are left out.
+ * What a phone row says (design "Items on a small phone", the item line): the model under the name; the grey line —
+ * how many, × the unit price when it has one, then the rest by name (a tax of its own, another spec of…); and the
+ * amount on the right (the line's computed total, when it has a price). Empty values and 0 are left out.
  */
-export function lineSummary(row: LineRow, columns: LineColumn[], values: LineValues): ReactNode[] {
-  // The quantity first, then the price (what a line is for), the model, the totals, then the rest.
-  const rank = (c: LineColumn) => (c.key === "quantity" ? 0 : c.input === "number" ? 1 : c.key === "model" ? 2 : !c.input ? 3 : 4);
-  const out: ReactNode[] = [];
+export function linePhoneParts(row: LineRow, columns: LineColumn[], values: LineValues): { under: ReactNode; line: ReactNode[]; amount: ReactNode } {
+  const priceCol = columns.find((c) => c.input && PRICE_KEYS.has(c.key));
+  const price = priceCol ? (values[priceCol.key] ?? "").trim() : "";
+  const priced = !!priceCol && !isZero(price);
+  // The amount: the last column worked out from the others, on the right (a line without a price has none).
+  const totalCol = [...columns].reverse().find((c) => !c.input && c.align === "right" && c.format);
+  const amount = totalCol && (!priceCol || priced) ? totalCol.format!(values, row) : null;
+  const model = (values.model ?? "").trim();
+  const line: ReactNode[] = [];
+  const qty = (values.quantity ?? "").trim();
+  if (qty || priced) line.push(`${qty ? `${qty} ${values.unit ?? ""}`.trim() : ""}${priced ? `${qty ? " × " : ""}${priceText(price)}` : ""}`);
+  const rank = (c: LineColumn) => (c.input === "number" ? 1 : !c.input ? 3 : 4);
   for (const c of [...columns.slice(1)].sort((a, b) => rank(a) - rank(b))) {
-    if (c.key === "unit") continue;
+    if (["unit", "quantity", "model"].includes(c.key) || c === priceCol || c === totalCol) continue;
     const raw = (values[c.key] ?? "").trim();
-    if (c.key === "quantity") {
-      if (raw) out.push(`${raw} ${values.unit ?? ""}`.trim());
-      continue;
-    }
     if (c.summary) {
       const said = c.summary(values, row);
-      if (said !== null && said !== undefined && said !== "") out.push(said);
+      if (said !== null && said !== undefined && said !== "") line.push(said);
       continue;
     }
     if (c.input && (!raw || (c.input === "number" && isZero(raw)))) continue;
-    const shown = c.format ? c.format(values, row) : c.options ? (c.options.find((o) => o.value === raw)?.label ?? raw) : raw;
+    const shown = c.format
+      ? c.format(values, row)
+      : c.options
+        ? (c.options.find((o) => o.value === raw)?.label ?? raw)
+        : c.input === "number" && /price/i.test(c.key)
+          ? priceText(raw)
+          : raw;
     if (shown === null || shown === undefined || shown === "" || shown === "—") continue;
-    out.push(
-      c.key === "model" ? (
-        shown
-      ) : (
-        <>
-          {c.label} {shown}
-        </>
-      ),
+    line.push(
+      <>
+        {c.label} {shown}
+      </>,
     );
   }
-  return out;
+  return { under: model || null, line, amount };
 }
 
 /**
- * One line in the phone list: tap it to open it; + Part (an item's) and ⋯ for what can be done to it.
- * Its parts are listed right under it, so it does not count them.
+ * One item in the phone list (design "Items on a small phone", the item line): its number, its name (two lines at
+ * most), the model under it, then how many × the unit price on the left and the amount on the right; what it still
+ * needs (No price) where the amount goes. A part is right under its item and in line with it — its number where the
+ * item's is, a little lighter — with no indent. A tap opens what can be done to it (its sheet: Edit first), never
+ * the window by itself; pressing and holding starts Select. In Select, a tap ticks it.
  */
 export function PhoneLineRow({
   no,
   kind,
   name,
-  summary,
+  under,
+  line,
+  amount,
   needs,
   fresh,
   lineKey,
+  rowId,
   badge,
   part,
   busy,
   onOpen,
-  menu,
+  onHold,
+  open,
   pick,
   dup,
 }: {
-  /** Select mode: a tick box; a tap ticks it (instead of opening the line). */
+  /** Select mode: a tick box; a tap ticks it (instead of opening the sheet). */
   pick?: { on: boolean; toggle: () => void };
   /** "Same as 1?": it looks like an earlier line. */
   dup?: string | null;
@@ -92,19 +115,53 @@ export function PhoneLineRow({
   /** "Item", "Line" or "Part": read before the number. */
   kind: string;
   name: string;
-  summary: ReactNode[];
+  /** Under the name (the model). */
+  under?: ReactNode;
+  /** The grey line: how many × the price, then the rest. */
+  line: ReactNode[];
+  /** On the right (the line's amount). */
+  amount?: ReactNode;
   needs: string | null;
   /** Just added: lit until the next window opens. */
   fresh?: boolean;
   /** Its key, to bring it into view once added. */
   lineKey?: string;
+  /** The row's own id (its sheet opens from it). */
+  rowId?: string;
   badge?: ReactNode;
   part: boolean;
   busy: boolean;
-  /** Opens it (none: shown only). */
+  /** Opens its sheet (none: shown only). */
   onOpen?: () => void;
-  menu?: ReactNode;
+  /** Pressed and held: start Select with it ticked. */
+  onHold?: () => void;
+  /** Its sheet is open. */
+  open?: boolean;
 }) {
+  const held = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stop = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  const hold = onHold
+    ? {
+        onPointerDown: () => {
+          held.current = false;
+          stop();
+          timer.current = setTimeout(() => {
+            held.current = true;
+            onHold();
+          }, 550);
+        },
+        onPointerUp: stop,
+        onPointerLeave: stop,
+        onPointerCancel: stop,
+        onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
+      }
+    : {};
+  useEffect(() => stop, []);
+  const missingMark = needs && <span className="shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-xs font-semibold text-warn">{needs}</span>;
   const body = (
     <>
       {pick && (
@@ -112,56 +169,72 @@ export function PhoneLineRow({
           {pick.on && <Check className="size-3.5" strokeWidth={3} />}
         </span>
       )}
-      <span className={cn("shrink-0 pt-0.5 text-[13px] font-semibold text-text-2 tabular", pick ? "w-7" : "w-8")}>
+      <span className={cn("w-[34px] shrink-0 pt-0.5 text-[13px] tabular", part ? "font-medium text-muted" : "font-semibold text-text-2")}>
         <span className="sr-only">{kind} </span>
         {no}
       </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="flex min-w-0 flex-1 flex-col">
         <span className={cn("line-clamp-2 text-[15px] leading-snug [overflow-wrap:anywhere]", part ? "font-medium" : "font-semibold")}>{name || <span className="text-muted">No description yet</span>}</span>
-        {summary.length > 0 && (
-          <span className="line-clamp-2 text-[13px] text-text-2 [overflow-wrap:anywhere]">
-            {summary.map((s, n) => (
-              <Fragment key={n}>
-                {n > 0 && " · "}
-                {s}
-              </Fragment>
-            ))}
+        {under && <span className="truncate text-xs text-muted">{under}</span>}
+        {(line.length > 0 || amount || needs) && (
+          <span className="mt-1 flex items-baseline justify-between gap-2 text-[13px] text-text-2 tabular">
+            <span className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">
+              {line.map((s, n) => (
+                <Fragment key={n}>
+                  {n > 0 && " · "}
+                  {s}
+                </Fragment>
+              ))}
+            </span>
+            {amount ? <span className="shrink-0 text-sm font-bold whitespace-nowrap text-text">{amount}</span> : missingMark}
           </span>
         )}
-        {(needs || badge || dup) && (
+        {(dup || badge || (needs && amount)) && (
           <span className="mt-1 flex flex-wrap items-center gap-1.5">
-            {dup && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">{dup}</span>}
-            {needs && <span className="rounded-md bg-warn-soft px-1.5 py-0.5 text-xs font-semibold text-warn">{needs}</span>}
+            {dup && <span className="rounded-md bg-warn-soft px-1.5 py-0.5 text-xs font-semibold text-warn">{dup}</span>}
+            {amount && missingMark}
             {badge}
           </span>
         )}
       </span>
-      {busy && <Loader2 className="mt-1 size-4 shrink-0 animate-spin text-muted" aria-label="Saving" />}
+      {busy ? (
+        <Loader2 className="mt-1 size-4 shrink-0 animate-spin text-muted" aria-label="Saving" />
+      ) : (
+        !pick && onOpen && <MoreHorizontal aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
+      )}
     </>
   );
+  const box = "flex min-h-16 min-w-0 flex-1 items-start gap-1.5 py-2.5 pr-2.5 pl-3 text-left";
   return (
     <li
       data-line={lineKey}
       className={cn(
         "flex scroll-mt-40 scroll-mb-24 items-stretch border-b border-line last:border-b-0",
-        part && "bg-surface-2/50 pl-5",
         dup && !pick?.on && "bg-warn-soft/40",
         pick?.on && "bg-primary-soft/50",
+        open && "bg-surface-2",
         fresh && !pick && "bg-primary-soft/60 shadow-[inset_3px_0_0_var(--color-primary-solid)]",
       )}
     >
       {pick ? (
-        <button type="button" role="checkbox" aria-checked={pick.on} onClick={pick.toggle} className="flex min-h-16 min-w-0 flex-1 items-start gap-2 px-3 py-2.5 text-left active:bg-surface-2">
+        <button type="button" role="checkbox" aria-checked={pick.on} onClick={pick.toggle} className={cn(box, "active:bg-surface-2")}>
           {body}
         </button>
       ) : onOpen ? (
-        <button type="button" onClick={onOpen} className="flex min-h-16 min-w-0 flex-1 items-start gap-2 px-3 py-2.5 text-left active:bg-surface-2">
+        <button
+          id={rowId}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => (held.current ? (held.current = false) : onOpen())}
+          {...hold}
+          className={cn(box, "select-none active:bg-surface-2 [-webkit-touch-callout:none]")}
+        >
           {body}
         </button>
       ) : (
-        <div className="flex min-h-16 min-w-0 flex-1 items-start gap-2 px-3 py-2.5">{body}</div>
+        <div className={box}>{body}</div>
       )}
-      {!pick && menu}
     </li>
   );
 }
