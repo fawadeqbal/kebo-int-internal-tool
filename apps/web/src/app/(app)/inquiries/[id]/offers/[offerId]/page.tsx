@@ -1,17 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { ButtonLink, cn, PageHeader, RevisionBadge, RULES } from "@kebo/ui";
+import { ButtonLink, RevisionBadge } from "@kebo/ui";
 import { MoreMenu } from "@/components/common/more-menu";
 import { requirePermission } from "@/lib/session";
 import { companyToday, date } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import { optional } from "@/components/print/data";
 import { coverOf } from "@/components/deals/offer-facts";
-import { OfferBoxes, OfferEdit, type OfferKit } from "@/components/deals/offer-work";
-import { OwnPagerTop, OwnPagerUnder } from "@/components/deals/own-pager";
+import { OfferBoxes, OfferUrlWindow, type OfferKit } from "@/components/deals/offer-work";
+import { RecordPage } from "@/components/records/record-page";
 import { getSettings } from "@/lib/loaders";
 import { editsOf } from "@/lib/edit-data";
 import { inquiryTitle } from "@/lib/titles";
@@ -35,8 +34,8 @@ export const generateMetadata = inquiryTitle("Supplier offer");
  * when it came and how long it holds, its tax; Quote this offer; ‹ 2 of 5 › through the inquiry's offers. Its
  * lines (Edit lines) and its details (Edit); beside them the quotations made from it and when it was asked.
  */
-export default async function OfferOwnPage({ params }: { params: Promise<{ id: string; offerId: string }> }) {
-  const { id, offerId } = await params;
+export default async function OfferOwnPage({ params, searchParams }: { params: Promise<{ id: string; offerId: string }>; searchParams: Promise<{ panel?: string }> }) {
+  const [{ id, offerId }, sp] = await Promise.all([params, searchParams]);
   await requirePermission("sourcing.manage");
   const [d, s, settings, q, requests] = await Promise.all([dealOf(id), sourcingOf(id), getSettings(), optional(() => quotationOf(id)), requestsOf(id)]);
   const at = s.quotes.findIndex((x) => x.id === offerId);
@@ -84,56 +83,49 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
     !x.lines.length ? "no items yet" : cover ? (cover.all ? (cover.of === 1 ? "covers the 1 item" : `covers all ${cover.of} items`) : `covers ${cover.n} of ${cover.of} items`) : null,
   ].filter(Boolean);
 
+  const pager = {
+    label: `Supplier offers of ${d.refNo}`,
+    what: "offer",
+    at,
+    of: s.quotes.length,
+    prev: prev ? { href: `${base}/offers/${prev.id}`, name: prev.factory.name } : null,
+    next: next ? { href: `${base}/offers/${next.id}`, name: next.factory.name } : null,
+  };
+
   return (
-    <div className="relative">
-      <OwnPagerTop
-        label={`Supplier offers of ${d.refNo}`}
-        what="offer"
-        at={at}
-        of={s.quotes.length}
-        prev={prev ? { href: `${base}/offers/${prev.id}`, name: prev.factory.name } : null}
-        next={next ? { href: `${base}/offers/${next.id}`, name: next.factory.name } : null}
-      />
-      <PageHeader
-        phoneStack
-        crumbs={[{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo, href: base }, { label: x.factory.name }]}
-        back={{ href: `${base}/sourcing`, label: `${d.refNo} · Supplier offers` }}
-        title={x.factory.name}
-        summary={summary.length ? <p className="min-w-0">{summary.join(" · ")}</p> : undefined}
-        actions={canEdit ? <OfferEdit kit={kit} q={x} step="factory" words="Edit offer" size="sm" /> : undefined}
-        primary={
+    <RecordPage
+      pager={pager}
+      header={{
+        crumbs: [{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo, href: base }, { label: x.factory.name }],
+        back: { href: `${base}/sourcing`, label: `${d.refNo} · Supplier offers` },
+        title: x.factory.name,
+        summary: summary.length ? <p className="min-w-0">{summary.join(" · ")}</p> : undefined,
+        primary:
           d.allowed.quote && x.lines.length > 0 ? (
             <ButtonLink href={`${base}/quotation?start=1&offer=${x.id}`} variant="primary" size="sm">
               <Plus aria-hidden /> Quote this offer
             </ButtonLink>
-          ) : undefined
-        }
-        more={
+          ) : undefined,
+        // One strong button (design rules 2 and 3): Edit offer is in ⋯ with the rest.
+        more: (
           <MoreMenu
             label={`More for ${x.factory.name}’s offer`}
             items={[
+              ...(canEdit ? [{ label: "Edit offer", href: `${base}/offers/${x.id}?panel=edit-offer` }] : []),
               { label: `Open the supplier ${x.factory.name}`, href: `/suppliers/${x.factory.id}` },
               { label: "Compare the offers side by side", href: `${base}/sourcing?view=compare` },
               { label: "Copy link to this offer", copy: `${base}/offers/${x.id}` },
             ]}
           />
-        }
-      >
-        <OwnPagerUnder
-          label={`Supplier offers of ${d.refNo}`}
-          what="offer"
-          at={at}
-          of={s.quotes.length}
-          prev={prev ? { href: `${base}/offers/${prev.id}`, name: prev.factory.name } : null}
-          next={next ? { href: `${base}/offers/${next.id}`, name: next.factory.name } : null}
-        />
-      </PageHeader>
-      <div className={cn("grid items-start gap-4", RULES.page.withPanel)}>
-        {/* The same boxes as its steps (design 18 Nov), each with its history and Edit. */}
-        <OfferBoxes q={x} kit={kit} canEdit={canEdit} edits={edits ?? undefined} mainCurrency={s.currency} historyHref={`${base}/history`} />
-        <aside aria-label="About this offer" className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
-          <Side title="Quoted in" id="o-quoted" last={!asked}>
-            {quotedIn.length ? (
+        ),
+      }}
+      panel={{
+        label: "About this offer",
+        sections: [
+          {
+            id: "o-quoted",
+            title: "Quoted in",
+            children: quotedIn.length ? (
               quotedIn.map((y) => (
                 <Link key={y.id} href={`${base}/quotations/${y.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-[13px] hover:bg-surface-2">
                   <span className="font-semibold">
@@ -144,28 +136,23 @@ export default async function OfferOwnPage({ params }: { params: Promise<{ id: s
               ))
             ) : (
               <p className="text-[13px] text-text-2">Not quoted yet.</p>
-            )}
-          </Side>
-          {asked && (
-            <Side title="Asked" id="o-asked" last>
-              <p className="text-[13px] text-text-2">
-                {`${date(asked.sentOn)}${asked.channel ? ` by ${REQUEST_CHANNEL_LABEL[asked.channel].toLowerCase()}` : ""}`}
-              </p>
-            </Side>
-          )}
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-function Side({ title, id, last, children }: { title: string; id: string; last?: boolean; children: ReactNode }) {
-  return (
-    <section aria-labelledby={id} className={cn("flex flex-col gap-1 px-4 py-3", !last && "border-b border-line")}>
-      <h2 id={id} className="mb-1 text-[15px] font-semibold">
-        {title}
-      </h2>
-      {children}
-    </section>
+            ),
+          },
+          ...(asked
+            ? [
+                {
+                  id: "o-asked",
+                  title: "Asked",
+                  children: <p className="text-[13px] text-text-2">{`${date(asked.sentOn)}${asked.channel ? ` by ${REQUEST_CHANNEL_LABEL[asked.channel].toLowerCase()}` : ""}`}</p>,
+                },
+              ]
+            : []),
+        ],
+      }}
+    >
+      {/* The same boxes as its steps (design 18 Nov), each with its history and Edit. */}
+      <OfferBoxes q={x} kit={kit} canEdit={canEdit} edits={edits ?? undefined} mainCurrency={s.currency} historyHref={`${base}/history`} />
+      {canEdit && sp.panel === "edit-offer" && <OfferUrlWindow kit={kit} q={x} />}
+    </RecordPage>
   );
 }

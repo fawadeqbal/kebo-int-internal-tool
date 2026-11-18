@@ -42,7 +42,8 @@ test("a long list in Edit offer › Prices: the tools and column names stay, onl
   await page.setViewportSize({ width: 1440, height: 900 });
   const { inquiry, offer } = await longOffer(page);
   await page.goto(`/inquiries/${inquiry}/offers/${offer}`);
-  await page.getByRole("button", { name: "Edit offer" }).click();
+  await page.getByRole("button", { name: /^More for .*offer/ }).click();
+  await page.getByRole("menuitem", { name: "Edit offer" }).click();
   const win = page.getByRole("dialog", { name: "Edit offer" });
   await win.getByRole("navigation", { name: "Steps" }).getByRole("button", { name: /Prices/ }).click();
   await expect(win.getByRole("button", { name: /^Add item/ })).toBeVisible();

@@ -30,7 +30,7 @@ async function newInquiry(page: Page) {
   return { id: inquiry.id as string, tag };
 }
 
-test("a new offer: Factory, Prices, Delivery & payment, Conditions, Review; a wrong line says which and saves nothing", async ({ page }) => {
+test("a new offer: Factory, Prices, Delivery & payment, Warranty & conditions, Review; a wrong line says which and saves nothing", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   const deal = await newInquiry(page);
@@ -38,7 +38,7 @@ test("a new offer: Factory, Prices, Delivery & payment, Conditions, Review; a wr
   await page.getByRole("button", { name: "New supplier offer" }).first().click();
   const win = page.getByRole("dialog", { name: "New supplier offer" });
   const rail = win.getByRole("navigation", { name: "Steps" });
-  for (const step of ["Supplier", "Prices", "Delivery & payment", "Conditions", "Review"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
+  for (const step of ["Supplier", "Prices", "Delivery & payment", "Warranty & conditions", "Review"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
   await expect(rail.getByRole("button", { name: /Supplier/ })).toHaveAttribute("aria-current", "step");
 
   // Who: a factory not on the list yet.
@@ -100,7 +100,7 @@ test("a new offer: Factory, Prices, Delivery & payment, Conditions, Review; a wr
   await expect(page.getByRole("heading", { level: 1, name: factory })).toBeVisible();
   await expect(page.getByText(`Offer from ${factory} added`)).toBeVisible();
   // The page: the same boxes as the steps.
-  for (const box of ["Supplier", "Delivery & payment", "Prices", "Conditions"]) await expect(page.getByRole("region", { name: box, exact: true })).toBeVisible();
+  for (const box of ["Supplier", "Delivery & payment", "Prices", "Warranty & conditions"]) await expect(page.getByRole("region", { name: box, exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Prices", exact: true })).toContainText("Change parts");
   await expect(page.getByRole("region", { name: "Prices", exact: true })).toContainText("120,000.00");
   const saved = (await (await page.request.get(`/api/inquiries/${deal.id}/sourcing`)).json()).quotes[0];
@@ -169,7 +169,8 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   await expect(page.getByRole("region", { name: "Prices", exact: true })).toContainText("9,000.00");
 
   // Edit offer: every part; the side bar counts the changes; Changes lists them with Undo; why once.
-  await page.getByRole("button", { name: "Edit offer" }).click();
+  await page.getByRole("button", { name: /^More for .*offer/ }).click();
+  await page.getByRole("menuitem", { name: "Edit offer" }).click();
   win = page.getByRole("dialog", { name: "Edit offer" });
   const rail = win.getByRole("navigation", { name: "Steps" });
   await expect(rail.getByRole("button", { name: /Supplier/ })).toHaveAttribute("aria-current", "step");

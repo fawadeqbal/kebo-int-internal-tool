@@ -514,12 +514,12 @@ export function FactoryPicker({
 
 /**
  * The offer's steps (design 18 Nov, the inquiry's rules): Factory (who sent it, when, and their paper) · Prices (the
- * currency and tax above the lines) · Delivery & payment · Conditions, then Review (a new offer) or Changes (an edit).
+ * currency and tax above the lines) · Delivery & payment · Warranty & conditions, then Review (a new offer) or Changes (an edit).
  */
 export type OfferStep = "factory" | "prices" | "terms" | "conditions" | "review" | "changes";
 /** The offer's parts: the steps that hold its fields, and its page's boxes. */
 export type OfferPart = Exclude<OfferStep, "review" | "changes">;
-export const OFFER_PART_LABEL: Record<OfferPart, string> = { factory: "Supplier", prices: "Prices", terms: "Delivery & payment", conditions: "Conditions" };
+export const OFFER_PART_LABEL: Record<OfferPart, string> = { factory: "Supplier", prices: "Prices", terms: "Delivery & payment", conditions: "Warranty & conditions" };
 const STEP_ICON: Record<OfferStep, typeof Factory> = {
   factory: Factory,
   prices: Tag,
@@ -1020,7 +1020,7 @@ export function OfferHeaderForm({
             )}
 
             {step === "conditions" && (
-              <PanelSection quiet first title="Conditions" className={grid}>
+              <PanelSection quiet first title="Warranty & conditions" className={grid}>
                 <div className={cn("contents", changedField("warrantyMonths"))}>
                   <WarrantyFields
                     idPrefix="fq"
@@ -1082,7 +1082,7 @@ export function OfferHeaderForm({
                   {linesReview?.(h)}
                 </ReviewBox>
                 <div className="grid gap-3.5 md:grid-cols-2 md:items-start">
-                  <ReviewBox title="Conditions" onEdit={() => setStep("conditions")}>
+                  <ReviewBox title="Warranty & conditions" onEdit={() => setStep("conditions")}>
                     <Facts
                       rows={[
                         ["Warranty", s.warrantyMonths.trim() ? `${s.warrantyMonths.trim()} months from ${WARRANTY_FROM_LABEL[s.warrantyFrom]}` : "—"],
@@ -1226,7 +1226,7 @@ const OFFER_STEPS: { key: OfferStep; label: string }[] = [
   { key: "factory", label: "Supplier" },
   { key: "prices", label: "Prices" },
   { key: "terms", label: "Delivery & payment" },
-  { key: "conditions", label: "Conditions" },
+  { key: "conditions", label: "Warranty & conditions" },
   { key: "review", label: "Review" },
   { key: "changes", label: "Changes" },
 ];

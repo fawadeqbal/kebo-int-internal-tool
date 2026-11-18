@@ -28,9 +28,9 @@ describe("a new supplier offer starts fresh", () => {
 
   it("choosing a supplier fills nothing from its last offer", async () => {
     show();
-    // The window is in steps (design 18 Nov): Factory · Prices · Delivery & payment · Conditions · Review.
+    // The window is in steps (design 18 Nov): Factory · Prices · Delivery & payment · Warranty & conditions · Review.
     const step = (name: RegExp) =>
-      fireEvent.click(screen.getByRole("navigation", { name: "Steps" }).querySelectorAll("button")[["Supplier", "Prices", "Delivery & payment", "Conditions", "Review"].findIndex((n) => name.test(n))]!);
+      fireEvent.click(screen.getByRole("navigation", { name: "Steps" }).querySelectorAll("button")[["Supplier", "Prices", "Delivery & payment", "Warranty & conditions", "Review"].findIndex((n) => name.test(n))]!);
     step(/Delivery/);
     fireEvent.change(document.getElementById("leadDays") as HTMLInputElement, { target: { value: "40" } });
     step(/Supplier/);
