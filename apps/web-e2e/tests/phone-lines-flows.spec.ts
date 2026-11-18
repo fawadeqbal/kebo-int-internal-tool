@@ -361,7 +361,11 @@ test.describe("the smallest phone (320 × 568)", () => {
     await expect(list.getByRole("button")).toHaveCount(2);
     await expect(win.getByRole("searchbox", { name: "Find an item" })).toBeVisible();
     // (The list back at its top: a price box half under the sticky tools is not a target to judge.)
-    await list.getByLabel("Unit price CNY for 1").scrollIntoViewIfNeeded();
+    await list.evaluate((el) => {
+      let box = el.parentElement;
+      while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
+      box?.scrollTo(0, 0);
+    });
     expect(await accessibilityProblems(page), "the items list on the smallest phone meets WCAG 2.2 AA").toEqual([]);
     expect(errors).toEqual([]);
   });
