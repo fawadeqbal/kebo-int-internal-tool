@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { countChanges } from "./change-words";
 
 type FieldEl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 
@@ -98,13 +99,13 @@ export function valuesByName(box: HTMLElement): Map<string, string> {
 }
 
 /**
- * How many of a window's fields differ from what it opened with, as it is typed (canvas board "One edit window":
- * "Save 2 changes", or "No changes"): the start is taken once the window is drawn; `recount` after each input
+ * How many of a window's fields differ from what it opened with, as it is typed — changed (or removed) and added
+ * apart, for changeWords ("No changes", "Save", "Save 2 changes"): the start is taken once the window is drawn; `recount` after each input
  * (a moment later, so values that follow a field — a hidden one kept in state — are counted too).
  */
 export function useChangeCount(box: RefObject<HTMLElement | null>) {
   const start = useRef<Map<string, string> | null>(null);
-  const [count, setCount] = useState(0);
+  const [counts, setCounts] = useState({ changed: 0, added: 0 });
   useEffect(() => {
     const t = setTimeout(() => {
       if (box.current) start.current = valuesByName(box.current);
@@ -116,10 +117,10 @@ export function useChangeCount(box: RefObject<HTMLElement | null>) {
       if (!box.current || !start.current) return;
       const now = valuesByName(box.current);
       const was = start.current;
-      let n = 0;
-      for (const k of new Set([...was.keys(), ...now.keys()])) if ((was.get(k) ?? "").trim() !== (now.get(k) ?? "").trim()) n += 1;
-      setCount(n);
+      // Added (an empty field filled) is not a change (canvas group 9): it is counted apart.
+      const next = countChanges([...new Set([...was.keys(), ...now.keys()])].map((k) => ({ from: was.get(k) ?? "", to: now.get(k) ?? "" })));
+      setCounts((c) => (c.changed === next.changed && c.added === next.added ? c : next));
     }, 0);
   }, [box]);
-  return { count, recount };
+  return { ...counts, recount };
 }

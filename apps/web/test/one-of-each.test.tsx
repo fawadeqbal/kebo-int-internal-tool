@@ -121,6 +121,14 @@ describe("one of each", () => {
     expect(found(/function UrlWindow\(/g)).toHaveLength(1);
   });
 
+  it("one set of change words: no hand-made Save N changes, Changed · was, or empty/none as a value", () => {
+    expect(found(/`Save \$\{|: `Save \d/g).filter((m) => !m.includes("change-words.tsx"))).toEqual([]);
+    expect(found(/Changed · was \{/g).filter((m) => !m.includes("change-words.tsx"))).toEqual([]);
+    expect(found(/function (WasHint|ChangeLine)\(/g)).toEqual([]);
+    expect(found(/\$\{c\.label\}:? \$\{c\.from\} → /g)).toEqual([]);
+    expect(found(/\|\| "empty"/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

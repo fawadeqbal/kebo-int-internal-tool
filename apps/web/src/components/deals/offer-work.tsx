@@ -15,6 +15,7 @@ import { PaperFacts, PaperLayout } from "@/components/records/paper-boxes";
 import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
 import { recordEditAction } from "@/lib/edit-actions";
 import { ConfirmDialog } from "@/components/common/dialog";
+import { changeLine } from "@/components/common/change-words";
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, dateTime, money as amount } from "@/lib/format";
 import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
@@ -290,7 +291,7 @@ function OfferWindow({
     if (saved.reason)
       for (const part of ["factory", "prices", "terms", "conditions"] as OfferPart[]) {
         const list = saved.changes.filter((c) => c.part === part);
-        const added = part === "factory" ? files.map((f) => `Added ${f.name}`) : [];
+        const added = part === "factory" ? files.map((f) => `Added · File: ${f.name}`) : [];
         if (!list.length && !added.length) continue;
         await recordEditAction({
           type: "factory_quote",
@@ -298,7 +299,7 @@ function OfferWindow({
           card: `offer.${part}`,
           kind: "edit",
           reason: saved.reason,
-          changes: [...list.map((c) => `${c.label}: ${c.from} → ${c.to}`), ...added],
+          changes: [...list.map((c) => changeLine(c.label, c.from, c.to)), ...added],
           keys: list.map((c) => c.key),
         }).catch(() => undefined);
       }

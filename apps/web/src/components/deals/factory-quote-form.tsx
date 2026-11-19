@@ -25,6 +25,7 @@ import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
+import { ChangeHint, changeCount, changedClassOf, changeKind, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
 import { FooterTotal, PANEL_FORM, PanelSection, useReportDirty, useReportLost, WindowCancel } from "@/components/common/panel";
 import { StepsFrame } from "@/components/common/steps-frame";
 import { ChoiceChips } from "@/components/common/choice-chips";
@@ -412,23 +413,23 @@ export type OfferChange = { key: string; label: string; from: string; to: string
 
 /** What changed between how the window opened and now, in words, part by part. */
 export function offerChanges(a: QuoteState, b: QuoteState): OfferChange[] {
-  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "none");
-  const day = (d: string) => (d ? date(d) : "none");
+  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "");
+  const day = (d: string) => (d ? date(d) : "");
   const tax = (x: QuoteState) => {
     const r = Number(x.taxRate || 0);
     return r > 0 ? `${r}% ${x.taxIncluded ? "included" : "added"}` : "no tax";
   };
-  const lead = (x: QuoteState) => (x.leadDays.trim() ? leadWords(Number(x.leadDays) || 0, x.leadFrom, "factory") : x.leadTime.trim() || "none");
-  const plan = (x: QuoteState) => (x.parts.length ? x.parts.map((p) => `${p.share}%`).join(" / ") : "none");
-  const warranty = (x: QuoteState) => (x.warrantyMonths.trim() ? `${x.warrantyMonths.trim()} months from ${WARRANTY_FROM_LABEL[x.warrantyFrom]}` : "none");
+  const lead = (x: QuoteState) => (x.leadDays.trim() ? leadWords(Number(x.leadDays) || 0, x.leadFrom, "factory") : x.leadTime.trim() );
+  const plan = (x: QuoteState) => (x.parts.length ? x.parts.map((p) => `${p.share}%`).join(" / ") : "");
+  const warranty = (x: QuoteState) => (x.warrantyMonths.trim() ? `${x.warrantyMonths.trim()} months from ${WARRANTY_FROM_LABEL[x.warrantyFrom]}` : "");
   const all: (OfferChange & { same: boolean })[] = [
-    { key: "factory", label: "Supplier", from: a.factory?.name ?? "none", to: b.factory?.name ?? "none", part: "factory", same: (a.factory?.id ?? a.factory?.name) === (b.factory?.id ?? b.factory?.name) },
+    { key: "factory", label: "Supplier", from: a.factory?.name ?? "", to: b.factory?.name ?? "", part: "factory", same: (a.factory?.id ?? a.factory?.name) === (b.factory?.id ?? b.factory?.name) },
     { key: "receivedOn", label: "Received on", from: day(a.receivedOn), to: day(b.receivedOn), part: "factory", same: a.receivedOn === b.receivedOn },
     { key: "validUntil", label: "Valid until", from: day(a.validUntil), to: day(b.validUntil), part: "factory", same: a.validUntil === b.validUntil },
     { key: "reference", label: "Their reference", from: short(a.reference), to: short(b.reference), part: "factory", same: a.reference.trim() === b.reference.trim() },
     { key: "currency", label: "Currency", from: a.currency.toUpperCase(), to: b.currency.toUpperCase(), part: "prices", same: a.currency.trim().toUpperCase() === b.currency.trim().toUpperCase() },
     { key: "tax", label: "Tax", from: tax(a), to: tax(b), part: "prices", same: tax(a) === tax(b) },
-    { key: "basis", label: "Incoterm", from: a.basis || "none", to: b.basis || "none", part: "terms", same: a.basis === b.basis },
+    { key: "basis", label: "Incoterm", from: a.basis , to: b.basis , part: "terms", same: a.basis === b.basis },
     { key: "basisPlace", label: b.basis === "EXW" ? "Town" : "Port", from: short(a.basisPlace), to: short(b.basisPlace), part: "terms", same: a.basisPlace.trim() === b.basisPlace.trim() },
     { key: "lead", label: "Lead time", from: lead(a), to: lead(b), part: "terms", same: lead(a) === lead(b) },
     { key: "parts", label: "Payment", from: plan(a), to: plan(b), part: "terms", same: JSON.stringify(partsPayload(a.parts, "factory")) === JSON.stringify(partsPayload(b.parts, "factory")) },
@@ -560,29 +561,31 @@ export function OfferHeaderForm({
   // An edit (design rules 18 Nov): each change, the save that counts them, and why — asked only when something changed.
   const fieldChanges = useMemo(() => (create ? [] : offerChanges(start, s)), [create, start, s]);
   const changedOf = (k: string) => fieldChanges.find((c) => c.key === k);
-  const total = fieldChanges.length + linesChanges.length + filesAdded.length;
+  // Added is not a change (canvas group 9): an empty field filled, a new item, a file are counted apart,
+  // and only what replaced or cleared a saved value asks Why?.
+  const fieldCounts = countChanges(fieldChanges);
+  const linesAdded = linesChanges.filter((x) => x.startsWith("Added ")).length;
+  const counts = { changed: fieldCounts.changed + linesChanges.length - linesAdded, added: fieldCounts.added + linesAdded + filesAdded.length };
+  const total = counts.changed + counts.added;
   const changesIn = (k: OfferStep) =>
     k === "changes"
       ? total
       : fieldChanges.filter((c) => c.part === k).length + (k === "prices" ? linesChanges.length : 0) + (k === "factory" ? filesAdded.length : 0);
   const [why, setWhy] = useState("");
-  const needWhy = !create && total > 0;
+  const needWhy = !create && counts.changed > 0;
   // Something changed: Save asks why, once, in a sheet (canvas board "Why the change? at Save").
   const canSave = create || total > 0;
   const [askWhy, setAskWhy] = useState(false);
   const formId = useId();
-  const saveLabel = total ? `Save ${total} change${total === 1 ? "" : "s"}` : "No changes";
+  const saveLabel = changeWords(counts);
   const changedNote = (k: string) => {
     const c = changedOf(k);
-    return c ? (
-      <span className="flex items-center gap-1.5 text-xs font-semibold text-action">
-        <span aria-hidden className="size-1.5 rounded-full bg-action-solid" />
-        Changed · was {c.from}
-      </span>
-    ) : null;
+    return c ? <ChangeHint was={c.from} now={c.to} onUndo={() => undo(k)} /> : null;
   };
-  const changedField = (k: string) =>
-    changedOf(k) ? "[&_:is(input,select,textarea)]:border-action/70 [&_[aria-checked=true]]:border-action" : undefined;
+  const changedField = (k: string) => {
+    const c = changedOf(k);
+    return c ? changedClassOf(c.from, c.to) : undefined;
+  };
   const whySheet = (
     <ReasonSheet
       open={askWhy && needWhy}
@@ -591,8 +594,8 @@ export function OfferHeaderForm({
       value={why}
       onChange={setWhy}
       formId={formId}
-      title={total === 1 ? "Why the change?" : "Why these changes?"}
-      what={`${total} change${total === 1 ? "" : "s"}: ${[...fieldChanges.map((c) => `${c.label} ${c.from} → ${c.to}`), ...linesChanges].slice(0, 2).join(" · ")}`}
+      title={counts.changed === 1 ? "Why the change?" : "Why these changes?"}
+      what={`${changeCount(counts)}: ${[...fieldChanges.filter((c) => changeKind(c.from, c.to) !== "added").map((c) => changeLine(c.label, c.from, c.to)), ...linesChanges].slice(0, 2).join(" · ")}`}
       saveLabel={saveLabel}
     />
   );
@@ -617,7 +620,7 @@ export function OfferHeaderForm({
         linesCount && linesCount !== "no lines yet" ? `Items: ${linesCount}` : null,
         filesAdded.length ? `Files: ${filesAdded.join(", ")}` : null,
       ].filter((x): x is string => !!x)
-    : [...fieldChanges.map((c) => `${c.label}: ${c.from} → ${c.to}`), ...linesChanges.slice(0, 4), ...filesAdded.map((f) => `File to add: ${f}`)];
+    : [...fieldChanges.map((c) => changeLine(c.label, c.from, c.to)), ...linesChanges.slice(0, 4), ...filesAdded.map((f) => `File to add: ${f}`)];
   const lostKey = lost.join("\n");
   useEffect(() => {
     reportLost(
@@ -1022,14 +1025,14 @@ export function OfferHeaderForm({
                             {c.label}
                           </span>
                           <span className="block sm:hidden">
-                            <s className="text-muted">{c.from}</s> → <b className="font-semibold">{c.to}</b>
+                            <Was was={c.from} /> → <Now now={c.to} />
                           </span>
                         </span>
                         <span role="cell" title={c.from} className="min-w-0 truncate max-sm:hidden">
-                          <s className="text-muted">{c.from}</s>
+                          <Was was={c.from} />
                         </span>
-                        <span role="cell" title={c.to} className="min-w-0 truncate font-semibold max-sm:hidden">
-                          {c.to}
+                        <span role="cell" title={c.to} className="min-w-0 truncate max-sm:hidden">
+                          <Now now={c.to} />
                         </span>
                         <span role="cell" className="text-right">
                           <Button type="button" size="xs" variant="ghost" onClick={() => undo(c.key)} className="text-primary hover:text-primary" aria-label={`Undo: ${c.label}`}>
