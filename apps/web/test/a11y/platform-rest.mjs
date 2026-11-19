@@ -219,7 +219,7 @@ for (const viewport of [
 
   // The log: a kind chip and the Excel file.
   await go(page, "/platform/log");
-  await page.locator("nav[aria-label='Filter the log'] a", { hasText: "Client inquiries" }).first().click();
+  await page.locator("nav[aria-label='Kinds of entry'] a", { hasText: "Client inquiries" }).first().click();
   await page.waitForURL(/kind=inquiries/);
   ok(/kind=inquiries/.test(page.url()), "log: kind filter in the URL");
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Excel" }).click()]);

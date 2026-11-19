@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FilterCard } from "@/components/common/filter-card";
 import { FileSpreadsheet } from "lucide-react";
 import { PLATFORM_LOG_KINDS, platformLogKind, type PlatformLogKind } from "@kebo/shared";
 import {
@@ -8,7 +9,7 @@ import {
   Card,
   DataRow,
   EmptyState,
-  ListToolbar,
+  LinkTabs,
   PageHeader,
   Pager,
   PhoneList,
@@ -50,20 +51,18 @@ export default async function PlatformLogPage({ searchParams }: { searchParams: 
         title="Platform log"
         summary="Everything done on the platform. What a platform admin does inside a company is also in that company's own audit log."
       />
-      <ListToolbar
-        search={{ placeholder: "What or who", value: sp.q, clearHref: href({ q: undefined }) }}
-        keep={keep}
-        label="Filter the log"
-        chips={[
-          { key: "all", label: "All", count: log.counts.all ?? 0, href: href({ kind: undefined }), active: !log.kind },
-          ...kinds.map((k) => ({
-            key: k,
-            label: kindLabel(k),
-            count: log.counts[k] ?? 0,
-            href: href({ kind: log.kind === k ? undefined : k }),
-            active: log.kind === k,
-          })),
+      <LinkTabs
+        look="tabs"
+        label="Kinds of entry"
+        tabs={[
+          { label: "All", count: log.counts.all ?? 0, href: href({ kind: undefined }), active: !log.kind },
+          ...kinds.map((k) => ({ label: kindLabel(k), count: log.counts[k] ?? 0, href: href({ kind: log.kind === k ? undefined : k }), active: log.kind === k })),
         ]}
+      />
+      <FilterCard
+        search="What or who"
+        value={sp.q}
+        keep={keep}
         end={
           <a href={buildHref("/platform/log/excel", {}, keep)} download className={buttonClass("secondary", "sm")} title="Export to Excel">
             <FileSpreadsheet aria-hidden /> Excel

@@ -80,6 +80,14 @@ describe("one of each", () => {
     expect(SOURCES.filter((s) => /deals\/documents-panel\.tsx$/.test(s.file))).toEqual([]);
   });
 
+  it("one filter row and one tab row: the second strip, the unused navs and the reports' own side list stay deleted", () => {
+    expect(found(/export function (?:ListToolbar|FilterBar|SearchField|SectionNav)\b/g)).toEqual([]);
+    expect(found(/<ListToolbar\b/g)).toEqual([]);
+    expect(found(/export function SectionList\b/g).filter((f) => !f.includes("packages/ui"))).toEqual([]);
+    // TabRow lives in ui; the app re-exports it, and LinkTabs' "tabs" look draws it.
+    expect(found(/export function TabRow\b/g).filter((f) => !f.includes("packages/ui"))).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

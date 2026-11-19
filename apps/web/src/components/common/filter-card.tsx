@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
-import { cn, RULES } from "@kebo/ui";
+import { cn, RULES, searchFrameClass, controlSizes } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "./floating";
 
 export interface FilterSelect {
@@ -415,7 +415,7 @@ export function FilterCard({
 
   return (
     <div role="search" aria-label="Filter the list" aria-busy={pending} className="mb-4 flex flex-wrap items-center gap-2">
-      <label className={cn("relative flex h-10 min-w-0 flex-[0_1_340px] items-center rounded-[10px] border border-line-strong bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 max-sm:h-11", selects.length ? "max-sm:flex-1" : "max-sm:basis-full")}>
+      <label className={cn(searchFrameClass, controlSizes.md, "relative flex min-w-0 flex-[0_1_340px] items-center", selects.length ? "max-sm:flex-1" : "max-sm:basis-full")}>
         <span className="sr-only">{search.replace(/…$/, "")}</span>
         {pending ? (
           <LoaderCircle className="pointer-events-none absolute left-3 size-4 animate-spin text-muted" aria-hidden />
@@ -433,7 +433,7 @@ export function FilterCard({
             if (text.trim() !== shown) go({ q: text.trim() || undefined });
           }}
           placeholder={search}
-          className="h-full w-full min-w-0 bg-transparent pr-9 pl-9 text-md text-text outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:appearance-none"
+          className="h-full w-full min-w-0 bg-transparent pr-9 pl-9 text-sm text-text outline-none placeholder:text-muted max-sm:text-base [&::-webkit-search-cancel-button]:appearance-none"
         />
         {text && (
           <button

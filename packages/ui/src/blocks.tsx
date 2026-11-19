@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Pending } from "./pending";
+
 import type { ReactNode } from "react";
 import { AlertTriangle, Check, CheckCircle2, Plus, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
@@ -498,75 +498,6 @@ export interface SectionNavItem {
   alert?: boolean;
   /** After the label: a short status in a small grey pill ("Written", "No offers", "R2 draft"). */
   tag?: string;
-}
-
-/**
- * Where you are in a record or a module, always visible (design system:
- * section navigation): numbered steps (orders, inquiries) or a list of
- * sections (Insights, Settings), with counts that show progress. From a
- * tablet up, a row of links on a line; on a phone, a row of chips that
- * scrolls sideways with the current one filled (`phone="chips"`), or nothing
- * when the page has its own phone picker (`phone="none"`).
- */
-export function SectionNav({
-  label,
-  items,
-  phone = "chips",
-  className,
-}: {
-  label: string;
-  items: SectionNavItem[];
-  phone?: "chips" | "none";
-  className?: string;
-}) {
-  return (
-    <>
-      <nav aria-label={label} className={cn("no-print hidden md:block", className)}>
-        <ul className="flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {items.map((l) => (
-            <li key={l.href} className="shrink-0">
-              <Link
-                href={l.href}
-                aria-current={l.active ? "page" : undefined}
-                className={cn(
-                  "flex h-9 items-center gap-1.5 rounded-[10px] border px-3 text-md whitespace-nowrap transition-colors [&_svg]:size-4",
-                  l.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface font-medium text-text-2 hover:border-line-strong hover:text-text",
-                )}
-              >
-                {l.mark}
-                <span>{l.label}</span>
-                {l.count !== undefined && l.count !== null && l.count !== "" && (
-                  <span className={cn("-ml-0.5 tabular", l.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{l.count}</span>
-                )}
-                {l.tag && (
-                  <span className={cn("rounded-lg px-[7px] py-px text-2xs font-medium", l.alert ? "bg-bad-soft text-bad" : l.active ? "bg-surface text-primary" : "bg-bg text-muted")}>{l.tag}</span>
-                )}
-                <Pending />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      {phone === "chips" && (
-        <nav aria-label={label} className={cn("no-print -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden", className)}>
-          {items.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              aria-current={l.active ? "page" : undefined}
-              className={cn(
-                "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-md font-medium whitespace-nowrap",
-                l.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:text-text",
-              )}
-            >
-              {l.label}
-              {l.count !== undefined && l.count !== null && l.count !== "" && <span className={cn("tabular", l.alert && "text-bad")}>{l.count}</span>}
-            </Link>
-          ))}
-        </nav>
-      )}
-    </>
-  );
 }
 
 /* ---------------------------------------------------------------- SectionList (Settings frame) */
