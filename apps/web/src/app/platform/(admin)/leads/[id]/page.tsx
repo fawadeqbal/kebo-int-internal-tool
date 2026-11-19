@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { COMPANY_KIND_LABEL, LEAD_SOURCE_LABEL, LEAD_STATUS_LABEL, suggestSlug } from "@kebo/shared";
-import { ButtonLink, buttonClass, Card, EmptyState, PageHeader, StatusBadge, EmptyLine, CardHeader } from "@kebo/ui";
+import { ButtonLink, buttonClass, Card, EmptyState, StatusBadge, EmptyLine, CardHeader } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { loadPlatform } from "@/lib/platform";
 import { date, dateTime } from "@/lib/format";
@@ -14,7 +14,8 @@ import { PanelButton } from "../../companies/[id]/cards";
 import { NoteForm } from "./forms";
 import { LeadPanels, ProgressSteps } from "./panels";
 import { cache } from "react";
-import { RecordBody } from "@/components/records/record-frame";
+import { RecordShell } from "@/components/records/record-frame";
+import { RecordTop } from "@/components/records/record-page";
 
 /** The client inquiry, read once per request (the page and its tab title). */
 const leadOf = cache((id: string) => loadPlatform(() => platformApi.get<LeadDetail>(`/leads/${id}`)));
@@ -89,24 +90,27 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        backHref="/platform/leads"
-        backLabel="Client inquiries"
-        phoneStack
-        title={l.companyName}
-        badge={<StatusBadge meaning={MEANING[l.status]}>{LEAD_STATUS_LABEL[l.status]}</StatusBadge>}
-        summary={summary.join(" · ")}
-        primary={primary}
-        papers={!company ? <PanelButton panel="give-demo">Give a demo</PanelButton> : undefined}
-        more={
-          <MoreMenu
-            label={`More for ${l.companyName}`}
-            items={more}
-            phoneItems={!company ? [{ label: "Give a demo", panel: "give-demo" }] : []}
+      <RecordShell
+        top={
+          <RecordTop
+            header={{
+              backHref: "/platform/leads",
+              backLabel: "Client inquiries",
+              title: l.companyName,
+              badge: <StatusBadge meaning={MEANING[l.status]}>{LEAD_STATUS_LABEL[l.status]}</StatusBadge>,
+              summary: summary.join(" · "),
+              primary: primary,
+              papers: !company ? <PanelButton panel="give-demo">Give a demo</PanelButton> : undefined,
+              more: (
+                <MoreMenu
+        label={`More for ${l.companyName}`}
+        items={more}
+        phoneItems={!company ? [{ label: "Give a demo", panel: "give-demo" }] : []}
+      />
+              ),
+            }}
           />
         }
-      />
-      <RecordBody
         panelLabel="Beside the client inquiry"
         panel={
           <>
@@ -264,7 +268,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               ...(l.origin?.cta ? [{ label: "Button pressed", value: l.origin.cta, readOnly: true }] : []),
             ]}
           />
-      </RecordBody>
+      </RecordShell>
       <LeadPanels l={l} plans={plans} suggested={suggested} update={updateLeadAction.bind(null, id)} demo={giveDemoAction.bind(null, id)} />
     </div>
   );

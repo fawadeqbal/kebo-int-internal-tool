@@ -175,6 +175,7 @@ describe("one of each", () => {
       "purchase-orders/[order]/[supplier]/page.tsx",
       "payments/[kind]/[id]/page.tsx",
       "users/[id]/page.tsx",
+      "platform/(admin)/leads/[id]/page.tsx",
     ];
     for (const r of records) {
       const src = SOURCES.find(({ file }) => file.endsWith(r));
