@@ -172,7 +172,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         }
         primary={
           canAdd && (
-            <OpenPanelButton panel="new-customer" variant="primary" label="Add customer">
+            <OpenPanelButton panel="new-customer" variant="strong" label="Add customer">
               <Plus aria-hidden /> <span className="sm:hidden">Add</span>
               <span className="max-sm:hidden">Add customer</span>
             </OpenPanelButton>

@@ -764,7 +764,7 @@ export function OfferHeaderForm({
   const bar = "sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4";
   const back =
     !only && at > 0 ? (
-      <Button type="button" variant="ghost" onClick={() => go(at - 1)} aria-label="Back" className="max-md:size-11 max-md:px-0">
+      <Button type="button" variant="ghost" onClick={() => go(at - 1)} aria-label="Back" className="max-md:px-0 max-md:aspect-square">
         <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
       </Button>
     ) : (
@@ -777,7 +777,7 @@ export function OfferHeaderForm({
       <FooterTotal line />
       {back}
       <span className="flex-1 max-md:hidden" />
-      <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
+      <WindowCancel className="max-md:flex-1" />
       {step === "review" ? (
         <>
           {onAnother && (
@@ -796,7 +796,7 @@ export function OfferHeaderForm({
               Review
             </Button>
           )}
-          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
+          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:flex-1">
             Next <ChevronRight aria-hidden />
           </Button>
         </>
@@ -810,7 +810,7 @@ export function OfferHeaderForm({
         <FooterTotal line />
         {back}
         <span className="flex-1 max-md:hidden" />
-        <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
+        <WindowCancel className="max-md:flex-1" />
         {only || step === "changes" ? (
           <SubmitButton variant="strong" size="lg" disabled={!canSave} pendingText="Saving…" className="max-md:flex-1">
             <Check aria-hidden /> {saveLabel}
@@ -822,7 +822,7 @@ export function OfferHeaderForm({
                 Changes{total ? ` · ${total}` : ""}
               </Button>
             )}
-            <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
+            <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:flex-1">
               Next <ChevronRight aria-hidden />
             </Button>
           </>

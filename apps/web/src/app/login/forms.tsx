@@ -88,7 +88,7 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
         <input type="checkbox" name="keep" defaultChecked className="size-[18px] accent-primary-solid" />
         Keep me signed in
       </label>
-      <SubmitButton pendingText="Signing in…" className="h-11 w-full text-lead">
+      <SubmitButton pendingText="Signing in…" className="w-full">
         Sign in
       </SubmitButton>
       {state.message && state.code !== "choose_company" && <Alert tone="error">{state.message}</Alert>}

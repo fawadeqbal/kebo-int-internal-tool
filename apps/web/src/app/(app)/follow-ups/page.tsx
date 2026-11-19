@@ -122,7 +122,7 @@ export default async function FollowUpsPage({
         summary="Your reminders to call, visit or chase"
         primary={
           <PanelButton
-            variant="primary"
+            variant="strong"
             icon={<Plus aria-hidden />}
             label="Add follow-up"
             title="New follow-up"
@@ -267,8 +267,7 @@ export default async function FollowUpsPage({
                           {f.can.edit && (
                             <PanelButton
                               variant="ghost"
-                              size="sm"
-                              className="size-9 px-0"
+                              size="icon-sm"
                               icon={<Pencil aria-hidden />}
                               label={<span className="sr-only">Edit {f.title}</span>}
                               title="Edit follow-up"

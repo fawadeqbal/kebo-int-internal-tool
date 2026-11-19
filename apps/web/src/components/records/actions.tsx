@@ -72,7 +72,7 @@ export function recordActions(menuLabel: string, list: RecordAction[]): { primar
     );
   else if (primary && "panel" in primary)
     strong = (
-      <OpenPanelButton panel={primary.panel} id={primary.panelId} variant="primary" size="sm" label={primary.ariaLabel}>
+      <OpenPanelButton panel={primary.panel} id={primary.panelId} variant="strong" size="sm" label={primary.ariaLabel}>
         {primary.icon} {primary.label}
       </OpenPanelButton>
     );

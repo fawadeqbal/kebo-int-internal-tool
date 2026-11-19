@@ -21,7 +21,6 @@ import { orderTitle } from "@/lib/titles";
 
 export const generateMetadata = orderTitle("Delivery and SAT");
 
-const SMALL = "h-8 px-2.5 text-md";
 const RESULT_TONE = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" } as const;
 
 /** A day some months later (YYYY-MM-DD), kept inside the month it lands in. */
@@ -80,7 +79,6 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
   const linesButton = canEdit && goodsLines.length > 0 && (
     <PanelButton
       size="sm"
-      className={SMALL}
       label="Edit items"
       title="Delivery"
       description="How many of each item reached the customer, and in what condition. Nothing is saved until Save changes."
@@ -170,7 +168,6 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
                 {canEdit && (
                   <PanelButton
                     size="sm"
-                    className={SMALL}
                     label="Points"
                     title="The SAT points"
                     description="Each point: Pass, Fail or N/A, and a note."

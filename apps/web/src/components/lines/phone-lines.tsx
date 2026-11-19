@@ -478,14 +478,14 @@ function UnitPicker({ c, id, value, set, error, used }: { c: LineColumn; id: str
       {typing ? (
         <span className="flex gap-2">
           <Input ref={box} id={id} value={value} onChange={(e) => set(e.target.value)} maxLength={c.maxLength ?? 20} className="h-12 min-w-0 flex-1 text-base" />
-          <Button
+          <Button size="lg"
             ref={button}
             variant="secondary"
             aria-label="Pick from the list"
             aria-haspopup="menu"
             aria-expanded={open}
             onClick={() => setOpen((o) => !o)}
-            className="size-12 shrink-0 px-0 max-sm:size-12"
+            className="aspect-square shrink-0 px-0"
           >
             <ChevronDown aria-hidden />
           </Button>
@@ -736,30 +736,30 @@ export function LineWindow({
       <div className="flex items-center gap-2 border-t border-line bg-surface px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {!isNew && (
           <>
-            <Button variant="secondary" aria-label="Previous" onClick={() => save("prev")} disabled={!hasPrev || busy} className="size-12 shrink-0 px-0">
+            <Button size="lg" variant="secondary" aria-label="Previous" onClick={() => save("prev")} disabled={!hasPrev || busy} className="aspect-square shrink-0 px-0">
               <ChevronLeft aria-hidden />
             </Button>
-            <Button variant="secondary" aria-label="Next" onClick={() => save("next")} disabled={!hasNext || busy} className="size-12 shrink-0 px-0">
+            <Button size="lg" variant="secondary" aria-label="Next" onClick={() => save("next")} disabled={!hasNext || busy} className="aspect-square shrink-0 px-0">
               <ChevronRight aria-hidden />
             </Button>
           </>
         )}
-        <Button variant="secondary" data-window-cancel="" onClick={close} disabled={busy} className={cn("h-12 text-lead", isNew ? "shrink-0 px-3.5" : "flex-1")}>
+        <Button variant="secondary" data-window-cancel="" onClick={close} disabled={busy} className={cn(isNew ? "shrink-0 px-3.5" : "flex-1")}>
           Cancel
         </Button>
         {isNew ? (
           // Add (adds it and closes) and the strong Add & next (the next one opens, ready to type), side by side.
           <>
-            <Button variant="soft" onClick={() => save("close")} disabled={busy} className="h-12 flex-1 text-lead">
+            <Button variant="soft" onClick={() => save("close")} disabled={busy} className="flex-1">
               Add
             </Button>
-            <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-12 flex-[1.4] text-lead">
+            <Button size="lg" variant="primary" onClick={() => save("next")} disabled={busy} className="flex-[1.4]">
               {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />} {busy ? "Adding…" : nextLabel}
             </Button>
           </>
         ) : (
           // Save (and close); › beside ‹ saves and opens the next one.
-          <Button variant="primary" onClick={() => save("close")} disabled={busy} className="h-12 flex-1 text-lead">
+          <Button size="lg" variant="primary" onClick={() => save("close")} disabled={busy} className="flex-1">
             {busy ? "Saving…" : "Save"}
           </Button>
         )}

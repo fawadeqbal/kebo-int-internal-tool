@@ -8,43 +8,51 @@ import { Filter, House, Info, Package, Settings, ShieldCheck, ShoppingCart, Tren
 import { cn } from "./cn";
 
 /* ---------------------------------------------------------------- Button */
-export type ButtonVariant = "primary" | "strong" | "soft" | "brand" | "secondary" | "ghost" | "danger" | "danger-ghost" | "danger-line" | "trust" | "link";
+/**
+ * The one button (canvas "RFQ Desk — the pieces", board "The one button: seven kinds, three sizes, every state").
+ * Kinds, each one job:
+ *   strong    the page's one next step (orange, bold, a glow) — one per screen; on a phone pinned at the bottom
+ *   primary   Main: the one way to finish a window — Save, Send, Record (green)
+ *   soft      a step forward that is not the finish: Next in a steps window
+ *   secondary Plain: every other act — + Add, Send request, View, Cancel
+ *   ghost     Quiet: a box's own ✎ Edit and the clock, a row's tools
+ *   danger-line Danger: Remove, Cancel the order — always asks first; danger (solid red) only on that confirm
+ *   link      words in a sentence or a table cell
+ * "brand" and "danger-ghost" are kept as names of primary and danger-line.
+ */
+export type ButtonVariant = "primary" | "strong" | "soft" | "brand" | "secondary" | "ghost" | "danger" | "danger-ghost" | "danger-line" | "link";
+/**
+ * Three sizes, never smaller on a phone: sm 32 (phone 40) in boxes and rows · md 40 (44) in windows and forms ·
+ * lg 44 (48) for the strong one. "xs" and "icon-xs" are kept as names of sm and icon-sm. No page sets a height.
+ */
 export type ButtonSize = "xs" | "sm" | "md" | "lg" | "icon" | "icon-sm" | "icon-xs";
 
 const buttonBase =
-  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold whitespace-nowrap transition-colors select-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0";
+  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold whitespace-nowrap transition-colors select-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0";
+const main = "bg-primary-solid text-primary-fg shadow-card hover:bg-primary-solid-hover";
+const dangerLine = "border border-bad/30 bg-surface text-bad hover:bg-bad-soft";
 const buttonVariants: Record<ButtonVariant, string> = {
-  /* The page's one main action: orange. */
-  primary: "bg-action-solid text-white shadow-card hover:bg-action-solid-hover",
-  /* The one button that finishes the job (design rules 18 Nov): orange, bold, a light glow. One per screen. */
-  strong: "bg-action-solid font-bold text-white shadow-[0_6px_16px_rgba(194,81,10,0.28)] hover:bg-action-solid-hover",
-  /* A step forward that is not the finish (Next): light orange, so the strong button stays the one that stands out. */
+  strong: "bg-action-solid font-bold text-white shadow-[0_6px_16px_color-mix(in_srgb,var(--action-solid)_28%,transparent)] hover:bg-action-solid-hover",
+  primary: main,
+  brand: main,
   soft: "border border-action/20 bg-action-soft text-action hover:border-action/45",
-  /* Green: the brand, for a second positive action beside the orange one (Save draft). */
-  brand: "bg-primary-solid text-primary-fg shadow-card hover:bg-primary-solid-hover",
   secondary: "border border-line-strong bg-surface text-text shadow-card hover:bg-surface-2",
   ghost: "text-text-2 hover:bg-surface-2 hover:text-text",
+  "danger-line": dangerLine,
+  "danger-ghost": dangerLine,
   danger: "bg-bad-solid text-white shadow-card hover:opacity-90",
-  "danger-ghost": "text-bad hover:bg-bad-soft",
-  /* Discard, Delete beside a strong button: red words in a white box. */
-  "danger-line": "border border-bad/30 bg-surface text-bad hover:bg-bad-soft",
-  trust: "bg-trust text-white shadow-card hover:opacity-90 dark:text-bg",
   link: "h-auto px-0 text-primary underline-offset-4 hover:underline",
 };
-/**
- * Compact everywhere (asked 17 Nov: buttons took too much room on a phone): on a phone a size steps down one
- * notch, and on a touch screen nothing is under 32 px each way, above WCAG 2.2's 24 px (2.5.8).
- */
+const small = " max-sm:h-10 max-sm:px-3.5";
+const iconSmall = "size-8 [&_svg]:size-3.5 max-sm:size-10";
 const buttonSizes: Record<ButtonSize, string> = {
-  xs: "h-7 rounded-lg px-2 text-xs [&_svg]:size-3.5 pointer-coarse:h-8 pointer-coarse:min-w-8 pointer-coarse:px-2.5",
-  // Design rule 10 (sizes): buttons 32–40 on a laptop, 40–44 on a phone (a thumb, not a pointer); the strong
-  // one 44, 48 on a phone. A button never gets smaller on a phone.
-  sm: "h-9 px-3 text-md max-sm:h-10 max-sm:px-3.5",
+  xs: small,
+  sm: small,
   md: "h-10 px-3.5 max-sm:h-11 max-sm:px-4",
-  lg: "h-11 px-5 max-sm:h-12",
-  icon: "size-10",
-  "icon-sm": "size-9",
-  "icon-xs": "size-7 rounded-md [&_svg]:size-3.5 pointer-coarse:size-8",
+  lg: "h-11 px-5 text-lead max-sm:h-12",
+  icon: "size-10 max-sm:size-11",
+  "icon-sm": iconSmall,
+  "icon-xs": iconSmall,
 };
 
 export function buttonClass(variant: ButtonVariant = "secondary", size: ButtonSize = "md", className?: string) {

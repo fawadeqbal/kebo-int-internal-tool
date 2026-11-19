@@ -128,7 +128,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
           </>
         }
         primary={
-          <OpenPanelButton panel="new-factory" variant="primary" label="Add supplier">
+          <OpenPanelButton panel="new-factory" variant="strong" label="Add supplier">
             <Plus aria-hidden /> <span className="sm:hidden">Add</span>
             <span className="max-sm:hidden">Add supplier</span>
           </OpenPanelButton>

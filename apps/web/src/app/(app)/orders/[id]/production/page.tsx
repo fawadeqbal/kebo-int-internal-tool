@@ -17,7 +17,6 @@ import { orderTitle } from "@/lib/titles";
 
 export const generateMetadata = orderTitle("Production");
 
-const SMALL = "h-8 px-2.5 text-md";
 const DAY = 86_400_000;
 
 /**
@@ -215,7 +214,6 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               <>
                 <PanelButton
                   size="sm"
-                  className={SMALL}
                   label="Edit items"
                   title="Goods from the supplier"
                   description="What has come in on each item, and when. Nothing is saved until Save changes."

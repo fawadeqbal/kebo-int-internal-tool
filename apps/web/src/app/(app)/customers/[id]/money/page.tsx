@@ -149,7 +149,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
                 </ButtonLink>
               )}
               {can(me, "payments.record") && (
-                <ButtonLink href={`/payments/new?kind=in&customer=${c.id}&back=/customers/${c.id}/money`} variant="primary" size="sm">
+                <ButtonLink href={`/payments/new?kind=in&customer=${c.id}&back=/customers/${c.id}/money`} variant="secondary" size="sm">
                   <Banknote aria-hidden /> Record payment
                 </ButtonLink>
               )}

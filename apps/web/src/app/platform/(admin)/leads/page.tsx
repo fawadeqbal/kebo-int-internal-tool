@@ -54,7 +54,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           </>
         }
         primary={
-          <ButtonLink href="/platform/leads/new" variant="primary">
+          <ButtonLink href="/platform/leads/new" variant="strong">
             <Plus aria-hidden /> Add client inquiry
           </ButtonLink>
         }

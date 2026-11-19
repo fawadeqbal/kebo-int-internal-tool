@@ -337,14 +337,14 @@ export function FileChip({
         {full.viewHref && (
           <button
             type="button"
-            className={buttonClass("ghost", "icon-xs", "size-6")}
+            className={buttonClass("ghost", "icon-sm")}
             aria-label={`View ${full.name}`}
             onClick={() => tools.view(full, set)}
           >
             <Eye aria-hidden />
           </button>
         )}
-        <a href={full.href} download className={buttonClass("ghost", "icon-xs", "size-6")} aria-label={`Download ${full.name}`}>
+        <a href={full.href} download className={buttonClass("ghost", "icon-sm")} aria-label={`Download ${full.name}`}>
           <Download aria-hidden />
         </a>
         <FileMenuButton file={full} set={set} className="size-6" />

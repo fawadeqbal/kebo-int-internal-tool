@@ -52,7 +52,6 @@ export function useOpenFromLink(name: string | undefined, open: () => void) {
 /** The quiet words that open a window from a table row. */
 export const ROW_LINK = "text-md font-medium whitespace-nowrap text-primary hover:underline";
 
-const SMALL = "h-8 px-2.5 text-md";
 
 /** The button that opens a window, in its look (WindowButton); the same for every kind of window. */
 export function WindowOpener({ button, disabled, onClick }: { button: WindowButton; disabled?: boolean; onClick: () => void }) {
@@ -82,7 +81,7 @@ export function WindowOpener({ button, disabled, onClick }: { button: WindowButt
   // "main" is a box's own act (Record payment, Add): plain like the others — the page's one orange button is the
   // header's next step (canvas row "The order on the same pieces": no orange buttons in boxes).
   return (
-    <Button size="sm" disabled={disabled} variant={kind === "danger" ? "danger" : "secondary"} className={SMALL} onClick={onClick}>
+    <Button size="sm" disabled={disabled} variant={kind === "danger" ? "danger" : "secondary"} onClick={onClick}>
       {button.label}
     </Button>
   );

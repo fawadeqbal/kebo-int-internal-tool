@@ -81,7 +81,7 @@ export default async function DashboardPage() {
             </Suspense>
           )}
           {can(me, "inquiries.create") && (
-            <ButtonLink href="/inquiries?panel=new-inquiry" variant="primary">
+            <ButtonLink href="/inquiries?panel=new-inquiry" variant="strong">
               <Plus aria-hidden /> Add inquiry
             </ButtonLink>
           )}

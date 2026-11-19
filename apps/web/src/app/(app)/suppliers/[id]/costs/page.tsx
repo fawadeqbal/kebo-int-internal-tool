@@ -124,7 +124,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
                 </ButtonLink>
               )}
               {(can(me, "payments.record") || can(me, "expenses.manage")) && (
-                <ButtonLink href={`/payments/new?kind=out&factory=${f.id}&back=/suppliers/${f.id}/costs`} variant="primary" size="sm">
+                <ButtonLink href={`/payments/new?kind=out&factory=${f.id}&back=/suppliers/${f.id}/costs`} variant="secondary" size="sm">
                   <Banknote aria-hidden /> Pay supplier
                 </ButtonLink>
               )}
