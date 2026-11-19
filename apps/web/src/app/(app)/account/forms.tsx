@@ -4,10 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound, Smartphone } from "lucide-react";
 import { Button, Field, Input, Notice } from "@kebo/ui";
-import { SubmitButton, toast } from "@kebo/ui/client";
+import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
+import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PasswordForm } from "@/components/people/password-form";
 import type { ActionState } from "@/lib/actions";
 import type { TwoStepStatus } from "@/lib/types-people";
 
@@ -30,45 +31,6 @@ export function PasswordEdit({ action }: { action: Action }) {
   );
 }
 
-export function PasswordForm({ action, onSaved }: { action: Action; onSaved?: () => void }) {
-  return (
-    <ActionForm
-      action={action}
-      resetOnSuccess
-      showSuccess={false}
-      className={PANEL_FORM}
-      onDone={(r) => {
-        toast(r.message ?? "Password changed");
-        onSaved?.();
-      }}
-    >
-      {(s) => (
-        <>
-          <PanelSection first className="sm:grid-cols-1">
-            <Field label="Current password" htmlFor="current" error={s.errors?.current}>
-              <Input id="current" name="current" type="password" autoComplete="current-password" aria-invalid={!!s.errors?.current} />
-            </Field>
-            <Field
-              label="New password"
-              htmlFor="next"
-              error={s.errors?.next}
-              hint="At least 10 characters, with letters and a number"
-            >
-              <Input id="next" name="next" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.next} />
-            </Field>
-            <Field label="New password again" htmlFor="confirm" error={s.errors?.confirm}>
-              <Input id="confirm" name="confirm" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.confirm} />
-            </Field>
-          </PanelSection>
-          <WindowFooter>
-            <SubmitButton pendingText="Changing…">Change my password</SubmitButton>
-            <PanelKeys />
-          </WindowFooter>
-        </>
-      )}
-    </ActionForm>
-  );
-}
 
 function CodeField({ id, error, label = "Code from your app" }: { id: string; error?: string[]; label?: string }) {
   return (

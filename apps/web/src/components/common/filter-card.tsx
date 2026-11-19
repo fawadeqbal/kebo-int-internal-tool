@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
-import { cn, RULES, searchFrameClass, controlSizes, EmptyLine } from "@kebo/ui";
+import { cn, RULES, searchFrameClass, controlSizes, EmptyLine, Button } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "./floating";
 
 export interface FilterSelect {
@@ -310,12 +310,12 @@ function FilterSheet({
           })}
         </div>
         <div className="flex gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
-          <button type="button" onClick={onClear} disabled={!anyOn} className="h-12 shrink-0 rounded-xl border border-line-strong px-4 text-lead font-semibold text-text disabled:opacity-50">
+          <Button size="lg" onClick={onClear} disabled={!anyOn}>
             Clear
-          </button>
-          <button type="button" onClick={onClose} className="h-12 flex-1 rounded-xl bg-action-solid px-4 text-lead font-semibold text-white shadow-sm">
+          </Button>
+          <Button size="lg" variant="strong" onClick={onClose} className="flex-1">
             {count ? `Show ${count}` : "Show the list"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,

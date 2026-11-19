@@ -316,9 +316,6 @@ export function CardBody({ className, ...props }: ComponentProps<"div">) {
   return <div className={cn("p-4 sm:p-5", className)} {...props} />;
 }
 
-export function CardFooter({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("flex items-center justify-end gap-2 border-t border-line px-4 py-3 sm:px-5", className)} {...props} />;
-}
 
 /* ---------------------------------------------------------------- Page structure */
 
