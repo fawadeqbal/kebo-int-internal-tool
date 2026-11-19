@@ -372,13 +372,30 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
   );
   let body: ReactNode;
   if (set === "factory") {
-    const totals = new Map<string, number>();
+    // Before tax · Tax · Total with tax (as on the supplier's offer), per currency; no tax: the total alone.
+    const gross = new Map<string, number>();
+    const net = new Map<string, number>();
     for (const l of lines) {
       const p = l.factoryPrice;
       if (!p?.currency) continue;
-      totals.set(p.currency, (totals.get(p.currency) ?? 0) + multiplyMinor(factoryUnitCostMinor(toMinor(p.unitPrice), p.taxRate, p.taxIncluded), l.quantity));
+      const unit = toMinor(p.unitPrice);
+      const rate = Number(p.taxRate) || 0;
+      const before = p.taxIncluded && rate ? Math.round(unit / (1 + rate / 100)) : unit;
+      gross.set(p.currency, (gross.get(p.currency) ?? 0) + multiplyMinor(factoryUnitCostMinor(unit, p.taxRate, p.taxIncluded), l.quantity));
+      net.set(p.currency, (net.get(p.currency) ?? 0) + multiplyMinor(before, l.quantity));
     }
-    body = totals.size ? item("Supplier total", [...totals].map(([c, m]) => formatMinor(m, c)).join(" + ")) : null;
+    const say = (m: Map<string, number>) => [...m].map(([c, x]) => formatMinor(x, c)).join(" + ");
+    const tax = new Map([...gross].map(([c, g]) => [c, g - (net.get(c) ?? g)]));
+    const taxed = [...tax.values()].some((x) => x > 0);
+    body = !gross.size ? null : taxed ? (
+      <>
+        {item("Before tax", say(net))}
+        {item("Tax", say(tax))}
+        {item("Total with tax", say(gross))}
+      </>
+    ) : (
+      item("Supplier total", say(gross))
+    );
   } else if (set === "received") {
     const done = lines.filter((l) => stateOf(Number(l.receivedQty), Number(l.quantity)) === "in").length;
     body = item("Received", `${done} of ${lines.length}`);

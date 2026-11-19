@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { OrderSection } from "@kebo/shared";
 import { Pencil } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { useChangeCount } from "@/components/common/changes";
 import { PANEL_FORM, PanelBody, PanelFooter, SidePanel, WhatHappens } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { WindowFiles } from "./section-files";
@@ -87,11 +88,28 @@ export function WindowOpener({ button, disabled, onClick }: { button: WindowButt
   );
 }
 
-function Foot({ submit, danger, note }: { submit: string; danger?: boolean; note?: ReactNode }) {
+function Foot({ submit, danger, note, disabled }: { submit: string; danger?: boolean; note?: ReactNode; disabled?: boolean }) {
   return (
     <PanelFooter start={note}>
-      <SubmitButton variant={danger ? "danger" : "primary"}>{submit}</SubmitButton>
+      <SubmitButton variant={danger ? "danger" : "primary"} disabled={disabled}>
+        {submit}
+      </SubmitButton>
     </PanelFooter>
+  );
+}
+
+/**
+ * The inside of an Edit window: its fields, counted as they are typed — the button says "No changes" (nothing to
+ * save) or "Save 2 changes" (useChangeCount; the same rule as every edit window).
+ */
+function Counted({ children, foot }: { children: ReactNode; foot: (words: string, none: boolean) => ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const { count, recount } = useChangeCount(box);
+  return (
+    <div ref={box} className="contents" onInput={recount} onChange={recount}>
+      {children}
+      {foot(count === 0 ? "No changes" : count === 1 ? "Save 1 change" : `Save ${count} changes`, count === 0)}
+    </div>
   );
 }
 
@@ -135,6 +153,7 @@ export function SectionWindow({
 }) {
   const [open, setOpen] = useState(false);
   useOpenFromLink(name, () => setOpen(true));
+  const counts = (button.kind ?? "edit") === "edit" && submit === "Save";
   return (
     <>
       <WindowOpener button={button} onClick={() => setOpen(true)} />
@@ -142,14 +161,24 @@ export function SectionWindow({
         <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && "md:w-[460px]", size === "md" && "md:w-[600px]")}>
           <PanelBody>
             <ActionForm action={action} onDone={() => setOpen(false)} showSuccess={false} className={PANEL_FORM}>
-              {(s) => (
-                <>
-                  {typeof children === "function" ? children(s) : children}
-                  {whats && whats.length > 0 && <WhatHappens lines={whats} />}
-                  {files && <WindowFiles {...files} />}
-                  <Foot submit={submit} danger={danger} note={note} />
-                </>
-              )}
+              {(s) => {
+                const body = (
+                  <>
+                    {typeof children === "function" ? children(s) : children}
+                    {whats && whats.length > 0 && <WhatHappens lines={whats} />}
+                    {files && <WindowFiles {...files} />}
+                  </>
+                );
+                // An Edit of saved values counts its changes; a window that does something says what it does.
+                return counts ? (
+                  <Counted foot={(words, none) => <Foot submit={words} danger={danger} note={note} disabled={none} />}>{body}</Counted>
+                ) : (
+                  <>
+                    {body}
+                    <Foot submit={submit} danger={danger} note={note} />
+                  </>
+                );
+              }}
             </ActionForm>
           </PanelBody>
         </SidePanel>

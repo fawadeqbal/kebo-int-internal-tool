@@ -190,7 +190,7 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(form.getByRole("link", { name: "Open the payment plan" })).toBeVisible();
   expect(await accessibilityProblems(page), "the Edit window meets WCAG 2.2 AA").toEqual([]);
   await form.locator("#agr-pod").fill("Karachi");
-  await form.getByRole("button", { name: "Save", exact: true }).click();
+  await form.getByRole("button", { name: /^Save \d+ changes?$/ }).click();
   await form.getByRole("button", { name: "Agreed a new port" }).click();
   await form.getByRole("button", { name: "Save with this reason" }).click();
   await expect(form).toBeHidden();
@@ -232,7 +232,7 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(terms.getByText(/Not sent yet/)).toBeVisible();
   expect(await accessibilityProblems(page), "the supplier's Change window meets WCAG 2.2 AA").toEqual([]);
   await terms.locator("#fac-lead").fill("35");
-  await terms.getByRole("button", { name: "Save", exact: true }).click();
+  await terms.getByRole("button", { name: /^Save \d+ changes?$/ }).click();
   await expect(terms).toBeHidden();
   await expect(factory.getByText("35 days after the deposit")).toBeVisible();
   // The purchase order's paper prints it.
