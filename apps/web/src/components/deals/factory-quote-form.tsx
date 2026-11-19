@@ -2,7 +2,7 @@
 
 import { Picker } from "@/components/common/picker";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Factory, History, ShieldCheck, Tag, Truck } from "lucide-react";
+import { ChevronDown, CircleCheck, Factory, History, ShieldCheck, Tag, Truck } from "lucide-react";
 import { fxRate } from "@kebo/money";
 import {
   basisText,
@@ -26,8 +26,8 @@ import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
 import { ChangeHint, changeCount, changedClassOf, changeKind, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
-import { FooterTotal, PANEL_FORM, PanelSection, useReportDirty, useReportLost, WindowCancel } from "@/components/common/panel";
-import { StepsFrame } from "@/components/common/steps-frame";
+import { PANEL_FORM, PanelSection, useReportDirty, useReportLost } from "@/components/common/panel";
+import { StepsFooter, StepsFrame } from "@/components/common/steps-frame";
 import { ChoiceChips } from "@/components/common/choice-chips";
 import { ReasonSheet } from "@/components/edits/reason-chips";
 import { date, money } from "@/lib/format";
@@ -642,73 +642,32 @@ export function OfferHeaderForm({
   const leadWordsWere = quote && quote.leadDays === null && quote.leadTime && !s.leadTime ? quote.leadTime : null;
   const warrantyWordsWere = quote && quote.warrantyMonths === null && quote.warranty && parseWarranty(quote.warranty) ? quote.warranty : null;
 
-  const bar = "sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4";
-  const back =
-    !only && at > 0 ? (
-      <Button type="button" variant="ghost" onClick={() => go(at - 1)} aria-label="Back" className="max-md:px-0 max-md:aspect-square">
-        <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
-      </Button>
-    ) : (
-      footerStart
-    );
+  // The one steps footer (StepsFooter): ‹ Back (or a note), Cancel, a quiet jump, Next — or the strong save.
   const footer = create ? (
-    // One strong button (design rules 18 Nov): Next is soft, Back and Review are words; Cancel beside them (canvas row "Cancel, not ✕").
-    // On a phone the items' total is a line of its own above them (design "Items on a small phone").
-    <div data-window-footer="" className={cn(bar, "max-sm:flex-wrap")}>
-      <FooterTotal line />
-      {back}
-      <span className="flex-1 max-md:hidden" />
-      <WindowCancel className="max-md:flex-1" />
-      {step === "review" ? (
-        <>
-          {onAnother && (
-            <SubmitButton variant="ghost" pendingText="Saving…" onClick={() => onAnother()} className="max-md:hidden">
-              Save and add another
-            </SubmitButton>
-          )}
-          <SubmitButton variant="strong" size="lg" pendingText="Saving…" className="max-md:flex-1">
-            <Check aria-hidden /> Confirm and save
+    <StepsFooter
+      onBack={!only && at > 0 ? () => go(at - 1) : null}
+      start={footerStart}
+      jump={at < STEPS.length - 2 ? { label: "Review", onClick: () => setStep("review") } : null}
+      onNext={step === "review" ? null : () => go(at + 1)}
+      save={{
+        label: "Confirm and save",
+        also: onAnother && (
+          <SubmitButton variant="ghost" pendingText="Saving…" onClick={() => onAnother()} className="max-md:hidden">
+            Save and add another
           </SubmitButton>
-        </>
-      ) : (
-        <>
-          {at < STEPS.length - 2 && (
-            <Button type="button" variant="ghost" onClick={() => setStep("review")} className="max-md:hidden">
-              Review
-            </Button>
-          )}
-          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:flex-1">
-            Next <ChevronRight aria-hidden />
-          </Button>
-        </>
-      )}
-    </div>
+        ),
+      }}
+    />
   ) : (
     <>
       {whySheet}
-      <div data-window-footer="" className={cn(bar, "max-sm:flex-wrap")}>
-        {/* On a phone the items' total on its own line above the buttons: Cancel · Save (canvas row "Cancel, not ✕"). */}
-        <FooterTotal line />
-        {back}
-        <span className="flex-1 max-md:hidden" />
-        <WindowCancel className="max-md:flex-1" />
-        {only || step === "changes" ? (
-          <SubmitButton variant="strong" size="lg" disabled={!canSave} pendingText="Saving…" className="max-md:flex-1">
-            <Check aria-hidden /> {saveLabel}
-          </SubmitButton>
-        ) : (
-          <>
-            {at < STEPS.length - 2 && (
-              <Button type="button" variant="ghost" onClick={() => setStep("changes")} className="max-md:hidden">
-                Changes{total ? ` · ${total}` : ""}
-              </Button>
-            )}
-            <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:flex-1">
-              Next <ChevronRight aria-hidden />
-            </Button>
-          </>
-        )}
-      </div>
+      <StepsFooter
+        onBack={!only && at > 0 ? () => go(at - 1) : null}
+        start={footerStart}
+        jump={at < STEPS.length - 2 ? { label: `Changes${total ? ` · ${total}` : ""}`, onClick: () => setStep("changes") } : null}
+        onNext={only || step === "changes" ? null : () => go(at + 1)}
+        save={{ label: saveLabel, disabled: !canSave }}
+      />
     </>
   );
 
