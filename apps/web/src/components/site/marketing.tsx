@@ -437,7 +437,7 @@ export function MarketingPage({
           <div className="mx-auto grid max-w-[76rem] gap-8 bg-(--s-green-solid) px-5 py-12 text-white sm:rounded-3xl sm:px-10 lg:grid-cols-2 lg:gap-14 lg:p-14">
             <div>
               <h2 className="s-display text-[clamp(1.9rem,4vw,3rem)]">{c.cta.title}</h2>
-              {c.cta.text && <p className="s-lead mt-3 max-w-[32rem] text-lg text-white/85">{c.cta.text}</p>}
+              {c.cta.text && <p className="s-lead mt-3 max-w-[32rem] text-lg text-white">{c.cta.text}</p>}
               <div className="mt-7 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
                 <a href={links.demo("closing")} className={strongBtn}>
                   {c.hero.primary}
@@ -504,7 +504,7 @@ function ContactLines({ contact }: { contact: SiteContent["contact"] }) {
     <ul className="mt-10 flex flex-col gap-3 text-lg">
       {lines.map((l) => (
         <li key={l.href}>
-          <a href={l.href} className="inline-flex items-center gap-3 text-white/90 underline-offset-4 hover:text-white hover:underline">
+          <a href={l.href} className="inline-flex items-center gap-3 text-white underline-offset-4 hover:text-white hover:underline">
             {l.icon}
             {l.label}
           </a>
