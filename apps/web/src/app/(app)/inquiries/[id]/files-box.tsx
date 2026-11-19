@@ -7,7 +7,7 @@ import { ATTACHMENT_KIND_LABEL, type AttachmentKind } from "@kebo/shared";
 import { buttonClass } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { FileRow, FileZone } from "@/components/common/file-zone";
-import { send } from "@/components/deals/documents-panel";
+import { send } from "@/components/files/upload";
 import { rowKey } from "@/components/deals/form-bits";
 
 /**

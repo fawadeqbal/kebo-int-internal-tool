@@ -1,5 +1,6 @@
 "use client";
 
+import { SegmentedChoice } from "@kebo/ui/client";
 import Link from "next/link";
 import { useState } from "react";
 import { Card, CardHeader, cn } from "@kebo/ui";
@@ -37,22 +38,15 @@ export function PerformanceView({
         title={title}
         description={description}
         actions={
-          <div role="group" aria-label="Which span" className="inline-flex rounded-lg border border-line bg-surface-2 p-0.5">
-            {(["year", "all"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={scope === s}
-                onClick={() => setScope(s)}
-                className={cn(
-                  "inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-text-2 hover:text-text",
-                  scope === s && "bg-surface text-text shadow-card",
-                )}
-              >
-                {s === "year" ? `Year ${yearLabel}` : "All time"}
-              </button>
-            ))}
-          </div>
+          <SegmentedChoice
+            label="Which span"
+            value={scope}
+            onChange={setScope}
+            options={[
+              { value: "year", label: `Year ${yearLabel}` },
+              { value: "all", label: "All time" },
+            ]}
+          />
         }
       />
       <ul

@@ -1,5 +1,6 @@
 "use client";
 
+import { ChoiceChips } from "@/components/common/choice-chips";
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, Plus } from "lucide-react";
@@ -331,24 +332,13 @@ export function AnswerButton({
       </Button>
       {open && (
         <SidePanel title={`Customer answered · ${refNo} R${number}`} description={customer} onClose={() => setOpen(false)} className="md:w-[760px]">
-          <div role="radiogroup" aria-label="Their answer" className="flex flex-wrap gap-2 px-6 pt-4 max-md:px-4">
-            {choices.map((c) => (
-              <button
-                key={c.key}
-                type="button"
-                role="radio"
-                aria-checked={answer === c.key}
-                onClick={() => setAnswer(c.key)}
-                className={cn(
-                  "h-9 rounded-full border px-4 text-md font-semibold",
-                  answer === c.key ? "border-primary bg-primary-soft text-primary" : "border-line-strong bg-surface text-text hover:bg-surface-2",
-                )}
-              >
-                {c.label}
-                {c.key === "expired" && overdue ? " · ran out" : ""}
-              </button>
-            ))}
-          </div>
+          <ChoiceChips
+            label="Their answer"
+            className="px-6 pt-4 max-md:px-4"
+            value={answer ?? ""}
+            items={choices.map((c) => ({ value: c.key, label: c.key === "expired" && overdue ? `${c.label} · ran out` : c.label }))}
+            onChange={setAnswer}
+          />
           {answer === "accepted" && (
             <AcceptForm options={options} currency={currency} action={answerAction} today={today} route={route} others={others} onOrder={(o) => router.push(`/orders/${o.orderId}`)} />
           )}

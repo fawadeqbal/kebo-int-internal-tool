@@ -1,10 +1,11 @@
 "use client";
 
+import { ChoiceChips } from "@/components/common/choice-chips";
 import { useState } from "react";
 import Link from "next/link";
-import { Check, LayoutGrid, Trash2, UserRound } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { PARTY_TYPE_LABEL, PARTY_TYPES, customerLetters, UNKNOWN_COUNTRY, type PartyType } from "@kebo/shared";
-import { Alert, Button, buttonClass, Card, CardBody, CardFooter, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Alert, Button, buttonClass, Card, CardBody, CardFooter, Checkbox, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelActions, PanelBody } from "@/components/common/panel";
@@ -137,21 +138,7 @@ export function CustomerForm({
         <input type="hidden" name="payload" value={payload} />
         {inPanel && <input type="hidden" name="inPanel" value="1" />}
         {/* Board "New customer window": Company / Individual, then the fields in three columns. */}
-        <div role="radiogroup" aria-label="Type" className="flex gap-2">
-          {PARTY_TYPES.map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="radio"
-              aria-checked={draft.type === t}
-              onClick={() => set("type", t)}
-              className={cn(buttonClass(draft.type === t ? "brand" : "secondary", "sm"), "gap-1.5")}
-            >
-              {t === "company" ? <LayoutGrid aria-hidden /> : <UserRound aria-hidden />}
-              {PARTY_TYPE_LABEL[t]}
-            </button>
-          ))}
-        </div>
+        <ChoiceChips label="Type" value={draft.type} options={PARTY_TYPES} labels={PARTY_TYPE_LABEL} onChange={(v) => set("type", v)} />
         <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-3">
           <Field label="Name" required htmlFor="name" error={s.errors?.name} className="sm:col-span-2">
             <Input

@@ -1,5 +1,6 @@
 "use client";
 
+import { FileRow as ChosenFile, FileZone } from "@/components/common/file-zone";
 import { lockScroll } from "@/lib/scroll-lock";
 import { useTime } from "@/lib/time-client";
 import {
@@ -351,102 +352,6 @@ export function FileChip({
       </span>
       {menu && phone && <FileMenu file={full} set={set} anchor={() => ref.current} onClose={() => setMenu(false)} />}
     </span>
-  );
-}
-
-/** A file as a row of a list: icon, name · size, what it is attached to, step, who · when, and its tools. */
-export function FileRow({
-  file,
-  set,
-  selected,
-  onSelect,
-  showStep = true,
-}: {
-  file: OrderFile;
-  set?: OrderFile[];
-  selected?: boolean;
-  onSelect?: (on: boolean) => void;
-  showStep?: boolean;
-}) {
-  const t = useTime();
-  const tools = useFileTools();
-  const phone = useIsPhone();
-  const ref = useRef<HTMLButtonElement>(null);
-  const [menu, setMenu] = useState(false);
-  return (
-    <li
-      data-target={`file.${file.sourceId}`}
-      className={cn(
-        "grid items-center gap-x-3 gap-y-0.5 border-b border-line py-2 last:border-b-0",
-        onSelect ? "grid-cols-[20px_18px_minmax(0,1fr)_auto]" : "grid-cols-[18px_minmax(0,1fr)_auto]",
-        showStep
-          ? onSelect
-            ? "md:grid-cols-[20px_18px_minmax(0,1.6fr)_minmax(0,1.3fr)_112px_136px_auto]"
-            : "md:grid-cols-[18px_minmax(0,1.6fr)_minmax(0,1.3fr)_112px_136px_auto]"
-          : onSelect
-            ? "md:grid-cols-[20px_18px_minmax(0,1.6fr)_minmax(0,1.3fr)_136px_auto]"
-            : "md:grid-cols-[18px_minmax(0,1.6fr)_minmax(0,1.3fr)_136px_auto]",
-        selected && "-mx-2 rounded-md bg-primary-soft px-2",
-      )}
-    >
-      {onSelect && (
-        <input
-          type="checkbox"
-          className="size-4 accent-[var(--primary)]"
-          aria-label={`Choose ${file.name}`}
-          checked={!!selected}
-          onChange={(e) => onSelect(e.target.checked)}
-        />
-      )}
-      <FileIcon file={file} />
-      <button
-        ref={ref}
-        type="button"
-        onClick={() => (phone ? setMenu(true) : tools?.view(file, set))}
-        className="min-w-0 truncate text-left text-sm"
-      >
-        <span className="font-medium hover:text-primary">{file.name}</span>
-        <span className="text-xs text-muted"> · {fileSize(file.size)}</span>
-        {file.version > 1 && <span className="text-xs text-muted"> · v{file.version}</span>}
-        <span className="block truncate text-xs text-muted md:hidden">
-          {[file.attachedTo.label, showStep ? file.stepLabel : null, file.by?.name, t.dayMonth(file.at)].filter(Boolean).join(" · ")}
-        </span>
-      </button>
-      <span className="hidden min-w-0 md:block">
-        <Link
-          href={file.attachedTo.href}
-          className="inline-flex h-6 max-w-full items-center truncate rounded-full bg-surface-2 px-2.5 text-xs hover:text-primary"
-        >
-          <span className="truncate">{file.attachedTo.label}</span>
-        </Link>
-      </span>
-      {showStep && <span className="hidden truncate text-xs text-text-2 md:block">{file.stepLabel}</span>}
-      <span className="hidden truncate text-xs text-muted md:block">
-        {file.by?.name ?? "System"} · {t.dayMonth(file.at)}
-      </span>
-      <span className="flex items-center justify-end gap-0.5">
-        {file.viewHref && (
-          <button
-            type="button"
-            className={buttonClass("ghost", "icon-xs", "hidden sm:inline-flex")}
-            aria-label={`View ${file.name}`}
-            onClick={() => tools?.view(file, set)}
-          >
-            <Eye aria-hidden />
-          </button>
-        )}
-        <a
-          href={file.href}
-          download
-          className={buttonClass("ghost", "icon-xs", "hidden sm:inline-flex")}
-          aria-label={`Download ${file.name}`}
-        >
-          <Download aria-hidden />
-        </a>
-        <FileMenuButton file={file} set={set} />
-      </span>
-      {menu && phone && <FileMenu file={file} set={set} anchor={() => ref.current} onClose={() => setMenu(false)} />}
-    </li>
   );
 }
 
@@ -880,9 +785,9 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
           }}
         >
           {error && <Alert tone="error">{error}</Alert>}
-          <Field label="The newer file" htmlFor={`${id}-f`}>
-            <Input id={`${id}-f`} type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="pt-1.5" />
-          </Field>
+          <FileZone label="The newer file" inputId={`${id}-f`} optional={false} compact one onFiles={(fs) => setFile(fs[0] ?? null)}>
+            {file && <ChosenFile name={file.name} />}
+          </FileZone>
           <Buttons pending={pending} save="Replace" onClose={onClose} />
         </form>
       </Modal>

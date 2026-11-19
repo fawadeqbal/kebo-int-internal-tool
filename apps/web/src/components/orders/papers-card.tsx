@@ -1,5 +1,6 @@
 "use client";
 
+import { FileRow, FileZone } from "@/components/common/file-zone";
 import { useId, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -105,9 +106,9 @@ export function RecordForm({
     <form action={submit} className="mt-2 flex flex-col gap-3 rounded-lg border border-line bg-surface p-3">
       {error && <Alert tone="error">{error}</Alert>}
       {mode === "upload" ? (
-        <Field label="The file" htmlFor={`${id}-file`}>
-          <Input id={`${id}-file`} type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="pt-1.5" />
-        </Field>
+        <FileZone label="The file" inputId={`${id}-file`} optional={false} compact one onFiles={(fs) => setFile(fs[0] ?? null)}>
+            {file && <FileRow name={file.name} />}
+          </FileZone>
       ) : (
         <Field label="Where is it" htmlFor={`${id}-where`}>
           <Input
