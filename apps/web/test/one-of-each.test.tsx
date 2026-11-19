@@ -194,6 +194,12 @@ describe("one of each", () => {
       expect(SOURCES.find(({ file }) => file.endsWith(f))!.text, f).toMatch(/<TabList\b/);
   });
 
+  it("one steps footer: no steps window types its own footer bar", () => {
+    expect(found(/function OnePartFooter\(/g)).toEqual([]);
+    expect(found(/data-window-footer="" className="sticky bottom-0/g).filter((m) => !m.includes("steps-frame.tsx"))).toEqual([]);
+    expect(found(/const bar = "sticky bottom-0/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

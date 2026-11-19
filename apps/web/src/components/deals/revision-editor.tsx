@@ -46,7 +46,7 @@ import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { PANEL_FORM, PanelSection, useReportDirty, WindowFooter } from "@/components/common/panel";
-import { OnePartFooter, StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
+import { StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
 import { PriceSheet, PriceTotals } from "./price-editor";
 import { shortName } from "./offer-facts";
 import {
@@ -1038,17 +1038,14 @@ export function RevisionEditor({
                 heading={stepCheck(step)}
                 single={only}
                 footer={
-                  only ? (
-                    <OnePartFooter onCancel={onCancel} canSave={!requireChanges || dirty} />
-                  ) : (
                   <StepsFooter
-                    first={stepAt === 0}
-                    last={stepAt === QUOTE_STEPS.length - 1}
-                    onBack={() => setStep(QUOTE_STEPS[Math.max(0, stepAt - 1)]!.key)}
-                    onNext={() => setStep(QUOTE_STEPS[Math.min(QUOTE_STEPS.length - 1, stepAt + 1)]!.key)}
-                    canSave={!requireChanges || dirty}
+                    onCancel={onCancel}
+                    onBack={only || stepAt === 0 ? null : () => setStep(QUOTE_STEPS[stepAt - 1]!.key)}
+                    // Save is the one strong button on the last step; before it, a quiet Save once something changed.
+                    jump={!only && (!requireChanges || dirty) ? { label: "Save now" } : null}
+                    onNext={only || stepAt === QUOTE_STEPS.length - 1 ? null : () => setStep(QUOTE_STEPS[stepAt + 1]!.key)}
+                    save={{ label: "Save", disabled: requireChanges && !dirty }}
                   />
-                  )
                 }
               >
                 {sections}

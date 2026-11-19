@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, CircleCheck, Download, Eye, FileText, History, List, Paperclip, Pencil, Sparkles, Trash2, UserRound } from "lucide-react";
+import { ChevronRight, CircleCheck, Download, Eye, FileText, History, List, Paperclip, Pencil, Sparkles, Trash2, UserRound } from "lucide-react";
 import {
   ATTACHMENT_KIND_LABEL,
   CHANNEL_LABEL,
@@ -17,12 +17,12 @@ import {
   type AttachmentKind,
 } from "@kebo/shared";
 import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice, Badge, EmptyLine } from "@kebo/ui";
-import { SubmitButton, toast } from "@kebo/ui/client";
+import { toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { ChangeHint, changeCount, changedClassOf, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
-import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens, WindowCancel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
-import { StepsFrame } from "@/components/common/steps-frame";
+import { StepsFooter, StepsFrame } from "@/components/common/steps-frame";
 import { CountrySelect } from "@/components/people/country-select";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { countryName } from "@/lib/countries";
@@ -433,105 +433,31 @@ export function DealForm({
               fill={step === "items"}
               footer={
                 step === "customer" && adding !== null ? (
-                  <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
-                    <Button type="button" variant="ghost" onClick={() => setAdding(null)}>
-                      <ChevronLeft aria-hidden /> Back to search
-                    </Button>
-                    <span className="flex-1" />
-                    <Button
-                      type="button"
-                      variant="strong"
-                      size="lg"
-                      disabled={addingBusy}
-                      onClick={() => newCustomer.current?.save()}
-                     
-                    >
-                      <Check aria-hidden /> {addingBusy ? "Adding…" : "Add and use"}
-                    </Button>
-                  </div>
+                  <StepsFooter
+                    cancel={false}
+                    onBack={() => setAdding(null)}
+                    backLabel="Back to search"
+                    save={{ label: addingBusy ? "Adding…" : "Add and use", busy: addingBusy, onClick: () => newCustomer.current?.save() }}
+                  />
                 ) : !create ? (
                   <>
-                  {whySheet}
-                  <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
-                    {!only && at > 0 ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => go(at - 1)}
-                        aria-label="Back"
-                        className="max-md:px-0 max-md:aspect-square"
-                      >
-                        <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
-                      </Button>
-                    ) : (
-                      lastChanged && <span className="text-xs text-text-2 max-md:hidden">Last changed {lastChanged}</span>
-                    )}
-                    <span className="flex-1 max-md:hidden" />
-                    <WindowCancel className="max-md:flex-1" />
-                    {only || step === "changes" ? (
-                      <SubmitButton
-                        variant="strong"
-                        size="lg"
-                        disabled={!canSave}
-                        pendingText={uploading ? "Uploading files…" : "Saving…"}
-                        className="max-md:flex-1"
-                      >
-                        <Check aria-hidden /> {saveLabel}
-                      </SubmitButton>
-                    ) : (
-                      <>
-                        {at < STEPS.length - 2 && (
-                          <Button type="button" variant="ghost" onClick={() => setStep("changes")} className="max-md:hidden">
-                            Changes{total ? ` · ${total}` : ""}
-                          </Button>
-                        )}
-                        <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:flex-1">
-                          Next <ChevronRight aria-hidden />
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                    {whySheet}
+                    <StepsFooter
+                      onBack={!only && at > 0 ? () => go(at - 1) : null}
+                      start={lastChanged ? `Last changed ${lastChanged}` : undefined}
+                      jump={at < STEPS.length - 2 ? { label: `Changes${total ? ` · ${total}` : ""}`, onClick: () => setStep("changes") } : null}
+                      onNext={only || step === "changes" ? null : () => go(at + 1)}
+                      save={{ label: saveLabel, disabled: !canSave, pendingText: uploading ? "Uploading files…" : "Saving…" }}
+                    />
                   </>
                 ) : (
-                  <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
-                    {/* One strong button (design rules 18 Nov): Next is soft, Back and Review are words; Cancel beside them (canvas row "Cancel, not ✕"). */}
-                    {at > 0 ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => go(at - 1)}
-                        aria-label="Back"
-                        className="max-md:px-0 max-md:aspect-square"
-                      >
-                        <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
-                      </Button>
-                    ) : null}
-                    <span className="flex-1 max-md:hidden" />
-                    <WindowCancel className="max-md:flex-1" />
-                    {create && step === "review" ? (
-                      <SubmitButton
-                        variant="strong"
-                        size="lg"
-                        pendingText={uploading ? "Uploading files…" : "Saving…"}
-                        className="max-md:flex-1"
-                      >
-                        <Check aria-hidden /> Confirm and save
-                      </SubmitButton>
-                    ) : (
-                      <>
-                        {create && at < STEPS.length - 2 && (
-                          <Button type="button" variant="ghost" onClick={() => setStep("review")} className="max-md:hidden">
-                            Review
-                          </Button>
-                        )}
-                        {!last && (
-                          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:flex-1">
-                            Next <ChevronRight aria-hidden />
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  // One strong button (design rules 18 Nov): Next is soft, Back and Review are words.
+                  <StepsFooter
+                    onBack={at > 0 ? () => go(at - 1) : null}
+                    jump={at < STEPS.length - 2 ? { label: "Review", onClick: () => setStep("review") } : null}
+                    onNext={step === "review" || last ? null : () => go(at + 1)}
+                    save={{ label: "Confirm and save", pendingText: uploading ? "Uploading files…" : "Saving…" }}
+                  />
                 )
               }
             >
