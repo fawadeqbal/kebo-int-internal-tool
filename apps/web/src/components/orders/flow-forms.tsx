@@ -305,8 +305,8 @@ export function SatEditor({ action, checks, suggested, locked }: { action: Actio
         {rows.map((r, i) => (
           <li key={r.key} className="grid gap-2 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
             <div className="flex min-w-0 flex-col gap-1">
-              <Input aria-label={`Point ${i + 1}`} value={r.item} disabled={locked} maxLength={200} onChange={(e) => set(i, { item: e.target.value })} className="h-8" />
-              <Input aria-label={`Note on point ${i + 1}`} value={r.note} disabled={locked} maxLength={500} onChange={(e) => set(i, { note: e.target.value })} placeholder="Note" className="h-8 text-xs" />
+              <Input size="sm" aria-label={`Point ${i + 1}`} value={r.item} disabled={locked} maxLength={200} onChange={(e) => set(i, { item: e.target.value })} />
+              <Input size="sm" aria-label={`Note on point ${i + 1}`} value={r.note} disabled={locked} maxLength={500} onChange={(e) => set(i, { note: e.target.value })} placeholder="Note" className="text-xs" />
             </div>
             <div role="radiogroup" aria-label={`Result of point ${i + 1}`} className="flex flex-wrap items-center gap-1">
               {SAT_RESULTS.map((x) => (

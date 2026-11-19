@@ -82,15 +82,34 @@ export function ButtonLink({
 }
 
 /* ---------------------------------------------------------------- Form controls */
+/**
+ * The one field (canvas board "The one field"): a label on top, the box, then one line (the hint, or the error in its
+ * place). One height: md 40 on a laptop, 44 on a phone, with 16 px text there so the phone does not zoom; a table
+ * cell has the small box, sm 32 (40 on a phone). No page sets a field's height of its own.
+ */
+export type ControlSize = "md" | "sm";
+export const controlSizes: Record<ControlSize, string> = { md: "h-10 max-sm:h-11", sm: "h-8 px-2.5 max-sm:h-10" };
 export const controlClass =
-  "w-full rounded-[10px] border border-line-strong bg-surface px-3 text-sm text-text shadow-card transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-bad aria-invalid:focus-visible:ring-bad/25";
+  "w-full rounded-[10px] border border-line-strong bg-surface px-3 text-sm text-text shadow-card max-sm:text-base transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-bad aria-invalid:focus-visible:ring-bad/25";
 
-export function Input({ className, leading, ...props }: ComponentProps<"input"> & { leading?: ReactNode }) {
-  if (!leading) return <input className={cn(controlClass, "h-10", className)} {...props} />;
+export function Input({
+  className,
+  leading,
+  unit,
+  size = "md",
+  ...props
+}: Omit<ComponentProps<"input">, "size"> & {
+  leading?: ReactNode;
+  /** The unit, inside the box on the right: %, days, pcs, GB (board "The one field", rule 3). */
+  unit?: ReactNode;
+  size?: ControlSize;
+}) {
+  if (!leading && !unit) return <input className={cn(controlClass, controlSizes[size], className)} {...props} />;
   return (
-    <div className="relative">
-      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted [&_svg]:size-4">{leading}</span>
-      <input className={cn(controlClass, "h-10 pl-9", className)} {...props} />
+    <div className={cn("relative", unit && className?.match(/(?:^|\s)(w-\S+)/)?.[1])}>
+      {leading && <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted [&_svg]:size-4">{leading}</span>}
+      {unit && <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted">{unit}</span>}
+      <input className={cn(controlClass, controlSizes[size], leading && "pl-9", unit && "pr-10", className, unit && "w-full")} {...props} />
     </div>
   );
 }
@@ -100,11 +119,17 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
 }
 
 /** Native select, styled: accessible, fast, works with forms and keyboard out of the box. */
-export function Select({ className, children, compact, ...props }: ComponentProps<"select"> & { compact?: boolean }) {
+export function Select({
+  className,
+  children,
+  compact,
+  size,
+  ...props
+}: Omit<ComponentProps<"select">, "size"> & { /** The same as size="sm". */ compact?: boolean; size?: ControlSize }) {
   // Width classes go on the wrapper so the chevron stays at the control's edge.
   return (
     <div className={cn("relative", className)}>
-      <select className={cn(controlClass, compact ? "h-8" : "h-10", "appearance-none pr-8")} {...props}>
+      <select className={cn(controlClass, controlSizes[size ?? (compact ? "sm" : "md")], "appearance-none pr-8")} {...props}>
         {children}
       </select>
       <svg aria-hidden className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted" viewBox="0 0 16 16" fill="none">

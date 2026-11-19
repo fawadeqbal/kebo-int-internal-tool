@@ -1,7 +1,8 @@
 "use client";
 
+import { Picker } from "@/components/common/picker";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Factory, History, Loader2, Plus, Search, ShieldCheck, Tag, Truck } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Factory, History, ShieldCheck, Tag, Truck } from "lucide-react";
 import { fxRate } from "@kebo/money";
 import {
   basisText,
@@ -16,7 +17,7 @@ import {
   type LeadFrom,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea, controlSizes } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -66,8 +67,7 @@ export function PortPicker({ id, value, onChange, exw }: { id: string; value: st
         autoComplete="off"
         value={value}
         maxLength={60}
-        
-        className={cn(controlClass, "h-9 pr-9")}
+        className={cn(controlClass, controlSizes.md, "pr-9")}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
           onChange(e.target.value);
@@ -178,12 +178,12 @@ export function TaxBox({
           <Input
             id={`${idPrefix}-tax-rate`}
             inputMode="decimal"
-            className="w-24 text-right tabular"
+            unit="%"
+            className="w-28 text-right tabular"
             value={rate}
             onChange={(e) => onRate(e.target.value.replace(/[^\d.]/g, ""))}
             placeholder="0"
           />
-          <span className="text-sm text-muted">%</span>
         </span>
       </Field>
       <label htmlFor={`${idPrefix}-tax-included`} className="flex min-h-11 cursor-pointer items-start gap-2.5 text-sm sm:mt-[26px]">
@@ -348,17 +348,9 @@ const OFFER_PRESETS: PartsPreset[] = [
 /** A factory asked for this inquiry (offered first in the picker): how it stands ("asked 15 Nov · no offer yet"). */
 export type AskedFactory = FactoryOption & { note?: string };
 
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join("");
-
 /**
- * Choose a known factory, or type a new one's name (it is added to the factory list on save). The factories asked
- * for this inquiry come first (design 18 Nov); typing searches them all.
+ * Choose a known supplier, or type a new one's name (it is added to the supplier list on save). The suppliers asked
+ * for this inquiry come first (design 18 Nov); typing searches them all. Drawn by the one Picker.
  */
 export function FactoryPicker({
   value,
@@ -373,140 +365,26 @@ export function FactoryPicker({
   asked?: AskedFactory[];
   error?: string[];
 }) {
-  const id = useId();
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState<FactoryOption[]>([]);
-  const [loading, setLoading] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const call = useRef(0);
-
-  useEffect(() => {
-    if (!open) return;
-    const n = ++call.current;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      const found = await search(q);
-      if (n !== call.current) return;
-      setRows(found);
-      setLoading(false);
-    }, 200);
-    return () => clearTimeout(t);
-  }, [q, open, search]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  if (value) {
-    const known = asked.find((a) => a.id === value.id);
-    return (
-      <div className={cn("flex min-h-12 items-center gap-3 rounded-[10px] border border-line bg-surface-2/60 px-3 py-2", error && "border-bad")}>
-        <Factory className="size-4 shrink-0 text-muted" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{value.name}</p>
-          <p className="truncate text-xs text-text-2">{!value.id ? "New supplier — added when you save" : (known?.note ?? known?.contactPerson ?? "")}</p>
-        </div>
-        <Button size="xs" variant="ghost" onClick={() => onChange(null)}>
-          Change
-        </Button>
-      </div>
-    );
-  }
-
-  const typed = q.trim();
-  const low = typed.toLowerCase();
-  const askedShown = asked.filter((a) => !low || a.name.toLowerCase().includes(low));
-  const others = rows.filter((r) => !asked.some((a) => a.id === r.id));
-  const exact = [...asked, ...rows].some((r) => r.name.toLowerCase() === low);
-  const pick = (f: FactoryOption) => onChange({ id: f.id, name: f.name }, f);
-  const option = (f: AskedFactory, note?: string) => (
-    <li
-      key={f.id}
-      role="option"
-      aria-selected={false}
-      onMouseDown={(e) => {
-        e.preventDefault();
-        pick(f);
-      }}
-      className="grid cursor-pointer grid-cols-[2rem_minmax(0,1fr)] items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-surface-2"
-    >
-      <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-surface-3 text-xs font-bold text-text-2">
-        {initialsOf(f.name)}
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-semibold">{f.name}</span>
-        {(note ?? f.contactPerson) && <span className="block truncate text-xs text-text-2">{note ?? f.contactPerson}</span>}
-      </span>
-    </li>
-  );
-  const group = (title: string) => (
-    <li role="presentation" className="px-2.5 pt-1.5 pb-1 text-2xs font-semibold tracking-wide text-text-2 uppercase">
-      {title}
-    </li>
-  );
+  const known = value ? asked.find((a) => a.id === value.id) : undefined;
   return (
-    <div ref={box} className="relative">
-      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
-      <input
-        id="factory"
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={`${id}-list`}
-        aria-invalid={!!error || undefined}
-        autoComplete="off"
-        value={q}
-        placeholder="Search suppliers"
-        className={cn(controlClass, "h-10 pr-9 pl-9 max-sm:h-11 max-sm:text-base")}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setOpen(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            const hit = [...askedShown, ...others].find((r) => r.name.toLowerCase() === low);
-            if (hit) pick(hit);
-            else if (typed) onChange({ id: null, name: typed });
-          } else if (e.key === "Escape") setOpen(false);
-        }}
-      />
-      {loading && <Loader2 className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted" aria-hidden />}
-      {open && (
-        <ul
-          id={`${id}-list`}
-          role="listbox"
-          aria-label="Suppliers"
-          className="absolute top-full right-0 left-0 z-30 mt-1 max-h-80 overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-pop"
-        >
-          {askedShown.length > 0 && group("Asked for this inquiry")}
-          {askedShown.map((f) => option(f, f.note))}
-          {others.length > 0 && group(typed ? `Results for “${typed}”` : "Other suppliers")}
-          {others.map((f) => option(f))}
-          {typed && !exact && (
-            <li
-              role="option"
-              aria-selected={false}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onChange({ id: null, name: typed });
-              }}
-              className="mt-1 grid cursor-pointer grid-cols-[2rem_minmax(0,1fr)] items-center gap-2.5 rounded-lg border-t border-line px-2.5 py-2 font-semibold text-primary hover:bg-surface-2"
-            >
-              <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-primary-soft">
-                <Plus className="size-4" />
-              </span>
-              <span className="truncate text-sm">New supplier “{typed}”</span>
-            </li>
-          )}
-          {!loading && !askedShown.length && !others.length && !typed && <li className="px-2.5 py-3 text-sm text-muted">No suppliers yet: type the name of the first one.</li>}
-        </ul>
-      )}
-    </div>
+    <Picker<AskedFactory>
+      inputId="factory"
+      placeholder="Search suppliers"
+      listLabel="Suppliers"
+      icon={<Factory />}
+      chosen={value && { name: value.name, sub: !value.id ? "New supplier — added when you save" : (known?.note ?? known?.contactPerson ?? "") }}
+      onClear={() => onChange(null)}
+      onPick={(f) => onChange({ id: f.id, name: f.name }, f)}
+      search={search}
+      first={{ title: "Asked for this inquiry", rows: asked, line: (f) => ({ sub: f.note ?? f.contactPerson }) }}
+      othersTitle="Other suppliers"
+      line={(f) => ({ sub: f.contactPerson })}
+      newLabel="New supplier"
+      onNew={(typed) => onChange({ id: null, name: typed })}
+      newOnlyWhenTyped
+      empty={(typed) => (typed ? `No supplier matches “${typed}”` : "No suppliers yet: type the name of the first one.")}
+      error={error}
+    />
   );
 }
 
@@ -1234,11 +1112,11 @@ function TaxChoice({ id, included, rate, onChange }: { id: string; included: boo
           <Input
             aria-label="Tax %"
             inputMode="decimal"
-            className="w-20 text-right tabular"
+            unit="%"
+            className="w-24 text-right tabular"
             value={rate}
             onChange={(e) => onChange(included, e.target.value.replace(/[^\d.]/g, ""))}
           />
-          <span className="text-sm text-muted">%</span>
         </span>
       )}
     </span>

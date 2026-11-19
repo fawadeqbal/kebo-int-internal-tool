@@ -280,8 +280,7 @@ export function Control({ f, text, checked, error }: { f: SettingField; text: st
         </Select>
       ) : f.kind === "number" ? (
         <div className="flex items-center gap-2">
-          <Input {...common} type="number" inputMode="decimal" min={0} step="any" className="w-28 tabular" />
-          {f.unit && <span className="text-sm text-muted">{f.unit}</span>}
+          <Input {...common} type="number" inputMode="decimal" min={0} step="any" unit={f.unit} className="w-32 tabular" />
         </div>
       ) : (
         <Input {...common} />

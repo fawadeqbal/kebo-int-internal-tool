@@ -193,11 +193,11 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
           <input type="hidden" name="period" value="custom" />
           <label className="text-xs text-text-2">
             From
-            <Input name="from" type="date" defaultValue={p.from} className="mt-1 h-9 w-40" />
+            <Input name="from" type="date" defaultValue={p.from} className="mt-1 w-40" />
           </label>
           <label className="text-xs text-text-2">
             To
-            <Input name="to" type="date" defaultValue={p.to} className="mt-1 h-9 w-40" />
+            <Input name="to" type="date" defaultValue={p.to} className="mt-1 w-40" />
           </label>
           <button className={buttonClass("secondary", "sm")}>Show</button>
           <span className="pb-1.5 text-xs text-muted">compared with the same number of days just before</span>

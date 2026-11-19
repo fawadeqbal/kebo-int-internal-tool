@@ -477,7 +477,7 @@ function UnitPicker({ c, id, value, set, error, used }: { c: LineColumn; id: str
     <Field label={c.label} htmlFor={id} required={!!c.required} error={error}>
       {typing ? (
         <span className="flex gap-2">
-          <Input ref={box} id={id} value={value} onChange={(e) => set(e.target.value)} maxLength={c.maxLength ?? 20} className="h-12 min-w-0 flex-1 text-base" />
+          <Input ref={box} id={id} value={value} onChange={(e) => set(e.target.value)} maxLength={c.maxLength ?? 20} className="min-w-0 flex-1 text-base" />
           <Button size="lg"
             ref={button}
             variant="secondary"

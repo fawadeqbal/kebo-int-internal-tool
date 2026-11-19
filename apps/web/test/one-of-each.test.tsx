@@ -50,6 +50,21 @@ describe("one of each", () => {
     expect(copies).toEqual([]);
   });
 
+  it("fields take their height from their size (md 40 · sm 32 in a table), never typed beside it", () => {
+    const tags = /<(?:Input|Select|MoneyInput|AutoSelect)\b(?:[^>{]|\{(?:[^{}]|\{[^{}]*\})*\})*>/g;
+    const height = /(?<![\w&:[-])(?:[a-z-]+:)*h-(?:\d+|\[[^\]]+\])(?![\w-])/;
+    const copies = SOURCES.flatMap(({ file, text }) => [...text.matchAll(tags)].filter((m) => height.test(m[0])).map((m) => `${file}: ${m[0].slice(0, 120)}`));
+    expect(copies).toEqual([]);
+  });
+
+  it("one picker, one AutoSelect: the copies stay deleted", () => {
+    const names = SOURCES.map((s) => s.file);
+    expect(names.filter((f) => /common\/(auto-select|percent-choice)\.tsx$/.test(f))).toEqual([]);
+    // The customer and the supplier pickers draw the one Picker; the port box (any port typed, the usual ones suggested) is the only other.
+    expect(found(/role="combobox"/g).filter((f) => /customer-picker/.test(f))).toEqual([]);
+    expect(found(/role="combobox"/g).filter((f) => /factory-quote-form/.test(f))).toHaveLength(1);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

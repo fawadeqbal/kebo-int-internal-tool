@@ -770,10 +770,10 @@ export function RevisionEditor({
                 <div className="flex flex-col gap-1 text-md text-text-2">
                   <p className="flex flex-wrap items-center gap-2">
                     <label htmlFor={`margin-${number}`}>Price every ticked offer at</label>
-                    <Input
+                    <Input size="sm"
                       id={`margin-${number}`}
                       inputMode="decimal"
-                      className="h-9 w-16 text-right tabular"
+                      className="w-16 text-right tabular"
                       value={margin}
                       onChange={(e) => priceEveryOffer(e.target.value)}
                     />
@@ -1179,10 +1179,10 @@ export function BasisCosts({
                       <span className="block text-sm">{BASIS_STEP_LABEL[step]}</span>
                       <span className="block text-xs text-muted">{BASIS_STEP_HINT[step]}</span>
                     </span>
-                    <Input
+                    <Input size="sm"
                       aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} cost`}
                       inputMode="decimal"
-                      className="h-8 text-right tabular"
+                      className="text-right tabular"
                       placeholder={asLine(step) ? "as a charge" : "0.00"}
                       value={c.amount}
                       onChange={(e) => onChange(step, { amount: e.target.value })}
@@ -1200,9 +1200,9 @@ export function BasisCosts({
                         onChange(step, { currency: to, ...(amount !== null ? { amount } : {}) });
                       }}
                     />
-                    <Input
+                    <Input size="sm"
                       aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} note`}
-                      className="h-8"
+                     
                       maxLength={200}
                       value={c.note}
                       onChange={(e) => onChange(step, { note: e.target.value })}
