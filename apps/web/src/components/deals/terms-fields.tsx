@@ -115,7 +115,7 @@ const relabel = (label: string, share: string) => {
 };
 
 const CHIP =
-  "inline-flex min-h-8 items-center rounded-full border px-3 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none";
+  "inline-flex min-h-8 items-center rounded-full border px-3 text-md font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none";
 
 /**
  * The payment as parts, inside a bigger form: a usual payment to start from, each part on its own line (what
@@ -157,7 +157,7 @@ export function PartsField({
     <div id={id} className="flex scroll-mt-24 flex-col gap-3 sm:col-span-2 md:col-span-full">
       {presets.length > 0 && (
         <div role="group" aria-label="Start from a usual payment" className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] text-text-2">Start from</span>
+          <span className="text-md text-text-2">Start from</span>
           {presets.map((p) => {
             const on = isPreset(rows, p);
             return (
@@ -196,7 +196,7 @@ export function PartsField({
             <li key={r.key} className="rounded-lg border border-line bg-surface p-2.5">
               {/* A phone: the part's number and its remove on top; the share beside when it falls due. */}
               <div className="mb-1.5 flex items-center justify-between md:hidden">
-                <span className="text-[13px] font-semibold">Part {n + 1}</span>
+                <span className="text-md font-semibold">Part {n + 1}</span>
                 {remove()}
               </div>
               <div
@@ -278,7 +278,7 @@ export function PartsField({
         <Plus aria-hidden /> Add a part
       </Button>
       <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2", ok ? "bg-ok-soft" : "bg-bad-soft")}>
-        <b role="status" className={cn("text-[13px] tabular sm:whitespace-nowrap", ok ? "text-ok" : "text-bad")}>
+        <b role="status" className={cn("text-md tabular sm:whitespace-nowrap", ok ? "text-ok" : "text-bad")}>
           {ok
             ? `Adds up: 100%${amounts ? ` · ${amounts}` : ""}`
             : sum < 100
@@ -324,7 +324,7 @@ export function RouteChoice({
 }) {
   return (
     <fieldset className="flex flex-col gap-1.5 sm:col-span-2 md:col-span-full">
-      <legend className="mb-1.5 text-[13px] font-medium text-text">How they pay</legend>
+      <legend className="mb-1.5 text-md font-medium text-text">How they pay</legend>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {ROUTES.map((r) => (
           <label

@@ -187,7 +187,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               {company && (
                 <Link
                   href={`/platform/companies/${company.id}`}
-                  className={buttonClass("ghost", "sm", "h-8 px-2.5 text-[13px] text-text-2")}
+                  className={buttonClass("ghost", "sm", "h-8 px-2.5 text-md text-text-2")}
                 >
                   Open {company.kind === "client" ? "company" : "demo"}
                 </Link>

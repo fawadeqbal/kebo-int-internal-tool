@@ -31,11 +31,11 @@ export function InquiryTabs({ base, tabs, order }: { base: string; tabs: Inquiry
       items={tabs.map((t) => ({ href: t.href, label: t.label, tag: t.tag, active: here(t.href) }))}
       end={
         order ? (
-          <Link href={order.href} className="-mb-px flex h-[42px] shrink-0 items-center gap-1.5 border-b-2 border-transparent text-[13.5px] font-semibold whitespace-nowrap text-primary hover:underline">
+          <Link href={order.href} className="-mb-px flex h-[42px] shrink-0 items-center gap-1.5 border-b-2 border-transparent text-md font-semibold whitespace-nowrap text-primary hover:underline">
             Order {order.refNo} <ArrowRight className="size-3.5" aria-hidden />
           </Link>
         ) : (
-          <span className="-mb-px flex h-[42px] shrink-0 items-center gap-1.5 text-[13.5px] font-medium whitespace-nowrap text-muted" title="The sales order is made when the customer accepts an option">
+          <span className="-mb-px flex h-[42px] shrink-0 items-center gap-1.5 text-md font-medium whitespace-nowrap text-muted" title="The sales order is made when the customer accepts an option">
             Order <span className="text-xs font-normal">when accepted</span>
           </span>
         )

@@ -36,7 +36,7 @@ export function TabRow({ label, items, end, className = "mt-4" }: { label: strin
           // Tabs swap in place: Back from any tab goes to where the record was opened from, not to the tab before.
           replace
           aria-current={t.active ? "page" : undefined}
-          className="-mb-px flex h-[42px] shrink-0 items-center gap-[7px] border-b-2 border-transparent text-[13.5px] font-medium whitespace-nowrap text-text-2 hover:text-text aria-[current]:border-primary-solid aria-[current]:font-bold aria-[current]:text-text"
+          className="-mb-px flex h-[42px] shrink-0 items-center gap-[7px] border-b-2 border-transparent text-md font-medium whitespace-nowrap text-text-2 hover:text-text aria-[current]:border-primary-solid aria-[current]:font-bold aria-[current]:text-text"
         >
           {t.label}
           {t.tag !== undefined && t.tag !== null && t.tag !== "" && (

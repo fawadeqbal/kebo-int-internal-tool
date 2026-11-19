@@ -53,7 +53,7 @@ export function TabList({
         className={cn(
           "max-md:order-last max-md:border-t max-md:border-line md:col-start-2 md:row-start-1 md:flex md:items-center md:border-b md:border-line md:pr-5",
           // A phone: the last row, its words in the main colour across the card.
-          "max-md:[&>button]:h-12 max-md:[&>button]:w-full max-md:[&>button]:rounded-none max-md:[&>button]:border-0 max-md:[&>button]:bg-transparent max-md:[&>button]:text-[14px] max-md:[&>button]:font-semibold max-md:[&>button]:text-primary max-md:[&>button]:shadow-none",
+          "max-md:[&>button]:h-12 max-md:[&>button]:w-full max-md:[&>button]:rounded-none max-md:[&>button]:border-0 max-md:[&>button]:bg-transparent max-md:[&>button]:text-sm max-md:[&>button]:font-semibold max-md:[&>button]:text-primary max-md:[&>button]:shadow-none",
         )}
       >
         {add}

@@ -43,7 +43,7 @@ export function ProgressSteps({ status, action }: { status: LeadStatus; action: 
           const current = k === status;
           const done = status !== "lost" && i < at;
           const cls = cn(
-            "flex h-9 w-full items-center justify-center gap-1 rounded-lg px-2 text-[13px] whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+            "flex h-9 w-full items-center justify-center gap-1 rounded-lg px-2 text-md whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
             current
               ? k === "lost"
                 ? "bg-bad-soft font-semibold text-bad"

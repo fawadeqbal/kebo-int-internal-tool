@@ -584,7 +584,7 @@ export function DealForm({
                           {mainContact && (
                             <span
                               className={cn(
-                                "rounded-full bg-primary-soft px-2 py-px text-[11.5px] font-semibold text-primary",
+                                "rounded-full bg-primary-soft px-2 py-px text-2xs font-semibold text-primary",
                                 changedField("contactId"),
                               )}
                             >
@@ -700,7 +700,7 @@ export function DealForm({
                       <button
                         type="button"
                         onClick={() => set("title", suggestedTitle)}
-                        className="inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-full border border-dashed border-primary bg-primary-soft/50 px-2.5 py-1 text-[12.5px] font-semibold text-primary hover:bg-primary-soft"
+                        className="inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-full border border-dashed border-primary bg-primary-soft/50 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary-soft"
                       >
                         <Sparkles aria-hidden className="size-3.5 shrink-0" />
                         <span className="truncate">Use “{suggestedTitle}”</span>
@@ -799,7 +799,7 @@ export function DealForm({
                         aria-label="What kind of file"
                         value={kindNext}
                         onChange={(e) => setKindNext(e.target.value as AttachmentKind)}
-                        className="h-[34px] w-auto text-[13px]"
+                        className="h-[34px] w-auto text-md"
                       >
                         {NEW_KINDS.map((k) => (
                           <option key={k} value={k}>
@@ -918,7 +918,7 @@ export function DealForm({
                     <div
                       role="table"
                       aria-label="What changed"
-                      className="overflow-hidden rounded-xl border border-line text-[13.5px] max-sm:[&>[role=row]:nth-child(2)]:border-t-0"
+                      className="overflow-hidden rounded-xl border border-line text-md max-sm:[&>[role=row]:nth-child(2)]:border-t-0"
                     >
                       <div role="row" className={cn(CHANGE_ROW, "h-9 border-t-0 bg-surface-2 py-0 text-xs font-semibold text-text-2 max-sm:hidden")}>
                         <span role="columnheader">Part</span>
@@ -1089,7 +1089,7 @@ function KindSelect({
       value={f.kind}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as AttachmentKind)}
-      className={cn("h-8 w-auto text-[13px]", className)}
+      className={cn("h-8 w-auto text-md", className)}
     >
       {NEW_KINDS.map((k) => (
         <option key={k} value={k}>
@@ -1227,7 +1227,7 @@ function NewCustomerForm({
         <h4 className="text-base font-bold">New customer</h4>
       </div>
       {matches.length > 0 && (
-        <div role="status" className="flex flex-col gap-2 rounded-xl border border-warn/30 bg-warn-soft px-3 py-2.5 text-[13.5px]">
+        <div role="status" className="flex flex-col gap-2 rounded-xl border border-warn/30 bg-warn-soft px-3 py-2.5 text-md">
           {matches.map((m) => (
             <div key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="min-w-0 flex-1">
@@ -1550,7 +1550,7 @@ function ReviewBoxes({
       </div>
       <ReviewBox title="Items" count={rows.length ? itemsCount(rows) : undefined} onEdit={() => onEdit("items")}>
         {lines.length ? (
-          <ul className="text-[13.5px]">
+          <ul className="text-md">
             {lines.map((r) => (
               <li
                 key={r.key}
@@ -1575,7 +1575,7 @@ function ReviewBoxes({
             {files.map((f) => (
               <span
                 key={f.key}
-                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-[13px]"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-md"
               >
                 <FileText aria-hidden className="size-3.5 shrink-0 text-text-2" />
                 <span className="truncate">{f.name}</span>
@@ -1611,7 +1611,7 @@ export function ReviewBox({ title, count, onEdit, children }: { title: string; c
 /** Label · value rows, the label quiet. */
 export function Facts({ rows }: { rows: [string, ReactNode][] }) {
   return (
-    <dl className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-4 py-3 text-[13.5px]">
+    <dl className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-4 py-3 text-md">
       {rows.map(([k, val]) => (
         <div key={k} className="contents">
           <dt className="text-text-2">{k}</dt>

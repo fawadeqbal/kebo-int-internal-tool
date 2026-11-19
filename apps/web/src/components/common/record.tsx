@@ -88,7 +88,7 @@ export function DetailsCard({
           {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
         {editHref && (
-          <Link href={editHref} className="tap inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline">
+          <Link href={editHref} className="tap inline-flex items-center gap-1.5 text-md font-semibold text-primary hover:underline">
             <Pencil className="size-4" aria-hidden /> Edit
           </Link>
         )}
@@ -98,7 +98,7 @@ export function DetailsCard({
             id={edit.id}
             variant="link"
             size="sm"
-            className="tap h-auto text-[13px] font-semibold [&_svg]:size-4"
+            className="tap h-auto text-md font-semibold [&_svg]:size-4"
             label={edit.label}
           >
             <Pencil aria-hidden /> Edit
@@ -148,7 +148,7 @@ export function RecordListCard({
     <Card className="overflow-clip">
       <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-semibold text-text">
+          <h2 className="text-lead font-semibold text-text">
             {title}
             {count !== undefined && <span className="font-semibold"> · {count}</span>}
           </h2>
@@ -225,7 +225,7 @@ export function RecordRow({
 /** "All 12 →" in a list card's header: the whole list elsewhere. */
 export function AllLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className={buttonClass("ghost", "sm", "h-8 px-2.5 text-[13px] text-text-2")}>
+    <Link href={href} className={buttonClass("ghost", "sm", "h-8 px-2.5 text-md text-text-2")}>
       {children}
     </Link>
   );

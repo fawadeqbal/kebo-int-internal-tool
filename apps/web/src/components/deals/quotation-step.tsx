@@ -223,7 +223,7 @@ export function AcceptForm({
           <input type="hidden" name="optionId" value={optionId} />
           <PanelBody className="flex flex-col gap-4">
             <fieldset className="flex flex-col gap-3">
-              <legend className="mb-3 text-[13px] font-semibold">
+              <legend className="mb-3 text-md font-semibold">
                 Which option did they accept?<span className="text-bad"> *</span>
               </legend>
               {options.map((o) => (
@@ -266,7 +266,7 @@ export function AcceptForm({
               </Field>
             </div>
             {chosen && (
-              <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">
+              <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-md text-text-2">
                 <strong className="block text-text">What happens</strong>
                 <span className="block">
                   · Sales order <strong className="text-text">SO-{today.slice(0, 4)}-…</strong> is made with Option {chosen.letter}&apos;s items, prices and terms.

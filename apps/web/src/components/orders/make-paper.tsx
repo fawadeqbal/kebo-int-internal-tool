@@ -36,7 +36,7 @@ function Preview({ src, title }: { src: string; title: string }) {
   return (
     <div
       ref={box}
-      className="relative w-full overflow-hidden rounded-lg border border-line bg-[#e7ebf0]"
+      className="relative w-full overflow-hidden rounded-lg border border-line bg-surface-3"
       style={{ height: SHEET_HEIGHT * scale }}
     >
       <iframe
@@ -258,7 +258,7 @@ function BuyerBox({
   return (
     <section aria-labelledby="buyer" className="rounded-lg border border-line p-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 id="buyer" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+        <h3 id="buyer" className="text-2xs font-semibold tracking-wide text-muted uppercase">
           Buyer as on the order
         </h3>
         {editing && p.canRefreshBuyer && (
@@ -301,7 +301,7 @@ function TermsBox({ p }: { p: PaperChecks }) {
   if (!t) return null;
   return (
     <section aria-labelledby="terms" className="rounded-lg border border-warn/40 bg-warn-soft p-3">
-      <h3 id="terms" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+      <h3 id="terms" className="text-2xs font-semibold tracking-wide text-muted uppercase">
         Payment terms
       </h3>
       <p className="mt-1 text-sm">
@@ -439,7 +439,7 @@ export function MakePaper({
         {notice && <Alert tone="success">{notice}</Alert>}
 
         <section aria-labelledby="filled">
-          <h3 id="filled" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+          <h3 id="filled" className="text-2xs font-semibold tracking-wide text-muted uppercase">
             Filled from the order
           </h3>
           <ul className="mt-1 flex flex-col divide-y divide-line">
@@ -468,7 +468,7 @@ export function MakePaper({
 
         {editing && p.options.length > 0 && (
           <fieldset>
-            <legend className="text-[11px] font-semibold tracking-wide text-muted uppercase">Options</legend>
+            <legend className="text-2xs font-semibold tracking-wide text-muted uppercase">Options</legend>
             <div className="mt-1.5 flex flex-col gap-2">
               {p.options.map((o) => (
                 <label key={o.key} className="flex items-center gap-2.5 text-sm">
@@ -539,7 +539,7 @@ export function MakePaper({
 
         {p.versions.length > 1 && (
           <section aria-labelledby="versions">
-            <h3 id="versions" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+            <h3 id="versions" className="text-2xs font-semibold tracking-wide text-muted uppercase">
               Versions
             </h3>
             <ul className="mt-1 flex flex-col gap-1 text-xs">

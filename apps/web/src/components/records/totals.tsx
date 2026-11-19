@@ -21,7 +21,7 @@ export function Totals({ rows, ours, label = "Totals" }: { rows: TotalsRow[]; ou
   return (
     <div role="group" aria-label={label} className="flex flex-col gap-2.5 px-3 py-2.5">
       {ours && ours.length > 0 && (
-        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 rounded-lg bg-info-soft/60 px-3 py-2 text-[13px]">
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 rounded-lg bg-info-soft/60 px-3 py-2 text-md">
           <p className="font-semibold text-text-2 max-sm:w-full">Ours only</p>
           <dl aria-label="Ours only" className="contents">
             {ours.map((o, i) => (
@@ -43,7 +43,7 @@ export function Totals({ rows, ours, label = "Totals" }: { rows: TotalsRow[]; ou
           ) : (
             <div key={i} className={cn(line, r.big && "font-bold text-text", r.big && i > 0 && "mt-0.5 border-t border-line pt-1.5")}>
               <dt className={r.big ? undefined : "text-text-2"}>{r.label}</dt>
-              <dd className={cn("tabular", r.big && "text-[15px]", r.bad && "text-bad")}>{r.value}</dd>
+              <dd className={cn("tabular", r.big && "text-lead", r.bad && "text-bad")}>{r.value}</dd>
             </div>
           ),
         )}

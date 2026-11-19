@@ -36,7 +36,7 @@ export function Notice({
     <div
       role={tone === "bad" ? "alert" : "status"}
       className={cn(
-        "flex flex-wrap items-start gap-x-2.5 gap-y-2 rounded-xl border px-3.5 py-3 text-[13.5px] leading-[19px] text-text [&_a]:font-bold [&_a]:underline [&_a]:underline-offset-2",
+        "flex flex-wrap items-start gap-x-2.5 gap-y-2 rounded-xl border px-3.5 py-3 text-md leading-[19px] text-text [&_a]:font-bold [&_a]:underline [&_a]:underline-offset-2",
         t.box,
         className,
       )}

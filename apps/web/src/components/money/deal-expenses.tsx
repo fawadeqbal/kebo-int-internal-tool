@@ -73,7 +73,7 @@ export async function DealExpensesCard({
   return (
     <div className="flex flex-col gap-4">
       {deal.stage === "lost" && (
-        <p className="rounded-xl border border-line bg-surface-2 px-[18px] py-3 text-[13px] text-text-2">
+        <p className="rounded-xl border border-line bg-surface-2 px-[18px] py-3 text-md text-text-2">
           <strong className="text-text">
             Lost{deal.closedAt ? ` on ${date(deal.closedAt)}` : ""}
             {deal.lostReason ? `, ${LOST_REASON_LABEL[deal.lostReason].toLowerCase()}` : ""}.
@@ -95,7 +95,7 @@ export async function DealExpensesCard({
         tone={toPay > 0 ? "warn" : "ok"}
         actions={
           <>
-            {live.length > 0 && <ExportLink what="expenses" query={{ inquiry: deal.id }} className="h-8 px-2.5 text-[13px]" />}
+            {live.length > 0 && <ExportLink what="expenses" query={{ inquiry: deal.id }} className="h-8 px-2.5 text-md" />}
             <AddCost setup={setup} />
           </>
         }
@@ -113,7 +113,7 @@ export async function DealExpensesCard({
             }}
           />
         ) : (
-          <p className="border-t border-line px-[18px] py-3.5 text-[13px] text-text-2">Nothing spent on this inquiry yet.</p>
+          <p className="border-t border-line px-[18px] py-3.5 text-md text-text-2">Nothing spent on this inquiry yet.</p>
         )}
         {deal.order && live.length > 0 && (
           <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">

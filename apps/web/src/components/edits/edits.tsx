@@ -48,7 +48,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
                   </span>
                 )}
                 {e.changes.length > 0 && (
-                  <ul className="text-[13px] leading-relaxed text-text-2">
+                  <ul className="text-md leading-relaxed text-text-2">
                     {e.changes.slice(0, 12).map((c, i) => (
                       <li key={i}>{c}</li>
                     ))}
@@ -76,7 +76,7 @@ export function editedMark(card: EditCard | null | undefined, key: string): Reac
   const n = card?.keys[key] ?? 0;
   if (!n) return null;
   return (
-    <span className="ml-1.5 align-middle text-[11px] font-semibold text-warn" title={`Changed in ${n} edit${n === 1 ? "" : "s"} since it was first saved`}>
+    <span className="ml-1.5 align-middle text-2xs font-semibold text-warn" title={`Changed in ${n} edit${n === 1 ? "" : "s"} since it was first saved`}>
       edited{n > 1 ? ` ${n}×` : ""}
     </span>
   );
@@ -141,7 +141,7 @@ export function ReasonDialog({
       <div className="flex flex-col gap-4">
         {note && <p className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm leading-relaxed">{note}</p>}
         {changes.length > 0 && (
-          <ul className="flex max-h-56 flex-col divide-y divide-line overflow-y-auto rounded-lg border border-line text-[13px]">
+          <ul className="flex max-h-56 flex-col divide-y divide-line overflow-y-auto rounded-lg border border-line text-md">
             {changes.map((c, i) => (
               <li key={i} className="px-3 py-2">
                 {c}
@@ -162,7 +162,7 @@ export function ReasonDialog({
                 aria-checked={pick === c}
                 onClick={() => setPick(pick === c ? null : c)}
                 className={cn(
-                  "h-9 rounded-full border px-3 text-[13px]",
+                  "h-9 rounded-full border px-3 text-md",
                   pick === c ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line-strong bg-surface hover:border-primary",
                 )}
               >

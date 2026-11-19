@@ -13,8 +13,8 @@ export function FileRow({ name, meta, tag, actions, children }: { name: string; 
   return (
     <li className="flex flex-col gap-2 rounded-[10px] border border-line bg-surface px-2.5 py-2">
       <div className="flex items-center gap-2.5">
-        <span className="grid size-9 flex-none place-items-center rounded-lg bg-primary-soft text-[10px] font-bold text-primary">{extOf(name)}</span>
-        <span className="min-w-0 flex-1 text-[13px]">
+        <span className="grid size-9 flex-none place-items-center rounded-lg bg-primary-soft text-2xs font-bold text-primary">{extOf(name)}</span>
+        <span className="min-w-0 flex-1 text-md">
           <strong className="block truncate">{name}</strong>
           {meta && <span className="text-xs text-muted">{meta}</span>}
         </span>
@@ -72,7 +72,7 @@ export function FileZone({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-semibold">
+        <span className="text-md font-semibold">
           {label}
           {optional && <span className="font-normal text-muted"> · optional</span>}
         </span>
@@ -86,7 +86,7 @@ export function FileZone({
         onDragLeave={() => setOver(false)}
         onDrop={drop}
         className={cn(
-          "relative flex cursor-pointer flex-wrap items-center justify-center gap-2.5 rounded-xl border-2 border-dashed border-primary-line bg-primary-soft/40 text-center text-[13px] transition-colors",
+          "relative flex cursor-pointer flex-wrap items-center justify-center gap-2.5 rounded-xl border-2 border-dashed border-primary-line bg-primary-soft/40 text-center text-md transition-colors",
           big ? "flex-col gap-2 px-5 py-8" : compact ? "px-3.5 py-3" : "p-5",
           over && "border-primary bg-primary-soft",
           disabled && "cursor-not-allowed opacity-60",
@@ -98,7 +98,7 @@ export function FileZone({
               <ArrowUpToLine className="size-5" />
             </span>
             <span>
-              <strong className="block text-[15px]">{one ? "Drop the file here" : "Drop files here"}</strong>
+              <strong className="block text-lead">{one ? "Drop the file here" : "Drop files here"}</strong>
               <span className="text-text-2">
                 or <span className="font-semibold text-primary underline">choose {one ? "a file" : "files"}</span>
               </span>

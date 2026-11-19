@@ -163,7 +163,7 @@ function AccountMenu({ user, companyName }: { user: { name: string; email: strin
         <span className="flex items-center gap-2.5 rounded-xl lg:py-1 lg:pr-2 lg:pl-1 lg:hover:bg-surface-2">
           <Avatar name={user.name} size={34} className="font-bold" />
           <span className="hidden text-left leading-tight lg:block">
-            <span className="block max-w-36 truncate text-[13px] font-semibold text-text">{user.name}</span>{" "}
+            <span className="block max-w-36 truncate text-md font-semibold text-text">{user.name}</span>{" "}
             <span className="block max-w-36 truncate text-xs text-muted">{user.role}</span>
           </span>
         </span>
@@ -221,7 +221,7 @@ function NewMenu({ items }: { items: NewItem[] }) {
 /** A count on a page or a closed group: what waits for this person (payments to verify). */
 function Count({ n, label }: { n: number; label: string }) {
   return (
-    <span className="inline-grid h-[18px] min-w-5 place-items-center rounded-full bg-warn-soft px-1.5 text-[11px] font-semibold text-warn tabular" aria-label={`${n} ${label}`}>
+    <span className="inline-grid h-[18px] min-w-5 place-items-center rounded-full bg-warn-soft px-1.5 text-2xs font-semibold text-warn tabular" aria-label={`${n} ${label}`}>
       {n > 99 ? "99+" : n}
     </span>
   );
@@ -242,7 +242,7 @@ function PageLink({ page, active, big }: { page: NavPage; active: boolean; big?:
       href={page.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2 rounded-lg pr-2 pl-9 text-[13.5px] text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+        "flex items-center gap-2 rounded-lg pr-2 pl-9 text-md text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
         big ? "min-h-11" : "h-8",
         active && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
       )}
@@ -284,7 +284,7 @@ function GroupTree({
           href={HOME_HREF}
           aria-current={home ? "page" : undefined}
           className={cn(
-            "flex items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-semibold text-text transition-colors hover:bg-surface-2",
+            "flex items-center gap-2.5 rounded-lg px-2.5 text-md font-semibold text-text transition-colors hover:bg-surface-2",
             row,
             home && "bg-primary-soft text-primary hover:bg-primary-soft",
           )}
@@ -307,7 +307,7 @@ function GroupTree({
                 href={m.pages[0]!.href}
                 aria-current={on ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-semibold text-text transition-colors hover:bg-surface-2",
+                  "flex items-center gap-2.5 rounded-lg px-2.5 text-md font-semibold text-text transition-colors hover:bg-surface-2",
                   row,
                   on && "bg-primary-soft text-primary hover:bg-primary-soft",
                 )}
@@ -327,7 +327,7 @@ function GroupTree({
               aria-controls={listId}
               onClick={() => toggle(m.key)}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] text-text transition-colors hover:bg-surface-2",
+                "flex w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-md text-text transition-colors hover:bg-surface-2",
                 m.key === current ? "font-bold" : "font-semibold",
                 row,
               )}
@@ -391,7 +391,7 @@ function MenuContent({
         <Link href={HOME_HREF} className={cn("flex min-w-0 items-center gap-2.5 rounded-lg", big && "pr-10")} aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
           <Logo companyName={companyName} logo={logo} size={32} />
           <span className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-[15.5px] font-bold tracking-tight text-text">{PRODUCT_NAME}</span>{" "}
+            <span className="truncate text-lead font-bold tracking-tight text-text">{PRODUCT_NAME}</span>{" "}
             {/* The space keeps the two names apart in the link's text, so what is read out matches what is shown (WCAG 2.5.3). */}
             <span className="truncate text-xs text-muted">{companyName}</span>
           </span>
@@ -570,7 +570,7 @@ function StripGroup({ m, current, activeHref }: { m: NavModule; current: boolean
                     tabIndex={-1}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex h-9 items-center justify-between gap-2 rounded-lg px-2.5 text-[13.5px] text-text-2 hover:bg-surface-2 hover:text-text focus-visible:bg-surface-2",
+                      "flex h-9 items-center justify-between gap-2 rounded-lg px-2.5 text-md text-text-2 hover:bg-surface-2 hover:text-text focus-visible:bg-surface-2",
                       active && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
                     )}
                   >
@@ -728,12 +728,12 @@ export function AppShell({
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        className={cn("relative flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px]", active ? "font-semibold text-primary" : "text-muted")}
+        className={cn("relative flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-2xs", active ? "font-semibold text-primary" : "text-muted")}
       >
         <Icon className="size-[22px]" strokeWidth={active ? 2.25 : 1.75} aria-hidden />
         {label}
         {!!badge && (
-          <span className="absolute top-1 left-1/2 ml-2 min-w-4 rounded-full bg-bad-solid px-1 text-center text-[10px] leading-4 font-semibold text-white" aria-label={`${badge} unread`}>
+          <span className="absolute top-1 left-1/2 ml-2 min-w-4 rounded-full bg-bad-solid px-1 text-center text-2xs leading-4 font-semibold text-white" aria-label={`${badge} unread`}>
             {badge > 9 ? "9+" : badge}
           </span>
         )}
@@ -787,7 +787,7 @@ export function AppShell({
             {/* On a phone a top page's own name takes this one's place (PageHeader's data-page-title, globals.css). */}
             <Link data-shell-logo="" href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg md:hidden" aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
               <Logo companyName={companyName} logo={logo} size={32} />
-              <span className="text-[15.5px] font-bold tracking-tight text-text max-[380px]:hidden">{PRODUCT_NAME}</span>
+              <span className="text-lead font-bold tracking-tight text-text max-[380px]:hidden">{PRODUCT_NAME}</span>
             </Link>
             {/* Under 1280 px the menu is the strip: the button opens the whole menu over the page. */}
             <button type="button" className={cn(buttonClass("ghost", "icon"), "hidden md:inline-flex xl:hidden")} onClick={() => setDrawer(true)} aria-label="Open the menu" aria-expanded={drawer}>
@@ -808,7 +808,7 @@ export function AppShell({
                 <Bell aria-hidden />
                 <span className="sr-only">{unread ? `Notifications, ${unread} unread` : "Notifications"}</span>
                 {!!unread && (
-                  <span className="absolute top-0.5 right-0 min-w-[18px] rounded-full bg-action-solid px-1 text-center text-[10px] leading-[18px] font-bold text-white" aria-hidden>
+                  <span className="absolute top-0.5 right-0 min-w-[18px] rounded-full bg-action-solid px-1 text-center text-2xs leading-[18px] font-bold text-white" aria-hidden>
                     {unread > 9 ? "9+" : unread}
                   </span>
                 )}
@@ -841,7 +841,7 @@ export function AppShell({
           tab("/customers", "Customers", Building2)
         )}
         {tab("/notifications", "Alerts", Bell, unread)}
-        <button type="button" onClick={() => setDrawer(true)} aria-expanded={drawer} className="flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px] text-muted">
+        <button type="button" onClick={() => setDrawer(true)} aria-expanded={drawer} className="flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-2xs text-muted">
           <MenuIcon className="size-[22px]" strokeWidth={1.75} aria-hidden />
           Menu
         </button>

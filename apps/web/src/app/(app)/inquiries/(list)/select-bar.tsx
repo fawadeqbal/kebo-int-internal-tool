@@ -22,7 +22,7 @@ export interface BarRow {
   open: boolean;
 }
 
-const BTN = "h-8 border-primary-line px-2.5 text-[13px]";
+const BTN = "h-8 border-primary-line px-2.5 text-md";
 
 /**
  * Select's bar on the inquiries list (design "list pages" 18 Nov): Responsible person, Next follow-up, Put on hold

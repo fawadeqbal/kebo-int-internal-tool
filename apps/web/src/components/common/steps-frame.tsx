@@ -122,7 +122,7 @@ export function StepsFrame<K extends string>({
                     onClick={() => onGo(s.key)}
                     aria-current={on ? "step" : undefined}
                     className={cn(
-                      "flex h-[38px] w-full items-center gap-3 rounded-[9px] px-2.5 text-left text-[14.5px] font-medium text-text hover:bg-surface-2/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text",
+                      "flex h-[38px] w-full items-center gap-3 rounded-[9px] px-2.5 text-left text-sm font-medium text-text hover:bg-surface-2/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text",
                       on && "bg-surface-2 font-semibold hover:bg-surface-2",
                     )}
                   >
@@ -158,7 +158,7 @@ export function StepsFrame<K extends string>({
         <div data-step-body className={body}>
           {/* On a phone the bar above says the step: its heading is for screen readers only, and takes no room. */}
           <div className={cn("flex min-h-7 items-center gap-3", !heading && "max-md:contents")}>
-            <h3 ref={head} tabIndex={-1} aria-label={`${current.label}, step ${i + 1} of ${steps.length}`} className="text-[17px] leading-7 font-bold outline-none max-md:sr-only">
+            <h3 ref={head} tabIndex={-1} aria-label={`${current.label}, step ${i + 1} of ${steps.length}`} className="text-lg leading-7 font-bold outline-none max-md:sr-only">
               {current.label}
             </h3>
             {heading && <span className="ml-auto">{heading}</span>}

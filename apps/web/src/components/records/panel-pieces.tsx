@@ -24,7 +24,7 @@ export function PanelRow({ label, children, href, tone, sub }: { label: ReactNod
     children
   );
   return (
-    <li className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
+    <li className="flex items-baseline justify-between gap-3 py-1 text-md">
       <span className="max-w-[55%] shrink-0 text-text-2 [overflow-wrap:anywhere]">{label}</span>
       <span className={cn("min-w-0 text-right tabular [overflow-wrap:anywhere]", tone ? TONE[tone] : "font-semibold", href && !tone && "text-primary")}>
         {value}
@@ -40,7 +40,7 @@ export function PanelSection({ title, action, lead, empty, footer, children }: {
   return (
     <section aria-label={title} className="border-b border-line px-[18px] pt-3.5 pb-3 last:border-b-0">
       <div className="mb-1 flex min-h-7 items-center justify-between gap-2">
-        <h3 className="text-[15px] font-semibold">{title}</h3>
+        <h3 className="text-lead font-semibold">{title}</h3>
         {action && <span className="flex shrink-0 items-center gap-1">{action}</span>}
       </div>
       {lead}
@@ -53,7 +53,7 @@ export function PanelSection({ title, action, lead, empty, footer, children }: {
 /** A quiet link beside a section's title ("All history", "Costs"). */
 export function PanelLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="text-[13px] font-medium text-primary hover:underline">
+    <Link href={href} className="text-md font-medium text-primary hover:underline">
       {children}
     </Link>
   );

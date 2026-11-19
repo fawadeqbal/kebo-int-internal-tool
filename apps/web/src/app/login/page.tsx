@@ -61,7 +61,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <div className="flex flex-col items-center gap-4 text-center">
         <BrandMark name={name} logoSrc={look?.logoSrc ?? null} size="card" />
         <div>
-          <h1 className="text-[22px] leading-7 font-semibold tracking-tight text-text">Sign in</h1>
+          <h1 className="text-xl leading-7 font-semibold tracking-tight text-text">Sign in</h1>
           <p className="mt-1 text-sm text-muted">
             {demoMode() ? (
               "This is a demo with sample data. Pick a person below to look around."

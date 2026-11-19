@@ -17,7 +17,7 @@ import { orderTitle } from "@/lib/titles";
 
 export const generateMetadata = orderTitle("Production");
 
-const SMALL = "h-8 px-2.5 text-[13px]";
+const SMALL = "h-8 px-2.5 text-md";
 const DAY = 86_400_000;
 
 /**

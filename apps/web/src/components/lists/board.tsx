@@ -49,9 +49,9 @@ export function Board<R>({
   const column = (c: BoardColumn<R>, hideTitle = false) => (
     <section key={c.key} aria-label={c.label} className="flex min-w-0 flex-col gap-2 rounded-xl bg-surface-3/70 p-2.5">
       {!hideTitle && (
-        <h2 className="mx-0.5 flex items-center gap-2 text-[13.5px] font-bold">
+        <h2 className="mx-0.5 flex items-center gap-2 text-md font-bold">
           <Badge tone={c.tone}>{c.label}</Badge>
-          <span className="text-[12.5px] font-semibold text-muted">{c.total}</span>
+          <span className="text-xs font-semibold text-muted">{c.total}</span>
         </h2>
       )}
       {c.rows.length ? (
@@ -61,10 +61,10 @@ export function Board<R>({
           ))}
         </ul>
       ) : (
-        <p className="px-1 pt-1 pb-2 text-[13px] text-muted">{c.empty}</p>
+        <p className="px-1 pt-1 pb-2 text-md text-muted">{c.empty}</p>
       )}
       {c.total > c.rows.length && (
-        <Link href={c.moreHref} className="px-1 text-[13px] font-semibold text-primary hover:underline">
+        <Link href={c.moreHref} className="px-1 text-md font-semibold text-primary hover:underline">
           Show {c.total - c.rows.length} more
         </Link>
       )}

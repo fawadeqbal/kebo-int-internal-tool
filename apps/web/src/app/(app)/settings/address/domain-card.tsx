@@ -24,9 +24,9 @@ function Record({ view }: { view: DomainView }) {
   const r = view.record!;
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[13px] font-semibold">Add this record where {r.zone} is managed</p>
+      <p className="text-md font-semibold">Add this record where {r.zone} is managed</p>
       <ScrollFade scrollLabel="The record to add" className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full min-w-[420px] text-left text-[13px]">
+        <table className="w-full min-w-[420px] text-left text-md">
           <thead className="bg-surface-2 text-xs text-text-2">
             <tr>
               <th className="px-3.5 py-2 font-semibold">Type</th>

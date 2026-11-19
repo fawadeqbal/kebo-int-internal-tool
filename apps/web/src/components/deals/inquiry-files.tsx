@@ -50,7 +50,7 @@ export function AddFilesCard({ dealId }: { dealId: string }) {
           label="Add files"
           onFiles={(f) => void upload(f)}
           kind={
-            <Select aria-label="What kind of file" value={kind} onChange={(e) => setKind(e.target.value as AttachmentKind)} className="h-[34px] w-auto text-[13px]">
+            <Select aria-label="What kind of file" value={kind} onChange={(e) => setKind(e.target.value as AttachmentKind)} className="h-[34px] w-auto text-md">
               {CUSTOMER_KINDS.map((k) => (
                 <option key={k} value={k}>
                   {KIND_WORD[k]}

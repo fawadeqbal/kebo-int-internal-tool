@@ -275,7 +275,7 @@ export function StatTile({
         title={typeof value === "string" ? value : undefined}
         className={cn(
           "truncate font-bold tracking-tight tabular",
-          size === "sm" ? "text-lg sm:text-xl" : "text-xl leading-7 sm:text-[21px]",
+          size === "sm" ? "text-lg sm:text-xl" : "text-xl leading-7 sm:text-xl",
         )}
       >
         {value}
@@ -308,7 +308,7 @@ export function StatTile({
   );
   const cls = cn(
     "flex h-full min-w-0 flex-col rounded-[14px] border bg-surface",
-    tone === "bad" ? "border-[#f3c7c2] dark:border-bad/40" : "border-line",
+    tone === "bad" ? "border-bad/30" : "border-line",
     size === "sm" ? "gap-0.5 px-4 py-3" : "gap-0.5 px-4 py-3.5",
     className,
   );
@@ -382,7 +382,7 @@ export type StepState = "done" | "current" | "attention" | "todo";
  */
 export function StageBar({ stages, current, label = "Stage" }: { stages: string[]; current: number; label?: string }) {
   return (
-    <ol aria-label={label} className="flex flex-wrap text-[13px] font-semibold">
+    <ol aria-label={label} className="flex flex-wrap text-md font-semibold">
       {stages.map((st, i) => (
         <li
           key={st}
@@ -413,7 +413,7 @@ export function ProgressSteps({ steps, label = "Progress" }: { steps: { key: str
         {steps.map((s, i) => {
           const inner = (
             <>
-              <span className="flex items-center gap-1.5 text-[13px] font-bold text-text">
+              <span className="flex items-center gap-1.5 text-md font-bold text-text">
                 {s.state === "done" ? (
                   <Check className="size-3.5 shrink-0 text-ok" strokeWidth={3} aria-hidden />
                 ) : s.state === "attention" ? (
@@ -426,7 +426,7 @@ export function ProgressSteps({ steps, label = "Progress" }: { steps: { key: str
                   </span>
                 )}
                 <span className="truncate">{s.label}</span>
-                <span className={cn("ml-auto pl-1 text-[11px] font-semibold", s.state === "attention" ? "text-bad" : s.state === "current" ? "text-action" : "text-muted")}>{STEP_WORD[s.state]}</span>
+                <span className={cn("ml-auto pl-1 text-2xs font-semibold", s.state === "attention" ? "text-bad" : s.state === "current" ? "text-action" : "text-muted")}>{STEP_WORD[s.state]}</span>
               </span>
               {s.sub && <span className="block truncate text-xs text-text-2">{s.sub}</span>}
             </>
@@ -529,7 +529,7 @@ export function SectionNav({
                 href={l.href}
                 aria-current={l.active ? "page" : undefined}
                 className={cn(
-                  "flex h-9 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] whitespace-nowrap transition-colors [&_svg]:size-4",
+                  "flex h-9 items-center gap-1.5 rounded-[10px] border px-3 text-md whitespace-nowrap transition-colors [&_svg]:size-4",
                   l.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface font-medium text-text-2 hover:border-line-strong hover:text-text",
                 )}
               >
@@ -539,7 +539,7 @@ export function SectionNav({
                   <span className={cn("-ml-0.5 tabular", l.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{l.count}</span>
                 )}
                 {l.tag && (
-                  <span className={cn("rounded-lg px-[7px] py-px text-[11px] font-medium", l.alert ? "bg-bad-soft text-bad" : l.active ? "bg-surface text-primary" : "bg-bg text-muted")}>{l.tag}</span>
+                  <span className={cn("rounded-lg px-[7px] py-px text-2xs font-medium", l.alert ? "bg-bad-soft text-bad" : l.active ? "bg-surface text-primary" : "bg-bg text-muted")}>{l.tag}</span>
                 )}
                 <Pending />
               </Link>
@@ -555,7 +555,7 @@ export function SectionNav({
               href={l.href}
               aria-current={l.active ? "page" : undefined}
               className={cn(
-                "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap",
+                "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-md font-medium whitespace-nowrap",
                 l.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:text-text",
               )}
             >
@@ -604,14 +604,14 @@ export function SectionList({
                 href={l.href}
                 aria-current={l.active ? "page" : undefined}
                 className={cn(
-                  "flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap lg:h-auto lg:rounded-md lg:px-2.5 lg:py-1.5 lg:text-sm",
+                  "flex h-8 items-center gap-1.5 rounded-full px-3 text-md font-medium whitespace-nowrap lg:h-auto lg:rounded-md lg:px-2.5 lg:py-1.5 lg:text-sm",
                   l.active ? "bg-primary-soft font-semibold text-primary" : "bg-surface-2 text-text-2 hover:text-text lg:bg-transparent lg:font-normal lg:hover:bg-surface-2",
                 )}
               >
                 {l.mark}
                 <span>{l.label}</span>
                 {l.count !== undefined && l.count !== null && l.count !== "" && (
-                  <span className={cn("ml-auto text-[11px] tabular", l.alert ? "text-bad" : "text-muted")}>{l.count}</span>
+                  <span className={cn("ml-auto text-2xs tabular", l.alert ? "text-bad" : "text-muted")}>{l.count}</span>
                 )}
               </Link>
             </li>

@@ -51,7 +51,7 @@ export function RecordBox({
     <Card className={cn("@container overflow-visible", className)}>
       <section id={id} aria-label={title}>
         <div className="flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4">
-          <h2 className="min-w-0 text-[15px] font-bold text-text">
+          <h2 className="min-w-0 text-lead font-bold text-text">
             {title}
             {titleMore && <span className="max-sm:hidden"> · {titleMore}</span>}
           </h2>

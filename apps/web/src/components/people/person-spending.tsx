@@ -22,7 +22,7 @@ function Head({ title, description, action }: { title: string; description?: str
   return (
     <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
       <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold text-text">{title}</h2>
+        <h2 className="text-lead font-semibold text-text">{title}</h2>
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
       </div>
       {action && <div className="flex shrink-0 items-center gap-1 text-xs text-text-2">{action}</div>}
@@ -70,7 +70,7 @@ function Bars({ title, rows, currency }: { title: string; rows: { label: string;
       {rows.length ? (
         <ul className="flex flex-col gap-2">
           {rows.map((r) => (
-            <li key={r.label} className="flex flex-col gap-1 text-[13px]">
+            <li key={r.label} className="flex flex-col gap-1 text-md">
               <span className="flex justify-between gap-3">
                 <span>{r.label}</span>
                 <span className="font-semibold tabular">{n0(r.amount)}</span>
@@ -82,7 +82,7 @@ function Bars({ title, rows, currency }: { title: string; rows: { label: string;
           ))}
         </ul>
       ) : (
-        <p className="text-[13px] text-muted">Nothing yet.</p>
+        <p className="text-md text-muted">Nothing yet.</p>
       )}
     </div>
   );
@@ -104,7 +104,7 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
         action={s.count ? `${s.count} cost${s.count === 1 ? "" : "s"} · ${money(s.spent, c)}` : undefined}
       />
       {s.count === 0 ? (
-        <p className="px-4 py-4 text-[13px] text-muted">Nothing spent in {year} yet.</p>
+        <p className="px-4 py-4 text-md text-muted">Nothing spent in {year} yet.</p>
       ) : (
         <>
           <div className="grid gap-6 px-4 py-4 sm:grid-cols-2">
@@ -116,7 +116,7 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
             {Number(s.outside) > 0 ? ` (${money(s.outside, c)})` : ""}.
           </p>
           <ScrollFade scrollLabel="Spending, kind by kind" className="overflow-x-auto border-t border-line">
-            <table className="w-full min-w-[560px] border-collapse text-[13px]">
+            <table className="w-full min-w-[560px] border-collapse text-md">
               <thead>
                 <tr className="bg-surface-2 text-left text-xs text-text-2">
                   <th scope="col" className="px-4 py-2 font-medium">
@@ -175,7 +175,7 @@ export function PersonOwedCard({ s, today, canPay }: { s: PersonSpending; today:
       <Head title={`Owed back to ${name}`} description="Paid with their own money and not paid back yet" />
       <ul className="divide-y divide-line">
         {s.owed.rows.map((e) => (
-          <li key={e.id} className="flex items-start justify-between gap-3 px-4 py-2.5 text-[13px]">
+          <li key={e.id} className="flex items-start justify-between gap-3 px-4 py-2.5 text-md">
             <span className="min-w-0">
               {e.description}
               <span className="block text-xs text-text-2">

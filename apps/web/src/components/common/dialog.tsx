@@ -199,13 +199,13 @@ export function ThrowAwayConfirm({ what, lost, onKeep, onThrow }: { what?: React
         className="relative w-full max-w-[440px] animate-in rounded-2xl border border-line bg-surface p-5 shadow-pop max-sm:max-w-none max-sm:rounded-b-none max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))]"
       >
         <span aria-hidden className="mx-auto -mt-2 mb-3 block h-1 w-10 rounded-full bg-line sm:hidden" />
-        <h2 id={`${id}-t`} className="text-[17px] font-bold">
+        <h2 id={`${id}-t`} className="text-lg font-bold">
           {title}
         </h2>
         <div id={`${id}-d`} className="mt-1 text-sm text-text-2">
           <p>{text}</p>
           {lines.length > 0 && (
-            <ul className="mt-3 overflow-hidden rounded-xl border border-line text-[13.5px] text-text">
+            <ul className="mt-3 overflow-hidden rounded-xl border border-line text-md text-text">
               {lines.slice(0, 6).map((l) => (
                 <li key={l} className="border-t border-line px-3 py-2 first:border-t-0">
                   {l}
@@ -318,7 +318,7 @@ export function WindowHead({
           {title}
         </h2>
         {description && (
-          <p id={`${id}-desc`} className="mt-0.5 text-[13px] text-text-2 max-md:line-clamp-2">
+          <p id={`${id}-desc`} className="mt-0.5 text-md text-text-2 max-md:line-clamp-2">
             {description}
           </p>
         )}

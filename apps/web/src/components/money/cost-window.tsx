@@ -128,7 +128,7 @@ const rateText = (r: number) => String(Number(r.toFixed(4)));
 
 const chip = (on: boolean) =>
   cn(
-    "h-8 rounded-full border px-3 text-[13px] font-medium transition-colors",
+    "h-8 rounded-full border px-3 text-md font-medium transition-colors",
     on ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
   );
 
@@ -144,7 +144,7 @@ function Seg<T extends string>({ labelledBy, value, options, onChange }: { label
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "inline-flex h-[34px] items-center rounded-lg px-3.5 text-[13px] font-medium whitespace-nowrap text-text-2 transition-colors hover:text-text",
+            "inline-flex h-[34px] items-center rounded-lg px-3.5 text-md font-medium whitespace-nowrap text-text-2 transition-colors hover:text-text",
             value === o.value && "bg-surface font-semibold text-text shadow-card",
           )}
         >
@@ -327,11 +327,11 @@ export function CostForm({
   const personName = s0.people.find((p) => p.id === paidBy)?.name ?? (paidBy === me.id ? me.name : null);
 
   const footerStart = expense && onRemove ? (
-    <button type="button" onClick={onRemove} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline">
+    <button type="button" onClick={onRemove} className="inline-flex items-center gap-1.5 text-md font-semibold text-bad hover:underline">
       <Trash2 className="size-4" aria-hidden /> Remove this cost…
     </button>
   ) : expense ? undefined : (
-    <RecordedBy verify={!!send} className="text-[12.5px] text-text-2" />
+    <RecordedBy verify={!!send} className="text-xs text-text-2" />
   );
   const buttons = (
     <>
@@ -382,7 +382,7 @@ export function CostForm({
                   {forLabel}
                 </span>
                 {!send && !month && (
-                  <button type="button" onClick={() => setChoosing(true)} className="shrink-0 text-[13px] font-semibold text-primary hover:underline">
+                  <button type="button" onClick={() => setChoosing(true)} className="shrink-0 text-md font-semibold text-primary hover:underline">
                     Change
                   </button>
                 )}
@@ -479,7 +479,7 @@ export function CostForm({
                 </button>
               ))}
               {!allKinds && (
-                <button type="button" onClick={() => setAllKinds(true)} className="h-8 px-2 text-[13px] font-medium text-primary hover:underline">
+                <button type="button" onClick={() => setAllKinds(true)} className="h-8 px-2 text-md font-medium text-primary hover:underline">
                   More kinds
                 </button>
               )}
@@ -667,7 +667,7 @@ export function CostForm({
           )}
 
           <PanelActions className={cn("justify-end gap-x-3 gap-y-2", !(inPanel || inWindow) && "static mx-0 mb-0 border-t-0 px-0 sm:mx-0 sm:px-0")} cancel={false}>
-            {footerStart && <span className={cn("mr-auto min-w-0 flex-[1_1_9rem] text-[12.5px] text-text-2", !expense && "max-sm:hidden")}>{footerStart}</span>}
+            {footerStart && <span className={cn("mr-auto min-w-0 flex-[1_1_9rem] text-xs text-text-2", !expense && "max-sm:hidden")}>{footerStart}</span>}
             {buttons}
           </PanelActions>
         </>
@@ -792,7 +792,7 @@ export function ConfirmCost({ setup, month, sub }: { setup: CostSetup; month: Co
   const [notice, setNotice] = useState<string | null>(null);
   return (
     <>
-      <Button type="button" size="sm" variant="secondary" className="h-8 px-2.5 text-[13px]" onClick={() => setOpen(true)}>
+      <Button type="button" size="sm" variant="secondary" className="h-8 px-2.5 text-md" onClick={() => setOpen(true)}>
         Confirm
       </Button>
       {notice && <Alert tone="warning">{notice}</Alert>}

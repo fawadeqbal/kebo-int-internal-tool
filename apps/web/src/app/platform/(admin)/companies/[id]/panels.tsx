@@ -396,7 +396,7 @@ export function CompanyPanels({ c, plans, today, actions }: { c: PanelCompany; p
             {(s) => (
               <>
                 <fieldset className="flex flex-col gap-2 text-sm">
-                  <legend className="mb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">Their data</legend>
+                  <legend className="mb-1 text-2xs font-semibold tracking-wide text-muted uppercase">Their data</legend>
                   <label className="flex items-start gap-2">
                     <input type="radio" name="keepData" value="keep" defaultChecked className="mt-1 accent-[var(--color-primary)]" /> Keep
                     everything they made

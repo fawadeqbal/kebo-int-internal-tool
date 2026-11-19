@@ -38,7 +38,7 @@ export function Marked({ text, q }: { text: string; q: string }) {
     <>
       {parts.map((p, i) =>
         i % 2 ? (
-          <mark key={i} className="rounded-[3px] bg-[#fff2c2] px-px text-inherit dark:bg-[#5c4a12]">
+          <mark key={i} className="rounded-[3px] bg-warn-soft px-px text-inherit">
             {p}
           </mark>
         ) : (

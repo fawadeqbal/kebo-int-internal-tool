@@ -103,10 +103,10 @@ const subscribeToast = (l: () => void) => {
 export const NOTE_MS = { plain: 5000, undo: 5000, fail: 5000 } as const;
 
 const KINDS: Record<NoteKind, { icon: ReactNode; className: string; said: string }> = {
-  done: { icon: <Check className="size-3.5" strokeWidth={3} aria-hidden />, className: "bg-[#2e8b57]", said: "Done" },
-  wait: { icon: <Clock className="size-3.5" strokeWidth={2.75} aria-hidden />, className: "bg-[#2f6fd6]", said: "Waiting" },
-  part: { icon: <span aria-hidden className="text-[13px] leading-none font-black">!</span>, className: "bg-[#b86e00]", said: "Partly done" },
-  fail: { icon: <X className="size-3.5" strokeWidth={3} aria-hidden />, className: "bg-[#c2382b]", said: "Not done" },
+  done: { icon: <Check className="size-3.5" strokeWidth={3} aria-hidden />, className: "bg-primary-solid", said: "Done" },
+  wait: { icon: <Clock className="size-3.5" strokeWidth={2.75} aria-hidden />, className: "bg-info-solid", said: "Waiting" },
+  part: { icon: <span aria-hidden className="text-md leading-none font-black">!</span>, className: "bg-warn-solid", said: "Partly done" },
+  fail: { icon: <X className="size-3.5" strokeWidth={3} aria-hidden />, className: "bg-bad-solid", said: "Not done" },
 };
 
 /**
@@ -167,9 +167,9 @@ export function Toaster() {
       </span>
       <div className="min-w-0 flex-1">
         <p className="leading-snug font-semibold">{t.message}</p>
-        {t.detail && <p className="mt-0.5 text-[12.5px] leading-snug text-note-sub">{t.detail}</p>}
+        {t.detail && <p className="mt-0.5 text-xs leading-snug text-note-sub">{t.detail}</p>}
         {(t.undo || steps.length > 0) && (
-          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-md">
             {t.undo && (
               <button type="button" onClick={() => void undo()} disabled={busy} className={link}>
                 {busy ? "Undoing…" : "Undo"}

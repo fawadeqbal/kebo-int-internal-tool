@@ -132,7 +132,7 @@ export function PlatformShell({
             </span>
             <span className="leading-tight">
               <span className="block text-sm font-semibold">RFQ Desk</span>
-              <span className="block text-[11px] text-muted">Platform admin</span>
+              <span className="block text-2xs text-muted">Platform admin</span>
             </span>
           </Link>
           <div className="ml-auto flex items-center gap-1">
@@ -174,7 +174,7 @@ export function PlatformShell({
                 <n.icon className="size-4" aria-hidden />
                 {n.label}
                 {!!c && "countLabel" in n && (
-                  <span className="rounded-full bg-warn-soft px-1.5 text-[11px] font-semibold text-warn tabular">
+                  <span className="rounded-full bg-warn-soft px-1.5 text-2xs font-semibold text-warn tabular">
                     {c}
                     <span className="sr-only"> {n.countLabel}</span>
                   </span>

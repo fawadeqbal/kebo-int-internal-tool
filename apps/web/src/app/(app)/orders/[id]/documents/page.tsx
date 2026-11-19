@@ -260,7 +260,7 @@ export default async function OrderDocuments({
             {bankSteps.map((b) => (
               <li
                 key={b.step}
-                className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-[18px] py-2 text-[13px] sm:grid-cols-[220px_120px_minmax(0,1fr)_auto]"
+                className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-[18px] py-2 text-md sm:grid-cols-[220px_120px_minmax(0,1fr)_auto]"
               >
                 <b className="font-semibold">{b.label}</b>
                 <span className="justify-self-end sm:justify-self-start">

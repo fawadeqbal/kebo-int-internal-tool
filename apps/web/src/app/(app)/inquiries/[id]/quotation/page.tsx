@@ -147,7 +147,7 @@ export default async function QuotationPage({
                   <Link
                     href={`${base}/quotations/${x.id}`}
                     className={cn(
-                      "grid grid-cols-[minmax(0,1fr)_auto_20px] items-start gap-x-4 gap-y-1 px-5 py-3 text-[13px] hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-text",
+                      "grid grid-cols-[minmax(0,1fr)_auto_20px] items-start gap-x-4 gap-y-1 px-5 py-3 text-md hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-text",
                       COLS,
                     )}
                   >

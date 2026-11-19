@@ -221,7 +221,7 @@ export default async function CustomerOverview({
                 </ButtonLink>
               }
             />
-            <CardBody className="flex flex-col gap-2.5 text-[13px]">
+            <CardBody className="flex flex-col gap-2.5 text-md">
               {totals.length ? (
                 totals.map((t) => {
                   const lateAmount = (pay?.orders ?? [])
@@ -327,7 +327,7 @@ export default async function CustomerOverview({
                   {notes.slice(0, 5).map((n) => (
                     <li key={n.id} className="flex gap-2.5">
                       <Avatar name={n.author.name} size={30} />
-                      <span className="min-w-0 text-[13px]">
+                      <span className="min-w-0 text-md">
                         <span className="line-clamp-2">{n.body}</span>
                         <span className="block text-xs text-muted">
                           {n.author.name} · {timeAgo(n.at)}

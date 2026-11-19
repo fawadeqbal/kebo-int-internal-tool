@@ -18,7 +18,7 @@ function DayBars({ days, label }: { days: { day: string; sent: number; failed: n
           </span>
         ))}
       </div>
-      <figcaption className="flex gap-2 text-[11px] text-muted">
+      <figcaption className="flex gap-2 text-2xs text-muted">
         {days.map((d, k) => (
           <span key={d.day} className="flex-1 text-center">
             {k === days.length - 1 ? "today" : dayShort(d.day)}

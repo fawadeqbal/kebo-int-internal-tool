@@ -149,7 +149,7 @@ export default async function SourcingPage({
     v ? (
       <>
         <span className="block">{v.main}</span>
-        {v.sub && <span className="block text-[12.5px] text-text-2">{v.sub}</span>}
+        {v.sub && <span className="block text-xs text-text-2">{v.sub}</span>}
       </>
     ) : (
       dash
@@ -195,9 +195,9 @@ export default async function SourcingPage({
                 const f = offerFigures(x);
                 return (
                   <li key={x.id}>
-                    <Link href={`/inquiries/${d.id}/offers/${x.id}`} className="block px-4 py-3 text-[13px] leading-[18px] active:bg-surface-2">
+                    <Link href={`/inquiries/${d.id}/offers/${x.id}`} className="block px-4 py-3 text-md leading-[18px] active:bg-surface-2">
                       <span className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold text-text">{x.factory.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text">{x.factory.name}</span>
                         {status(x)}
                       </span>
                       <span className="mt-1 block font-semibold text-text tabular">
@@ -210,10 +210,10 @@ export default async function SourcingPage({
                 );
               })}
               {others.map((r) => (
-                <li key={r.id} className="flex items-start gap-2 px-4 py-3 text-[13px] leading-[18px]">
+                <li key={r.id} className="flex items-start gap-2 px-4 py-3 text-md leading-[18px]">
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <Link href={`/suppliers/${r.factory.id}`} className="min-w-0 flex-1 truncate text-[14.5px] font-semibold text-text">
+                      <Link href={`/suppliers/${r.factory.id}`} className="min-w-0 flex-1 truncate text-sm font-semibold text-text">
                         {r.factory.name}
                       </Link>
                       {requestStatus(r)}
@@ -225,7 +225,7 @@ export default async function SourcingPage({
               ))}
             </ul>
             <div className="overflow-x-auto max-md:hidden">
-              <table aria-label="Supplier offers" className="w-full border-collapse text-[13.5px]">
+              <table aria-label="Supplier offers" className="w-full border-collapse text-md">
                 <thead className="bg-surface-2/60">
                   <tr>
                     <th className={cn(th, "min-w-[12rem]")}>Supplier</th>
@@ -251,7 +251,7 @@ export default async function SourcingPage({
                           <Link href={href} className="font-semibold text-text after:absolute after:inset-0 hover:text-primary focus-visible:outline-2 focus-visible:outline-text">
                             {x.factory.name}
                           </Link>
-                          <span className="block text-[12.5px] text-text-2">{offerLine(x)}</span>
+                          <span className="block text-xs text-text-2">{offerLine(x)}</span>
                         </td>
                         <td className={cn(td, "text-right whitespace-nowrap tabular")}>
                           {x.lines.length && unpriced(x) ? (
@@ -259,7 +259,7 @@ export default async function SourcingPage({
                           ) : x.lines.length ? (
                             <>
                               <b className="block font-semibold">{money(f.withTax, x.currency)}</b>
-                              <span className="block text-[12.5px] text-text-2">{f.taxWord}</span>
+                              <span className="block text-xs text-text-2">{f.taxWord}</span>
                             </>
                           ) : (
                             dash
@@ -267,7 +267,7 @@ export default async function SourcingPage({
                         </td>
                         <td className={cn(td, "whitespace-nowrap", !x.lines.length && "text-warn")}>
                           {covers(x)}
-                          {x.unpriced > 0 && <span className="block text-[12.5px] text-warn">{x.unpriced} without a price</span>}
+                          {x.unpriced > 0 && <span className="block text-xs text-warn">{x.unpriced} without a price</span>}
                         </td>
                         <td className={cn(td, "whitespace-nowrap")}>{two(f.lead)}</td>
                         <td className={cn(td, "whitespace-nowrap")}>{two(f.basis)}</td>
@@ -285,7 +285,7 @@ export default async function SourcingPage({
                         <Link href={`/suppliers/${r.factory.id}`} className="font-semibold text-text hover:text-primary">
                           {r.factory.name}
                         </Link>
-                        <span className={cn("block text-[12.5px] text-text-2", r.late && "text-bad")}>{askedLine(r)}</span>
+                        <span className={cn("block text-xs text-text-2", r.late && "text-bad")}>{askedLine(r)}</span>
                       </td>
                       <td className={cn(td, "text-right")}>{dash}</td>
                       <td className={td}>{dash}</td>

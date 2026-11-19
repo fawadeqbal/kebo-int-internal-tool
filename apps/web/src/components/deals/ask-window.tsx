@@ -62,7 +62,7 @@ export function AskWindow({
         <>
           <div data-panel-body className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 *:shrink-0 sm:px-6">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px] font-semibold">
+              <span className="text-md font-semibold">
                 Suppliers<span className="text-bad"> *</span> <span className="font-normal text-muted">· {picked.length} chosen</span>
               </span>
               <Link href="/suppliers?panel=new-factory" className={buttonClass("secondary", "sm")}>

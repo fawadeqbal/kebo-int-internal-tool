@@ -332,7 +332,7 @@ function OfferWindow({
   const fileRows = (
     <div className="flex flex-col gap-2">
       {(q?.files ?? []).map((f) => (
-        <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-[13px]">
+        <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-md">
           <span className="min-w-0 truncate">
             <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
               {f.fileName}
@@ -529,7 +529,7 @@ function OfferWindow({
         onAnother={onAnother ? () => (another.current = true) : undefined}
         footerStart={
           q && removeAction && !only ? (
-            <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} aria-label="Remove this offer" className="inline-flex min-h-9 items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline max-sm:min-w-9 max-sm:justify-center pointer-coarse:min-h-8">
+            <button type="button" onClick={() => (setAskError(null), setWhy(""), setAsking("offer"))} aria-label="Remove this offer" className="inline-flex min-h-9 items-center gap-1.5 text-md font-semibold text-bad hover:underline max-sm:min-w-9 max-sm:justify-center pointer-coarse:min-h-8">
               <Trash2 className="size-4 max-sm:size-5" aria-hidden /> <span className="max-sm:sr-only">Remove this offer</span>
             </button>
           ) : undefined
@@ -585,7 +585,7 @@ function LinesReview({ rows, currency, tax }: { rows: LineRow[]; currency: strin
   const numbers = lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey })));
   return (
     <>
-      <table className="w-full text-[13.5px]">
+      <table className="w-full text-md">
         <tbody>
           {rows.map((r, i) => {
             const p = Number((r.values.unitPrice ?? "").replace(/,/g, ""));

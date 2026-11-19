@@ -261,7 +261,7 @@ export function CustomerMoneyLine({
       </>
     );
   return (
-    <p data-target="factory.customer" className={cn("mx-[18px] flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-md bg-surface-2 px-3 py-2 text-[13px]", warn && "text-warn")}>
+    <p data-target="factory.customer" className={cn("mx-[18px] flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-md bg-surface-2 px-3 py-2 text-md", warn && "text-warn")}>
       <span className={warn ? "font-medium" : "text-text-2"}>{text}</span>
       <Link href={`/orders/${orderId}/payment`} className={ROW_LINK}>
         Payment tab

@@ -46,7 +46,7 @@ export async function AuthShell({
           ) : (
             <>
               <BrandMark name={look.name} logoSrc={null} size="top" />
-              <span className="text-[15px] font-semibold tracking-tight text-text">{look.name}</span>
+              <span className="text-lead font-semibold tracking-tight text-text">{look.name}</span>
             </>
           )
         ) : (
@@ -54,7 +54,7 @@ export async function AuthShell({
             <span className="grid size-7 place-items-center rounded-[7px] bg-primary-solid text-sm font-bold text-primary-fg" aria-hidden>
               K
             </span>
-            <span className="text-[15px] font-semibold tracking-tight text-text">{title}</span>
+            <span className="text-lead font-semibold tracking-tight text-text">{title}</span>
           </>
         )}
       </header>
@@ -66,17 +66,17 @@ export async function AuthShell({
               {children}
             </div>
             {host && (
-              <p className="flex items-center justify-center gap-1.5 rounded-b-[14px] border-t border-line bg-faint px-5 py-3.5 text-[13px] font-medium text-text-2">
+              <p className="flex items-center justify-center gap-1.5 rounded-b-[14px] border-t border-line bg-faint px-5 py-3.5 text-md font-medium text-text-2">
                 <Lock className="size-3.5 text-primary" aria-hidden />
                 <span className="sr-only">Secure address: </span>
                 {host}
               </p>
             )}
           </div>
-          {footer && <div className="mx-auto mt-5 max-w-[420px] text-center text-[13px] leading-relaxed text-muted">{footer}</div>}
+          {footer && <div className="mx-auto mt-5 max-w-[420px] text-center text-md leading-relaxed text-muted">{footer}</div>}
         </div>
       </main>
-      <footer className="px-6 pb-7 text-center text-[13px] text-muted">
+      <footer className="px-6 pb-7 text-center text-md text-muted">
         © {new Date().getFullYear()} {look ? `${look.name}. All rights reserved.` : PRODUCT_NAME}
       </footer>
       <Suspense>

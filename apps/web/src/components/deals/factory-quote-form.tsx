@@ -444,7 +444,7 @@ export function FactoryPicker({
     </li>
   );
   const group = (title: string) => (
-    <li role="presentation" className="px-2.5 pt-1.5 pb-1 text-[11.5px] font-semibold tracking-wide text-text-2 uppercase">
+    <li role="presentation" className="px-2.5 pt-1.5 pb-1 text-2xs font-semibold tracking-wide text-text-2 uppercase">
       {title}
     </li>
   );
@@ -1123,7 +1123,7 @@ export function OfferHeaderForm({
             {step === "changes" && (
               <div className="flex flex-col gap-3.5">
                 {total ? (
-                  <div role="table" aria-label="What changed" className="overflow-hidden rounded-xl border border-line text-[13.5px] max-sm:[&>[role=row]:nth-child(2)]:border-t-0">
+                  <div role="table" aria-label="What changed" className="overflow-hidden rounded-xl border border-line text-md max-sm:[&>[role=row]:nth-child(2)]:border-t-0">
                     <div role="row" className={cn(CHANGE_ROW, "h-9 border-t-0 bg-surface-2 py-0 text-xs font-semibold text-text-2 max-sm:hidden")}>
                       <span role="columnheader">Part</span>
                       <span role="columnheader">What</span>

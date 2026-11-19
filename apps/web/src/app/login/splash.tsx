@@ -45,7 +45,7 @@ export function Splash({ children, footer }: { children: ReactNode; footer: stri
           />
         </div>
       </div>
-      <p className="px-6 pb-7 text-center text-[13px] text-muted">{footer}</p>
+      <p className="px-6 pb-7 text-center text-md text-muted">{footer}</p>
     </div>
   );
 }

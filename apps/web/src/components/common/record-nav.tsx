@@ -46,7 +46,7 @@ export function RecordNav({ label, items }: { label: string; items: RecordNavIte
                 document.getElementById(i.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
               className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium whitespace-nowrap",
+                "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-md font-medium whitespace-nowrap",
                 current === i.id
                   ? "border-primary/40 bg-primary-soft font-semibold text-primary"
                   : "border-line bg-surface text-text-2 hover:text-text",

@@ -267,15 +267,15 @@ export function PhoneLineRow({
           {pick.on && <Check className="size-3.5" strokeWidth={3} />}
         </span>
       )}
-      <span className={cn("w-[34px] shrink-0 pt-0.5 text-[13px] tabular", part ? "font-medium text-muted" : "font-semibold text-text-2")}>
+      <span className={cn("w-[34px] shrink-0 pt-0.5 text-md tabular", part ? "font-medium text-muted" : "font-semibold text-text-2")}>
         <span className="sr-only">{kind} </span>
         {no}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className={cn("line-clamp-2 text-[15px] leading-snug [overflow-wrap:anywhere]", part ? "font-medium" : "font-semibold")}>{name || <span className="text-muted">No description yet</span>}</span>
+        <span className={cn("line-clamp-2 text-lead leading-snug [overflow-wrap:anywhere]", part ? "font-medium" : "font-semibold")}>{name || <span className="text-muted">No description yet</span>}</span>
         {under && <span className="truncate text-xs text-muted">{under}</span>}
         {(line.length > 0 || amount || needs) && (
-          <span className="mt-1 flex items-baseline justify-between gap-2 text-[13px] text-text-2 tabular">
+          <span className="mt-1 flex items-baseline justify-between gap-2 text-md text-text-2 tabular">
             <span className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">
               {line.map((s, n) => (
                 <Fragment key={n}>
@@ -308,13 +308,13 @@ export function PhoneLineRow({
     // under the words, and the words let the tap through to it.
     const words = (
       <>
-        <span className={cn("w-[34px] shrink-0 pt-0.5 text-[13px] tabular", part ? "font-medium text-muted" : "font-semibold text-text-2")}>
+        <span className={cn("w-[34px] shrink-0 pt-0.5 text-md tabular", part ? "font-medium text-muted" : "font-semibold text-text-2")}>
           <span className="sr-only">{kind} </span>
           {no}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-start gap-1.5">
-            <span className={cn("line-clamp-2 min-w-0 flex-1 text-[15px] leading-snug [overflow-wrap:anywhere]", part ? "font-medium" : "font-semibold")}>
+            <span className={cn("line-clamp-2 min-w-0 flex-1 text-lead leading-snug [overflow-wrap:anywhere]", part ? "font-medium" : "font-semibold")}>
               {name || <span className="text-muted">No description yet</span>}
             </span>
             {busy ? (
@@ -325,7 +325,7 @@ export function PhoneLineRow({
           </span>
           {under && <span className="truncate text-xs text-muted">{under}</span>}
           <span className="mt-1.5 flex items-center justify-between gap-2">
-            <span className="line-clamp-2 min-w-0 text-[13px] text-text-2 tabular [overflow-wrap:anywhere]">
+            <span className="line-clamp-2 min-w-0 text-md text-text-2 tabular [overflow-wrap:anywhere]">
               {line.map((s, n) => (
                 <Fragment key={n}>
                   {n > 0 && " · "}
@@ -677,7 +677,7 @@ export function LineWindow({
           <h2 id={`${id}-title`} ref={head} tabIndex={-1} className="truncate text-lg font-semibold tracking-tight outline-none">
             {title}
           </h2>
-          {sub && <p className="text-[13px] text-text-2">{sub}</p>}
+          {sub && <p className="text-md text-text-2">{sub}</p>}
         </div>
       </div>
       {progress !== undefined && (
@@ -696,7 +696,7 @@ export function LineWindow({
           <div className="flex items-center gap-2.5 rounded-[10px] border border-line bg-surface-2 px-3 py-2.5 text-sm">
             <span className="inline-flex h-[22px] shrink-0 items-center rounded-full bg-primary-soft px-2 text-xs font-bold text-primary">Part of {partOf.no}</span>
             <span className="min-w-0 flex-1 truncate">{partOf.name}</span>
-            <button type="button" onClick={partOf.onMakeItem} className="-my-2 -mr-1.5 shrink-0 rounded-md px-1.5 py-2 text-[13.5px] font-semibold text-primary hover:bg-primary-soft">
+            <button type="button" onClick={partOf.onMakeItem} className="-my-2 -mr-1.5 shrink-0 rounded-md px-1.5 py-2 text-md font-semibold text-primary hover:bg-primary-soft">
               Make it an item
             </button>
           </div>
@@ -744,22 +744,22 @@ export function LineWindow({
             </Button>
           </>
         )}
-        <Button variant="secondary" data-window-cancel="" onClick={close} disabled={busy} className={cn("h-12 text-[15px]", isNew ? "shrink-0 px-3.5" : "flex-1")}>
+        <Button variant="secondary" data-window-cancel="" onClick={close} disabled={busy} className={cn("h-12 text-lead", isNew ? "shrink-0 px-3.5" : "flex-1")}>
           Cancel
         </Button>
         {isNew ? (
           // Add (adds it and closes) and the strong Add & next (the next one opens, ready to type), side by side.
           <>
-            <Button variant="soft" onClick={() => save("close")} disabled={busy} className="h-12 flex-1 text-[15px]">
+            <Button variant="soft" onClick={() => save("close")} disabled={busy} className="h-12 flex-1 text-lead">
               Add
             </Button>
-            <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-12 flex-[1.4] text-[15px]">
+            <Button variant="primary" onClick={() => save("next")} disabled={busy} className="h-12 flex-[1.4] text-lead">
               {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />} {busy ? "Adding…" : nextLabel}
             </Button>
           </>
         ) : (
           // Save (and close); › beside ‹ saves and opens the next one.
-          <Button variant="primary" onClick={() => save("close")} disabled={busy} className="h-12 flex-1 text-[15px]">
+          <Button variant="primary" onClick={() => save("close")} disabled={busy} className="h-12 flex-1 text-lead">
             {busy ? "Saving…" : "Save"}
           </Button>
         )}

@@ -120,7 +120,7 @@ export default async function FactoryOverview({
             />
             {pos ? (
               pos.rows.length ? (
-                <DataTable label="Purchase orders" tableClassName="min-w-[640px] text-[13px]">
+                <DataTable label="Purchase orders" tableClassName="min-w-[640px] text-md">
                     <THead>
                       <tr>
                         <Th>Sales order</Th>
@@ -205,7 +205,7 @@ export default async function FactoryOverview({
                 </ButtonLink>
               }
             />
-            <CardBody className="flex flex-col gap-2.5 text-[13px]">
+            <CardBody className="flex flex-col gap-2.5 text-md">
               {sums.length ? (
                 sums.map((t) => (
                   <div key={t.cur} className="flex flex-col gap-2.5">
@@ -237,7 +237,7 @@ export default async function FactoryOverview({
           {/* How they perform (board). */}
           <Card>
             <CardHeader title="How they perform" />
-            <CardBody className="flex flex-col gap-2.5 text-[13px]">
+            <CardBody className="flex flex-col gap-2.5 text-md">
               {(
                 [
                   ["Offers sent", String(f.quotes.length)],

@@ -21,7 +21,7 @@ import { orderTitle } from "@/lib/titles";
 
 export const generateMetadata = orderTitle("Delivery and SAT");
 
-const SMALL = "h-8 px-2.5 text-[13px]";
+const SMALL = "h-8 px-2.5 text-md";
 const RESULT_TONE = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" } as const;
 
 /** A day some months later (YYYY-MM-DD), kept inside the month it lands in. */
@@ -186,7 +186,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
               <ul className="flex flex-col divide-y divide-line border-t border-line px-[18px]">
                 {dv.sat.map((c) => (
                   <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 py-2">
-                    <span className="min-w-0 text-[13px]">
+                    <span className="min-w-0 text-md">
                       <span className="block font-semibold">{c.item}</span>
                       {c.note && <span className="block text-xs text-text-2">{c.note}</span>}
                     </span>
@@ -213,7 +213,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
               { label: "Ends on", value: until ? date(until) : null },
             ]}
             actions={
-              <Link href={`/orders/${o.id}#agreed`} className="text-[13px] font-medium whitespace-nowrap text-primary hover:underline">
+              <Link href={`/orders/${o.id}#agreed`} className="text-md font-medium whitespace-nowrap text-primary hover:underline">
                 As agreed with the customer
               </Link>
             }

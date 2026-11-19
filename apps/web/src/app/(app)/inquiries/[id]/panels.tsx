@@ -35,7 +35,7 @@ function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
             <input type="hidden" name="to" value={to} />
             {lost && (
               <fieldset className="flex flex-col gap-2.5">
-                <legend className="mb-2 text-[13px] font-semibold">
+                <legend className="mb-2 text-md font-semibold">
                   Why was it lost? <span className="text-bad">*</span>
                 </legend>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -55,7 +55,7 @@ function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
             <Field label="Note" htmlFor="note">
               <Textarea id="note" name="note" rows={3} className="min-h-0" defaultValue={s.values?.note} />
             </Field>
-            {lost && <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">A quotation sent and not answered is marked “rejected”. You can reopen the inquiry later.</p>}
+            {lost && <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-md text-text-2">A quotation sent and not answered is marked “rejected”. You can reopen the inquiry later.</p>}
             <Buttons save={lost ? "Mark lost" : "Confirm"} danger={lost} />
           </>
         )}
@@ -259,7 +259,7 @@ export function NoteForm({ action }: { action: Action }) {
     <ActionForm action={action} resetOnSuccess showSuccess={false} className="flex flex-col gap-2">
       {(s) => (
         <>
-          <label htmlFor="inquiry-note" className="text-[13px] font-medium text-text-2">
+          <label htmlFor="inquiry-note" className="text-md font-medium text-text-2">
             Add a note
           </label>
           <Textarea id="inquiry-note" name="body" rows={2} placeholder="Write a note or @mention someone" className="min-h-0" />

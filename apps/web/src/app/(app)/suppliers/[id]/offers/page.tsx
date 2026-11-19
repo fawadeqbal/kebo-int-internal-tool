@@ -112,7 +112,7 @@ export default async function FactoryOffers({
                 );
               })}
             </PhoneList>
-            <DataTable label="Offers" className="max-sm:hidden" tableClassName="min-w-[1100px] text-[13px]">
+            <DataTable label="Offers" className="max-sm:hidden" tableClassName="min-w-[1100px] text-md">
                 <THead>
                   <tr>
                     <Th>Inquiry</Th>

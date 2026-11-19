@@ -20,7 +20,7 @@ export function EditButton({
     <Button
       size={size}
       variant="secondary"
-      className={cn(size === "sm" && "h-8 px-2.5 text-[13px] [&_svg]:size-3.5", className)}
+      className={cn(size === "sm" && "h-8 px-2.5 text-md [&_svg]:size-3.5", className)}
       {...props}
     >
       <Pencil aria-hidden /> {label}
@@ -40,7 +40,7 @@ export function AddButton({
   ...props
 }: Omit<ComponentProps<"button">, "children"> & { label?: ReactNode; size?: "xs" | "sm" }) {
   return (
-    <Button size={size} variant="ghost" className={cn(size === "sm" && "h-8 px-2.5 text-[13px] [&_svg]:size-3.5", className)} {...props}>
+    <Button size={size} variant="ghost" className={cn(size === "sm" && "h-8 px-2.5 text-md [&_svg]:size-3.5", className)} {...props}>
       <Plus aria-hidden /> {label}
     </Button>
   );
