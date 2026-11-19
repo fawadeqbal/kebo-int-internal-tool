@@ -19,7 +19,7 @@ import {
 } from "@/components/order-sections/factory-windows";
 import { BoxFacts } from "@/components/common/record-box";
 import { SendForm, type PurchaseOrderView } from "@/components/orders/purchase-order-card";
-import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
+import { OrderLinesView } from "@/components/orders/order-lines";
 import { PanelButton } from "@/components/orders/step-view";
 import { SupplierPlanWindow } from "@/components/money/plan-editor";
 import { CustomerMoneyLine, SupplierPlanTable, supplierPlanWords, theirInvoices } from "@/components/order-sections/supplier-plan";
@@ -382,14 +382,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
 
       {priced.length > 0 && (
         <Section title="Items to the supplier" state={`${priced.length} item${priced.length === 1 ? "" : "s"}`}>
-          <div className="px-[18px] pb-3.5">
-            <div className="max-md:hidden">
-              <OrderLines set="factory" orderId={o.id} lines={priced} canEdit={false} today={now} />
-            </div>
-            <div className="md:hidden">
-              <PhoneLines set="factory" lines={priced} />
-            </div>
-          </div>
+          <OrderLinesView set="factory" lines={priced} label={`${o.refNo} · items to the supplier`} />
         </Section>
       )}
 

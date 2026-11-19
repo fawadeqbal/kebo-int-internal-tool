@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Globe } from "lucide-react";
 import {
@@ -22,6 +23,7 @@ import type { ShipmentView } from "@/lib/types-flow";
 import type { DetailField } from "@/components/orders/step-view";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
+import { PartsBox, type BoxPart } from "@/components/records/parts-box";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import { FieldsWindow } from "@/components/order-sections/fields-window";
 import { fieldsAction } from "../../light-actions";
@@ -189,13 +191,12 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       </div>
       {shipments.map((s, i) => {
         const air = s.mode === "air";
-        // Several shipments: each has its heading; the sections keep their short names.
-        const of = "";
         const sub = `${o.refNo}${many ? ` · Shipment ${i + 1}` : ""}`;
         const action = fieldsAction.bind(null, o.id, s.id ? `shipment:${s.id}` : "shipment:new");
         const filesOf = (section: OrderSection, hint: string) => (d.canFiles && i === 0 ? { orderId: o.id, section, hint } : undefined);
         const row = (section: OrderSection) =>
-          i === 0 ? <SectionFiles orderId={o.id} section={section} canAdd={d.canFiles} /> : undefined;
+          // A part shows its files only when it has some: they are added in its window.
+          i === 0 ? <SectionFiles orderId={o.id} section={section} canAdd={false} quiet /> : undefined;
         const win = (
           title: string,
           fields: DetailField[],
@@ -281,195 +282,136 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         const arrived = has(s.arrivedOn, s.customsBroker, s.customsDeclarationNo, s.clearedOn);
         const leaves = air ? "Flown" : "Sailed";
 
-        return (
-          <div key={i} className="contents">
-            {many && (
-              <div className={cn("flex items-center justify-between gap-3", i > 0 && "mt-2")}>
-                <h2 className="text-[13px] font-bold text-text-2">Shipment {i + 1}</h2>
-                {/* A shipment added by mistake: only one that has not left. */}
-                {canShip && s.id && !left && (
-                  <RemoveButton action={removeShipmentAction.bind(null, o.id, s.id)} what={`shipment ${i + 1}`} />
-                )}
-              </div>
-            )}
-            {booked ? (
-              <Section
-                title={`Booking${of}`}
-                state={s.bookingNo ? "Booked" : "Forwarder chosen"}
-                tone={s.bookingNo ? "ok" : "info"}
-                cols={3}
-                rows={[
-                  { label: "Way", value: SHIP_MODE_LABEL[s.mode ?? "sea"] },
-                  { label: "Forwarder", value: s.forwarder },
-                  { label: "Contact", value: [s.forwarderContact, s.forwarderPhone].filter(Boolean).join(" · ") || null },
-                  { label: "Booking no.", value: s.bookingNo },
-                  { label: "From", value: s.portOfLoading },
-                  { label: "To", value: s.portOfDischarge },
-                  { label: "ETD", value: s.etd ? date(s.etd) : null },
-                  { label: "ETA", value: s.eta ? date(s.eta) : null },
-                  ...(air ? [] : [{ label: "Container type", value: s.containerType }]),
+        const vesselTitle = air ? "Flight and air waybill" : "Vessel and bill of lading";
+        const loadTitle = air ? "Handing over" : "Container and loading";
+        // One box per shipment, a line per part, each with its own button (canvas board "Shipping", PartsBox).
+        const parts: BoxPart[] = [
+          {
+            key: "booking",
+            title: "Booking",
+            word: booked ? { text: s.bookingNo ? "Booked" : "Forwarder chosen", tone: s.bookingNo ? "ok" : "info" } : null,
+            facts: booked
+              ? [
+                  ["Way", SHIP_MODE_LABEL[s.mode ?? "sea"]],
+                  ["Forwarder", s.forwarder],
+                  ["Contact", [s.forwarderContact, s.forwarderPhone].filter(Boolean).join(" · ")],
+                  ["Booking no.", s.bookingNo],
+                  ["From", s.portOfLoading],
+                  ["To", s.portOfDischarge],
+                  ["ETD", s.etd ? date(s.etd) : null],
+                  ["ETA", s.eta ? date(s.eta) : null],
+                  ...(air ? [] : ([["Container type", s.containerType]] as [string, ReactNode][])),
                   ...(o.shipBy
-                    ? [
-                        {
-                          label: lcLatest ? "Ship by · LC latest" : "Ship by",
-                          value: (
-                            <span className={cn(lateForLc && "text-bad")}>
-                              {date(o.shipBy)}
-                              {lcLatest ? ` · ${date(lcLatest)}` : ""}
-                            </span>
-                          ),
-                        },
-                      ]
+                    ? ([
+                        [
+                          lcLatest ? "Ship by · LC latest" : "Ship by",
+                          <span key="sb" className={cn(lateForLc && "text-bad")}>
+                            {date(o.shipBy)}
+                            {lcLatest ? ` · ${date(lcLatest)}` : ""}
+                          </span>,
+                        ],
+                      ] as [string, ReactNode][])
                     : []),
-                ]}
-                actions={win("Booking", booking, true, filesOf("booking", "the booking copy"))}
-                files={row("booking")}
-              />
-            ) : (
-              <EmptySection
-                title={`Booking${of}`}
-                text={o.shipBy ? `Not booked yet. Ship by ${date(o.shipBy)}.` : "Not booked yet."}
-                action={win("Booking", booking, false, filesOf("booking", "the booking copy"), undefined, true)}
-              />
-            )}
-
-            <div className="grid min-w-0 items-stretch gap-4 lg:grid-cols-2">
-              {loaded ? (
-                <Section
-                  title={`${air ? "Handing over" : "Container and loading"}${of}`}
-                  state={s.loadedOn ? `${air ? "Handed over" : "Loaded"} ${dayMonth(s.loadedOn)}` : "Not loaded yet"}
-                  tone={s.loadedOn ? "ok" : "neutral"}
-                  rows={
-                    air
-                      ? [{ label: "Handed over on", value: s.loadedOn ? date(s.loadedOn) : null }]
-                      : [
-                          { label: "Container no.", value: s.containerNo },
-                          { label: "Seal no.", value: s.sealNo },
-                          { label: "Loaded on", value: s.loadedOn ? date(s.loadedOn) : null },
-                          { label: "Gross weight (VGM)", value: s.vgmKg ? `${Number(s.vgmKg).toLocaleString("en-US")} kg` : null },
-                        ]
-                  }
-                  actions={win(
-                    air ? "Handing over" : "Container and loading",
-                    container,
-                    true,
-                    filesOf("container", "loading photos, the VGM slip"),
-                  )}
-                  files={row("container")}
-                />
-              ) : (
-                <EmptySection
-                  title={`${air ? "Handing over" : "Container and loading"}${of}`}
-                  text="Not loaded yet."
-                  action={win(
-                    air ? "Handing over" : "Container and loading",
-                    container,
-                    false,
-                    filesOf("container", "loading photos, the VGM slip"),
-                  )}
-                />
-              )}
-              {sailed ? (
-                <Section
-                  title={`${air ? "Flight and air waybill" : "Vessel and bill of lading"}${of}`}
-                  state={s.departedOn ? `${leaves} ${dayMonth(s.departedOn)}` : `Not ${air ? "flown" : "sailed"} yet`}
-                  tone={s.departedOn ? "ok" : "neutral"}
-                  rows={[
-                    ...(air ? [] : [{ label: "Vessel", value: s.vessel }]),
-                    { label: air ? "AWB no." : "B/L no.", value: s.blNo },
-                    { label: `${leaves} on`, value: s.departedOn ? date(s.departedOn) : null },
-                    { label: "Tracking no.", value: s.trackingNo },
-                    ...(s.note ? [{ label: "Note", value: s.note }] : []),
-                  ]}
-                  actions={
-                    <>
-                      {track && (
-                        <a
-                          href={track.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={buttonClass("secondary", "sm", SMALL)}
-                          title={`${track.carrier} · ${track.number}`}
-                        >
-                          <Globe aria-hidden /> Track
-                        </a>
-                      )}
-                      {win(
-                        air ? "Flight and air waybill" : "Vessel and bill of lading",
-                        vessel,
-                        true,
-                        filesOf("vessel", air ? "the AWB copy" : "the B/L copy"),
-                        left ? undefined : [`With a date the section says “${leaves} …”.`, "The order becomes “Shipped”."],
-                      )}
-                    </>
-                  }
-                  files={row("vessel")}
-                />
-              ) : (
-                <EmptySection
-                  title={`${air ? "Flight and air waybill" : "Vessel and bill of lading"}${of}`}
-                  text={`Not ${air ? "flown" : "sailed"} yet.`}
-                  action={win(
-                    air ? "Flight and air waybill" : "Vessel and bill of lading",
-                    vessel,
-                    false,
-                    filesOf("vessel", air ? "the AWB copy" : "the B/L copy"),
-                    [`With a date the section says “${leaves} …”.`, "The order becomes “Shipped”."],
-                  )}
-                />
-              )}
-              {paidFreight ? (
-                <Section
-                  title={`Freight and insurance${of}`}
-                  state={s.insurer || s.insurancePolicyNo ? "Insured" : "Not insured yet"}
-                  tone={s.insurer || s.insurancePolicyNo ? "ok" : "warn"}
-                  rows={[
-                    {
-                      label: "Freight",
-                      value: s.freightAmount
-                        ? `${money(s.freightAmount, s.freightCurrency ?? o.currency)}${s.freightTerms ? ` · ${FREIGHT_TERMS_LABEL[s.freightTerms as FreightTerms].toLowerCase()}` : ""}`
-                        : null,
-                    },
-                    { label: "Insured with", value: s.insurer },
-                    { label: "Policy no.", value: s.insurancePolicyNo },
-                    { label: "Insured value", value: s.insuredValue ? money(s.insuredValue, o.currency) : null },
-                    { label: "Premium", value: s.insurancePremium ? money(s.insurancePremium, s.insuranceCurrency ?? o.currency) : null },
-                  ]}
-                  actions={win("Freight and insurance", freight, true, filesOf("freight", "the policy, the freight invoice"), COST_WHATS)}
-                  files={row("freight")}
-                />
-              ) : (
-                <EmptySection
-                  title={`Freight and insurance${of}`}
-                  text="No freight or insurance yet."
-                  action={win("Freight and insurance", freight, false, filesOf("freight", "the policy, the freight invoice"), COST_WHATS)}
-                />
-              )}
-              {arrived ? (
-                <Section
-                  title={`Arrival and customs${of}`}
-                  state={
-                    s.clearedOn ? `Cleared ${dayMonth(s.clearedOn)}` : s.arrivedOn ? `Arrived ${dayMonth(s.arrivedOn)}` : "Not arrived yet"
-                  }
-                  tone={s.arrivedOn || s.clearedOn ? "ok" : "neutral"}
-                  rows={[
-                    { label: "Arrived on", value: s.arrivedOn ? date(s.arrivedOn) : null },
-                    { label: "Customs broker", value: s.customsBroker },
-                    { label: "Declaration no.", value: s.customsDeclarationNo },
-                    { label: "Cleared on", value: s.clearedOn ? date(s.clearedOn) : null },
-                  ]}
-                  actions={win("Arrival and customs", arrival, true, filesOf("arrival", "the arrival notice, the customs release"))}
-                  files={row("arrival")}
-                />
-              ) : (
-                <EmptySection
-                  title={`Arrival and customs${of}`}
-                  text="Not arrived yet."
-                  action={win("Arrival and customs", arrival, false, filesOf("arrival", "the arrival notice, the customs release"))}
-                />
-              )}
-            </div>
-          </div>
+                ]
+              : [],
+            empty: o.shipBy ? `Not booked yet. Ship by ${date(o.shipBy)}.` : "Not booked yet.",
+            action: win("Booking", booking, booked, filesOf("booking", "the booking copy")),
+            files: row("booking"),
+          },
+          {
+            key: "container",
+            title: loadTitle,
+            word: loaded ? { text: s.loadedOn ? `${air ? "Handed over" : "Loaded"} ${dayMonth(s.loadedOn)}` : "Not loaded yet", tone: s.loadedOn ? "ok" : "neutral" } : null,
+            facts: air
+              ? [["Handed over on", s.loadedOn ? date(s.loadedOn) : null]]
+              : [
+                  ["Container no.", s.containerNo],
+                  ["Seal no.", s.sealNo],
+                  ["Loaded on", s.loadedOn ? date(s.loadedOn) : null],
+                  ["Gross weight (VGM)", s.vgmKg ? `${Number(s.vgmKg).toLocaleString("en-US")} kg` : null],
+                ],
+            empty: "Not loaded yet.",
+            action: win(loadTitle, container, loaded, filesOf("container", "loading photos, the VGM slip")),
+            files: row("container"),
+          },
+          {
+            key: "vessel",
+            title: vesselTitle,
+            word: sailed ? { text: s.departedOn ? `${leaves} ${dayMonth(s.departedOn)}` : `Not ${air ? "flown" : "sailed"} yet`, tone: s.departedOn ? "ok" : "neutral" } : null,
+            facts: [
+              ...(air ? [] : ([["Vessel", s.vessel]] as [string, ReactNode][])),
+              [air ? "AWB no." : "B/L no.", s.blNo],
+              [`${leaves} on`, s.departedOn ? date(s.departedOn) : null],
+              ["Tracking no.", s.trackingNo],
+              ["Note", s.note],
+            ],
+            empty: `Not ${air ? "flown" : "sailed"} yet.`,
+            action: (
+              <>
+                {track && (
+                  <a href={track.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm", SMALL)} title={`${track.carrier} · ${track.number}`}>
+                    <Globe aria-hidden /> Track
+                  </a>
+                )}
+                {win(vesselTitle, vessel, sailed, filesOf("vessel", "the B/L copy"))}
+              </>
+            ),
+            files: row("vessel"),
+          },
+          {
+            key: "freight",
+            title: "Freight and insurance",
+            word: paidFreight ? { text: s.insurer || s.insurancePolicyNo ? "Insured" : "Not insured yet", tone: s.insurer || s.insurancePolicyNo ? "ok" : "warn" } : null,
+            facts: [
+              [
+                "Freight",
+                s.freightAmount
+                  ? `${money(s.freightAmount, s.freightCurrency ?? o.currency)}${s.freightTerms ? ` · ${FREIGHT_TERMS_LABEL[s.freightTerms as FreightTerms].toLowerCase()}` : ""}`
+                  : null,
+              ],
+              ["Insured with", s.insurer],
+              ["Policy no.", s.insurancePolicyNo],
+              ["Insured value", s.insuredValue ? money(s.insuredValue, o.currency) : null],
+              ["Premium", s.insurancePremium ? money(s.insurancePremium, s.insuranceCurrency ?? o.currency) : null],
+            ],
+            empty: "No freight or insurance yet.",
+            action: win("Freight and insurance", freight, paidFreight, filesOf("freight", "the policy, the freight invoice"), COST_WHATS),
+            files: row("freight"),
+          },
+          {
+            key: "arrival",
+            title: "Arrival and customs",
+            word: arrived ? { text: s.clearedOn ? `Cleared ${dayMonth(s.clearedOn)}` : s.arrivedOn ? `Arrived ${dayMonth(s.arrivedOn)}` : "Not arrived yet", tone: s.arrivedOn || s.clearedOn ? "ok" : "neutral" } : null,
+            facts: [
+              ["Arrived on", s.arrivedOn ? date(s.arrivedOn) : null],
+              ["Customs broker", s.customsBroker],
+              ["Declaration no.", s.customsDeclarationNo],
+              ["Cleared on", s.clearedOn ? date(s.clearedOn) : null],
+            ],
+            empty: "Not arrived yet.",
+            action: win("Arrival and customs", arrival, arrived, filesOf("arrival", "the arrival notice, the customs release")),
+            files: row("arrival"),
+          },
+        ];
+        // Where the shipment stands, in a word: the furthest part it has got to.
+        const word = s.clearedOn
+          ? { text: `Cleared ${dayMonth(s.clearedOn)}`, tone: "ok" as const }
+          : s.arrivedOn
+            ? { text: `Arrived ${dayMonth(s.arrivedOn)}`, tone: "ok" as const }
+            : s.departedOn
+              ? { text: `${leaves} ${dayMonth(s.departedOn)}`, tone: "info" as const }
+              : s.bookingNo
+                ? { text: "Booked", tone: "info" as const }
+                : { text: "Not booked yet", tone: "neutral" as const };
+        return (
+          <PartsBox
+            key={s.id ?? i}
+            title={many ? `Shipment ${i + 1}` : "Shipment"}
+            titleMore={SHIP_MODE_LABEL[s.mode ?? "sea"]}
+            word={word}
+            actions={canShip && s.id && !left && many ? <RemoveButton action={removeShipmentAction.bind(null, o.id, s.id)} what={`shipment ${i + 1}`} /> : undefined}
+            parts={parts}
+          />
         );
       })}
 

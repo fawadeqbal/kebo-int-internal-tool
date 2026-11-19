@@ -12,6 +12,7 @@ import { FilterCard } from "@/components/common/filter-card";
 import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { orderTitle } from "@/lib/titles";
+import { RecordBox } from "@/components/common/record-box";
 
 export const generateMetadata = orderTitle("History");
 
@@ -40,11 +41,19 @@ export default async function OrderHistory({
     optional(() => getPeople()),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
   ]);
-  const who = [...new Map(history.map((e) => [e.by?.id ?? "system", e.by?.name ?? "System"])).entries()].map(([value, label]) => ({ value, label }));
+  const who = [...new Map(history.map((e) => [e.by?.id ?? "system", e.by?.name ?? "System"])).entries()].map(([value, label]) => ({
+    value,
+    label,
+  }));
   const q = sp.q?.trim().toLowerCase() ?? "";
   const rows = history.filter((e) => (!q || historyText(e).includes(q)) && (!sp.who || (e.by?.id ?? "system") === sp.who));
   const stages = sections?.stages ?? [...FLOW_STEPS];
-  const stageOf = Object.fromEntries(rows.map((e) => [e.id, e.step && (FLOW_STEPS as readonly string[]).includes(e.step) ? ORDER_TAB_LABEL[e.step as FlowStep] : ORDER_TAB_LABEL.overview]));
+  const stageOf = Object.fromEntries(
+    rows.map((e) => [
+      e.id,
+      e.step && (FLOW_STEPS as readonly string[]).includes(e.step) ? ORDER_TAB_LABEL[e.step as FlowStep] : ORDER_TAB_LABEL.overview,
+    ]),
+  );
   return (
     <OrderPage id={id}>
       <section aria-label="History" className="min-w-0">
@@ -57,13 +66,25 @@ export default async function OrderHistory({
             { name: "who", label: "Who", value: sp.who, options: who },
           ]}
         />
-        <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+        <RecordBox
+          title="Changes"
+          count={`${rows.length} ${rows.length === 1 ? "change" : "changes"}`}
+          what="changes"
+          canEdit={false}
+          className="mt-4"
+        >
           <HistoryTable
             entries={rows}
             tags={{ label: "Stage", of: stageOf }}
-            empty={q || sp.who ? "Nothing matches. Clear the search or choose everyone." : step ? "Nothing changed in this stage yet." : "Nothing has changed yet."}
+            empty={
+              q || sp.who
+                ? "Nothing matches. Clear the search or choose everyone."
+                : step
+                  ? "Nothing changed in this stage yet."
+                  : "Nothing has changed yet."
+            }
           />
-        </div>
+        </RecordBox>
       </section>
       <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
         <NotesCard
@@ -82,7 +103,13 @@ export default async function OrderHistory({
             ) : null
           }
         />
-        <FollowUpsCard on={{ key: "orderId", id: o.id }} label={`${o.refNo} · ${o.customer.name}`} rows={followUps?.rows ?? []} people={people ?? []} meId={me.id} />
+        <FollowUpsCard
+          on={{ key: "orderId", id: o.id }}
+          label={`${o.refNo} · ${o.customer.name}`}
+          rows={followUps?.rows ?? []}
+          people={people ?? []}
+          meId={me.id}
+        />
       </div>
     </OrderPage>
   );
