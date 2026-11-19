@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import {
-  INQUIRY_STAGE_LABEL,
-  INQUIRY_STAGE_TONE,
+  INQUIRY,
+  inquiryStateOf,
   ORDER_STAGE_LABEL,
   ORDER_STAGE_TONE,
   PRIORITY_LABEL,
@@ -73,14 +73,11 @@ export function StatusBadge({ meaning, children, className }: { meaning: StatusM
   );
 }
 
-export const StageBadge = ({ stage, onHold }: { stage: InquiryStage; onHold?: boolean }) => (
-  <span className="inline-flex items-center gap-1">
-    <Badge tone={INQUIRY_STAGE_TONE[stage]} dot>
-      {INQUIRY_STAGE_LABEL[stage]}
-    </Badge>
-    {onHold && <Badge tone="outline">On hold</Badge>}
-  </span>
-);
+/** An inquiry's stage, as every list shows it (the inquiry record type): On hold in place of an open stage. */
+export const StageBadge = ({ stage, onHold }: { stage: InquiryStage; onHold?: boolean }) => {
+  const s = INQUIRY.states[inquiryStateOf({ stage, onHold: !!onHold })];
+  return <Badge tone={s.tone}>{s.words}</Badge>;
+};
 
 export const RevisionBadge = ({ status }: { status: RevisionStatus }) => (
   <Badge tone={REVISION_STATUS_TONE[status]} dot>

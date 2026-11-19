@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { ReactNode } from "react";
+import { Children, isValidElement, type ReactNode } from "react";
 import { AlertTriangle, Check, CheckCircle2, Plus, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 import { HowMade } from "./primitives";
@@ -205,15 +205,61 @@ export function AddCard({
 
 const ICON_BG = { 1: "bg-chart-1", 2: "bg-chart-2", 3: "bg-chart-3", 4: "bg-chart-4", 5: "bg-chart-5" } as const;
 
-/** Tiles in a row of 3–6. */
-export function StatRow({ children, className, phone = "tiles" }: { children: ReactNode; className?: string; phone?: "tiles" | "line" }) {
-  // phone "line" (a list's figures, design rule 15 and canvas board "List pages on a phone"): on a phone the tiles
-  // become one slim line of facts ("Customers owe USD 50.1K · USD 9,449 late"), so the list starts near the top.
+/** One fact of a list's facts line: its words, its figure, a grey word after it, red when it is bad, a link. */
+export interface Fact {
+  label: ReactNode;
+  value: ReactNode;
+  /** After the value, in grey ("9 quotations", "this year"). */
+  sub?: ReactNode;
+  tone?: "ok" | "warn" | "bad";
+  href?: string;
+}
+
+/**
+ * The one facts line of a list page (canvas board "One list page for all 25 lists": facts, not tiles): one slim line
+ * with only what the tabs do not already say, a figure each, never a big card per number. Not on a phone: there
+ * the tabs and the rows are the page.
+ */
+export function FactsLine({ facts, className }: { facts: Fact[]; className?: string }) {
+  if (!facts.length) return null;
   return (
-    <div data-stat-row={phone} className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]", className)}>
-      {children}
-    </div>
+    <dl aria-label="Facts" className={cn("mb-4 flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>
+      {facts.map((f, i) => {
+        return (
+          <div key={i} className={cn("flex items-baseline gap-1.5 px-3.5 text-md whitespace-nowrap text-muted", i > 0 && "border-l border-line")}>
+            <dt>{f.label}</dt>
+            <dd className={cn("text-sm font-bold text-text tabular", f.tone === "bad" && "text-bad", f.tone === "warn" && "text-warn")}>
+              {f.href ? (
+                <Link href={f.href} className="hover:underline">
+                  {f.value}
+                </Link>
+              ) : (
+                f.value
+              )}
+            </dd>
+            {f.sub && <dd>{f.sub}</dd>}
+          </div>
+        );
+      })}
+    </dl>
   );
+}
+
+/**
+ * Tiles in a row of 3–6 (Home, reports, a record's figures). `facts`: a list page's figures — drawn as the one
+ * FactsLine from the tiles' label, value, line and link, so every list says its figures the same way.
+ */
+export function StatRow({ children, className, facts }: { children: ReactNode; className?: string; facts?: boolean }) {
+  if (facts) {
+    const list = Children.toArray(children)
+      .filter(isValidElement)
+      .map((el) => {
+        const p = el.props as { label: ReactNode; value: ReactNode; sub?: ReactNode; also?: ReactNode; tone?: Fact["tone"]; href?: string };
+        return { label: p.label, value: p.value, sub: p.sub ?? p.also, tone: p.tone === "ok" ? undefined : p.tone, href: p.href };
+      });
+    return <FactsLine facts={list} className={className} />;
+  }
+  return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]", className)}>{children}</div>;
 }
 
 /**

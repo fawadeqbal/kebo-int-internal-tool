@@ -139,7 +139,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           {approver ? "Added by the team, not counted yet." : "To correct and send again."}
         </Notice>
       )}
-      <StatRow className="mb-4" phone="line">
+      <StatRow facts>
         <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} {...moneyTile(t.in)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />
         <StatTile icon={ArrowUpFromLine} iconColor={2} label={`Out${when}`} {...moneyTile(t.out)} sub={`${t.outCount} payment${t.outCount === 1 ? "" : "s"} out`} />
         <StatTile icon={Banknote} iconColor={4} label="Expenses" {...moneyTile(t.expenses)} sub={`${list.counts.expense} entr${list.counts.expense === 1 ? "y" : "ies"}`} />

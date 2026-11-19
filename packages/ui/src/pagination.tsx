@@ -47,7 +47,8 @@ function pageList(page: number, pages: number): (number | null)[] {
   return sorted.flatMap((p, i) => (i > 0 && p - sorted[i - 1]! > 1 ? [null, p] : [p]));
 }
 
-export function Pagination({
+/** The pager's row (Pager draws it; not used on its own). */
+function Pagination({
   base,
   params,
   page,

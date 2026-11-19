@@ -61,7 +61,7 @@ export default async function PurchaseOrdersPage({
           <ExportCsv what="purchase-orders" />
         }
       />
-      <StatRow className="mb-4" phone="line">
+      <StatRow facts>
         <StatTile label="Open purchase orders" value={tiles.open} />
         <StatTile
           icon={ShoppingCart}

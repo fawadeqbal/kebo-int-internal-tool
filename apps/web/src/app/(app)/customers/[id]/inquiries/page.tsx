@@ -1,6 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { can, CHANNEL_LABEL, INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE, LOST_REASON_LABEL, type InquiryStage } from "@kebo/shared";
-import { ButtonLink, Card, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { Badge, ButtonLink, Card, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, Td, Th, THead, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { customerOf } from "@/lib/party-data";
@@ -19,7 +19,7 @@ function Stage({ d }: { d: DealRow }) {
   const label =
     d.stage === "lost" && d.lostReason ? `Lost · ${LOST_REASON_LABEL[d.lostReason].toLowerCase()}` : INQUIRY_STAGE_LABEL[d.stage];
   return (
-    <StatusBadge meaning={d.stage === "lost" ? "bad" : INQUIRY_STAGE_TONE[d.stage]}>{d.onHold ? `${label} · on hold` : label}</StatusBadge>
+    <Badge tone={d.onHold && d.stage !== "won" && d.stage !== "lost" ? "neutral" : INQUIRY_STAGE_TONE[d.stage]}>{d.onHold ? `${label} · on hold` : label}</Badge>
   );
 }
 

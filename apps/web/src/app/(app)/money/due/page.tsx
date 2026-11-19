@@ -104,7 +104,7 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
 
   return (
     <>
-      <StatRow className="mb-4" phone="line">
+      <StatRow facts>
         <StatTile label="Customers owe us" {...moneyTile(owed)} sub={`${r.rows.length} order${r.rows.length === 1 ? "" : "s"}`} />
         <StatTile
           label="Late"
@@ -343,7 +343,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
 
   return (
     <>
-      <StatRow className="mb-4" phone="line">
+      <StatRow facts>
         <StatTile label="We owe" {...moneyTile(owe)} sub={`${all.length} to pay`} />
         <StatTile label="Late" {...moneyTile(late)} sub={lateCount ? `${lateCount} to pay` : "nothing late"} tone={lateCount ? "bad" : undefined} href={lateCount ? href({ show: "late", page: undefined }) : undefined} />
         <StatTile label="Due in the next 7 days" {...moneyTile(dueSoon)} sub={`${soonCount} to pay`} tone={soonCount ? "warn" : undefined} href={soonCount ? href({ show: "week", page: undefined }) : undefined} />
