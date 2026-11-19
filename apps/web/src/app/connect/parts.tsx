@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { CONNECT_SUB, connectTarget } from "@kebo/shared";
-import { buttonClass, Field, Input } from "@kebo/ui";
+import { buttonClass, Field, Input, ScrollFade } from "@kebo/ui";
 
 /** The address the record points to: connect.<BASE_DOMAIN> (or a stand-in where companies have no addresses of their own). */
 export const target = () => (process.env.BASE_DOMAIN ? connectTarget(process.env.BASE_DOMAIN) : `${CONNECT_SUB}.your-rfq-desk-address`);
@@ -39,7 +39,7 @@ export function CheckForm({ action, value = "", label = "Check the record" }: { 
 /** The one record, as a table to copy from. */
 export function RecordTable({ name = "the first part, e.g. staff" }: { name?: string }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-line">
+    <ScrollFade scrollLabel="The record to add" className="overflow-x-auto rounded-lg border border-line">
       <table className="w-full min-w-[460px] text-left text-[13px]">
         <thead className="bg-surface-2 text-xs text-text-2">
           <tr>
@@ -56,6 +56,6 @@ export function RecordTable({ name = "the first part, e.g. staff" }: { name?: st
           </tr>
         </tbody>
       </table>
-    </div>
+    </ScrollFade>
   );
 }
