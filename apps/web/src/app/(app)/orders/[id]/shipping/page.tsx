@@ -1,6 +1,18 @@
 import Link from "next/link";
 import { Globe } from "lucide-react";
-import { can, dayMonth, FREIGHT_TERMS, FREIGHT_TERMS_LABEL, portsOf, SHIP_MODE_LABEL, SHIP_MODES, shipByVsLc, trackingLink, type FreightTerms, type OrderSection } from "@kebo/shared";
+import {
+  can,
+  dayMonth,
+  FREIGHT_TERMS,
+  FREIGHT_TERMS_LABEL,
+  portsOf,
+  SHIP_MODE_LABEL,
+  SHIP_MODES,
+  shipByVsLc,
+  trackingLink,
+  type FreightTerms,
+  type OrderSection,
+} from "@kebo/shared";
 import { Badge, buttonClass, ButtonLink, cn } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
@@ -83,7 +95,14 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             sub={`${o.refNo} · ${o.customer.name}`}
             action={fieldsAction.bind(null, o.id, "order")}
             fields={[
-              { name: "consignee", label: "Consignee", type: "textarea", value: o.consignee ?? null, placeholder: o.customer.name, wide: true },
+              {
+                name: "consignee",
+                label: "Consignee",
+                type: "textarea",
+                value: o.consignee ?? null,
+                placeholder: o.customer.name,
+                wide: true,
+              },
               { name: "notifyParty", label: "Notify party", type: "textarea", value: o.notifyParty ?? null, wide: true },
               { name: "deliveryAddress", label: "Deliver to", type: "textarea", value: o.deliveryAddress ?? null, wide: true },
             ]}
@@ -129,9 +148,45 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       </OrderPage>
     );
 
+  // The shipping advice beside the instructions (two short boxes side by side).
+  const adviceBox =
+    advice &&
+    (advice.state === "ready" || advice.state === "draft" ? (
+      <Section
+        title="Shipping advice to the customer"
+        state={advice.stateLabel}
+        tone={advice.state === "ready" ? "ok" : "info"}
+        rows={[
+          { label: "Number", value: advice.number },
+          { label: "Version", value: advice.version ? String(advice.version) : null },
+        ]}
+        actions={
+          <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary" className={SMALL}>
+            Open
+          </ButtonLink>
+        }
+        files={<SectionFiles orderId={o.id} section="advice" canAdd={d.canFiles} />}
+      />
+    ) : (
+      <EmptySection
+        title="Shipping advice to the customer"
+        text="Not sent yet."
+        action={
+          advice.makeable && papers?.canMake ? (
+            <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary" className={SMALL}>
+              Make and send
+            </ButtonLink>
+          ) : undefined
+        }
+      />
+    ));
+
   return (
     <OrderPage id={id}>
-      {instructions}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {instructions}
+        {adviceBox}
+      </div>
       {shipments.map((s, i) => {
         const air = s.mode === "air";
         // Several shipments: each has its heading; the sections keep their short names.
@@ -139,8 +194,16 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         const sub = `${o.refNo}${many ? ` · Shipment ${i + 1}` : ""}`;
         const action = fieldsAction.bind(null, o.id, s.id ? `shipment:${s.id}` : "shipment:new");
         const filesOf = (section: OrderSection, hint: string) => (d.canFiles && i === 0 ? { orderId: o.id, section, hint } : undefined);
-        const row = (section: OrderSection) => (i === 0 ? <SectionFiles orderId={o.id} section={section} canAdd={d.canFiles} /> : undefined);
-        const win = (title: string, fields: DetailField[], filled: boolean, files?: ReturnType<typeof filesOf>, whats?: string[], main = false) =>
+        const row = (section: OrderSection) =>
+          i === 0 ? <SectionFiles orderId={o.id} section={section} canAdd={d.canFiles} /> : undefined;
+        const win = (
+          title: string,
+          fields: DetailField[],
+          filled: boolean,
+          files?: ReturnType<typeof filesOf>,
+          whats?: string[],
+          main = false,
+        ) =>
           canShip && (
             <FieldsWindow
               button={filled ? { label: "Edit" } : { label: "Add", kind: main ? "main" : "plain" }}
@@ -157,7 +220,13 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         const left = !!s.departedOn;
 
         const booking: DetailField[] = [
-          { name: "mode", label: "Way", type: "select", value: s.mode ?? "sea", options: SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] })) },
+          {
+            name: "mode",
+            label: "Way",
+            type: "select",
+            value: s.mode ?? "sea",
+            options: SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] })),
+          },
           { name: "forwarder", label: "Forwarder", value: s.forwarder },
           { name: "forwarderContact", label: "Contact", value: s.forwarderContact },
           { name: "forwarderPhone", label: "Phone", value: s.forwarderPhone },
@@ -186,7 +255,13 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         const freight: DetailField[] = [
           { name: "freightAmount", label: "Freight", type: "number", value: s.freightAmount },
           { name: "freightCurrency", label: "Currency", value: s.freightCurrency ?? (s.freightAmount ? null : o.currency) },
-          { name: "freightTerms", label: "Paid", type: "select", value: s.freightTerms ?? "", options: [{ value: "", label: "Not said" }, ...FREIGHT_TERMS.map((t) => ({ value: t, label: FREIGHT_TERMS_LABEL[t] }))] },
+          {
+            name: "freightTerms",
+            label: "Paid",
+            type: "select",
+            value: s.freightTerms ?? "",
+            options: [{ value: "", label: "Not said" }, ...FREIGHT_TERMS.map((t) => ({ value: t, label: FREIGHT_TERMS_LABEL[t] }))],
+          },
           { name: "insurer", label: "Insured with", value: s.insurer },
           { name: "insurancePolicyNo", label: "Policy no.", value: s.insurancePolicyNo },
           { name: "insuredValue", label: `Insured value, ${o.currency}`, type: "number", value: s.insuredValue },
@@ -212,7 +287,9 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
               <div className={cn("flex items-center justify-between gap-3", i > 0 && "mt-2")}>
                 <h2 className="text-[13px] font-bold text-text-2">Shipment {i + 1}</h2>
                 {/* A shipment added by mistake: only one that has not left. */}
-                {canShip && s.id && !left && <RemoveButton action={removeShipmentAction.bind(null, o.id, s.id)} what={`shipment ${i + 1}`} />}
+                {canShip && s.id && !left && (
+                  <RemoveButton action={removeShipmentAction.bind(null, o.id, s.id)} what={`shipment ${i + 1}`} />
+                )}
               </div>
             )}
             {booked ? (
@@ -249,7 +326,11 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                 files={row("booking")}
               />
             ) : (
-              <EmptySection title={`Booking${of}`} text={o.shipBy ? `Not booked yet. Ship by ${date(o.shipBy)}.` : "Not booked yet."} action={win("Booking", booking, false, filesOf("booking", "the booking copy"), undefined, true)} />
+              <EmptySection
+                title={`Booking${of}`}
+                text={o.shipBy ? `Not booked yet. Ship by ${date(o.shipBy)}.` : "Not booked yet."}
+                action={win("Booking", booking, false, filesOf("booking", "the booking copy"), undefined, true)}
+              />
             )}
 
             <div className="grid min-w-0 items-stretch gap-4 lg:grid-cols-2">
@@ -258,17 +339,35 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                   title={`${air ? "Handing over" : "Container and loading"}${of}`}
                   state={s.loadedOn ? `${air ? "Handed over" : "Loaded"} ${dayMonth(s.loadedOn)}` : "Not loaded yet"}
                   tone={s.loadedOn ? "ok" : "neutral"}
-                  rows={air ? [{ label: "Handed over on", value: s.loadedOn ? date(s.loadedOn) : null }] : [
-                    { label: "Container no.", value: s.containerNo },
-                    { label: "Seal no.", value: s.sealNo },
-                    { label: "Loaded on", value: s.loadedOn ? date(s.loadedOn) : null },
-                    { label: "Gross weight (VGM)", value: s.vgmKg ? `${Number(s.vgmKg).toLocaleString("en-US")} kg` : null },
-                  ]}
-                  actions={win(air ? "Handing over" : "Container and loading", container, true, filesOf("container", "loading photos, the VGM slip"))}
+                  rows={
+                    air
+                      ? [{ label: "Handed over on", value: s.loadedOn ? date(s.loadedOn) : null }]
+                      : [
+                          { label: "Container no.", value: s.containerNo },
+                          { label: "Seal no.", value: s.sealNo },
+                          { label: "Loaded on", value: s.loadedOn ? date(s.loadedOn) : null },
+                          { label: "Gross weight (VGM)", value: s.vgmKg ? `${Number(s.vgmKg).toLocaleString("en-US")} kg` : null },
+                        ]
+                  }
+                  actions={win(
+                    air ? "Handing over" : "Container and loading",
+                    container,
+                    true,
+                    filesOf("container", "loading photos, the VGM slip"),
+                  )}
                   files={row("container")}
                 />
               ) : (
-                <EmptySection title={`${air ? "Handing over" : "Container and loading"}${of}`} text="Not loaded yet." action={win(air ? "Handing over" : "Container and loading", container, false, filesOf("container", "loading photos, the VGM slip"))} />
+                <EmptySection
+                  title={`${air ? "Handing over" : "Container and loading"}${of}`}
+                  text="Not loaded yet."
+                  action={win(
+                    air ? "Handing over" : "Container and loading",
+                    container,
+                    false,
+                    filesOf("container", "loading photos, the VGM slip"),
+                  )}
+                />
               )}
               {sailed ? (
                 <Section
@@ -285,11 +384,23 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                   actions={
                     <>
                       {track && (
-                        <a href={track.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm", SMALL)} title={`${track.carrier} · ${track.number}`}>
+                        <a
+                          href={track.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={buttonClass("secondary", "sm", SMALL)}
+                          title={`${track.carrier} · ${track.number}`}
+                        >
                           <Globe aria-hidden /> Track
                         </a>
                       )}
-                      {win(air ? "Flight and air waybill" : "Vessel and bill of lading", vessel, true, filesOf("vessel", air ? "the AWB copy" : "the B/L copy"), left ? undefined : [`With a date the section says “${leaves} …”.`, "The order becomes “Shipped”."])}
+                      {win(
+                        air ? "Flight and air waybill" : "Vessel and bill of lading",
+                        vessel,
+                        true,
+                        filesOf("vessel", air ? "the AWB copy" : "the B/L copy"),
+                        left ? undefined : [`With a date the section says “${leaves} …”.`, "The order becomes “Shipped”."],
+                      )}
                     </>
                   }
                   files={row("vessel")}
@@ -298,7 +409,13 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                 <EmptySection
                   title={`${air ? "Flight and air waybill" : "Vessel and bill of lading"}${of}`}
                   text={`Not ${air ? "flown" : "sailed"} yet.`}
-                  action={win(air ? "Flight and air waybill" : "Vessel and bill of lading", vessel, false, filesOf("vessel", air ? "the AWB copy" : "the B/L copy"), [`With a date the section says “${leaves} …”.`, "The order becomes “Shipped”."])}
+                  action={win(
+                    air ? "Flight and air waybill" : "Vessel and bill of lading",
+                    vessel,
+                    false,
+                    filesOf("vessel", air ? "the AWB copy" : "the B/L copy"),
+                    [`With a date the section says “${leaves} …”.`, "The order becomes “Shipped”."],
+                  )}
                 />
               )}
               {paidFreight ? (
@@ -309,7 +426,9 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                   rows={[
                     {
                       label: "Freight",
-                      value: s.freightAmount ? `${money(s.freightAmount, s.freightCurrency ?? o.currency)}${s.freightTerms ? ` · ${FREIGHT_TERMS_LABEL[s.freightTerms as FreightTerms].toLowerCase()}` : ""}` : null,
+                      value: s.freightAmount
+                        ? `${money(s.freightAmount, s.freightCurrency ?? o.currency)}${s.freightTerms ? ` · ${FREIGHT_TERMS_LABEL[s.freightTerms as FreightTerms].toLowerCase()}` : ""}`
+                        : null,
                     },
                     { label: "Insured with", value: s.insurer },
                     { label: "Policy no.", value: s.insurancePolicyNo },
@@ -320,12 +439,18 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                   files={row("freight")}
                 />
               ) : (
-                <EmptySection title={`Freight and insurance${of}`} text="No freight or insurance yet." action={win("Freight and insurance", freight, false, filesOf("freight", "the policy, the freight invoice"), COST_WHATS)} />
+                <EmptySection
+                  title={`Freight and insurance${of}`}
+                  text="No freight or insurance yet."
+                  action={win("Freight and insurance", freight, false, filesOf("freight", "the policy, the freight invoice"), COST_WHATS)}
+                />
               )}
               {arrived ? (
                 <Section
                   title={`Arrival and customs${of}`}
-                  state={s.clearedOn ? `Cleared ${dayMonth(s.clearedOn)}` : s.arrivedOn ? `Arrived ${dayMonth(s.arrivedOn)}` : "Not arrived yet"}
+                  state={
+                    s.clearedOn ? `Cleared ${dayMonth(s.clearedOn)}` : s.arrivedOn ? `Arrived ${dayMonth(s.arrivedOn)}` : "Not arrived yet"
+                  }
                   tone={s.arrivedOn || s.clearedOn ? "ok" : "neutral"}
                   rows={[
                     { label: "Arrived on", value: s.arrivedOn ? date(s.arrivedOn) : null },
@@ -337,7 +462,11 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                   files={row("arrival")}
                 />
               ) : (
-                <EmptySection title={`Arrival and customs${of}`} text="Not arrived yet." action={win("Arrival and customs", arrival, false, filesOf("arrival", "the arrival notice, the customs release"))} />
+                <EmptySection
+                  title={`Arrival and customs${of}`}
+                  text="Not arrived yet."
+                  action={win("Arrival and customs", arrival, false, filesOf("arrival", "the arrival notice, the customs release"))}
+                />
               )}
             </div>
           </div>
@@ -348,7 +477,13 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       {packGoods.length > 0 && (
         <PackingCard
           title="Packing"
-          badge={o.goods.totals.packages > 0 ? <Badge tone="ok">{`${o.goods.totals.packages.toLocaleString("en-US")} package${o.goods.totals.packages === 1 ? "" : "s"}`}</Badge> : <Badge tone="neutral">No packing list yet</Badge>}
+          badge={
+            o.goods.totals.packages > 0 ? (
+              <Badge tone="ok">{`${o.goods.totals.packages.toLocaleString("en-US")} package${o.goods.totals.packages === 1 ? "" : "s"}`}</Badge>
+            ) : (
+              <Badge tone="neutral">No packing list yet</Badge>
+            )
+          }
           orderId={o.id}
           lines={o.lines.filter((l) => l.type === "goods")}
           goods={packGoods}
@@ -366,34 +501,6 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         />
       )}
 
-      {advice &&
-        (advice.state === "ready" || advice.state === "draft" ? (
-          <Section
-            title="Shipping advice to the customer"
-            state={advice.stateLabel}
-            tone={advice.state === "ready" ? "ok" : "info"}
-            rows={[{ label: "Number", value: advice.number }, { label: "Version", value: advice.version ? String(advice.version) : null }]}
-            actions={
-              <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary" className={SMALL}>
-                Open
-              </ButtonLink>
-            }
-            files={<SectionFiles orderId={o.id} section="advice" canAdd={d.canFiles} />}
-          />
-        ) : (
-          <EmptySection
-            title="Shipping advice to the customer"
-            text="Not sent yet."
-            action={
-              advice.makeable && papers?.canMake ? (
-                <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary" className={SMALL}>
-                  Make and send
-                </ButtonLink>
-              ) : undefined
-            }
-          />
-        ))}
-
       {canShip && shipping.shipments.length > 0 && (
         <div>
           <FieldsWindow
@@ -405,7 +512,13 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             save="Add the shipment"
             whats={["Shipping shows its sections once per shipment."]}
             fields={[
-              { name: "mode", label: "Way", type: "select", value: "sea", options: SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] })) },
+              {
+                name: "mode",
+                label: "Way",
+                type: "select",
+                value: "sea",
+                options: SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] })),
+              },
               { name: "forwarder", label: "Forwarder", value: "" },
               { name: "etd", label: "Planned ETD", type: "date", value: "" },
               { name: "note", label: "What goes in it", type: "textarea", value: "", wide: true },

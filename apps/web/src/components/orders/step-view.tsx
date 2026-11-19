@@ -24,10 +24,10 @@ export const dayLabel = (iso: string | null | undefined, style: TimeStyle = time
 
 /* ---------------------------------------------------------------- the side panel (common/panel) */
 
-function PanelFooter({ save = "Save", busy, note }: { save?: string; busy?: boolean; note?: ReactNode }) {
+function PanelFooter({ save = "Save", busy, note, disabled }: { save?: string; busy?: boolean; note?: ReactNode; disabled?: boolean }) {
   return (
     <PanelActions>
-      <Button type="submit" size="sm" disabled={busy} aria-busy={busy}>
+      <Button type="submit" size="sm" disabled={busy || disabled} aria-busy={busy}>
         {busy ? "Saving…" : save}
       </Button>
       <span className="text-xs text-muted">{note ?? "Changes show in the step’s Changes."}</span>
@@ -146,6 +146,20 @@ export function FieldsForm({
   const groups = [...new Set(editable.map((f) => f.group ?? ""))];
   const [errors, setErrors] = useState<Record<string, string>>({});
   const saver = useEditSave({ edit, card, what: "values" });
+  // What differs from what is saved, as it is typed (canvas board "One edit window"): the button counts it
+  // ("Save 2 changes", or "No changes"), and each changed field says what it was.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [changed, setChanged] = useState<string[]>([]);
+  const recount = () => {
+    if (!formRef.current) return;
+    const data = new FormData(formRef.current);
+    const now = editable.filter((f) => data.has(f.name!) && String(data.get(f.name!) ?? "").trim() !== (f.value ?? "").trim()).map((f) => f.name!);
+    setChanged((was) => (was.join() === now.join() ? was : now));
+  };
+  // A window that names its own button (Add the shipment) keeps it, and so does one for something new (plain);
+  // the Save of saved values counts.
+  const counting = !save && !plain;
+  const saveWords = counting ? (changed.length === 0 ? "No changes" : changed.length === 1 ? "Save 1 change" : `Save ${changed.length} changes`) : save;
 
   const submit = (form: HTMLFormElement) => {
     const data = new FormData(form);
@@ -192,8 +206,11 @@ export function FieldsForm({
 
   return (
     <form
+      ref={formRef}
       noValidate
       className="flex min-h-0 flex-1 flex-col"
+      onInput={recount}
+      onChange={recount}
       onSubmit={(e) => {
         e.preventDefault();
         submit(e.currentTarget);
@@ -210,7 +227,7 @@ export function FieldsForm({
                   key={f.name}
                   label={f.panelLabel ?? f.label}
                   htmlFor={`${id}-${f.name}`}
-                  hint={f.hint}
+                  hint={changed.includes(f.name!) ? <WasHint f={f} hint={f.hint} /> : f.hint}
                   error={errors[f.name!]}
                   className={cn(f.wide && "sm:col-span-2")}
                 >
@@ -220,10 +237,23 @@ export function FieldsForm({
           </PanelSection>
         ))}
         {extra}
-        <PanelFooter save={save} busy={saver.busy} note={note ?? (card?.first ? "Changing a saved value asks why." : undefined)} />
+        <PanelFooter save={saveWords} busy={saver.busy} disabled={counting && changed.length === 0} note={note ?? (card?.first ? "Changing a saved value asks why." : undefined)} />
       </PanelBody>
       {saver.dialog}
     </form>
+  );
+}
+
+/** Under a changed field: what it was ("Changed · was 14 Nov 2026"), then its own hint. */
+function WasHint({ f, hint }: { f: DetailField; hint?: ReactNode }) {
+  const was = changeText(f, (f.value ?? "").trim());
+  return (
+    <>
+      <span data-was="" className="block font-medium text-action">
+        Changed · was {was || "empty"}
+      </span>
+      {hint}
+    </>
   );
 }
 
