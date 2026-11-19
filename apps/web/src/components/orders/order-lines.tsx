@@ -109,7 +109,9 @@ function columnsOf(set: LineSet): LineColumn[] {
         </>
       ),
     },
-    { key: "quantity", label: "Quantity", width: "4.75rem", align: "right", format: (v, r) => `${n(v.quantity)} ${r.values.unit}` },
+    // Quantity and Unit apart, as on every record's items (canvas "The order's Overview today", 7).
+    { key: "quantity", label: "Quantity", width: "4.75rem", align: "right", format: (v) => n(v.quantity) },
+    { key: "unit", label: "Unit", width: "3.75rem", phoneHidden: true },
   ];
   const number = (key: string, label: string, width: string, digits = 2, phoneHidden = false): LineColumn => ({
     key,

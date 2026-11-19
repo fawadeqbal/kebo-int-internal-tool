@@ -30,7 +30,13 @@ const TABS: PapersTab[] = ["bank", "all", "missing"];
  * payment route, the originals couriered to the customer, or the bank's steps. Papers are made and
  * uploaded here and nowhere else on the order.
  */
-export default async function OrderDocuments({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+export default async function OrderDocuments({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const { id } = await params;
   const sp = await searchParams;
   const d = await stageData(id, "documents");
@@ -83,7 +89,9 @@ export default async function OrderDocuments({ params, searchParams }: { params:
   const sub = `${o.refNo} · ${o.customer.name}`;
   // "Money reached us" is the payment itself: recording it here records the payment and marks the step.
   const reached = bankSteps.find((b) => b.step === "bank_paid_us" && !b.doneOn) && can(me, "payments.record") && open;
-  const [pays, money, settings] = reached ? await Promise.all([orderPaymentsOf(o.id), orderMoneyOf(o.id), getSettings()]) : [null, null, null];
+  const [pays, money, settings] = reached
+    ? await Promise.all([orderPaymentsOf(o.id), orderMoneyOf(o.id), getSettings()])
+    : [null, null, null];
 
   const stepWindow = (b: BankStepView, originals = false) =>
     canBank && (
@@ -93,17 +101,35 @@ export default async function OrderDocuments({ params, searchParams }: { params:
         sub={originals ? sub : `${sub}${contract?.number ? ` · ${contract.number}` : ""}`}
         plain={!b.doneOn}
         action={lightAction.bind(null, o.id, `bank:${b.step}`)}
-        files={d.canFiles ? { orderId: o.id, section: originals ? "originals" : "bank_steps", hint: originals ? "the courier slip" : "the slip or the bank’s message" } : undefined}
+        files={
+          d.canFiles
+            ? {
+                orderId: o.id,
+                section: originals ? "originals" : "bank_steps",
+                hint: originals ? "the courier slip" : "the slip or the bank’s message",
+              }
+            : undefined
+        }
         fields={[
           { name: "doneOn", label: originals ? "Sent on" : "Done on", type: "date", value: b.doneOn, max: now },
           ...(originals || b.step === "couriered_to_customer_bank" ? [{ name: "courier", label: "Courier", value: b.courier }] : []),
-          { name: "reference", label: originals || b.step === "couriered_to_customer_bank" ? "Tracking no." : "Reference", value: b.reference },
+          {
+            name: "reference",
+            label: originals || b.step === "couriered_to_customer_bank" ? "Tracking no." : "Reference",
+            value: b.reference,
+          },
           { name: "note", label: "Note", type: "textarea" as const, value: b.note, wide: true },
         ]}
       />
     );
   const hintOf = (step: BankStepKind): string =>
-    step === "sent_to_our_bank" ? (contract?.ourBank ?? "") : step === "customer_bank_received" ? (contract?.customerBank ?? "") : step === "bank_paid_us" ? "recorded with the payment" : "";
+    step === "sent_to_our_bank"
+      ? (contract?.ourBank ?? "")
+      : step === "customer_bank_received"
+        ? (contract?.customerBank ?? "")
+        : step === "bank_paid_us"
+          ? "recorded with the payment"
+          : "";
   const originals = !viaBank ? (bankSteps.find((b) => b.step === "copies_to_customer") ?? null) : null;
 
   // How the papers print (design "terms that travel"): what decides how this order's papers look, in one place.
@@ -122,7 +148,10 @@ export default async function OrderDocuments({ params, searchParams }: { params:
       title="How the documents print"
       cols={4}
       rows={[
-        { label: "Heading over the items", value: o.documentTitle || <span className="font-normal text-text-2">{o.inquiry.title} (the inquiry’s title)</span> },
+        {
+          label: "Heading over the items",
+          value: o.documentTitle || <span className="font-normal text-text-2">{o.inquiry.title} (the inquiry’s title)</span>,
+        },
         { label: "Agreed payment conditions", value: conditionsWord },
         {
           label: "Shipping marks",
@@ -178,7 +207,6 @@ export default async function OrderDocuments({ params, searchParams }: { params:
 
   return (
     <OrderPage id={id}>
-      {howPrint}
       {papers && (
         <PapersTable
           orderId={o.id}
@@ -188,43 +216,59 @@ export default async function OrderDocuments({ params, searchParams }: { params:
           canMake={papers.canMake}
           canRecord={papers.canRecord}
           addAction={addDocumentAction.bind(null, o.id)}
-          updateActions={Object.fromEntries(rows.filter((r) => r.doc).map((r) => [r.doc!.id, updateDocumentAction.bind(null, o.id, r.doc!.id)]))}
+          updateActions={Object.fromEntries(
+            rows.filter((r) => r.doc).map((r) => [r.doc!.id, updateDocumentAction.bind(null, o.id, r.doc!.id)]),
+          )}
           shipNumber={o.blNo}
           today={now}
           issueProforma={!o.proforma && can(me, "orders.update") && open ? issueProformaAction.bind(null, o.id) : undefined}
         />
       )}
 
-      {originals &&
-        (originals.doneOn ? (
-          <Section
-            title="Originals to the customer"
-            state={`Sent ${dayMonth(originals.doneOn)}`}
-            tone="ok"
-            cols={3}
-            rows={[
-              { label: "Courier", value: originals.courier },
-              { label: "Tracking no.", value: originals.reference },
-              { label: "Sent on", value: date(originals.doneOn) },
-              ...(originals.note ? [{ label: "Note", value: originals.note }] : []),
-            ]}
-            actions={stepWindow(originals, true)}
-            files={<SectionFiles orderId={o.id} section="originals" canAdd={d.canFiles} />}
-          />
-        ) : (
-          <EmptySection title="Originals to the customer" text="Not sent yet." action={stepWindow(originals, true)} />
-        ))}
+      {/* The papers first; then the originals beside how the papers print (two short boxes side by side). */}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {originals &&
+          (originals.doneOn ? (
+            <Section
+              title="Originals to the customer"
+              state={`Sent ${dayMonth(originals.doneOn)}`}
+              tone="ok"
+              cols={3}
+              rows={[
+                { label: "Courier", value: originals.courier },
+                { label: "Tracking no.", value: originals.reference },
+                { label: "Sent on", value: date(originals.doneOn) },
+                ...(originals.note ? [{ label: "Note", value: originals.note }] : []),
+              ]}
+              actions={stepWindow(originals, true)}
+              files={<SectionFiles orderId={o.id} section="originals" canAdd={d.canFiles} />}
+            />
+          ) : (
+            <EmptySection title="Originals to the customer" text="Not sent yet." action={stepWindow(originals, true)} />
+          ))}
+        {howPrint}
+      </div>
 
       {viaBank && bankSteps.length > 0 && (
-        <Section title="The bank’s steps" state={`${done} of ${bankSteps.length}`} tone={done === bankSteps.length ? "ok" : "neutral"} files={<SectionFiles orderId={o.id} section="bank_steps" canAdd={d.canFiles} />}>
+        <Section
+          title="The bank’s steps"
+          state={`${done} of ${bankSteps.length}`}
+          tone={done === bankSteps.length ? "ok" : "neutral"}
+          files={<SectionFiles orderId={o.id} section="bank_steps" canAdd={d.canFiles} />}
+        >
           <ul>
             {bankSteps.map((b) => (
-              <li key={b.step} className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-[18px] py-2 text-[13px] sm:grid-cols-[220px_120px_minmax(0,1fr)_auto]">
+              <li
+                key={b.step}
+                className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-[18px] py-2 text-[13px] sm:grid-cols-[220px_120px_minmax(0,1fr)_auto]"
+              >
                 <b className="font-semibold">{b.label}</b>
                 <span className="justify-self-end sm:justify-self-start">
                   <Badge tone={b.doneOn ? "ok" : "neutral"}>{b.doneOn ? dayMonth(b.doneOn) : "Waiting"}</Badge>
                 </span>
-                <span className="col-span-2 text-text-2 sm:col-span-1">{b.doneOn ? [b.courier, b.reference, b.note].filter(Boolean).join(" · ") || hintOf(b.step) : hintOf(b.step)}</span>
+                <span className="col-span-2 text-text-2 sm:col-span-1">
+                  {b.doneOn ? [b.courier, b.reference, b.note].filter(Boolean).join(" · ") || hintOf(b.step) : hintOf(b.step)}
+                </span>
                 <span className="col-span-2 justify-self-end sm:col-span-1">
                   {b.step === "bank_paid_us"
                     ? !b.doneOn &&

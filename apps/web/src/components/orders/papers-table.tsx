@@ -182,15 +182,17 @@ export function PapersTable({
             role="row"
             className="hidden grid-cols-[28px_minmax(0,1.35fr)_minmax(0,1fr)_120px_minmax(0,1.25fr)_190px] gap-x-3 border-b border-line px-2 py-2 text-xs font-medium text-text-2 md:grid"
           >
-            <span role="columnheader" className="sr-only">
-              Done
+            {/* A heading only read out still keeps its column (sr-only on the cell itself took it out of the grid,
+                and Document slid into the tick's 28 px under Number · date). */}
+            <span role="columnheader">
+              <span className="sr-only">Done</span>
             </span>
             <span role="columnheader">Document</span>
             <span role="columnheader">Number · date</span>
             <span role="columnheader">From</span>
             <span role="columnheader">File</span>
-            <span role="columnheader" className="sr-only">
-              Actions
+            <span role="columnheader">
+              <span className="sr-only">Actions</span>
             </span>
           </div>
           {!shown.length && (
