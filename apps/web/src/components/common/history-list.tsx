@@ -131,7 +131,7 @@ export function HistoryTable({
 }) {
   if (!entries.length) return <p className="px-4 py-6 text-sm text-muted sm:px-5">{empty}</p>;
   return (
-    <Table className={cn("min-w-[720px]", tags && "table-fixed")}>
+    <Table className={cn("", tags && "table-fixed")}>
       <THead>
         <tr>
           <Th className={tags ? "w-40" : "w-44"}>When</Th>

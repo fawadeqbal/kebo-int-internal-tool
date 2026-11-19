@@ -84,7 +84,7 @@ export default async function RolesPage() {
           actions={
             // Roles beyond the three built in are a plan feature.
             custom && (
-              <OpenPanelButton panel="new-role" variant="ghost" size="sm" className="">
+              <OpenPanelButton panel="new-role" variant="ghost" size="sm">
                 <Plus aria-hidden /> Add role
               </OpenPanelButton>
             )

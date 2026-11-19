@@ -79,7 +79,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
         {d.people.length === 0 ? (
           <p className="p-4 text-sm text-muted">Nothing was spent {p.name}.</p>
         ) : (
-          <Table className="min-w-[720px]">
+          <Table>
             <THead>
               <tr>
                 <Th>Person</Th>

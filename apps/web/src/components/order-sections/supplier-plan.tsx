@@ -148,7 +148,7 @@ export function SupplierPlanTable({
           </li>
         ))}
       </ul>
-      <div className="hidden overflow-x-auto sm:block">
+      <div className="hidden sm:block">
         <Table>
           <THead>
             <tr>

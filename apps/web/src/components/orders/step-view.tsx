@@ -511,7 +511,7 @@ export function LinesCard({
             {actions}
             {editable && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
             {canEdit && editPanel && (
-              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="secondary" size="sm" className="">
+              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="secondary" size="sm">
                 <Pencil aria-hidden /> {editLabel}
               </OpenPanelButton>
             )}

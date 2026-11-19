@@ -240,7 +240,7 @@ export function CustomerForm({
             <Alert tone="error">{s.errors.contacts[0]}</Alert>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-md">
+            <table className="w-full text-md">
               <thead className="bg-faint text-left text-text-2">
                 <tr>
                   <th className="w-[22%] px-2 py-2.5 font-semibold">

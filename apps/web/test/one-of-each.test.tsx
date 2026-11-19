@@ -88,6 +88,15 @@ describe("one of each", () => {
     expect(found(/export function TabRow\b/g).filter((f) => !f.includes("packages/ui"))).toEqual([]);
   });
 
+  it("a table never forces a width, and never sits in a second sideways scroll box", () => {
+    expect(found(/(?<![\w-])min-w-\[(?:5[0-9]\d|[6-9]\d\d|1\d{3})px\]/g)).toEqual([]);
+    expect(found(/<div className="[^"]*overflow-x-auto[^"]*">\s*<Table\b/g)).toEqual([]);
+  });
+
+  it("one totals block: the order's money is Totals, not its own line", () => {
+    expect(found(/^function Totals\(/gm)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

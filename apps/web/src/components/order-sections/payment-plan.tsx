@@ -120,7 +120,6 @@ export function PaymentPlanTable({
             <Button
               size="sm"
               variant="secondary"
-              className=""
               onClick={() => setSending({ action: send.bind(null, i.id), orderId, refId: i.id, number: i.number, label: i.label, amount: i.amount, currency, dueOn: i.dueOn, again: r.with === "request" })}
             >
               {r.with === "request" ? "Send again" : "Send request"}
@@ -164,7 +163,7 @@ export function PaymentPlanTable({
           </li>
         ))}
       </ul>
-      <div className="hidden overflow-x-auto sm:block">
+      <div className="hidden sm:block">
         <Table>
           <THead>
             <tr>

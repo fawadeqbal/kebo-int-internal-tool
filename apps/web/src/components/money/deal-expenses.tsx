@@ -95,7 +95,7 @@ export async function DealExpensesCard({
         tone={toPay > 0 ? "warn" : "ok"}
         actions={
           <>
-            {live.length > 0 && <ExportLink what="expenses" query={{ inquiry: deal.id }} className="" />}
+            {live.length > 0 && <ExportLink what="expenses" query={{ inquiry: deal.id }} />}
             <AddCost setup={setup} />
           </>
         }

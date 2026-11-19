@@ -130,7 +130,7 @@ export default async function PurchaseOrdersPage({
             description={data.suppliers.length ? "Clear the search or choose All." : "Each supplier on a sales order gets one, numbered PO-2026-0001, when the order is made."}
           />
         ) : (
-          <Table className="min-w-[900px]">
+          <Table>
             <THead>
               <tr>
                 <Th>Purchase order</Th>

@@ -29,7 +29,7 @@ export function DataTable({
   children: ReactNode;
   clearParam?: string;
   className?: string;
-  /** For the table itself, e.g. the width below which it scrolls sideways (`min-w-[1000px]`). */
+  /** For the table itself (its text size). No table sets a width: columns that do not fit wrap. */
   tableClassName?: string;
 }) {
   const router = useRouter();

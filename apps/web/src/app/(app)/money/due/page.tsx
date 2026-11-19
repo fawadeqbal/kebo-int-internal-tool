@@ -144,8 +144,8 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
         {shown.length === 0 ? (
           <EmptyState framed title={r.rows.length ? "No order matches" : "Nothing to receive"} description={r.rows.length ? "Clear the search or choose All open." : "Every customer has paid what they owe."} />
         ) : (
-          <div className="overflow-x-auto">
-            <Table className="min-w-[860px]">
+          <div>
+            <Table>
               <THead>
                 <tr>
                   <Th className="w-8">
@@ -364,8 +364,8 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
         {shown.length === 0 ? (
           <EmptyState framed title={all.length ? "Nothing matches" : "Nothing to pay"} description={all.length ? "Clear the search or choose All open." : "Every supplier and every bill is paid."} />
         ) : (
-          <div className="overflow-x-auto">
-            <Table className="min-w-[860px]">
+          <div>
+            <Table>
               <THead>
                 <tr>
                   <Th>Who we owe</Th>

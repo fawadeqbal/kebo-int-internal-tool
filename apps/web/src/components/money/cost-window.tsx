@@ -767,7 +767,7 @@ export function ConfirmCost({ setup, month, sub }: { setup: CostSetup; month: Co
   const [notice, setNotice] = useState<string | null>(null);
   return (
     <>
-      <Button type="button" size="sm" variant="secondary" className="" onClick={() => setOpen(true)}>
+      <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
         Confirm
       </Button>
       {notice && <Alert tone="warning">{notice}</Alert>}

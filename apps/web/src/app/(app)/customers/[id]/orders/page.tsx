@@ -125,7 +125,7 @@ export default async function CustomerOrders({
                 );
               })}
             </PhoneList>
-            <DataTable label="Orders" className="max-sm:hidden" tableClassName="min-w-[1000px] text-md">
+            <DataTable label="Orders" className="max-sm:hidden" tableClassName="text-md">
                 <THead>
                   <tr>
                     <Th>Order</Th>

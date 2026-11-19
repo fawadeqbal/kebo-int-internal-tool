@@ -210,7 +210,7 @@ export default async function FollowUpsPage({
               }
             />
           ) : (
-            <DataTable label="Follow-ups" tableClassName="min-w-[720px] text-md">
+            <DataTable label="Follow-ups" tableClassName="text-md">
                 <THead>
                   <tr>
                     <Th className="w-12">
