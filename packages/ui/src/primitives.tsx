@@ -37,11 +37,13 @@ const buttonVariants: Record<ButtonVariant, string> = {
  */
 const buttonSizes: Record<ButtonSize, string> = {
   xs: "h-7 rounded-lg px-2 text-xs [&_svg]:size-3.5 pointer-coarse:h-8 pointer-coarse:min-w-8 pointer-coarse:px-2.5",
-  sm: "h-9 px-3 text-[13px] max-sm:h-8 max-sm:px-2.5",
-  md: "h-10 px-3.5 max-sm:h-9 max-sm:px-3 max-sm:text-[13px]",
-  lg: "h-11 px-5",
-  icon: "size-10 max-sm:size-9",
-  "icon-sm": "size-9 max-sm:size-8",
+  // Design rule 10 (sizes): buttons 32–40 on a laptop, 40–44 on a phone (a thumb, not a pointer); the strong
+  // one 44, 48 on a phone. A button never gets smaller on a phone.
+  sm: "h-9 px-3 text-[13px] max-sm:h-10 max-sm:px-3.5",
+  md: "h-10 px-3.5 max-sm:h-11 max-sm:px-4",
+  lg: "h-11 px-5 max-sm:h-12",
+  icon: "size-10",
+  "icon-sm": "size-9",
   "icon-xs": "size-7 rounded-md [&_svg]:size-3.5 pointer-coarse:size-8",
 };
 
