@@ -37,10 +37,10 @@ export function SectionFiles({ orderId, section, canAdd, quiet }: { orderId: str
   const files = useSectionFiles(section);
   const input = useRef<HTMLInputElement>(null);
   const { busy, error, send } = useSectionUpload(orderId, section);
-  if (quiet && files.length === 0) return null;
+  // No file and none to add here: nothing at all (no "No file yet" rows: canvas "The order's Overview today", 8).
+  if (files.length === 0 && (quiet || !canAdd)) return null;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line px-[18px] py-2.5" data-section-files={section}>
-      {files.length === 0 && <span className="text-[12.5px] text-text-2">No file yet</span>}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line px-5 py-2.5 max-sm:px-4" data-section-files={section}>
       {files.map((f) => (
         <FileChip key={f.id} file={f} set={files} />
       ))}

@@ -35,7 +35,12 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
   const many = rows.length > 1;
   const goodsLines = o.lines.filter((l) => l.type === "goods");
   const place = rows.map((r) => r.goodsReceivedAt).find(Boolean) ?? null;
-  const lastIn = goodsLines.map((l) => l.receivedOn).filter((x): x is string => !!x).sort().at(-1) ?? null;
+  const lastIn =
+    goodsLines
+      .map((l) => l.receivedOn)
+      .filter((x): x is string => !!x)
+      .sort()
+      .at(-1) ?? null;
   const first = rows[0]?.factory?.id ?? null;
 
   return (
@@ -56,9 +61,24 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               action={readyDateAction.bind(null, o.id, fid, r.readyOn)}
               files={d.canFiles ? { orderId: o.id, section: "ready_date" } : undefined}
               fields={[
-                { name: "readyOn", label: "Supplier says ready on", type: "date", value: r.readyOn, hint: defaults.leadTime ? `Lead time on the quotation: ${defaults.leadTime.text}` : undefined },
+                {
+                  name: "readyOn",
+                  label: "Supplier says ready on",
+                  type: "date",
+                  value: r.readyOn,
+                  hint: defaults.leadTime ? `Lead time on the quotation: ${defaults.leadTime.text}` : undefined,
+                },
                 { name: "readyToldOn", label: "Told on", type: "date", value: r.readyToldOn, max: now },
-                { name: "readyToldVia", label: "How", type: "select", value: r.readyToldVia ?? "", options: [{ value: "", label: "Not said" }, ...REQUEST_CHANNELS.map((c) => ({ value: c, label: REQUEST_CHANNEL_LABEL[c] }))] },
+                {
+                  name: "readyToldVia",
+                  label: "How",
+                  type: "select",
+                  value: r.readyToldVia ?? "",
+                  options: [
+                    { value: "", label: "Not said" },
+                    ...REQUEST_CHANNELS.map((c) => ({ value: c, label: REQUEST_CHANNEL_LABEL[c] })),
+                  ],
+                },
                 { name: "readyNote", label: "Note", type: "textarea", value: r.readyNote, wide: true },
               ]}
             />
@@ -74,27 +94,58 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               files={d.canFiles ? { orderId: o.id, section: "fat" } : undefined}
               fields={[
                 { name: "fatPlannedOn", label: "Planned on", type: "date", value: r.fat.plannedOn },
-                { name: "fatAttendedById", label: "Attended by", type: "select", value: r.fat.attendedBy?.id ?? "", options: [{ value: "", label: "Nobody of ours" }, ...(people ?? []).map((p) => ({ value: p.id, label: p.name }))] },
+                {
+                  name: "fatAttendedById",
+                  label: "Attended by",
+                  type: "select",
+                  value: r.fat.attendedBy?.id ?? "",
+                  options: [{ value: "", label: "Nobody of ours" }, ...(people ?? []).map((p) => ({ value: p.id, label: p.name }))],
+                },
                 { name: "fatDoneOn", label: "Done on", type: "date", value: r.fat.doneOn, max: now },
-                { name: "fatResult", label: "Result", type: "select", value: r.fat.result ?? "", options: [{ value: "", label: "No result yet" }, ...FAT_RESULTS.map((x) => ({ value: x, label: FAT_RESULT_LABEL[x] }))] },
+                {
+                  name: "fatResult",
+                  label: "Result",
+                  type: "select",
+                  value: r.fat.result ?? "",
+                  options: [{ value: "", label: "No result yet" }, ...FAT_RESULTS.map((x) => ({ value: x, label: FAT_RESULT_LABEL[x] }))],
+                },
                 { name: "fatRemarks", label: "Remarks", type: "textarea", value: r.fat.remarks, wide: true },
               ]}
             />
           );
         const hasFat = !!(r.fat.plannedOn || r.fat.doneOn || r.fat.result);
         return (
-          <div key={fid ?? "goods"} className="contents">
+          // The ready date beside the factory test (two short boxes side by side), per supplier.
+          <div key={fid ?? "goods"} className="grid items-start gap-4 lg:grid-cols-2">
             {r.readyOn || r.readyToldOn ? (
               <Section
                 title={`Ready date${of}`}
-                state={!r.readyOn ? "No date yet" : allIn ? `Ready ${dayMonth(r.readyOn)}` : left! < 0 ? `${-left!} day${left === -1 ? "" : "s"} late` : "On time"}
+                state={
+                  !r.readyOn
+                    ? "No date yet"
+                    : allIn
+                      ? `Ready ${dayMonth(r.readyOn)}`
+                      : left! < 0
+                        ? `${-left!} day${left === -1 ? "" : "s"} late`
+                        : "On time"
+                }
                 tone={!r.readyOn ? "neutral" : allIn ? "ok" : left! < 0 ? "bad" : "ok"}
                 cols={4}
                 rows={[
                   { label: "Supplier says ready", value: r.readyOn ? date(r.readyOn) : null },
-                  { label: allIn ? "Goods in" : "Days left", value: allIn ? (lastIn ? date(lastIn) : "Yes") : left === null ? null : left < 0 ? `${-left} late` : String(left) },
+                  {
+                    label: allIn ? "Goods in" : "Days left",
+                    value: allIn ? (lastIn ? date(lastIn) : "Yes") : left === null ? null : left < 0 ? `${-left} late` : String(left),
+                  },
                   { label: "Ship by", value: o.shipBy ? date(o.shipBy) : null },
-                  { label: "Told on", value: r.readyToldOn ? `${date(r.readyToldOn)}${r.readyToldVia ? ` · ${REQUEST_CHANNEL_LABEL[r.readyToldVia]}` : ""}` : r.readyToldVia ? REQUEST_CHANNEL_LABEL[r.readyToldVia] : null },
+                  {
+                    label: "Told on",
+                    value: r.readyToldOn
+                      ? `${date(r.readyToldOn)}${r.readyToldVia ? ` · ${REQUEST_CHANNEL_LABEL[r.readyToldVia]}` : ""}`
+                      : r.readyToldVia
+                        ? REQUEST_CHANNEL_LABEL[r.readyToldVia]
+                        : null,
+                  },
                   ...(r.readyNote ? [{ label: "Note", value: r.readyNote }] : []),
                 ]}
                 actions={readyWindow("edit")}
@@ -106,8 +157,22 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
             {hasFat ? (
               <Section
                 title={`Factory test (FAT)${of}`}
-                state={r.fat.doneOn ? `${r.fat.result ? FAT_RESULT_LABEL[r.fat.result] : "Done"} ${dayMonth(r.fat.doneOn)}` : r.fat.plannedOn ? `Planned ${dayMonth(r.fat.plannedOn)}` : "Not planned"}
-                tone={r.fat.doneOn ? (r.fat.result ? FAT_RESULT_TONE[r.fat.result] : "ok") : r.fat.plannedOn && r.fat.plannedOn < now ? "bad" : "info"}
+                state={
+                  r.fat.doneOn
+                    ? `${r.fat.result ? FAT_RESULT_LABEL[r.fat.result] : "Done"} ${dayMonth(r.fat.doneOn)}`
+                    : r.fat.plannedOn
+                      ? `Planned ${dayMonth(r.fat.plannedOn)}`
+                      : "Not planned"
+                }
+                tone={
+                  r.fat.doneOn
+                    ? r.fat.result
+                      ? FAT_RESULT_TONE[r.fat.result]
+                      : "ok"
+                    : r.fat.plannedOn && r.fat.plannedOn < now
+                      ? "bad"
+                      : "info"
+                }
                 cols={4}
                 rows={[
                   { label: "Planned on", value: r.fat.plannedOn ? date(r.fat.plannedOn) : null },
@@ -129,9 +194,22 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       {goodsLines.length > 0 && (
         <Section
           title="Goods from the supplier"
-          state={o.goods.allReceived ? `${o.goods.received} of ${o.goods.lines} received` : o.goods.received > 0 ? `${o.goods.received} of ${o.goods.lines} received` : "Not received yet"}
+          state={
+            o.goods.allReceived
+              ? `${o.goods.received} of ${o.goods.lines} received`
+              : o.goods.received > 0
+                ? `${o.goods.received} of ${o.goods.lines} received`
+                : "Not received yet"
+          }
           tone={o.goods.allReceived ? "ok" : o.goods.received > 0 ? "warn" : "neutral"}
-          rows={o.goods.received > 0 || place ? [{ label: "Received on", value: lastIn ? date(lastIn) : null }, { label: "Received at", value: place }] : undefined}
+          rows={
+            o.goods.received > 0 || place
+              ? [
+                  { label: "Received on", value: lastIn ? date(lastIn) : null },
+                  { label: "Received at", value: place },
+                ]
+              : undefined
+          }
           actions={
             canEdit && (
               <>
@@ -142,10 +220,25 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
                   title="Goods from the supplier"
                   description="What has come in on each item, and when. Nothing is saved until Save changes."
                   panelClassName="md:w-[1180px]"
-                  body={<OrderLinesEditor set="received" orderId={o.id} lines={goodsLines} today={now} edit={{ type: "order", id: o.id, card: "lines.received" }} card={edits.cards["lines.received"]} />}
+                  body={
+                    <OrderLinesEditor
+                      set="received"
+                      orderId={o.id}
+                      lines={goodsLines}
+                      today={now}
+                      edit={{ type: "order", id: o.id, card: "lines.received" }}
+                      card={edits.cards["lines.received"]}
+                    />
+                  }
                 />
                 {!o.goods.allReceived && (
-                  <AllReceivedWindow sub={`${o.refNo} · ${o.goods.lines} item${o.goods.lines === 1 ? "" : "s"}`} action={goodsReceivedAction.bind(null, o.id, first, true)} today={now} place={place} lines={o.goods.lines} />
+                  <AllReceivedWindow
+                    sub={`${o.refNo} · ${o.goods.lines} item${o.goods.lines === 1 ? "" : "s"}`}
+                    action={goodsReceivedAction.bind(null, o.id, first, true)}
+                    today={now}
+                    place={place}
+                    lines={o.goods.lines}
+                  />
                 )}
                 {o.goods.allReceived && (
                   <FieldsWindow

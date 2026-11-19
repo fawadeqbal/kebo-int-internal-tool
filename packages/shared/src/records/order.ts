@@ -84,7 +84,7 @@ export interface OrderStep {
 const STEP: Record<OrderStepKey, Omit<OrderStep, "key">> = {
   choose_route: { label: "Choose how they pay", tab: "payment", window: "route" },
   record_deposit: { label: "Record the deposit", tab: "payment", window: "record-payment" },
-  send_po: { label: "Send the PO", tab: "factory" },
+  send_po: { label: "Send the PO", tab: "factory", window: "send-po" },
   set_ready: { label: "Set the ready date", tab: "production", window: "ready-date" },
   goods_in: { label: "Goods received", tab: "production", window: "all-received" },
   book: { label: "Book the shipment", tab: "shipping" },

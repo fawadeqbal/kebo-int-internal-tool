@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
-import { Badge, cn } from "@kebo/ui";
 import type { Tone } from "@kebo/shared";
+import { cn } from "@kebo/ui";
+import { BoxFacts, RecordBox } from "@/components/common/record-box";
 
 /**
- * One small section of an order's page (the order without checklists): its
- * name, one word for where it stands, its values read-only (a dash when
- * empty), anything bigger (a table), its own files, and its button — which
- * opens a window with only this section's fields. Nothing is ticked.
+ * One box of an order's tab, drawn as every record's box (canvas row "The order on the same pieces", board "Every
+ * tab"): the record box's head — its name, one word for where it stands, its buttons (Edit, + Add…; never the
+ * orange one: that is the header's next step) — its values as label · value rows (a dash when empty), anything
+ * bigger (a table), and its files at its foot. Its button opens a window with only this box's fields.
  */
 export function Section({
   title,
@@ -27,9 +28,10 @@ export function Section({
   /** Where it stands, in a word: "Booked 28 Nov". */
   state?: string | null;
   tone?: Tone;
-  /** Its buttons (Edit, and at most one main one). */
+  /** Its buttons (Edit, + Add…). */
   actions?: ReactNode;
   rows?: { label: string; value: ReactNode }[];
+  /** Many values (3 or more across before): in two columns of rows once the box is wide enough. */
   cols?: 2 | 3 | 4;
   /** Takes the whole row of the page's grid. */
   wide?: boolean;
@@ -39,50 +41,28 @@ export function Section({
   id?: string;
 }) {
   return (
-    <section id={id} aria-label={title} className={cn("flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-card", wide && "lg:col-span-full")}>
-      <div className="flex min-h-[54px] flex-wrap items-center gap-x-2.5 gap-y-1.5 px-[18px] pt-3 pb-2.5">
-        <h2 className="min-w-0 flex-1 text-[15px] font-bold">
-          {title}
-          {titleMore && <span className="max-sm:hidden"> · {titleMore}</span>}
-        </h2>
-        {state && <Badge tone={tone}>{state}</Badge>}
-        {actions}
-      </div>
-      {rows && rows.length > 0 && (
-        <dl className={cn("grid grid-cols-2 gap-x-[18px] gap-y-3 px-[18px] pt-1 pb-3.5", cols === 3 && "sm:grid-cols-3", cols === 4 && "sm:grid-cols-4")}>
-          {rows.map((r, i) => (
-            <div key={`${i}:${r.label}`} className="flex min-w-0 flex-col gap-0.5">
-              <dt className="text-xs text-text-2">{r.label}</dt>
-              <dd className="text-[13px] font-semibold [overflow-wrap:anywhere]">{r.value === null || r.value === undefined || r.value === "" ? <span className="font-normal text-muted">—</span> : r.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+    <RecordBox
+      id={id}
+      title={title}
+      titleMore={titleMore}
+      word={state ? { text: state, tone } : null}
+      what={title.toLowerCase()}
+      canEdit={!!actions}
+      edit={actions ? <span className="flex flex-wrap items-center gap-1.5">{actions}</span> : undefined}
+      className={cn("min-w-0", wide && "lg:col-span-full")}
+      files={files}
+    >
+      {rows && rows.length > 0 && <BoxFacts wide={cols > 2 && rows.length > 3} rows={rows.map((r) => [r.label, r.value])} />}
       {children}
-      {files && (
-        <>
-          <span className="flex-1" />
-          {files}
-        </>
-      )}
-    </section>
+    </RecordBox>
   );
 }
 
-/** A section with nothing in it yet: a dashed box that says so, with the button that fills it. */
+/** A box with nothing in it yet: its name, a line that says so, and the button that fills it. */
 export function EmptySection({ title, text, action, wide, id }: { title: string; text: string; action?: ReactNode; wide?: boolean; id?: string }) {
   return (
-    <section
-      id={id}
-      aria-label={title}
-      className={cn("flex min-h-16 min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2 rounded-xl border border-dashed border-line-strong bg-surface-2/40 px-[18px] py-3.5", wide && "lg:col-span-full")}
-    >
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <h2 className="text-[15px] font-bold">{title}</h2>
-        <span className="text-[12.5px] text-text-2">{text}</span>
-      </div>
-      {action}
-    </section>
+    <RecordBox id={id} title={title} what={title.toLowerCase()} canEdit={!!action} edit={action} className={cn("min-w-0", wide && "lg:col-span-full")}>
+      <p className="px-5 py-4 text-[13px] text-text-2 max-sm:px-4">{text}</p>
+    </RecordBox>
   );
 }
-
