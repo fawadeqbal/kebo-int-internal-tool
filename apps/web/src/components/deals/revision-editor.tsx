@@ -37,7 +37,7 @@ import {
   type TheirTerms,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -792,13 +792,13 @@ export function RevisionEditor({
                 .map((o, i) => ({ o, i }))
                 .filter(({ o }) => requireChanges && !s.options.some((x) => x.factoryQuoteId === o.factoryQuoteId))
                 .map(({ o, i }) => (
-                  <p key={o.factoryQuoteId ?? "items"} className="rounded-lg bg-warn-soft/60 px-3 py-2 text-md">
+                  <Notice key={o.factoryQuoteId ?? "items"} tone="todo">
                     Option {optionLetter(i)}
                     {o.factoryQuoteId
                       ? ` (${offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.factory.name ?? "its offer"})`
                       : ""}{" "}
                     and the prices you set for it will be removed when you save.
-                  </p>
+                  </Notice>
                 ))}
               <ErrorText error={st.errors?.options} />
             </PanelSection>

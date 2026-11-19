@@ -17,7 +17,7 @@ import {
   type LeadFrom,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea, controlSizes } from "@kebo/ui";
+import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea, controlSizes, EmptyLine } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -1075,7 +1075,7 @@ export function OfferHeaderForm({
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-text-2">Nothing changed.</p>
+                  <EmptyLine>Nothing changed.</EmptyLine>
                 )}
               </div>
             )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
-import { Alert, Field, Input } from "@kebo/ui";
+import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
@@ -101,10 +101,10 @@ export function AddressForm({ view, disabled, onSaved }: { view: AddressView; di
         ) : null}
       </p>
       {free && (
-        <Alert tone="info">
+        <Notice tone="info">
           Everyone signs in again at the new address. The old one keeps sending people there for 30 days (bookmarks, emails, the phone app
           keep working), and only then becomes free for others. The address can change again after 30 days.
-        </Alert>
+        </Notice>
       )}
       <PanelActions>
         <SubmitButton pendingText="Changing…" disabled={disabled || !free}>

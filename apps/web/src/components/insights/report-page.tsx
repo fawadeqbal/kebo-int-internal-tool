@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { Banknote, Factory, LayoutGrid, Receipt, Target, TrendingUp, User, Users, type LucideIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
-import { Alert, buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage } from "@kebo/ui";
+import { buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage, Notice } from "@kebo/ui";
 import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { crumbsFor, labelFor } from "@/lib/nav";
@@ -253,7 +253,7 @@ async function Body({
     }
     case "cash": {
       const { report } = await loadCash(p);
-      if (!report) return <Alert tone="info">Cash &amp; bank is not switched on for the company, so there are no accounts to report on.</Alert>;
+      if (!report) return <Notice tone="info">Cash &amp; bank is not switched on for the company, so there are no accounts to report on.</Notice>;
       return (
         <>
           <Missing rates={report.missingRates} />
@@ -281,7 +281,7 @@ async function Body({
     case "funnel":
       return <FunnelSection d={await loadFunnel(p)} p={p} />;
     case "spending": {
-      if (!(await hasFeature("expenses"))) return <Alert tone="info">Expenses are not switched on for the company, so there is no spending to report on.</Alert>;
+      if (!(await hasFeature("expenses"))) return <Notice tone="info">Expenses are not switched on for the company, so there is no spending to report on.</Notice>;
       return <SpendingSection d={await loadSpending(p)} p={p} />;
     }
   }
@@ -290,9 +290,9 @@ async function Body({
 function Missing({ rates }: { rates: string[] }) {
   if (!rates.length) return null;
   return (
-    <Alert tone="warning" className="mb-4">
+    <Notice tone="todo" className="mb-4">
       There is no exchange rate for {rates.join(", ")} in Settings, so amounts in {rates.length === 1 ? "it are" : "them are"} left out.
-    </Alert>
+    </Notice>
   );
 }
 

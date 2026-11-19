@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea, Notice } from "@kebo/ui";
 import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { EditButton } from "@/components/common/edit-button";
@@ -93,19 +93,15 @@ export function StageActions({
                 </div>
               )}
               {warn && (
-                <div role="alert" className="flex flex-col gap-2 rounded-lg border border-warn/30 bg-warn-soft p-3 text-sm">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
-                    <div>
-                      <span className="block font-medium">Check before you go ahead</span>
-                      <Warnings text={s.message ?? ""} />
-                    </div>
-                  </div>
+                <>
+                  <Notice tone="todo" title="Check before you go ahead">
+                    <Warnings text={s.message ?? ""} />
+                  </Notice>
                   <input type="hidden" name="confirm" value="true" />
                   <Field label="Note" htmlFor="move-note" optional error={s.errors?.note}>
                     <Textarea id="move-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
                   </Field>
-                </div>
+                </>
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <SubmitButton pendingText="Moving…">

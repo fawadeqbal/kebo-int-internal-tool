@@ -1,4 +1,4 @@
-import { Alert, Card, CardBody, CardHeader } from "@kebo/ui";
+import { Card, CardBody, CardHeader, Notice } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { CopyBlock, NewKeyButton } from "./form";
 import type { WebsiteFormView } from "./types";
@@ -34,11 +34,11 @@ export async function WebsiteFormCard() {
       />
       <CardBody className="flex flex-col gap-5">
         {!view ? (
-          <Alert tone="info">Only a Super Admin can see the website form&apos;s key.</Alert>
+          <Notice tone="info">Only a Super Admin can see the website form&apos;s key.</Notice>
         ) : (
           <>
             {!view.allowed && (
-              <Alert tone="warning">Your plan does not include the website form. Inquiries sent with this key are refused.</Alert>
+              <Notice tone="todo">Your plan does not include the website form. Inquiries sent with this key are refused.</Notice>
             )}
             <div>
               <p className="text-xs font-medium tracking-wide text-muted uppercase">Key</p>

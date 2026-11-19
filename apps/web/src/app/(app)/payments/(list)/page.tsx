@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, List, Plus, TriangleAlert } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
@@ -126,15 +126,18 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         }
       />
       {waiting > 0 && (
-        <p className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm">
-          <span>
-            <strong className="font-semibold">{approver ? `${waiting} waiting to be verified` : `${waiting} sent back to you`}</strong>
-            <span className="text-text-2"> · {approver ? "added by the team, not counted yet" : "to correct and send again"}</span>
-          </span>
-          <ButtonLink href={approver ? "/approvals" : "/approvals?status=sent_back"} variant="secondary" size="sm">
-            {approver ? "Verify" : "Open"}
-          </ButtonLink>
-        </p>
+        <Notice
+          tone="todo"
+          className="mb-4"
+          title={approver ? `${waiting} waiting to be verified` : `${waiting} sent back to you`}
+          action={
+            <ButtonLink href={approver ? "/approvals" : "/approvals?status=sent_back"} variant="secondary" size="sm">
+              {approver ? "Verify" : "Open"}
+            </ButtonLink>
+          }
+        >
+          {approver ? "Added by the team, not counted yet." : "To correct and send again."}
+        </Notice>
       )}
       <StatRow className="mb-4" phone="line">
         <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} {...moneyTile(t.in)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />

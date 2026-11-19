@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { Alert, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import type { LeadOrigin } from "@kebo/shared";
 import { OriginFields } from "@/components/site/origin-fields";
@@ -20,7 +20,7 @@ export function RequestDemoForm({ origin }: { origin: LeadOrigin }) {
   const v = state.values ?? {};
   return (
     <form action={action} className="mt-5 flex flex-col gap-4" noValidate>
-      {state.message && <Alert tone="error">{state.message}</Alert>}
+      {state.message && <Notice tone="bad">{state.message}</Notice>}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Company" htmlFor="companyName" error={state.errors?.companyName}>
           <Input id="companyName" name="companyName" autoComplete="organization" required defaultValue={v.companyName} />

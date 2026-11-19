@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Download, LogIn } from "lucide-react";
 import { COMPANY_KIND_LABEL } from "@kebo/shared";
-import { Alert, Banner, buttonClass, PageHeader, SectionList, StatusBadge, toPage } from "@kebo/ui";
+import { buttonClass, PageHeader, SectionList, StatusBadge, toPage, Notice } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { platformApi } from "@/lib/api";
 import { loadPlatform, readFlash } from "@/lib/platform";
@@ -161,21 +161,21 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
       />
 
       {off && (
-        <Banner meaning="bad">
+        <Notice tone="bad">
           <span id="open-reason">
             Switched off{c.statusReason ? ` (${c.statusReason})` : ""}: nobody can sign in, and it cannot be opened. Switch it on from ⋯ to
             open it.
           </span>
-        </Banner>
+        </Notice>
       )}
       {!live && (
-        <Banner meaning="info">
+        <Notice tone="info">
           Deleted {c.deletedAt ? date(c.deletedAt) : ""}: its data and files are gone; a copy was kept in storage (see History). Its short
           name stays taken for a while.
-        </Banner>
+        </Notice>
       )}
       {flash && (
-        <Alert tone="success">
+        <Notice tone="ok">
           {c.kind !== "client" ? "The demo is ready." : "The company is ready."}{" "}
           {flash.link
             ? flash.emailed
@@ -183,7 +183,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
               : "Email is not set up: send the tenant admin this link to set a password:"
             : "The person signs in with the password they chose."}
           {flash.link && <CopyLink link={flash.link} />}
-        </Alert>
+        </Notice>
       )}
 
       <SectionList

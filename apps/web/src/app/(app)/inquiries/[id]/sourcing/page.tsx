@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, Columns3, Factory, List } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { Alert, Badge, cn, EmptyState } from "@kebo/ui";
+import { Badge, cn, EmptyState, Notice } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { dayMonth, money, plural, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
@@ -101,11 +101,11 @@ export default async function SourcingPage({
   const waiting = (requests?.items ?? []).filter((r) => !r.factoryQuoteId && r.status === "sent");
 
   const notice = !canEdit && (
-    <Alert tone="info">
+    <Notice tone="info">
       {d.stage === "won" || d.stage === "lost"
         ? "This inquiry is closed, so its supplier prices can no longer change."
         : "Only the person handling this inquiry (or a manager) can change its supplier prices."}
-    </Alert>
+    </Notice>
   );
 
   // One row per supplier: its offer once it is in, else that it was asked (still waiting, declined, no reply), last.

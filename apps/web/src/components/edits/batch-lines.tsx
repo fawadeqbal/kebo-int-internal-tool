@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { lineNumbers } from "@kebo/shared";
-import { Alert, Button } from "@kebo/ui";
+import { Button, Notice } from "@kebo/ui";
 import { PanelActions, PanelBody, useReportDirty } from "@/components/common/panel";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineTableProps, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { insertLines, moveLine, removeLine } from "@/components/lines/local-lines";
@@ -258,7 +258,7 @@ export function BatchLines({
       {typeof above === "function" ? above({ rows, add }) : above}
       <LineTable rows={rows} columns={columns} {...table} {...local} fill={fill} footer={footer?.(rows)} />
       {below}
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && <Notice tone="bad">{error}</Notice>}
       <PanelActions>
         <Button
           size="sm"

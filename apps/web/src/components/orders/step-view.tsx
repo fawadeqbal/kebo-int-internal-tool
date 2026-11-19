@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { Alert, Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant } from "@kebo/ui";
+import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice } from "@kebo/ui";
 import { OpenPanelButton, PanelActions, PanelBody, PanelSection, SidePanel, useClosePanel } from "@/components/common/panel";
 import { EditButton } from "@/components/common/edit-button";
 import { EditsChip, editedMark } from "@/components/edits/edits";
@@ -217,7 +217,7 @@ export function FieldsForm({
       }}
     >
       <PanelBody className="gap-5">
-        {saver.error && <Alert tone="error">{saver.error}</Alert>}
+        {saver.error && <Notice tone="bad">{saver.error}</Notice>}
         {groups.map((g, i) => (
           <PanelSection key={g} title={g || undefined} first={i === 0}>
             {editable

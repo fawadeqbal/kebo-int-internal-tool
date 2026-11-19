@@ -1,4 +1,4 @@
-import { Alert, Card, CardBody, CardHeader } from "@kebo/ui";
+import { Card, CardBody, CardHeader, Notice } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date } from "@/lib/format";
 import { AddressEdit } from "./form";
@@ -28,9 +28,9 @@ export async function AddressCard({ sendsTo }: { /** The company's own domain, w
           {sendsTo && <p className="mt-1 text-xs text-text-2">Sends people on to {sendsTo}</p>}
         </div>
         {!view.canChange ? (
-          <Alert tone="info">Only a Super Admin can change the company&apos;s address.</Alert>
+          <Notice tone="info">Only a Super Admin can change the company&apos;s address.</Notice>
         ) : wait ? (
-          <Alert tone="info">The address was changed recently. It can change again on {wait}, or ask us to change it sooner.</Alert>
+          <Notice tone="info">The address was changed recently. It can change again on {wait}, or ask us to change it sooner.</Notice>
         ) : null}
       </CardBody>
     </Card>

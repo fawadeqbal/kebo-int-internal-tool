@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Alert, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Segmented, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Segmented, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
 import { ArrowRight, Factory, Landmark, List, User, Users } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
@@ -162,13 +162,13 @@ async function Entries({
     <>
       <LedgerFilters path={PATH} sp={all} period={period} keep={keep} />
       {sp.account && (
-        <Alert tone="info" className="mb-3">
+        <Notice tone="info" className="mb-3">
           One account:{" "}
           <strong className="font-semibold">{data.rows[0]?.account === sp.account ? data.rows[0]?.accountLabel : sp.account}</strong>.{" "}
           <Link href={buildHref(PATH, all, { account: undefined, page: undefined })} className="font-medium underline">
             Show every account
           </Link>
-        </Alert>
+        </Notice>
       )}
       <Card className="overflow-clip p-0">
         {data.rows.length === 0 ? (
@@ -364,10 +364,10 @@ async function Accounts({ period }: { period: { to: string } }) {
   return (
     <div className="flex flex-col gap-4">
       {a.check && a.check.differences > 0 && (
-        <Alert tone="warning">
+        <Notice tone="todo">
           The last check found {a.check.differences} difference(s) between the ledger and today&rsquo;s figures. They are in the platform
           log.
-        </Alert>
+        </Notice>
       )}
       {a.groups.length === 0 ? (
         <Card>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { PERMISSION_FEATURE, PERMISSION_GROUPS, permissionInPlan, planFeatureName, type Permission } from "@kebo/shared";
-import { Alert, Checkbox, cn, Field, Input, Textarea } from "@kebo/ui";
+import { Checkbox, cn, Field, Input, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useFeatures } from "@/components/common/features";
@@ -129,16 +129,16 @@ export function RoleForm({
           <fieldset className="flex flex-col gap-4">
             <legend className="mb-1 text-sm font-semibold">What people in this role may do</legend>
             {superAdmin && (
-              <Alert tone="info">
+              <Notice tone="info">
                 The Super Admin always has every permission, including any added later. Only the description and the two-step rule change
                 here.
-              </Alert>
+              </Notice>
             )}
             {locked && !superAdmin && (
-              <Alert tone="info">
+              <Notice tone="info">
                 Changing what a role allows is part of custom roles, which your company&apos;s plan does not include. The description and
                 the two-step rule still change here.
-              </Alert>
+              </Notice>
             )}
             {s.errors?.permissions && <p className="text-sm text-bad">{s.errors.permissions[0]}</p>}
             <div className="grid gap-4">

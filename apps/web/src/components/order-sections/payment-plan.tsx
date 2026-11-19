@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
-import { Badge, Button, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, Button, cn, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { dueText, money } from "@/lib/format";
 import { useTime } from "@/lib/time-client";
 import type { ActionState } from "@/lib/actions";
@@ -80,7 +80,7 @@ export function PaymentPlanTable({
   // The dialog lives here, not in the row: once sent, the row's button changes and the dialog still says what to do next.
   const [sending, setSending] = useState<Sending | null>(null);
   const close = useCallback(() => setSending(null), []);
-  if (!plan.items.length && !plan.cancelled.length) return <p className="text-sm text-muted">No plan yet.</p>;
+  if (!plan.items.length && !plan.cancelled.length) return <EmptyLine>No plan yet.</EmptyLine>;
   const next = plan.items.find((i) => i.request.state !== "paid");
 
   /** Under a part's name: its request's number (the kept copy, once sent) and how it is paid. */

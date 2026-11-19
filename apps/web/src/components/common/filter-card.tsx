@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
-import { cn, RULES, searchFrameClass, controlSizes } from "@kebo/ui";
+import { cn, RULES, searchFrameClass, controlSizes, EmptyLine } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "./floating";
 
 export interface FilterSelect {
@@ -154,7 +154,7 @@ function FilterButton({ s, onPick }: { s: FilterSelect; onPick: (name: string, v
           {shown.map((o) => (
             <Choice key={o.value} label={o.label} on={o.value === s.value} onPick={() => pick(o.value)} />
           ))}
-          {find.trim() && !shown.length && <p className="px-2.5 py-2 text-sm text-muted">Nothing matches “{find.trim()}”.</p>}
+          {find.trim() && !shown.length && <EmptyLine className="px-2.5 py-2">Nothing matches “{find.trim()}”.</EmptyLine>}
         </FloatingMenu>
       )}
     </span>

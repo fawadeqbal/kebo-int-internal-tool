@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import { AuthShell } from "./auth-shell";
 import { BrandMark } from "./brand-mark";
 import { LoginForm } from "./forms";
@@ -53,9 +53,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </Splash>
       )}
       {moved && (
-        <Alert tone="info" className="mb-5">
+        <Notice tone="info" className="mb-5">
           This is your company&apos;s new address. Sign in once more here, and bookmark it.
-        </Alert>
+        </Notice>
       )}
       {/* Who you are signing in to: the company's logo, or its initials (board "Trusted sign in", White label). */}
       <div className="flex flex-col items-center gap-4 text-center">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardBody, CardHeader, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Card, CardBody, CardHeader, EmptyState, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import type { SiteFigures, SiteNumbers } from "@/app/platform/(admin)/website/types";
 
 const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 1000) / 10}%` : "–");
@@ -87,7 +87,7 @@ export function SiteNumbersCard({
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted">No visits yet. Share the page link to start.</p>
+            <EmptyLine>No visits yet. Share the page link to start.</EmptyLine>
           )}
         </figure>
 

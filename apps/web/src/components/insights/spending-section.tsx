@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LOST_REASON_LABEL } from "@kebo/shared";
-import { Card, CardHeader, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Card, CardHeader, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { money } from "@/lib/format";
 import { bigMoney, change, type Period } from "@/lib/insights-period";
@@ -77,7 +77,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
       <Card className="overflow-clip">
         <CardHeader title="Who spends" description="What each person paid, against what they sold. A name opens their page." />
         {d.people.length === 0 ? (
-          <p className="p-4 text-sm text-muted">Nothing was spent {p.name}.</p>
+          <EmptyLine inset>Nothing was spent {p.name}.</EmptyLine>
         ) : (
           <Table>
             <THead>
@@ -130,7 +130,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
             {d.kinds.length ? (
               <BarList label="Spent to sell by kind" rows={d.kinds.map((k) => ({ key: k.category, label: costKind(k.category), value: Number(k.amount), text: n0(k.amount) }))} />
             ) : (
-              <p className="text-sm text-muted">Nothing spent to sell {p.name}.</p>
+              <EmptyLine>Nothing spent to sell {p.name}.</EmptyLine>
             )}
           </div>
         </Card>
@@ -138,7 +138,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
         <Card className="overflow-clip">
           <CardHeader title="What losing cost us, by reason" description={`${lostDeals} lost inquir${lostDeals === 1 ? "y" : "ies"} with costs ${p.name}`} />
           {d.lostReasons.length === 0 ? (
-            <p className="p-4 text-sm text-muted">Nothing was spent on a lost inquiry {p.name}.</p>
+            <EmptyLine inset>Nothing was spent on a lost inquiry {p.name}.</EmptyLine>
           ) : (
             <Table>
               <THead>
@@ -208,7 +208,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
         <Card className="overflow-clip">
           <CardHeader title="Supplier visits" description="Trips, hotels, meals and checks with a supplier named" />
           {d.factories.length === 0 ? (
-            <p className="p-4 text-sm text-muted">No supplier visit {p.name}.</p>
+            <EmptyLine inset>No supplier visit {p.name}.</EmptyLine>
           ) : (
             <Table>
               <THead>

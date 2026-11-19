@@ -5,7 +5,7 @@ import { requestWords } from "@/lib/requests";
 import type { PaymentList } from "@kebo/shared";
 import type { ReactNode } from "react";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote } from "lucide-react";
-import { Alert, buildHref, Card, CardBody, CardHeader, LinkTabs, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { buildHref, Card, CardBody, CardHeader, LinkTabs, Table, Td, Th, THead, Tr, Notice } from "@kebo/ui";
 import { date, money, companyToday } from "@/lib/format";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -308,7 +308,7 @@ async function OnOrder({
           today={today}
         />
       ) : (
-        <Alert tone="info">Nothing is owed to a supplier on this order.</Alert>
+        <Notice tone="info">Nothing is owed to a supplier on this order.</Notice>
       )}
     </>
   );
@@ -325,7 +325,7 @@ async function Expense({ today }: { today: string }) {
 async function Transfer({ today }: { today: string }) {
   const accounts = await api.get<AccountRow[]>("/money/accounts");
   return accounts.filter((a) => !a.archived).length < 2 ? (
-    <Alert tone="info">A transfer needs two accounts. Add them in Money › Cash & bank.</Alert>
+    <Notice tone="info">A transfer needs two accounts. Add them in Money › Cash & bank.</Notice>
   ) : (
     <MoveMoney startOpen accounts={accounts} today={today} />
   );
@@ -340,7 +340,7 @@ async function FromCustomer({ customerId, today }: { customerId: string; today: 
   ]);
   const name = customers.find((c) => c.id === customerId)?.name ?? "the customer";
   const open = pay.orders.filter((o) => o.status !== "cancelled" && Number(o.due) > 0);
-  if (!pay.credit.canRecord) return <Alert tone="info">You cannot record money received.</Alert>;
+  if (!pay.credit.canRecord) return <Notice tone="info">You cannot record money received.</Notice>;
   return (
     <ReceiptForm
       startOpen

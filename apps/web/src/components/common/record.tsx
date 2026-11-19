@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { buttonClass, Card, cn } from "@kebo/ui";
+import { buttonClass, Card, cn, CardHeader } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
 
 /**
@@ -146,16 +146,16 @@ export function RecordListCard({
   const rows = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : [];
   return (
     <Card className="overflow-clip">
-      <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0">
-          <h2 className="text-lead font-semibold text-text">
+      <CardHeader
+        title={
+          <>
             {title}
-            {count !== undefined && <span className="font-semibold"> · {count}</span>}
-          </h2>
-          {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
-        </div>
-        {action && <div className="flex shrink-0 items-center gap-1">{action}</div>}
-      </div>
+            {count !== undefined && <span> · {count}</span>}
+          </>
+        }
+        description={description}
+        actions={action}
+      />
       {rows.length ? <ul className="divide-y divide-line">{children}</ul> : empty}
       {footer}
     </Card>
@@ -231,13 +231,3 @@ export function AllLink({ href, children }: { href: string; children: ReactNode 
   );
 }
 
-/** A record's empty list: what goes here, and the one way to add it. */
-export function RecordEmpty({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
-  return (
-    <div className="m-4 rounded-lg border border-dashed border-line-strong px-4 py-5 text-center">
-      <p className="text-sm font-semibold">{title}</p>
-      <p className="mx-auto mt-1 max-w-sm text-xs text-text-2">{children}</p>
-      {action && <div className="mt-3 flex justify-center">{action}</div>}
-    </div>
-  );
-}

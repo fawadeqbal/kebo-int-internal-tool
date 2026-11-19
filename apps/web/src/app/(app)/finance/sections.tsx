@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Banknote, Landmark, Wallet } from "lucide-react";
 import { can, CURRENCIES, MONEY_ACCOUNT_KIND_LABEL } from "@kebo/shared";
-import { Alert, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile } from "@kebo/ui";
+import { Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice } from "@kebo/ui";
 import { convertAmount } from "@kebo/money";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -292,13 +292,13 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
         </FilterChip>
       </div>
       {acct !== "none" && book.unassigned > 0 && (
-        <Alert tone="warning">
+        <Notice tone="todo">
           {book.unassigned} {one ? `${one.currency} ` : ""}amount{book.unassigned === 1 ? " is" : "s are"} not on an account in {pr.name}, so the balances leave{" "}
           {book.unassigned === 1 ? "it" : "them"} out.{" "}
           <Link href={href({ acct: "none", cur: undefined })} className="font-medium underline">
             Put {book.unassigned === 1 ? "it" : "them"} on an account
           </Link>
-        </Alert>
+        </Notice>
       )}
 
       {one ? (

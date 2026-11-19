@@ -2,7 +2,7 @@
 
 import { Fragment, useActionState, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import { toast, toastsShown, type ToastInput } from "@kebo/ui/client";
 import type { ActionState } from "@/lib/actions";
 import { ONCE_FIELD, newOnceKey } from "@/lib/once";
@@ -222,10 +222,10 @@ export function ActionForm({
         (state.ok === false || showSuccess) &&
         state.code !== "reason_needed" &&
         !(state.code && quietCodes?.includes(state.code)) && (
-          <Alert tone={state.ok ? "success" : "error"} className="mb-3">
+          <Notice tone={state.ok ? "ok" : "bad"} className="mb-3">
             {state.message}
             {state.detail && <span className="block text-xs opacity-80">{state.detail}</span>}
-          </Alert>
+          </Notice>
         )}
     </>
   );

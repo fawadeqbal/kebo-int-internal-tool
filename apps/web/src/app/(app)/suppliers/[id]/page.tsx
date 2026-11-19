@@ -20,8 +20,7 @@ import {
   Th,
   THead,
   Tr,
-  type StatusMeaning,
-} from "@kebo/ui";
+  type StatusMeaning, EmptyLine } from "@kebo/ui";
 import { date, plural, whole, companyToday } from "@/lib/format";
 import { getPeople } from "@/lib/loaders";
 import type { Person } from "@/lib/types";
@@ -229,7 +228,7 @@ export default async function FactoryOverview({
                   </div>
                 ))
               ) : (
-                <p className="text-muted">Nothing bought or owed yet.</p>
+                <EmptyLine>Nothing bought or owed yet.</EmptyLine>
               )}
             </CardBody>
           </Card>

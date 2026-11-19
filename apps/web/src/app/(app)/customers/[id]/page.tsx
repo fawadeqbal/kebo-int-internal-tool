@@ -1,24 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import {
-  Avatar,
-  Banner,
-  Card,
-  cn,
-  CardBody,
-  CardHeader,
-  RefCode,
-  StatRow,
-  StatTile,
-  StatusBadge,
-  Table,
-  Td,
-  Th,
-  THead,
-  Tr,
-  ButtonLink,
-} from "@kebo/ui";
+import { Avatar, Card, cn, CardBody, CardHeader, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, Tr, ButtonLink, Notice, EmptyLine } from "@kebo/ui";
 import { ArrowRight, FileText } from "lucide-react";
 import { ORDER_WORD_TONE } from "@kebo/shared";
 import { customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
@@ -139,7 +122,7 @@ export default async function CustomerOverview({
             footer={
               <>
                 {!countryKnown && (
-                  <Banner meaning="warn" className="mx-4 mb-4">
+                  <Notice tone="todo" className="mx-4 mb-4">
                     Their country is not set yet — it decides shipping.{" "}
                     {canEdit ? (
                       <OpenPanelButton panel="edit-customer" id={c.id} variant="link" size="sm" className="h-auto font-semibold">
@@ -148,7 +131,7 @@ export default async function CustomerOverview({
                     ) : (
                       "Ask someone who manages customers to add it."
                     )}
-                  </Banner>
+                  </Notice>
                 )}
               </>
             }
@@ -192,7 +175,7 @@ export default async function CustomerOverview({
               </Table>
             ) : (
               <CardBody>
-                <p className="text-sm text-muted">No orders yet. An order is made when they accept a quotation.</p>
+                <EmptyLine>No orders yet. An order is made when they accept a quotation.</EmptyLine>
               </CardBody>
             )}
           </Card>
@@ -246,7 +229,7 @@ export default async function CustomerOverview({
                   );
                 })
               ) : (
-                <p className="text-muted">No orders yet.</p>
+                <EmptyLine>No orders yet.</EmptyLine>
               )}
               {account && (Number(account.totals.spent) > 0 || Number(account.totals.sales) > 0) && (
                 <div className="flex flex-col gap-2.5 border-t border-line pt-2.5">
@@ -337,7 +320,7 @@ export default async function CustomerOverview({
                   ))}
                 </ol>
               ) : (
-                <p className="text-sm text-muted">Nothing yet. Notes, calls and meetings show here.</p>
+                <EmptyLine>Nothing yet. Notes, calls and meetings show here.</EmptyLine>
               )}
             </CardBody>
           </Card>

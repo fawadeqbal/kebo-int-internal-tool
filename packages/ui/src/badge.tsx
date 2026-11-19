@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import {
   INQUIRY_STAGE_LABEL,
   INQUIRY_STAGE_TONE,
@@ -27,10 +27,25 @@ const TONES: Record<Tone | "primary" | "outline", string> = {
   outline: "border border-line text-text-2",
 };
 
-/** Colour is never the only signal: every badge carries its words. */
-export function Badge({ tone = "neutral", dot, children, className }: { tone?: keyof typeof TONES; dot?: boolean; children: ReactNode; className?: string }) {
+/** Colour is never the only signal: every badge carries its words. `sm`: the small pill inside a line of text. */
+export function Badge({
+  tone = "neutral",
+  dot,
+  size = "md",
+  children,
+  className,
+  ...props
+}: { tone?: keyof typeof TONES; dot?: boolean; size?: "md" | "sm"; children: ReactNode; className?: string } & Omit<ComponentProps<"span">, "children" | "className">) {
   return (
-    <span className={cn("inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap [&_svg]:size-3", TONES[tone], className)}>
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold whitespace-nowrap [&_svg]:size-3",
+        size === "sm" ? "h-5 px-2 align-middle text-2xs" : "h-6 px-2.5 text-xs",
+        TONES[tone],
+        className,
+      )}
+      {...props}
+    >
       {dot && <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />}
       {children}
     </span>

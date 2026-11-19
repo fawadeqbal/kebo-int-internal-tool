@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { lineNumbers } from "@kebo/shared";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { Button, cn, Input, Textarea } from "@kebo/ui";
+import { Button, cn, Input, Textarea, Badge } from "@kebo/ui";
 import { parseList, type PastedItem } from "@/components/deals/paste-list";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
 import { downloadSheet, ExcelMenu, useSheetPicker } from "@/components/sheets/excel-menu";
@@ -1960,7 +1960,7 @@ export function LineTable({
                               <span className="line-clamp-3 whitespace-pre-line">{c.format ? c.format({ ...r.values, [c.key]: value }, r) : value}</span>
                               {r.badge}
                               {dupOf.has(r.key) && (
-                                <span className="ml-1.5 inline-flex rounded-full bg-warn-soft px-2 py-px align-middle text-xs font-semibold text-warn">Same as {dupOf.get(r.key)}?</span>
+                                <Badge size="sm" tone="warn" className="ml-1.5">Same as {dupOf.get(r.key)}?</Badge>
                               )}
                             </span>
                           ) : isChoice(c) && !readOnly ? (
@@ -2547,7 +2547,7 @@ function PastePanel({
                 <span className="mr-2 inline-block w-8 text-xs text-muted tabular">{no}</span>
                 {p.description}
                 {p.model && <span className="text-muted"> · {p.model}</span>}
-                {dups[n] && <span className="ml-1.5 rounded-full bg-warn-soft px-2 py-px text-xs font-semibold text-warn">{dups[n]}</span>}
+                {dups[n] && <Badge size="sm" tone="warn" className="ml-1.5">{dups[n]}</Badge>}
               </span>
               <span className="shrink-0 text-muted tabular">{p.quantity ? `${p.quantity} ${p.unit}`.trim() : "no quantity"}</span>
             </li>
@@ -2624,7 +2624,7 @@ function FilePanel({
                   <span className="mr-2 inline-block w-8 text-xs text-muted tabular">{l.problem ? "—" : l.no}</span>
                   <span className={cn(l.partOf !== null && "pl-3")}>{(l.values.description ?? "").split("\n")[0] || <span className="text-muted">(no description)</span>}</span>
                   {l.values.model && <span className="text-muted"> · {l.values.model}</span>}
-                  {dups[read.lines.indexOf(l)] && <span className="ml-1.5 rounded-full bg-warn-soft px-2 py-px text-xs font-semibold text-warn">{dups[read.lines.indexOf(l)]}</span>}
+                  {dups[read.lines.indexOf(l)] && <Badge size="sm" tone="warn" className="ml-1.5">{dups[read.lines.indexOf(l)]}</Badge>}
                   {l.problem && (
                     <span className="block text-xs text-bad">
                       Row {l.fileRow}: {l.problem}

@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, Trash2 } from "lucide-react";
 import { PARTY_TYPE_LABEL, PARTY_TYPES, customerLetters, UNKNOWN_COUNTRY, type PartyType } from "@kebo/shared";
-import { Alert, Button, buttonClass, Card, CardBody, CardFooter, Checkbox, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, buttonClass, Card, CardBody, CardFooter, Checkbox, Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelActions, PanelBody } from "@/components/common/panel";
@@ -212,7 +212,7 @@ export function CustomerForm({
 
         {s.code === "duplicate" && s.matches?.length ? (
           <>
-            <Alert tone="warning">
+            <Notice tone="todo">
               <strong>Possible duplicate.</strong> A customer with the same email or phone exists:{" "}
               {s.matches.map((m, i) => (
                 <span key={m.id}>
@@ -224,7 +224,7 @@ export function CustomerForm({
                 </span>
               ))}
               . Open it, or tick “Save anyway”.
-            </Alert>
+            </Notice>
             <label className="flex items-center gap-2.5 text-sm">
               <Checkbox name="allowDuplicate" value="true" />
               Save anyway — this is a different {draft.type === "company" ? "company" : "person"}
@@ -237,7 +237,7 @@ export function CustomerForm({
             Contacts
           </h3>
           {s.errors?.contacts && !Object.keys(s.errors).some((k) => k.startsWith("contacts.")) && (
-            <Alert tone="error">{s.errors.contacts[0]}</Alert>
+            <Notice tone="bad">{s.errors.contacts[0]}</Notice>
           )}
           <div className="overflow-x-auto">
             <table className="w-full text-md">

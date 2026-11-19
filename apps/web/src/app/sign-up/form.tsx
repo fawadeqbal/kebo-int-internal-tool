@@ -4,7 +4,7 @@ import type { LeadOrigin } from "@kebo/shared";
 import { OriginFields } from "@/components/site/origin-fields";
 import { useActionState, useRef, useState } from "react";
 import { MailCheck } from "lucide-react";
-import { Alert, Field, Input } from "@kebo/ui";
+import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { signUpAction, slugCheckAction } from "./actions";
 
@@ -33,7 +33,7 @@ export function SignUpForm({ trialDays, origin }: { trialDays: number; origin: L
   };
   return (
     <form action={action} className="mt-5 flex flex-col gap-4" noValidate>
-      {state.message && <Alert tone="error">{state.message}</Alert>}
+      {state.message && <Notice tone="bad">{state.message}</Notice>}
       <Field label="Company" htmlFor="companyName" error={state.errors?.companyName}>
         <Input
           id="companyName"

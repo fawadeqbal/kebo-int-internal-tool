@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Banknote, Check, FileText } from "lucide-react";
 import { can, PAYMENT_RECORD_KINDS, PAYMENT_RECORD_LABEL, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
-import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, dateTime, companyToday, money } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
@@ -137,7 +137,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
                   <FileText className="size-4" aria-hidden /> {p.file.name}
                 </a>
               ) : (
-                <p className="text-sm text-muted">No file attached.</p>
+                <EmptyLine>No file attached.</EmptyLine>
               )}
             </CardBody>
           </Card>

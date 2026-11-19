@@ -3,7 +3,7 @@
 import { ChoiceChips } from "@/components/common/choice-chips";
 import { useState, type ReactNode } from "react";
 import { REASON_CHOICES } from "@kebo/shared";
-import { Button, Field, Textarea } from "@kebo/ui";
+import { Button, Field, Textarea, Badge, Notice } from "@kebo/ui";
 import { Modal } from "@/components/common/dialog";
 import type { EditCard } from "@/lib/types-edits";
 import { formatDayMonth, formatTime, todayIn, type TimeStyle } from "@kebo/utils";
@@ -39,7 +39,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
             {card.edits.map((e) => (
               <li key={`${e.n}-${e.at}`} className="flex flex-col gap-1 py-3">
                 <span className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-bold text-warn">Edit {e.n}</span>
+                  <Badge size="sm" tone="warn">Edit {e.n}</Badge>
                   <b>{e.by ?? "Someone"}</b>
                   <span className="text-xs text-muted">{whenText(e.at, style)}</span>
                 </span>
@@ -60,7 +60,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
             ))}
             {card.first && (
               <li className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <span className="rounded-full bg-ok-soft px-2 py-0.5 text-xs font-bold text-ok">First saved</span>
+                <Badge size="sm" tone="ok">First saved</Badge>
                 <b>{card.first.by ?? "Someone"}</b>
                 <span className="text-xs text-muted">{whenText(card.first.at, style)}</span>
               </li>
@@ -121,7 +121,7 @@ export function ReasonDialog({
       title={
         <span className="flex flex-wrap items-center gap-2">
           {title}
-          {n ? <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-bold text-warn">Edit {n}</span> : null}
+          {n ? <Badge size="sm" tone="warn">Edit {n}</Badge> : null}
         </span>
       }
       sub={sub}
@@ -140,7 +140,7 @@ export function ReasonDialog({
       }
     >
       <div className="flex flex-col gap-4">
-        {note && <p className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm leading-relaxed">{note}</p>}
+        {note && <Notice tone="todo">{note}</Notice>}
         {changes.length > 0 && (
           <ul className="flex max-h-56 flex-col divide-y divide-line overflow-y-auto rounded-lg border border-line text-md">
             {changes.map((c, i) => (

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Alert, Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, Notice } from "@kebo/ui";
 import { date, plural } from "@/lib/format";
 import { bigMoney, monthYearOf, type Period } from "@/lib/insights-period";
 import type { CashReport } from "@/lib/types-facts";
@@ -39,13 +39,13 @@ export function CashSection({ r, p }: { r: CashReport; p: Period }) {
         />
       </StatRow>
       {r.offAccount > 0 && (
-        <Alert tone="warning">
+        <Notice tone="todo">
           {plural(r.offAccount, "payment")} of this period {r.offAccount === 1 ? "is" : "are"} on no account yet, so {r.offAccount === 1 ? "it is" : "they are"} in the months below and in no
           account’s balance.{" "}
           <Link href="/finance/cash-book?acct=none" className="font-medium underline underline-offset-2">
             Put them on an account
           </Link>
-        </Alert>
+        </Notice>
       )}
 
       <Card className="overflow-hidden">

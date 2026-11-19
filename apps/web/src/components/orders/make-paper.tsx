@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Mail, MessageCircle, RefreshCw, X } from "lucide-react";
 import { FLOW_STEP_LABEL, inSentence, type PaperCheck } from "@kebo/shared";
-import { Alert, Badge, Button, buttonClass, Card, Checkbox, cn, Input, controlClass, controlSizes } from "@kebo/ui";
+import { Badge, Button, buttonClass, Card, Checkbox, cn, Input, controlClass, controlSizes, Notice, chipClass } from "@kebo/ui";
 import { FileActions } from "@/components/common/file-actions";
 import type { ActionState } from "@/lib/actions";
 import type { PaperChecks } from "@/lib/types-papers";
@@ -424,10 +424,7 @@ export function MakePaper({
                 key={f.id}
                 href={`${base}/papers/${p.kind}?ref=${f.id}`}
                 aria-current={p.ref === f.id ? "page" : undefined}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-xs",
-                  p.ref === f.id ? "border-primary bg-primary-soft text-primary" : "border-line text-text-2",
-                )}
+                className={chipClass(p.ref === f.id)}
               >
                 {f.name}
               </Link>
@@ -435,8 +432,8 @@ export function MakePaper({
           </nav>
         )}
 
-        {error && <Alert tone="error">{error}</Alert>}
-        {notice && <Alert tone="success">{notice}</Alert>}
+        {error && <Notice tone="bad">{error}</Notice>}
+        {notice && <Notice tone="ok">{notice}</Notice>}
 
         <section aria-labelledby="filled">
           <h3 id="filled" className="text-2xs font-semibold tracking-wide text-muted uppercase">

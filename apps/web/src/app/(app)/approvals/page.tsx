@@ -2,25 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Check, Clock, FileText } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, type ExpenseCategory } from "@kebo/shared";
-import {
-  Alert,
-  Badge,
-  Card,
-  EmptyState,
-  LinkTabs,
-  PageHeader,
-  Pager,
-  StatRow,
-  StatTile,
-  StatusBadge,
-  Table,
-  Td,
-  Th,
-  THead,
-  toPage,
-  Tr,
-  type StatusMeaning,
-} from "@kebo/ui";
+import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
@@ -141,9 +123,9 @@ export default async function ApprovalsPage({
       />
       <FilterCard search="Search order, customer, who sent it…" value={sp.q} keep={{ mine: keep.mine, status: keep.status }} clearHref={base({ mine: keep.mine, status: keep.status })} />
       {!mine && status === "pending" && list.counts.pending > 0 && (
-        <Alert tone="info" className="mb-3">
+        <Notice tone="info" className="mb-3">
           They added it; you approve it. Nothing counts until you do.
-        </Alert>
+        </Notice>
       )}
       <Card className="overflow-clip p-0">
         {list.rows.length === 0 ? (

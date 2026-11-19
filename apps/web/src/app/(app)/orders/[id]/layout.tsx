@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, Eye, Package, XCircle } from "lucide-react";
+import { ArrowRight, Eye, Package } from "lucide-react";
 import { can, dayMonth, ORDER, ORDER_TABS, orderNextStep, RECORD_KIND, type FlowStep, type OrderTab } from "@kebo/shared";
-import { ButtonLink, cn } from "@kebo/ui";
+import { ButtonLink, cn, Notice } from "@kebo/ui";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderMoneyOf, orderOf, orderPapersOf, orderSectionsOf } from "@/lib/order-data";
@@ -170,14 +170,10 @@ export default async function OrderLayout({ children, params }: { children: Reac
             }}
             notice={
               o.cancelled && (
-                <div role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/25 bg-bad-soft p-4 text-sm">
-                  <XCircle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />
-                  <div>
-                    <p className="font-medium">Cancelled{o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.</p>
-                    {o.cancelled.reason && <p className="mt-0.5 text-text-2">{o.cancelled.reason}</p>}
-                    <p className="mt-1 text-muted">The inquiry can be reopened and quoted again. Money already received stays recorded here.</p>
-                  </div>
-                </div>
+                <Notice tone="bad" className="mt-4" title={`Cancelled${o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.`}>
+                  {o.cancelled.reason && <p>{o.cancelled.reason}</p>}
+                  <p className="mt-1">The inquiry can be reopened and quoted again. Money already received stays recorded here.</p>
+                </Notice>
               )
             }
             tabs={<OrderTabs base={base} tabs={tabs} />}

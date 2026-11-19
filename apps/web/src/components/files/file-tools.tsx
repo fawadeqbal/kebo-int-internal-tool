@@ -21,7 +21,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Download, Eye, FileText, Image as ImageIcon, MoreHorizontal, Share2, X } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, ATTACHMENT_KINDS, fileSize, FLOW_STEP_LABEL, type AttachmentKind } from "@kebo/shared";
-import { Alert, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
 import type { AttachTarget, OrderFile } from "@/lib/types-files";
@@ -639,7 +639,7 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
             run(() => fileUpdateAction(orderId, ...sourceOf(f), { name }));
           }}
         >
-          {error && <Alert tone="error">{error}</Alert>}
+          {error && <Notice tone="bad">{error}</Notice>}
           <Field label="Name" htmlFor={`${id}-n`}>
             <Input
               id={`${id}-n`}
@@ -670,7 +670,7 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
             );
           }}
         >
-          {error && <Alert tone="error">{error}</Alert>}
+          {error && <Notice tone="bad">{error}</Notice>}
           <Field label="Kind" htmlFor={`${id}-k`}>
             <Select id={`${id}-k`} name="kind" defaultValue={f.kind ?? "other"}>
               {ATTACHMENT_KINDS.filter((k) => k !== "factory_quote").map((k) => (
@@ -722,7 +722,7 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
             });
           }}
         >
-          {error && <Alert tone="error">{error}</Alert>}
+          {error && <Notice tone="bad">{error}</Notice>}
           {!files.length ? (
             <p className="text-sm text-muted">None of these files can be moved.</p>
           ) : (
@@ -784,7 +784,7 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
             });
           }}
         >
-          {error && <Alert tone="error">{error}</Alert>}
+          {error && <Notice tone="bad">{error}</Notice>}
           <FileZone label="The newer file" inputId={`${id}-f`} optional={false} compact one onFiles={(fs) => setFile(fs[0] ?? null)}>
             {file && <ChosenFile name={file.name} />}
           </FileZone>
@@ -820,7 +820,7 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
             });
           }}
         >
-          {error && <Alert tone="error">{error}</Alert>}
+          {error && <Notice tone="bad">{error}</Notice>}
           <Buttons pending={pending || !files.length} save="Delete" onClose={onClose} danger />
         </form>
       </Modal>
@@ -923,8 +923,8 @@ function ShareDialog({
       description="On a phone this opens the share sheet with the files themselves (WhatsApp, email, WeChat). On a computer the files download (several as one zip) and the message is copied for you to paste."
       onClose={onClose}
     >
-      {error && <Alert tone="error">{error}</Alert>}
-      {copied && <Alert tone="success">Downloaded, and the message is copied: paste it in WhatsApp or your email.</Alert>}
+      {error && <Notice tone="bad">{error}</Notice>}
+      {copied && <Notice tone="ok">Downloaded, and the message is copied: paste it in WhatsApp or your email.</Notice>}
       <Field label="Message" htmlFor={`${id}-m`}>
         <Textarea id={`${id}-m`} rows={4} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
       </Field>

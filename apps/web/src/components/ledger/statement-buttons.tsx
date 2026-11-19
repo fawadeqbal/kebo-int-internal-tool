@@ -4,7 +4,7 @@ import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Share2 } from "lucide-react";
 import type { LedgerPartyKind } from "@kebo/shared";
-import { Alert, Button, Field, Textarea } from "@kebo/ui";
+import { Button, Field, Textarea, Notice } from "@kebo/ui";
 import { PanelActions, PanelBody, SidePanel } from "@/components/common/panel";
 import { downloadHref } from "@/components/files/file-tools";
 import { issueStatementAction, type IssuedStatement } from "@/app/(app)/finance/ledger/actions";
@@ -50,9 +50,9 @@ export function StatementButtons({
         <Share2 aria-hidden /> Share statement
       </Button>
       {error && (
-        <Alert tone="error" className="basis-full">
+        <Notice tone="bad" className="basis-full">
           {error}
-        </Alert>
+        </Notice>
       )}
       {share && <SharePanel s={share} onClose={() => setShare(null)} />}
     </>
@@ -103,8 +103,8 @@ function SharePanel({ s, onClose }: { s: IssuedStatement; onClose: () => void })
       onClose={onClose}
     >
       <PanelBody className="gap-4">
-        {error && <Alert tone="error">{error}</Alert>}
-        {copied && <Alert tone="success">Downloaded, and the message is copied: paste it in WhatsApp, WeChat or your email.</Alert>}
+        {error && <Notice tone="bad">{error}</Notice>}
+        {copied && <Notice tone="ok">Downloaded, and the message is copied: paste it in WhatsApp, WeChat or your email.</Notice>}
         <Field label="Message" htmlFor={`${id}-m`}>
           <Textarea id={`${id}-m`} rows={5} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
         </Field>

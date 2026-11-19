@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Card, cn, ScrollFade } from "@kebo/ui";
+import { Card, cn, ScrollFade, EmptyLine, CardHeader } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
 import { date, money, dayMonth } from "@/lib/format";
@@ -19,15 +19,7 @@ const n0 = (v: string | number) => Math.round(Number(v)).toLocaleString("en-US")
 
 /** The header of a card on a person's page (as RecordListCard's). */
 function Head({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
-  return (
-    <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-      <div className="min-w-0">
-        <h2 className="text-lead font-semibold text-text">{title}</h2>
-        {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
-      </div>
-      {action && <div className="flex shrink-0 items-center gap-1 text-xs text-text-2">{action}</div>}
-    </div>
-  );
+  return <CardHeader title={title} description={description} actions={action && <span className="text-xs text-text-2">{action}</span>} />;
 }
 
 /** What a cost was on: the order, the inquiry (lost or not), the customer, or the company. */
@@ -82,7 +74,7 @@ function Bars({ title, rows, currency }: { title: string; rows: { label: string;
           ))}
         </ul>
       ) : (
-        <p className="text-md text-muted">Nothing yet.</p>
+        <EmptyLine>Nothing yet.</EmptyLine>
       )}
     </div>
   );
@@ -104,7 +96,7 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
         action={s.count ? `${s.count} cost${s.count === 1 ? "" : "s"} · ${money(s.spent, c)}` : undefined}
       />
       {s.count === 0 ? (
-        <p className="px-4 py-4 text-md text-muted">Nothing spent in {year} yet.</p>
+        <EmptyLine inset>Nothing spent in {year} yet.</EmptyLine>
       ) : (
         <>
           <div className="grid gap-6 px-4 py-4 sm:grid-cols-2">
