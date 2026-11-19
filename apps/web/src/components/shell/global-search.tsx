@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { createPortal } from "react-dom";
 import { ArrowLeft, Clock, Loader2, Search, X } from "lucide-react";
 import { SEARCH_KIND_LABEL, type SearchKind, type SearchResult } from "@kebo/shared";
-import { Badge, cn, Kbd } from "@kebo/ui";
+import { Badge, cn, Kbd, controlClass, controlSizes } from "@kebo/ui";
 import { useBackGuard } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
 import { kindCount, kindOne, Marked, SEARCH_ICON as ICON, searchHref } from "./search-bits";
@@ -324,7 +324,7 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Names, numbers, phones…"
-            className="h-11 w-full rounded-xl border-2 border-primary-solid bg-surface pr-10 pl-9 text-base text-text focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className={cn(controlClass, controlSizes.md, "pr-10 pl-9 [&::-webkit-search-cancel-button]:hidden")}
           />
           {text && (
             <button type="button" onClick={() => setText("")} aria-label="Clear the words" className="absolute top-1/2 right-1 grid size-9 -translate-y-1/2 place-items-center text-muted">

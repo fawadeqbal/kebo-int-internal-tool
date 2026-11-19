@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { FileSpreadsheet, Plus } from "lucide-react";
 import { COMPANY_KIND_LABEL, COMPANY_LOG_KINDS, LIFECYCLE, planFeatureName, type CompanyLogKind } from "@kebo/shared";
-import { Badge, buildHref, buttonClass, Card, cn, EmptyState, ListToolbar, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
+import { Badge, buildHref, buttonClass, Card, cn, EmptyState, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile, LinkTabs } from "@kebo/ui";
 import type { ISODate } from "@kebo/utils";
 import { RowMenu } from "@/components/common/more-menu";
 import { date, dateTime, money, timeAgo } from "@/lib/format";
@@ -616,20 +616,21 @@ export function HistorySection({ c, history, page }: { c: CompanyDetail; history
       title={`History · ${history.counts.all ?? 0}`}
       description="everything done to this company from the platform, newest first"
     >
-      <ListToolbar
-        inCard
-        label="Kinds of history"
-        chips={[
-          { key: "all", label: "All", count: history.counts.all ?? 0, href: buildHref(base, { section: "history" }, {}), active: !kind },
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
+        <LinkTabs
+          className="min-w-0 flex-1"
+          label="Kinds of history"
+          tabs={[
+          { label: "All", count: history.counts.all ?? 0, href: buildHref(base, { section: "history" }, {}), active: !kind },
           ...kinds.map((k) => ({
-            key: k.key,
             label: k.label,
             count: history.counts[k.key] ?? 0,
             href: buildHref(base, { section: "history", kind: k.key }, {}),
             active: kind === k.key,
           })),
         ]}
-        end={
+        />
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <a
             href={buildHref(`${base}/history-excel`, {}, { kind })}
             download
@@ -638,8 +639,8 @@ export function HistorySection({ c, history, page }: { c: CompanyDetail; history
           >
             <FileSpreadsheet aria-hidden /> Excel
           </a>
-        }
-      />
+        </div>
+      </div>
       <LogList entries={rows} empty={kind ? "Nothing of this kind yet." : "Nothing yet."} />
       <Pager base={base} params={{ section: "history", kind }} page={page} total={history.rows.length} />
     </Box>

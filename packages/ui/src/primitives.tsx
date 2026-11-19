@@ -1,10 +1,10 @@
-import Form from "next/form";
+
 import Link from "next/link";
 import { BackArrow, ListLink } from "./back";
 import { Pending } from "./pending";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
-import { Filter, House, Info, Package, Settings, ShieldCheck, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
+import { House, Info, Package, Settings, ShieldCheck, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 
 /* ---------------------------------------------------------------- Button */
@@ -91,6 +91,9 @@ export type ControlSize = "md" | "sm";
 export const controlSizes: Record<ControlSize, string> = { md: "h-10 max-sm:h-11", sm: "h-8 px-2.5 max-sm:h-10" };
 export const controlClass =
   "w-full rounded-[10px] border border-line-strong bg-surface px-3 text-sm text-text shadow-card max-sm:text-base transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-bad aria-invalid:focus-visible:ring-bad/25";
+/** The search box's frame (a label around an icon and the input): the field's border, corner and focus ring. */
+export const searchFrameClass =
+  "rounded-[10px] border border-line-strong bg-surface shadow-card transition-colors focus-within:border-primary-solid focus-within:ring-3 focus-within:ring-ring";
 
 export function Input({
   className,
@@ -751,6 +754,79 @@ export function Kbd({ children }: { children: ReactNode }) {
   return <kbd className="inline-flex h-5 items-center rounded border border-line bg-surface-2 px-1.5 font-mono text-2xs text-muted">{children}</kbd>;
 }
 
+/**
+ * The one tab row (board "The one filter row and the one tab row"): underlined tabs, 42 tall, the open one bold
+ * with a green line, a short fact beside a name ("3", "R1 draft"). Each tab is its own address; by default a tab
+ * replaces the one before in the browser's history. phone "tabs" (a record's tabs): the row scrolls sideways;
+ * phone "chips" (a list's stages, rule 15): round chips on a phone, underlined from 640 px.
+ */
+export interface TabRowItem {
+  href: string;
+  label: ReactNode;
+  /** The short fact beside the name: a count, "R1 draft", "sailed". */
+  tag?: ReactNode;
+  /** The fact is bad news (late): drawn in red. */
+  alert?: boolean;
+  active: boolean;
+}
+
+export function TabRow({
+  label,
+  items,
+  end,
+  className = "mt-4",
+  replace = true,
+  phone = "tabs",
+}: {
+  label: string;
+  items: TabRowItem[];
+  end?: ReactNode;
+  className?: string;
+  replace?: boolean;
+  phone?: "tabs" | "chips";
+}) {
+  const chips = phone === "chips";
+  return (
+    <ScrollFade
+      as="nav"
+      aria-label={label}
+      className={cn(
+        "no-print flex overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        chips ? "-mx-4 items-center gap-2 px-4 py-0.5 sm:mx-0 sm:items-stretch sm:gap-x-[22px] sm:border-b sm:border-line sm:px-0 sm:py-0" : "items-stretch gap-x-[22px] border-b border-line",
+        className,
+      )}
+    >
+      {items.map((t) => (
+        <Link
+          key={t.href}
+          href={t.href}
+          replace={replace}
+          scroll={replace ? false : undefined}
+          aria-current={t.active ? "page" : undefined}
+          className={cn(
+            "shrink-0 items-center whitespace-nowrap text-md",
+            chips
+              ? cn(
+                  "inline-flex h-9 gap-1.5 rounded-full border px-3 font-semibold transition-colors max-sm:h-10 [&_svg]:size-4",
+                  t.active ? "border-primary-line bg-primary-soft text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
+                  "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:bg-transparent sm:px-0",
+                  t.active ? "sm:border-primary-solid sm:font-bold sm:text-text" : "sm:border-transparent sm:font-medium sm:text-text-2 sm:hover:text-text",
+                )
+              : "-mb-px flex h-[42px] gap-[7px] border-b-2 border-transparent font-medium text-text-2 hover:text-text aria-[current]:border-primary-solid aria-[current]:font-bold aria-[current]:text-text",
+          )}
+        >
+          {t.label}
+          {t.tag !== undefined && t.tag !== null && t.tag !== "" && (
+            <span className={cn("text-xs font-semibold tabular", t.alert ? "rounded-md bg-bad-soft px-1.5 text-bad" : "text-text-2 max-md:rounded-full max-md:bg-surface-2 max-md:px-1.5 max-md:leading-[17px]")}>{t.tag}</span>
+          )}
+          <Pending />
+        </Link>
+      ))}
+      {end}
+    </ScrollFade>
+  );
+}
+
 /** Sub-tabs as chips (the page's sections), as links: URL-driven, so they work without JavaScript. The current one is soft green. */
 export function LinkTabs({
   tabs,
@@ -770,14 +846,22 @@ export function LinkTabs({
    */
   look?: "chips" | "tabs";
 }) {
-  const tabsLook = look === "tabs";
+  if (look === "tabs")
+    return (
+      <TabRow
+        label={label}
+        phone="chips"
+        replace={!!replace}
+        className={className ?? ""}
+        items={tabs.map((x) => ({ href: x.href, label: x.label, tag: x.count, alert: x.alert, active: x.active }))}
+      />
+    );
   return (
     <ScrollFade
       as="nav"
       aria-label={label}
       className={cn(
         "-mx-4 flex items-center gap-2 overflow-x-auto overflow-y-hidden px-4 py-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0.5 [&::-webkit-scrollbar]:hidden",
-        tabsLook && "sm:items-stretch sm:gap-x-[22px] sm:border-b sm:border-line sm:px-0 sm:py-0",
         className,
       )}
     >
@@ -788,19 +872,11 @@ export function LinkTabs({
           replace={replace}
           scroll={replace ? false : undefined}
           aria-current={t.active ? "page" : undefined}
-          className={cn(
-            "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-md font-medium whitespace-nowrap transition-colors [&_svg]:size-4",
-            t.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
-            tabsLook && "max-sm:rounded-full max-sm:text-md max-sm:font-semibold",
-            tabsLook &&
-              (t.active
-                ? "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-primary-solid sm:bg-transparent sm:px-0 sm:text-md sm:font-bold sm:text-text"
-                : "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-transparent sm:bg-transparent sm:px-0 sm:text-md sm:font-medium sm:text-text-2 sm:hover:text-text"),
-          )}
+          className={chipClass(t.active)}
         >
           {t.label}
           {t.count !== undefined && (
-            <span className={cn("tabular", tabsLook && "text-xs font-semibold", t.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{t.count}</span>
+            <span className={cn("tabular", t.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{t.count}</span>
           )}
           <Pending />
         </Link>
@@ -809,109 +885,22 @@ export function LinkTabs({
   );
 }
 
-/** The strip above a table: search on the left, filter chips, extras on the right. */
-export function FilterBar({ children, end, className }: { children: ReactNode; end?: ReactNode; className?: string }) {
-  return (
-    <div className={cn("flex flex-wrap items-center gap-2 border-b border-line px-4 py-3", className)}>
-      {children}
-      {end && <div className="ml-auto flex items-center gap-2">{end}</div>}
-    </div>
-  );
-}
-
 /**
- * A filter chip that is a link: dashed when off, tinted when on. `pill`: the
- * list toolbar's round chip with its count ("Overdue 2"), ringed when on.
+ * A filter chip that is a link: the one chip (the same as LinkTabs' chips), tinted when on, with its count
+ * ("Overdue 2"). `pill` is kept as a name; every chip looks the same.
  */
-export function FilterChip({ href, active, count, pill, children }: { href: string; active: boolean; count?: number; pill?: boolean; children: ReactNode }) {
+export const chipClass = (active: boolean) =>
+  cn(
+    "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-md font-medium whitespace-nowrap transition-colors max-sm:h-10 [&_svg]:size-4",
+    active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
+  );
+
+export function FilterChip({ href, active, count, children }: { href: string; active: boolean; count?: number; pill?: boolean; children: ReactNode }) {
   return (
-    <Link
-      href={href}
-      aria-current={active ? "true" : undefined}
-      className={cn(
-        pill
-          ? "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-md font-medium whitespace-nowrap text-text transition-colors hover:bg-surface-2"
-          : buttonClass("secondary", "sm"),
-        !pill && "h-8 gap-1 border-dashed px-2.5 text-xs",
-        active &&
-          (pill
-            ? "border-primary-line bg-primary-soft font-semibold text-primary hover:bg-primary-soft"
-            : "border-solid border-primary/40 bg-primary-soft text-primary hover:bg-primary-soft"),
-      )}
-    >
+    <Link href={href} aria-current={active ? "true" : undefined} className={chipClass(active)}>
       {children}
-      {count !== undefined && <span className={cn("tabular", active ? "font-semibold" : "text-text-2")}>{count}</span>}
+      {count !== undefined && <span className="tabular">{count}</span>}
     </Link>
-  );
-}
-
-export interface ListChip {
-  key: string;
-  label: ReactNode;
-  count?: number;
-  href: string;
-  active: boolean;
-}
-
-/**
- * The filters above a list (design system: List frame), drawn the same as every list's: the chips (tabs with
- * their counts) on their own row, then the white filter strip with the search taking the width, the list's
- * other filters and Filter, and on the right the list's Excel. The search is a GET form that keeps the other
- * filters (`keep`), so the URL holds them all. Inside a card (`inCard`) the chips sit in a row with a rule under it.
- */
-export function ListToolbar({
-  search,
-  keep = {},
-  chips = [],
-  filters,
-  end,
-  label = "Filters",
-  className,
-  inCard,
-}: {
-  search?: { placeholder: string; value?: string; clearHref?: string; label?: string; name?: string };
-  /** The list's other filters, carried by the search form (page is dropped: a new search starts at page 1). */
-  keep?: Record<string, string | undefined>;
-  chips?: ListChip[];
-  /** After the search: the list's other filters (selects). */
-  filters?: ReactNode;
-  /** The list's Excel (export what the filters show). */
-  end?: ReactNode;
-  label?: string;
-  className?: string;
-  /** Inside a card: the chips and the end in one row with a rule under it, no strip. */
-  inCard?: boolean;
-}) {
-  const name = search?.name ?? "q";
-  const tabs = chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }));
-  if (inCard) {
-    return (
-      <div data-slot="list-toolbar" className={cn("flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5", className)}>
-        {tabs.length > 0 && <LinkTabs label={label} tabs={tabs} className="min-w-0 flex-1" />}
-        {end && <div className="ml-auto flex shrink-0 items-center gap-2">{end}</div>}
-      </div>
-    );
-  }
-  return (
-    <div data-slot="list-toolbar" className={className}>
-      {tabs.length > 0 && <LinkTabs label={label} tabs={tabs} className="mb-4" />}
-      {(search || filters || end) && (
-        <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3">
-          {search && (
-            <Form action="" scroll={false} role="search" aria-label={search.label ?? "Search this list"} className="flex min-w-0 flex-[1_1_260px] items-center gap-2.5">
-              {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
-              <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="min-w-0 flex-1" />
-              <button type="submit" className={buttonClass("secondary", "md", "shrink-0")}>
-                <Filter aria-hidden />
-                Filter
-              </button>
-            </Form>
-          )}
-          {filters && <div className="flex flex-wrap items-center gap-2.5">{filters}</div>}
-          {end && <div className="ml-auto flex shrink-0 items-center gap-2">{end}</div>}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -934,29 +923,6 @@ export function Segmented({ options, className, label }: { options: { href: stri
         </Link>
       ))}
     </ScrollFade>
-  );
-}
-
-/** Search box for a FilterBar (GET form field; Enter submits). */
-export function SearchField({ defaultValue, placeholder, clearHref, label = "Search", className }: { defaultValue?: string; placeholder: string; clearHref?: string; label?: string; className?: string }) {
-  return (
-    <div className={cn("relative w-full sm:w-72", className)}>
-      <label htmlFor="search" className="sr-only">
-        {label}
-      </label>
-      <svg aria-hidden viewBox="0 0 24 24" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-3.5-3.5" />
-      </svg>
-      <input id="search" name="q" type="search" defaultValue={defaultValue} placeholder={placeholder} className={cn(controlClass, "h-10 pr-8 pl-9 [&::-webkit-search-cancel-button]:appearance-none")} />
-      {defaultValue && clearHref && (
-        <Link href={clearHref} className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-muted hover:text-text" aria-label="Clear search">
-          <svg aria-hidden viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </Link>
-      )}
-    </div>
   );
 }
 

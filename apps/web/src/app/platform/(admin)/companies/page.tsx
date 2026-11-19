@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { FilterCard } from "@/components/common/filter-card";
 import { Plus } from "lucide-react";
 import { COMPANY_KIND_LABEL } from "@kebo/shared";
-import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, LinkTabs } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { date, dateTime, timeAgo } from "@/lib/format";
 import type { CompanyRow } from "@/lib/types-platform";
@@ -72,12 +73,8 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
           </ButtonLink>
         }
       />
-      <ListToolbar
-        search={{ placeholder: "Name, short name or email", value: sp.q, clearHref: href({ q: undefined }) }}
-        keep={keep}
-        chips={chips}
-        label="Filter companies"
-      />
+      <LinkTabs look="tabs" label="Kinds of company" tabs={chips} />
+      <FilterCard search="Name, short name or email" value={sp.q} keep={keep} />
       <Card className="overflow-clip p-0">
         {shown.length === 0 ? (
           live.length + gone.length === 0 && !sp.q ? (
