@@ -28,6 +28,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/access/sessions")}
         title="Sessions"
         actions={

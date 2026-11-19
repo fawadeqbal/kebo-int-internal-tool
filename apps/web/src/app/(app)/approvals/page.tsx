@@ -77,14 +77,9 @@ export default async function ApprovalsPage({
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={[{ label: "Money" }, { label: "Payments", href: "/payments" }, { label: "To verify" }]}
-        icon={Check}
         title="To verify"
-        summary={
-          mine
-            ? "Sent for approval: money received and expenses you added. Each counts once a manager approves it."
-            : "Payments recorded by the team, waiting for a manager to check the bank"
-        }
         primary={!mine && status === "pending" && list.rows.some((r) => r.can.approve) ? <VerifyChosen action={approveManyAction} /> : undefined}
       />
       {!mine && (

@@ -70,6 +70,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={[{ label: "Money" }, { label: "Ledger" }]}
         title="Ledger"
         actions={

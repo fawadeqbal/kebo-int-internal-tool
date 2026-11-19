@@ -32,8 +32,8 @@ export function ListHeader({
 }) {
   return (
     <PageHeader
+      kind="list"
       crumbs={crumbsFor(path)}
-      icon={null}
       title={labelFor(path)}
       views={
         views && (

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr, FactsLine } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -149,17 +149,12 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/audit")}
         title="Activity log"
-        summary={
-          <>
-            {data.total.toLocaleString("en-US")} {data.total === 1 ? "entry" : "entries"}
-            {who && ` by ${who}`}
-            <span className="max-sm:hidden"> · every change anyone made, newest first; entries cannot be edited or removed</span>
-          </>
-        }
         actions={<ExportCsv what="audit" query={{ type: sp.type, person: sp.person, q: sp.q }} />}
       />
+      <FactsLine facts={[{ label: who ? `Entries by ${who}` : "Entries", value: data.total.toLocaleString("en-US") }]} />
       <LinkTabs label="Which records" className="mb-4" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
       <FilterCard
         count={countOf(data.total, "entry", "entries")}

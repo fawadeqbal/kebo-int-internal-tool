@@ -26,7 +26,7 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
   const filtered = !!(sp.person || failed || sp.q);
   return (
     <div>
-      <PageHeader crumbs={crumbsFor("/access/sign-ins")} title="Sign-ins" />
+      <PageHeader kind="list" crumbs={crumbsFor("/access/sign-ins")} title="Sign-ins" />
       <LinkTabs
         label="Which attempts"
         className="mb-4"

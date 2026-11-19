@@ -99,6 +99,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/payments")}
         title="Payments"
         phoneStack

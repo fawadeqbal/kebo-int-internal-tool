@@ -76,6 +76,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbs}
         title="Company costs"
         actions={list.count > 0 ? <ExportCsv what="expenses" query={{ ...span(month), category, q: text }} /> : undefined}

@@ -29,7 +29,7 @@ export default async function RolesPage() {
   const frozen = roles.filter((r) => r.frozen);
   return (
     <div>
-      <PageHeader crumbs={crumbsFor("/access/roles")} title="Roles" />
+      <PageHeader kind="list" crumbs={crumbsFor("/access/roles")} title="Roles" />
       <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Signed in now" value={o.liveSessions} sub="Browsers and phones" href="/access/sessions" />

@@ -50,6 +50,7 @@ export default async function PlansPage() {
   return (
     <div>
       <PageHeader
+        kind="list"
         title="Plans"
         primary={
           <OpenPanelButton panel="new-plan" variant="strong" label="Add plan">

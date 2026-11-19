@@ -121,8 +121,8 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/orders")}
-        icon={Package}
         title="Sales orders"
         actions={
           <>
@@ -346,8 +346,8 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/orders")}
-        icon={Package}
         title="Sales orders"
         actions={<ViewSwitch view="board" mine={mine} />}
       />

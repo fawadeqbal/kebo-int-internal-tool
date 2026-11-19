@@ -161,6 +161,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/customers")}
         title="Customers"
         papers={
