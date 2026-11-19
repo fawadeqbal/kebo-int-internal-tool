@@ -1,14 +1,15 @@
 import { Plus, X } from "lucide-react";
 import { can, CHANNEL_LABEL, INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE, LOST_REASON_LABEL, type InquiryStage } from "@kebo/shared";
-import { Badge, ButtonLink, Card, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, Td, Th, THead, toPage } from "@kebo/ui";
+import { Badge, ButtonLink, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, Td, Th, THead, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { customerOf } from "@/lib/party-data";
-import { date, whole } from "@/lib/format";
+import { date, whole, countOf } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { customerTitle } from "@/lib/titles";
+import { TabList } from "@/components/lists/tab-list";
 
 export const generateMetadata = customerTitle("Inquiries");
 
@@ -57,7 +58,7 @@ export default async function CustomerInquiries({
           { name: "status", label: "Status", value: status, options: STAGES.map((x) => ({ value: x, label: INQUIRY_STAGE_LABEL[x] })) },
         ]}
       />
-      <Card className="overflow-clip p-0">
+      <TabList title="Inquiries" summary={countOf(list?.total ?? 0, "inquiry", "inquiries")}>
         {rows.length === 0 ? (
           <EmptyState
             title={filtered ? "No inquiries match" : "No inquiries yet"}
@@ -125,7 +126,7 @@ export default async function CustomerInquiries({
             </DataTable>
           </>
         )}
-      </Card>
+      </TabList>
       {list && <Pager base={base} params={{ q: sp.q, status }} page={list.page} pageSize={list.pageSize} total={list.total} bare />}
     </>
   );

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { buttonClass, Card, cn, CardHeader } from "@kebo/ui";
+import { buttonClass, Card, cn } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
+import { TabList } from "@/components/lists/tab-list";
 
 /** A section of a record page, where its chip (RecordNav) and old ?tab= links land. */
 export function RecordSection({ id, children, className }: { id: string; children: ReactNode; className?: string }) {
@@ -120,21 +121,12 @@ export function RecordListCard({
   footer?: ReactNode;
 }) {
   const rows = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : [];
+  // The one list inside a record (TabList): its name and count, a line under it, the card's action on the right.
   return (
-    <Card className="overflow-clip">
-      <CardHeader
-        title={
-          <>
-            {title}
-            {count !== undefined && <span> · {count}</span>}
-          </>
-        }
-        description={description}
-        actions={action}
-      />
+    <TabList title={count !== undefined ? `${title} · ${count}` : title} summary={description} buttons={action}>
       {rows.length ? <ul className="divide-y divide-line">{children}</ul> : empty}
       {footer}
-    </Card>
+    </TabList>
   );
 }
 

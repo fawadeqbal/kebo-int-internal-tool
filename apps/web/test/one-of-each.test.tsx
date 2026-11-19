@@ -184,6 +184,16 @@ describe("one of each", () => {
     }
   });
 
+  it("lists draw the one table and phone rows; a list inside a record is TabList", () => {
+    for (const f of ["components/security/sign-in-list.tsx", "components/security/session-list.tsx", "(app)/notifications/page.tsx"]) {
+      const src = SOURCES.find(({ file }) => file.endsWith(f))!;
+      expect(src.text, f).toMatch(/<(Table|DataTable)\b/);
+      expect(src.text, f).toMatch(/<PhoneList\b/);
+    }
+    for (const f of ["customers/[id]/inquiries/page.tsx", "customers/[id]/orders/page.tsx", "suppliers/[id]/offers/page.tsx", "components/common/record.tsx"])
+      expect(SOURCES.find(({ file }) => file.endsWith(f))!.text, f).toMatch(/<TabList\b/);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });
