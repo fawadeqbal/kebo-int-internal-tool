@@ -155,9 +155,22 @@ export function ActionForm({
   // The save's one-time key (lib/once.ts): the same one until it goes through, so sending it twice saves once.
   const onceKey = useRef<string | null>(null);
   const problems = problemsOf(state);
+  // The field the cursor goes to after a mistake: the first one named. In a steps window it may be on another
+  // step (JumpToStep goes there): it is focused once that step is drawn, after the step's own title took focus.
+  const focusNext = useRef<string | null>(null);
+  useEffect(() => {
+    const key = focusNext.current;
+    if (!key) return;
+    const el = fieldOf(formRef.current, key, fieldId);
+    // Not drawn yet, or on a step that is hidden: wait for the commit that shows it.
+    if (!el || el.closest(".hidden,[hidden]")) return;
+    focusNext.current = null;
+    el.focus();
+  });
   useEffect(() => {
     if (state === seen.current || state.ok === undefined) return;
     seen.current = state;
+    focusNext.current = problemsOf(state)[0]?.name ?? null;
     // A mistake: the fields it names are marked, and the cursor goes to the first one (nothing typed is lost).
     // A tick later: a steps window first goes to the step that holds the first one (JumpToStep), then it is found.
     setTimeout(() => {
@@ -174,7 +187,12 @@ export function ActionForm({
           el.setAttribute("aria-invalid", "true");
           el.setAttribute("data-marked", "");
         }
-      named[0]?.focus();
+      const first = focusNext.current ? fieldOf(form, focusNext.current, fieldId) : null;
+      if (first && !first.closest(".hidden,[hidden]")) {
+        focusNext.current = null;
+        first.focus();
+      } else if (!reveal) named[0]?.focus();
+      // Else it waits for its step to be drawn (the effect above).
     }, 0);
     // No connection: the note says so, with Try again (the window stays, with what was typed).
     if (state.code === "offline")
@@ -191,7 +209,7 @@ export function ActionForm({
       onDone?.(state);
       windowDone?.();
     }
-  }, [state, router, onDone, resetOnSuccess, windowDone, banner, fieldId]);
+  }, [state, router, onDone, resetOnSuccess, windowDone, banner, fieldId, reveal]);
   useEffect(
     () => () => {
       const note = unseen.current;
@@ -216,8 +234,13 @@ export function ActionForm({
               <li key={p.name}>
                 <button type="button" className="text-left underline underline-offset-2 hover:opacity-80" onClick={() => {
                     // In a steps window, its step first (`reveal`), then the field.
-                    reveal?.(p.name);
-                    setTimeout(() => fieldOf(formRef.current, p.name, fieldId)?.focus(), 0);
+                    const here = fieldOf(formRef.current, p.name, fieldId);
+                    if (here && !here.closest(".hidden,[hidden]")) here.focus();
+                    else {
+                      // On another step: focused once that step is drawn.
+                      focusNext.current = p.name;
+                      reveal?.(p.name);
+                    }
                   }}
                 >
                   {p.message}
