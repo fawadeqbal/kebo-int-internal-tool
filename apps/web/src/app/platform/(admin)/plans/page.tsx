@@ -53,7 +53,7 @@ export default async function PlansPage() {
         title="Plans"
         summary="What companies can buy · click a plan to change it"
         primary={
-          <OpenPanelButton panel="new-plan" variant="primary" label="Add plan">
+          <OpenPanelButton panel="new-plan" variant="strong" label="Add plan">
             <Plus aria-hidden /> Add plan
           </OpenPanelButton>
         }

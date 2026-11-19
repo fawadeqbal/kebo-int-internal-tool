@@ -199,7 +199,7 @@ export function FloatingMenu({
           </div>
           {/* Its way out, where the thumb is (canvas row "Cancel, not ✕"): Cancel across the sheet, after a gap. */}
           <div className="shrink-0 border-t-[6px] border-surface-2 px-3 pt-2.5">
-            <Button type="button" variant="secondary" onClick={onClose} className="min-h-12 w-full">
+            <Button type="button" variant="secondary" onClick={onClose} className="w-full">
               Cancel
             </Button>
           </div>

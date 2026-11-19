@@ -16,7 +16,7 @@ describe("PageHeader", () => {
           </>
         }
         primary={
-          <ButtonLink href="/pay" variant="primary">
+          <ButtonLink href="/pay" variant="strong">
             Record a payment
           </ButtonLink>
         }

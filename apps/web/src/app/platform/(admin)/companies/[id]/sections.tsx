@@ -206,7 +206,7 @@ export function OverviewSection({ c, today }: { c: CompanyDetail; today: ISODate
         title="Recent history"
         description="everything done to this company from the platform"
         action={
-          <Link href={sectionHref(c.id, "history")} className={buttonClass("ghost", "sm", "h-8 px-2.5 text-md text-text-2")}>
+          <Link href={sectionHref(c.id, "history")} className={buttonClass("ghost", "sm", "text-text-2")}>
             All history
           </Link>
         }

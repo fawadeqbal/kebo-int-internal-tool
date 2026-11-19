@@ -49,15 +49,15 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const suggested = `${suggestSlug(l.companyName).slice(0, 25)}-demo`;
 
   const primary = !company ? (
-    <ButtonLink href={`/platform/companies/new?lead=${id}&kind=client`} variant="primary">
+    <ButtonLink href={`/platform/companies/new?lead=${id}&kind=client`} variant="strong">
       <Building2 aria-hidden /> Make a company
     </ButtonLink>
   ) : company.kind !== "client" ? (
-    <ButtonLink href={`/platform/companies/${company.id}?section=plan&panel=make-real`} variant="primary">
+    <ButtonLink href={`/platform/companies/${company.id}?section=plan&panel=make-real`} variant="strong">
       <Building2 aria-hidden /> Make it a client
     </ButtonLink>
   ) : (
-    <ButtonLink href={`/platform/companies/${company.id}`} variant="primary">
+    <ButtonLink href={`/platform/companies/${company.id}`} variant="strong">
       <Building2 aria-hidden /> Open their company
     </ButtonLink>
   );
@@ -187,7 +187,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               {company && (
                 <Link
                   href={`/platform/companies/${company.id}`}
-                  className={buttonClass("ghost", "sm", "h-8 px-2.5 text-md text-text-2")}
+                  className={buttonClass("ghost", "sm", "text-text-2")}
                 >
                   Open {company.kind === "client" ? "company" : "demo"}
                 </Link>

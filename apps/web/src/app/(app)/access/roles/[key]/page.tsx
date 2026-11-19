@@ -18,7 +18,6 @@ export async function generateMetadata({ params }: { params: Promise<{ key: stri
   return { title: `${r.name} · Roles` };
 }
 
-const editClass = "h-8 px-2.5 text-md [&_svg]:size-3.5";
 
 /**
  * One role (Settings frame): its details and what it allows, read-only, with
@@ -32,7 +31,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
   const superAdmin = !!roles.find((x) => x.key === me.role)?.superAdmin;
   const has = new Set(r.permissions);
   const edit = (
-    <OpenPanelButton panel="edit-role" size="sm" className={editClass} label={`Edit the role ${r.name}`}>
+    <OpenPanelButton panel="edit-role" size="sm" label={`Edit the role ${r.name}`}>
       <Pencil aria-hidden /> Edit
     </OpenPanelButton>
   );

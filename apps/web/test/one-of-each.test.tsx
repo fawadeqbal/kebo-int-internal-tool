@@ -40,6 +40,20 @@ describe("one of each", () => {
     expect(found(/(?<![\w-])text-\[\d+(?:\.\d+)?px\]/g)).toEqual([]);
   });
 
+  it("buttons take their height from their size (sm 32 · md 40 · lg 44), never typed beside it", () => {
+    // A button, a link drawn as one, or buttonClass(): a height, min-height or square size in its own classes is a copy.
+    const tags = /<(?:Button|ButtonLink|SubmitButton|ConfirmSubmit|OpenPanelButton|PanelButton|WindowCancel)\b(?:[^>{]|\{(?:[^{}]|\{[^{}]*\})*\})*>|buttonClass\([^)]*\)/g;
+    const height = /(?<![\w&:[-])(?:[a-z-]+:)*(?:h|min-h|size)-(?:\d+|\[[^\]]+\])(?![\w-])/;
+    const copies = SOURCES.flatMap(({ file, text }) =>
+      [...text.matchAll(tags)].filter((m) => height.test(m[0].replace(/\[&_svg\]:size-[\w.[\]]+/g, ""))).map((m) => `${file}: ${m[0].slice(0, 120)}`),
+    );
+    expect(copies).toEqual([]);
+  });
+
+  it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
+    expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
+  });
+
   it("colours come from the theme's variables, never typed as #hex in a class", () => {
     expect(found(/(?<![\w-])(?:bg|text|border|ring|fill|stroke|from|to|via|outline|decoration|divide|shadow)-\[#[0-9a-fA-F]{3,8}\]/g)).toEqual([]);
   });

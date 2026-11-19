@@ -216,10 +216,10 @@ export function ThrowAwayConfirm({ what, lost, onKeep, onThrow }: { what?: React
           )}
         </div>
         <div className="mt-5 flex justify-end gap-2 max-sm:flex-col-reverse">
-          <Button variant="danger-line" onClick={onThrow} className="max-sm:h-11 max-sm:w-full">
+          <Button variant="danger-line" onClick={onThrow} className="max-sm:w-full">
             <Trash2 aria-hidden /> Discard
           </Button>
-          <Button ref={keep} variant="strong" onClick={onKeep} className="max-sm:h-12 max-sm:w-full">
+          <Button size="lg" ref={keep} variant="strong" onClick={onKeep} className="max-sm:w-full">
             Keep editing
           </Button>
         </div>
@@ -323,7 +323,7 @@ export function WindowHead({
           </p>
         )}
       </div>
-      <Button data-window-x="" size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled} className="max-md:order-1 max-md:size-11 max-md:rounded-full max-md:[&_svg]:size-[22px]">
+      <Button data-window-x="" size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled} className="max-md:order-1 max-md:rounded-full max-md:[&_svg]:size-[22px]">
         <X aria-hidden />
       </Button>
     </div>

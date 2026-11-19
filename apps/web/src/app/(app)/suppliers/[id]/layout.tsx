@@ -45,11 +45,11 @@ export default async function FactoryLayout({ children, params }: { children: Re
         }
         primary={
           can(me, "payments.record") || can(me, "expenses.manage") ? (
-            <ButtonLink href={`/payments/new?kind=out&factory=${f.id}`} variant="primary">
+            <ButtonLink href={`/payments/new?kind=out&factory=${f.id}`} variant="strong">
               <Banknote aria-hidden /> Pay supplier
             </ButtonLink>
           ) : (
-            <ButtonLink href="/inquiries?stage=sourcing" variant="primary">
+            <ButtonLink href="/inquiries?stage=sourcing" variant="strong">
               <Search aria-hidden /> Ask for prices
             </ButtonLink>
           )

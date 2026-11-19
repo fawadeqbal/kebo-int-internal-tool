@@ -57,7 +57,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           <span className="min-w-0 flex-1 text-sm">
             <span className="font-semibold">{counts.exact.label}</span> <span className="text-text-2">· {kindOne(counts.exact.kind)}</span>
           </span>
-          <ButtonLink href={counts.exact.href} size="sm" variant="primary">
+          <ButtonLink href={counts.exact.href} size="sm" variant="strong">
             Open it <ArrowRight aria-hidden />
           </ButtonLink>
         </Card>

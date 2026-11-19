@@ -120,7 +120,7 @@ export function PaymentPlanTable({
             <Button
               size="sm"
               variant="secondary"
-              className="h-8 px-2.5 text-md"
+              className=""
               onClick={() => setSending({ action: send.bind(null, i.id), orderId, refId: i.id, number: i.number, label: i.label, amount: i.amount, currency, dueOn: i.dueOn, again: r.with === "request" })}
             >
               {r.with === "request" ? "Send again" : "Send request"}

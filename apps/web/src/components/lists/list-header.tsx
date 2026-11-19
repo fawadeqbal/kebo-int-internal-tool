@@ -46,7 +46,7 @@ export function ListHeader({
       primary={
         create && (
           <span className="max-sm:hidden">
-            <OpenPanelButton panel={create.panel} variant="primary" label={create.label}>
+            <OpenPanelButton panel={create.panel} variant="strong" label={create.label}>
               <Plus aria-hidden /> {create.label}
             </OpenPanelButton>
           </span>

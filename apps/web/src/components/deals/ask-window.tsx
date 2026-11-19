@@ -216,7 +216,7 @@ export function RequestMore({
         aria-label={`More for ${name}`}
         disabled={pending}
         // ⋯, the quiet end of a row (design "list pages" 18 Nov).
-        className={buttonClass("ghost", "sm", "size-8 px-0 text-text-2")}
+        className={buttonClass("ghost", "icon-sm", "text-text-2")}
         onClick={() => setOpen((o) => !o)}
       >
         <MoreHorizontal aria-hidden />

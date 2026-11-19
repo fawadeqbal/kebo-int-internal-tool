@@ -108,7 +108,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
             place: "primary",
             when: d.allowed.quote && x.lines.length > 0,
             node: (
-              <ButtonLink href={`${base}/quotation?start=1&offer=${x.id}`} variant="primary" size="sm">
+              <ButtonLink href={`${base}/quotation?start=1&offer=${x.id}`} variant="strong" size="sm">
                 <Plus aria-hidden /> Quote this offer
               </ButtonLink>
             ),

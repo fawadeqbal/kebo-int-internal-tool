@@ -225,7 +225,7 @@ export function RecordRow({
 /** "All 12 →" in a list card's header: the whole list elsewhere. */
 export function AllLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className={buttonClass("ghost", "sm", "h-8 px-2.5 text-md text-text-2")}>
+    <Link href={href} className={buttonClass("ghost", "sm", "text-text-2")}>
       {children}
     </Link>
   );

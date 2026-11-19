@@ -35,7 +35,7 @@ export function PanelButton({
       variant={variant}
       aria-label={label}
       aria-haspopup="dialog"
-      className={cn(variant !== "link" && "h-8 px-2.5 text-md [&_svg]:size-3.5", variant === "link" && "h-auto p-0 text-xs", className)}
+      className={cn(variant !== "link" && "", variant === "link" && "h-auto p-0 text-xs", className)}
       onClick={() => p.openPanel(id)}
     >
       {children}

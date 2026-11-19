@@ -441,7 +441,7 @@ export function DealForm({
                       size="lg"
                       disabled={addingBusy}
                       onClick={() => newCustomer.current?.save()}
-                      className="max-md:h-11"
+                     
                     >
                       <Check aria-hidden /> {addingBusy ? "Adding…" : "Add and use"}
                     </Button>
@@ -456,7 +456,7 @@ export function DealForm({
                         variant="ghost"
                         onClick={() => go(at - 1)}
                         aria-label="Back"
-                        className="max-md:size-11 max-md:px-0"
+                        className="max-md:px-0 max-md:aspect-square"
                       >
                         <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
                       </Button>
@@ -464,7 +464,7 @@ export function DealForm({
                       lastChanged && <span className="text-xs text-text-2 max-md:hidden">Last changed {lastChanged}</span>
                     )}
                     <span className="flex-1 max-md:hidden" />
-                    <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
+                    <WindowCancel className="max-md:flex-1" />
                     {only || step === "changes" ? (
                       <SubmitButton
                         variant="strong"
@@ -482,7 +482,7 @@ export function DealForm({
                             Changes{total ? ` · ${total}` : ""}
                           </Button>
                         )}
-                        <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
+                        <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:flex-1">
                           Next <ChevronRight aria-hidden />
                         </Button>
                       </>
@@ -498,13 +498,13 @@ export function DealForm({
                         variant="ghost"
                         onClick={() => go(at - 1)}
                         aria-label="Back"
-                        className="max-md:size-11 max-md:px-0"
+                        className="max-md:px-0 max-md:aspect-square"
                       >
                         <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
                       </Button>
                     ) : null}
                     <span className="flex-1 max-md:hidden" />
-                    <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
+                    <WindowCancel className="max-md:flex-1" />
                     {create && step === "review" ? (
                       <SubmitButton
                         variant="strong"
@@ -522,7 +522,7 @@ export function DealForm({
                           </Button>
                         )}
                         {!last && (
-                          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
+                          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:flex-1">
                             Next <ChevronRight aria-hidden />
                           </Button>
                         )}

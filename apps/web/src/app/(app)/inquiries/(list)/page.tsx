@@ -118,7 +118,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
               <X aria-hidden /> Clear filters
             </ButtonLink>
           ) : canCreate ? (
-            <OpenPanelButton panel="new-inquiry" variant="primary">
+            <OpenPanelButton panel="new-inquiry" variant="strong">
               <Plus aria-hidden /> New inquiry
             </OpenPanelButton>
           ) : undefined,

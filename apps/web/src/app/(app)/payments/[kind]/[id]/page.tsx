@@ -108,7 +108,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
               Check that {p.currency} {Number(p.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} reached{p.account ? ` ${p.account}` : " the account"} on {date(p.on)}.
             </span>
           </p>
-          <ButtonLink href="/approvals" variant="primary">
+          <ButtonLink href="/approvals" variant="strong">
             <Check aria-hidden /> Verify
           </ButtonLink>
         </section>

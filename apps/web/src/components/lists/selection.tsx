@@ -65,7 +65,7 @@ export function SelectionFrame({ ids, children }: { ids: string[]; children: Rea
 export function SelectButton() {
   const s = useSelection();
   return (
-    <Button variant="secondary" onClick={s.start} className="h-10">
+    <Button variant="secondary" onClick={s.start}>
       <CheckSquare aria-hidden /> Select
     </Button>
   );

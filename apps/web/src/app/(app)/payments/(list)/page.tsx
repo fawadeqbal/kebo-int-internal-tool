@@ -119,7 +119,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         }
         primary={
           canRecord ? (
-            <ButtonLink href={recordHref} variant="primary">
+            <ButtonLink href={recordHref} variant="strong">
               <Plus aria-hidden /> Record payment
             </ButtonLink>
           ) : undefined

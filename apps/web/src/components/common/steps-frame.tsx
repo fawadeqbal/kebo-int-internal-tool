@@ -200,7 +200,7 @@ export function StepsFooter({
       {/* A phone: the items' total on its own line above the buttons (design "Items on a small phone"). */}
       <FooterTotal line />
       {!first && (
-        <Button type="button" variant="secondary" data-back="" aria-label="Back" onClick={onBack} className="max-md:size-12 max-md:px-0">
+        <Button type="button" variant="secondary" data-back="" aria-label="Back" onClick={onBack} className="max-md:px-0 max-md:aspect-square">
           <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
         </Button>
       )}
@@ -210,7 +210,7 @@ export function StepsFooter({
         {saveLabel}
       </SubmitButton>
       {!last && (
-        <Button type="button" variant="primary" onClick={onNext}>
+        <Button type="button" variant="soft" onClick={onNext}>
           Next <ChevronRight aria-hidden className="max-md:hidden" />
         </Button>
       )}

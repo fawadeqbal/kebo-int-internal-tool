@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { Alert, Button, Card, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Alert, Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant } from "@kebo/ui";
 import { OpenPanelButton, PanelActions, PanelBody, PanelSection, SidePanel, useClosePanel } from "@/components/common/panel";
 import { EditButton } from "@/components/common/edit-button";
 import { EditsChip, editedMark } from "@/components/edits/edits";
@@ -511,7 +511,7 @@ export function LinesCard({
             {actions}
             {editable && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
             {canEdit && editPanel && (
-              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="secondary" size="sm" className="h-8 px-2.5 text-md [&_svg]:size-3.5">
+              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="secondary" size="sm" className="">
                 <Pencil aria-hidden /> {editLabel}
               </OpenPanelButton>
             )}
@@ -565,8 +565,8 @@ export function PanelButton({
   body: ReactNode;
   /** The window's own width and such (md:w-[820px]). */
   panelClassName?: string;
-  variant?: "primary" | "secondary" | "ghost";
-  size?: "xs" | "sm" | "md";
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   icon?: ReactNode;
   className?: string;
 }) {

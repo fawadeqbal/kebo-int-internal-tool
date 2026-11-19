@@ -455,7 +455,7 @@ function PlanEditWindow({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" variant="secondary" className="h-8 px-2.5 text-md" onClick={() => setOpen(true)}>
+      <Button size="sm" variant="secondary" className="" onClick={() => setOpen(true)}>
         {label}
       </Button>
       {open && (

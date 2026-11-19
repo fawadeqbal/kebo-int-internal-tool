@@ -29,7 +29,6 @@ type Search = { side?: string; show?: string; q?: string; who?: string; page?: s
 
 const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
-const SMALL = "h-8 px-2.5 text-md";
 
 const add = (m: Map<string, number>, currency: string, v: string | number) => m.set(currency, (m.get(currency) ?? 0) + Number(v));
 
@@ -197,7 +196,7 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
                         </Td>
                         <Td className="text-right">
                           {(can(me, "payments.record") || can(me, "money.submit")) && !open && (
-                            <Link href={href({ open: o.id, do: "pay" })} scroll={false} className={buttonClass("secondary", "sm", SMALL)}>
+                            <Link href={href({ open: o.id, do: "pay" })} scroll={false} className={buttonClass("secondary", "sm")}>
                               Record payment
                             </Link>
                           )}
@@ -413,7 +412,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
                             <PayPart part={r.part} today={today} />
                           </Suspense>
                         ) : (
-                          <Link href={href({ pay: r.key })} scroll={false} className={buttonClass("secondary", "sm", SMALL)}>
+                          <Link href={href({ pay: r.key })} scroll={false} className={buttonClass("secondary", "sm")}>
                             Pay
                           </Link>
                         )

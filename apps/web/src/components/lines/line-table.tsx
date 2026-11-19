@@ -1188,7 +1188,7 @@ export function LineTable({
               aria-keyshortcuts="Enter"
               disabled={isBlank(entry, columns, entryAt.parentKey)}
               // Grey until something is typed (design 18 Nov), then the brand colour.
-              className="h-7 gap-1.5 pr-2 pl-2.5 disabled:bg-surface-3 disabled:text-muted disabled:opacity-100 disabled:shadow-none max-sm:h-7"
+              className="gap-1.5 pr-2 pl-2.5 disabled:bg-surface-3 disabled:text-muted disabled:opacity-100 disabled:shadow-none"
             >
               <Check aria-hidden /> Add
               {/* The key, drawn (not text): the button's name stays "Add the item". */}
@@ -1253,14 +1253,14 @@ export function LineTable({
           variant="ghost"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => findRef.current?.blur()}
-          className="h-10 shrink-0 px-2 text-lead font-bold text-primary hover:text-primary"
+          className="shrink-0 px-2 font-bold text-primary hover:text-primary"
         >
           Done
         </Button>
       ) : (
         rows.length > 0 && (
           <>
-            <Button type="button" variant="primary" onClick={() => openNew()} aria-label={`Add ${noun}`} className="h-10 w-11 shrink-0 px-0 max-sm:h-10 [&_svg]:size-[22px]">
+            <Button type="button" variant="strong" onClick={() => openNew()} aria-label={`Add ${noun}`} className="w-11 shrink-0 px-0 [&_svg]:size-[22px]">
               <Plus aria-hidden strokeWidth={2.6} />
             </Button>
             <Button
@@ -1273,7 +1273,7 @@ export function LineTable({
               aria-haspopup="menu"
               aria-expanded={moreOpen}
               disabled={phonePicker.busy}
-              className="size-10 shrink-0 max-sm:size-10"
+              className="shrink-0"
             >
               {phonePicker.busy ? <Loader2 className="animate-spin" aria-hidden /> : <MoreHorizontal aria-hidden />}
             </Button>
@@ -1288,7 +1288,7 @@ export function LineTable({
   const phoneSelectTop = (
     <div className="flex min-h-11 items-center justify-between gap-2 rounded-[10px] bg-primary-soft px-3 text-primary">
       <span className="text-lead font-bold">{pickedRows.length ? pickedLabel : `Tap the ${noun}s to select them`}</span>
-      <Button type="button" variant="ghost" onClick={stopSelecting} className="h-10 px-2 text-lead font-bold text-primary hover:text-primary">
+      <Button type="button" variant="ghost" onClick={stopSelecting} className="px-2 font-bold text-primary hover:text-primary">
         Done
       </Button>
     </div>
@@ -1338,21 +1338,21 @@ export function LineTable({
       {empty ? <div className="text-sm text-text-2">{empty}</div> : <p className="text-sm text-text-2">Add them one by one, or bring them in at once.</p>}
       {!readOnly && (
         <>
-          <Button type="button" variant="primary" onClick={() => openNew()} className="h-12 text-lead max-sm:h-12">
+          <Button size="lg" type="button" variant="strong" onClick={() => openNew()}>
             <Plus aria-hidden /> Add {noun}
           </Button>
           {ways.map((w, n) => (
-            <Button key={w.key} type="button" variant={n === 0 ? "soft" : "secondary"} onClick={w.onSelect} className="h-12 text-lead max-sm:h-12">
+            <Button key={w.key} type="button" variant={n === 0 ? "soft" : "secondary"} onClick={w.onSelect}>
               {w.icon ?? <Copy aria-hidden />} {w.label}
               {w.note ? ` · ${w.note}` : ""}
             </Button>
           ))}
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant="secondary" onClick={() => setPasteOpen(true)} className="h-12 max-sm:h-12">
+            <Button type="button" variant="secondary" onClick={() => setPasteOpen(true)}>
               <ClipboardPaste aria-hidden /> Paste items
             </Button>
             {canUpload && excelAllowed && (
-              <Button type="button" variant="secondary" onClick={() => phonePicker.pick()} className="h-12 max-sm:h-12">
+              <Button type="button" variant="secondary" onClick={() => phonePicker.pick()}>
                 <FileSpreadsheet aria-hidden /> Import Excel
               </Button>
             )}
@@ -1415,7 +1415,7 @@ export function LineTable({
                   variant="secondary"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => openNew({ afterKey: null, parentKey: null }, { [columns[0]!.key]: query.trim() })}
-                  className="h-12 text-lead max-sm:h-12"
+                 
                 >
                   <Plus aria-hidden /> Add “{query.trim()}” as {an(noun)}
                 </Button>
@@ -1563,26 +1563,26 @@ export function LineTable({
             (phone ? (
               // A phone (design 18 Nov): one big Add, and ⋯ beside it for the other ways in (paste, Excel).
               <div className="flex w-full gap-2">
-                <Button variant="primary" onClick={() => openNew()} className="h-12 flex-1 text-lead max-sm:h-12 max-sm:text-lead">
+                <Button size="lg" variant="strong" onClick={() => openNew()} className="flex-1">
                   <Plus aria-hidden /> Add {noun}
                 </Button>
                 <Button
                   id={`moreadd-${menuId}`}
-                  size="icon"
+                  size="lg"
                   variant="secondary"
                   onClick={() => setMoreOpen((o) => !o)}
                   aria-label="More ways to add"
                   aria-haspopup="menu"
                   aria-expanded={moreOpen}
                   disabled={phonePicker.busy}
-                  className="size-12 max-sm:size-12"
+                  className="aspect-square px-0"
                 >
                   {phonePicker.busy ? <Loader2 className="animate-spin" aria-hidden /> : <MoreHorizontal aria-hidden />}
                 </Button>
                 {phonePicker.input}
               </div>
             ) : (
-              <Button variant="primary" onClick={addLine}>
+              <Button variant="strong" onClick={addLine}>
                 <Plus aria-hidden /> Add {noun}
               </Button>
             ))}

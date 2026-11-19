@@ -34,7 +34,6 @@ import { orderTitle } from "@/lib/titles";
 
 export const generateMetadata = orderTitle("Purchase order");
 
-const SMALL = "h-8 px-2.5 text-md";
 
 /**
  * Factory order (design "the order, final"): the purchase order to each factory, the lines we ordered at
@@ -327,7 +326,6 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                   href={`/orders/${o.id}/papers/purchase-order?ref=${po.supplier.id}`}
                   size="sm"
                   variant="secondary"
-                  className={SMALL}
                 >
                   <Printer aria-hidden /> View / print
                 </ButtonLink>
@@ -346,7 +344,6 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                   <PanelButton
                     name="send-po"
                     size="sm"
-                    className={SMALL}
                     icon={<Mail aria-hidden />}
                     label="Send to the supplier"
                     title={`Send ${po.number} to ${po.supplier.name}`}
