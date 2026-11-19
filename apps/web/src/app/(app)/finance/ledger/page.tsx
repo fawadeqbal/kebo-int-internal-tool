@@ -313,7 +313,7 @@ async function Balances({ sp }: { sp: Search }) {
           {shown.length === 0 ? (
             <EmptyState title="Nothing here" description="Balances appear when money is recorded: orders, payments, expenses, transfers." />
           ) : (
-            <Table className="min-w-[760px]">
+            <Table>
               <THead>
                 <tr>
                   <Th>Who</Th>

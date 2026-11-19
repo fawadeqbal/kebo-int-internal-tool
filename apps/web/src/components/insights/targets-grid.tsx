@@ -31,7 +31,7 @@ export function TargetsGrid({ rows, people, actions, currency }: { rows: TargetR
   const cols = ["company", ...people.map((p) => `p:${p.id}`)];
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line text-left text-xs text-muted">
             <th className="sticky left-0 z-10 bg-surface px-3 py-2 font-medium">Month</th>

@@ -1,5 +1,7 @@
 "use client";
 
+import { PhoneItems } from "@/components/records/phone-items";
+import { Totals, type TotalsRow } from "@/components/records/totals";
 import { useMemo, useState, type ReactNode } from "react";
 import { factoryUnitCostMinor, formatMinor, multiplyMinor, toMinor } from "@kebo/money";
 import { LINE_CONDITION_LABEL, LINE_CONDITION_TONE, LINE_CONDITIONS, type LineCondition } from "@kebo/shared";
@@ -285,7 +287,7 @@ export function OrderLines({
         onRemove={fixed}
         onMove={fixed}
         onEdit={onEdit}
-        footer={<Totals set={set} lines={shown} extra={footer} />}
+        footer={<StepFigures set={set} lines={shown} extra={footer} />}
         empty="No items on this order."
       />
       {!readOnly && (
@@ -363,7 +365,8 @@ export function OrderLinesEditor({
 }
 
 /** Under the table: the step's totals. */
-function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; extra?: ReactNode }) {
+/** Under a step's lines: the money as the one Totals block (the supplier's lines), or the step's own figures. */
+function StepFigures({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; extra?: ReactNode }) {
   const sum = (f: (l: OrderLineView) => number) => lines.reduce((t, l) => t + (f(l) || 0), 0);
   const item = (label: string, value: ReactNode) => (
     <span className="text-muted">
@@ -371,6 +374,7 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
     </span>
   );
   let body: ReactNode;
+  let money: TotalsRow[] | null = null;
   if (set === "factory") {
     // Before tax · Tax · Total with tax (as on the supplier's offer), per currency; no tax: the total alone.
     const gross = new Map<string, number>();
@@ -387,15 +391,15 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
     const say = (m: Map<string, number>) => [...m].map(([c, x]) => formatMinor(x, c)).join(" + ");
     const tax = new Map([...gross].map(([c, g]) => [c, g - (net.get(c) ?? g)]));
     const taxed = [...tax.values()].some((x) => x > 0);
-    body = !gross.size ? null : taxed ? (
-      <>
-        {item("Before tax", say(net))}
-        {item("Tax", say(tax))}
-        {item("Total with tax", say(gross))}
-      </>
-    ) : (
-      item("Supplier total", say(gross))
-    );
+    money = !gross.size
+      ? null
+      : taxed
+        ? [
+            { label: "Before tax", value: say(net) },
+            { label: "Tax", value: say(tax) },
+            { label: "Total with tax", value: say(gross), big: true },
+          ]
+        : [{ label: "Supplier total", value: say(gross), big: true }];
   } else if (set === "received") {
     const done = lines.filter((l) => stateOf(Number(l.receivedQty), Number(l.quantity)) === "in").length;
     body = item("Received", `${done} of ${lines.length}`);
@@ -422,11 +426,12 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
       </>
     );
   }
-  if (!body && !extra) return null;
+  if (!body && !money && !extra) return null;
   return (
-    <div className="flex flex-col gap-2 px-3 py-2">
-      {body && <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 text-sm">{body}</div>}
-      {extra}
+    <div className="flex flex-col gap-2">
+      {money && <Totals rows={money} />}
+      {body && <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-3 py-2 text-sm">{body}</div>}
+      {extra && <div className="px-3 pb-2">{extra}</div>}
     </div>
   );
 }
@@ -460,7 +465,7 @@ export function OrderLinesView({ set, lines, label }: { set: LineSet; lines: Ord
       columns={columnsOf(set).map((c) => (c.key === "description" ? { ...c, width: "minmax(0,1fr)" } : c))}
       numbers={lines.map((l) => l.no)}
       phone={phone}
-      totals={<Totals set={set} lines={lines} />}
+      totals={<StepFigures set={set} lines={lines} />}
       empty="No items on this order."
     />
   );
@@ -472,16 +477,11 @@ export function OrderLinesView({ set, lines, label }: { set: LineSet; lines: Ord
  */
 export function PhoneLines({ set, lines }: { set: LineSet; lines: OrderLineView[] }) {
   if (!lines.length) return <p className="text-sm text-muted">No items on this order.</p>;
+  // The one phone item line (PhoneItems), read only: number, name, the step's figure under it.
   return (
-    <ul className="flex flex-col divide-y divide-line" aria-label="Items">
-      {lines.map((l) => (
-        <li key={l.id} className={cn("py-2.5", l.no.includes(".") && "pl-3")}>
-          <p className="text-sm font-medium">
-            <span className="font-normal text-muted tabular">{l.no}</span> {head(l.description)}
-          </p>
-          <p className="text-xs text-muted">{phoneLine(set, valuesOf(l))}</p>
-        </li>
-      ))}
-    </ul>
+    <PhoneItems
+      label="Items"
+      rows={lines.map((l) => ({ key: l.id, no: l.no, part: l.no.includes("."), title: head(l.description), sub: phoneLine(set, valuesOf(l)) }))}
+    />
   );
 }

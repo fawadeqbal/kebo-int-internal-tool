@@ -167,7 +167,7 @@ export default async function ApprovalsPage({
                 <Row key={s.id} s={s} />
               ))}
             </ul>
-            <div className="hidden overflow-x-auto md:block">
+            <div className="hidden md:block">
               <Table>
                 <THead>
                   <tr>

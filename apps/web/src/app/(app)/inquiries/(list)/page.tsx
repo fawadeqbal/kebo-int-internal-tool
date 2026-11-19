@@ -109,7 +109,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
         rowKey={(d) => d.id}
         href={(d) => `/inquiries/${d.id}`}
         select={(d) => ({ id: d.id, label: d.refNo })}
-        tableClassName="min-w-[960px] text-md"
+        tableClassName="text-md"
         empty={{
           icon: MessageSquareText,
           title: narrowed ? `No ${INQUIRY.name.many} match` : `No ${INQUIRY.name.many} yet`,

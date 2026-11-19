@@ -76,7 +76,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
               </>
             }
           />
-          <Table className="min-w-[720px]">
+          <Table>
             <THead>
               <tr>
                 <Th>File</Th>

@@ -545,7 +545,7 @@ export function PriceTotals({
             </label>
           </dt>
           <dd>
-            <PriceInput id={`disc-${opt.key}${sheet ? "-sheet" : ""}`} className="h-8 w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
+            <PriceInput id={`disc-${opt.key}${sheet ? "-sheet" : ""}`} className="w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
           </dd>
         </div>
         <Fig label={s.options.length > 1 ? `Option ${letter} total` : "Total"} strong>
@@ -602,7 +602,7 @@ export function PriceTotals({
                 <dd>
                   <span className="flex items-center gap-1 text-sm font-semibold">
                     −
-                    <PriceInput id={`disc-${opt.key}`} className="h-8 w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
+                    <PriceInput id={`disc-${opt.key}`} className="w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
                   </span>
                 </dd>
               </div>

@@ -101,7 +101,7 @@ export interface FileLine {
 export function FilesTable({ files }: { files: FileLine[] }) {
   const [editing, setEditing] = useState<string | null>(null);
   return (
-    <Table className="min-w-[820px]">
+    <Table>
       <THead>
         <tr>
           <Th>File</Th>

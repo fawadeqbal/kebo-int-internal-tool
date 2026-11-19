@@ -116,7 +116,7 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
             {Number(s.outside) > 0 ? ` (${money(s.outside, c)})` : ""}.
           </p>
           <ScrollFade scrollLabel="Spending, kind by kind" className="overflow-x-auto border-t border-line">
-            <table className="w-full min-w-[560px] border-collapse text-md">
+            <table className="w-full border-collapse text-md">
               <thead>
                 <tr className="bg-surface-2 text-left text-xs text-text-2">
                   <th scope="col" className="px-4 py-2 font-medium">
