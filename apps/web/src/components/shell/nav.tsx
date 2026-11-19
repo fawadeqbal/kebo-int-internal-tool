@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
-import { Avatar, buttonClass, cn, RULES } from "@kebo/ui";
+import { Avatar, buttonClass, cn, RULES, Badge } from "@kebo/ui";
 import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
@@ -208,9 +208,9 @@ function NewMenu({ items }: { items: NewItem[] }) {
 /** A count on a page or a closed group: what waits for this person (payments to verify). */
 function Count({ n, label }: { n: number; label: string }) {
   return (
-    <span className="inline-grid h-[18px] min-w-5 place-items-center rounded-full bg-warn-soft px-1.5 text-2xs font-semibold text-warn tabular" aria-label={`${n} ${label}`}>
+    <Badge size="sm" tone="warn" className="min-w-5 justify-center px-1.5 tabular" aria-label={`${n} ${label}`}>
       {n > 99 ? "99+" : n}
-    </span>
+    </Badge>
   );
 }
 

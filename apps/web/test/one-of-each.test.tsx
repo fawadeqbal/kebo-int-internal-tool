@@ -201,6 +201,13 @@ describe("one of each", () => {
     expect(found(/const bar = "sticky bottom-0/g)).toEqual([]);
   });
 
+  it("no second copy of a shared piece: one window opener, one password form, no hand-made menu counts", () => {
+    expect(found(/export function PanelButton\(/g).filter((m) => !m.includes("orders/step-view.tsx"))).toEqual([]);
+    expect(found(/export function PasswordForm\(/g)).toHaveLength(1);
+    expect(found(/<span className="[^"]*rounded-full bg-warn-soft px-1\.5/g)).toEqual([]);
+    expect(found(/<button[^>]*className="[^"]*rounded-(?:lg|xl)[^"]*(?:border border-line-strong|bg-action-solid)/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

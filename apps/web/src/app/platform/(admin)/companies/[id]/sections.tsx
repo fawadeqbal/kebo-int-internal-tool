@@ -8,7 +8,8 @@ import { RowMenu } from "@/components/common/more-menu";
 import { date, dateTime, money, timeAgo } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
 import type { CompanyDetail, CompanyHistory, LogEntry } from "@/lib/types-platform";
-import { GroupCard, ModulesList, PanelButton } from "./cards";
+import { GroupCard, ModulesList } from "./cards";
+import { OpenPanelButton } from "@/components/common/panel";
 import { attention, daysTo, inDays, modulesOn, paidShare, paidState, sectionHref, storage, type Meaning } from "./model";
 import type { SavedCard } from "./panels";
 
@@ -310,7 +311,7 @@ export function PlanSection({ c, modules, saved }: { c: CompanyDetail; modules: 
           titleId="plan-title"
           title="Plan"
           description="what they pay for, and their limits"
-          actions={live && <PanelButton panel="change-plan">Change plan</PanelButton>}
+          actions={live && <OpenPanelButton size="sm" panel="change-plan">Change plan</OpenPanelButton>}
         />
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-3.5 xl:grid-cols-4">
           {[
@@ -334,8 +335,8 @@ export function PlanSection({ c, modules, saved }: { c: CompanyDetail; modules: 
           description={ends ? `${ends <= new Date() ? "ended" : "ends"} ${dateTime(c.endsAt)}` : "no end date"}
           action={
             <>
-              <PanelButton panel="extend">Extend…</PanelButton>
-              <PanelButton panel="make-real">Make it a client</PanelButton>
+              <OpenPanelButton size="sm" panel="extend">Extend…</OpenPanelButton>
+              <OpenPanelButton size="sm" panel="make-real">Make it a client</OpenPanelButton>
             </>
           }
         >
@@ -387,9 +388,9 @@ export function BillingSection({
         actions={
           client &&
           live && (
-            <PanelButton panel="record-payment">
+            <OpenPanelButton size="sm" panel="record-payment">
               <Plus aria-hidden /> Record payment
-            </PanelButton>
+            </OpenPanelButton>
           )
         }
       />
@@ -404,9 +405,9 @@ export function BillingSection({
                   <>
                     {" "}
                     ·{" "}
-                    <PanelButton panel="paid-until" variant="link" label="Change the paid-until date">
+                    <OpenPanelButton panel="paid-until" variant="link" className="text-xs" label="Change the paid-until date">
                       change
-                    </PanelButton>
+                    </OpenPanelButton>
                   </>
                 )}
               </span>

@@ -5,7 +5,7 @@ import { requestWords } from "@/lib/requests";
 import type { PaymentList } from "@kebo/shared";
 import type { ReactNode } from "react";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote } from "lucide-react";
-import { buildHref, Card, CardBody, CardHeader, LinkTabs, Table, Td, Th, THead, Tr, Notice } from "@kebo/ui";
+import { buildHref, Card, CardBody, CardHeader, LinkTabs, Table, Td, Th, THead, Tr, Notice, buttonClass } from "@kebo/ui";
 import { date, money, companyToday } from "@/lib/format";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -225,7 +225,7 @@ async function OnOrder({
             ))}
           </AutoSelect>
           <noscript>
-            <button className="inline-flex h-9 items-center rounded-lg border border-line-strong px-3 text-sm font-medium hover:bg-surface-2">Continue</button>
+            <button className={buttonClass("secondary", "sm")}>Continue</button>
           </noscript>
         </Form>
       </CardBody>
@@ -255,7 +255,7 @@ async function OnOrder({
                 ))}
             </AutoSelect>
             <noscript>
-              <button className="inline-flex h-9 items-center rounded-lg border border-line-strong px-3 text-sm font-medium hover:bg-surface-2">Continue</button>
+              <button className={buttonClass("secondary", "sm")}>Continue</button>
             </noscript>
           </Form>
         </CardBody>

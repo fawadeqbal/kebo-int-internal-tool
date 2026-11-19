@@ -2,14 +2,11 @@ import type { ComponentProps, ReactNode } from "react";
 import {
   INQUIRY,
   inquiryStateOf,
-  ORDER_STAGE_LABEL,
-  ORDER_STAGE_TONE,
   PRIORITY_LABEL,
   PRIORITY_TONE,
   REVISION_STATUS_LABEL,
   REVISION_STATUS_TONE,
   type InquiryStage,
-  type OrderStage,
   type Priority,
   type RevisionStatus,
   type Tone,
@@ -85,11 +82,6 @@ export const RevisionBadge = ({ status }: { status: RevisionStatus }) => (
   </Badge>
 );
 
-export const OrderStageBadge = ({ stage }: { stage: OrderStage }) => (
-  <Badge tone={ORDER_STAGE_TONE[stage]} dot>
-    {ORDER_STAGE_LABEL[stage]}
-  </Badge>
-);
 
 export const PriorityBadge = ({ priority }: { priority: Priority }) =>
   priority === "normal" ? null : <Badge tone={PRIORITY_TONE[priority]}>{PRIORITY_LABEL[priority]}</Badge>;

@@ -10,7 +10,7 @@ import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { GroupCard } from "@/components/platform/group-card";
 import { CompanyStatusBadge } from "@/components/platform/badges";
 import { deleteLeadAction, giveDemoAction, leadNoteAction, updateLeadAction } from "@/app/platform/actions";
-import { PanelButton } from "../../companies/[id]/cards";
+import { OpenPanelButton } from "@/components/common/panel";
 import { NoteForm } from "./forms";
 import { LeadPanels, ProgressSteps } from "./panels";
 import { cache } from "react";
@@ -100,7 +100,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               badge: <StatusBadge meaning={MEANING[l.status]}>{LEAD_STATUS_LABEL[l.status]}</StatusBadge>,
               summary: summary.join(" · "),
               primary: primary,
-              papers: !company ? <PanelButton panel="give-demo">Give a demo</PanelButton> : undefined,
+              papers: !company ? <OpenPanelButton size="sm" panel="give-demo">Give a demo</OpenPanelButton> : undefined,
               more: (
                 <MoreMenu
         label={`More for ${l.companyName}`}
@@ -220,9 +220,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                   "No follow-up yet"
                 )}{" "}
                 ·{" "}
-                <PanelButton panel="follow-up" variant="link" label={l.followUpOn ? "change the follow-up date" : "set a follow-up date"}>
+                <OpenPanelButton panel="follow-up" variant="link" className="text-xs" label={l.followUpOn ? "change the follow-up date" : "set a follow-up date"}>
                   {l.followUpOn ? "change" : "set a follow-up date"}
-                </PanelButton>
+                </OpenPanelButton>
               </p>
             </div>
           </Card>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { Activity, Building2, ClipboardList, Gauge, Inbox, LogOut, Package, ScrollText, Settings } from "lucide-react";
-import { Avatar, cn, RULES } from "@kebo/ui";
+import { Avatar, cn, RULES, Badge } from "@kebo/ui";
 import { NavMemoryKeeper } from "@kebo/ui/client";
 import { platformLogoutAction } from "@/app/platform/actions";
 
@@ -174,10 +174,10 @@ export function PlatformShell({
                 <n.icon className="size-4" aria-hidden />
                 {n.label}
                 {!!c && "countLabel" in n && (
-                  <span className="rounded-full bg-warn-soft px-1.5 text-2xs font-semibold text-warn tabular">
+                  <Badge size="sm" tone="warn" className="min-w-5 justify-center px-1.5 tabular">
                     {c}
                     <span className="sr-only"> {n.countLabel}</span>
-                  </span>
+                  </Badge>
                 )}
               </Link>
             );
