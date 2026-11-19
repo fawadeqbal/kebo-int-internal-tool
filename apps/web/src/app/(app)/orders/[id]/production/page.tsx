@@ -9,7 +9,7 @@ import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import { FieldsWindow } from "@/components/order-sections/fields-window";
 import { AllReceivedWindow } from "@/components/order-sections/production-windows";
-import { OrderLines, OrderLinesEditor, PhoneLines } from "@/components/orders/order-lines";
+import { OrderLinesEditor, OrderLinesView } from "@/components/orders/order-lines";
 import { PanelButton } from "@/components/orders/step-view";
 import { factoryTestAction, goodsReceivedAction, readyDateAction } from "../../section-actions";
 import { stageData } from "../stage-data";
@@ -255,14 +255,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
           }
           files={<SectionFiles orderId={o.id} section="goods" canAdd={d.canFiles} />}
         >
-          <div className="px-[18px] pb-3.5">
-            <div className="max-md:hidden">
-              <OrderLines set="received" orderId={o.id} lines={goodsLines} canEdit={false} today={now} />
-            </div>
-            <div className="md:hidden">
-              <PhoneLines set="received" lines={goodsLines} />
-            </div>
-          </div>
+          <OrderLinesView set="received" lines={goodsLines} label={`${o.refNo} · goods from the supplier`} />
         </Section>
       )}
     </OrderPage>

@@ -39,17 +39,43 @@ export function ItemsBox({
 }) {
   return (
     <RecordBox {...box}>
-      {rows.length ? (
-        <>
-          <div className="p-3 max-sm:hidden">
-            <LinesView label={label} rows={rows} columns={columns} numbers={numbers} after={after} />
-          </div>
-          <PhoneItems label={label} rows={phone} />
-          {totals && <div className="max-sm:border-t max-sm:border-line">{totals}</div>}
-        </>
-      ) : (
-        <div className="px-5 py-4 text-sm text-muted max-sm:px-4">{empty}</div>
-      )}
+      <ItemsBody label={label} rows={rows} columns={columns} numbers={numbers} after={after} totals={totals} phone={phone} empty={empty} />
     </RecordBox>
+  );
+}
+
+/**
+ * The inside of the items box, for a box that is drawn another way (an order's step box): the lined read-only
+ * sheet on a laptop, the item lines on a phone, the totals under them.
+ */
+export function ItemsBody({
+  label,
+  rows,
+  columns,
+  numbers,
+  after,
+  totals,
+  phone,
+  empty,
+}: {
+  label: string;
+  rows: LineRow[];
+  columns: LineColumn[];
+  numbers: string[];
+  after?: ComponentProps<typeof LinesView>["after"];
+  totals?: ReactNode;
+  phone: ItemsPhoneRow[];
+  empty: ReactNode;
+}) {
+  return rows.length ? (
+    <>
+      <div className="p-3 max-sm:hidden">
+        <LinesView label={label} rows={rows} columns={columns} numbers={numbers} after={after} />
+      </div>
+      <PhoneItems label={label} rows={phone} />
+      {totals && <div className="max-sm:border-t max-sm:border-line">{totals}</div>}
+    </>
+  ) : (
+    <div className="px-5 py-4 text-sm text-muted max-sm:px-4">{empty}</div>
   );
 }

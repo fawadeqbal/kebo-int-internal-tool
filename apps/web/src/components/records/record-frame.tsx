@@ -114,11 +114,12 @@ export function RecordShell({ top, panel, panelLabel, children }: { top: ReactNo
       <div className={cn("mt-4 grid items-start gap-4", withPanel ? RULES.page.withPanel : "grid-cols-[minmax(0,1fr)]")}>
         <div className="flex min-w-0 flex-col gap-4">{children}</div>
         {withPanel && (
-          // On a phone its bar comes first, under the tabs; the panel opens from it.
+          // On a phone its bar comes first, under the tabs; the panel opens from it. On a laptop it is short enough
+          // to stay under the top at the very end of the page too (the copyright line comes after the boxes).
           <aside
             aria-label={panelLabel}
             data-record-panel=""
-            className="flex min-w-0 flex-col gap-4 max-lg:order-first lg:sticky lg:top-[calc(var(--record-top)+16px)] lg:max-h-[calc(100dvh-var(--record-top)-32px)] lg:overflow-y-auto lg:[scrollbar-width:thin]"
+            className="flex min-w-0 flex-col gap-4 max-lg:order-first lg:sticky lg:top-[calc(var(--record-top)+16px)] lg:max-h-[calc(100dvh-var(--record-top)-120px)] lg:overflow-y-auto lg:[scrollbar-width:thin]"
           >
             {panel}
           </aside>

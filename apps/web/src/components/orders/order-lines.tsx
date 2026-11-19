@@ -10,6 +10,7 @@ import { LineTable, type LineColumn, type LineResult, type LineRow, type LineVal
 import { orderLineAction } from "@/app/(app)/orders/actions";
 import { formatDate } from "@kebo/utils";
 import type { OrderLineView } from "@/lib/types-orders";
+import { ItemsBody, type ItemsPhoneRow } from "@/components/records/items-box";
 
 /**
  * The order's lines, kept once, opened by each step with its own columns:
@@ -410,6 +411,42 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
       {body && <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 text-sm">{body}</div>}
       {extra}
     </div>
+  );
+}
+
+/**
+ * A step's lines read only, in the one items box's inside (ItemsBody): the step's columns in the lined sheet on a
+ * laptop, the item lines on a phone (number, name, model, the step's figure), the step's totals under them. Every
+ * step box that shows the order's lines uses it (Goods from the supplier, Items to the supplier, Delivery).
+ */
+export function OrderLinesView({ set, lines, label }: { set: LineSet; lines: OrderLineView[]; label: string }) {
+  const byNo = new Map(lines.map((l) => [l.no, l.id]));
+  const rows: LineRow[] = lines.map((l) => {
+    const top = l.no.includes(".") ? l.no.split(".")[0]! : null;
+    return { key: l.id, parentKey: top ? (byNo.get(top) ?? null) : null, values: valuesOf(l) };
+  });
+  const phone: ItemsPhoneRow[] = lines.map((l) => {
+    const v = valuesOf(l);
+    return {
+      key: l.id,
+      no: l.no,
+      part: l.no.includes("."),
+      title: head(l.description),
+      under: l.model || undefined,
+      sub: phoneLine(set, v),
+      amount: set === "factory" && l.factoryPrice?.currency ? formatMinor(toMinor(l.factoryPrice.unitPrice), l.factoryPrice.currency) : undefined,
+    };
+  });
+  return (
+    <ItemsBody
+      label={label}
+      rows={rows}
+      columns={columnsOf(set).map((c) => (c.key === "description" ? { ...c, width: "minmax(0,1fr)" } : c))}
+      numbers={lines.map((l) => l.no)}
+      phone={phone}
+      totals={<Totals set={set} lines={lines} />}
+      empty="No items on this order."
+    />
   );
 }
 

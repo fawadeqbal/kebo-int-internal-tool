@@ -11,7 +11,7 @@ import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import { FieldsWindow } from "@/components/order-sections/fields-window";
 import { AllDeliveredWindow, ClaimAddWindow, ClaimsTable, SatSignWindow } from "@/components/order-sections/delivery-windows";
-import { OrderLines, OrderLinesEditor, PhoneLines } from "@/components/orders/order-lines";
+import { OrderLinesEditor, OrderLinesView } from "@/components/orders/order-lines";
 import { PanelButton } from "@/components/orders/step-view";
 import { SatEdit } from "@/components/orders/view-panels";
 import { addClaimAction, satAction, updateClaimAction } from "../../flow-actions";
@@ -134,14 +134,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
           files={<SectionFiles orderId={o.id} section="delivery" canAdd={d.canFiles} />}
         >
           {goodsLines.length > 0 && (
-            <div className="px-[18px] pb-3.5">
-              <div className="max-md:hidden">
-                <OrderLines set="delivered" orderId={o.id} lines={goodsLines} canEdit={false} today={now} />
-              </div>
-              <div className="md:hidden">
-                <PhoneLines set="delivered" lines={goodsLines} />
-              </div>
-            </div>
+            <OrderLinesView set="delivered" lines={goodsLines} label={`${o.refNo} · delivered`} />
           )}
         </Section>
       ) : (

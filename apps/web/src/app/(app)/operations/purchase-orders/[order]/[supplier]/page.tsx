@@ -15,7 +15,7 @@ import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import { PayFactoryWindow } from "@/components/order-sections/factory-windows";
 import type { PurchaseOrderView } from "@/components/orders/purchase-order-card";
-import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
+import { OrderLinesView } from "@/components/orders/order-lines";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { CustomerMoneyLine, SupplierPlanTable, supplierPlanWords } from "@/components/order-sections/supplier-plan";
 import { PaymentsList } from "@/components/order-sections/payments-list";
@@ -193,14 +193,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
 
           {lines.length > 0 ? (
             <Section title="Items" state={`${lines.length} item${lines.length === 1 ? "" : "s"}`}>
-              <div className="px-[18px] pb-3.5">
-                <div className="max-md:hidden">
-                  <OrderLines set="factory" orderId={o.id} lines={lines} canEdit={false} today={now} />
-                </div>
-                <div className="md:hidden">
-                  <PhoneLines set="factory" lines={lines} />
-                </div>
-              </div>
+              <OrderLinesView set="factory" lines={lines} label={`${o.refNo} · items to the supplier`} />
             </Section>
           ) : (
             <EmptySection title="Items" text="This supplier's items are on the order." />

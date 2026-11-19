@@ -16,15 +16,37 @@ import { CostsExcel } from "@/components/orders/costs-tables";
 import { costState } from "@/components/orders/cost-words";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
+import { RecordBox } from "@/components/common/record-box";
 
 export const generateMetadata = orderTitle("Costs");
 
 /** One of the four figures at the top. */
-function Figure({ label, value, sub, tone, first }: { label: string; value: string; sub: string; tone?: "ok" | "warn" | "bad"; first?: boolean }) {
+function Figure({
+  label,
+  value,
+  sub,
+  tone,
+  first,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tone?: "ok" | "warn" | "bad";
+  first?: boolean;
+}) {
   return (
     <div className={cn("flex min-w-0 flex-col gap-0.5 px-[18px] py-3.5", !first && "border-line max-sm:border-t sm:border-l")}>
       <span className="text-xs text-text-2">{label}</span>
-      <span className={cn("text-lg font-bold tabular", tone === "ok" && "text-ok", tone === "warn" && "text-warn", tone === "bad" && "text-bad")}>{value}</span>
+      <span
+        className={cn(
+          "text-lg font-bold tabular",
+          tone === "ok" && "text-ok",
+          tone === "warn" && "text-warn",
+          tone === "bad" && "text-bad",
+        )}
+      >
+        {value}
+      </span>
       <span className="text-xs text-text-2">{sub}</span>
     </div>
   );
@@ -63,7 +85,11 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
     ids: r.items.map((x) => x.id),
     since: r.items.reduce((a, x) => (x.spentOn < a ? x.spentOn : a), r.items[0]?.spentOn ?? now),
   }));
-  const fromHref: Partial<Record<CostSheetRow["from"], string>> = { factory: `${base}/factory`, shipment: `${base}/shipping`, payment: `${base}/payment` };
+  const fromHref: Partial<Record<CostSheetRow["from"], string>> = {
+    factory: `${base}/factory`,
+    shipment: `${base}/shipping`,
+    payment: `${base}/payment`,
+  };
 
   /** What can be done on a row: pay or repay what waits, open where it comes from, or change a cost added here. */
   const action = (r: CostSheetRow) => {
@@ -81,9 +107,25 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
             {ORDER_TAB_LABEL.factory} →
           </Link>
         ) : r.state === "to_pay" && e && canEdit ? (
-          <PayCostWindow orderId={o.id} id={e.id} currency={r.currency} sub={[r.owedTo, r.label, money(r.amount, r.currency)].filter(Boolean).join(" · ")} today={now} from={e.spentOn} canFiles={d.canFiles} />
+          <PayCostWindow
+            orderId={o.id}
+            id={e.id}
+            currency={r.currency}
+            sub={[r.owedTo, r.label, money(r.amount, r.currency)].filter(Boolean).join(" · ")}
+            today={now}
+            from={e.spentOn}
+            canFiles={d.canFiles}
+          />
         ) : r.state === "to_repay" && e && canEdit ? (
-          <RepayWindow orderId={o.id} ids={[e.id]} currency={r.currency} name={e.paidBy?.name ?? "them"} amount={money(r.amount, r.currency)} today={now} canFiles={d.canFiles} />
+          <RepayWindow
+            orderId={o.id}
+            ids={[e.id]}
+            currency={r.currency}
+            name={e.paidBy?.name ?? "them"}
+            amount={money(r.amount, r.currency)}
+            today={now}
+            canFiles={d.canFiles}
+          />
         ) : (
           <Badge tone={r.state === "paid" ? "ok" : r.state === "estimate" ? "neutral" : "warn"}>{costState(r)}</Badge>
         )}
@@ -94,20 +136,40 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
 
   return (
     <OrderPage id={id}>
-      <section aria-label="Costs at a glance" className="grid min-w-0 overflow-hidden rounded-xl border border-line bg-surface shadow-card sm:grid-cols-2 xl:grid-cols-4">
-        <Figure first label="Order total" value={whole(o.total, o.currency)} sub={Number(o.money.due) <= 0 ? "received in full" : `${whole(o.money.received, o.currency)} received`} />
-        {sheet.costs !== null && sheet.profit !== null ? (
-          <>
-            <Figure label="Costs so far" value={whole(sheet.costs, c)} sub={`${known} cost${known === 1 ? "" : "s"} known`} />
-            <Figure label="Paid so far" value={whole(sheet.paid ?? 0, c)} sub={toPay > 0 ? `${whole(toPay, c)} still to pay` : "nothing waiting"} tone={toPay > 0 ? "warn" : undefined} />
-            <Figure label="Profit now" value={whole(sheet.profit, c)} sub={sheet.margin !== null ? `${sheet.margin.toFixed(1)}% of the order` : "—"} tone={Number(sheet.profit) < 0 ? "bad" : "ok"} />
-          </>
-        ) : (
-          <Figure label="Costs so far" value="—" sub={`no rate for ${costs.missingRate ?? c}`} />
-        )}
-      </section>
+      {/* The four figures in a record box like every other part of the order. */}
+      <RecordBox title="Profit on this order" what="the profit" canEdit={false}>
+        <div className="grid min-w-0 sm:grid-cols-2 xl:grid-cols-4">
+          <Figure
+            first
+            label="Order total"
+            value={whole(o.total, o.currency)}
+            sub={Number(o.money.due) <= 0 ? "received in full" : `${whole(o.money.received, o.currency)} received`}
+          />
+          {sheet.costs !== null && sheet.profit !== null ? (
+            <>
+              <Figure label="Costs so far" value={whole(sheet.costs, c)} sub={`${known} cost${known === 1 ? "" : "s"} known`} />
+              <Figure
+                label="Paid so far"
+                value={whole(sheet.paid ?? 0, c)}
+                sub={toPay > 0 ? `${whole(toPay, c)} still to pay` : "nothing waiting"}
+                tone={toPay > 0 ? "warn" : undefined}
+              />
+              <Figure
+                label="Profit now"
+                value={whole(sheet.profit, c)}
+                sub={sheet.margin !== null ? `${sheet.margin.toFixed(1)}% of the order` : "—"}
+                tone={Number(sheet.profit) < 0 ? "bad" : "ok"}
+              />
+            </>
+          ) : (
+            <Figure label="Costs so far" value="—" sub={`no rate for ${costs.missingRate ?? c}`} />
+          )}
+        </div>
+      </RecordBox>
 
-      {costs.missingRate && <Alert tone="warning">There is no exchange rate for {costs.missingRate} in Settings, so the costs cannot be added up in it.</Alert>}
+      {costs.missingRate && (
+        <Alert tone="warning">There is no exchange rate for {costs.missingRate} in Settings, so the costs cannot be added up in it.</Alert>
+      )}
 
       <Section
         id="costs"
@@ -139,7 +201,9 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
           />
         )}
         {Number(sheet.uncosted) > 0 && (
-          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">{money(sheet.uncosted, c)} of the order is on items without a cost: left out of the profit.</p>
+          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">
+            {money(sheet.uncosted, c)} of the order is on items without a cost: left out of the profit.
+          </p>
         )}
       </Section>
 
@@ -154,8 +218,8 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
           }
         >
           <p className="border-t border-line px-[18px] pt-2.5 text-xs text-text-2">
-            {dealSpent[0]?.deal ? `From ${dealSpent[0].deal.refNo}. ` : ""}Not in Profit now, which stays the number the Orders list and Reports use. It counts on{" "}
-            {o.customer.name} after all costs.
+            {dealSpent[0]?.deal ? `From ${dealSpent[0].deal.refNo}. ` : ""}Not in Profit now, which stays the number the Orders list and
+            Reports use. It counts on {o.customer.name} after all costs.
           </p>
           <ul className="flex flex-col divide-y divide-line px-[18px]">
             {dealSpent.map((e) => {
