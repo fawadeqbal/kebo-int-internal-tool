@@ -1,11 +1,16 @@
 import type { ComponentProps } from "react";
-import { cn, controlClass } from "@kebo/ui";
+import { cn, controlClass, controlSizes, type ControlSize } from "@kebo/ui";
 
 /**
  * An amount box that always shows its currency (USD, CNY, PKR) inside it, so
  * nobody types a number without seeing which money it is.
  */
-export function MoneyInput({ currency, className, ...props }: Omit<ComponentProps<"input">, "type"> & { currency: string }) {
+export function MoneyInput({
+  currency,
+  size = "md",
+  className,
+  ...props
+}: Omit<ComponentProps<"input">, "type" | "size"> & { currency: string; size?: ControlSize }) {
   return (
     <div className="relative">
       <span
@@ -14,7 +19,7 @@ export function MoneyInput({ currency, className, ...props }: Omit<ComponentProp
       >
         {currency || "—"}
       </span>
-      <input inputMode="decimal" autoComplete="off" className={cn(controlClass, "h-9 pl-12 tabular", className)} {...props} />
+      <input inputMode="decimal" autoComplete="off" className={cn(controlClass, controlSizes[size], "pl-12 tabular", className)} {...props} />
     </div>
   );
 }

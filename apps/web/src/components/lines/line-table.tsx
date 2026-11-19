@@ -1589,12 +1589,12 @@ export function LineTable({
           {rows.length > 8 && (
             <div className="relative min-w-0 flex-1 basis-36">
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
-              <Input
+              <Input size="sm"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={`Find in ${rows.length} ${noun}s…`}
                 aria-label={`Find ${an(noun)}`}
-                className="h-8 pl-8"
+                className="pl-8"
                 onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
               />
             </div>

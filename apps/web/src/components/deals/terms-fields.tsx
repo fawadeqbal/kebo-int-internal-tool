@@ -219,11 +219,11 @@ export function PartsField({
                   />
                 </Field>
                 <Field label="Share" htmlFor={fid(r, "share")}>
-                  <div className="relative">
-                    <Input
+                  <Input
                       id={fid(r, "share")}
                       inputMode="decimal"
-                      className="pr-7 tabular"
+                      unit="%"
+                      className="tabular"
                       value={r.share}
                       onChange={(e) => {
                         const share = e.target.value;
@@ -231,10 +231,6 @@ export function PartsField({
                         set(r.key, { share, label: relabel(r.label, Number.isFinite(v) ? String(v) : "") });
                       }}
                     />
-                    <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted">
-                      %
-                    </span>
-                  </div>
                 </Field>
                 <Field label="When" htmlFor={fid(r, "rule")}>
                   <Select

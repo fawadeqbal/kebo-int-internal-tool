@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Mail, MessageCircle, RefreshCw, X } from "lucide-react";
 import { FLOW_STEP_LABEL, inSentence, type PaperCheck } from "@kebo/shared";
-import { Alert, Badge, Button, buttonClass, Card, Checkbox, cn, Input } from "@kebo/ui";
+import { Alert, Badge, Button, buttonClass, Card, Checkbox, cn, Input, controlClass, controlSizes } from "@kebo/ui";
 import { FileActions } from "@/components/common/file-actions";
 import type { ActionState } from "@/lib/actions";
 import type { PaperChecks } from "@/lib/types-papers";
@@ -102,7 +102,7 @@ function CheckRow({
               type={fix.type}
               value={v}
               onChange={(e) => setV(e.target.value)}
-              className="h-8 w-36 min-w-0 rounded-md border-[1.5px] border-primary/60 bg-surface px-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+              className={cn(controlClass, controlSizes.sm, "w-36 min-w-0 border-primary/60")}
             />
             {v.trim() && (
               <Button type="submit" size="xs" variant="secondary" disabled={pending}>
@@ -147,7 +147,7 @@ function CheckRow({
                   value={hs[l.id] ?? ""}
                   onChange={(e) => setHs((x) => ({ ...x, [l.id]: e.target.value }))}
                   inputMode="decimal"
-                  className="h-7 w-28 rounded-md border border-line-strong bg-surface px-2 text-xs focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                  className={cn(controlClass, controlSizes.sm, "w-28 tabular")}
                 />
                 {hs[l.id]?.trim() && (
                   <Button type="submit" size="xs" variant="secondary" disabled={pending}>

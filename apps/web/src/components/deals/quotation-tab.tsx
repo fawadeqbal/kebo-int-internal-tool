@@ -227,7 +227,7 @@ function NewQuotationsForm({
                   <Input id="nq-valid" name="validUntil" type="date" defaultValue={s.values?.validUntil ?? defaults.validUntil} />
                 </Field>
                 <Field label="Margin" htmlFor="nq-margin" error={s.errors?.margin ?? (marginOk ? undefined : "From 0 up to 99.9%")}>
-                  <Input id="nq-margin" name="margin" inputMode="decimal" value={margin} onChange={(e) => setMargin(e.target.value)} />
+                  <Input id="nq-margin" name="margin" inputMode="decimal" unit="%" value={margin} onChange={(e) => setMargin(e.target.value)} />
                 </Field>
               </div>
               {rows.length > 0 && (

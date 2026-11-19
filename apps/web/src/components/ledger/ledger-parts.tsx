@@ -119,7 +119,7 @@ export function LedgerFilters({
         {removedChip
           ? !removed && <input type="hidden" name="removed" value="0" />
           : sp.removed && <input type="hidden" name="removed" value={sp.removed} />}
-        <AutoSelect name="period" defaultValue={period.key === "custom" ? "" : period.key} aria-label="Period" className="w-auto">
+        <AutoSelect size="sm" name="period" defaultValue={period.key === "custom" ? "" : period.key} aria-label="Period" className="w-auto">
           {period.key === "custom" && <option value="">{period.label}</option>}
           {PERIODS.map((p) => (
             <option key={p.key} value={p.key}>
@@ -128,7 +128,7 @@ export function LedgerFilters({
           ))}
         </AutoSelect>
         {types && (
-          <AutoSelect name="type" defaultValue={sp.type ?? ""} aria-label="Type" className="w-auto">
+          <AutoSelect size="sm" name="type" defaultValue={sp.type ?? ""} aria-label="Type" className="w-auto">
             <option value="">All types</option>
             {LEDGER_ENTRY_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -137,7 +137,7 @@ export function LedgerFilters({
             ))}
           </AutoSelect>
         )}
-        <AutoSelect name="cur" defaultValue={sp.cur ?? ""} aria-label="Currency" className="w-auto">
+        <AutoSelect size="sm" name="cur" defaultValue={sp.cur ?? ""} aria-label="Currency" className="w-auto">
           <option value="">All currencies</option>
           {CURRENCIES.map((c) => (
             <option key={c} value={c}>

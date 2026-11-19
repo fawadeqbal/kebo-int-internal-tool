@@ -1,3 +1,4 @@
+import { AutoSelect } from "@kebo/ui/client";
 import Form from "next/form";
 import { redirect } from "next/navigation";
 import { requestWords } from "@/lib/requests";
@@ -5,7 +6,6 @@ import type { PaymentList } from "@kebo/shared";
 import type { ReactNode } from "react";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote } from "lucide-react";
 import { Alert, buildHref, Card, CardBody, CardHeader, LinkTabs, Table, Td, Th, THead, Tr } from "@kebo/ui";
-import { AutoSelect } from "@/components/common/auto-select";
 import { date, money, companyToday } from "@/lib/format";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";

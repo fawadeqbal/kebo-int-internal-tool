@@ -795,11 +795,11 @@ export function DealForm({
                       ])
                     }
                     kind={
-                      <Select
+                      <Select size="sm"
                         aria-label="What kind of file"
                         value={kindNext}
                         onChange={(e) => setKindNext(e.target.value as AttachmentKind)}
-                        className="h-[34px] w-auto text-md"
+                        className="w-auto text-md"
                       >
                         {NEW_KINDS.map((k) => (
                           <option key={k} value={k}>
@@ -1084,12 +1084,12 @@ function KindSelect({
   className?: string;
 }) {
   return (
-    <Select
+    <Select size="sm"
       aria-label={`What kind of file is ${f.file.name}`}
       value={f.kind}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as AttachmentKind)}
-      className={cn("h-8 w-auto text-md", className)}
+      className={cn("w-auto text-md", className)}
     >
       {NEW_KINDS.map((k) => (
         <option key={k} value={k}>

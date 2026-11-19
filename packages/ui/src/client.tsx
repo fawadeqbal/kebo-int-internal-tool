@@ -231,6 +231,7 @@ export function Toast() {
 }
 
 /** A filter select that applies itself as soon as it changes. */
+/** A select that sends its form as soon as a choice is made: no Continue button. The one AutoSelect (size like Select). */
 export function AutoSelect(props: ComponentProps<typeof Select>) {
-  return <Select compact {...props} onChange={(e) => e.currentTarget.form?.requestSubmit()} />;
+  return <Select {...props} onChange={(e) => e.currentTarget.form?.requestSubmit()} />;
 }
