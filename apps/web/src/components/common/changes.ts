@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 type FieldEl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 
@@ -83,3 +83,43 @@ export const watchChanges = (c: { focus: () => void; begin: () => void; filled: 
   onInputCapture: c.filled,
   onChangeCapture: c.filled,
 });
+
+/** Each named field's value now (name → value), read the way `fieldValues` reads them. */
+export function valuesByName(box: HTMLElement): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const part of fieldValues(box).split("\u0002")) {
+    if (!part) continue;
+    const [name, value = ""] = part.split("\u0001");
+    if (!name) continue;
+    // A radio group or several ticks under one name: their values together.
+    out.set(name, out.has(name) ? `${out.get(name)}|${value}` : value);
+  }
+  return out;
+}
+
+/**
+ * How many of a window's fields differ from what it opened with, as it is typed (canvas board "One edit window":
+ * "Save 2 changes", or "No changes"): the start is taken once the window is drawn; `recount` after each input
+ * (a moment later, so values that follow a field — a hidden one kept in state — are counted too).
+ */
+export function useChangeCount(box: RefObject<HTMLElement | null>) {
+  const start = useRef<Map<string, string> | null>(null);
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (box.current) start.current = valuesByName(box.current);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [box]);
+  const recount = useCallback(() => {
+    setTimeout(() => {
+      if (!box.current || !start.current) return;
+      const now = valuesByName(box.current);
+      const was = start.current;
+      let n = 0;
+      for (const k of new Set([...was.keys(), ...now.keys()])) if ((was.get(k) ?? "").trim() !== (now.get(k) ?? "").trim()) n += 1;
+      setCount(n);
+    }, 0);
+  }, [box]);
+  return { count, recount };
+}
