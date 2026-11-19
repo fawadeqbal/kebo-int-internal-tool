@@ -6,15 +6,7 @@ import { LIFECYCLE } from "@kebo/shared";
 import { Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import {
-  PANEL_FORM,
-  PanelActions,
-  PanelBody,
-  PanelKeys,
-  PanelSection,
-  SidePanel,
-  useSidePanel,
-} from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { CompanyDetail, Plan } from "@/lib/types-platform";
 import { CopyLink } from "./forms";
@@ -102,12 +94,12 @@ function PanelForm({
             </p>
           )}
           {children(s)}
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton variant={danger ? "danger" : "primary"} pendingText="Saving…">
               {submit}
             </SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>

@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { OrderSection } from "@kebo/shared";
-import { cn } from "@kebo/ui";
+import { cn, RULES } from "@kebo/ui";
 import { SidePanel, WhatHappens } from "@/components/common/panel";
 import { FieldsForm, type DetailField } from "@/components/orders/step-view";
 import type { ActionState } from "@/lib/actions";
@@ -53,7 +53,7 @@ export function FieldsWindow({
     <>
       <WindowOpener button={button} disabled={disabled} onClick={() => setOpen(true)} />
       {open && (
-        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && "md:w-[480px]", size === "md" && "md:w-[600px]")}>
+        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && RULES.window.part, size === "md" && RULES.window.part)}>
           <FieldsForm
             action={action}
             fields={fields}

@@ -6,7 +6,7 @@ import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
 import { useFeature } from "@/components/common/features";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import { SwitchList } from "@/components/common/switch-list";
 import type { ActionState } from "@/lib/actions";
 import { ColoursCard } from "./colours";
@@ -238,10 +238,10 @@ function CardForm({
               ),
             )}
           </PanelSection>
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton pendingText="Saving…">Save</SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>

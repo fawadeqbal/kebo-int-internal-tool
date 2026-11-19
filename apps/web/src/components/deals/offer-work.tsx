@@ -1085,7 +1085,7 @@ export function AddOfferButton({
           key={round}
           title="New supplier offer"
           description={refNo ? `For ${[refNo, inquiryTitle].filter(Boolean).join(" · ")}` : "Internal, never shown to the customer."}
-          className="md:w-[1180px]"
+          className={RULES.window.items}
           onClose={() => setOpen(false)}
         >
           <OfferWindow

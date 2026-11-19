@@ -6,7 +6,7 @@ import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import { changeAddressAction, checkAddressAction } from "./actions";
 import type { AddressView } from "./types";
 
@@ -106,12 +106,12 @@ export function AddressForm({ view, disabled, onSaved }: { view: AddressView; di
           keep working), and only then becomes free for others. The address can change again after 30 days.
         </Notice>
       )}
-      <PanelActions>
+      <WindowFooter>
         <SubmitButton pendingText="Changing…" disabled={disabled || !free}>
           Change the address
         </SubmitButton>
         <PanelKeys />
-      </PanelActions>
+      </WindowFooter>
     </ActionForm>
   );
 }

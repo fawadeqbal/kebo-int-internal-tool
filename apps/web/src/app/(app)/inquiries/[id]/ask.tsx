@@ -1,3 +1,4 @@
+import { RULES } from "@kebo/ui";
 import { Factory, Send } from "lucide-react";
 import { can } from "@kebo/shared";
 import { api } from "@/lib/api";
@@ -38,7 +39,7 @@ export async function askFactories(d: DealDetail, me: Me, variant: "ghost" | "se
         label={opts.label ?? "Ask suppliers"}
         title="Ask suppliers for prices"
         description={`${d.refNo} · ${d.title}. Each supplier gets its own request you can follow.`}
-        panelClassName="md:w-[820px]"
+        panelClassName={RULES.window.wideRows}
         body={<AskWindow data={requests} ask={askFactoriesAction.bind(null, d.id)} message={message} excelHref={excel ? `/sheets/export/factory-list?id=${d.id}` : null} today={today()} />}
       />
     ),

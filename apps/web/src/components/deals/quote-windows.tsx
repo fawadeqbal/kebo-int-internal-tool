@@ -1,7 +1,7 @@
 "use client";
+import { RULES } from "@kebo/ui";
 
-import type { ReactNode } from "react";
-import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PanelBody, UrlWindow } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import { QuoteStepsPanel, TermsPanel } from "./quotation-step";
@@ -12,28 +12,6 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
  * A window kept in the address (?panel=name), so an action in ⋯ can open it (canvas board "Actions: one list per
  * record type"): Back closes it, a link opens it again.
  */
-export function UrlWindow({
-  name,
-  title,
-  description,
-  className,
-  children,
-}: {
-  name: string;
-  title: string;
-  description?: ReactNode;
-  className?: string;
-  children: ReactNode;
-}) {
-  const panel = useSidePanel(name);
-  if (!panel.open) return null;
-  return (
-    <SidePanel title={title} description={description} onClose={() => panel.close()} className={className}>
-      {children}
-    </SidePanel>
-  );
-}
-
 /** "Edit all" from ⋯ on a draft: the quotation's steps (Prices · Delivery · Payment · Warranty & conditions), one Save. */
 export function EditAllWindow({
   quoteRef,
@@ -48,7 +26,7 @@ export function EditAllWindow({
   action: Action;
 }) {
   return (
-    <UrlWindow name="edit-quote" title={`Edit · ${quoteRef}`} description="Draft" className="md:w-[1180px]">
+    <UrlWindow name="edit-quote" title={`Edit · ${quoteRef}`} description="Draft" className={RULES.window.items}>
       <QuoteStepsPanel {...editor} step="lines" />
     </UrlWindow>
   );
@@ -75,7 +53,7 @@ export function NewRevisionWindow({
 }) {
   if (!draft || !offers)
     return (
-      <UrlWindow name="new-revision" title="New revision" className="md:w-[560px]">
+      <UrlWindow name="new-revision" title="New revision" className={RULES.window.part}>
         <PanelBody>
           <p className="text-sm text-text-2">{whyNot ?? "A new revision cannot start yet."}</p>
         </PanelBody>
@@ -86,7 +64,7 @@ export function NewRevisionWindow({
       name="new-revision"
       title={`New quotation R${draft.number}`}
       description={`Starts as a copy of R${draft.number - 1}. Change what is different, then save the draft.`}
-      className="md:w-[860px]"
+      className={RULES.window.wideRows}
     >
       <TermsPanel
         number={draft.number}

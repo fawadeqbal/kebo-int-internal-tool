@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Paperclip, Trash2, Upload, X } from "lucide-react";
 import { Button, buttonClass, cn, Field, Notice } from "@kebo/ui";
+import { toast } from "@kebo/ui/client";
 import { saveThenSend } from "@kebo/utils";
 import type { ActionState } from "@/lib/actions";
 import type { AttachedFileInfo } from "@/lib/types-money";
@@ -70,7 +71,7 @@ export function useSaveThenSend(
       if (r.fileError) {
         const message = `${what}, but its file was not: ${r.fileError} Open it to add the file again.`;
         if (mounted.current && hear.current) hear.current(message);
-        else window.alert(message);
+        else toast({ message, kind: "fail" });
       }
     }
     return r;

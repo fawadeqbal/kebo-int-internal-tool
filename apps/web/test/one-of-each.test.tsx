@@ -113,6 +113,14 @@ describe("one of each", () => {
     expect(found(/<h3 className="text-lead font-semibold">\{title\}<\/h3>/g)).toEqual([]);
   });
 
+  it("one window: three widths, the app's own confirm, one footer, one UrlWindow", () => {
+    // Widths are RULES.window (part 640 · wideRows 720 · items 1180); the bottom sheet is not a window.
+    expect(found(/md:w-\[\d+px\]/g).filter((m) => !m.includes("bottom-sheet.tsx") && !m.includes("rules.ts"))).toEqual([]);
+    expect(found(/\b(?:window\.)?(?:confirm|alert)\((?!\))/g).filter((m) => !m.includes("website-form/card.tsx"))).toEqual([]);
+    expect(found(/<(PanelActions|PanelFooter)\b|function (PanelActions|PanelFooter)\(/g)).toEqual([]);
+    expect(found(/function UrlWindow\(/g)).toHaveLength(1);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

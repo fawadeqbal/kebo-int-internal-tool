@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Button, Card, CardBody, CardHeader, cn } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, cn, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -327,7 +327,7 @@ export function PackingCard({
             title="Edit packing list"
             description="Packed in, packages, weights and volume of each line. Nothing is saved until Save changes."
             onClose={closeEditor}
-            className="md:w-[1180px]"
+            className={RULES.window.items}
           >
             <OrderLinesEditor set="packing" orderId={orderId} lines={lines} today={today} edit={ref("lines.packing")} card={edits?.cards["lines.packing"]} />
           </SidePanel>

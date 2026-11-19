@@ -2,8 +2,8 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice } from "@kebo/ui";
-import { OpenPanelButton, PanelActions, PanelBody, PanelSection, SidePanel, useClosePanel } from "@/components/common/panel";
+import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice, RULES } from "@kebo/ui";
+import { OpenPanelButton, PanelBody, PanelSection, SidePanel, useClosePanel, WindowFooter } from "@/components/common/panel";
 import { EditButton } from "@/components/common/edit-button";
 import { EditsChip, editedMark } from "@/components/edits/edits";
 import { useEditSave } from "@/components/edits/use-edit-save";
@@ -23,17 +23,6 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 export const dayLabel = (iso: string | null | undefined, style: TimeStyle = timeStyle()) => (iso ? formatDate(iso, style) : "");
 
 /* ---------------------------------------------------------------- the side panel (common/panel) */
-
-function PanelFooter({ save = "Save", busy, note, disabled }: { save?: string; busy?: boolean; note?: ReactNode; disabled?: boolean }) {
-  return (
-    <PanelActions>
-      <Button type="submit" size="sm" disabled={busy || disabled} aria-busy={busy}>
-        {busy ? "Saving…" : save}
-      </Button>
-      <span className="text-xs text-muted">{note ?? "Changes show in the step’s Changes."}</span>
-    </PanelActions>
-  );
-}
 
 /* ---------------------------------------------------------------- fields */
 
@@ -237,7 +226,11 @@ export function FieldsForm({
           </PanelSection>
         ))}
         {extra}
-        <PanelFooter save={saveWords} busy={saver.busy} disabled={counting && changed.length === 0} note={note ?? (card?.first ? "Changing a saved value asks why." : undefined)} />
+        <WindowFooter note={note ?? (card?.first ? "Changing a saved value asks why." : "Changes show in the step’s Changes.")}>
+          <Button type="submit" variant="strong" disabled={saver.busy || (counting && changed.length === 0)} aria-busy={saver.busy}>
+            {saver.busy ? "Saving…" : (saveWords ?? "Save")}
+          </Button>
+        </WindowFooter>
       </PanelBody>
       {saver.dialog}
     </form>
@@ -535,7 +528,7 @@ export function LinesCard({
           title={panelTitle ?? `Edit ${name.toLowerCase().startsWith("lines") ? name.toLowerCase() : name}`}
           description={panelDescription}
           onClose={close}
-          className="md:w-[1180px]"
+          className={RULES.window.items}
         >
           {edit}
         </SidePanel>
@@ -563,7 +556,7 @@ export function PanelButton({
   title: string;
   description?: string;
   body: ReactNode;
-  /** The window's own width and such (md:w-[820px]). */
+  /** The window's width: one of RULES.window (part 640, wideRows 720, items 1180). */
   panelClassName?: string;
   variant?: ButtonVariant;
   size?: ButtonSize;

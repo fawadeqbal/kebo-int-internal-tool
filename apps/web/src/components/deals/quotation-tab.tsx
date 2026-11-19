@@ -6,10 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { Check, Plus } from "lucide-react";
 import { fromMinor, priceForMargin, toMinor } from "@kebo/money";
 import { CURRENCIES, LOST_REASON_LABEL, LOST_REASONS, quotationLetter, type PaymentRoute } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelBody, PanelFooter, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, SidePanel, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { date, money } from "@/lib/format";
 import type { OptionView, QuoteOffers } from "@/lib/types-deals";
@@ -68,7 +68,7 @@ export function NewQuotationsButton({
         <Plus aria-hidden /> {label}
       </Button>
       {open && (
-        <SidePanel title="New quotations" description="Each offer ticked becomes its own draft." onClose={close} className="md:w-[860px]">
+        <SidePanel title="New quotations" description="Each offer ticked becomes its own draft." onClose={close} className={RULES.window.wideRows}>
           <NewQuotationsForm action={action} first={first} loadOffers={loadOffers} defaults={defaults} usedIn={usedIn} letters={letters} base={base} only={only} />
         </SidePanel>
       )}
@@ -267,11 +267,11 @@ function NewQuotationsForm({
               )}
             </fieldset>
 
-            <PanelFooter>
+            <WindowFooter>
               <SubmitButton pendingText="Making…" disabled={!ticked.length || !marginOk}>
                 <Check aria-hidden /> {ticked.length === 1 ? "Make the draft" : `Make ${ticked.length || ""} drafts`}
               </SubmitButton>
-            </PanelFooter>
+            </WindowFooter>
           </>
         )}
       </ActionForm>
@@ -331,7 +331,7 @@ export function AnswerButton({
         Customer answered
       </Button>
       {open && (
-        <SidePanel title={`Customer answered · ${refNo} R${number}`} description={customer} onClose={() => setOpen(false)} className="md:w-[760px]">
+        <SidePanel title={`Customer answered · ${refNo} R${number}`} description={customer} onClose={() => setOpen(false)} className={RULES.window.wideRows}>
           <ChoiceChips
             label="Their answer"
             className="px-6 pt-4 max-md:px-4"
@@ -395,11 +395,11 @@ function SaidNoForm({ action, today, number, othersWaiting }: { action: Action; 
                 ),
               ]}
             />
-            <PanelFooter>
+            <WindowFooter>
               <SubmitButton variant={closeDeal ? "danger" : "primary"} pendingText="Saving…">
                 {closeDeal ? "Mark as lost" : `Mark R${number} rejected`}
               </SubmitButton>
-            </PanelFooter>
+            </WindowFooter>
           </>
         )}
       </ActionForm>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Badge, RULES } from "@kebo/ui";
 import { getPeople } from "@/lib/loaders";
 import { date } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
@@ -82,7 +82,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
       label="Edit items"
       title="Delivery"
       description="How many of each item reached the customer, and in what condition. Nothing is saved until Save changes."
-      panelClassName="md:w-[1180px]"
+      panelClassName={RULES.window.items}
       body={<OrderLinesEditor set="delivered" orderId={o.id} lines={goodsLines} today={now} edit={{ type: "order", id: o.id, card: "lines.delivered" }} card={edits.cards["lines.delivered"]} />}
     />
   );

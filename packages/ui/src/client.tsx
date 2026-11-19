@@ -28,24 +28,6 @@ export function SubmitButton({
   );
 }
 
-/** Submit button that asks for confirmation first (for destructive or irreversible actions). */
-export function ConfirmSubmit({
-  message,
-  children,
-  ...props
-}: ComponentProps<typeof SubmitButton> & { message: string }) {
-  return (
-    <SubmitButton
-      {...props}
-      onClick={(e) => {
-        if (!window.confirm(message)) e.preventDefault();
-      }}
-    >
-      {children}
-    </SubmitButton>
-  );
-}
-
 /* ---------------------------------------------------------------- Toast */
 
 /**

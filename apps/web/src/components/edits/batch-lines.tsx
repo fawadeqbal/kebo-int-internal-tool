@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { lineNumbers } from "@kebo/shared";
 import { Button, Notice } from "@kebo/ui";
-import { PanelActions, PanelBody, useReportDirty } from "@/components/common/panel";
+import { PanelBody, useReportDirty, WindowFooter } from "@/components/common/panel";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineTableProps, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { insertLines, moveLine, removeLine } from "@/components/lines/local-lines";
 import type { EditCard, EditRef } from "@/lib/types-edits";
@@ -259,7 +259,7 @@ export function BatchLines({
       <LineTable rows={rows} columns={columns} {...table} {...local} fill={fill} footer={footer?.(rows)} />
       {below}
       {error && <Notice tone="bad">{error}</Notice>}
-      <PanelActions>
+      <WindowFooter>
         <Button
           size="sm"
           disabled={!dirty || busy}
@@ -274,7 +274,7 @@ export function BatchLines({
           {count ? `${count} change${count === 1 ? "" : "s"} not saved yet${askWhy ? " · Save asks why" : ""}` : "Nothing changed yet"}
         </span>
         {note && <span className="text-xs text-muted max-md:hidden">{note}</span>}
-      </PanelActions>
+      </WindowFooter>
       {dialog}
     </PanelBody>
   );

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mail, Printer } from "lucide-react";
 import { can, PAYMENT_METHOD_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
-import { ButtonLink, RefCode } from "@kebo/ui";
+import { ButtonLink, RefCode, RULES } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf } from "@/lib/order-data";
@@ -355,7 +355,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                         .filter(Boolean)
                         .join(" · ") || undefined
                     }
-                    panelClassName="md:w-[760px]"
+                    panelClassName={RULES.window.wideRows}
                     body={
                       <SendForm
                         action={sendPurchaseOrderAction.bind(null, o.id, po.id)}

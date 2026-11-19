@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@kebo/ui";
-import { SidePanel, PanelBody, useSidePanel } from "./panel";
+import { PanelBody, UrlWindow } from "./panel";
 
 export interface RecordNavItem {
   /** The RecordSection's id. */
@@ -95,11 +95,9 @@ export function RecordLanding({ section, clearParam = "saved" }: { section?: str
  * every change with who, when, old → new and the reason when one was asked.
  */
 export function HistoryPanel({ title, children }: { title: string; children: ReactNode }) {
-  const panel = useSidePanel("history");
-  if (!panel.open) return null;
   return (
-    <SidePanel title={title} description="Every change, newest first, with the reason when one was asked." onClose={() => panel.close()}>
+    <UrlWindow name="history" title={title} description="Every change, newest first, with the reason when one was asked.">
       <PanelBody>{children}</PanelBody>
-    </SidePanel>
+    </UrlWindow>
   );
 }

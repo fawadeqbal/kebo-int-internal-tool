@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { useConfirmSubmit } from "@/components/common/dialog";
 import { useRouter } from "next/navigation";
 import { Download, Eye, Trash2 } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, type AttachmentKind } from "@kebo/shared";
@@ -100,7 +101,9 @@ export interface FileLine {
 /** The inquiry's own files: a click on the kind or note changes them. */
 export function FilesTable({ files }: { files: FileLine[] }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const { onClick: confirmSubmit, dialog } = useConfirmSubmit();
   return (
+    <>
     <Table>
       <THead>
         <tr>
@@ -154,7 +157,7 @@ export function FilesTable({ files }: { files: FileLine[] }) {
                           className={buttonClass("ghost", "icon-sm")}
                           aria-label={`Remove ${f.fileName}`}
                           title="Remove"
-                          onClick={(e) => !confirm(`Remove ${f.fileName}?`) && e.preventDefault()}
+                          onClick={confirmSubmit({ question: `Remove ${f.fileName}?`, confirmLabel: "Remove", danger: true })}
                         >
                           <Trash2 aria-hidden />
                         </button>
@@ -190,5 +193,7 @@ export function FilesTable({ files }: { files: FileLine[] }) {
         })}
       </tbody>
     </Table>
+    {dialog}
+    </>
   );
 }

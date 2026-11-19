@@ -4,7 +4,8 @@ import { useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea, Notice } from "@kebo/ui";
 import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
-import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
+import { SubmitButton } from "@kebo/ui/client";
+import { ConfirmSubmit } from "@/components/common/dialog";
 import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -53,7 +54,7 @@ export function StageActions({
   const backLink = back && (
     <ActionForm action={action} showSuccess={false} className="inline-flex flex-col items-start">
       <input type="hidden" name="to" value={back.to} />
-      <ConfirmSubmit variant="ghost" size="sm" pendingText="Moving…" message={`${back.label}? Use this only if the order was moved by mistake.`} className="text-muted">
+      <ConfirmSubmit confirmLabel={back.label} variant="ghost" size="sm" pendingText="Moving…" message={`${back.label}? Use this only if the order was moved by mistake.`} className="text-muted">
         <ArrowLeft aria-hidden /> {back.label}
       </ConfirmSubmit>
     </ActionForm>

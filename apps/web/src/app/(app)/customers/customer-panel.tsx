@@ -1,4 +1,5 @@
 "use client";
+import { RULES } from "@kebo/ui";
 
 import { useRouter } from "next/navigation";
 import { toast } from "@kebo/ui/client";
@@ -60,7 +61,7 @@ export function CustomerPanel({
         customer ? "Removing a contact keeps them on past inquiries." : "Opens from Customers, and from “Customer → + New” on a new inquiry"
       }
       onClose={() => panel.close()}
-      className="md:w-[960px]"
+      className={RULES.window.wideRows}
     >
       <CustomerForm action={action} customer={customer} currencies={currencies} inPanel onSaved={saved} />
     </SidePanel>

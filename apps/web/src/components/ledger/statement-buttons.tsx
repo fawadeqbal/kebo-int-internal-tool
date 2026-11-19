@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { FileText, Share2 } from "lucide-react";
 import type { LedgerPartyKind } from "@kebo/shared";
 import { Button, Field, Textarea, Notice } from "@kebo/ui";
-import { PanelActions, PanelBody, SidePanel } from "@/components/common/panel";
+import { PanelBody, SidePanel, WindowFooter } from "@/components/common/panel";
 import { downloadHref } from "@/components/files/file-tools";
 import { issueStatementAction, type IssuedStatement } from "@/app/(app)/finance/ledger/actions";
 
@@ -108,7 +108,7 @@ function SharePanel({ s, onClose }: { s: IssuedStatement; onClose: () => void })
         <Field label="Message" htmlFor={`${id}-m`}>
           <Textarea id={`${id}-m`} rows={5} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
         </Field>
-        <PanelActions cancel={false}>
+        <WindowFooter cancel={false}>
           <Button size="sm" variant="primary" disabled={pending} onClick={doShare}>
             {pending ? "Preparing…" : "Share"}
           </Button>
@@ -118,7 +118,7 @@ function SharePanel({ s, onClose }: { s: IssuedStatement; onClose: () => void })
           <Button size="sm" variant="ghost" data-window-cancel="" onClick={onClose}>
             {copied ? "Done" : "Cancel"}
           </Button>
-        </PanelActions>
+        </WindowFooter>
       </PanelBody>
     </SidePanel>
   );

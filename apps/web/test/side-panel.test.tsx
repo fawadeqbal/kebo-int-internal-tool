@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Modal } from "@/components/common/dialog";
-import { PanelActions, PanelBody, SidePanel, useClosePanel } from "@/components/common/panel";
+import { PanelBody, SidePanel, useClosePanel, WindowFooter } from "@/components/common/panel";
 
 /** Its footer gets the window's Cancel by itself (canvas row "Cancel, not ✕"). */
 function Form({ onSubmit }: { onSubmit: () => void }) {
@@ -18,9 +18,9 @@ function Form({ onSubmit }: { onSubmit: () => void }) {
         <input id="name" />
         <label htmlFor="city">City</label>
         <input id="city" />
-        <PanelActions>
+        <WindowFooter>
           <button type="submit">Save</button>
-        </PanelActions>
+        </WindowFooter>
       </PanelBody>
     </form>
   );

@@ -20,7 +20,8 @@ import {
   type SatResult,
 } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, SelectCard, SelectCardList, Textarea } from "@kebo/ui";
-import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
+import { SubmitButton } from "@kebo/ui/client";
+import { ConfirmSubmit } from "@/components/common/dialog";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
@@ -212,7 +213,7 @@ const nextKey = () => `n${++seq}`;
 export function RemoveButton({ action, what }: { action: Action; what: string }) {
   return (
     <ActionForm action={action} showSuccess={false} className="inline-flex">
-      <ConfirmSubmit size="xs" variant="danger-ghost" pendingText="Removing…" message={`Remove ${what}?`}>
+      <ConfirmSubmit confirmLabel="Remove" size="xs" variant="danger-ghost" pendingText="Removing…" message={`Remove ${what}?`}>
         <Trash2 aria-hidden /> Remove
       </ConfirmSubmit>
     </ActionForm>

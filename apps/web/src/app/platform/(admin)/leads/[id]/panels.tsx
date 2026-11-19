@@ -6,15 +6,7 @@ import { LEAD_STATUS_LABEL, LIFECYCLE } from "@kebo/shared";
 import { Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import {
-  PANEL_FORM,
-  PanelActions,
-  PanelBody,
-  PanelKeys,
-  PanelSection,
-  SidePanel,
-  useSidePanel,
-} from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, UrlWindow, useSidePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { LeadDetail, LeadStatus, Plan } from "@/lib/types-platform";
 
@@ -109,12 +101,12 @@ function PanelForm({
             </p>
           )}
           {children(s)}
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton variant={danger ? "danger" : "primary"} pendingText="Saving…">
               {submit}
             </SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>
@@ -132,12 +124,10 @@ function Panel({
   description?: string;
   children: (close: () => void) => ReactNode;
 }) {
-  const p = useSidePanel(name);
-  if (!p.open) return null;
   return (
-    <SidePanel title={title} description={description} onClose={() => p.close()}>
-      <PanelBody>{children(() => p.close())}</PanelBody>
-    </SidePanel>
+    <UrlWindow name={name} title={title} description={description}>
+      {(close) => <PanelBody>{children(close)}</PanelBody>}
+    </UrlWindow>
   );
 }
 

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Download, FileText, MoreHorizontal, Plus, Share2 } from "lucide-react";
 import { paperDone, type FlowStep, type PaperKind } from "@kebo/shared";
 import { Badge, Button, buttonClass, Card, CardHeader, cn } from "@kebo/ui";
+import { toast } from "@kebo/ui/client";
+import { useConfirm } from "@/components/common/dialog";
 import { FloatingMenu } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
 import type { PaperRow } from "@/lib/types-papers";
@@ -318,6 +320,7 @@ function PaperLine({
   const tools = useFileTools();
   const router = useRouter();
   const [busy, start] = useTransition();
+  const { ask, dialog } = useConfirm();
   const from = fromOf(r);
   const print = printOf(orderId, r);
   const make = r.makeable ? `/orders/${orderId}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}` : null;
@@ -335,14 +338,11 @@ function PaperLine({
         variant="primary"
         disabled={busy}
         onClick={() =>
-          window.confirm(
-            `Make version ${r.version} of the ${r.label.toLowerCase()} final? It keeps exactly what it prints now; version ${(r.version ?? 2) - 1} stays as it was.`,
-          ) &&
-          start(async () => {
+          ask({ question: `Make version ${r.version} of the ${r.label.toLowerCase()} final? It keeps exactly what it prints now; version ${(r.version ?? 2) - 1} stays as it was.`, confirmLabel: r.kind === "proforma" ? "Issue it" : "Make it final" }, () => start(async () => {
             const res = await ownDocumentAction(orderId, r.kind as "proforma" | "packing-list", "final");
-            if (!res.ok) window.alert(res.message ?? "Something went wrong.");
+            if (!res.ok) toast({ message: res.message ?? "Something went wrong.", kind: "fail" });
             router.refresh();
-          })
+          }))
         }
       >
         {r.kind === "proforma" ? `Issue version ${r.version}` : `Make version ${r.version} final`}
@@ -356,14 +356,11 @@ function PaperLine({
         variant="secondary"
         disabled={busy}
         onClick={() =>
-          window.confirm(
-            "Issue the proforma now? It gets its number dated today (your letters, the date, the customer's letters, the handler's count) and is final: re-printing it shows exactly what it prints now. A correction later is Make again (version 2, same number).",
-          ) &&
-          start(async () => {
+          ask({ question: "Issue the proforma now? It gets its number dated today (your letters, the date, the customer's letters, the handler's count) and is final: re-printing it shows exactly what it prints now. A correction later is Make again (version 2, same number).", confirmLabel: "Issue it" }, () => start(async () => {
             const res = await issueProforma({}, new FormData());
-            if (!res.ok) window.alert(res.message ?? "Something went wrong.");
+            if (!res.ok) toast({ message: res.message ?? "Something went wrong.", kind: "fail" });
             router.refresh();
-          })
+          }))
         }
       >
         Issue it
@@ -490,6 +487,7 @@ function PaperLine({
           />
         </div>
       )}
+      {dialog}
     </div>
   );
 }
@@ -527,6 +525,7 @@ export function PaperMenu({
   const router = useRouter();
   const [menu, setMenu] = useState(false);
   const [busy, start] = useTransition();
+  const { ask, dialog } = useConfirm();
   const more = useRef<HTMLButtonElement>(null);
   const scanId = useId();
   const print = printOf(orderId, r);
@@ -564,7 +563,7 @@ export function PaperMenu({
         f,
         drop ? { step: r.step, attachTo: drop, note: `${r.label}, signed` } : { step: r.step, note: `${r.label}, signed` },
       );
-      if (res.error) window.alert(res.error);
+      if (res.error) toast({ message: res.error, kind: "fail" });
       router.refresh();
     });
   const leading = lead?.((label, on, hint) => item(label, on, hint));
@@ -615,7 +614,7 @@ export function PaperMenu({
               () =>
                 start(async () => {
                   const res = await paperAgainAction(orderId, r.kind as PaperKind, r.ref);
-                  if (!res.ok) return window.alert(res.message ?? "Something went wrong.");
+                  if (!res.ok) return toast({ message: res.message ?? "Something went wrong.", kind: "fail" });
                   router.push(make!);
                 }),
               `version ${(r.version ?? 1) + 1}, keeps ${r.version ?? 1}`,
@@ -626,14 +625,11 @@ export function PaperMenu({
               {item(
                 "Make again",
                 () =>
-                  window.confirm(
-                    `Start version ${r.version! + 1} of the ${r.label.toLowerCase()} from the order as it is now? Version ${r.version} stays exactly as it was printed; the number stays ${r.number}.`,
-                  ) &&
-                  start(async () => {
+                  ask({ question: `Start version ${r.version! + 1} of the ${r.label.toLowerCase()} from the order as it is now? Version ${r.version} stays exactly as it was printed; the number stays ${r.number}.`, confirmLabel: "Start version " + (r.version! + 1) }, () => start(async () => {
                     const res = await ownDocumentAction(orderId, r.kind as "proforma" | "packing-list", "again");
-                    if (!res.ok) window.alert(res.message ?? "Something went wrong.");
+                    if (!res.ok) toast({ message: res.message ?? "Something went wrong.", kind: "fail" });
                     router.refresh();
-                  }),
+                  })),
                 `version ${r.version + 1}, keeps ${r.version}`,
               )}
             </>
@@ -651,12 +647,11 @@ export function PaperMenu({
             item(
               "Delete the draft",
               () =>
-                window.confirm(`Delete the draft of the ${r.label.toLowerCase()} (version ${r.version})? Version ${(r.version ?? 2) - 1} stays.`) &&
-                start(async () => {
+                ask({ question: `Delete the draft of the ${r.label.toLowerCase()} (version ${r.version})? Version ${(r.version ?? 2) - 1} stays.`, confirmLabel: "Delete the draft", danger: true }, () => start(async () => {
                   const res = await ownDocumentAction(orderId, r.kind as "proforma" | "packing-list", "delete");
-                  if (!res.ok) window.alert(res.message ?? "Something went wrong.");
+                  if (!res.ok) toast({ message: res.message ?? "Something went wrong.", kind: "fail" });
                   router.refresh();
-                }),
+                })),
               "drafts only",
               true,
             )}
@@ -674,12 +669,11 @@ export function PaperMenu({
               {item(
                 "Delete the draft",
                 () =>
-                  window.confirm(`Delete the draft of the ${r.label.toLowerCase()} (version ${r.version})?`) &&
-                  start(async () => {
+                  ask({ question: `Delete the draft of the ${r.label.toLowerCase()} (version ${r.version})?`, confirmLabel: "Delete the draft", danger: true }, () => start(async () => {
                     const res = await paperDeleteDraftAction(orderId, r.paperId!);
-                    if (!res.ok) window.alert(res.message ?? "Something went wrong.");
+                    if (!res.ok) toast({ message: res.message ?? "Something went wrong.", kind: "fail" });
                     router.refresh();
-                  }),
+                  })),
                 "drafts only",
                 true,
               )}
@@ -688,6 +682,7 @@ export function PaperMenu({
         </FloatingMenu>
       )}
       <input id={scanId} type="file" hidden accept="application/pdf,image/*" onChange={(e) => (sendScan(e.target.files?.[0]), (e.target.value = ""))} />
+      {dialog}
     </>
   );
 }

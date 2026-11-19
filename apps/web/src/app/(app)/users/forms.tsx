@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Field, Input, Select } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { RoleRow } from "@/lib/types-people";
 
@@ -43,10 +43,10 @@ function PanelForm({ action, onSaved, save, pending, children }: { action: Actio
       {(s) => (
         <PanelBody className={PANEL_FORM}>
           {children(s)}
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton pendingText={pending}>{save}</SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </PanelBody>
       )}
     </ActionForm>

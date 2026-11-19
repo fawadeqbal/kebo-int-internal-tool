@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Trash2, X } from "lucide-react";
-import { Button, cn } from "@kebo/ui";
+import { Button, cn, RULES } from "@kebo/ui";
+import { SubmitButton } from "@kebo/ui/client";
 import { lockScroll } from "@/lib/scroll-lock";
 import { useChanges, watchChanges } from "./changes";
 
@@ -151,6 +152,77 @@ export function ConfirmDialog({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** What useConfirm asks: the question (its first sentence is the title, the rest the line under it) and the button. */
+export interface ConfirmAsk {
+  question: string;
+  confirmLabel: string;
+  danger?: boolean;
+}
+
+/**
+ * The browser's own confirm(), in the app's look (canvas group 8: "confirm() → ConfirmDialog"): `ask(q, then)`
+ * shows the ConfirmDialog and runs `then` only on its button; render `dialog` once in the component.
+ */
+export function useConfirm() {
+  const [open, setOpen] = useState<(ConfirmAsk & { then: () => void }) | null>(null);
+  const ask = useCallback((q: ConfirmAsk, then: () => void) => setOpen({ ...q, then }), []);
+  let dialog: ReactNode = null;
+  if (open) {
+    const [title, ...rest] = open.question.split(/(?<=\?)\s+/);
+    dialog = (
+      <ConfirmDialog
+        title={title ?? open.question}
+        confirmLabel={open.confirmLabel}
+        danger={open.danger}
+        onCancel={() => setOpen(null)}
+        onConfirm={() => {
+          setOpen(null);
+          open.then();
+        }}
+      >
+        {rest.length ? rest.join(" ") : undefined}
+      </ConfirmDialog>
+    );
+  }
+  return { ask, dialog };
+}
+
+/**
+ * A submit button that asks first: on its click the form waits, and is sent (by this button) only on Yes.
+ * For a plain <form> or ActionForm whose button removes something.
+ */
+export function useConfirmSubmit() {
+  const { ask, dialog } = useConfirm();
+  const onClick = useCallback(
+    (q: ConfirmAsk) => (e: { preventDefault: () => void; currentTarget: HTMLButtonElement }) => {
+      e.preventDefault();
+      const button = e.currentTarget;
+      ask(q, () => button.form?.requestSubmit(button));
+    },
+    [ask],
+  );
+  return { onClick, dialog };
+}
+
+/** A form's submit button that asks first, in the app's ConfirmDialog (red when its button is). */
+export function ConfirmSubmit({
+  message,
+  confirmLabel,
+  danger,
+  children,
+  ...props
+}: ComponentProps<typeof SubmitButton> & { message: string; confirmLabel: string; danger?: boolean }) {
+  const { onClick, dialog } = useConfirmSubmit();
+  return (
+    <>
+      <SubmitButton {...props} onClick={onClick({ question: message, confirmLabel, danger: danger ?? String(props.variant ?? "").startsWith("danger") })}>
+        {children}
+      </SubmitButton>
+      {dialog}
+    </>
   );
 }
 
@@ -334,7 +406,7 @@ export function WindowHead({
 export const WINDOW_FOOTER =
   "flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-6";
 
-const MODAL_WIDTH = { md: "md:w-[600px]", lg: "md:w-[760px]" } as const;
+const MODAL_WIDTH = { md: RULES.window.part, lg: RULES.window.wideRows } as const;
 
 /**
  * A window over the page (cancel an order, a file, a request): the same frame as every other window.

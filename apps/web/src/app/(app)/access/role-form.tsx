@@ -7,7 +7,7 @@ import { Checkbox, cn, Field, Input, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useFeatures } from "@/components/common/features";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, UrlWindow, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -25,20 +25,20 @@ export function RolePanel({
   description,
   ...form
 }: Omit<RoleFormProps, "onSaved"> & { name: string; title: string; description?: string }) {
-  const panel = useSidePanel(name);
-  if (!panel.open) return null;
   return (
-    <SidePanel title={title} description={description} onClose={() => panel.close()}>
-      <PanelBody>
-        <RoleForm
-          {...form}
-          onSaved={(message) => {
-            toast(message && !/^saved\.?$/i.test(message) ? message : "Role saved");
-            panel.close();
-          }}
-        />
-      </PanelBody>
-    </SidePanel>
+    <UrlWindow name={name} title={title} description={description}>
+      {(close) => (
+        <PanelBody>
+          <RoleForm
+            {...form}
+            onSaved={(message) => {
+              toast(message && !/^saved\.?$/i.test(message) ? message : "Role saved");
+              close();
+            }}
+          />
+        </PanelBody>
+      )}
+    </UrlWindow>
   );
 }
 
@@ -208,10 +208,10 @@ export function RoleForm({
             </div>
           </fieldset>
 
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton pendingText="Saving…">{submitLabel}</SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>

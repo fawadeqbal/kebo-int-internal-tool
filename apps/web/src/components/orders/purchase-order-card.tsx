@@ -4,7 +4,7 @@ import { Mail } from "lucide-react";
 import { Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
+import { PanelBody, useClosePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { Incoterm, LeadFrom, WarrantyFrom } from "@kebo/shared";
 
@@ -95,11 +95,11 @@ export function SendForm({ action, deposit, today, supplierRef }: { action: Acti
               </Field>
             )}
           </PanelBody>
-          <PanelActions className="static mx-0 mb-0 justify-end">
+          <WindowFooter className="static mx-0 mb-0">
             <SubmitButton pendingText="Saving…">
               <Mail aria-hidden /> Send purchase order
             </SubmitButton>
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>
