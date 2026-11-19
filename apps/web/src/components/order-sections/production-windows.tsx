@@ -14,6 +14,7 @@ export function AllReceivedWindow({ sub, action, today, place, lines }: { sub: s
   return (
     <SectionWindow
       button={{ label: "All received", kind: "plain" }}
+      name="all-received"
       title="Goods from the supplier"
       sub={sub}
       action={action}

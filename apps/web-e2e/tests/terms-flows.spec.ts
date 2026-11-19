@@ -162,25 +162,33 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await send(`/revisions/${revision.id}/status`, { to: "accepted", route: "informal", customerRef: "AS/PO/2611" });
   const orderId = (await (await page.request.get(`/api/inquiries/${deal.id}`)).json()).orders[0].id as string;
 
-  // The Overview: their order; what was agreed, copied from the quotation; the factory beside it.
+  // The Overview, on the pieces (canvas row "The order on the same pieces"): the quotation's boxes — Customer (their
+  // order) | Delivery & payment, the items, Warranty & conditions — copied from the quotation when it was accepted.
   await page.goto(`/orders/${orderId}`);
-  const theirs = page.getByRole("region", { name: "Their order" });
+  const theirs = page.getByRole("region", { name: "Customer", exact: true });
   await expect(theirs.locator("dd", { hasText: "AS/PO/2611" })).toBeVisible();
-  const agreed = page.getByRole("region", { name: "Agreed with the customer" });
+  const agreed = page.getByRole("region", { name: "Delivery & payment" });
   await expect(agreed.getByText("FOB Qingdao")).toBeVisible();
   await expect(agreed.getByText("45 days after the deposit")).toBeVisible();
   await expect(agreed.getByText("Worked out once the deposit is in")).toBeVisible();
-  await expect(agreed.getByText("12 months", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Warranty & conditions" }).getByText(/^12 months/)).toBeVisible();
+  // No list of stages: each stage's word is on its tab; the next step is the header's one strong button.
+  await expect(page.getByRole("region", { name: "Where it stands" })).toHaveCount(0);
+  await expect(page.locator("[data-record-top] [data-slot=primary]").getByRole("link", { name: "Record the deposit" })).toBeVisible();
+  const items = page.getByRole("region", { name: "Items", exact: true });
+  await expect(items.getByRole("columnheader", { name: "Where it is" })).toBeVisible();
+  await expect(items.getByRole("gridcell", { name: "Not ordered yet" }).or(items.getByRole("cell", { name: "Not ordered yet" })).first()).toBeVisible();
   // The customer beside the factory is hidden for now (16 Nov 2026).
   await expect(page.getByRole("region", { name: "The customer and the supplier, side by side" })).toHaveCount(0);
   expect(await accessibilityProblems(page), "the order's Overview meets WCAG 2.2 AA").toEqual([]);
 
-  // Change: a new port differs from the quotation, so it asks why; the reason goes with it.
-  await agreed.getByRole("button", { name: "Change", exact: true }).click();
-  const form = page.getByRole("dialog", { name: `What we agreed with ${deal.customer}` });
-  for (const group of ["Delivery", "Payment", "Warranty", "Conditions"]) await expect(form.locator("legend", { hasText: group }).first()).toBeVisible();
+  // Its Edit opens only that box's part: a new port differs from the quotation, so it asks why; the reason goes with it.
+  await agreed.getByRole("button", { name: "Edit delivery and payment" }).click();
+  const form = page.getByRole("dialog", { name: "Delivery & payment" });
+  for (const group of ["Delivery", "Payment"]) await expect(form.locator("legend", { hasText: group }).first()).toBeVisible();
+  await expect(form.locator("legend", { hasText: "Warranty" })).toHaveCount(0);
   await expect(form.getByRole("link", { name: "Open the payment plan" })).toBeVisible();
-  expect(await accessibilityProblems(page), "the Change window meets WCAG 2.2 AA").toEqual([]);
+  expect(await accessibilityProblems(page), "the Edit window meets WCAG 2.2 AA").toEqual([]);
   await form.locator("#agr-pod").fill("Karachi");
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await form.getByRole("button", { name: "Agreed a new port" }).click();
@@ -188,6 +196,21 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(form).toBeHidden();
   await expect(agreed.getByText("Karachi")).toBeVisible();
   await expect(agreed.getByRole("link", { name: "Changed 1×" })).toBeVisible();
+  // The warranty's Edit: only Warranty and Conditions; nothing changed is nothing to save.
+  await page.getByRole("region", { name: "Warranty & conditions" }).getByRole("button", { name: "Edit the warranty and conditions" }).click();
+  const cond = page.getByRole("dialog", { name: "Warranty & conditions" });
+  await expect(cond.locator("legend", { hasText: "Warranty" }).first()).toBeVisible();
+  await expect(cond.locator("#agr-pod")).toHaveCount(0);
+  await cond.getByRole("button", { name: "Cancel" }).click();
+  await expect(cond).toBeHidden();
+
+  // The header's next step (accepted as T/T, the deposit not in) opens its tab and the window there that does it.
+  await page.locator("[data-record-top] [data-slot=primary]").getByRole("link", { name: "Record the deposit" }).click();
+  await expect(page).toHaveURL((u) => u.pathname === `/orders/${orderId}/payment` && !u.searchParams.has("do"));
+  const pay = page.getByRole("dialog", { name: "Record a payment" });
+  await expect(pay).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(pay).toBeHidden();
 
   // Who the goods go to is on Shipping now; how the papers print, on Documents.
   await page.goto(`/orders/${orderId}/shipping`);

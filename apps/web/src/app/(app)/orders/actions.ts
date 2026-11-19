@@ -299,3 +299,14 @@ export async function voidCreditAction(customerId: string, kind: "credit" | "rec
   if (r.ok) refreshCustomer(customerId);
   return r;
 }
+
+/** Who handles the order (the panel's picker): the person on its inquiry, saved there; both pages show it now. */
+export async function assignOrderAction(orderId: string, inquiryId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(form, () => api.post(`/inquiries/${inquiryId}/assign`, { assigneeId: v.assigneeId || null, reason: reasonOf(form) }), "Assignment saved.");
+  if (!r.ok) return r;
+  revalidatePath(`/orders/${orderId}`, "layout");
+  revalidatePath(`/inquiries/${inquiryId}`, "layout");
+  const d = r.data as { assignee?: { name?: string } | null } | undefined;
+  return { ...r, message: d?.assignee?.name ? `${d.assignee.name} handles this order` : "Nobody handles this order now" };
+}

@@ -28,7 +28,7 @@ export function OwnPager({
 }) {
   if (of < 2) return null;
   return (
-    <nav aria-label={label} className={cn("flex items-center gap-1 text-[13px] font-semibold text-text-2", className)}>
+    <nav aria-label={label} data-own-pager="" className={cn("flex items-center gap-1 text-[13px] font-semibold text-text-2", className)}>
       <PagerLink href={prev?.href ?? null} label={prev ? `Previous ${what}, ${prev.name}` : `No previous ${what}`}>
         <ChevronLeft className="size-4" aria-hidden />
       </PagerLink>

@@ -38,6 +38,7 @@ export * from "./dev-tools";
 export * from "./workflows/search";
 export * from "./records/types";
 export * from "./records/inquiry";
+export * from "./records/order";
 export * from "./records/paper-terms";
 export * from "./records/titles";
 export * from "./records/prices";

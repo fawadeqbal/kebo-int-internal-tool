@@ -148,3 +148,41 @@
     display: none;
   }
 }
+
+/* A record's top, folded once its page has scrolled (canvas board "The top and the panel stay; only the body
+   moves"): the path, the icon, the pager and a notice step aside; the name gets smaller; the state stays on one
+   line (gone on a phone, where the bar keeps the name); the tabs stay. RecordFrame keeps the room it gave up. */
+[data-record-top][data-stuck] nav[aria-label="Breadcrumb"],
+[data-record-top][data-stuck] [data-slot="page-icon"],
+[data-record-top][data-stuck] [data-page-desc],
+[data-record-top][data-stuck] [data-own-pager],
+[data-record-top][data-stuck] [data-record-notice] {
+  display: none;
+}
+[data-record-top][data-stuck] header {
+  margin-bottom: 0;
+  padding-top: 0.625rem;
+}
+[data-record-top][data-stuck] h1 {
+  font-size: 18px;
+  line-height: 24px;
+}
+[data-record-top][data-stuck] [data-page-summary] {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-record-top][data-stuck] [data-record-tabs] > * {
+  margin-top: 0.375rem;
+}
+[data-record-top][data-stuck] {
+  border-bottom: 1px solid var(--color-line);
+}
+@media (width < 48rem) {
+  [data-record-top][data-stuck] [data-page-summary] {
+    display: none;
+  }
+  [data-record-top][data-stuck] header {
+    padding-top: 0;
+  }
+}

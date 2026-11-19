@@ -33,10 +33,11 @@ function useSectionUpload(orderId: string, section: OrderSection) {
  * The files row at the foot of a section: each file opens here (view,
  * download, its menu), and "+ Add a file" adds one to this section.
  */
-export function SectionFiles({ orderId, section, canAdd }: { orderId: string; section: OrderSection; canAdd: boolean }) {
+export function SectionFiles({ orderId, section, canAdd, quiet }: { orderId: string; section: OrderSection; canAdd: boolean; /** Nothing at all while it has no file (a record box: files are added in its window). */ quiet?: boolean }) {
   const files = useSectionFiles(section);
   const input = useRef<HTMLInputElement>(null);
   const { busy, error, send } = useSectionUpload(orderId, section);
+  if (quiet && files.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line px-[18px] py-2.5" data-section-files={section}>
       {files.length === 0 && <span className="text-[12.5px] text-text-2">No file yet</span>}

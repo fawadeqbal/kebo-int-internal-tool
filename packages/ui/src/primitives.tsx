@@ -423,8 +423,8 @@ export function PageHeader({
                 {badge}
               </div>
               {/* A top page's plain sentence under its name is a help line: not on a phone (design rule 15). */}
-              {summary && <div className={cn("mt-0.5 text-[13px] text-muted", !up && titleInBar && typeof summary === "string" && "max-md:hidden")}>{summary}</div>}
-              {description && <div className={cn("mt-0.5 max-w-2xl text-[13px] text-muted", titleInBar && "max-md:hidden")}>{description}</div>}
+              {summary && <div data-page-summary="" className={cn("mt-0.5 text-[13px] text-muted", !up && titleInBar && typeof summary === "string" && "max-md:hidden")}>{summary}</div>}
+              {description && <div data-page-desc="" className={cn("mt-0.5 max-w-2xl text-[13px] text-muted", titleInBar && "max-md:hidden")}>{description}</div>}
             </div>
           </div>
           {/* Papers first, then the one primary, then ⋯: always top right. */}

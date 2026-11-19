@@ -4,6 +4,10 @@ import { accessibilityProblems, watchErrors } from "./check";
 /** Money on an order, done in a browser: paying the supplier looks and works like being paid. */
 
 /** The first order whose tab has what the check needs (other checks change orders too). */
+// The checks here pick the same orders (the first with what each needs) and change their plans: one after the
+// other, in one worker, so two of them never edit the same order's plan at once.
+test.describe.configure({ mode: "default" });
+
 async function orderWith(page: Page, tab: string, has: (page: Page) => Locator, stages = ["in_production", "shipped", "confirmed"]) {
   for (const stage of stages) {
     await page.goto(`/orders?stage=${stage}`);

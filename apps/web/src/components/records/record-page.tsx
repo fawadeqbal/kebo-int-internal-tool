@@ -1,7 +1,8 @@
 import type { ComponentProps, ReactNode } from "react";
-import { cn, PageHeader, RULES } from "@kebo/ui";
+import { cn, PageHeader } from "@kebo/ui";
 import { OwnPagerTop, OwnPagerUnder } from "@/components/deals/own-pager";
 import { SideSheet } from "@/components/common/side-sheet";
+import { RecordShell } from "./record-frame";
 
 /** ‹ 2 of 5 › to a record's siblings (an inquiry's offers, its quotations). */
 export type RecordPager = Parameters<typeof OwnPagerTop>[0];
@@ -38,11 +39,15 @@ export function RecordPage({
   panel?: RecordPanelProps | null;
   children: ReactNode;
 }) {
+  // The same frame as a record with tabs: the top stays (folding as the page scrolls), the panel beside the boxes.
   return (
-    <div className="relative">
-      <RecordTop pager={pager} header={header} />
-      <RecordBody panel={panel}>{children}</RecordBody>
-    </div>
+    <RecordShell
+      top={<RecordTop pager={pager} header={header} />}
+      panelLabel={panel?.label}
+      panel={panel ? ("sheet" in panel ? panel.sheet : <RecordPanel sections={panel.sections} summary={panel.summary} />) : null}
+    >
+      {children}
+    </RecordShell>
   );
 }
 
@@ -71,27 +76,9 @@ export function RecordTop({
       <PageHeader phoneStack {...header}>
         {pager && <OwnPagerUnder {...pager} />}
       </PageHeader>
-      {notice}
-      {tabs}
+      {notice && <div data-record-notice="">{notice}</div>}
+      {tabs && <div data-record-tabs="">{tabs}</div>}
     </>
-  );
-}
-
-/** A record's boxes and, beside them, its panel (`top`: what comes above both, like a state's notice). */
-export function RecordBody({ panel, top, children }: { panel?: RecordPanelProps | null; top?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-4">
-      {top}
-      <div className={cn("grid items-start gap-4", panel ? RULES.page.withPanel : "grid-cols-[minmax(0,1fr)]")}>
-        <div className="flex min-w-0 flex-col gap-4">{children}</div>
-        {panel && (
-          // On a phone its bar comes first, under the header (and the tabs); the panel opens from it.
-          <aside aria-label={panel.label} className="flex min-w-0 flex-col gap-4 max-lg:order-first">
-            {"sheet" in panel ? panel.sheet : <RecordPanel sections={panel.sections} summary={panel.summary} />}
-          </aside>
-        )}
-      </div>
-    </div>
   );
 }
 

@@ -44,7 +44,11 @@ async function settled(page: Page) {
 /** One line per rule broken: "color-contrast (serious) ×3 at .badge: <span class=…>". */
 export async function accessibilityProblems(page: Page): Promise<string[]> {
   await settled(page);
+  // A record's top stays at the top as the page scrolls (RecordFrame): a button that has scrolled under it is
+  // scrolled past, not too small, so the page is read with the top in its own place (where it sits anyway).
+  const unstick = await page.addStyleTag({ content: "[data-record-top]{position:static!important}" });
   const result = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  await unstick.evaluate((tag) => (tag as Element).remove());
   return result.violations.map((v) => {
     const first = v.nodes[0];
     return `${v.id} (${v.impact}) ×${v.nodes.length} at ${first?.target.join(" ")}: ${first?.html.slice(0, 160)} — ${v.help}`;
