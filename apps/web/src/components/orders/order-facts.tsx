@@ -2,6 +2,7 @@ import type { FlowStep, OrderStepFacts } from "@kebo/shared";
 import { date } from "@/lib/format";
 import type { OrderFlow } from "@/lib/types-flow";
 import type { OrderView } from "@/lib/types-orders";
+import type { OrderMoney } from "@/lib/types-money";
 import type { PanelTone } from "@/components/records/panel-pieces";
 
 const DAY = 86_400_000;
@@ -72,6 +73,7 @@ export function orderStepFacts(
   flow: OrderFlow | null,
   stages: FlowStep[] | null,
   may: { update: boolean },
+  more: { money?: OrderMoney | null; advice?: { state: string } | null } = {},
 ): OrderStepFacts {
   const uses = (s: FlowStep) => !stages || stages.includes(s);
   const ship = flow?.shipping?.shipments[0] ?? null;
@@ -91,6 +93,13 @@ export function orderStepFacts(
     depositDue: depositDue > 0 ? depositDue : 0,
     production: uses("factory") && (flow?.modules.production ?? true),
     poSent: !!flow?.factory.orderedOn || o.word !== "Confirmed",
+    // The supplier's part due when we order, still open (people who see supplier money only).
+    supplierDepositDue: (more.money?.factories?.plans ?? [])
+      .flatMap((p) => p.rows)
+      .filter((r) => r.dueRule === "on_order" && r.status !== "paid" && r.status !== "later")
+      .reduce((t, r) => t + Number(r.open), 0),
+    // Made by the app and not ready (missing or a draft): not sent yet. Null: no shipping advice here.
+    adviceSent: more.advice ? ["ready", "else", "up"].includes(more.advice.state) : null,
     readyOn: flow?.factory.readyOn ?? o.readyOn,
     goodsIn: o.goods?.allReceived ?? false,
     shipping: uses("shipping") && (flow?.modules.shipping ?? true),

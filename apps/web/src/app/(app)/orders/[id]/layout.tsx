@@ -4,7 +4,7 @@ import { can, dayMonth, ORDER, ORDER_TABS, orderNextStep, RECORD_KIND, type Flow
 import { ButtonLink, cn } from "@kebo/ui";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
-import { orderFilesOf, orderFlowOf, orderOf, orderSectionsOf } from "@/lib/order-data";
+import { orderFilesOf, orderFlowOf, orderMoneyOf, orderOf, orderPapersOf, orderSectionsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date } from "@/lib/format";
 import { orderName } from "@/lib/titles";
@@ -69,7 +69,13 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const base = `/orders/${o.id}`;
   // The header's one strong button: the order's next step (packages/shared orderNextStep), the same on every tab;
   // it opens its tab, and the window there that does it. Closing and reopening are done right here.
-  const step = orderNextStep(orderStepFacts(o, flow, sections?.stages ?? null, { update: can(me, "orders.update") }), now);
+  // The supplier's money (people who see it) and the shipping advice paper, for the steps that read them.
+  const [money, papers] = await Promise.all([
+    can(me, "sourcing.manage") ? optional(() => orderMoneyOf(id)) : Promise.resolve(null),
+    optional(() => orderPapersOf(id)),
+  ]);
+  const advice = papers?.papers.find((p) => p.kind === "shipping-advice") ?? null;
+  const step = orderNextStep(orderStepFacts(o, flow, sections?.stages ?? null, { update: can(me, "orders.update") }, { money, advice }), now);
   const primary =
     step?.key === "close" || step?.key === "reopen" ? (
       <StageActions
