@@ -1,8 +1,10 @@
 "use client";
 
+import { FileZone } from "@/components/common/file-zone";
+import { ChoiceChips } from "@/components/common/choice-chips";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Copy, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Copy, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   EXPENSE_BEARER_HINT,
   EXPENSE_BEARER_LABEL,
@@ -132,28 +134,6 @@ const chip = (on: boolean) =>
     on ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
   );
 
-/** A row of choices of which one is on (For, Paid, Who bears it). */
-function Seg<T extends string>({ labelledBy, value, options, onChange }: { labelledBy: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
-  return (
-    <div role="radiogroup" aria-labelledby={labelledBy} className="inline-flex w-fit max-w-full flex-wrap gap-0.5 rounded-[10px] border border-line bg-surface-2 p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "inline-flex h-[34px] items-center rounded-lg px-3.5 text-md font-medium whitespace-nowrap text-text-2 transition-colors hover:text-text",
-            value === o.value && "bg-surface font-semibold text-text shadow-card",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function GroupLabel({ id, children, optional }: { id: string; children: ReactNode; optional?: boolean }) {
   return (
@@ -389,7 +369,7 @@ export function CostForm({
               </div>
             ) : (
               <>
-                <Seg labelledBy="cost-for-label" value={place} options={forOptions} onChange={setPlace} />
+                <ChoiceChips labelledBy="cost-for-label" value={place} items={forOptions} onChange={setPlace} />
                 {loading && !choices && <p className="text-xs text-muted">Loading the customers, inquiries and orders…</p>}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {!send && place !== "company" && !fixedCustomer && (
@@ -549,7 +529,7 @@ export function CostForm({
                 {settled.account ? ` from ${settled.account.name}` : ""}
               </p>
             ) : (
-              <Seg labelledBy="cost-paid-label" value={paid} options={paidOptions} onChange={setPaid} />
+              <ChoiceChips labelledBy="cost-paid-label" value={paid} items={paidOptions} onChange={setPaid} />
             )}
             {!settled && paid === "later" && <p className="text-xs text-text-2">It shows under Still to pay until it is paid. Pay it from its row, or from Money › To receive and to pay.</p>}
             {!settled && paid === "now" && (
@@ -624,10 +604,10 @@ export function CostForm({
               {place === "order" && (
                 <div className="flex flex-col gap-2">
                   <GroupLabel id="cost-bearer-label">Who bears it</GroupLabel>
-                  <Seg
+                  <ChoiceChips
                     labelledBy="cost-bearer-label"
                     value={bearer}
-                    options={EXPENSE_BEARERS.filter((b) => b !== "factory" || (onSetupOrder && s0.order!.factories.length > 0) || bearer === "factory").map((b) => ({ value: b, label: EXPENSE_BEARER_LABEL[b] }))}
+                    items={EXPENSE_BEARERS.filter((b) => b !== "factory" || (onSetupOrder && s0.order!.factories.length > 0) || bearer === "factory").map((b) => ({ value: b, label: EXPENSE_BEARER_LABEL[b] }))}
                     onChange={(b) => {
                       setBearer(b);
                       if (b === "factory" && onSetupOrder && s0.order!.factories.length === 1) setFactoryId(s0.order!.factories[0]!.id);
@@ -678,35 +658,30 @@ export function CostForm({
 
 /** "Their bill or a photo": chosen here, sent once the cost is saved; a new one replaces the one kept. */
 function Receipt({ file, onChange, kept, label }: { file: File | null; onChange: (f: File | null) => void; kept: { id: string; name: string } | null; label: string }) {
+  if (!file)
+    return (
+      <FileZone
+        label={label}
+        inputId="cost-receipt"
+        compact
+        one
+        accept="image/*,application/pdf"
+        hint={kept ? <a href={`/files/${kept.id}?view=1`} target="_blank" rel="noreferrer" className="text-primary hover:underline">Kept: {kept.name} · a new one replaces it</a> : "Their bill or a photo"}
+        onFiles={(fs) => onChange(fs[0] ?? null)}
+      />
+    );
   return (
     <div className="grid content-start gap-1.5">
       <span className="flex items-baseline gap-1.5 text-sm font-medium text-text">
         {label} <span className="text-xs font-normal text-muted">optional</span>
       </span>
-      {file ? (
-        <span className="flex h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-2.5 text-sm">
-          <Paperclip className="size-4 shrink-0 text-muted" aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{file.name}</span>
-          <Button type="button" size="icon-xs" variant="ghost" onClick={() => onChange(null)} aria-label="Do not attach this file">
-            <X aria-hidden />
-          </Button>
-        </span>
-      ) : (
-        <>
-          <input id="cost-receipt" type="file" accept="image/*,application/pdf" className="peer sr-only" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
-          <label
-            htmlFor="cost-receipt"
-            className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-dashed border-primary/40 px-3 text-sm font-medium text-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary hover:bg-primary-soft"
-          >
-            <Camera className="size-4" aria-hidden /> {kept ? "Replace the file" : "Their bill or a photo"}
-          </label>
-        </>
-      )}
-      {kept && !file && (
-        <a href={`/files/${kept.id}?view=1`} target="_blank" rel="noreferrer" className="w-fit text-xs text-primary hover:underline">
-          Kept: {kept.name}
-        </a>
-      )}
+      <span className="flex h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-2.5 text-sm">
+        <Paperclip className="size-4 shrink-0 text-muted" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{file.name}</span>
+        <Button type="button" size="icon-sm" variant="ghost" onClick={() => onChange(null)} aria-label="Do not attach this file">
+          <X aria-hidden />
+        </Button>
+      </span>
     </div>
   );
 }

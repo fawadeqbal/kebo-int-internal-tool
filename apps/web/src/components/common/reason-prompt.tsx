@@ -1,5 +1,6 @@
 "use client";
 
+import { QuickReasons } from "@/components/common/choice-chips";
 import { useEffect, useRef, useState } from "react";
 import { MessageCircleQuestion } from "lucide-react";
 import { Input } from "@kebo/ui";
@@ -33,24 +34,10 @@ export function ReasonPrompt({ state }: { state: ActionState }) {
           <span className="text-text-2">{state.message} It is kept in the history.</span>
         </div>
       </div>
-      {!!state.choices?.length && (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick reasons">
-          {state.choices.map((c) => (
-            <button
-              key={c}
-              type="button"
-              aria-pressed={value === c}
-              onClick={() => {
-                setValue(c);
-                input.current?.focus();
-              }}
-              className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs hover:border-line-strong aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:text-primary"
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
+      <QuickReasons choices={state.choices ?? []} value={value} onChange={(c) => {
+            setValue(c);
+            input.current?.focus();
+          }} />
       <div className="flex flex-wrap items-center gap-2">
         <Input
           ref={input}

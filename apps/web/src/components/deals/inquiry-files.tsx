@@ -9,7 +9,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
 import type { ActionState } from "@/lib/actions";
-import { send, type Staged } from "./documents-panel";
+import { send, type Staged } from "@/components/files/upload";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 

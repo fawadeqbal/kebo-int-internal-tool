@@ -19,7 +19,7 @@ import type { ActionState } from "@/lib/actions";
 import { date as dateText, dateTime, money as amount } from "@/lib/format";
 import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
-import { send, type Staged } from "./documents-panel";
+import { send, type Staged } from "@/components/files/upload";
 import { FileRow, FileZone } from "@/components/common/file-zone";
 import { fileSize } from "@/lib/format";
 import { convertText, type Fx } from "@/lib/fx";

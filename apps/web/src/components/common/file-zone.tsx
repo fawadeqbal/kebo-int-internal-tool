@@ -40,8 +40,14 @@ export function FileZone({
   one,
   compact,
   big,
+  accept,
+  inputId,
   children,
 }: {
+  /** The kinds of file taken (image/*,application/pdf). */
+  accept?: string;
+  /** The file input's id (a Field's htmlFor). */
+  inputId?: string;
   /** A large drop area (design rules 18 Nov: the Files step), the words under a round icon. */
   big?: boolean;
   label: ReactNode;
@@ -118,7 +124,9 @@ export function FileZone({
         )}
         <input
           ref={input}
+          id={inputId}
           type="file"
+          accept={accept}
           multiple={!one}
           disabled={disabled}
           className="sr-only"

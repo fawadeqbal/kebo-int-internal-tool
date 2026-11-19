@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
 import { Avatar, buttonClass, cn } from "@kebo/ui";
-import { NavMemoryKeeper } from "@kebo/ui/client";
+import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
 import { PRODUCT_NAME } from "@/lib/product";
@@ -133,20 +133,7 @@ function LookChoice() {
   return (
     <div data-keep-open className="flex h-9 items-center justify-between gap-2 px-2 text-sm text-text-2">
       <span id="look-label">Look</span>
-      <div role="radiogroup" aria-labelledby="look-label" className="inline-flex overflow-hidden rounded-lg border border-line-strong">
-        {options.map(([m, label]) => (
-          <button
-            key={m}
-            type="button"
-            role="radio"
-            aria-checked={mode === m}
-            onClick={() => choose(m)}
-            className={cn("h-7 px-2.5 text-xs text-text-2 hover:bg-surface-2", mode === m && "bg-primary-soft font-semibold text-text hover:bg-primary-soft")}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedChoice label="Look" value={mode} options={options.map(([value, label]) => ({ value, label }))} onChange={choose} />
     </div>
   );
 }

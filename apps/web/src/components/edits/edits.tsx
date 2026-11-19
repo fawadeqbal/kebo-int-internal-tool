@@ -1,8 +1,9 @@
 "use client";
 
+import { ChoiceChips } from "@/components/common/choice-chips";
 import { useState, type ReactNode } from "react";
 import { REASON_CHOICES } from "@kebo/shared";
-import { Button, cn, Field, Textarea } from "@kebo/ui";
+import { Button, Field, Textarea } from "@kebo/ui";
 import { Modal } from "@/components/common/dialog";
 import type { EditCard } from "@/lib/types-edits";
 import { formatDayMonth, formatTime, todayIn, type TimeStyle } from "@kebo/utils";
@@ -153,23 +154,7 @@ export function ReasonDialog({
           <span className="text-sm font-semibold">
             Reason <span className="text-bad">*</span>
           </span>
-          <div role="radiogroup" aria-label="Reason" className="flex flex-wrap gap-2">
-            {choices.map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={pick === c}
-                onClick={() => setPick(pick === c ? null : c)}
-                className={cn(
-                  "h-9 rounded-full border px-3 text-md",
-                  pick === c ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line-strong bg-surface hover:border-primary",
-                )}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+          <ChoiceChips label="Reason" value={pick ?? ""} options={choices} onChange={setPick} />
           <Field label="Or write it" htmlFor="edit-reason">
             <Textarea id="edit-reason" rows={2} className="min-h-0" maxLength={500} value={text} onChange={(e) => setText(e.target.value)} />
           </Field>

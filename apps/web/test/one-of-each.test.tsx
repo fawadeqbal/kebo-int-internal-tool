@@ -65,6 +65,21 @@ describe("one of each", () => {
     expect(found(/role="combobox"/g).filter((f) => /factory-quote-form/.test(f))).toHaveLength(1);
   });
 
+  it("one choice: a pick-one is ChoiceChips, a view switch SegmentedChoice — no radio group drawn by hand", () => {
+    // The order's payment cards carry a line under each choice (option cards) and the filter sheet is step 5's.
+    const allowed = /choice-chips\.tsx|packages\/ui\/src\/client\.tsx|orders\/\[id\]\/forms\.tsx|filter-card\.tsx/;
+    expect(found(/role="radiogroup"/g).filter((f) => !allowed.test(f))).toEqual([]);
+  });
+
+  it("one way to add a file: the drop zone (a button that picks a file is fine, a bare file box is not)", () => {
+    expect(found(/<Input\b[^>]*type="file"/g)).toEqual([]);
+    const bare = SOURCES.flatMap(({ file, text }) =>
+      [...text.matchAll(/<input\b[^>]*type="file"[^>]*>/g)].filter((m) => !/\bhidden\b|sr-only/.test(m[0]) && !/file-zone\.tsx/.test(file)).map((m) => `${file}: ${m[0].slice(0, 100)}`),
+    );
+    expect(bare).toEqual([]);
+    expect(SOURCES.filter((s) => /deals\/documents-panel\.tsx$/.test(s.file))).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

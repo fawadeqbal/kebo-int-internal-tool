@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Check, Clock, Loader2, X } from "lucide-react";
 import { buttonClass, Select, type ButtonSize, type ButtonVariant } from "./primitives";
+import { cn } from "./cn";
 
 export { BackArrow, ListLink, NavMemoryKeeper, placeOf, readNav, writeNav, type NavMemory, type Place } from "./back";
 
@@ -234,4 +235,52 @@ export function Toast() {
 /** A select that sends its form as soon as a choice is made: no Continue button. The one AutoSelect (size like Select). */
 export function AutoSelect(props: ComponentProps<typeof Select>) {
   return <Select {...props} onChange={(e) => e.currentTarget.form?.requestSubmit()} />;
+}
+
+/**
+ * The view switch made of buttons (board "The one choice": the same data shown another way — Chart | Table, Year | All
+ * time). The link one is Segmented; this one keeps its value in the page. A radio group: one stop for Tab, ← → move.
+ */
+export function SegmentedChoice<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+}: {
+  label: string;
+  value: T;
+  options: readonly { value: T; label: ReactNode }[];
+  onChange: (v: T) => void;
+  className?: string;
+}) {
+  const at = Math.max(0, options.findIndex((o) => o.value === value));
+  return (
+    <div role="radiogroup" aria-label={label} className={cn("inline-flex max-w-full rounded-[10px] border border-line bg-surface-2 p-0.5", className)}>
+      {options.map((o, i) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={o.value === value}
+          tabIndex={i === at ? 0 : -1}
+          onClick={() => onChange(o.value)}
+          onKeyDown={(e) => {
+            const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+            if (!step) return;
+            e.preventDefault();
+            const n = (i + step + options.length) % options.length;
+            onChange(options[n]!.value);
+            (e.currentTarget.parentElement?.children[n] as HTMLElement | undefined)?.focus();
+          }}
+          className={cn(
+            "inline-flex h-8 items-center rounded-lg px-3 text-md font-medium whitespace-nowrap text-muted transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text max-sm:h-10",
+            o.value === value && "bg-surface font-semibold text-primary shadow-card",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
 }

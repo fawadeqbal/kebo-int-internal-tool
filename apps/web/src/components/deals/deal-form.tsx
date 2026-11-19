@@ -31,7 +31,7 @@ import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole } fr
 import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/inquiries/actions";
 import { CustomerPicker } from "./customer-picker";
 import { ChoiceChips } from "@/components/common/choice-chips";
-import { send, type Staged } from "./documents-panel";
+import { send, type Staged } from "@/components/files/upload";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
 import { LineTable } from "@/components/lines/line-table";
 import { ReasonSheet } from "@/components/edits/reason-chips";

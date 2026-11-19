@@ -1,5 +1,6 @@
 "use client";
 
+import { QuickReasons } from "@/components/common/choice-chips";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ClipboardEvent, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -2463,21 +2464,7 @@ function ReasonBox({ pending, onCancel }: { pending: Pending; onCancel: () => vo
           <span className="text-text-2">{pending.message} It is kept in the history.</span>
         </div>
       </div>
-      {pending.choices.length > 0 && (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick reasons">
-          {pending.choices.map((c) => (
-            <button
-              key={c}
-              type="button"
-              aria-pressed={value === c}
-              onClick={() => setValue(c)}
-              className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs hover:border-line-strong aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:text-primary"
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
+      <QuickReasons choices={pending.choices} value={value} onChange={setValue} />
       <div className="flex flex-wrap items-center gap-2">
         <Input
           ref={input}

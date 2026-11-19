@@ -1,5 +1,6 @@
 "use client";
 
+import { SegmentedChoice } from "@kebo/ui/client";
 import { useState, type ReactNode } from "react";
 import { Card, CardHeader, cn } from "@kebo/ui";
 
@@ -42,14 +43,16 @@ export function ChartCard({
         actions={
           <>
             {actions}
-            <button
-              type="button"
-              aria-pressed={asTable}
-              onClick={() => setAsTable((v) => !v)}
-              className="no-print inline-flex h-8 items-center rounded-md px-2.5 text-sm font-medium text-text-2 hover:bg-surface-2 hover:text-text aria-pressed:bg-surface-2 aria-pressed:text-text"
-            >
-              {asTable ? "Chart" : "Table"}
-            </button>
+            <SegmentedChoice
+              label="Show as"
+              className="no-print"
+              value={asTable ? "table" : "chart"}
+              onChange={(v) => setAsTable(v === "table")}
+              options={[
+                { value: "chart", label: "Chart" },
+                { value: "table", label: "Table" },
+              ]}
+            />
           </>
         }
       />

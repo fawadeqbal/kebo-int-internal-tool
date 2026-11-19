@@ -191,7 +191,7 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   expect(await accessibilityProblems(page), "the Edit window meets WCAG 2.2 AA").toEqual([]);
   await form.locator("#agr-pod").fill("Karachi");
   await form.getByRole("button", { name: /^Save \d+ changes?$/ }).click();
-  await form.getByRole("button", { name: "Agreed a new port" }).click();
+  await form.getByRole("radio", { name: "Agreed a new port" }).click();
   await form.getByRole("button", { name: "Save with this reason" }).click();
   await expect(form).toBeHidden();
   await expect(agreed.getByText("Karachi")).toBeVisible();
