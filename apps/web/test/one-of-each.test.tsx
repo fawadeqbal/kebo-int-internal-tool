@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { INQUIRY, INQUIRY_STAGE_TONE } from "@kebo/shared";
 
 /**
  * One of each (canvas "RFQ Desk — the pieces", consistency plan): the app's pages and pieces take their sizes and
@@ -143,6 +144,15 @@ describe("one of each", () => {
     expect(found(/grid-cols-\[minmax\(0,1fr\)_\d+px\]/g).filter((m) => !m.includes("rules.ts") && !own.some((o) => m.includes(o)))).toEqual([]);
     expect(found(/export function RecordFrame\(/g)).toHaveLength(1);
     expect(found(/withSheetPanel|SIDE_COLUMNS/g)).toEqual([]);
+  });
+
+  it("one list facts line, one pager, one set of stage colours", () => {
+    // A list's figures are the one FactsLine (StatRow facts), never tiles; the old phone-only line mode is gone.
+    expect(found(/phone="line"|data-stat-row/g)).toEqual([]);
+    expect(found(/export function (FactLine|FactsLine)\(/g)).toHaveLength(1);
+    expect(found(/export function Pagination\(|<Pagination\b/g).filter((m) => !m.includes("pagination.tsx"))).toEqual([]);
+    // Every inquiry stage pill reads the record type's colours.
+    for (const [stage, tone] of Object.entries(INQUIRY_STAGE_TONE)) expect(INQUIRY.states[stage as keyof typeof INQUIRY.states].tone).toBe(tone);
   });
 
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {

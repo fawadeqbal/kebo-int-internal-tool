@@ -148,7 +148,8 @@ export const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
 /** Badge colours by meaning; the UI maps tones to its palette. Colour is never the only signal. */
 export type Tone = "neutral" | "info" | "ok" | "warn" | "bad";
 
-export const INQUIRY_STAGE_TONE: Record<InquiryStage, Tone> = { new: "warn", sourcing: "info", quoted: "info", won: "ok", lost: "neutral" };
+/** The same colours as the inquiry record type (records/inquiry.ts INQUIRY.states): New grey, Quoted orange, Lost red. */
+export const INQUIRY_STAGE_TONE: Record<InquiryStage, Tone> = { new: "neutral", sourcing: "info", quoted: "warn", won: "ok", lost: "bad" };
 
 export const REVISION_STATUS_TONE: Record<RevisionStatus, Tone> = {
   draft: "neutral",

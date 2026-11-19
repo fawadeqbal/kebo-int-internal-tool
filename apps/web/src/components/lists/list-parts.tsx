@@ -8,32 +8,8 @@ import { Avatar, Badge, cn } from "@kebo/ui";
  * row of three lines. Drawn on the inquiries list; orders, customers, suppliers and quotations use the same.
  */
 
-export interface Fact {
-  label: string;
-  value: ReactNode;
-  /** After the value, in grey ("9 quotations", "this year"). */
-  sub?: string;
-  tone?: "bad";
-}
-
-/**
- * One slim line of facts, only what the tabs do not already say (never a big card per number). Not on a phone:
- * there the tabs and the rows are the page.
- */
-export function FactLine({ facts, className }: { facts: Fact[]; className?: string }) {
-  if (!facts.length) return null;
-  return (
-    <dl aria-label="Facts" className={cn("mb-4 flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>
-      {facts.map((f, i) => (
-        <div key={f.label} className={cn("flex items-baseline gap-1.5 px-3.5 text-md whitespace-nowrap text-muted", i > 0 && "border-l border-line")}>
-          <dt>{f.label}</dt>
-          <dd className={cn("text-sm font-bold text-text tabular", f.tone === "bad" && "text-bad")}>{f.value}</dd>
-          {f.sub && <dd>{f.sub}</dd>}
-        </div>
-      ))}
-    </dl>
-  );
-}
+/** The facts line is the one in @kebo/ui (FactsLine), the same on every list. */
+export { FactsLine as FactLine, type Fact } from "@kebo/ui";
 
 /** Who is responsible: initials and name, or "Nobody yet" in orange. `short`: the phone's smaller one. */
 export function Responsible({ name, short }: { name: string | null | undefined; short?: boolean }) {
