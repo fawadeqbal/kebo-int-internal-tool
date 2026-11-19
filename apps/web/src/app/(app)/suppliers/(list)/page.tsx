@@ -120,7 +120,6 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         crumbs={crumbsFor("/suppliers")}
         icon={Factory}
         title={labelFor("/suppliers")}
-        summary="Suppliers you buy from"
         papers={
           <>
             <PartyExcel kind="factories" importAction={importFactoriesAction} />

@@ -163,7 +163,6 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       <PageHeader
         crumbs={crumbsFor("/customers")}
         title="Customers"
-        summary="Companies and people who buy from you"
         papers={
           <>
             {canAdd && <PartyExcel kind="customers" importAction={importCustomersAction} />}

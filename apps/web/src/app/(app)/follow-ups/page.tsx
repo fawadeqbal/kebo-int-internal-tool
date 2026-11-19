@@ -119,7 +119,6 @@ export default async function FollowUpsPage({
         crumbs={crumbsFor("/follow-ups")}
         icon={Clock}
         title="Follow-ups"
-        summary="Your reminders to call, visit or chase"
         primary={
           <PanelButton
             variant="strong"

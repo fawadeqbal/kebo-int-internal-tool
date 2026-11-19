@@ -17,6 +17,13 @@ export const RULES = {
   stepsRail: "md:grid-cols-[248px_minmax(0,1fr)]",
   page: {
     /**
+     * The one app frame (canvas row "The one of each, frames", AFOne): the company app and the platform alike —
+     * 1440px at most, centred, 16px at the sides (24px from 640), 18px under the top bar.
+     */
+    frame: "mx-auto w-full max-w-[1440px] px-4 pt-[18px] sm:px-6",
+    /** The settings pages (and other one-form pages): one centred 720px column (rule 4). */
+    column: "mx-auto w-full max-w-[720px]",
+    /**
      * A record page (the inquiry, a supplier offer, a quotation): its boxes, and beside them the one side panel,
      * 320px from 1024 on every record and every tab; below that one column, the panel a bar that opens a sheet
      * (rule 3; canvas board "What changes, piece by piece").

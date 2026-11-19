@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
-import { Avatar, buttonClass, cn } from "@kebo/ui";
+import { Avatar, buttonClass, cn, RULES } from "@kebo/ui";
 import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
@@ -805,7 +805,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main id="main" className="mx-auto w-full max-w-[1440px] px-4 pt-[18px] pb-28 sm:px-6 md:pb-10">
+        <main id="main" className={cn(RULES.page.frame, "pb-28 md:pb-10")}>
           {children}
           <p className="no-print mt-6 text-xs text-muted">
             © {new Date().getFullYear()} {PRODUCT_NAME} · {companyName}

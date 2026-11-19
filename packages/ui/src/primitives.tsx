@@ -330,8 +330,8 @@ export function CardFooter({ className, ...props }: ComponentProps<"div">) {
  * On a phone the paper buttons hide and the page passes them to ⋯ instead
  * (MoreMenu's `phoneItems`), so the row is the primary and ⋯.
  *
- * `actions` and `description` are the older form (a free row of buttons, a
- * line of text), kept for the pages not yet moved to the frame.
+ * `actions` is the older form (a free row of buttons), kept for the pages not yet moved to the frame. There is no
+ * help line under a title (rule 15): what a page is for shows in what it holds.
  */
 /** The icon of each group of the menu, shown in the title's tile when the page names no icon of its own. */
 export const MODULE_ICONS: Record<string, LucideIcon> = {
@@ -362,7 +362,6 @@ export function PageHeader({
   views,
   primary,
   more,
-  description,
   actions,
   backHref,
   backLabel,
@@ -402,7 +401,6 @@ export function PageHeader({
   primary?: ReactNode;
   /** The ⋯ menu (MoreMenu): everything else; delete last, in red. */
   more?: ReactNode;
-  description?: ReactNode;
   actions?: ReactNode;
   backHref?: string;
   backLabel?: string;
@@ -476,7 +474,6 @@ export function PageHeader({
               </div>
               {/* A top page's plain sentence under its name is a help line: not on a phone (design rule 15). */}
               {summary && <div data-page-summary="" className={cn("mt-0.5 text-md text-muted", !up && titleInBar && typeof summary === "string" && "max-md:hidden")}>{summary}</div>}
-              {description && <div data-page-desc="" className={cn("mt-0.5 max-w-2xl text-md text-muted", titleInBar && "max-md:hidden")}>{description}</div>}
             </div>
           </div>
           {/* Papers first, then the one primary, then ⋯: always top right. */}

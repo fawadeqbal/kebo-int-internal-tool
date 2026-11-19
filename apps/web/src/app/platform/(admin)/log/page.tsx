@@ -49,7 +49,6 @@ export default async function PlatformLogPage({ searchParams }: { searchParams: 
     <div>
       <PageHeader
         title="Platform log"
-        summary="Everything done on the platform. What a platform admin does inside a company is also in that company's own audit log."
       />
       <LinkTabs
         look="tabs"

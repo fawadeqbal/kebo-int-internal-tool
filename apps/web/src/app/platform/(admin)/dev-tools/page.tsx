@@ -51,7 +51,7 @@ export default async function DevToolsPage({ searchParams }: { searchParams: Pro
   const problems = (t: DevTab) => overview.checks.filter((c) => c.tab === t && (c.level === "warn" || c.level === "bad"));
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Dev tools" summary="How the server and the app are doing. Checked every minute." actions={<Refresh checked={checked} />} />
+      <PageHeader title="Dev tools" actions={<Refresh checked={checked} />} />
       <LinkTabs
         label="Dev tools sections"
         tabs={TABS.map((t) => {

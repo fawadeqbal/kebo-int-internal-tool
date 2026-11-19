@@ -57,7 +57,6 @@ export default async function PurchaseOrdersPage({
         crumbs={crumbsFor("/operations/purchase-orders")}
         icon={ShoppingCart}
         title="Purchase orders"
-        description="One per supplier on each sales order"
         actions={
           <ExportCsv what="purchase-orders" />
         }
