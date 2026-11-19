@@ -166,6 +166,24 @@ describe("one of each", () => {
       }
   });
 
+  it("every record draws the one record top that stays and folds (RecordTop in RecordFrame or RecordShell)", () => {
+    const records = [
+      "inquiries/[id]/layout.tsx",
+      "orders/[id]/layout.tsx",
+      "customers/[id]/layout.tsx",
+      "suppliers/[id]/layout.tsx",
+      "purchase-orders/[order]/[supplier]/page.tsx",
+      "payments/[kind]/[id]/page.tsx",
+      "users/[id]/page.tsx",
+    ];
+    for (const r of records) {
+      const src = SOURCES.find(({ file }) => file.endsWith(r));
+      expect(src, r).toBeTruthy();
+      expect(src!.text, r).toMatch(/<Record(Frame|Shell)\b/);
+      expect(src!.text, r).not.toMatch(/<PageHeader\b/);
+    }
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });
