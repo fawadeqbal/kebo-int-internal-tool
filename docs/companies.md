@@ -173,6 +173,9 @@ A company keeps its address under ours (`acme.rfq.fawadiqbal.dev`), or connects 
 - **Lost**: connected domains are looked up once a day. A record that is gone, and still gone an hour later, makes it lost: the company is at its address under ours again until the record returns (looked up every hour). A look-up that fails (the resolver, not the record) changes nothing.
 - **Remove**: back to the address under ours only.
 - A domain can be connected to one company. Connecting and removing are in the company's history and the platform log.
+- **Why it is not connected yet** (the look-up step by step): the domain itself answers, a record of that name exists, it points to `connect.…`, it reaches our server with no proxy in between, and who keeps the records (from the nameservers: Cloudflare, GoDaddy, Hostinger, …). One verdict: right, no record, points elsewhere, behind Cloudflare's proxy, another address, or the look-up did not answer.
+- **The platform admin**, on Companies → the company → Details, "Their own domain" under "Web address": the status, that look-up, the record, Check now, "Copy the message for the client" (the record and a link to the check), add their domain (when the client asks us to), remove. Written in the company's history.
+- **`connect.rfq.fawadiqbal.dev`** opens a page for whoever looks after the client's DNS: what the address is, the one record, the usual mistakes, and `/check?domain=…`, the same look-up for any domain (it never says whose a domain is; 12 checks a minute per address). Covered by the `*.rfq` record and certificate check; nothing else to set up.
 
 **Switching it on** (off by default; while off the card is not shown and no domain is served):
 

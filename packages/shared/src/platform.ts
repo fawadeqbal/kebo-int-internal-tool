@@ -375,6 +375,81 @@ export function ownDomainRecord(domain: string, baseDomain: string): NonNullable
   const [name, ...rest] = domain.split(".");
   return { type: "CNAME", name: name!, value: connectTarget(baseDomain), zone: rest.join(".") };
 }
+
+/**
+ * What a full look-up of a domain found, step by step (claude/own-domains-admin-design.md): shown on the
+ * platform's company page and on connect.<BASE_DOMAIN>'s check page, so whoever looks sees why a domain
+ * is not connected yet. A list that is null: that look-up itself failed (the internet, not the record).
+ */
+export interface DomainDiagnosis {
+  domain: string;
+  /** Where the record is added ("keboint.com" for "staff.keboint.com"). */
+  zone: string;
+  /** What the record must point to: connect.<BASE_DOMAIN>. */
+  target: string;
+  checkedAt: string;
+  verdict: DomainVerdict;
+  /** The domain itself answers (its website): it exists and its DNS works. */
+  zoneAddresses: string[] | null;
+  /** What the record points to (CNAME). */
+  cname: string[] | null;
+  /** Where the address goes in the end. */
+  addresses: string[] | null;
+  /** Our server's addresses (connect.<BASE_DOMAIN>). */
+  ourAddresses: string[] | null;
+  /** The domain's nameservers: where its records are kept. */
+  nameservers: string[] | null;
+  /** The company those nameservers belong to, when we know it ("Cloudflare"). */
+  provider: string | null;
+}
+
+/**
+ * right: points to us; no_record: there is no record of that name; wrong_target: a CNAME to another name;
+ * proxied: it answers with Cloudflare's addresses (the orange cloud); other_address: it answers, but not
+ * with ours (an A record, or another host); unknown: the look-up failed.
+ */
+export type DomainVerdict = "right" | "no_record" | "wrong_target" | "proxied" | "other_address" | "unknown";
+
+/** Each verdict in words: a title, and what to do next. */
+export const DOMAIN_VERDICT_WORDS: Record<DomainVerdict, { title: string; next: string }> = {
+  right: { title: "The record is right", next: "Nothing more to do in DNS. It is connected within 10 minutes, or at once with Check now." },
+  no_record: { title: "The record is not there yet", next: "Add the CNAME where the domain's nameservers point, then check again in a few minutes." },
+  wrong_target: { title: "The record points somewhere else", next: "Edit the record so its value is the address below." },
+  proxied: { title: "The record is behind Cloudflare's proxy", next: "Set the record to DNS only (grey cloud) in Cloudflare › DNS, and save." },
+  other_address: { title: "The address points somewhere else", next: "Remove the A record (or other record) with this name and add the CNAME instead." },
+  unknown: { title: "The look-up did not answer", next: "Nothing is known: try again in a minute." },
+};
+
+/** Who keeps a domain's records, from its nameservers (null: we do not know the name). */
+export function dnsProvider(nameservers: string[]): string | null {
+  const known: [RegExp, string][] = [
+    [/\.ns\.cloudflare\.com$/, "Cloudflare"],
+    [/\.domaincontrol\.com$/, "GoDaddy"],
+    [/\.registrar-servers\.com$/, "Namecheap"],
+    [/(\.dns-parking\.com|\.hostinger\.com)$/, "Hostinger"],
+    [/\.awsdns-[\d]+\./, "Amazon Route 53"],
+    [/\.googledomains\.com$|\.google\.com$/, "Google"],
+    [/\.azure-dns\./, "Azure DNS"],
+    [/\.digitalocean\.com$/, "DigitalOcean"],
+    [/\.hetzner\.(com|de)$/, "Hetzner"],
+    [/\.vercel-dns\.com$/, "Vercel"],
+    [/\.wixdns\.net$/, "Wix"],
+    [/\.squarespacedns\.com$/, "Squarespace"],
+    [/\.bluehost\.com$/, "Bluehost"],
+    [/\.hostgator\.com$/, "HostGator"],
+    [/\.siteground\.net$/, "SiteGround"],
+    [/\.namesilo\.com$/, "NameSilo"],
+    [/\.porkbun\.com$/, "Porkbun"],
+    [/\.ovh\.net$/, "OVH"],
+    [/\.name\.com$/, "Name.com"],
+  ];
+  for (const ns of nameservers.map((n) => n.toLowerCase().replace(/\.$/, ""))) {
+    const hit = known.find(([re]) => re.test(ns));
+    if (hit) return hit[1];
+  }
+  return null;
+}
+
 export const adminOrigin = (baseDomain: string | undefined, fallback: string) =>
   baseDomain ? `https://admin.${baseDomain}` : fallback.replace(/\/$/, "");
 /** The marketing site: the plain address itself ("https://rfq.example.com"). */

@@ -499,7 +499,8 @@ export function BillingSection({
 
 /* ---------------------------------------------------------------- Details */
 
-export function DetailsSection({ c, saved }: { c: CompanyDetail; saved?: SavedCard }) {
+/** `domain`: the company's own domain card, under its web address (domain-card.tsx; drawn by the page, it reads the API). */
+export function DetailsSection({ c, saved, domain }: { c: CompanyDetail; saved?: SavedCard; domain?: ReactNode }) {
   const live = c.status !== "deleted";
   const edit = (panel: string) => (live ? panel : undefined);
   const profile = c.profile;
@@ -559,6 +560,7 @@ export function DetailsSection({ c, saved }: { c: CompanyDetail; saved?: SavedCa
           { label: "Old short name", value: c.previousSlug ? `${c.previousSlug} (still works for now)` : "none", readOnly: true },
         ]}
       />
+      {domain}
       <GroupCard
         id="limits"
         title="Limits"
