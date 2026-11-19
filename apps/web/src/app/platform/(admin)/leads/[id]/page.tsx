@@ -14,6 +14,7 @@ import { PanelButton } from "../../companies/[id]/cards";
 import { NoteForm } from "./forms";
 import { LeadPanels, ProgressSteps } from "./panels";
 import { cache } from "react";
+import { RecordBody } from "@/components/records/record-frame";
 
 /** The client inquiry, read once per request (the page and its tab title). */
 const leadOf = cache((id: string) => loadPlatform(() => platformApi.get<LeadDetail>(`/leads/${id}`)));
@@ -105,77 +106,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           />
         }
       />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card className="overflow-clip" aria-labelledby="progress-title">
-            <div className="border-b border-line px-4 py-3">
-              <h2 id="progress-title" className="text-sm font-semibold">
-                Progress
-              </h2>
-              <p className="mt-0.5 text-xs text-muted">click a step to move it there</p>
-            </div>
-            <div className="flex flex-col gap-2 px-4 py-3">
-              <ProgressSteps status={l.status} action={updateLeadAction.bind(null, id)} />
-              {l.status === "lost" && l.lostReason && <p className="text-xs text-bad">Lost: {l.lostReason}</p>}
-              <p className="text-xs text-text-2">
-                {l.followUpOn ? (
-                  <>
-                    Next: follow up <b className="text-text">{date(l.followUpOn)}</b>
-                  </>
-                ) : (
-                  "No follow-up yet"
-                )}{" "}
-                ·{" "}
-                <PanelButton panel="follow-up" variant="link" label={l.followUpOn ? "change the follow-up date" : "set a follow-up date"}>
-                  {l.followUpOn ? "change" : "set a follow-up date"}
-                </PanelButton>
-              </p>
-            </div>
-          </Card>
-          <GroupCard
-            id="who"
-            title="Who"
-            description="from their request"
-            panel="edit-who"
-            editLabel="Edit who"
-            items={[
-              { label: "Company", value: l.companyName },
-              { label: "Contact", value: l.name },
-              {
-                label: "Email",
-                value: (
-                  <a href={`mailto:${l.email}`} className="break-all text-primary hover:underline">
-                    {l.email}
-                  </a>
-                ),
-              },
-              { label: "Phone / WhatsApp", value: l.phone },
-              { label: "Country", value: l.country },
-              { label: "Team size", value: l.teamSize },
-            ]}
-          />
-          <GroupCard
-            id="need"
-            title="What they need"
-            description="in their words, and yours"
-            panel="edit-need"
-            editLabel="Edit what they need"
-            columns={2}
-            items={[
-              {
-                label: "What they need",
-                value: l.message ? <span className="font-normal whitespace-pre-wrap">{l.message}</span> : null,
-                wide: true,
-              },
-              { label: "Came from", value: l.channel ?? LEAD_SOURCE_LABEL[l.source], readOnly: true },
-              ...(l.origin?.campaign
-                ? [{ label: "Campaign", value: [l.origin.campaign, l.origin.medium].filter(Boolean).join(", "), readOnly: true }]
-                : []),
-              ...(l.origin?.cta ? [{ label: "Button pressed", value: l.origin.cta, readOnly: true }] : []),
-            ]}
-          />
-        </div>
-        <div className="flex min-w-0 flex-col gap-4">
+      <RecordBody
+        panelLabel="Beside the client inquiry"
+        panel={
+          <>
           <Card className="overflow-clip" aria-labelledby="demo-title">
             <CardHeader
               titleId="demo-title"
@@ -260,8 +194,77 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               <EmptyLine className="px-4 py-3">Nothing yet.</EmptyLine>
             )}
           </Card>
-        </div>
-      </div>
+        </>
+        }
+      >
+          <Card className="overflow-clip" aria-labelledby="progress-title">
+            <div className="border-b border-line px-4 py-3">
+              <h2 id="progress-title" className="text-sm font-semibold">
+                Progress
+              </h2>
+              <p className="mt-0.5 text-xs text-muted">click a step to move it there</p>
+            </div>
+            <div className="flex flex-col gap-2 px-4 py-3">
+              <ProgressSteps status={l.status} action={updateLeadAction.bind(null, id)} />
+              {l.status === "lost" && l.lostReason && <p className="text-xs text-bad">Lost: {l.lostReason}</p>}
+              <p className="text-xs text-text-2">
+                {l.followUpOn ? (
+                  <>
+                    Next: follow up <b className="text-text">{date(l.followUpOn)}</b>
+                  </>
+                ) : (
+                  "No follow-up yet"
+                )}{" "}
+                ·{" "}
+                <PanelButton panel="follow-up" variant="link" label={l.followUpOn ? "change the follow-up date" : "set a follow-up date"}>
+                  {l.followUpOn ? "change" : "set a follow-up date"}
+                </PanelButton>
+              </p>
+            </div>
+          </Card>
+          <GroupCard
+            id="who"
+            title="Who"
+            description="from their request"
+            panel="edit-who"
+            editLabel="Edit who"
+            items={[
+              { label: "Company", value: l.companyName },
+              { label: "Contact", value: l.name },
+              {
+                label: "Email",
+                value: (
+                  <a href={`mailto:${l.email}`} className="break-all text-primary hover:underline">
+                    {l.email}
+                  </a>
+                ),
+              },
+              { label: "Phone / WhatsApp", value: l.phone },
+              { label: "Country", value: l.country },
+              { label: "Team size", value: l.teamSize },
+            ]}
+          />
+          <GroupCard
+            id="need"
+            title="What they need"
+            description="in their words, and yours"
+            panel="edit-need"
+            editLabel="Edit what they need"
+            columns={2}
+            items={[
+              {
+                label: "What they need",
+                value: l.message ? <span className="font-normal whitespace-pre-wrap">{l.message}</span> : null,
+                wide: true,
+              },
+              { label: "Came from", value: l.channel ?? LEAD_SOURCE_LABEL[l.source], readOnly: true },
+              ...(l.origin?.campaign
+                ? [{ label: "Campaign", value: [l.origin.campaign, l.origin.medium].filter(Boolean).join(", "), readOnly: true }]
+                : []),
+              ...(l.origin?.cta ? [{ label: "Button pressed", value: l.origin.cta, readOnly: true }] : []),
+            ]}
+          />
+      </RecordBody>
       <LeadPanels l={l} plans={plans} suggested={suggested} update={updateLeadAction.bind(null, id)} demo={giveDemoAction.bind(null, id)} />
     </div>
   );

@@ -18,6 +18,7 @@ import type { CustomerPayments } from "@/lib/types-money";
 import { NewFactoryPayment } from "@/components/money/forms";
 import { CostForm, type ExpenseChoices } from "@/components/money/cost-window";
 import { MoveMoney, type AccountRow } from "@/components/money/cash-forms";
+import { RecordBody } from "@/components/records/record-frame";
 import { customerReceiptAction, paymentAction } from "../../orders/actions";
 import { factoryPaymentAction } from "../../money/actions";
 import { opensPayments } from "../shared";
@@ -94,10 +95,9 @@ export async function RecordPayment({ sp, inWindow = false }: { sp: Search; inWi
           {side}
         </div>
       ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="flex min-w-0 flex-col gap-4">{form}</div>
-          <div className="flex flex-col gap-4">{side}</div>
-        </div>
+        <RecordBody panelLabel="Beside the payment" panel={side}>
+          {form}
+        </RecordBody>
       )}
     </>
   );

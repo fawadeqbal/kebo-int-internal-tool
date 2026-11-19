@@ -1,6 +1,7 @@
 import { Mail, MessageCircle, Pencil, Phone } from "lucide-react";
 import { can } from "@kebo/shared";
 import { Badge, Card, CardHeader, EmptyState } from "@kebo/ui";
+import { RecordBody } from "@/components/records/record-frame";
 import { requireUser } from "@/lib/session";
 import { customerOf } from "@/lib/party-data";
 import { PanelButton } from "@/components/orders/step-view";
@@ -23,7 +24,19 @@ export default async function CustomerContacts({ params }: { params: Promise<{ i
   const people = [...c.contacts].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <RecordBody
+      panelLabel="New contact"
+      panel={
+        canEdit ? (
+        <Card>
+          <CardHeader title="New contact" />
+          <div className="p-5">
+            <ContactForm action={saveContactAction.bind(null, c.id, null)} />
+          </div>
+        </Card>
+        ) : undefined
+      }
+    >
       {people.length === 0 ? (
         <Card>
           <EmptyState
@@ -107,14 +120,6 @@ export default async function CustomerContacts({ params }: { params: Promise<{ i
           ))}
         </div>
       )}
-      {canEdit && (
-        <Card>
-          <CardHeader title="New contact" />
-          <div className="p-5">
-            <ContactForm action={saveContactAction.bind(null, c.id, null)} />
-          </div>
-        </Card>
-      )}
-    </div>
+    </RecordBody>
   );
 }

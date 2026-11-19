@@ -137,6 +137,14 @@ describe("one of each", () => {
     expect(found(/<div className=\{RULES\.page\.column\}>/g).length).toBeGreaterThanOrEqual(4);
   });
 
+  it("one record body: every record's panel is RecordBody's 320, no hand-typed page grid, no second RecordFrame", () => {
+    // Left on purpose: a report's own side (charts) and a role's access map, which takes its panel only from 1280.
+    const own = ["insights/report-page.tsx", "access/roles/[key]/page.tsx"];
+    expect(found(/grid-cols-\[minmax\(0,1fr\)_\d+px\]/g).filter((m) => !m.includes("rules.ts") && !own.some((o) => m.includes(o)))).toEqual([]);
+    expect(found(/export function RecordFrame\(/g)).toHaveLength(1);
+    expect(found(/withSheetPanel|SIDE_COLUMNS/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

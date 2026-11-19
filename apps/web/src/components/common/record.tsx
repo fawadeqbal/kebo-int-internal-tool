@@ -4,30 +4,6 @@ import { Pencil } from "lucide-react";
 import { buttonClass, Card, cn, CardHeader } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
 
-/**
- * Record pages (design system: Record frame) — customers, factories, users:
- * the same frame as orders. Under the page header, the main column of cards
- * (Performance, Details with ✎ Edit, then the record's lists) and, beside it,
- * the right panel (Files · Changes). No tabs: every section is on the page.
- * On a phone it stacks — the sections become a row of chips (RecordNav) and
- * the right panel moves under the page.
- */
-export function RecordFrame({ nav, main, side, sideLabel }: { nav?: ReactNode; main: ReactNode; side?: ReactNode; sideLabel: string }) {
-  return (
-    <>
-      {nav}
-      <div className={cn("grid items-start gap-5", side && "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_360px]")}>
-        <div className="flex min-w-0 flex-col gap-5">{main}</div>
-        {side && (
-          <aside aria-label={sideLabel} className="min-w-0">
-            {side}
-          </aside>
-        )}
-      </div>
-    </>
-  );
-}
-
 /** A section of a record page, where its chip (RecordNav) and old ?tab= links land. */
 export function RecordSection({ id, children, className }: { id: string; children: ReactNode; className?: string }) {
   return (
