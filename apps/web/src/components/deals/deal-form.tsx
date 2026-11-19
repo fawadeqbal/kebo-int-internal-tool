@@ -22,7 +22,7 @@ import { ConfirmDialog } from "@/components/common/dialog";
 import { ChangeHint, changeCount, changedClassOf, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
 import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
-import { StepsFooter, StepsFrame } from "@/components/common/steps-frame";
+import { JumpToStep, StepsFooter, StepsFrame } from "@/components/common/steps-frame";
 import { CountrySelect } from "@/components/people/country-select";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { countryName } from "@/lib/countries";
@@ -463,7 +463,8 @@ export function DealForm({
             >
               {/* A refused field on another part: every step, at that one. */}
               <JumpToStep
-                st={s}
+                errors={s.errors}
+                stepOf={(f): RequestStep => (f === "items" || f.startsWith("items.") ? "items" : DETAIL_FIELDS.has(f) ? "details" : "customer")}
                 onJump={(k) => {
                   setStep(k);
                   if (only && k !== step) onAllSteps?.();
@@ -1545,16 +1546,3 @@ export function Facts({ rows }: { rows: [string, ReactNode][] }) {
 }
 const DETAIL_FIELDS = new Set(["title", "category", "priority", "requirements"]);
 
-/** A save refused for a field on another step opens that step, so the field and its message are in view. */
-function JumpToStep({ st, onJump }: { st: ActionState; onJump: (step: RequestStep) => void }) {
-  // Once per answer: a later step change by hand is not undone.
-  const jump = useRef(onJump);
-  useEffect(() => {
-    jump.current = onJump;
-  });
-  useEffect(() => {
-    const first = Object.keys(st.errors ?? {}).find((k) => st.errors?.[k]?.length);
-    if (first) jump.current(first === "items" || first.startsWith("items.") ? "items" : DETAIL_FIELDS.has(first) ? "details" : "customer");
-  }, [st]);
-  return null;
-}

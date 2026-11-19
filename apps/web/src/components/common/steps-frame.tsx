@@ -253,3 +253,21 @@ export function StepsFooter({
     </div>
   );
 }
+
+/**
+ * A refused field on another step: every steps window goes to the step that holds it, once per answer (a later
+ * step change by hand is not undone). `stepOf` names the step of an error's field key.
+ */
+export function JumpToStep<K extends string>({ errors, stepOf, onJump }: { errors?: Record<string, string[] | undefined>; stepOf: (field: string) => K; onJump: (step: K) => void }) {
+  const jump = useRef(onJump);
+  const where = useRef(stepOf);
+  useEffect(() => {
+    jump.current = onJump;
+    where.current = stepOf;
+  });
+  useEffect(() => {
+    const first = Object.keys(errors ?? {}).find((k) => errors?.[k]?.length);
+    if (first) jump.current(where.current(first));
+  }, [errors]);
+  return null;
+}

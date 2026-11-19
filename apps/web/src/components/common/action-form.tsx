@@ -75,12 +75,15 @@ export function ActionForm({
   id,
   banner,
   fieldId,
+  reveal,
   beforeSend,
 }: {
   /** Checked as the form is sent (a button or Ctrl+Enter): false keeps it here unsent; the form shows why itself. */
   beforeSend?: () => boolean;
   /** Where a field the server names is, when its name is not its field's (a contact's name in a list): its id. */
   fieldId?: (key: string) => string | null | undefined;
+  /** A steps window: shows the step that holds a field (before the cursor goes there). */
+  reveal?: (key: string) => void;
   /** Draws the form's own message instead of the usual one (return null to show nothing). */
   banner?: (state: ActionState) => ReactNode;
   /** The form's id, for a submit button placed outside it (form="…"). */
@@ -156,20 +159,23 @@ export function ActionForm({
     if (state === seen.current || state.ok === undefined) return;
     seen.current = state;
     // A mistake: the fields it names are marked, and the cursor goes to the first one (nothing typed is lost).
-    const form = formRef.current;
-    form?.querySelectorAll("[data-marked]").forEach((el) => {
-      el.removeAttribute("aria-invalid");
-      el.removeAttribute("data-marked");
-    });
-    const named = Object.keys(state.ok === false && state.code !== "reason_needed" ? (state.errors ?? {}) : {})
-      .map((name) => fieldOf(form, name, fieldId))
-      .filter((el): el is HTMLElement => !!el);
-    for (const el of named)
-      if (!el.hasAttribute("aria-invalid")) {
-        el.setAttribute("aria-invalid", "true");
-        el.setAttribute("data-marked", "");
-      }
-    named[0]?.focus();
+    // A tick later: a steps window first goes to the step that holds the first one (JumpToStep), then it is found.
+    setTimeout(() => {
+      const form = formRef.current;
+      form?.querySelectorAll("[data-marked]").forEach((el) => {
+        el.removeAttribute("aria-invalid");
+        el.removeAttribute("data-marked");
+      });
+      const named = Object.keys(state.ok === false && state.code !== "reason_needed" ? (state.errors ?? {}) : {})
+        .map((name) => fieldOf(form, name, fieldId))
+        .filter((el): el is HTMLElement => !!el);
+      for (const el of named)
+        if (!el.hasAttribute("aria-invalid")) {
+          el.setAttribute("aria-invalid", "true");
+          el.setAttribute("data-marked", "");
+        }
+      named[0]?.focus();
+    }, 0);
     // No connection: the note says so, with Try again (the window stays, with what was typed).
     if (state.code === "offline")
       toast({
@@ -208,7 +214,12 @@ export function ActionForm({
           <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
             {problems.map((p) => (
               <li key={p.name}>
-                <button type="button" className="text-left underline underline-offset-2 hover:opacity-80" onClick={() => fieldOf(formRef.current, p.name, fieldId)?.focus()}>
+                <button type="button" className="text-left underline underline-offset-2 hover:opacity-80" onClick={() => {
+                    // In a steps window, its step first (`reveal`), then the field.
+                    reveal?.(p.name);
+                    setTimeout(() => fieldOf(formRef.current, p.name, fieldId)?.focus(), 0);
+                  }}
+                >
                   {p.message}
                 </button>
               </li>
