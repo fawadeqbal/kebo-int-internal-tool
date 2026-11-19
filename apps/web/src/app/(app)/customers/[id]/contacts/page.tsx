@@ -39,7 +39,7 @@ export default async function CustomerContacts({ params }: { params: Promise<{ i
                 <strong>{p.name}</strong>
                 {p.isPrimary && <Badge tone="ok">Primary</Badge>}
               </div>
-              {p.position && <span className="text-[13px] text-text-2">{p.position}</span>}
+              {p.position && <span className="text-md text-text-2">{p.position}</span>}
               {p.email && (
                 <a href={`mailto:${p.email}`} className="flex items-center gap-2 break-all hover:text-primary">
                   <Mail className="size-[15px] shrink-0 text-muted" aria-hidden />

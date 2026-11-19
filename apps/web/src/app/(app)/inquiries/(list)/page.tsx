@@ -109,7 +109,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
         rowKey={(d) => d.id}
         href={(d) => `/inquiries/${d.id}`}
         select={(d) => ({ id: d.id, label: d.refNo })}
-        tableClassName="min-w-[960px] text-[13.5px]"
+        tableClassName="min-w-[960px] text-md"
         empty={{
           icon: MessageSquareText,
           title: narrowed ? `No ${INQUIRY.name.many} match` : `No ${INQUIRY.name.many} yet`,
@@ -132,7 +132,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
           who: <Responsible name={d.assignee?.name} short />,
         })}
         columns={[
-          { key: "no", header: "No.", className: "w-[124px] text-[13px] whitespace-nowrap text-muted tabular", cell: (d) => d.refNo },
+          { key: "no", header: "No.", className: "w-[124px] text-md whitespace-nowrap text-muted tabular", cell: (d) => d.refNo },
           {
             key: "inquiry",
             header: "Inquiry",
@@ -144,7 +144,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
                   </Link>
                   <PriorityTag priority={d.priority} />
                 </span>
-                <span className="block max-w-[26rem] truncate text-[12.5px] text-text-2">
+                <span className="block max-w-[26rem] truncate text-xs text-text-2">
                   {d.customer.name}
                   {d.customer.country === UNKNOWN_COUNTRY && <span className="text-warn"> · country not set</span>}
                 </span>

@@ -128,7 +128,7 @@ export async function VaultOverview({ today }: { today: string }) {
                       <Td className={cn("text-right whitespace-nowrap tabular", Number(a.balance) < 0 && "font-semibold text-bad")}>{money(a.balance, a.currency)}</Td>
                       <Td className="text-right whitespace-nowrap tabular">{eq === null ? <span className="text-muted">no rate</span> : eq.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
                       <Td className="text-right">
-                        <Link href={`/finance/cash-book?acct=${a.id}`} className="text-[13px] font-medium whitespace-nowrap text-primary hover:underline">
+                        <Link href={`/finance/cash-book?acct=${a.id}`} className="text-md font-medium whitespace-nowrap text-primary hover:underline">
                           Statement
                         </Link>
                       </Td>

@@ -90,7 +90,7 @@ export default async function CustomerInquiries({
                 />
               ))}
             </PhoneList>
-            <DataTable label="Inquiries" className="max-sm:hidden" tableClassName="min-w-[980px] text-[13px]">
+            <DataTable label="Inquiries" className="max-sm:hidden" tableClassName="min-w-[980px] text-md">
                 <THead>
                   <tr>
                     <Th>Inquiry</Th>

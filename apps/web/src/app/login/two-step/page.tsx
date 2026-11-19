@@ -23,7 +23,7 @@ export default async function TwoStepPage({ searchParams }: { searchParams: Prom
           <ShieldCheck className="size-[26px]" />
         </span>
         <div>
-          <h1 className="text-[22px] leading-7 font-semibold tracking-tight text-text">Two-step verification</h1>
+          <h1 className="text-xl leading-7 font-semibold tracking-tight text-text">Two-step verification</h1>
           <p className="mt-1 text-sm text-muted">Enter the 6-digit code from your authenticator app.</p>
         </div>
       </div>

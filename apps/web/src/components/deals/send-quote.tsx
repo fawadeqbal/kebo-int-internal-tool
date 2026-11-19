@@ -132,7 +132,7 @@ export function SendWindow({
     </label>
   );
   const file = (name: string, print: string, download: string) => (
-    <div key={name} className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-[13px]">
+    <div key={name} className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-md">
       <span className="font-semibold">{name}</span>
       <span className="flex gap-4">
         <a href={print} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline" aria-label={many ? `See how ${name} prints` : undefined}>

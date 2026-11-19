@@ -145,10 +145,10 @@ function NewQuotationsForm({
               <input key={id} type="hidden" name="offer" value={id} />
             ))}
             <fieldset className="flex flex-col gap-2">
-              <legend className="mb-2 text-[13px] font-semibold">Offers</legend>
+              <legend className="mb-2 text-md font-semibold">Offers</legend>
               {/* Made to fit a phone (data-fit): the tick, the offer and its cost; where it is quoted goes under its name. */}
               <div className="relative overflow-x-auto rounded-xl border border-line">
-                <table data-fit className="w-full border-collapse text-[13px]">
+                <table data-fit className="w-full border-collapse text-md">
                   <thead>
                     <tr className="bg-surface-2 text-left text-xs text-text-2">
                       <th scope="col" className="w-10 border-b border-line px-3 py-2 max-sm:w-9 max-sm:px-2.5">
@@ -212,7 +212,7 @@ function NewQuotationsForm({
             </fieldset>
 
             <fieldset className="flex flex-col gap-3">
-              <legend className="mb-2 text-[13px] font-semibold">Drafts</legend>
+              <legend className="mb-2 text-md font-semibold">Drafts</legend>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Field label="Currency" htmlFor="nq-currency" error={s.errors?.currency}>
                   <Select id="nq-currency" name="currency" value={currency} onChange={(e) => void changeCurrency(e.target.value)}>
@@ -232,7 +232,7 @@ function NewQuotationsForm({
               </div>
               {rows.length > 0 && (
                 <div className="relative overflow-x-auto rounded-xl border border-line">
-                  <table data-fit className="w-full border-collapse text-[13px]">
+                  <table data-fit className="w-full border-collapse text-md">
                     <thead>
                       <tr className="bg-surface-2 text-left text-xs text-text-2">
                         <th scope="col" className="border-b border-line px-3 py-2 font-medium">
@@ -340,7 +340,7 @@ export function AnswerButton({
                 aria-checked={answer === c.key}
                 onClick={() => setAnswer(c.key)}
                 className={cn(
-                  "h-9 rounded-full border px-4 text-[13px] font-semibold",
+                  "h-9 rounded-full border px-4 text-md font-semibold",
                   answer === c.key ? "border-primary bg-primary-soft text-primary" : "border-line-strong bg-surface text-text hover:bg-surface-2",
                 )}
               >

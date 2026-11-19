@@ -246,14 +246,14 @@ export function CustomerForm({
         ) : null}
 
         <div role="group" aria-labelledby="contacts-title" className="flex min-w-0 flex-col gap-3">
-          <h3 id="contacts-title" className="text-[15px] font-bold">
+          <h3 id="contacts-title" className="text-lead font-bold">
             Contacts
           </h3>
           {s.errors?.contacts && !Object.keys(s.errors).some((k) => k.startsWith("contacts.")) && (
             <Alert tone="error">{s.errors.contacts[0]}</Alert>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-[13px]">
+            <table className="w-full min-w-[760px] text-md">
               <thead className="bg-faint text-left text-text-2">
                 <tr>
                   <th className="w-[22%] px-2 py-2.5 font-semibold">

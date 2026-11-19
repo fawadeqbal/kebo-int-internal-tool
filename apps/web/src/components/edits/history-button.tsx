@@ -102,7 +102,7 @@ export function HistoryButton({ title, entries, allHref }: { title: string; entr
                 {entries.map((e, n) => (
                   <li
                     key={n}
-                    className="grid grid-cols-[10px_minmax(0,1fr)] gap-2.5 border-t border-line px-4 py-2.5 text-[13.5px] first:border-t-0"
+                    className="grid grid-cols-[10px_minmax(0,1fr)] gap-2.5 border-t border-line px-4 py-2.5 text-md first:border-t-0"
                   >
                     <span aria-hidden className={cn("mt-1.5 size-2 rounded-full", e.start ? "bg-line-strong" : "bg-primary-solid")} />
                     <span className="flex min-w-0 flex-col gap-1">
@@ -110,7 +110,7 @@ export function HistoryButton({ title, entries, allHref }: { title: string; entr
                         <ChangeLine key={l} text={l} />
                       ))}
                       {e.reason && (
-                        <span className="self-start rounded-md bg-action-soft px-2 py-0.5 text-[12.5px] font-semibold text-action">
+                        <span className="self-start rounded-md bg-action-soft px-2 py-0.5 text-xs font-semibold text-action">
                           Why: {e.reason}
                         </span>
                       )}

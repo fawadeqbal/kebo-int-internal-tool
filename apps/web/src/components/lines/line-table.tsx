@@ -1094,7 +1094,7 @@ export function LineTable({
         <p className="line-clamp-2 text-base leading-snug font-semibold">
           {numbers[i]} · {firstLine(r) || "No description yet"}
         </p>
-        <p className="text-[13px] text-text-2 tabular">
+        <p className="text-md text-text-2 tabular">
           {bits.line[0]}
           {bits.amount ? <> = {bits.amount}</> : null}
           {parts ? ` · ${parts} part${parts === 1 ? "" : "s"}` : r.parentKey ? ` · part of ${parentLabel(r.parentKey)}` : null}
@@ -1192,7 +1192,7 @@ export function LineTable({
             >
               <Check aria-hidden /> Add
               {/* The key, drawn (not text): the button's name stays "Add the item". */}
-              {!inline && !flat && partButton && <kbd aria-hidden className="rounded bg-white/20 px-1.5 font-sans text-[11px] leading-5 font-semibold before:content-['Enter']" />}
+              {!inline && !flat && partButton && <kbd aria-hidden className="rounded bg-white/20 px-1.5 font-sans text-2xs leading-5 font-semibold before:content-['Enter']" />}
             </Button>
             {inline && (
               <Button size="icon-xs" variant="ghost" onClick={() => setEntryAt({ afterKey: null, parentKey: null })} aria-label="Stop adding here" title="Esc">
@@ -1253,7 +1253,7 @@ export function LineTable({
           variant="ghost"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => findRef.current?.blur()}
-          className="h-10 shrink-0 px-2 text-[15px] font-bold text-primary hover:text-primary"
+          className="h-10 shrink-0 px-2 text-lead font-bold text-primary hover:text-primary"
         >
           Done
         </Button>
@@ -1287,8 +1287,8 @@ export function LineTable({
   // Select on a phone: the top says how many, Done ends it; the bar of what to do takes the footer's place.
   const phoneSelectTop = (
     <div className="flex min-h-11 items-center justify-between gap-2 rounded-[10px] bg-primary-soft px-3 text-primary">
-      <span className="text-[15px] font-bold">{pickedRows.length ? pickedLabel : `Tap the ${noun}s to select them`}</span>
-      <Button type="button" variant="ghost" onClick={stopSelecting} className="h-10 px-2 text-[15px] font-bold text-primary hover:text-primary">
+      <span className="text-lead font-bold">{pickedRows.length ? pickedLabel : `Tap the ${noun}s to select them`}</span>
+      <Button type="button" variant="ghost" onClick={stopSelecting} className="h-10 px-2 text-lead font-bold text-primary hover:text-primary">
         Done
       </Button>
     </div>
@@ -1326,7 +1326,7 @@ export function LineTable({
       <span className="flex items-center gap-1 text-xs text-text-2">
         {total.label} <ChevronUp className="size-3.5" aria-hidden />
       </span>
-      <span className="max-w-full truncate text-[15px] font-bold tabular">{total.value}</span>
+      <span className="max-w-full truncate text-lead font-bold tabular">{total.value}</span>
     </button>
   );
   const totalsInFooter = phone && !!footerSlot && !!totalButton && !selecting;
@@ -1338,11 +1338,11 @@ export function LineTable({
       {empty ? <div className="text-sm text-text-2">{empty}</div> : <p className="text-sm text-text-2">Add them one by one, or bring them in at once.</p>}
       {!readOnly && (
         <>
-          <Button type="button" variant="primary" onClick={() => openNew()} className="h-12 text-[15px] max-sm:h-12">
+          <Button type="button" variant="primary" onClick={() => openNew()} className="h-12 text-lead max-sm:h-12">
             <Plus aria-hidden /> Add {noun}
           </Button>
           {ways.map((w, n) => (
-            <Button key={w.key} type="button" variant={n === 0 ? "soft" : "secondary"} onClick={w.onSelect} className="h-12 text-[15px] max-sm:h-12">
+            <Button key={w.key} type="button" variant={n === 0 ? "soft" : "secondary"} onClick={w.onSelect} className="h-12 text-lead max-sm:h-12">
               {w.icon ?? <Copy aria-hidden />} {w.label}
               {w.note ? ` · ${w.note}` : ""}
             </Button>
@@ -1365,7 +1365,7 @@ export function LineTable({
   const phoneList = (
     <div className="flex flex-col gap-2">
       {notice && rows.length > 0 && (
-        <div className="flex items-start gap-2 rounded-[10px] border border-info/20 bg-info-soft px-3 py-2 text-[13px] text-text">
+        <div className="flex items-start gap-2 rounded-[10px] border border-info/20 bg-info-soft px-3 py-2 text-md text-text">
           <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
           <span className={cn("min-w-0 flex-1", !noticeOpen && "truncate")}>{notice}</span>
           <button type="button" onClick={() => setNoticeOpen((o) => !o)} aria-expanded={noticeOpen} className="shrink-0 font-bold text-info underline underline-offset-2">
@@ -1384,7 +1384,7 @@ export function LineTable({
               type="button"
               aria-pressed={f.on}
               onClick={() => setNeedsOnly(f.set)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:font-semibold aria-pressed:text-primary"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-md aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:font-semibold aria-pressed:text-primary"
             >
               {f.label} <b className="tabular">{f.n}</b>
             </button>
@@ -1392,7 +1392,7 @@ export function LineTable({
         </div>
       )}
       {rows.length > 0 && (
-        <p className="truncate text-[12.5px] text-text-2">
+        <p className="truncate text-xs text-text-2">
           {q ? `${matching} of ${rows.length} match “${query.trim()}”` : selecting ? `Tap the ${noun}s to select them` : [countWords(rows, noun), caption].filter(Boolean).map((x, n) => (
             <span key={n}>
               {n > 0 && " · "}
@@ -1415,7 +1415,7 @@ export function LineTable({
                   variant="secondary"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => openNew({ afterKey: null, parentKey: null }, { [columns[0]!.key]: query.trim() })}
-                  className="h-12 text-[15px] max-sm:h-12"
+                  className="h-12 text-lead max-sm:h-12"
                 >
                   <Plus aria-hidden /> Add “{query.trim()}” as {an(noun)}
                 </Button>
@@ -1484,7 +1484,7 @@ export function LineTable({
         </div>
       )}
       {suggest && !q && !selecting && rows.length > 0 && (
-        <div className="flex items-center gap-2 rounded-xl border-[1.5px] border-dashed border-line-strong px-3 py-2.5 text-[13px] text-text-2">
+        <div className="flex items-center gap-2 rounded-xl border-[1.5px] border-dashed border-line-strong px-3 py-2.5 text-md text-text-2">
           <span className="min-w-0 flex-1">{suggest.text}</span>
           <button type="button" onClick={suggest.onSelect} className="shrink-0 font-bold text-primary">
             {suggest.label}
@@ -1563,7 +1563,7 @@ export function LineTable({
             (phone ? (
               // A phone (design 18 Nov): one big Add, and ⋯ beside it for the other ways in (paste, Excel).
               <div className="flex w-full gap-2">
-                <Button variant="primary" onClick={() => openNew()} className="h-12 flex-1 text-[15px] max-sm:h-12 max-sm:text-[15px]">
+                <Button variant="primary" onClick={() => openNew()} className="h-12 flex-1 text-lead max-sm:h-12 max-sm:text-lead">
                   <Plus aria-hidden /> Add {noun}
                 </Button>
                 <Button
@@ -1632,7 +1632,7 @@ export function LineTable({
             />
           )}
           {/* Tick boxes only when asked for (design 18 Nov): the table stays clean; Done turns them off. */}
-          {!readOnly && !phone && rows.length > 0 && <span className="ml-auto text-[13px] text-text-2">{countWords(rows, noun)}</span>}
+          {!readOnly && !phone && rows.length > 0 && <span className="ml-auto text-md text-text-2">{countWords(rows, noun)}</span>}
           {!readOnly && !phone && rows.length > 0 && (
             <Button
               size="sm"
@@ -2389,7 +2389,7 @@ function SelectBarButton({ icon, children, onClick, disabled, danger }: { icon: 
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[11.5px] font-semibold text-text active:bg-surface-2 disabled:opacity-40 [&_svg]:size-5",
+        "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-2xs font-semibold text-text active:bg-surface-2 disabled:opacity-40 [&_svg]:size-5",
         danger && "text-bad",
       )}
     >
@@ -2428,7 +2428,7 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40 max-sm:min-h-12 max-sm:gap-3 max-sm:text-[15px] [&_svg]:size-4 [&_svg]:text-muted max-sm:[&_svg]:size-5",
+        "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40 max-sm:min-h-12 max-sm:gap-3 max-sm:text-lead [&_svg]:size-4 [&_svg]:text-muted max-sm:[&_svg]:size-5",
         danger && "border-t border-line text-bad hover:bg-bad-soft [&_svg]:text-bad",
         strong && "font-bold text-primary [&_svg]:text-primary",
       )}
@@ -2436,7 +2436,7 @@ function MenuItem({
       {icon}
       <span className="flex-1 text-left">{children}</span>
       {note ? (
-        <span className="ml-3 shrink-0 text-[13px] text-muted">{note}</span>
+        <span className="ml-3 shrink-0 text-md text-muted">{note}</span>
       ) : (
         hint && <span className="ml-3 hidden text-xs text-muted sm:inline">{hint}</span>
       )}
@@ -2545,7 +2545,7 @@ function PastePanel({
         onChange={(e) => setText(e.target.value)}
       />
       {items.length > 0 && (
-        <p className="text-[13px] text-text-2">
+        <p className="text-md text-text-2">
           {items.length} row{items.length === 1 ? "" : "s"}
           {dupCount > 0 && `, ${dupCount} may be ${dupCount === 1 ? "a duplicate" : "duplicates"}`}
         </p>
@@ -2667,7 +2667,7 @@ function BarButton({ children, danger, className, ...props }: ComponentProps<"bu
     <button
       type="button"
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-semibold text-text hover:bg-surface/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-text-2",
+        "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-md font-semibold text-text hover:bg-surface/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-text-2",
         danger && "text-bad [&_svg]:text-bad",
         className,
       )}

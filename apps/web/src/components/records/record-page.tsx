@@ -90,7 +90,7 @@ export function RecordPanel({ sections, summary }: { sections: PanelSection[]; s
       <section className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
         {sections.map((s, i) => (
           <section key={s.id} aria-labelledby={s.id} className={cn("flex flex-col gap-1 px-4 py-3", i < sections.length - 1 && "border-b border-line")}>
-            <h2 id={s.id} className="mb-1 text-[15px] font-semibold">
+            <h2 id={s.id} className="mb-1 text-lead font-semibold">
               {s.title}
             </h2>
             {s.children}

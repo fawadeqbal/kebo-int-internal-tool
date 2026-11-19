@@ -28,7 +28,7 @@ export function PapersEditor({ off: initial, action }: { off: string[]; action: 
       {PAPER_SWITCH_GROUPS.map((g) => (
         <section key={g.title} aria-labelledby={`papers-${g.title}`} className="flex flex-col border-t border-line first:border-t-0">
           <div className="px-4 pt-3 pb-1">
-            <h3 id={`papers-${g.title}`} className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+            <h3 id={`papers-${g.title}`} className="text-2xs font-semibold tracking-wide text-muted uppercase">
               {g.title}
             </h3>
             <p className="text-xs text-muted">{g.hint}</p>

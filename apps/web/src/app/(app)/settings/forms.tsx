@@ -109,28 +109,28 @@ export function BrandPreview({ initial, label = "The top of your documents" }: {
     <div ref={box} className="sm:col-span-2">
       {label && <p className="mb-1.5 text-sm font-medium">{label}</p>}
       {/* Wider than a phone: it scrolls sideways, so the keyboard can reach it too. */}
-      <div tabIndex={0} role="region" aria-label="Preview of the top of your documents" className="overflow-x-auto rounded-lg border border-line bg-white p-5 text-[#1a1a1a]">
+      <div tabIndex={0} role="region" aria-label="Preview of the top of your documents" className="overflow-x-auto rounded-lg border border-line bg-white p-5 text-kebo-ink">
         <div className="flex min-w-[26rem] items-center gap-3.5">
           {b.logo ? (
             // eslint-disable-next-line @next/next/no-img-element -- a data URL kept in the settings
             <img src={b.logo} alt="" className="size-[70px] shrink-0 object-contain" />
           ) : (
-            <div className="grid size-[62px] shrink-0 place-items-center rounded-full border-[3px] border-[#B08D3C] bg-[#063C8C] text-[22px] font-extrabold text-white">
+            <div className="grid size-[62px] shrink-0 place-items-center rounded-full border-[3px] border-kebo-gold bg-kebo-deep text-xl font-extrabold text-white">
               {initials}
             </div>
           )}
           <div className="min-w-0">
-            <div className="text-[28px] leading-none font-extrabold tracking-[0.14em] text-[#063C8C]">{mark}</div>
-            {b.tagline && <div className="mt-0.5 text-[11.5px] font-semibold tracking-[0.18em] text-[#8A6A22]">{b.tagline.toUpperCase()}</div>}
-            <div className="mt-0.5 text-[11.5px] text-[#444]">
+            <div className="text-2xl leading-none font-extrabold tracking-[0.14em] text-kebo-deep">{mark}</div>
+            {b.tagline && <div className="mt-0.5 text-2xs font-semibold tracking-[0.18em] text-kebo-gold-deep">{b.tagline.toUpperCase()}</div>}
+            <div className="mt-0.5 text-2xs text-kebo-grey">
               {b.name}
               {b.nameLocal && ` · ${b.nameLocal}`}
             </div>
           </div>
         </div>
         <div className="mt-4 flex h-[3px]">
-          <div className="flex-[7] bg-[#063C8C]" />
-          <div className="flex-[3] bg-[#B08D3C]" />
+          <div className="flex-[7] bg-kebo-deep" />
+          <div className="flex-[3] bg-kebo-gold" />
         </div>
       </div>
     </div>
@@ -266,7 +266,7 @@ export function Control({ f, text, checked, error }: { f: SettingField; text: st
         <Textarea
           {...common}
           rows={Math.min(8, Math.max(3, text.split("\n").length + 1))}
-          className="font-mono text-[13px]"
+          className="font-mono text-md"
           spellCheck={false}
         />
       ) : f.kind === "select" ? (

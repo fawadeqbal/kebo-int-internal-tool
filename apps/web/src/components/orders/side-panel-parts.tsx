@@ -81,9 +81,9 @@ export function SideSection({
   return (
     <section aria-label={title} data-target={target} data-target-card={target ? "" : undefined} className="border-b border-line px-[18px] pt-3.5 pb-3 last:border-b-0">
       <div className="mb-1 flex min-h-8 items-center justify-between gap-2">
-        <h3 className="text-[15px] font-semibold">
+        <h3 className="text-lead font-semibold">
           {title}
-          {count !== undefined && <span className="ml-1.5 text-[13px] font-normal text-muted tabular">{count}</span>}
+          {count !== undefined && <span className="ml-1.5 text-md font-normal text-muted tabular">{count}</span>}
         </h3>
         {action && <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">{action}</span>}
       </div>

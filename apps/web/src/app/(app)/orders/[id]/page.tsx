@@ -219,7 +219,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
         {m.plan.items.map((i) => (
           <span key={i.id} className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3">
             <span className="min-w-0">{i.label}</span>
-            <span className={cn("shrink-0 text-[13px] font-normal tabular", i.status === "paid" ? "text-ok" : "text-text-2")}>{partState(i, o.currency)}</span>
+            <span className={cn("shrink-0 text-md font-normal tabular", i.status === "paid" ? "text-ok" : "text-text-2")}>{partState(i, o.currency)}</span>
           </span>
         ))}
       </span>

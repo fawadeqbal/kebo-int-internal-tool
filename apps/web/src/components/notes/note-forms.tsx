@@ -273,7 +273,7 @@ export function FollowUpDoneNext({ action, title, what, inquiryHref, as = "butto
                   <Input id={`${id}-title`} name="nextTitle" maxLength={200} defaultValue={s.values?.nextTitle ?? title} />
                 </Field>
                 <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
-                  <Link href={inquiryHref} className="text-[13px] font-medium text-text-2 hover:text-primary hover:underline">
+                  <Link href={inquiryHref} className="text-md font-medium text-text-2 hover:text-primary hover:underline">
                     Or mark the inquiry won or lost
                   </Link>
                   <span className="flex-1" />

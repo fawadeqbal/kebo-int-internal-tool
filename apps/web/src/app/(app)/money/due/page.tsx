@@ -29,7 +29,7 @@ type Search = { side?: string; show?: string; q?: string; who?: string; page?: s
 
 const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
-const SMALL = "h-8 px-2.5 text-[13px]";
+const SMALL = "h-8 px-2.5 text-md";
 
 const add = (m: Map<string, number>, currency: string, v: string | number) => m.set(currency, (m.get(currency) ?? 0) + Number(v));
 
@@ -240,7 +240,7 @@ async function OrderParts({ id, me, today, back, auto }: { id: string; me: Me; t
       <div className="overflow-hidden rounded-lg border border-line bg-surface pt-1 pb-3">
         <PlanInList orderId={o.id} plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} send={sendRequestAction.bind(null, o.id)} pay={pay} back={back} auto={auto} />
       </div>
-      <Link href={`/orders/${o.id}/payment`} className="w-fit text-[13px] font-medium text-primary hover:underline">
+      <Link href={`/orders/${o.id}/payment`} className="w-fit text-md font-medium text-primary hover:underline">
         Open the order →
       </Link>
     </div>
@@ -405,7 +405,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
                     <Td className="text-right">
                       {r.part ? (
                         !parts.canPay ? (
-                          <Link href={`/orders/${r.part.order.id}/factory`} className="text-[13px] font-medium text-primary hover:underline">
+                          <Link href={`/orders/${r.part.order.id}/factory`} className="text-md font-medium text-primary hover:underline">
                             Open
                           </Link>
                         ) : sp.pay === r.key ? (

@@ -33,7 +33,7 @@ export function RepeatingRow({ w, setup }: { w: Waiting; setup: CostSetup }) {
         <Button
           size="sm"
           variant="secondary"
-          className="h-8 px-2.5 text-[13px]"
+          className="h-8 px-2.5 text-md"
           disabled={busy}
           onClick={() =>
             start(async () => {

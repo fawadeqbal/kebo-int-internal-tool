@@ -62,7 +62,7 @@ export function Section({
 export function EmptySection({ title, text, action, wide, id }: { title: string; text: string; action?: ReactNode; wide?: boolean; id?: string }) {
   return (
     <RecordBox id={id} title={title} what={title.toLowerCase()} canEdit={!!action} edit={action} className={cn("min-w-0", wide && "lg:col-span-full")}>
-      <p className="px-5 py-4 text-[13px] text-text-2 max-sm:px-4">{text}</p>
+      <p className="px-5 py-4 text-md text-text-2 max-sm:px-4">{text}</p>
     </RecordBox>
   );
 }

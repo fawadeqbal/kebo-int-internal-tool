@@ -26,7 +26,7 @@ export function CostsExcel({ costs }: { costs: OrderCosts }) {
         type="button"
         variant="secondary"
         size="sm"
-        className="h-8 px-2.5 text-[13px]"
+        className="h-8 px-2.5 text-md"
         disabled={busy || !costs.sheet.rows.length}
         onClick={async () => {
           setBusy(true);

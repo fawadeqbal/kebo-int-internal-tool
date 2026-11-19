@@ -91,11 +91,11 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             <Card key={g.kind} className="overflow-clip p-0">
               <section aria-label={SEARCH_KIND_LABEL[g.kind]}>
                 <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5 sm:px-5">
-                  <h2 className="text-[13px] font-semibold tracking-wide text-text-2 uppercase">
+                  <h2 className="text-md font-semibold tracking-wide text-text-2 uppercase">
                     {SEARCH_KIND_LABEL[g.kind]} · {g.total}
                   </h2>
                   {!kind && (
-                    <Link href={tab(g.kind)} className="inline-flex min-h-8 items-center text-[13px] font-medium text-primary hover:underline">
+                    <Link href={tab(g.kind)} className="inline-flex min-h-8 items-center text-md font-medium text-primary hover:underline">
                       {g.total > g.items.length ? `See all ${kindCount(g.kind, g.total)}` : `Only ${SEARCH_KIND_LABEL[g.kind].toLowerCase()}`}
                     </Link>
                   )}
@@ -106,7 +106,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                   ))}
                 </ul>
                 {kind && g.total > g.items.length && (
-                  <p className="border-t border-line px-4 py-2.5 text-[13px] text-text-2 sm:px-5">
+                  <p className="border-t border-line px-4 py-2.5 text-md text-text-2 sm:px-5">
                     The first {g.items.length} of {g.total}: add words to narrow it.
                   </p>
                 )}
@@ -131,7 +131,7 @@ function ResultRow({ x, q }: { x: SearchItem; q: string }) {
           <span className="block truncate text-sm font-semibold text-text">
             <Marked text={x.title} q={q} />
           </span>
-          <span className="block truncate text-[13px] text-text-2">
+          <span className="block truncate text-md text-text-2">
             <Marked text={x.sub} q={q} />
           </span>
         </span>

@@ -48,7 +48,7 @@ export function SectionFiles({ orderId, section, canAdd, quiet }: { orderId: str
       {canAdd && (
         <>
           <input ref={input} type="file" multiple hidden onChange={(e) => (send(e.target.files), (e.target.value = ""))} />
-          <button type="button" disabled={busy} className="tap text-[12.5px] font-medium text-text-2 hover:text-primary hover:underline disabled:opacity-60" onClick={() => input.current?.click()}>
+          <button type="button" disabled={busy} className="tap text-xs font-medium text-text-2 hover:text-primary hover:underline disabled:opacity-60" onClick={() => input.current?.click()}>
             {busy ? "Sending…" : "+ Add a file"}
           </button>
         </>
@@ -96,7 +96,7 @@ export function WindowFiles({ orderId, section }: { orderId: string; section: Or
           send(e.dataTransfer.files);
         }}
         className={cn(
-          "flex min-h-11 items-center justify-center rounded-lg border border-dashed border-line-strong px-3 py-2 text-center text-[12.5px] text-text-2 hover:border-primary/60 hover:text-text",
+          "flex min-h-11 items-center justify-center rounded-lg border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-2 hover:border-primary/60 hover:text-text",
           over && "border-primary bg-primary-soft text-text",
         )}
       >

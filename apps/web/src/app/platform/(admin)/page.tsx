@@ -131,7 +131,7 @@ export default async function PlatformOverviewPage() {
               <h2 className="text-sm font-semibold">Renewals and demos ending</h2>
               <p className="mt-0.5 text-xs text-muted">overdue, ending within a week, renewing within 30 days</p>
             </div>
-            <Link href="/platform/companies" className={buttonClass("ghost", "sm", "h-8 px-2.5 text-[13px] text-text-2")}>
+            <Link href="/platform/companies" className={buttonClass("ghost", "sm", "h-8 px-2.5 text-md text-text-2")}>
               All companies
             </Link>
           </div>

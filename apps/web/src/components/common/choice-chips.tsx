@@ -55,7 +55,7 @@ export function ChoiceChips<T extends string>({
             onClick={() => onChange(o)}
             onKeyDown={(e) => move(e, i)}
             className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text max-sm:h-10",
+              "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-md font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text max-sm:h-10",
               on ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line-strong bg-surface text-text hover:bg-surface-2",
             )}
           >

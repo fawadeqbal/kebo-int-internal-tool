@@ -573,7 +573,7 @@ export function PriceTotals({
         <span className="flex items-center gap-1 text-xs text-text-2">
           {showCosts ? "Total · margin" : "Total"} <ChevronUp className="size-3.5" aria-hidden />
         </span>
-        <span className="max-w-full truncate text-[15px] font-bold tabular">
+        <span className="max-w-full truncate text-lead font-bold tabular">
           {fmt(totals.total)}
           {showCosts && costing.marginPercent !== null && <span className={cn("font-semibold", tone(costing.marginPercent))}> · {costing.marginPercent.toFixed(1)}%</span>}
         </span>

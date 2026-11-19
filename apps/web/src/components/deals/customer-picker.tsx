@@ -167,7 +167,7 @@ export function CustomerPicker({
         <div className="absolute top-full right-0 left-0 z-30 mt-1 overflow-hidden rounded-xl border border-line bg-surface shadow-pop">
           <ul id={listId} role="listbox" aria-label="Customers" className="max-h-80 overflow-y-auto p-1">
             {rows.length > 0 && (
-              <li role="presentation" className="px-2.5 pt-1.5 pb-1 text-[11.5px] font-semibold tracking-wide text-text-2 uppercase">
+              <li role="presentation" className="px-2.5 pt-1.5 pb-1 text-2xs font-semibold tracking-wide text-text-2 uppercase">
                 {showRecent ? "Recent" : `Results for “${typed || "all"}”`}
               </li>
             )}

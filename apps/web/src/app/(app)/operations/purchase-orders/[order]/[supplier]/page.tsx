@@ -287,7 +287,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                   ["Goods ready", po.readyOn ? date(po.readyOn) : "—"],
                 ] as [string, string][]
               ).map(([k, v]) => (
-                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
+                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-md">
                   <span className="text-text-2">{k}</span>
                   <span className="text-right font-semibold tabular">{v}</span>
                 </li>
@@ -302,7 +302,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                     ["Still to pay", whole(r.toPay, r.currency)],
                   ] as [string, string][]
                 ).map(([k, v]) => (
-                  <li key={`${r.currency}:${k}`} className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
+                  <li key={`${r.currency}:${k}`} className="flex items-baseline justify-between gap-3 py-1 text-md">
                     <span className="text-text-2">{k}</span>
                     <span className="text-right font-semibold tabular">{v}</span>
                   </li>
@@ -317,14 +317,14 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                   ["Responsible person", o.inquiry.assignee?.name ?? "—"],
                 ] as [string, string][]
               ).map(([k, v]) => (
-                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
+                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-md">
                   <span className="text-text-2">{k}</span>
                   <span className="text-right font-semibold">{v}</span>
                 </li>
               ))}
             </SideSection>
             <SideSection title="Changed on the order">
-              <li className="py-1 text-[13px]">
+              <li className="py-1 text-md">
                 <Link href={orderHref} className="font-semibold text-primary hover:underline">
                   Open {o.refNo} › Purchase order
                 </Link>

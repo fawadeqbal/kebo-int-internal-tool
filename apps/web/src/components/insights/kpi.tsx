@@ -12,7 +12,7 @@ export function TargetRing({ percent, reached, amount, currency, size = 132 }: {
       <svg viewBox="0 0 120 120" width={size} height={size} role="img" aria-label={`${percent}% of the target reached`} className="shrink-0 -rotate-90">
         <circle cx="60" cy="60" r={r} fill="none" stroke="var(--surface-3)" strokeWidth="12" />
         <circle cx="60" cy="60" r={r} fill="none" stroke={tone} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${(shown / 100) * c} ${c}`} />
-        <text x="60" y="60" textAnchor="middle" dominantBaseline="central" className="fill-text text-[22px] font-semibold" transform="rotate(90 60 60)">
+        <text x="60" y="60" textAnchor="middle" dominantBaseline="central" className="fill-text text-xl font-semibold" transform="rotate(90 60 60)">
           {percent}%
         </text>
       </svg>

@@ -22,10 +22,10 @@ export function BrandMark({ name, logoSrc, size }: { name: string; logoSrc: stri
     );
   const tile =
     size === "top"
-      ? "size-[30px] rounded-lg text-[13px]"
+      ? "size-[30px] rounded-lg text-md"
       : size === "card"
         ? "size-14 rounded-[14px] text-xl ring-4 ring-primary-soft"
-        : "size-20 rounded-[20px] text-[28px] ring-[6px] ring-primary-soft";
+        : "size-20 rounded-[20px] text-2xl ring-[6px] ring-primary-soft";
   return (
     <span className={`grid place-items-center bg-primary-solid font-bold tracking-wide text-primary-fg ${tile}`} aria-hidden>
       {initialsOf(name)}

@@ -40,7 +40,7 @@ export const generateMetadata = orderTitle("Shipping");
 /** What saving the freight and the insurance does to the order's costs. */
 const COST_WHATS = ["Freight we pay (not “collect”) and the premium become costs of this order by themselves."];
 
-const SMALL = "h-8 px-2.5 text-[13px]";
+const SMALL = "h-8 px-2.5 text-md";
 const has = (...v: (string | null | undefined)[]) => v.some((x) => x !== null && x !== undefined && x !== "");
 
 /**

@@ -66,7 +66,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
         />
       </Tiles>
 
-      <p className="text-[13px] text-text-2">
+      <p className="text-md text-text-2">
         The company&apos;s own costs (rent, salaries, the office: {money(d.company, c)} {p.name}) are on{" "}
         <Link href="/money/company-costs" className="font-medium text-primary hover:underline">
           Money › Company costs

@@ -83,7 +83,7 @@ const ROUTE_SHORT: Record<PaymentRoute, string> = { informal: "informal", bank_c
 /** A step's check on the right of its heading: a few words (the whole sentence is in the step, and on hover). */
 function StepChip({ ok, title, children }: { ok: boolean; title?: string; children: ReactNode }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 text-[13px] font-semibold", ok ? "text-ok" : "text-warn")} title={title}>
+    <span className={cn("inline-flex items-center gap-1.5 text-md font-semibold", ok ? "text-ok" : "text-warn")} title={title}>
       {ok ? <CheckCircle2 className="size-4 shrink-0" aria-hidden /> : <AlertTriangle className="size-4 shrink-0" aria-hidden />}
       {children}
     </span>
@@ -767,7 +767,7 @@ export function RevisionEditor({
                 )}
               </ul>
               {showCosts && (
-                <div className="flex flex-col gap-1 text-[13px] text-text-2">
+                <div className="flex flex-col gap-1 text-md text-text-2">
                   <p className="flex flex-wrap items-center gap-2">
                     <label htmlFor={`margin-${number}`}>Price every ticked offer at</label>
                     <Input
@@ -792,7 +792,7 @@ export function RevisionEditor({
                 .map((o, i) => ({ o, i }))
                 .filter(({ o }) => requireChanges && !s.options.some((x) => x.factoryQuoteId === o.factoryQuoteId))
                 .map(({ o, i }) => (
-                  <p key={o.factoryQuoteId ?? "items"} className="rounded-lg bg-warn-soft/60 px-3 py-2 text-[13px]">
+                  <p key={o.factoryQuoteId ?? "items"} className="rounded-lg bg-warn-soft/60 px-3 py-2 text-md">
                     Option {optionLetter(i)}
                     {o.factoryQuoteId
                       ? ` (${offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.factory.name ?? "its offer"})`

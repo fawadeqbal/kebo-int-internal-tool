@@ -39,7 +39,7 @@ const buttonSizes: Record<ButtonSize, string> = {
   xs: "h-7 rounded-lg px-2 text-xs [&_svg]:size-3.5 pointer-coarse:h-8 pointer-coarse:min-w-8 pointer-coarse:px-2.5",
   // Design rule 10 (sizes): buttons 32–40 on a laptop, 40–44 on a phone (a thumb, not a pointer); the strong
   // one 44, 48 on a phone. A button never gets smaller on a phone.
-  sm: "h-9 px-3 text-[13px] max-sm:h-10 max-sm:px-3.5",
+  sm: "h-9 px-3 text-md max-sm:h-10 max-sm:px-3.5",
   md: "h-10 px-3.5 max-sm:h-11 max-sm:px-4",
   lg: "h-11 px-5 max-sm:h-12",
   icon: "size-10",
@@ -301,7 +301,7 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
  * aside while it is there (globals.css). With nothing in it (no next step) it is not there and the bar stays.
  */
 const DOCK =
-  "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:flex max-md:gap-2 max-md:border-t max-md:border-line max-md:bg-surface max-md:px-3 max-md:pt-2 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-md:shadow-[0_-4px_12px_rgb(0_0_0/0.06)] max-md:[&:not(:has(a,button))]:hidden max-md:[&>*]:min-w-0 max-md:[&>*]:flex-1 max-md:[&_:is(a,button)]:h-12 max-md:[&_:is(a,button)]:w-full max-md:[&_:is(a,button)]:justify-center max-md:[&_:is(a,button)]:text-[15px]";
+  "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:flex max-md:gap-2 max-md:border-t max-md:border-line max-md:bg-surface max-md:px-3 max-md:pt-2 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-md:shadow-[0_-4px_12px_rgb(0_0_0/0.06)] max-md:[&:not(:has(a,button))]:hidden max-md:[&>*]:min-w-0 max-md:[&>*]:flex-1 max-md:[&_:is(a,button)]:h-12 max-md:[&_:is(a,button)]:w-full max-md:[&_:is(a,button)]:justify-center max-md:[&_:is(a,button)]:text-lead";
 
 export function PageHeader({
   title,
@@ -383,8 +383,8 @@ export function PageHeader({
           <div data-record-bar="" className="no-print fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-1 border-b border-line bg-surface pr-1.5 pl-1 md:hidden">
             <BackArrow up={up.href} label={up.label} root={up.root} bar />
             <div className="min-w-0 flex-1 pl-0.5">
-              <p className="truncate text-[16.5px] leading-5 font-bold text-text">{name ?? title}</p>
-              <p className="truncate text-[12px] leading-4 font-medium text-muted">{under}</p>
+              <p className="truncate text-base leading-5 font-bold text-text">{name ?? title}</p>
+              <p className="truncate text-xs leading-4 font-medium text-muted">{under}</p>
             </div>
             {/* ⋯ as a plain icon here, the size of ← (it is a bordered button in the header). */}
             {more && <div className="shrink-0 [&>button]:size-11 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
@@ -396,7 +396,7 @@ export function PageHeader({
         // (globals.css hides that while this is on the page), and its ⋯ at the bar's end; the menu, search and
         // alerts stay around them.
         <div data-page-title="" className="no-print pointer-events-none fixed top-0 right-36 left-14 z-30 flex h-14 items-center gap-1 md:hidden">
-          <span aria-hidden className="min-w-0 flex-1 truncate text-[17px] leading-5 font-bold text-text">
+          <span aria-hidden className="min-w-0 flex-1 truncate text-lg leading-5 font-bold text-text">
             {named}
           </span>
           {more && <div className="pointer-events-auto shrink-0 [&>button]:size-10 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
@@ -419,14 +419,14 @@ export function PageHeader({
             )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <h1 className={cn("font-bold text-text", framed ? "text-[22px] leading-7 sm:text-[26px] sm:leading-8" : "text-2xl leading-8 sm:text-[26px] sm:leading-8", titleInBar && "max-md:sr-only")}>
+                <h1 className={cn("font-bold text-text", framed ? "text-xl leading-7 sm:text-2xl sm:leading-8" : "text-2xl leading-8 sm:text-2xl sm:leading-8", titleInBar && "max-md:sr-only")}>
                   {title}
                 </h1>
                 {badge}
               </div>
               {/* A top page's plain sentence under its name is a help line: not on a phone (design rule 15). */}
-              {summary && <div data-page-summary="" className={cn("mt-0.5 text-[13px] text-muted", !up && titleInBar && typeof summary === "string" && "max-md:hidden")}>{summary}</div>}
-              {description && <div data-page-desc="" className={cn("mt-0.5 max-w-2xl text-[13px] text-muted", titleInBar && "max-md:hidden")}>{description}</div>}
+              {summary && <div data-page-summary="" className={cn("mt-0.5 text-md text-muted", !up && titleInBar && typeof summary === "string" && "max-md:hidden")}>{summary}</div>}
+              {description && <div data-page-desc="" className={cn("mt-0.5 max-w-2xl text-md text-muted", titleInBar && "max-md:hidden")}>{description}</div>}
             </div>
           </div>
           {/* Papers first, then the one primary, then ⋯: always top right. */}
@@ -532,7 +532,7 @@ const ALERT_TONES = {
 
 export function Alert({ tone = "info", children, className }: { tone?: keyof typeof ALERT_TONES; children: ReactNode; className?: string }) {
   return (
-    <div role={tone === "error" ? "alert" : "status"} className={cn("rounded-xl px-3.5 py-3 text-[13px] [&_strong]:font-bold", ALERT_TONES[tone], className)}>
+    <div role={tone === "error" ? "alert" : "status"} className={cn("rounded-xl px-3.5 py-3 text-md [&_strong]:font-bold", ALERT_TONES[tone], className)}>
       {children}
     </div>
   );
@@ -556,7 +556,7 @@ export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
     <ScrollFade className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
-      <table className={cn("w-full border-collapse text-[13px]", className)} {...props} />
+      <table className={cn("w-full border-collapse text-md", className)} {...props} />
     </ScrollFade>
   );
 }
@@ -566,7 +566,7 @@ export function THead({ className, ...props }: ComponentProps<"thead">) {
 export function Th({ className, ...props }: ComponentProps<"th">) {
   // relative: a hidden (sr-only) name inside is placed in its cell, so a table that scrolls
   // sideways keeps it in its box instead of widening the page.
-  return <th scope="col" className={cn("relative h-[42px] border-b border-line px-3.5 text-left text-[13px] font-semibold whitespace-nowrap text-muted", className)} {...props} />;
+  return <th scope="col" className={cn("relative h-[42px] border-b border-line px-3.5 text-left text-md font-semibold whitespace-nowrap text-muted", className)} {...props} />;
 }
 export function Td({ className, ...props }: ComponentProps<"td">) {
   return <td className={cn("h-[52px] border-b border-line px-3.5 py-3 align-middle text-text", className)} {...props} />;
@@ -715,7 +715,7 @@ export function RefCode({ children, href, className }: { children: ReactNode; hr
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="inline-flex h-5 items-center rounded border border-line bg-surface-2 px-1.5 font-mono text-[11px] text-muted">{children}</kbd>;
+  return <kbd className="inline-flex h-5 items-center rounded border border-line bg-surface-2 px-1.5 font-mono text-2xs text-muted">{children}</kbd>;
 }
 
 /** Sub-tabs as chips (the page's sections), as links: URL-driven, so they work without JavaScript. The current one is soft green. */
@@ -756,13 +756,13 @@ export function LinkTabs({
           scroll={replace ? false : undefined}
           aria-current={t.active ? "page" : undefined}
           className={cn(
-            "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap transition-colors [&_svg]:size-4",
+            "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-md font-medium whitespace-nowrap transition-colors [&_svg]:size-4",
             t.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
-            tabsLook && "max-sm:rounded-full max-sm:text-[13.5px] max-sm:font-semibold",
+            tabsLook && "max-sm:rounded-full max-sm:text-md max-sm:font-semibold",
             tabsLook &&
               (t.active
-                ? "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-primary-solid sm:bg-transparent sm:px-0 sm:text-[13.5px] sm:font-bold sm:text-text"
-                : "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-transparent sm:bg-transparent sm:px-0 sm:text-[13.5px] sm:font-medium sm:text-text-2 sm:hover:text-text"),
+                ? "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-primary-solid sm:bg-transparent sm:px-0 sm:text-md sm:font-bold sm:text-text"
+                : "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-transparent sm:bg-transparent sm:px-0 sm:text-md sm:font-medium sm:text-text-2 sm:hover:text-text"),
           )}
         >
           {t.label}
@@ -797,7 +797,7 @@ export function FilterChip({ href, active, count, pill, children }: { href: stri
       aria-current={active ? "true" : undefined}
       className={cn(
         pill
-          ? "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-[13px] font-medium whitespace-nowrap text-text transition-colors hover:bg-surface-2"
+          ? "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-md font-medium whitespace-nowrap text-text transition-colors hover:bg-surface-2"
           : buttonClass("secondary", "sm"),
         !pill && "h-8 gap-1 border-dashed px-2.5 text-xs",
         active &&
@@ -895,7 +895,7 @@ export function Segmented({ options, className, label }: { options: { href: stri
           key={o.href}
           href={o.href}
           aria-current={o.active ? "page" : undefined}
-          className={cn("inline-flex h-8 items-center rounded-lg px-3 text-[13px] font-medium whitespace-nowrap text-muted transition-colors hover:text-text", o.active && "bg-surface font-semibold text-primary shadow-card")}
+          className={cn("inline-flex h-8 items-center rounded-lg px-3 text-md font-medium whitespace-nowrap text-muted transition-colors hover:text-text", o.active && "bg-surface font-semibold text-primary shadow-card")}
         >
           {o.label}
         </Link>

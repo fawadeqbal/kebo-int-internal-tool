@@ -26,15 +26,15 @@ const SHOWN = RULES.board.perColumn;
 function Card({ d, today }: { d: DealRow; today: string }) {
   return (
     <li>
-      <Link href={`/inquiries/${d.id}`} className="block rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[13px] leading-[18px] transition-colors hover:border-primary-line">
+      <Link href={`/inquiries/${d.id}`} className="block rounded-[10px] border border-line bg-surface px-3 py-2.5 text-md leading-[18px] transition-colors hover:border-primary-line">
         <span className="block text-xs text-muted tabular">{d.refNo}</span>
-        <span className="block text-[13.5px] font-semibold text-text">
+        <span className="block text-md font-semibold text-text">
           {d.title}
           <PriorityTag priority={d.priority} />
         </span>
-        <span className="block truncate text-[12.5px] text-text-2">{d.customer.name}</span>
+        <span className="block truncate text-xs text-text-2">{d.customer.name}</span>
         <span className="mt-1 block text-text-2">{whereItStands(d, today)}</span>
-        <span className="mt-2 flex items-center justify-between gap-2 text-[12.5px]">
+        <span className="mt-2 flex items-center justify-between gap-2 text-xs">
           <Responsible name={d.assignee?.name} short />
           <FollowUpDay next={d.nextFollowUp} day={soonDay} />
         </span>
@@ -71,8 +71,8 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
   const listOf = (stage: string) => buildHref("/inquiries", {}, { ...keep, stage });
 
   const closed = (
-    <section aria-label="Closed" className="rounded-xl border border-dashed border-line-strong bg-surface p-3 text-[13px] leading-5">
-      <h2 className="mb-1.5 text-[13.5px] font-bold">Closed</h2>
+    <section aria-label="Closed" className="rounded-xl border border-dashed border-line-strong bg-surface p-3 text-md leading-5">
+      <h2 className="mb-1.5 text-md font-bold">Closed</h2>
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Link href={listOf("won")} className="inline-flex items-center gap-1.5 hover:underline">
           <Badge tone={INQUIRY.states.won.tone}>{INQUIRY.states.won.words}</Badge> {counts.won ?? 0}

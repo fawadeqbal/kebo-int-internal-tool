@@ -45,7 +45,7 @@ export function SideSheet({ title, summary, children }: { title: string; summary
         className="flex h-11 w-full items-center gap-3 rounded-xl border border-line bg-surface pr-3 pl-4 text-left shadow-card hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text lg:hidden"
       >
         {/* One slim line (canvas row "Every page's top on a phone"): its name, then what it holds. */}
-        <span className="min-w-0 flex-1 truncate text-[13px] text-text-2">
+        <span className="min-w-0 flex-1 truncate text-md text-text-2">
           <span className="font-semibold text-text">{title}</span>
           {summary ? <> · {summary}</> : null}
         </span>
@@ -67,7 +67,7 @@ export function SideSheet({ title, summary, children }: { title: string; summary
         >
           {open && (
             <div className="flex items-center justify-between gap-3 border-b border-line py-1.5 pr-1.5 pl-4 lg:hidden">
-              <h2 className="text-[17px] font-bold">{title}</h2>
+              <h2 className="text-lg font-bold">{title}</h2>
               <Button ref={shut} type="button" size="icon" variant="ghost" onClick={close} aria-label="Close">
                 <X aria-hidden />
               </Button>

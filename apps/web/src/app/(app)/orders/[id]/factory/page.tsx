@@ -34,7 +34,7 @@ import { orderTitle } from "@/lib/titles";
 
 export const generateMetadata = orderTitle("Purchase order");
 
-const SMALL = "h-8 px-2.5 text-[13px]";
+const SMALL = "h-8 px-2.5 text-md";
 
 /**
  * Factory order (design "the order, final"): the purchase order to each factory, the lines we ordered at

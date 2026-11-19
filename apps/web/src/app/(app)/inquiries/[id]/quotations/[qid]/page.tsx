@@ -233,7 +233,7 @@ export default async function QuotationOwnPage({
         back: { href: `${base}/quotation`, label: `${d.refNo} · Quotations` },
         title: RECORD_TITLE.quotation({ customer: d.customer.name, option: q.quotations.length > 1 ? x.letter : null }),
         record: { kind: RECORD_KIND.quotation, number: x.refNo },
-        badge: <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[13px] font-semibold text-text-2 tabular">R{r.number}</span>,
+        badge: <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-md font-semibold text-text-2 tabular">R{r.number}</span>,
         summary: (
           <p className="min-w-0">
             <span className={cn("font-semibold", TONE[state.tone])}>{state.text}</span>
@@ -378,7 +378,7 @@ export default async function QuotationOwnPage({
 /** The panel beside the quotation: its revisions, and the offer it came from (who it goes to is in Customer). */
 function quoteSide({ x, r, here, base, offers }: { x: QuotationOfDeal; r: RevisionView; here: string; base: string; offers: QuoteOffers | null }): PanelSection[] {
   const row = (label: string, value: ReactNode) => (
-    <div className="flex justify-between gap-3 text-[13px]">
+    <div className="flex justify-between gap-3 text-md">
       <dt className="text-text-2">{label}</dt>
       <dd className="min-w-0 text-right font-medium break-words text-text">{value}</dd>
     </div>
@@ -392,7 +392,7 @@ function quoteSide({ x, r, here, base, offers }: { x: QuotationOfDeal; r: Revisi
           key={v.id}
           href={`${here}?rev=${v.id}`}
           aria-current={v.id === r.id ? "page" : undefined}
-          className={cn("-mx-2 flex items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-[13px] hover:bg-surface-2", v.id === r.id && "bg-surface-2")}
+          className={cn("-mx-2 flex items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-md hover:bg-surface-2", v.id === r.id && "bg-surface-2")}
         >
           <span className="font-semibold">R{v.number}</span>
           <span className="text-right text-xs text-text-2">
@@ -424,7 +424,7 @@ function quoteSide({ x, r, here, base, offers }: { x: QuotationOfDeal; r: Revisi
           {r.options
             .filter((o) => o.factoryQuoteId && offers)
             .map((o) => (
-              <Link key={o.id} href={`${base}/offers/${o.factoryQuoteId}`} className="mt-1 inline-flex items-center gap-1 text-[13px] font-semibold text-primary underline underline-offset-2">
+              <Link key={o.id} href={`${base}/offers/${o.factoryQuoteId}`} className="mt-1 inline-flex items-center gap-1 text-md font-semibold text-primary underline underline-offset-2">
                 Open {r.options.length > 1 ? `Option ${o.letter}’s offer` : "the offer"} <ChevronRight className="size-3.5" aria-hidden />
               </Link>
             ))}

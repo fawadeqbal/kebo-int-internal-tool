@@ -53,7 +53,7 @@ export function PhoneItems({ label, rows, noun = "item" }: { label: string; rows
             <>
               <span
                 className={cn(
-                  "w-[34px] shrink-0 pt-0.5 text-[13px] tabular",
+                  "w-[34px] shrink-0 pt-0.5 text-md tabular",
                   r.part ? "font-medium text-muted" : "font-semibold text-text-2",
                 )}
               >
@@ -61,13 +61,13 @@ export function PhoneItems({ label, rows, noun = "item" }: { label: string; rows
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span
-                  className={cn("line-clamp-2 text-[15px] leading-snug [overflow-wrap:anywhere]", r.part ? "font-medium" : "font-semibold")}
+                  className={cn("line-clamp-2 text-lead leading-snug [overflow-wrap:anywhere]", r.part ? "font-medium" : "font-semibold")}
                 >
                   {r.title}
                   {r.badge}
                 </span>
                 {r.under && <span className="truncate text-xs text-muted">{r.under}</span>}
-                <span className="mt-1 flex items-baseline justify-between gap-2 text-[13px] text-text-2 tabular">
+                <span className="mt-1 flex items-baseline justify-between gap-2 text-md text-text-2 tabular">
                   <span className="min-w-0 [overflow-wrap:anywhere]">{r.sub}</span>
                   {r.amount && <span className="shrink-0 text-sm font-bold whitespace-nowrap text-text">{r.amount}</span>}
                 </span>
@@ -94,7 +94,7 @@ export function PhoneItems({ label, rows, noun = "item" }: { label: string; rows
         <button
           type="button"
           onClick={() => setAll(true)}
-          className="flex h-11 w-full items-center justify-center gap-1.5 border-t border-line text-[13.5px] font-bold text-primary"
+          className="flex h-11 w-full items-center justify-center gap-1.5 border-t border-line text-md font-bold text-primary"
         >
           Show all {rows.length} {noun}s <ChevronDown className="size-4" aria-hidden />
         </button>

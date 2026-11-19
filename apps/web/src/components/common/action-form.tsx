@@ -203,7 +203,7 @@ export function ActionForm({
       {banner && state.code !== "reason_needed" && banner(state)}
       {/* A mistake: what to fix, each a way to its field (the fields say it too). */}
       {!banner && problems.length > 0 && (
-        <div role="alert" className="mb-3 rounded-[10px] border border-bad/30 bg-bad-soft px-3.5 py-2.5 text-[13px] leading-snug text-bad">
+        <div role="alert" className="mb-3 rounded-[10px] border border-bad/30 bg-bad-soft px-3.5 py-2.5 text-md leading-snug text-bad">
           <b className="block">{COUNT[problems.length] ?? `${problems.length} things`} to fix before saving</b>
           <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
             {problems.map((p) => (
@@ -224,7 +224,7 @@ export function ActionForm({
         !(state.code && quietCodes?.includes(state.code)) && (
           <Alert tone={state.ok ? "success" : "error"} className="mb-3">
             {state.message}
-            {state.detail && <span className="block text-[12.5px] opacity-80">{state.detail}</span>}
+            {state.detail && <span className="block text-xs opacity-80">{state.detail}</span>}
           </Alert>
         )}
     </>

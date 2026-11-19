@@ -25,7 +25,7 @@ export function ViewSwitch({ label, views, current, compact }: { label: string; 
       aria-label={label}
       className={cn(
         "inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-surface-3 p-1",
-        compact === "sm" ? "h-9 rounded-[10px] p-0.5 [&>a]:h-8 [&>a]:px-2.5 [&>a]:text-[13px] [&_svg]:size-4" : compact && "h-10 [&>a]:h-8 [&_svg]:size-4",
+        compact === "sm" ? "h-9 rounded-[10px] p-0.5 [&>a]:h-8 [&>a]:px-2.5 [&>a]:text-md [&_svg]:size-4" : compact && "h-10 [&>a]:h-8 [&_svg]:size-4",
       )}
     >
       {views.map((v) => (

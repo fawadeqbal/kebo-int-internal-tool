@@ -315,7 +315,7 @@ export function PanelActions({
 export function PanelFooter({ start, onCancel, children }: { start?: ReactNode; onCancel?: () => void; children: ReactNode }) {
   return (
     <PanelActions className="justify-end" cancel={false}>
-      {start && <span className="mr-auto min-w-0 text-[12.5px] text-text-2 max-md:basis-full">{start}</span>}
+      {start && <span className="mr-auto min-w-0 text-xs text-text-2 max-md:basis-full">{start}</span>}
       {/* `onCancel`: a form that leaves in its own way (an editor on the page) still has its Cancel here. */}
       {onCancel ? <WindowCancel onClick={onCancel} /> : <WindowCancelIn />}
       {children}
@@ -331,7 +331,7 @@ export function WindowCancelIn() {
 /** "What happens": said above the button of a window that changes a status or removes something. */
 export function WhatHappens({ lines }: { lines: ReactNode[] }) {
   return (
-    <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2 [&_strong]:text-text">
+    <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-md text-text-2 [&_strong]:text-text">
       <strong className="block">What happens</strong>
       {lines.filter(Boolean).map((l, n) => (
         <span key={n} className="block">

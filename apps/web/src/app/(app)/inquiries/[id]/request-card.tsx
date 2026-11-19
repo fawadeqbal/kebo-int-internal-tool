@@ -32,11 +32,11 @@ export function RequestBoxes({ d, edits }: { d: DealDetail; edits?: EditsView })
       <RecordBox title="Customer" step="customer" what="who asked" canEdit={canEdit} history={history("request.customer", "Customer")}>
         {contact ? (
           <div className="flex flex-col gap-1 px-5 pt-4 max-sm:px-4">
-            <span className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-text">
+            <span className="flex flex-wrap items-center gap-2 text-lead font-semibold text-text">
               {contact.name}
-              {contact.isPrimary && <span className="rounded-full bg-primary-soft px-2 py-px text-[11.5px] font-semibold text-primary">Main contact</span>}
+              {contact.isPrimary && <span className="rounded-full bg-primary-soft px-2 py-px text-2xs font-semibold text-primary">Main contact</span>}
             </span>
-            {(contact.email || phone) && <span className="text-[13px] text-text-2 [overflow-wrap:anywhere]">{[contact.email, phone].filter(Boolean).join(" · ")}</span>}
+            {(contact.email || phone) && <span className="text-md text-text-2 [overflow-wrap:anywhere]">{[contact.email, phone].filter(Boolean).join(" · ")}</span>}
             <span className="mt-1.5 flex flex-wrap gap-1.5">
               {phone && (
                 <a href={`tel:${phone.replace(/[^+\d]/g, "")}`} className={way}>

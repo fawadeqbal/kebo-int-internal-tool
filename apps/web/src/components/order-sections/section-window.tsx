@@ -50,9 +50,9 @@ export function useOpenFromLink(name: string | undefined, open: () => void) {
 }
 
 /** The quiet words that open a window from a table row. */
-export const ROW_LINK = "text-[13px] font-medium whitespace-nowrap text-primary hover:underline";
+export const ROW_LINK = "text-md font-medium whitespace-nowrap text-primary hover:underline";
 
-const SMALL = "h-8 px-2.5 text-[13px]";
+const SMALL = "h-8 px-2.5 text-md";
 
 /** The button that opens a window, in its look (WindowButton); the same for every kind of window. */
 export function WindowOpener({ button, disabled, onClick }: { button: WindowButton; disabled?: boolean; onClick: () => void }) {

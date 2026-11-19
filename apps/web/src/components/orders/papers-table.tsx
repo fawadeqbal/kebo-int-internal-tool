@@ -206,7 +206,7 @@ export function PapersTable({
                 if (!list.length) return null;
                 return (
                   <div key={g.label} role="rowgroup">
-                    <p className="px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">{g.label}</p>
+                    <p className="px-2 pt-3 pb-1 text-2xs font-semibold tracking-wide text-muted uppercase">{g.label}</p>
                     {list.map(row)}
                   </div>
                 );

@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ key: stri
   return { title: `${r.name} · Roles` };
 }
 
-const editClass = "h-8 px-2.5 text-[13px] [&_svg]:size-3.5";
+const editClass = "h-8 px-2.5 text-md [&_svg]:size-3.5";
 
 /**
  * One role (Settings frame): its details and what it allows, read-only, with
@@ -118,7 +118,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
               const allowed = g.items.filter((i) => r.superAdmin || has.has(i.permission));
               return (
                 <div key={g.title} className="min-w-0">
-                  <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+                  <p className="text-2xs font-semibold tracking-wide text-muted uppercase">
                     {g.title} <span className="font-normal tabular">{allowed.length}/{g.items.length}</span>
                   </p>
                   {allowed.length ? (

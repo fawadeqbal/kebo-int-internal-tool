@@ -53,12 +53,12 @@ export function PartsBox({
             <li key={p.key} aria-label={p.title} className="flex flex-col gap-2 px-5 py-3 max-sm:px-4">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 @2xl:grid-cols-[12rem_minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <h3 className="text-[14px] font-semibold text-text">{p.title}</h3>
+                  <h3 className="text-sm font-semibold text-text">{p.title}</h3>
                   {p.word && <Badge tone={p.word.tone ?? "neutral"}>{p.word.text}</Badge>}
                 </div>
                 <div className={cn("col-span-2 row-start-2 min-w-0 @2xl:col-span-1 @2xl:col-start-2 @2xl:row-start-1")}>
                   {facts.length ? (
-                    <dl className="flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
+                    <dl className="flex flex-wrap gap-x-5 gap-y-1 text-md">
                       {facts.map(([k, v], i) => (
                         <div key={`${i}:${k}`} className="flex min-w-0 items-baseline gap-1.5">
                           <dt className="text-text-2">{k}</dt>
@@ -67,7 +67,7 @@ export function PartsBox({
                       ))}
                     </dl>
                   ) : (
-                    <p className="text-[13px] text-text-2">{p.empty ?? "Nothing yet."}</p>
+                    <p className="text-md text-text-2">{p.empty ?? "Nothing yet."}</p>
                   )}
                 </div>
                 {p.action && <div className="col-start-2 row-start-1 flex flex-wrap items-center justify-end gap-1.5 @2xl:col-start-3">{p.action}</div>}

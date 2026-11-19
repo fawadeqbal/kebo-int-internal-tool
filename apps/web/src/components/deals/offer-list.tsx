@@ -38,7 +38,7 @@ export function offerFigures(x: FactoryQuoteView) {
 }
 
 const Best = ({ children }: { children: ReactNode }) => (
-  <Badge tone="ok" className="ml-1.5 h-5 px-2 align-[1px] text-[11.5px] max-sm:mt-1 max-sm:ml-0 max-sm:flex max-sm:w-fit">
+  <Badge tone="ok" className="ml-1.5 h-5 px-2 align-[1px] text-2xs max-sm:mt-1 max-sm:ml-0 max-sm:flex max-sm:w-fit">
     {children}
   </Badge>
 );
@@ -65,8 +65,8 @@ export function OfferCompare({ view, status, dealId, waiting }: { view: Sourcing
   const bases = new Set(offers.map((q) => q.basis ?? "?"));
   // Two offers fit a 360 px phone side by side (labels narrow, values wrap); more scroll sideways in the card.
   const cols = { gridTemplateColumns: `minmax(6.5rem,13rem) repeat(${offers.length}, minmax(8rem, 1fr))`, minWidth: `${6.5 + 8 * offers.length}rem` };
-  const cell = "border-b border-line/70 px-3 py-2 text-[13.5px] leading-[19px] max-sm:px-2 max-sm:text-[13px] max-sm:leading-[18px]";
-  const label = cn(cell, "pl-5 text-[13px] text-text-2 max-sm:pl-4 max-sm:text-[12.5px]");
+  const cell = "border-b border-line/70 px-3 py-2 text-md leading-[19px] max-sm:px-2 max-sm:text-md max-sm:leading-[18px]";
+  const label = cn(cell, "pl-5 text-md text-text-2 max-sm:pl-4 max-sm:text-xs");
   const group = (name: string) => (
     <div className="col-span-full border-b border-line/70 bg-surface-2/70 px-5 py-1.5 text-xs font-bold tracking-[.03em] text-text-2 uppercase max-sm:px-4">{name}</div>
   );
@@ -149,7 +149,7 @@ export function OfferCompare({ view, status, dealId, waiting }: { view: Sourcing
           {row("Their quotation file", (q) => (q.files.length ? "Attached" : <span className="text-warn">Missing</span>))}
         </div>
       </div>
-      {waiting.length > 0 && <p className="px-5 py-2.5 text-[13px] text-text-2">{waiting.join(" ")}</p>}
+      {waiting.length > 0 && <p className="px-5 py-2.5 text-md text-text-2">{waiting.join(" ")}</p>}
     </div>
   );
 }

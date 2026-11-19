@@ -77,7 +77,7 @@ export function CompaniesTab({ v, all }: { v: DevCompaniesView; all: boolean }) 
               <span key={h} className="block flex-1 rounded-t-sm bg-chart-1" style={{ height: `${Math.max(2, (n / max) * 100)}%` }} title={`${String(h).padStart(2, "0")}:00 · ${n.toLocaleString("en-US")} requests`} />
             ))}
           </div>
-          <div className="mt-1.5 flex justify-between text-[11px] text-muted tabular">
+          <div className="mt-1.5 flex justify-between text-2xs text-muted tabular">
             <span>00:00</span>
             <span>06:00</span>
             <span>12:00</span>

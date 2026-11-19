@@ -57,7 +57,7 @@ export function BottomSheet({
           <h2 id={`${id}-t`} className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">
             {title}
           </h2>
-          {sub && <p className="text-[13px] text-text-2 tabular">{sub}</p>}
+          {sub && <p className="text-md text-text-2 tabular">{sub}</p>}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         <div className="flex shrink-0 gap-2 border-t border-line px-3 pt-2.5 [&>*]:min-h-12 [&>*]:flex-1">

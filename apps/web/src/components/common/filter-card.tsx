@@ -89,7 +89,7 @@ function FilterButton({ s, onPick }: { s: FilterSelect; onPick: (name: string, v
   return (
     <span
       className={cn(
-        "inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border text-[13px] font-semibold",
+        "inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border text-md font-semibold",
         chosen ? "border-primary-line bg-primary-soft text-primary max-sm:-order-1" : "border-line-strong bg-surface text-text-2 hover:border-text-2/40",
       )}
     >
@@ -171,7 +171,7 @@ function MonthStep({ m, onPick }: { m: FilterMonth; onPick: (name: string, value
   const next = month && month < m.thisMonth ? step(month, 1) : null;
   const arrow = "grid w-9 place-items-center text-text-2 outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-35";
   return (
-    <span className="inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border border-line-strong bg-surface text-[13px] font-semibold">
+    <span className="inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border border-line-strong bg-surface text-md font-semibold">
       <button type="button" aria-label="The month before" disabled={!prev} onClick={() => prev && go(prev)} className={arrow}>
         <ChevronLeft className="size-4" aria-hidden />
       </button>
@@ -245,7 +245,7 @@ function FilterSheet({
       <div ref={box} role="dialog" aria-modal="true" aria-label="Filters" className="relative flex max-h-[88dvh] flex-col rounded-t-2xl border-t border-line bg-surface shadow-pop">
         <span className="mx-auto mt-2 h-1 w-10 rounded-full bg-line-strong" aria-hidden />
         <div className="flex items-center justify-between border-b border-line py-1 pr-1.5 pl-4">
-          <p className="text-[17px] font-bold text-text">Filters</p>
+          <p className="text-lg font-bold text-text">Filters</p>
           <button type="button" data-sheet-close aria-label="Close" onClick={onClose} className="grid size-11 place-items-center rounded-full text-text-2 hover:bg-surface-2">
             <X className="size-5" aria-hidden />
           </button>
@@ -260,10 +260,10 @@ function FilterSheet({
             const on = (v: string) => (f.value ?? "") === v;
             return (
               <section key={f.name} aria-label={f.label}>
-                <h3 className="mt-4 mb-2 text-[13px] font-bold text-text-2">{f.label}</h3>
+                <h3 className="mt-4 mb-2 text-md font-bold text-text-2">{f.label}</h3>
                 {rows ? (
                   <div role="radiogroup" aria-label={f.label}>
-                    <label className="mb-1 flex h-11 items-center gap-2 rounded-[10px] border border-line-strong px-3 text-[15px] focus-within:border-primary">
+                    <label className="mb-1 flex h-11 items-center gap-2 rounded-[10px] border border-line-strong px-3 text-lead focus-within:border-primary">
                       <Search className="size-4 shrink-0 text-muted" aria-hidden />
                       <span className="sr-only">Find {f.label.toLowerCase()}</span>
                       <input
@@ -280,7 +280,7 @@ function FilterSheet({
                         role="radio"
                         aria-checked={on(o.value)}
                         onClick={() => onPick(f.name, o.value || undefined)}
-                        className="flex min-h-11 w-full items-center gap-3 border-b border-line/70 text-left text-[15px] text-text last:border-b-0"
+                        className="flex min-h-11 w-full items-center gap-3 border-b border-line/70 text-left text-lead text-text last:border-b-0"
                       >
                         <span className={cn("size-5 shrink-0 rounded-full border-[1.5px] border-line-strong", on(o.value) && "border-[6px] border-primary-solid")} aria-hidden />
                         {o.label}
@@ -310,10 +310,10 @@ function FilterSheet({
           })}
         </div>
         <div className="flex gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
-          <button type="button" onClick={onClear} disabled={!anyOn} className="h-12 shrink-0 rounded-xl border border-line-strong px-4 text-[15px] font-semibold text-text disabled:opacity-50">
+          <button type="button" onClick={onClear} disabled={!anyOn} className="h-12 shrink-0 rounded-xl border border-line-strong px-4 text-lead font-semibold text-text disabled:opacity-50">
             Clear
           </button>
-          <button type="button" onClick={onClose} className="h-12 flex-1 rounded-xl bg-action-solid px-4 text-[15px] font-semibold text-white shadow-sm">
+          <button type="button" onClick={onClose} className="h-12 flex-1 rounded-xl bg-action-solid px-4 text-lead font-semibold text-white shadow-sm">
             {count ? `Show ${count}` : "Show the list"}
           </button>
         </div>
@@ -433,7 +433,7 @@ export function FilterCard({
             if (text.trim() !== shown) go({ q: text.trim() || undefined });
           }}
           placeholder={search}
-          className="h-full w-full min-w-0 bg-transparent pr-9 pl-9 text-[13.5px] text-text outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:appearance-none"
+          className="h-full w-full min-w-0 bg-transparent pr-9 pl-9 text-md text-text outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:appearance-none"
         />
         {text && (
           <button
@@ -462,7 +462,7 @@ export function FilterCard({
           )}
         >
           <ListFilter className="size-4" aria-hidden /> Filters
-          {chosen > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary-solid px-1 text-[11px] font-bold text-white">{chosen}</span>}
+          {chosen > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary-solid px-1 text-2xs font-bold text-white">{chosen}</span>}
         </button>
       )}
       {(selects.length > 0 || month || anyOn) && (
@@ -474,14 +474,14 @@ export function FilterCard({
           ))}
           {month && <MonthStep m={month} onPick={pick} />}
           {anyOn && (
-            <button type="button" onClick={clear} className="h-10 shrink-0 rounded-md px-1.5 text-[13px] font-semibold whitespace-nowrap text-primary hover:underline max-sm:hidden">
+            <button type="button" onClick={clear} className="h-10 shrink-0 rounded-md px-1.5 text-md font-semibold whitespace-nowrap text-primary hover:underline max-sm:hidden">
               Clear all
             </button>
           )}
         </div>
       )}
       {count && (
-        <span className="ml-auto text-[13px] whitespace-nowrap text-muted max-sm:hidden" aria-live="polite">
+        <span className="ml-auto text-md whitespace-nowrap text-muted max-sm:hidden" aria-live="polite">
           {count}
         </span>
       )}

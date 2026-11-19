@@ -88,7 +88,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 )}{" "}
                 Two-step sign-in with an authenticator app
               </p>
-              {status.required && <p className="text-[13px] text-muted">Your role requires it.</p>}
+              {status.required && <p className="text-md text-muted">Your role requires it.</p>}
               {inline ? (
                 <div className="w-full">{twoStep}</div>
               ) : (
@@ -106,7 +106,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           </Card>
           <Card>
             <CardHeader title="Where you are signed in" />
-            <ul className="flex flex-col gap-3 p-5 text-[13px]">
+            <ul className="flex flex-col gap-3 p-5 text-md">
               {shown.map((s) => (
                 <li key={s.id} className="flex items-center justify-between gap-3">
                   <span className="min-w-0">

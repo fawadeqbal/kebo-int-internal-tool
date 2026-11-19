@@ -74,7 +74,7 @@ export function compactChanges(entries: (HistoryEntry & { step?: string | null }
 export function changeRows(lines: ChangeLine[]) {
   return lines.map((c) => (
     <li key={c.id} title={c.title} className="grid grid-cols-[24px_minmax(0,1fr)] items-start gap-2.5 border-b border-line py-2 last:border-b-0">
-      <span aria-hidden className="grid size-6 place-items-center rounded-full bg-primary-soft text-[11px] font-bold text-primary">
+      <span aria-hidden className="grid size-6 place-items-center rounded-full bg-primary-soft text-2xs font-bold text-primary">
         {c.initial}
       </span>
       <span className="min-w-0">
