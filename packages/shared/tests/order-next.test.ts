@@ -11,6 +11,7 @@ const base: OrderStepFacts = {
   depositDue: 0,
   production: true,
   poSent: false,
+  supplierDepositDue: 0,
   readyOn: null,
   goodsIn: false,
   shipping: true,
@@ -23,6 +24,7 @@ const base: OrderStepFacts = {
   deliverySat: true,
   delivered: false,
   satOpen: false,
+  adviceSent: null,
 };
 const next = (f: Partial<OrderStepFacts>) => orderNextStep({ ...base, ...f }, today)?.key ?? null;
 
@@ -45,6 +47,14 @@ describe("the order's next step: the first that is true", () => {
     expect(next({ poSent: true })).toBe("set_ready");
     expect(next({ poSent: true, readyOn: "2026-12-20" })).toBe(null);
     expect(next({ poSent: true, readyOn: "2026-11-14" })).toBe("goods_in");
+  });
+
+  it("the supplier's deposit right after the PO; the shipping advice once it sailed", () => {
+    expect(next({ poSent: true, supplierDepositDue: 500 })).toBe("pay_supplier");
+    const gone = { poSent: true, goodsIn: true, booked: true, sailed: true, eta: "2026-11-10" };
+    expect(next({ ...gone, adviceSent: false })).toBe("send_advice");
+    expect(next({ ...gone, adviceSent: true })).toBe("arrived");
+    expect(next({ ...gone, adviceSent: null })).toBe("arrived");
   });
 
   it("then the shipment: booked once the goods are in or due within two weeks; the balance; sailed on the ETD", () => {

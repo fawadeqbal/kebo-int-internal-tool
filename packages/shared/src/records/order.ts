@@ -35,6 +35,8 @@ export interface OrderStepFacts {
   production: boolean;
   /** The purchase order went to the supplier. */
   poSent: boolean;
+  /** The supplier's deposit (their part due when we order) still to pay (0: none, or paid). */
+  supplierDepositDue: number;
   /** The supplier's ready date (null: none given). */
   readyOn: ISODate | null;
   /** Every goods line came in from the supplier. */
@@ -49,6 +51,8 @@ export interface OrderStepFacts {
   arrived: boolean;
   /** The balance is due before shipment, and still to come. */
   balanceBeforeShipment: number;
+  /** The shipping advice went to the customer (null: this company does not make one). */
+  adviceSent: boolean | null;
   /** The company keeps Delivery & SAT. */
   deliverySat: boolean;
   delivered: boolean;
@@ -61,11 +65,13 @@ export type OrderStepKey =
   | "choose_route"
   | "record_deposit"
   | "send_po"
+  | "pay_supplier"
   | "set_ready"
   | "goods_in"
   | "book"
   | "ask_balance"
   | "sailed"
+  | "send_advice"
   | "arrived"
   | "delivered"
   | "sign_sat"
@@ -85,11 +91,13 @@ const STEP: Record<OrderStepKey, Omit<OrderStep, "key">> = {
   choose_route: { label: "Choose how they pay", tab: "payment", window: "route" },
   record_deposit: { label: "Record the deposit", tab: "payment", window: "record-payment" },
   send_po: { label: "Send the PO", tab: "factory", window: "send-po" },
+  pay_supplier: { label: "Pay the supplier's deposit", tab: "factory" },
   set_ready: { label: "Set the ready date", tab: "production", window: "ready-date" },
   goods_in: { label: "Goods received", tab: "production", window: "all-received" },
   book: { label: "Book the shipment", tab: "shipping" },
   ask_balance: { label: "Ask for the balance", tab: "payment" },
   sailed: { label: "Sailed", tab: "shipping" },
+  send_advice: { label: "Send the shipping advice", tab: "shipping" },
   arrived: { label: "Arrived", tab: "shipping" },
   delivered: { label: "Delivered", tab: "delivery", window: "all-delivered" },
   sign_sat: { label: "Sign off the SAT", tab: "delivery", window: "sign-off" },
@@ -111,6 +119,7 @@ export function orderNextStep(f: OrderStepFacts, today: ISODate): OrderStep | nu
   const gone = f.sailed || f.arrived || f.delivered;
   if (f.production && !gone) {
     if (!f.poSent) return step("send_po");
+    if (f.supplierDepositDue > 0) return step("pay_supplier");
     if (!f.goodsIn && !f.readyOn) return step("set_ready");
     if (!f.goodsIn && f.readyOn && f.readyOn <= today) return step("goods_in");
   }
@@ -120,6 +129,7 @@ export function orderNextStep(f: OrderStepFacts, today: ISODate): OrderStep | nu
     if (f.balanceBeforeShipment > 0 && (f.booked || f.goodsIn)) return step("ask_balance");
     if (f.booked && f.etd && f.etd <= today) return step("sailed");
   }
+  if (f.shipping && f.sailed && f.adviceSent === false && !f.delivered) return step("send_advice");
   if (f.shipping && f.sailed && !f.arrived && !f.delivered && f.eta && f.eta <= today) return step("arrived");
   if (f.deliverySat && f.arrived && !f.delivered) return step("delivered");
   if (f.deliverySat && f.delivered && f.satOpen) return step("sign_sat");

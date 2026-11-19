@@ -451,7 +451,6 @@ export function OrderLinesView({ set, lines, label }: { set: LineSet; lines: Ord
       title: head(l.description),
       under: l.model || undefined,
       sub: phoneLine(set, v),
-      amount: set === "factory" && l.factoryPrice?.currency ? formatMinor(toMinor(l.factoryPrice.unitPrice), l.factoryPrice.currency) : undefined,
     };
   });
   return (
