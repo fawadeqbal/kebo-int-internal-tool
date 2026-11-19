@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, Printer, ShoppingCart } from "lucide-react";
 import { PAYMENT_METHOD_LABEL, RECORD_KIND, RECORD_TITLE } from "@kebo/shared";
-import { ButtonLink, PageHeader, StatusBadge } from "@kebo/ui";
+import { ButtonLink, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderFilesOf, orderMoneyOf, orderOf } from "@/lib/order-data";
@@ -24,7 +24,8 @@ import { FileToolsProvider } from "@/components/files/file-tools";
 import { factoryPaymentAction } from "../../../../money/actions";
 import { stageData } from "../../../../orders/[id]/stage-data";
 import { cache } from "react";
-import { RecordBody } from "@/components/records/record-frame";
+import { RecordShell } from "@/components/records/record-frame";
+import { RecordTop } from "@/components/records/record-page";
 
 /** The order's purchase orders, read once per request (the page and its tab title). */
 const purchaseOrdersOf = cache((order: string) => optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${order}/purchase-orders`)));
@@ -120,15 +121,17 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
 
   return (
     <FileToolsProvider orderId={o.id} files={files?.files ?? []} targets={files?.targets ?? []} share={{ refNo: o.refNo, greeting: `Dear ${o.customer.name}`, vessel: null, eta: null }}>
-      <PageHeader
-        crumbs={[{ label: "Purchasing" }, { label: "Purchase orders", href: PURCHASE_ORDERS }, { label: po.number }]}
-        icon={ShoppingCart}
-        title={RECORD_TITLE.purchaseOrder({ items: lines, supplier: po.supplier.name })}
-        record={{ kind: RECORD_KIND.purchaseOrder, number: po.number }}
-        phoneStack
-        badge={status ? <StatusBadge meaning={status.meaning}>{status.label}</StatusBadge> : undefined}
-        summary={
-          <p className="min-w-0">
+      <RecordShell
+        top={
+          <RecordTop
+            header={{
+              crumbs: [{ label: "Purchasing" }, { label: "Purchase orders", href: PURCHASE_ORDERS }, { label: po.number }],
+              icon: ShoppingCart,
+              title: RECORD_TITLE.purchaseOrder({ items: lines, supplier: po.supplier.name }),
+              record: { kind: RECORD_KIND.purchaseOrder, number: po.number },
+              badge: status ? <StatusBadge meaning={status.meaning}>{status.label}</StatusBadge> : undefined,
+              summary: (
+                <p className="min-w-0">
             {meta.map((x, i) => (
               <span key={i}>
                 {i > 0 && (
@@ -140,9 +143,9 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               </span>
             ))}
           </p>
-        }
-        actions={
-          <>
+              ),
+              actions: (
+                <>
             <ButtonLink href={`/orders/${o.id}/papers/purchase-order?ref=${po.supplier.id}`}>
               <Printer aria-hidden /> View / print
             </ButtonLink>
@@ -150,9 +153,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               <ExternalLink aria-hidden /> Open the order
             </ButtonLink>
           </>
+              ),
+            }}
+          />
         }
-      />
-      <RecordBody
         panelLabel="Beside the purchase order"
         panel={
           <>
@@ -334,7 +338,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           )}
 
           <Section title="Files" files={<SectionFiles orderId={o.id} section="purchase_order" canAdd={false} />} />
-      </RecordBody>
+      </RecordShell>
     </FileToolsProvider>
   );
 }

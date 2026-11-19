@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Banknote, Check, FileText } from "lucide-react";
 import { can, PAYMENT_RECORD_KINDS, PAYMENT_RECORD_LABEL, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
-import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
+import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, RefCode, StatusBadge, Table, Td, Th, THead, Tr, EmptyLine, Notice } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, dateTime, companyToday, money } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
@@ -18,7 +18,8 @@ import { editPaymentAction, factoryPaymentAction, removePaymentFileAction } from
 import { voidPaymentAction } from "../../actions";
 import { opensPayments } from "../../shared";
 import { cache } from "react";
-import { RecordBody } from "@/components/records/record-frame";
+import { RecordShell } from "@/components/records/record-frame";
+import { RecordTop } from "@/components/records/record-page";
 
 /** One payment, read once per request (the page and its tab title). */
 const paymentOf = cache((kind: PaymentRecordKind, id: string) => api.get<PaymentView>(`/treasury/payments/${kind}/${id}`).catch(() => null));
@@ -86,41 +87,48 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        icon={Banknote}
-        crumbs={[...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }]}
-        title={title}
-        record={{ kind: kindOf(p), number: p.number }}
-        badge={<StatusBadge meaning={STATUS_MEANING[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</StatusBadge>}
-        summary={[money(p.amount, p.currency), p.party?.label, p.for.map((f) => f.label).join(", ") || null, date(p.on)].filter(Boolean).join(" · ")}
-        actions={
-          order?.href ? (
+      <RecordShell
+        top={
+          <RecordTop
+            header={{
+              icon: Banknote,
+              crumbs: [...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }],
+              title: title,
+              record: { kind: kindOf(p), number: p.number },
+              badge: <StatusBadge meaning={STATUS_MEANING[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</StatusBadge>,
+              summary: [money(p.amount, p.currency), p.party?.label, p.for.map((f) => f.label).join(", ") || null, date(p.on)].filter(Boolean).join(" · "),
+              actions: (
+                order?.href ? (
             <ButtonLink href={order.href} variant="secondary">
               Open {order.label}
             </ButtonLink>
           ) : undefined
-        }
-      />
-      {p.status === "to_verify" && (
-        <section className="flex flex-col gap-3 rounded-2xl border border-warn/30 bg-warn-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            <strong className="block font-bold text-warn">Waiting for verification.</strong>
-            <span className="block text-sm text-text-2">
+              ),
+            }}
+            notice={
+        <>
+          {p.status === "to_verify" && (
+            <Notice
+              tone="todo"
+              title="Waiting for verification."
+              action={
+                <ButtonLink href="/approvals" variant="strong">
+                  <Check aria-hidden /> Verify
+                </ButtonLink>
+              }
+            >
               Check that {p.currency} {Number(p.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} reached{p.account ? ` ${p.account}` : " the account"} on {date(p.on)}.
-            </span>
-          </p>
-          <ButtonLink href="/approvals" variant="strong">
-            <Check aria-hidden /> Verify
-          </ButtonLink>
-        </section>
-      )}
-      {p.voided && (
-        <p className="rounded-lg bg-surface-2 px-4 py-3 text-sm">
-          Removed {dateTime(p.voided.at)}
-          {p.voided.reason && <>: {p.voided.reason}</>}
-        </p>
-      )}
-      <RecordBody
+            </Notice>
+          )}
+          {p.voided && (
+            <Notice tone="neutral" title={`Removed ${dateTime(p.voided.at)}`}>
+              {p.voided.reason}
+            </Notice>
+          )}
+        </>
+            }
+          />
+        }
         panelLabel="Beside the payment"
         panel={
           <Card className="p-0">
@@ -195,7 +203,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
               {p.voidPath && <VoidForm action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
             </div>
           )}
-      </RecordBody>
+      </RecordShell>
     </div>
   );
 }
