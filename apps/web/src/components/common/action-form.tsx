@@ -191,7 +191,11 @@ export function ActionForm({
       if (first && !first.closest(".hidden,[hidden]")) {
         focusNext.current = null;
         first.focus();
-      } else if (!reveal) named[0]?.focus();
+      } else if (!reveal) {
+        // Not a steps window that shows a field's step: nothing to wait for (the first field found, as before).
+        focusNext.current = null;
+        named[0]?.focus();
+      }
       // Else it waits for its step to be drawn (the effect above).
     }, 0);
     // No connection: the note says so, with Try again (the window stays, with what was typed).
@@ -277,6 +281,13 @@ export function ActionForm({
       className={className}
       noValidate
       onReset={keepFields ? (e) => e.preventDefault() : undefined}
+      // The person moved on (a click, a key): a field still waiting for its step no longer takes the cursor.
+      onPointerDownCapture={() => {
+        focusNext.current = null;
+      }}
+      onKeyDownCapture={() => {
+        focusNext.current = null;
+      }}
       onSubmit={(e) => {
         if (beforeSend && !beforeSend()) {
           e.preventDefault();
