@@ -43,7 +43,8 @@ const buttonVariants: Record<ButtonVariant, string> = {
   danger: "bg-bad-solid text-white shadow-card hover:opacity-90",
   link: "h-auto px-0 text-primary underline-offset-4 hover:underline",
 };
-const small = " max-sm:h-10 max-sm:px-3.5";
+/** sm: 32px high on a laptop, 40 on a phone, with room either side of its words (never tighter than this). */
+const small = "h-8 px-2.5 text-md [&_svg]:size-3.5 max-sm:h-10 max-sm:px-3.5";
 const iconSmall = "size-8 [&_svg]:size-3.5 max-sm:size-10";
 const buttonSizes: Record<ButtonSize, string> = {
   xs: small,
