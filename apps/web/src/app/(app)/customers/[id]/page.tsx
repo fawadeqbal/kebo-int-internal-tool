@@ -24,6 +24,7 @@ import { ConfirmAction } from "@/components/people/confirm-action";
 import { CustomerPanel } from "../customer-panel";
 import { currenciesFrom } from "../currencies";
 import { customerTitle } from "@/lib/titles";
+import { RecordBody } from "@/components/records/record-frame";
 
 export const generateMetadata = customerTitle();
 
@@ -104,96 +105,10 @@ export default async function CustomerOverview({
           sub="on their orders"
         />
       </StatRow>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <DetailsCard
-            flash={sp.saved === c.id}
-            edit={canEdit ? { panel: "edit-customer", id: c.id, label: `Edit ${c.name}` } : null}
-            items={[
-              { label: "Type", value: PARTY_TYPE_LABEL[c.type] },
-              { label: "Country", value: countryKnown ? countryName(c.country) : null },
-              { label: "Default currency", value: c.defaultCurrency },
-              { label: "Address", value: c.address && <span className="whitespace-pre-line">{c.address}</span>, wide: true },
-              { label: "Initials on documents", value: c.initials },
-              { label: "Tax no.", value: c.taxNo },
-              { label: "Registration no.", value: c.regNo },
-              { label: "Notes", value: c.notes && <span className="whitespace-pre-line">{c.notes}</span>, wide: true },
-            ]}
-            footer={
-              <>
-                {!countryKnown && (
-                  <Notice tone="todo" className="mx-4 mb-4">
-                    Their country is not set yet — it decides shipping.{" "}
-                    {canEdit ? (
-                      <OpenPanelButton panel="edit-customer" id={c.id} variant="link" size="sm" className="h-auto font-semibold">
-                        Add it
-                      </OpenPanelButton>
-                    ) : (
-                      "Ask someone who manages customers to add it."
-                    )}
-                  </Notice>
-                )}
-              </>
-            }
-          />
-          {/* Latest orders (board): number, date, total, what they owe, stage. */}
-          <Card className="overflow-hidden">
-            <CardHeader
-              title="Latest orders"
-              actions={
-                <ButtonLink href={`/customers/${c.id}/orders`} variant="link" size="sm">
-                  <ArrowRight aria-hidden /> All orders
-                </ButtonLink>
-              }
-            />
-            {latest.length ? (
-              <Table>
-                <THead>
-                  <tr>
-                    <Th>Order</Th>
-                    <Th>Date</Th>
-                    <Th className="text-right">Total</Th>
-                    <Th className="text-right">They owe</Th>
-                    <Th>Status</Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {latest.map((o) => (
-                    <Tr key={o.id}>
-                      <Td>
-                        <RefCode href={`/orders/${o.id}`}>{o.refNo}</RefCode>
-                      </Td>
-                      <Td className="whitespace-nowrap">{date(o.orderedOn)}</Td>
-                      <Td className="text-right whitespace-nowrap tabular">{whole(o.total, o.currency)}</Td>
-                      <Td className="text-right whitespace-nowrap tabular">{Number(o.due) > 0.005 ? whole(o.due, o.currency) : "—"}</Td>
-                      <Td>
-                        <StatusBadge meaning={ORDER_WORD_TONE[o.word]}>{o.word}</StatusBadge>
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            ) : (
-              <CardBody>
-                <EmptyLine>No orders yet. An order is made when they accept a quotation.</EmptyLine>
-              </CardBody>
-            )}
-          </Card>
-          {can(me, "customers.delete") && (
-            <div className="flex justify-end">
-              <ConfirmAction
-                action={removeCustomerAction.bind(null, c.id)}
-                confirm={`Remove ${c.name}? They stay on past inquiries and orders, and can be brought back from Customers › Archived. Not possible while an order is open.`}
-                label="Remove this customer"
-                pendingText="Removing…"
-                variant="danger-ghost"
-                size="sm"
-              />
-            </div>
-          )}
-        </div>
-
-        <aside aria-label="At a glance" className="flex min-w-0 flex-col gap-4">
+      <RecordBody
+        panelLabel="At a glance"
+        panel={
+          <>
           {/* Money (board): sold, received, they owe, credit, per currency. */}
           <Card>
             <CardHeader
@@ -324,8 +239,95 @@ export default async function CustomerOverview({
               )}
             </CardBody>
           </Card>
-        </aside>
-      </div>
+        </>
+        }
+      >
+          <DetailsCard
+            flash={sp.saved === c.id}
+            edit={canEdit ? { panel: "edit-customer", id: c.id, label: `Edit ${c.name}` } : null}
+            items={[
+              { label: "Type", value: PARTY_TYPE_LABEL[c.type] },
+              { label: "Country", value: countryKnown ? countryName(c.country) : null },
+              { label: "Default currency", value: c.defaultCurrency },
+              { label: "Address", value: c.address && <span className="whitespace-pre-line">{c.address}</span>, wide: true },
+              { label: "Initials on documents", value: c.initials },
+              { label: "Tax no.", value: c.taxNo },
+              { label: "Registration no.", value: c.regNo },
+              { label: "Notes", value: c.notes && <span className="whitespace-pre-line">{c.notes}</span>, wide: true },
+            ]}
+            footer={
+              <>
+                {!countryKnown && (
+                  <Notice tone="todo" className="mx-4 mb-4">
+                    Their country is not set yet — it decides shipping.{" "}
+                    {canEdit ? (
+                      <OpenPanelButton panel="edit-customer" id={c.id} variant="link" size="sm" className="h-auto font-semibold">
+                        Add it
+                      </OpenPanelButton>
+                    ) : (
+                      "Ask someone who manages customers to add it."
+                    )}
+                  </Notice>
+                )}
+              </>
+            }
+          />
+          {/* Latest orders (board): number, date, total, what they owe, stage. */}
+          <Card className="overflow-hidden">
+            <CardHeader
+              title="Latest orders"
+              actions={
+                <ButtonLink href={`/customers/${c.id}/orders`} variant="link" size="sm">
+                  <ArrowRight aria-hidden /> All orders
+                </ButtonLink>
+              }
+            />
+            {latest.length ? (
+              <Table>
+                <THead>
+                  <tr>
+                    <Th>Order</Th>
+                    <Th>Date</Th>
+                    <Th className="text-right">Total</Th>
+                    <Th className="text-right">They owe</Th>
+                    <Th>Status</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {latest.map((o) => (
+                    <Tr key={o.id}>
+                      <Td>
+                        <RefCode href={`/orders/${o.id}`}>{o.refNo}</RefCode>
+                      </Td>
+                      <Td className="whitespace-nowrap">{date(o.orderedOn)}</Td>
+                      <Td className="text-right whitespace-nowrap tabular">{whole(o.total, o.currency)}</Td>
+                      <Td className="text-right whitespace-nowrap tabular">{Number(o.due) > 0.005 ? whole(o.due, o.currency) : "—"}</Td>
+                      <Td>
+                        <StatusBadge meaning={ORDER_WORD_TONE[o.word]}>{o.word}</StatusBadge>
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <CardBody>
+                <EmptyLine>No orders yet. An order is made when they accept a quotation.</EmptyLine>
+              </CardBody>
+            )}
+          </Card>
+          {can(me, "customers.delete") && (
+            <div className="flex justify-end">
+              <ConfirmAction
+                action={removeCustomerAction.bind(null, c.id)}
+                confirm={`Remove ${c.name}? They stay on past inquiries and orders, and can be brought back from Customers › Archived. Not possible while an order is open.`}
+                label="Remove this customer"
+                pendingText="Removing…"
+                variant="danger-ghost"
+                size="sm"
+              />
+            </div>
+          )}
+      </RecordBody>
       {editing && settings && (
         <CustomerPanel action={saveCustomerAction.bind(null, c.id, c.updatedAt)} customer={c} currencies={currenciesFrom(settings)} onRecord />
       )}

@@ -1,5 +1,6 @@
 import { NOTE_KIND_LABEL, type NoteKind } from "@kebo/shared";
 import { Avatar, Badge, Card, CardHeader, EmptyState } from "@kebo/ui";
+import { RecordBody } from "@/components/records/record-frame";
 import { date, companyToday } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
 import type { Note } from "@/lib/types-notes";
@@ -29,7 +30,19 @@ export function NotesTab({
   contacts?: { id: string; name: string }[];
 }) {
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <RecordBody
+      panelLabel="Add a note"
+      panel={
+        add ? (
+        <Card>
+          <CardHeader title="Add a note" />
+          <div className="p-5">
+            <NoteCardForm action={add} contacts={contacts} today={companyToday()} />
+          </div>
+        </Card>
+        ) : undefined
+      }
+    >
       <Card>
         <CardHeader title="Notes and calls" />
         {notes.length === 0 ? (
@@ -55,14 +68,6 @@ export function NotesTab({
           </ol>
         )}
       </Card>
-      {add && (
-        <Card>
-          <CardHeader title="Add a note" />
-          <div className="p-5">
-            <NoteCardForm action={add} contacts={contacts} today={companyToday()} />
-          </div>
-        </Card>
-      )}
-    </div>
+    </RecordBody>
   );
 }

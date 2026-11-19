@@ -29,6 +29,7 @@ import { RecordLanding } from "@/components/common/record-nav";
 import { removeFactoryAction, saveFactoryAction } from "../actions";
 import { FactoryPanel } from "../factory-form";
 import { supplierTitle } from "@/lib/titles";
+import { RecordBody } from "@/components/records/record-frame";
 
 export const generateMetadata = supplierTitle();
 
@@ -84,8 +85,72 @@ export default async function FactoryOverview({
   return (
     <div className="flex flex-col gap-4">
       <RecordLanding />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-4">
+      <RecordBody
+        panelLabel="At a glance"
+        panel={
+          <>
+          {/* Money (board): bought, paid, what we owe. */}
+          <Card>
+            <CardHeader
+              title="Money"
+              actions={
+                <ButtonLink href={`/suppliers/${f.id}/costs`} variant="link" size="sm">
+                  <FileText aria-hidden /> Statement
+                </ButtonLink>
+              }
+            />
+            <CardBody className="flex flex-col gap-2.5 text-md">
+              {sums.length ? (
+                sums.map((t) => (
+                  <div key={t.cur} className="flex flex-col gap-2.5">
+                    {[
+                      [`Bought (${plural(t.orders, "order")})`, whole(t.owed, t.cur)],
+                      ["Paid", whole(t.paid, t.cur)],
+                      ["We owe", whole(t.toPay, t.cur)],
+                    ].map(([k, v]) => (
+                      <div key={k} className="flex justify-between gap-3">
+                        <span className="text-text-2">{k}</span>
+                        <strong className="tabular">{v}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ))
+              ) : toPay.length ? (
+                toPay.map((p) => (
+                  <div key={p.currency} className="flex justify-between gap-3">
+                    <span className="text-text-2">We owe ({plural(p.orders.length, "order")})</span>
+                    <strong className="tabular">{whole(p.toPay, p.currency)}</strong>
+                  </div>
+                ))
+              ) : (
+                <EmptyLine>Nothing bought or owed yet.</EmptyLine>
+              )}
+            </CardBody>
+          </Card>
+
+          {/* How they perform (board). */}
+          <Card>
+            <CardHeader title="How they perform" />
+            <CardBody className="flex flex-col gap-2.5 text-md">
+              {(
+                [
+                  ["Offers sent", String(f.quotes.length)],
+                  ["Chosen in a quotation", String(f.quotes.filter((q) => q.usedIn).length)],
+                  ...(perf ? ([["Won by customer", String(perf.offersWon)]] as const) : []),
+                  ["Avg. reply", r.avgDaysToAnswer === null ? "—" : `${r.avgDaysToAnswer} days`],
+                  ...(perf ? ([["On-time ready", perf.ready.known ? `${perf.ready.onTime} of ${perf.ready.known}` : "—"]] as const) : []),
+                ] as const
+              ).map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-3">
+                  <span className="text-text-2">{k}</span>
+                  <strong className="tabular">{v}</strong>
+                </div>
+              ))}
+            </CardBody>
+          </Card>
+        </>
+        }
+      >
           <DetailsCard
             flash={sp.saved === f.id}
             edit={{ panel: "edit-factory", id: f.id, label: `Edit ${f.name}` }}
@@ -191,70 +256,7 @@ export default async function FactoryOverview({
               />
             </div>
           )}
-        </div>
-
-        <aside aria-label="At a glance" className="flex min-w-0 flex-col gap-4">
-          {/* Money (board): bought, paid, what we owe. */}
-          <Card>
-            <CardHeader
-              title="Money"
-              actions={
-                <ButtonLink href={`/suppliers/${f.id}/costs`} variant="link" size="sm">
-                  <FileText aria-hidden /> Statement
-                </ButtonLink>
-              }
-            />
-            <CardBody className="flex flex-col gap-2.5 text-md">
-              {sums.length ? (
-                sums.map((t) => (
-                  <div key={t.cur} className="flex flex-col gap-2.5">
-                    {[
-                      [`Bought (${plural(t.orders, "order")})`, whole(t.owed, t.cur)],
-                      ["Paid", whole(t.paid, t.cur)],
-                      ["We owe", whole(t.toPay, t.cur)],
-                    ].map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-3">
-                        <span className="text-text-2">{k}</span>
-                        <strong className="tabular">{v}</strong>
-                      </div>
-                    ))}
-                  </div>
-                ))
-              ) : toPay.length ? (
-                toPay.map((p) => (
-                  <div key={p.currency} className="flex justify-between gap-3">
-                    <span className="text-text-2">We owe ({plural(p.orders.length, "order")})</span>
-                    <strong className="tabular">{whole(p.toPay, p.currency)}</strong>
-                  </div>
-                ))
-              ) : (
-                <EmptyLine>Nothing bought or owed yet.</EmptyLine>
-              )}
-            </CardBody>
-          </Card>
-
-          {/* How they perform (board). */}
-          <Card>
-            <CardHeader title="How they perform" />
-            <CardBody className="flex flex-col gap-2.5 text-md">
-              {(
-                [
-                  ["Offers sent", String(f.quotes.length)],
-                  ["Chosen in a quotation", String(f.quotes.filter((q) => q.usedIn).length)],
-                  ...(perf ? ([["Won by customer", String(perf.offersWon)]] as const) : []),
-                  ["Avg. reply", r.avgDaysToAnswer === null ? "—" : `${r.avgDaysToAnswer} days`],
-                  ...(perf ? ([["On-time ready", perf.ready.known ? `${perf.ready.onTime} of ${perf.ready.known}` : "—"]] as const) : []),
-                ] as const
-              ).map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-3">
-                  <span className="text-text-2">{k}</span>
-                  <strong className="tabular">{v}</strong>
-                </div>
-              ))}
-            </CardBody>
-          </Card>
-        </aside>
-      </div>
+      </RecordBody>
       {editing && <FactoryPanel action={saveFactoryAction.bind(null, f.id, f.updatedAt)} factory={f} people={people} meId={me.id} onRecord />}
     </div>
   );

@@ -24,6 +24,7 @@ import { FileToolsProvider } from "@/components/files/file-tools";
 import { factoryPaymentAction } from "../../../../money/actions";
 import { stageData } from "../../../../orders/[id]/stage-data";
 import { cache } from "react";
+import { RecordBody } from "@/components/records/record-frame";
 
 /** The order's purchase orders, read once per request (the page and its tab title). */
 const purchaseOrdersOf = cache((order: string) => optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${order}/purchase-orders`)));
@@ -151,8 +152,66 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           </>
         }
       />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex min-w-0 flex-col gap-4">
+      <RecordBody
+        panelLabel="Beside the purchase order"
+        panel={
+          <>
+          <SidePanelCard>
+            <SideSection title="Key dates">
+              {(
+                [
+                  ["Order made", date(o.orderedOn)],
+                  ["Sent to the supplier", po.sentOn ? date(po.sentOn) : "—"],
+                  ["Goods ready", po.readyOn ? date(po.readyOn) : "—"],
+                ] as [string, string][]
+              ).map(([k, v]) => (
+                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-md">
+                  <span className="text-text-2">{k}</span>
+                  <span className="text-right font-semibold tabular">{v}</span>
+                </li>
+              ))}
+            </SideSection>
+            <SideSection title="Money">
+              {owed.flatMap((r) =>
+                (
+                  [
+                    ["Total", whole(r.owed, r.currency)],
+                    ["Paid", whole(r.paid, r.currency)],
+                    ["Still to pay", whole(r.toPay, r.currency)],
+                  ] as [string, string][]
+                ).map(([k, v]) => (
+                  <li key={`${r.currency}:${k}`} className="flex items-baseline justify-between gap-3 py-1 text-md">
+                    <span className="text-text-2">{k}</span>
+                    <span className="text-right font-semibold tabular">{v}</span>
+                  </li>
+                )),
+              )}
+            </SideSection>
+            <SideSection title="People">
+              {(
+                [
+                  ["Supplier", po.supplier.name],
+                  ["Customer", o.customer.name],
+                  ["Responsible person", o.inquiry.assignee?.name ?? "—"],
+                ] as [string, string][]
+              ).map(([k, v]) => (
+                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-md">
+                  <span className="text-text-2">{k}</span>
+                  <span className="text-right font-semibold">{v}</span>
+                </li>
+              ))}
+            </SideSection>
+            <SideSection title="Changed on the order">
+              <li className="py-1 text-md">
+                <Link href={orderHref} className="font-semibold text-primary hover:underline">
+                  Open {o.refNo} › Purchase order
+                </Link>
+              </li>
+            </SideSection>
+          </SidePanelCard>
+        </>
+        }
+      >
           <Section
             title="Terms"
             state={sent}
@@ -275,64 +334,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           )}
 
           <Section title="Files" files={<SectionFiles orderId={o.id} section="purchase_order" canAdd={false} />} />
-        </div>
-
-        <aside aria-label="Beside the purchase order" className="flex min-w-0 flex-col gap-4">
-          <SidePanelCard>
-            <SideSection title="Key dates">
-              {(
-                [
-                  ["Order made", date(o.orderedOn)],
-                  ["Sent to the supplier", po.sentOn ? date(po.sentOn) : "—"],
-                  ["Goods ready", po.readyOn ? date(po.readyOn) : "—"],
-                ] as [string, string][]
-              ).map(([k, v]) => (
-                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-md">
-                  <span className="text-text-2">{k}</span>
-                  <span className="text-right font-semibold tabular">{v}</span>
-                </li>
-              ))}
-            </SideSection>
-            <SideSection title="Money">
-              {owed.flatMap((r) =>
-                (
-                  [
-                    ["Total", whole(r.owed, r.currency)],
-                    ["Paid", whole(r.paid, r.currency)],
-                    ["Still to pay", whole(r.toPay, r.currency)],
-                  ] as [string, string][]
-                ).map(([k, v]) => (
-                  <li key={`${r.currency}:${k}`} className="flex items-baseline justify-between gap-3 py-1 text-md">
-                    <span className="text-text-2">{k}</span>
-                    <span className="text-right font-semibold tabular">{v}</span>
-                  </li>
-                )),
-              )}
-            </SideSection>
-            <SideSection title="People">
-              {(
-                [
-                  ["Supplier", po.supplier.name],
-                  ["Customer", o.customer.name],
-                  ["Responsible person", o.inquiry.assignee?.name ?? "—"],
-                ] as [string, string][]
-              ).map(([k, v]) => (
-                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-md">
-                  <span className="text-text-2">{k}</span>
-                  <span className="text-right font-semibold">{v}</span>
-                </li>
-              ))}
-            </SideSection>
-            <SideSection title="Changed on the order">
-              <li className="py-1 text-md">
-                <Link href={orderHref} className="font-semibold text-primary hover:underline">
-                  Open {o.refNo} › Purchase order
-                </Link>
-              </li>
-            </SideSection>
-          </SidePanelCard>
-        </aside>
-      </div>
+      </RecordBody>
     </FileToolsProvider>
   );
 }

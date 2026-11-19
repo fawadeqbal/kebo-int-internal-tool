@@ -18,6 +18,7 @@ import { editPaymentAction, factoryPaymentAction, removePaymentFileAction } from
 import { voidPaymentAction } from "../../actions";
 import { opensPayments } from "../../shared";
 import { cache } from "react";
+import { RecordBody } from "@/components/records/record-frame";
 
 /** One payment, read once per request (the page and its tab title). */
 const paymentOf = cache((kind: PaymentRecordKind, id: string) => api.get<PaymentView>(`/treasury/payments/${kind}/${id}`).catch(() => null));
@@ -119,8 +120,23 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
           {p.voided.reason && <>: {p.voided.reason}</>}
         </p>
       )}
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex min-w-0 flex-col gap-4">
+      <RecordBody
+        panelLabel="Beside the payment"
+        panel={
+          <Card className="p-0">
+          <CardHeader title="History" />
+          <CardBody className="flex flex-col gap-3 text-sm">
+            <HistoryLine who={p.recordedBy} what={p.kind === "submission" ? "Sent for verification" : "Recorded"} at={p.recordedAt} />
+            {p.voided && <HistoryLine who={null} what={`Removed${p.voided.reason ? `: ${p.voided.reason}` : ""}`} at={p.voided.at} />}
+            {p.ledgerHref && (
+              <Link href={p.ledgerHref} className="font-medium text-primary hover:underline">
+                View in the general ledger
+              </Link>
+            )}
+          </CardBody>
+        </Card>
+        }
+      >
           <Card className="p-0">
             <CardHeader title="Payment" />
             <CardBody>
@@ -179,20 +195,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
               {p.voidPath && <VoidForm action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
             </div>
           )}
-        </div>
-        <Card className="p-0">
-          <CardHeader title="History" />
-          <CardBody className="flex flex-col gap-3 text-sm">
-            <HistoryLine who={p.recordedBy} what={p.kind === "submission" ? "Sent for verification" : "Recorded"} at={p.recordedAt} />
-            {p.voided && <HistoryLine who={null} what={`Removed${p.voided.reason ? `: ${p.voided.reason}` : ""}`} at={p.voided.at} />}
-            {p.ledgerHref && (
-              <Link href={p.ledgerHref} className="font-medium text-primary hover:underline">
-                View in the general ledger
-              </Link>
-            )}
-          </CardBody>
-        </Card>
-      </div>
+      </RecordBody>
     </div>
   );
 }

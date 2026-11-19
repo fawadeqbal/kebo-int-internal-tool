@@ -9,7 +9,8 @@ import type { DealRow, HistoryEntry, Paged } from "@/lib/types";
 import type { AuditRow, RoleRow, UserRow } from "@/lib/types-people";
 import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { OpenPanelButton } from "@/components/common/panel";
-import { AllLink, DetailsCard, RecordFrame, RecordListCard, RecordRow, RecordSection } from "@/components/common/record";
+import { AllLink, DetailsCard, RecordListCard, RecordRow, RecordSection } from "@/components/common/record";
+import { RecordBody } from "@/components/records/record-frame";
 import { RecordLanding, RecordNav } from "@/components/common/record-nav";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { changeRows, compactChanges } from "@/components/common/change-lines";
@@ -159,20 +160,38 @@ export default async function UserPage({ params, searchParams }: { params: Promi
       />
       <RecordLanding />
 
-      <RecordFrame
-        sideLabel="Changes"
-        nav={
-          <RecordNav
-            label="Person sections"
-            items={[
-              { id: "overview", label: "Overview" },
-              ...(spending ? [{ id: "spending", label: "Spending", count: spending.count }] : []),
-              ...(inquiries ? [{ id: "inquiries", label: "Inquiries", count: inquiries.total }] : []),
-              ...(changes ? [{ id: "changes", label: "Changes", count: changes.length }] : []),
-            ]}
-          />
-        }
-        main={
+      <>
+        <RecordNav
+          label="Person sections"
+          items={[
+            { id: "overview", label: "Overview" },
+            ...(spending ? [{ id: "spending", label: "Spending", count: spending.count }] : []),
+            ...(inquiries ? [{ id: "inquiries", label: "Inquiries", count: inquiries.total }] : []),
+            ...(changes ? [{ id: "changes", label: "Changes", count: changes.length }] : []),
+          ]}
+        />
+        <RecordBody
+          panelLabel="Changes"
+          panel={
+          changes && (
+            <SidePanelCard>
+              <div id="changes" className="scroll-mt-32">
+                <SideSection
+                  title="Changes"
+                  count={changes.length}
+                  dense
+                  action={
+<AllLink href={`/audit?person=${u.id}`}>What they did</AllLink>
+                  }
+                  empty="Nothing changed on their account yet."
+                >
+                  {changeRows(changes)}
+                </SideSection>
+              </div>
+            </SidePanelCard>
+          )
+          }
+        >
           <>
             <RecordSection id="overview" className="flex flex-col gap-5">
               <PerformanceCard kind="user" id={u.id} me={me} />
@@ -235,27 +254,8 @@ export default async function UserPage({ params, searchParams }: { params: Promi
               </RecordSection>
             )}
           </>
-        }
-        side={
-          changes && (
-            <SidePanelCard>
-              <div id="changes" className="scroll-mt-32">
-                <SideSection
-                  title="Changes"
-                  count={changes.length}
-                  dense
-                  action={
-<AllLink href={`/audit?person=${u.id}`}>What they did</AllLink>
-                  }
-                  empty="Nothing changed on their account yet."
-                >
-                  {changeRows(changes)}
-                </SideSection>
-              </div>
-            </SidePanelCard>
-          )
-        }
-      />
+        </RecordBody>
+      </>
 
       {sp.panel === "edit-user" && <EditUserPanel action={updateUserAction.bind(null, u.id)} user={u} roles={roles} isMe={isMe} />}
       {sp.panel === "user-password" && !isMe && <PasswordPanel action={setPasswordAction.bind(null, u.id)} name={u.name} />}
