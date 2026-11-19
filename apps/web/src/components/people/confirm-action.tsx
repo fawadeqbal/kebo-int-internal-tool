@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
+import { SubmitButton } from "@kebo/ui/client";
+import { ConfirmSubmit } from "@/components/common/dialog";
 import type { ButtonSize, ButtonVariant } from "@kebo/ui";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -36,7 +37,7 @@ export function ConfirmAction({
   return (
     <ActionForm action={action} className={className} showSuccess={showSuccess}>
       {confirm ? (
-        <ConfirmSubmit message={confirm} variant={variant} size={size} pendingText={pendingText}>
+        <ConfirmSubmit confirmLabel={label} message={confirm} variant={variant} size={size} pendingText={pendingText}>
           {icon}
           {label}
         </ConfirmSubmit>

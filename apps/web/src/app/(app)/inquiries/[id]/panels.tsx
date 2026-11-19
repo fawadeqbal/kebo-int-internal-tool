@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+import { useConfirmSubmit } from "@/components/common/dialog";
 import { Clock } from "lucide-react";
 import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from "@kebo/shared";
-import { Field, Select, Textarea } from "@kebo/ui";
+import { Field, Select, Textarea, RULES } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelButton } from "@/components/orders/step-view";
-import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, SidePanel, useClosePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -15,11 +16,11 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 /** A panel form's Save / Cancel. */
 function Buttons({ save, danger }: { save: string; danger?: boolean }) {
   return (
-    <PanelActions>
+    <WindowFooter>
       <SubmitButton size="sm" variant={danger ? "danger" : "primary"} pendingText="Saving…">
         {save}
       </SubmitButton>
-    </PanelActions>
+    </WindowFooter>
   );
 }
 
@@ -118,7 +119,7 @@ export function DecisionWindows({
           title={onHold ? "Resume the inquiry" : "Put the inquiry on hold"}
           description={onHold ? "It goes back to the lists as active." : "It stays where it is, marked on hold, until resumed."}
           onClose={() => hold.close({})}
-          className="md:w-[560px]"
+          className={RULES.window.part}
         >
           <HoldForm onHold={onHold} action={holdAction} />
         </SidePanel>
@@ -128,7 +129,7 @@ export function DecisionWindows({
           title={m.to === "lost" ? `Mark ${refNo} as lost` : m.label}
           description={m.to === "lost" ? "The reason shows on reports. A manager can reopen it." : undefined}
           onClose={() => move.close({})}
-          className="md:w-[560px]"
+          className={RULES.window.part}
         >
           <StageForm to={m.to} action={stageAction} />
         </SidePanel>
@@ -276,16 +277,18 @@ export function NoteForm({ action }: { action: Action }) {
 }
 
 export function RemoveFile({ action, name }: { action: Action; name: string }) {
+  const { onClick: confirmSubmit, dialog } = useConfirmSubmit();
   return (
     <ActionForm action={action} showSuccess={false} className="inline">
       <button
         type="submit"
         className="text-xs text-muted hover:text-bad"
         aria-label={`Remove ${name}`}
-        onClick={(e) => !confirm(`Remove ${name}?`) && e.preventDefault()}
+        onClick={confirmSubmit({ question: `Remove ${name}?`, confirmLabel: "Remove", danger: true })}
       >
         Remove
       </button>
+      {dialog}
     </ActionForm>
   );
 }

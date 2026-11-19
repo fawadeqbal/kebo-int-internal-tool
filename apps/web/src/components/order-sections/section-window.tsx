@@ -4,11 +4,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { OrderSection } from "@kebo/shared";
 import { Pencil } from "lucide-react";
-import { Button, cn } from "@kebo/ui";
+import { Button, cn, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useChangeCount } from "@/components/common/changes";
-import { PANEL_FORM, PanelBody, PanelFooter, SidePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, SidePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { WindowFiles } from "./section-files";
 
@@ -89,11 +89,11 @@ export function WindowOpener({ button, disabled, onClick }: { button: WindowButt
 
 function Foot({ submit, danger, note, disabled }: { submit: string; danger?: boolean; note?: ReactNode; disabled?: boolean }) {
   return (
-    <PanelFooter start={note}>
+    <WindowFooter note={note}>
       <SubmitButton variant={danger ? "danger" : "primary"} disabled={disabled}>
         {submit}
       </SubmitButton>
-    </PanelFooter>
+    </WindowFooter>
   );
 }
 
@@ -157,7 +157,7 @@ export function SectionWindow({
     <>
       <WindowOpener button={button} onClick={() => setOpen(true)} />
       {open && (
-        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && "md:w-[460px]", size === "md" && "md:w-[600px]")}>
+        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && RULES.window.part, size === "md" && RULES.window.part)}>
           <PanelBody>
             <ActionForm action={action} onDone={() => setOpen(false)} showSuccess={false} className={PANEL_FORM}>
               {(s) => {

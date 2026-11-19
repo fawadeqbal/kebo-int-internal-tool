@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { MAIL_PROVIDER_LABEL, MAIL_PROVIDERS, SMTP_PORTS, type MailProvider, type MailSettingsView } from "@kebo/shared";
 import { Card, CardBody, CardHeader, cn, Field, Input, Select } from "@kebo/ui";
-import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
+import { SubmitButton } from "@kebo/ui/client";
+import { ConfirmSubmit } from "@/components/common/dialog";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 
@@ -133,7 +134,7 @@ export function MailCards({ view, me, saveAction, removeAction, testAction }: { 
 
       {view.provider && (
         <ActionForm action={removeAction} showSuccess={false}>
-          <ConfirmSubmit variant="ghost" size="sm" pendingText="Removing…" className="text-bad" message={view.serverDefault ? "Remove this company's own email setting? Its emails will go through the server's own again." : "Remove this company's own email setting? No email will be sent until one is set again."}>
+          <ConfirmSubmit variant="ghost" size="sm" pendingText="Removing…" className="text-bad" confirmLabel="Remove" danger message={view.serverDefault ? "Remove this company's own email setting? Its emails will go through the server's own again." : "Remove this company's own email setting? No email will be sent until one is set again."}>
             Remove this setting
           </ConfirmSubmit>
         </ActionForm>

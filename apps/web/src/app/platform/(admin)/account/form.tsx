@@ -4,7 +4,7 @@ import { Field, Input } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import { platformPasswordAction } from "@/app/platform/actions";
 
 /** ✎ Change in the Password card's header, and the side panel it opens (?panel=password). */
@@ -49,10 +49,10 @@ export function PasswordForm({ onSaved }: { onSaved?: () => void }) {
               <Input id="confirm" name="confirm" type="password" autoComplete="new-password" required />
             </Field>
           </PanelSection>
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton pendingText="Changing…">Change password</SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>

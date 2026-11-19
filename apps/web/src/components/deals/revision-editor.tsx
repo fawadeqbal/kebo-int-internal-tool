@@ -45,7 +45,7 @@ import type { OfferLine, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
-import { PANEL_FORM, PanelFooter, PanelSection, useReportDirty } from "@/components/common/panel";
+import { PANEL_FORM, PanelSection, useReportDirty, WindowFooter } from "@/components/common/panel";
 import { OnePartFooter, StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
 import { PriceSheet, PriceTotals } from "./price-editor";
 import { shortName } from "./offer-facts";
@@ -1056,11 +1056,11 @@ export function RevisionEditor({
             ) : (
               <>
                 {sections}
-              <PanelFooter start={footNote} onCancel={onCancel}>
+              <WindowFooter note={footNote} onCancel={onCancel}>
                 <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
                   <Check aria-hidden /> {submitLabel}
                 </SubmitButton>
-              </PanelFooter>
+              </WindowFooter>
               </>
             )}
           </>

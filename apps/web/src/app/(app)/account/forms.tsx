@@ -7,15 +7,7 @@ import { Button, Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import {
-  PANEL_FORM,
-  PanelActions,
-  PanelBody,
-  PanelKeys,
-  PanelSection,
-  SidePanel,
-  useSidePanel,
-} from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { TwoStepStatus } from "@/lib/types-people";
 
@@ -68,10 +60,10 @@ export function PasswordForm({ action, onSaved }: { action: Action; onSaved?: ()
               <Input id="confirm" name="confirm" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.confirm} />
             </Field>
           </PanelSection>
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton pendingText="Changing…">Change my password</SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>

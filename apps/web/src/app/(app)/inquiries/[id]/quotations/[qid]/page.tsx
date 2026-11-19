@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Fragment, type ReactNode } from "react";
 import { ChevronRight, Download, Eye, Lock, Send } from "lucide-react";
 import { BASIS_STEP_LABEL, can, PAPER, RECORD_KIND, RECORD_TITLE, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, unpricedItems, type BasisStep, type TermsCheck } from "@kebo/shared";
-import { cn } from "@kebo/ui";
+import { cn, RULES } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
 import { recordActions } from "@/components/records/actions";
@@ -20,7 +20,8 @@ import type { QuotationOfDeal, QuoteOffers, RevisionDraft, RevisionView } from "
 import { QuoteEdit, type QuoteBox } from "@/components/deals/quotation-step";
 import { AnswerButton } from "@/components/deals/quotation-tab";
 import { CheckChip, checksOf, optionOf, optionTitle, PaymentParts, quoteCount, quotePrices } from "@/components/deals/quote-view";
-import { EditAllWindow, NewRevisionWindow, UrlWindow } from "@/components/deals/quote-windows";
+import { UrlWindow } from "@/components/common/panel";
+import { EditAllWindow, NewRevisionWindow } from "@/components/deals/quote-windows";
 import { SendWindow, type SendItem } from "@/components/deals/send-quote";
 import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offerPricesAction, offersAction, reviseAction, saidNoAction, updateRevisionAction } from "../../quotation/actions";
 import { ActionForm } from "@/components/common/action-form";
@@ -144,7 +145,7 @@ export default async function QuotationOwnPage({
       place: "primary",
       when: isDraft && !!send,
       node: (
-        <PanelButton variant="strong" size="sm" icon={<Send aria-hidden />} label={`Send R${r.number}`} title={`Send ${quoteRef} to ${d.customer.name}`} description={`Valid until ${date(r.validUntil)}`} panelClassName="md:w-[620px]" body={send} />
+        <PanelButton variant="strong" size="sm" icon={<Send aria-hidden />} label={`Send R${r.number}`} title={`Send ${quoteRef} to ${d.customer.name}`} description={`Valid until ${date(r.validUntil)}`} panelClassName={RULES.window.part} body={send} />
       ),
     },
     {
@@ -364,7 +365,7 @@ export default async function QuotationOwnPage({
       {/* The windows ⋯ opens (kept in the address: Back closes them). */}
       {editor && sp.panel === "edit-quote" && <EditAllWindow {...editor} />}
       {send && r.status === "sent" && sp.panel === "send-again" && (
-        <UrlWindow name="send-again" title={`Send ${quoteRef} again`} description="The same PDF, by email" className="md:w-[620px]">
+        <UrlWindow name="send-again" title={`Send ${quoteRef} again`} description="The same PDF, by email" className={RULES.window.part}>
           {send}
         </UrlWindow>
       )}

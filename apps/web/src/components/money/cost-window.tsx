@@ -17,13 +17,13 @@ import {
   type ExpenseCategory,
   type InquiryStage,
 } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea, Notice } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Notice, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { MoneyInput } from "@/components/common/money-input";
-import { PANEL_FORM, PanelActions, PanelBody, SidePanel, WhatHappens, WindowCancelIn } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, SidePanel, WhatHappens, WindowCancelIn, WindowFooter } from "@/components/common/panel";
 import { useWindowDone } from "@/components/common/route-window";
 import { costChoicesAction, expenseAction, submitCostAction, voidExpenseAction } from "@/app/(app)/money/actions";
 import type { ActionState } from "@/lib/actions";
@@ -646,10 +646,10 @@ export function CostForm({
             </Field>
           )}
 
-          <PanelActions className={cn("justify-end gap-x-3 gap-y-2", !(inPanel || inWindow) && "static mx-0 mb-0 border-t-0 px-0 sm:mx-0 sm:px-0")} cancel={false}>
+          <WindowFooter className={cn("justify-end gap-x-3 gap-y-2", !(inPanel || inWindow) && "static mx-0 mb-0 border-t-0 px-0 sm:mx-0 sm:px-0")} cancel={false}>
             {footerStart && <span className={cn("mr-auto min-w-0 flex-[1_1_9rem] text-xs text-text-2", !expense && "max-sm:hidden")}>{footerStart}</span>}
             {buttons}
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>
@@ -706,7 +706,7 @@ function CostPanel({
   onRemove?: () => void;
 }) {
   return (
-    <SidePanel title={title} description={sub} onClose={onClose} className="md:w-[640px]">
+    <SidePanel title={title} description={sub} onClose={onClose} className={RULES.window.part}>
       <PanelBody className="gap-4">
         <CostForm setup={setup} mode={mode} inPanel onSaved={onClose} onFileError={onFileError} onRemove={onRemove} />
       </PanelBody>

@@ -5,7 +5,7 @@ import { MODULE_PRESETS, PLAN_FEATURES, withPreset } from "@kebo/shared";
 import { Button, Checkbox, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, UrlWindow, useSidePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { Plan } from "@/lib/types-platform";
 
@@ -88,10 +88,10 @@ export function PlanForm({ action, plan, onDone, submit }: { action: Action; pla
               <Checkbox name="isActive" value="on" defaultChecked={plan.isActive} /> Offered for new companies
             </label>
           )}
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton pendingText="Saving…">{submit}</SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>
@@ -117,24 +117,26 @@ export function PresetButtons({ features, onPick }: { features: readonly string[
 
 /** "New plan" and "Edit plan · name" in the side panel (?panel=new-plan, ?panel=edit-plan&id=…). */
 export function PlanPanels({ plans, create, update }: { plans: Plan[]; create: Action; update: Record<string, Action> }) {
-  const add = useSidePanel("new-plan");
   const edit = useSidePanel("edit-plan");
   const plan = plans.find((p) => p.id === edit.id);
-  if (add.open)
-    return (
-      <SidePanel title="New plan" description="A price, limits on people and files, and the features included." onClose={() => add.close()}>
-        <PanelBody>
-          <PlanForm action={create} onDone={() => add.close()} submit="Make the plan" />
-        </PanelBody>
-      </SidePanel>
-    );
-  if (edit.open && plan)
-    return (
-      <SidePanel title={`Edit plan · ${plan.name}`} description={`${plan.companies} ${plan.companies === 1 ? "company" : "companies"} on it · they get the change at once`} onClose={() => edit.close()}>
-        <PanelBody>
-          <PlanForm action={update[plan.id]!} plan={plan} onDone={() => edit.close()} submit="Save the plan" />
-        </PanelBody>
-      </SidePanel>
-    );
-  return null;
+  return (
+    <>
+      <UrlWindow name="new-plan" title="New plan" description="A price, limits on people and files, and the features included.">
+        {(close) => (
+          <PanelBody>
+            <PlanForm action={create} onDone={close} submit="Make the plan" />
+          </PanelBody>
+        )}
+      </UrlWindow>
+      {plan && (
+        <UrlWindow name="edit-plan" title={`Edit plan · ${plan.name}`} description={`${plan.companies} ${plan.companies === 1 ? "company" : "companies"} on it · they get the change at once`}>
+          {(close) => (
+            <PanelBody>
+              <PlanForm action={update[plan.id]!} plan={plan} onDone={close} submit="Save the plan" />
+            </PanelBody>
+          )}
+        </UrlWindow>
+      )}
+    </>
+  );
 }

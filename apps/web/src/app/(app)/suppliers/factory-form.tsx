@@ -1,9 +1,9 @@
 "use client";
 
-import { Field, Input, Select, Textarea } from "@kebo/ui";
+import { Field, Input, Select, Textarea, RULES } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import { Check } from "lucide-react";
 import type { ActionState } from "@/lib/actions";
 import type { Person } from "@/lib/types";
@@ -78,11 +78,11 @@ function FactoryForm({
                 <Textarea id="notes" name="notes" rows={3} defaultValue={val("notes")} />
               </Field>
             </div>
-            <PanelActions className="justify-end">
+            <WindowFooter>
               <SubmitButton pendingText="Saving…">
                 <Check aria-hidden /> {factory ? "Save changes" : "Save supplier"}
               </SubmitButton>
-            </PanelActions>
+            </WindowFooter>
           </PanelBody>
         );
       }}
@@ -129,7 +129,7 @@ export function FactoryPanel({
           : "Opens from Suppliers, from “Ask suppliers”, and from “Supplier → + New” when entering an offer"
       }
       onClose={() => panel.close()}
-      className="md:w-[900px]"
+      className={RULES.window.wideRows}
     >
       <FactoryForm action={action} factory={factory} people={people} meId={meId} onSaved={saved} />
     </SidePanel>
