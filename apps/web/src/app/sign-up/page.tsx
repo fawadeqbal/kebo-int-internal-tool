@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LIFECYCLE } from "@kebo/shared";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import { apiFetch } from "@/lib/api";
 import { headers } from "next/headers";
 import { AuthShell } from "@/app/login/auth-shell";
@@ -38,9 +38,9 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
         </>
       ) : (
         <>
-          <Alert tone="info" className="mt-3">
+          <Notice tone="info" className="mt-3">
             Sign-up is not open yet. Request a demo and we will set one up for you.
-          </Alert>
+          </Notice>
           <Link href="/request-a-demo" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
             Request a demo
           </Link>

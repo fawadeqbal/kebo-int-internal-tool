@@ -16,7 +16,7 @@ import {
   UNKNOWN_COUNTRY,
   type AttachmentKind,
 } from "@kebo/shared";
-import { Alert, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice, Badge, EmptyLine } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens, WindowCancel } from "@/components/common/panel";
@@ -351,7 +351,7 @@ export function DealForm({
   if (created)
     return (
       <PanelBody>
-        <Alert tone="warning">
+        <Notice tone="todo">
           <p className="font-medium">The inquiry was saved, but some files did not upload:</p>
           <ul className="mt-1 list-disc pl-5 text-sm">
             {created.failed.map((f) => (
@@ -361,7 +361,7 @@ export function DealForm({
           <Link href={`/inquiries/${created.id}/files`} className={buttonClass("primary", "sm", "mt-3")}>
             Open the inquiry’s files and try them again
           </Link>
-        </Alert>
+        </Notice>
       </PanelBody>
     );
 
@@ -389,9 +389,9 @@ export function DealForm({
         }}
         banner={(st) =>
           st.message && st.ok === false ? (
-            <Alert tone="error">
+            <Notice tone="bad">
               <strong>Not saved.</strong> {notSaved(st)}
-            </Alert>
+            </Notice>
           ) : null
         }
       >
@@ -582,14 +582,9 @@ export function DealForm({
                           Contact
                           {/* The main contact is chosen for you, and says so. */}
                           {mainContact && (
-                            <span
-                              className={cn(
-                                "rounded-full bg-primary-soft px-2 py-px text-2xs font-semibold text-primary",
-                                changedField("contactId"),
-                              )}
-                            >
+                            <Badge size="sm" tone="primary" className={changedField("contactId")}>
                               Main contact
-                            </span>
+                            </Badge>
                           )}
                         </>
                       }
@@ -671,17 +666,13 @@ export function DealForm({
                     {...sheet.handlers}
                   />
                   {itemErrors(s.errors).length > 0 && (
-                    <div
-                      role="alert"
-                      className="flex flex-col gap-0.5 rounded-xl border border-bad/30 bg-bad-soft px-3 py-2.5 text-sm text-bad"
-                    >
-                      <span className="font-semibold">
-                        Fix {itemErrors(s.errors).length === 1 ? "this item" : "these items"}, then save again:
-                      </span>
+                    <Notice tone="bad" title={`Fix ${itemErrors(s.errors).length === 1 ? "this item" : "these items"}, then save again:`}>
                       {itemErrors(s.errors).map((e) => (
-                        <span key={e}>{e}</span>
+                        <span key={e} className="block">
+                          {e}
+                        </span>
                       ))}
-                    </div>
+                    </Notice>
                   )}
                 </PanelSection>
               )}
@@ -1015,7 +1006,7 @@ export function DealForm({
                       )}
                     </div>
                   ) : (
-                    <p className="text-sm text-text-2">Nothing changed.</p>
+                    <EmptyLine>Nothing changed.</EmptyLine>
                   )}
                 </div>
               )}
@@ -1227,7 +1218,8 @@ function NewCustomerForm({
         <h4 className="text-base font-bold">New customer</h4>
       </div>
       {matches.length > 0 && (
-        <div role="status" className="flex flex-col gap-2 rounded-xl border border-warn/30 bg-warn-soft px-3 py-2.5 text-md">
+        <Notice tone="todo">
+          <div className="flex flex-col gap-2">
           {matches.map((m) => (
             <div key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="min-w-0 flex-1">
@@ -1244,7 +1236,8 @@ function NewCustomerForm({
               It’s a different customer: add it anyway
             </Button>
           ) : null}
-        </div>
+          </div>
+        </Notice>
       )}
       {result && !result.matches?.length && !Object.keys(result.errors ?? {}).length && (
         <p className="text-sm text-bad">{result.message}</p>

@@ -5,7 +5,7 @@ import { Totals, type TotalsRow } from "@/components/records/totals";
 import { useMemo, useState, type ReactNode } from "react";
 import { factoryUnitCostMinor, formatMinor, multiplyMinor, toMinor } from "@kebo/money";
 import { LINE_CONDITION_LABEL, LINE_CONDITION_TONE, LINE_CONDITIONS, type LineCondition } from "@kebo/shared";
-import { Badge, cn } from "@kebo/ui";
+import { Badge, cn, EmptyLine } from "@kebo/ui";
 import { BatchLines } from "@/components/edits/batch-lines";
 import type { EditCard, EditRef } from "@/lib/types-edits";
 import { LineTable, type LineColumn, type LineResult, type LineRow, type LineValues } from "@/components/lines/line-table";
@@ -476,7 +476,7 @@ export function OrderLinesView({ set, lines, label }: { set: LineSet; lines: Ord
  * OrderV4Phone): the number and name, then the step's figure.
  */
 export function PhoneLines({ set, lines }: { set: LineSet; lines: OrderLineView[] }) {
-  if (!lines.length) return <p className="text-sm text-muted">No items on this order.</p>;
+  if (!lines.length) return <EmptyLine>No items on this order.</EmptyLine>;
   // The one phone item line (PhoneItems), read only: number, name, the step's figure under it.
   return (
     <PhoneItems

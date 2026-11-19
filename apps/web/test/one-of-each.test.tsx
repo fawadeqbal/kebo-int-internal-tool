@@ -97,6 +97,22 @@ describe("one of each", () => {
     expect(found(/^function Totals\(/gm)).toEqual([]);
   });
 
+  it("one notice: no Alert or Banner, and no hand-made coloured notice box", () => {
+    expect(found(/<(Alert|Banner)\b/g)).toEqual([]);
+    expect(found(/<(p|div)(?: role="(?:alert|status)")? className="[^"]*rounded-(?:xl|lg)[^"]*border border-(?:ok|bad|info)\/\d+ bg-(?:ok|bad|info)-soft[^"]*">/g).filter((m) => !m.includes("shadow-pop"))).toEqual([]);
+  });
+
+  it("one pill: no hand-made rounded-full label span", () => {
+    expect(found(/<span className="[^"]*rounded-full bg-(?:primary|warn|ok|bad|info)-soft px-2[^"]*text-(?:2xs|xs)[^"]*">/g)).toEqual([]);
+  });
+
+  it("one empty line, one box head, one side section", () => {
+    expect(found(/<p className="(?:p-4 )?text-sm text-muted">(?:No |Nothing )/g)).toEqual([]);
+    expect(found(/function RecordEmpty\(/g)).toEqual([]);
+    expect(found(/<div className="flex min-h-14 items-start justify-between gap-3 border-b border-line/g)).toEqual([]);
+    expect(found(/<h3 className="text-lead font-semibold">\{title\}<\/h3>/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

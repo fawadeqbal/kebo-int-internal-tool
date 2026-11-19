@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LOST_REASON_LABEL, type InquiryStage, type LostReason } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Badge, EmptyLine } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, money, companyToday } from "@/lib/format";
 import type { CostSheetRow, ExpenseList } from "@/lib/types-money";
@@ -113,7 +113,7 @@ export async function DealExpensesCard({
             }}
           />
         ) : (
-          <p className="border-t border-line px-[18px] py-3.5 text-md text-text-2">Nothing spent on this inquiry yet.</p>
+          <EmptyLine className="border-t border-line px-[18px] py-3.5">Nothing spent on this inquiry yet.</EmptyLine>
         )}
         {deal.order && live.length > 0 && (
           <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">

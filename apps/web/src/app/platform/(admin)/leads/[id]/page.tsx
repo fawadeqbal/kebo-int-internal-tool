@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { COMPANY_KIND_LABEL, LEAD_SOURCE_LABEL, LEAD_STATUS_LABEL, suggestSlug } from "@kebo/shared";
-import { ButtonLink, buttonClass, Card, EmptyState, PageHeader, StatusBadge } from "@kebo/ui";
+import { ButtonLink, buttonClass, Card, EmptyState, PageHeader, StatusBadge, EmptyLine, CardHeader } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { loadPlatform } from "@/lib/platform";
 import { date, dateTime } from "@/lib/format";
@@ -177,22 +177,18 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card className="overflow-clip" aria-labelledby="demo-title">
-            <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-              <div>
-                <h2 id="demo-title" className="text-sm font-semibold">
-                  {company?.kind === "client" ? "Their company" : "Demo"}
-                </h2>
-                <p className="mt-0.5 text-xs text-muted">{company ? "made for them" : "none yet"}</p>
-              </div>
-              {company && (
-                <Link
-                  href={`/platform/companies/${company.id}`}
-                  className={buttonClass("ghost", "sm", "text-text-2")}
-                >
-                  Open {company.kind === "client" ? "company" : "demo"}
-                </Link>
-              )}
-            </div>
+            <CardHeader
+              titleId="demo-title"
+              title={company?.kind === "client" ? "Their company" : "Demo"}
+              description={company ? "made for them" : "none yet"}
+              actions={
+                company && (
+                  <Link href={`/platform/companies/${company.id}`} className={buttonClass("ghost", "sm", "text-text-2")}>
+                    Open {company.kind === "client" ? "company" : "demo"}
+                  </Link>
+                )
+              }
+            />
             {company ? (
               <dl className="divide-y divide-line px-4">
                 {[
@@ -261,7 +257,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 ))}
               </ol>
             ) : (
-              <p className="px-4 py-3 text-sm text-muted">Nothing yet.</p>
+              <EmptyLine className="px-4 py-3">Nothing yet.</EmptyLine>
             )}
           </Card>
         </div>

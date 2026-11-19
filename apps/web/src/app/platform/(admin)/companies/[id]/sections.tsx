@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { FileSpreadsheet, Plus } from "lucide-react";
 import { COMPANY_KIND_LABEL, COMPANY_LOG_KINDS, LIFECYCLE, planFeatureName, type CompanyLogKind } from "@kebo/shared";
-import { Badge, buildHref, buttonClass, Card, cn, EmptyState, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile, LinkTabs } from "@kebo/ui";
+import { Badge, buildHref, buttonClass, Card, cn, EmptyState, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile, LinkTabs, EmptyLine, CardHeader } from "@kebo/ui";
 import type { ISODate } from "@kebo/utils";
 import { RowMenu } from "@/components/common/more-menu";
 import { date, dateTime, money, timeAgo } from "@/lib/format";
@@ -36,20 +36,7 @@ function Box({
 }) {
   return (
     <Card id={id} className={cn("overflow-clip", className)} aria-labelledby={id ? `${id}-title` : undefined}>
-      <div
-        className={cn(
-          "flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3",
-          description && action && "max-sm:flex-col max-sm:gap-2",
-        )}
-      >
-        <div className="min-w-0">
-          <h2 id={id ? `${id}-title` : undefined} className="text-sm font-semibold text-text">
-            {title}
-          </h2>
-          {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
-        </div>
-        {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
-      </div>
+      <CardHeader titleId={id ? `${id}-title` : undefined} title={title} description={description} actions={action} />
       {children}
     </Card>
   );
@@ -183,7 +170,7 @@ export function OverviewSection({ c, today }: { c: CompanyDetail; today: ISODate
               ))}
             </ul>
           ) : (
-            <p className="px-4 py-4 text-sm text-text-2">Nothing needs you: they are paid up, within their limits and signing in safely.</p>
+            <EmptyLine inset>Nothing needs you: they are paid up, within their limits and signing in safely.</EmptyLine>
           )}
         </Box>
         <Box title="What they do" description="your own visits don't count">
@@ -319,15 +306,12 @@ export function PlanSection({ c, modules, saved }: { c: CompanyDetail; modules: 
   return (
     <>
       <Card id="plan" aria-labelledby="plan-title" className={cn("overflow-clip", saved === "plan" && "animate-flash")}>
-        <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-          <div className="min-w-0">
-            <h2 id="plan-title" className="text-sm font-semibold">
-              Plan
-            </h2>
-            <p className="mt-0.5 text-xs text-muted">what they pay for, and their limits</p>
-          </div>
-          {live && <PanelButton panel="change-plan">Change plan</PanelButton>}
-        </div>
+        <CardHeader
+          titleId="plan-title"
+          title="Plan"
+          description="what they pay for, and their limits"
+          actions={live && <PanelButton panel="change-plan">Change plan</PanelButton>}
+        />
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-3.5 xl:grid-cols-4">
           {[
             { label: "Plan", value: p?.name ?? "No plan" },
@@ -396,21 +380,19 @@ export function BillingSection({
   const share = paidShare(c, today);
   return (
     <Card id="billing" aria-labelledby="billing-title" className={cn("overflow-clip", saved === "billing" && "animate-flash")}>
-      <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0">
-          <h2 id="billing-title" className="text-sm font-semibold">
-            Billing
-          </h2>
-          <p className="mt-0.5 text-xs text-muted">
-            {client ? "each payment sets the paid-until date" : `a ${c.kind} pays nothing; make it a client first`}
-          </p>
-        </div>
-        {client && live && (
-          <PanelButton panel="record-payment">
-            <Plus aria-hidden /> Record payment
-          </PanelButton>
-        )}
-      </div>
+      <CardHeader
+        titleId="billing-title"
+        title="Billing"
+        description={client ? "each payment sets the paid-until date" : `a ${c.kind} pays nothing; make it a client first`}
+        actions={
+          client &&
+          live && (
+            <PanelButton panel="record-payment">
+              <Plus aria-hidden /> Record payment
+            </PanelButton>
+          )
+        }
+      />
       {client ? (
         <>
           <div className="flex flex-col gap-2 px-4 py-3">

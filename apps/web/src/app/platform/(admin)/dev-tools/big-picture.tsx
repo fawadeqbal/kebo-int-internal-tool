@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { agoText, forText, type DevOverview } from "@kebo/shared";
-import { Card, CardHeader, EmptyState, StatRow, StatTile } from "@kebo/ui";
+import { Card, CardHeader, EmptyState, StatRow, StatTile, Notice } from "@kebo/ui";
 import { currentZone } from "@/lib/format";
 import { CheckMap, Dot, LineChart, NeedsYou, Timeline, UseBar, gbText } from "./parts";
 import { msText } from "./speed";
@@ -19,12 +19,9 @@ export function BigPicture({ o, days }: { o: DevOverview; days: 1 | 7 }) {
   return (
     <div className="flex flex-col gap-4">
       {!o.checkedAt && (
-        <div className="rounded-xl border border-info/25 bg-info-soft px-4 py-3 text-sm">
-          <p className="font-semibold">The server&apos;s status is not set up yet.</p>
-          <p className="text-text-2">
-            The next deploy installs it by itself. By hand, on the server: <code className="font-mono text-xs">bash deploy/server/install.sh</code>
-          </p>
-        </div>
+        <Notice tone="info" title="The server’s status is not set up yet.">
+          The next deploy installs it by itself. By hand, on the server: <code className="font-mono text-xs">bash deploy/server/install.sh</code>
+        </Notice>
       )}
       <NeedsYou checks={o.checks} />
       <StatRow>

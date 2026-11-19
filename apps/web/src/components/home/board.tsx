@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { buttonClass, Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { buttonClass, Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { date, plural, whole } from "@/lib/format";
 import { bigMoney, change, monthShortOf, percent } from "@/lib/insights-period";
 import type { HomeFigures, HomeStage, Receivables, Reminders } from "@/lib/types-insights";
@@ -94,7 +94,7 @@ export function NeedsYou({ r }: { r: Reminders }) {
         actions={r.counts.total > 0 ? <span className="grid h-6 min-w-6 place-items-center rounded-md bg-warn-soft px-1.5 text-xs font-bold text-warn tabular">{r.counts.total}</span> : undefined}
       />
       {top.length === 0 ? (
-        <p className="p-4 text-sm text-muted sm:px-5">Nothing needs you right now.</p>
+        <EmptyLine inset>Nothing needs you right now.</EmptyLine>
       ) : (
         <ul className="divide-y divide-line">
           {top.map((i) => (
@@ -126,7 +126,7 @@ export function StandsOut({ h }: { h: HomeFigures }) {
     <Card>
       <CardHeader title="What stands out" description="worked out from the numbers, not typed" how={how.standsOut} />
       {h.standout.length === 0 ? (
-        <p className="p-4 text-sm text-muted sm:px-5">Nothing unusual: sales are level, nobody is late, no cost is growing, no supplier keeps slipping.</p>
+        <EmptyLine inset>Nothing unusual: sales are level, nobody is late, no cost is growing, no supplier keeps slipping.</EmptyLine>
       ) : (
         <ul className="divide-y divide-line">
           {h.standout.map((s) => (

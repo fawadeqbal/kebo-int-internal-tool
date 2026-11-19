@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ORDER_STAGE_LABEL, type OrderStage } from "@kebo/shared";
-import { Badge, Card, CardHeader, cn, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, Card, CardHeader, cn, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { plural } from "@/lib/format";
 import { bigMoney, change, monthYearOf, type Period } from "@/lib/insights-period";
 import { PROFIT_SORT_LABEL, PROFIT_SORTS, type loadProfit, type ProfitSort } from "@/lib/insights-data";
@@ -145,7 +145,7 @@ export function ProfitSection({
           }
         />
         {d.orders.length === 0 ? (
-          <p className="p-4 text-sm text-muted">No order {p.name}.</p>
+          <EmptyLine inset>No order {p.name}.</EmptyLine>
         ) : (
           <Table>
             <THead>

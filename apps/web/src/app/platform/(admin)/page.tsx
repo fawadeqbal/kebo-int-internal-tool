@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { Card, cn, DataRow, EmptyState, PageHeader, ButtonLink, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, buttonClass, StatTile } from "@kebo/ui";
+import { Card, cn, DataRow, EmptyState, PageHeader, ButtonLink, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, buttonClass, StatTile, CardHeader } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { date, dateTime } from "@/lib/format";
 import type { Dashboard, Overview } from "@/lib/types-platform";
@@ -126,15 +126,15 @@ export default async function PlatformOverviewPage() {
           )}
         </Card>
         <Card className="overflow-clip">
-          <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold">Renewals and demos ending</h2>
-              <p className="mt-0.5 text-xs text-muted">overdue, ending within a week, renewing within 30 days</p>
-            </div>
-            <Link href="/platform/companies" className={buttonClass("ghost", "sm", "text-text-2")}>
-              All companies
-            </Link>
-          </div>
+          <CardHeader
+            title="Renewals and demos ending"
+            description="overdue, ending within a week, renewing within 30 days"
+            actions={
+              <Link href="/platform/companies" className={buttonClass("ghost", "sm", "text-text-2")}>
+                All companies
+              </Link>
+            }
+          />
           {d.watch.length ? (
             <>
               <PhoneList label="Renewals and demos ending">

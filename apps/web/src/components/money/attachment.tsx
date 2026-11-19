@@ -4,7 +4,7 @@ import { FileZone } from "@/components/common/file-zone";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Paperclip, Trash2, Upload, X } from "lucide-react";
-import { Alert, Button, buttonClass, cn, Field } from "@kebo/ui";
+import { Button, buttonClass, cn, Field, Notice } from "@kebo/ui";
 import { saveThenSend } from "@kebo/utils";
 import type { ActionState } from "@/lib/actions";
 import type { AttachedFileInfo } from "@/lib/types-money";
@@ -233,7 +233,7 @@ export function AttachedFile({
           )}
         </div>
       )}
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && <Notice tone="bad">{error}</Notice>}
     </div>
   );
 }

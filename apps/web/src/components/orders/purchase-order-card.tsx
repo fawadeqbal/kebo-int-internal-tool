@@ -1,7 +1,7 @@
 "use client";
 
 import { Mail } from "lucide-react";
-import { Alert, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
@@ -63,9 +63,9 @@ export function SendForm({ action, deposit, today, supplierRef }: { action: Acti
         <>
           <PanelBody className="flex flex-col gap-4">
             {!deposit.verified && (
-              <Alert tone="warning">
+              <Notice tone="todo">
                 <strong>Deposit not verified.</strong> {deposit.text}
-              </Alert>
+              </Notice>
             )}
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Sent on" htmlFor="po-sent" required error={s.errors?.sentOn}>

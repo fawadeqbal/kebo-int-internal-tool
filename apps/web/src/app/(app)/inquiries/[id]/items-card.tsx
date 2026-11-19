@@ -1,6 +1,6 @@
 import { ChevronRight, Pencil } from "lucide-react";
 import { can } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Badge, EmptyLine } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { dateTime, money, qty } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
@@ -147,7 +147,7 @@ export async function ItemsCard({ id }: { id: string }) {
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-text-2">No supplier offer has it yet.</p>
+                        <EmptyLine>No supplier offer has it yet.</EmptyLine>
                       )}
                     </SheetPart>
                   )}

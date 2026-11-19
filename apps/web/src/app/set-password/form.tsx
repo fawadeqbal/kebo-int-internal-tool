@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Alert, Field, Input } from "@kebo/ui";
+import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { setPasswordAction } from "./actions";
 
@@ -9,7 +9,7 @@ export function SetPasswordForm({ token, email, platform = false }: { token: str
   const [state, action] = useActionState(setPasswordAction, {});
   return (
     <form action={action} className="mt-5 flex flex-col gap-4" noValidate>
-      {state.message && <Alert tone="error">{state.message}</Alert>}
+      {state.message && <Notice tone="bad">{state.message}</Notice>}
       <input type="hidden" name="token" value={token} />
       {platform && <input type="hidden" name="platform" value="1" />}
       <input type="email" name="email" autoComplete="username" value={email} readOnly hidden />

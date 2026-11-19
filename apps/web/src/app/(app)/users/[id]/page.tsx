@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { can } from "@kebo/shared";
-import { PageHeader, StageBadge, StatusBadge } from "@kebo/ui";
+import { PageHeader, StageBadge, StatusBadge, EmptyState } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { date, dateTime, timeAgo, companyToday } from "@/lib/format";
@@ -9,7 +9,7 @@ import type { DealRow, HistoryEntry, Paged } from "@/lib/types";
 import type { AuditRow, RoleRow, UserRow } from "@/lib/types-people";
 import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { OpenPanelButton } from "@/components/common/panel";
-import { AllLink, DetailsCard, RecordEmpty, RecordFrame, RecordListCard, RecordRow, RecordSection } from "@/components/common/record";
+import { AllLink, DetailsCard, RecordFrame, RecordListCard, RecordRow, RecordSection } from "@/components/common/record";
 import { RecordLanding, RecordNav } from "@/components/common/record-nav";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { changeRows, compactChanges } from "@/components/common/change-lines";
@@ -206,9 +206,10 @@ export default async function UserPage({ params, searchParams }: { params: Promi
                   description={inquiries.total ? "New, sourcing and quoted, newest first" : undefined}
                   action={inquiries.total > ROWS && <AllLink href={`/inquiries?assignee=${u.id}`}>All {inquiries.total}</AllLink>}
                   empty={
-                    <RecordEmpty title="No open inquiries">
-                      Inquiries they handle show here while they are open. Choose them under &ldquo;Responsible person&rdquo; on an inquiry.
-                    </RecordEmpty>
+                    <EmptyState
+                      title="No open inquiries"
+                      description="Inquiries they handle show here while they are open. Choose them under “Responsible person” on an inquiry."
+                    />
                   }
                 >
                   {inquiries.rows.map((d) => (

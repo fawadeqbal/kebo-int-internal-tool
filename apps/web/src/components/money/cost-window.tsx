@@ -17,7 +17,7 @@ import {
   type ExpenseCategory,
   type InquiryStage,
 } from "@kebo/shared";
-import { Alert, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
@@ -743,9 +743,9 @@ export function AddCost({
         {icon === "plus" ? <Plus aria-hidden /> : icon === "copy" ? <Copy aria-hidden /> : null} {label}
       </Button>
       {notice && (
-        <Alert tone="warning" className="basis-full">
+        <Notice tone="todo" className="basis-full">
           {notice}
-        </Alert>
+        </Notice>
       )}
       {open && (
         <CostPanel
@@ -770,7 +770,7 @@ export function ConfirmCost({ setup, month, sub }: { setup: CostSetup; month: Co
       <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
         Confirm
       </Button>
-      {notice && <Alert tone="warning">{notice}</Alert>}
+      {notice && <Notice tone="todo">{notice}</Notice>}
       {open && <CostPanel title="Confirm" sub={sub} setup={setup} mode={{ kind: "confirm", month }} onClose={() => setOpen(false)} onFileError={setNotice} />}
     </>
   );
@@ -785,7 +785,7 @@ export function SendCost({ setup, orders }: { setup: CostSetup; orders: { id: st
       <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
         Add a cost
       </Button>
-      {notice && <Alert tone="error">{notice}</Alert>}
+      {notice && <Notice tone="bad">{notice}</Notice>}
       {open && <CostPanel title="New cost" sub="A manager approves it before it counts" setup={setup} mode={{ kind: "send", orders }} onClose={() => setOpen(false)} onFileError={setNotice} />}
     </>
   );
@@ -835,7 +835,7 @@ export function ChangeCost({
           <Pencil aria-hidden /> Change
         </Button>
       )}
-      {notice && <Alert tone="warning">{notice}</Alert>}
+      {notice && <Notice tone="todo">{notice}</Notice>}
       {open && (
         <CostPanel
           title="Change the cost"

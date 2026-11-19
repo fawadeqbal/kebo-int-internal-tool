@@ -1,22 +1,7 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { LIFECYCLE, marketingOrigin } from "@kebo/shared";
-import {
-  Alert,
-  buttonClass,
-  Card,
-  CardBody,
-  CardHeader,
-  EmptyState,
-  PageHeader,
-  SectionList,
-  StatusBadge,
-  Table,
-  Td,
-  Th,
-  THead,
-  Tr,
-} from "@kebo/ui";
+import { buttonClass, Card, CardBody, CardHeader, EmptyState, PageHeader, SectionList, StatusBadge, Table, Td, Th, THead, Tr, Notice } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { requirePlatformAdmin } from "@/lib/platform";
 import { dateTime, timeAgo } from "@/lib/format";
@@ -300,11 +285,11 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
                 ))}
               </tbody>
             </Table>
-            <Alert tone="info" className="m-4">
+            <Notice tone="info" className="m-4">
               Platform admins are added and switched off on the server:{" "}
               <code className="font-mono text-xs">platform-admin add you@example.com &quot;Your Name&quot;</code> (prints a link to set the
               password) and <code className="font-mono text-xs">platform-admin off …</code>. See docs/companies.md.
-            </Alert>
+            </Notice>
           </Card>
         )}
       </SectionList>

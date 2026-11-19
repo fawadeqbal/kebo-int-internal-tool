@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Plus } from "lucide-react";
-import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Badge, Notice } from "@kebo/ui";
 import { FIT_VIEW, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
 import { FloatingMenu } from "@/components/common/floating";
@@ -694,7 +694,7 @@ export function LineWindow({
         )}
         {partOf && (
           <div className="flex items-center gap-2.5 rounded-[10px] border border-line bg-surface-2 px-3 py-2.5 text-sm">
-            <span className="inline-flex h-[22px] shrink-0 items-center rounded-full bg-primary-soft px-2 text-xs font-bold text-primary">Part of {partOf.no}</span>
+            <Badge size="sm" tone="primary">Part of {partOf.no}</Badge>
             <span className="min-w-0 flex-1 truncate">{partOf.name}</span>
             <button type="button" onClick={partOf.onMakeItem} className="-my-2 -mr-1.5 shrink-0 rounded-md px-1.5 py-2 text-md font-semibold text-primary hover:bg-primary-soft">
               Make it an item
@@ -727,9 +727,7 @@ export function LineWindow({
           </dl>
         )}
         {problem && (
-          <p role="alert" className="rounded-lg border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad">
-            {problem}
-          </p>
+          <Notice tone="bad">{problem}</Notice>
         )}
         {reason}
       </div>

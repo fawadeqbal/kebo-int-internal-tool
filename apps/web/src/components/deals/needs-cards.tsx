@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@kebo/ui";
+import { cn, EmptyLine } from "@kebo/ui";
 import type { DealItem } from "@/lib/types";
 import { ITEM_COLUMNS } from "./items-sheet";
 import { LinesExcel, LinesView } from "./lines-view";
@@ -39,7 +39,7 @@ export function ItemsView({ items, requirements, phone = false }: { items: DealI
       {items.length > 0 && phone && <ItemsPhone items={items} />}
       {items.length > 0 && !phone && <LinesView label="What they need" rows={rowsOf(items)} columns={ITEM_COLUMNS} numbers={items.map((it) => it.no)} />}
       {requirements && <p className="rounded-lg bg-surface-2 p-3 text-sm whitespace-pre-line">{requirements}</p>}
-      {!items.length && !requirements && <p className="text-sm text-muted">Nothing written yet.</p>}
+      {!items.length && !requirements && <EmptyLine>Nothing written yet.</EmptyLine>}
     </div>
   );
 }

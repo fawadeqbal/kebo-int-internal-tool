@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
-import { Alert, buttonClass } from "@kebo/ui";
+import { buttonClass, Notice } from "@kebo/ui";
 import { companyOrigin } from "@kebo/shared";
 import { apiFetch } from "@/lib/api";
 import { AuthShell } from "@/app/login/auth-shell";
@@ -30,9 +30,9 @@ export default async function ConfirmSignUpPage({ searchParams }: { searchParams
       ) : (
         <>
           <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-2xl sm:leading-9">This link does not work</h1>
-          <Alert tone="warning" className="mt-3">
+          <Notice tone="todo" className="mt-3">
             {body.error ?? "It has expired. Sign up again."}
-          </Alert>
+          </Notice>
           <Link href="/sign-up" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
             Sign up again
           </Link>

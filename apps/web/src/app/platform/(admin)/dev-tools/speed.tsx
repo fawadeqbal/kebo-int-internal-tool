@@ -1,5 +1,5 @@
 import { agoText, type DevSpeedView } from "@kebo/shared";
-import { Badge, Card, CardHeader, EmptyState, Segmented, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, Card, CardHeader, EmptyState, Segmented, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { currentZone } from "@/lib/format";
 import { CopyForClaude, MarkError } from "./error-actions";
 import { LineChart } from "./parts";
@@ -65,7 +65,7 @@ export function SpeedTab({ v, errors }: { v: DevSpeedView; errors: "open" | "fix
               ]}
             />
           ) : (
-            <p className="text-sm text-muted">No requests yet in this time.</p>
+            <EmptyLine>No requests yet in this time.</EmptyLine>
           )}
         </div>
       </Card>

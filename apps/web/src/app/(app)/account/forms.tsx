@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
-import { Alert, Button, Field, Input } from "@kebo/ui";
+import { Check, Copy, KeyRound, Smartphone } from "lucide-react";
+import { Button, Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
@@ -106,13 +106,13 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
   };
   return (
     <div className="flex flex-col gap-3">
-      <Alert tone="warning">
+      <Notice tone="todo">
         <p className="font-medium">Save these recovery codes now. They are shown only once.</p>
         <p className="mt-0.5 text-text-2">
           If you lose your phone, each code lets you sign in one time instead of the code from your app. Keep them somewhere safe, away from
           your phone (a password manager, or printed).
         </p>
-      </Alert>
+      </Notice>
       <ol className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-surface-2/60 p-3 font-mono text-sm tabular sm:grid-cols-2">
         {codes.map((c, i) => (
           <li key={c} className="flex items-baseline gap-2">
@@ -174,18 +174,12 @@ export function TwoStepPanel({
   if (status.on && !setup)
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex items-start gap-3 rounded-lg border border-ok/25 bg-ok-soft p-3">
-          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-ok" aria-hidden />
-          <div className="text-sm">
-            <p className="font-medium">Two-step sign-in is on{sinceText ? ` since ${sinceText}` : ""}.</p>
-            <p className="text-text-2">
-              After your password you enter the code from your authenticator app. {status.recoveryCodesLeft} recovery code
-              {status.recoveryCodesLeft === 1 ? "" : "s"} left.
-            </p>
-          </div>
-        </div>
+        <Notice tone="ok" title={`Two-step sign-in is on${sinceText ? ` since ${sinceText}` : ""}.`}>
+          After your password you enter the code from your authenticator app. {status.recoveryCodesLeft} recovery code
+          {status.recoveryCodesLeft === 1 ? "" : "s"} left.
+        </Notice>
         {status.recoveryCodesLeft <= 3 && (
-          <Alert tone="warning">You are running out of recovery codes. Make new ones so you can still get in if you lose your phone.</Alert>
+          <Notice tone="todo">You are running out of recovery codes. Make new ones so you can still get in if you lose your phone.</Notice>
         )}
         <div className="flex flex-wrap gap-2">
           <Button

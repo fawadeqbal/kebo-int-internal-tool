@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Banner, Badge, Card, CardHeader, PageHeader, StatusBadge, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
+import { Badge, Card, CardHeader, PageHeader, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
@@ -44,7 +44,7 @@ export default async function RolesPage() {
       </div>
 
       {o.mustSetUp.length > 0 && (
-        <Banner meaning="warn">
+        <Notice tone="todo">
           <p className="font-medium">
             {o.mustSetUp.length === 1 ? "1 person has" : `${o.mustSetUp.length} people have`} not set up two-step sign-in yet, though their role needs it.
           </p>
@@ -61,11 +61,11 @@ export default async function RolesPage() {
             ))}
             .
           </p>
-        </Banner>
+        </Notice>
       )}
 
       {frozen.length > 0 && (
-        <Banner meaning="info">
+        <Notice tone="info">
           <p className="font-medium">
             {frozen.length === 1 ? `The role ${frozen[0]!.name} is` : `${frozen.length} roles your company made are`} frozen: your plan
             {company?.plan ? ` (${company.plan.name})` : ""} does not include custom roles.
@@ -74,7 +74,7 @@ export default async function RolesPage() {
             Their people keep working with what the plan includes. They cannot be changed or given to anyone else; move people to Super Admin, Manager or Staff, or ask for a
             plan with custom roles.
           </p>
-        </Banner>
+        </Notice>
       )}
 
       <Card className="overflow-hidden p-0">

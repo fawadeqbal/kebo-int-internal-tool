@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { createPortal } from "react-dom";
 import { ArrowLeft, Clock, Loader2, Search, X } from "lucide-react";
 import { SEARCH_KIND_LABEL, type SearchKind, type SearchResult } from "@kebo/shared";
-import { Badge, cn, Kbd, controlClass, controlSizes } from "@kebo/ui";
+import { Badge, cn, Kbd, controlClass, controlSizes, EmptyLine } from "@kebo/ui";
 import { useBackGuard } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
 import { kindCount, kindOne, Marked, SEARCH_ICON as ICON, searchHref } from "./search-bits";
@@ -348,7 +348,7 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
         ) : !result ? (
           <p className="px-4 py-4 text-sm text-text-2">{failed ? "Search did not answer. Try again in a moment." : "Searching…"}</p>
         ) : result.groups.length === 0 && !result.exact ? (
-          <p className="px-4 py-4 text-sm text-text-2">Nothing found for “{q}”. Try a part of a name, a number or a phone.</p>
+          <EmptyLine inset>Nothing found for “{q}”. Try a part of a name, a number or a phone.</EmptyLine>
         ) : (
           <>
             {result.exact && (

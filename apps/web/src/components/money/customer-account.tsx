@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import { api } from "@/lib/api";
 import type { CustomerAccount } from "@/lib/types-money";
 
@@ -27,12 +27,12 @@ export async function CustomerHistoryNote({ customerId, dealId }: { customerId: 
   if (a.depositDaysLate !== null)
     parts.push(a.depositDaysLate > 0 ? `pays deposits about ${a.depositDaysLate} day${a.depositDaysLate === 1 ? "" : "s"} late` : "pays deposits on time");
   return (
-    <Alert tone="neutral">
+    <Notice tone="neutral">
       <strong>Customer history.</strong>{" "}
       <Link href={`/customers/${customerId}`} className="text-text-2 hover:underline">
         {a.customer.name}
       </Link>
       : {parts.join(", ")}.
-    </Alert>
+    </Notice>
   );
 }

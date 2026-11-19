@@ -254,6 +254,13 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
   );
 }
 
+/**
+ * The one box head (canvas group 7): a 48px row under a line — the title (15px bold), what stands beside it, and its
+ * buttons at the right. CardHeader and the record's boxes (RecordBox) both draw it from these.
+ */
+export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4";
+export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
+
 export function Card({ className, ...props }: ComponentProps<"section">) {
   return <section className={cn("rounded-2xl border border-line bg-surface", className)} {...props} />;
 }
@@ -265,6 +272,7 @@ export function CardHeader({
   className,
   how,
   howTitle,
+  titleId,
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -274,12 +282,18 @@ export function CardHeader({
   how?: string;
   /** The ⓘ note's heading when the title is not plain text. */
   howTitle?: string;
+  /** The title's id, for a box labelled by it (aria-labelledby). */
+  titleId?: string;
 }) {
-  const heading = <h2 className="text-base font-bold text-text">{title}</h2>;
+  const heading = (
+    <h2 id={titleId} className={boxTitleClass}>
+      {title}
+    </h2>
+  );
   return (
     // With a description and actions, a phone puts the actions under the text instead of squeezing it; actions
     // that do not fit beside the title (a narrow screen) go under it rather than past the edge.
-    <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
+    <div className={cn(boxHeadClass, "justify-between gap-x-3", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
       <div className="min-w-0">
         {how ? (
           <div className="flex items-center gap-1">
@@ -558,33 +572,12 @@ export function EmptyState({
   );
 }
 
-const ALERT_TONES = {
-  info: "bg-info-soft text-info",
-  error: "bg-bad-soft text-bad",
-  success: "bg-ok-soft text-ok",
-  warning: "bg-warn-soft text-warn",
-  neutral: "bg-surface-2 text-text-2 [&_strong]:text-text",
-};
-
-export function Alert({ tone = "info", children, className }: { tone?: keyof typeof ALERT_TONES; children: ReactNode; className?: string }) {
-  return (
-    <div role={tone === "error" ? "alert" : "status"} className={cn("rounded-xl px-3.5 py-3 text-md [&_strong]:font-bold", ALERT_TONES[tone], className)}>
-      {children}
-    </div>
-  );
-}
-
 /**
- * A problem or a note on the page, shown in the card it concerns (not at the
- * top of the page): the Alert in the design system's meanings.
+ * The one empty line (canvas group 7): what is not there yet, in quiet words, inside the box it concerns — "No
+ * payments yet." A whole empty list with its one way to add is EmptyState. `inset`: with the box's own padding.
  */
-export function Banner({ meaning = "info", children, className }: { meaning?: "info" | "ok" | "warn" | "bad"; children: ReactNode; className?: string }) {
-  const tone = meaning === "ok" ? "success" : meaning === "warn" ? "warning" : meaning === "bad" ? "error" : "info";
-  return (
-    <Alert tone={tone} className={className}>
-      {children}
-    </Alert>
-  );
+export function EmptyLine({ inset, className, ...props }: ComponentProps<"p"> & { inset?: boolean }) {
+  return <p className={cn("text-sm text-muted", inset && "p-4 sm:px-5", className)} {...props} />;
 }
 
 /* ---------------------------------------------------------------- Table */

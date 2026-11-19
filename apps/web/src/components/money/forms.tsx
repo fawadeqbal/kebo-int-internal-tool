@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind, type PaymentMethod } from "@kebo/shared";
-import { Alert, Button, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
@@ -402,7 +402,7 @@ export function FactoryPaymentForm({
             </Field>
           </div>
           {mismatch && (
-            <Alert tone="warning">
+            <Notice tone="todo">
               <p className="font-medium">
                 We owe {chosen!.factory.name} in {owedIn}, so a payment in {m.currency} would not count against it.
               </p>
@@ -412,7 +412,7 @@ export function FactoryPaymentForm({
               <Button type="button" size="xs" variant="secondary" className="mt-2" onClick={() => m.setCurrency(owedIn!)}>
                 Pay in {owedIn}
               </Button>
-            </Alert>
+            </Notice>
           )}
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Method" htmlFor="fp-method">
@@ -478,7 +478,7 @@ export function NewFactoryPayment({
   if (!open)
     return (
       <div className="flex flex-col gap-2">
-        {fileError && <Alert tone="error">{fileError}</Alert>}
+        {fileError && <Notice tone="bad">{fileError}</Notice>}
         <Button
           className="w-fit"
           size="sm"

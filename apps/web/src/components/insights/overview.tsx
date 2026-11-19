@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { date, money, plural, whole } from "@/lib/format";
 import { amountCell, bigMoney, change, monthYearOf, percent, type Period } from "@/lib/insights-period";
 import type { loadOverview } from "@/lib/insights-data";
@@ -105,7 +105,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
               }
             />
             {d.cash.byCurrency.length === 0 ? (
-              <p className="p-4 text-sm text-muted">No account yet. Add the first one on Cash &amp; bank.</p>
+              <EmptyLine inset>No account yet. Add the first one on Cash &amp; bank.</EmptyLine>
             ) : (
               <ul className="divide-y divide-line">
                 {d.cash.byCurrency.map((x) => (
@@ -138,7 +138,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             }
           />
           {d.month.orders.length === 0 ? (
-            <p className="p-4 text-sm text-muted">No order this month.</p>
+            <EmptyLine inset>No order this month.</EmptyLine>
           ) : (
             <Table>
               <THead>

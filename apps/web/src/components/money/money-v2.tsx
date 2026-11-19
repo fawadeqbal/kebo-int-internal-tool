@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, Circle, Info, Lock, Plus, Square } from "lucide-react";
 import { divideMinor, formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
 import { allocateOldestFirst, CREDIT_KIND_LABEL, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type LcCheck, type PaymentMethod } from "@kebo/shared";
-import { Alert, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Notice, EmptyLine } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
@@ -98,7 +98,7 @@ export function ReceivedForm({
   if (!open)
     return (
       <div className="flex flex-col gap-2">
-        {fileError && <Alert tone="error">{fileError}</Alert>}
+        {fileError && <Notice tone="bad">{fileError}</Notice>}
         <Button
           className="w-fit"
           variant={quiet ? "secondary" : "primary"}
@@ -481,7 +481,7 @@ function ReceiptFields({
               <span className="font-semibold tabular">{fmt(a.countsMinor, currency)}</span>
             </p>
             {order.length === 0 ? (
-              <p className="text-sm text-muted">No open {currency} orders: it all becomes {customer}&apos;s credit.</p>
+              <EmptyLine>No open {currency} orders: it all becomes {customer}&apos;s credit.</EmptyLine>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[22rem] border-collapse text-sm">
