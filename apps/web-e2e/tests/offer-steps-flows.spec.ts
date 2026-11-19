@@ -122,6 +122,8 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
     newFactoryName: `Hefei Steps ${deal.tag}`,
     receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
     currency: "CNY",
+    // A lead time already saved, so typing another one is a change (an empty one filled is only Added).
+    leadDays: 30,
     lines: [
       { requestedItemId: items[0].id, description: "Capsule filling machine", model: "NJP-800", quantity: 1, unit: "set", unitPrice: 98000 },
       { requestedItemId: items[1].id, description: "Change parts", quantity: 2, unit: "sets", unitPrice: 4000 },

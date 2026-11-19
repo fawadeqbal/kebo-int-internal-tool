@@ -129,7 +129,7 @@ test("inquiry items on a phone: a list, Add & next, a tap opens the item's sheet
   await paste.getByRole("button", { name: "Close" }).click();
 
   // Saved with the inquiry: Save asks why, once (a sheet), then every change is saved.
-  await win.getByRole("button", { name: /^Save \d+ changes$/ }).click();
+  await win.getByRole("button", { name: /^Save \d+ changes?$/ }).click();
   await answerWhy(page, "Customer changed the list");
   await expect(win).toBeHidden();
   const saved = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
