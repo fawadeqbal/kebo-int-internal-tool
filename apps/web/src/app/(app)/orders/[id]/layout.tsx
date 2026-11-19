@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Package, XCircle } from "lucide-react";
-import { can, dayMonth, ORDER_TABS, ORDER_WORD_TONE, RECORD_KIND, type FlowStep, type OrderTab } from "@kebo/shared";
-import { cn, PageHeader } from "@kebo/ui";
+import { ArrowRight, Eye, Package, XCircle } from "lucide-react";
+import { can, dayMonth, ORDER, ORDER_TABS, orderNextStep, RECORD_KIND, type FlowStep, type OrderTab } from "@kebo/shared";
+import { ButtonLink, cn } from "@kebo/ui";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderOf, orderSectionsOf } from "@/lib/order-data";
@@ -10,13 +10,18 @@ import { date } from "@/lib/format";
 import { orderName } from "@/lib/titles";
 import { today } from "@/components/orders/today";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
-import { ScrolledBar } from "@/components/orders/scrolled-bar";
+import { RecordFrame } from "@/components/records/record-frame";
+import { RecordTop } from "@/components/records/record-page";
+import { OrderSide } from "@/components/order-sections/order-side";
 import { OrderTabs } from "@/components/order-sections/order-tabs";
 import { orderCostsSetup } from "@/components/orders/costs-data";
+import { orderStepFacts } from "@/components/orders/order-facts";
 import { FileToolsProvider } from "@/components/files/file-tools";
 import { OrderDrop } from "@/components/files/order-drop";
 import { docHref } from "./shared";
 import { CancelOrder } from "./cancel-order";
+import { moveStageAction } from "../actions";
+import { StageActions } from "./forms";
 
 /**
  * Every page of an order shares one top (design "the order, final"): the path, the order's name, one
@@ -48,7 +53,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
         ? [o.money && Number(o.money.due) <= 0 ? "paid in full" : null]
         : [ready ? `ready ${dayMonth(ready)}` : null, o.shipBy ? `ship by ${dayMonth(o.shipBy)}` : null];
   const late = o.status === "open" && !left && !!o.shipBy && o.shipBy < now;
-  const tone = o.status === "cancelled" ? "bad" : o.status === "closed" ? "neutral" : late ? "bad" : ORDER_WORD_TONE[o.word];
+  const tone = o.status === "cancelled" ? "bad" : o.status === "closed" ? "neutral" : late ? "bad" : ORDER.states[o.word].tone;
   const statusText = (
     <span
       className={cn(
@@ -62,6 +67,26 @@ export default async function OrderLayout({ children, params }: { children: Reac
   );
   const ship = flow?.shipping?.shipments[0];
   const base = `/orders/${o.id}`;
+  // The header's one strong button: the order's next step (packages/shared orderNextStep), the same on every tab;
+  // it opens its tab, and the window there that does it. Closing and reopening are done right here.
+  const step = orderNextStep(orderStepFacts(o, flow, sections?.stages ?? null, { update: can(me, "orders.update") }), now);
+  const primary =
+    step?.key === "close" || step?.key === "reopen" ? (
+      <StageActions
+        key={o.stage}
+        next={step.key === "close" ? o.next : null}
+        back={step.key === "reopen" ? o.back : null}
+        action={moveStageAction.bind(null, o.id)}
+        today={now}
+        readyOn={o.readyOn}
+        shippedOn={o.shippedOn}
+        blNo={o.blNo}
+      />
+    ) : step ? (
+      <ButtonLink href={`${base}${step.tab === "overview" ? "" : `/${step.tab}`}${step.window ? `?do=${step.window}` : ""}`} variant="primary" scroll={false}>
+        {step.label} <ArrowRight aria-hidden />
+      </ButtonLink>
+    ) : undefined;
   const proforma = o.documents.find((d) => d.kind === "proforma");
   const pdf = proforma ? docHref(o, proforma) : null;
   // On a phone the paper buttons fold into ⋯ (design system: page header).
@@ -90,68 +115,69 @@ export default async function OrderLayout({ children, params }: { children: Reac
     </Link>,
   ];
 
+  const tabs = ORDER_TABS.filter((t) => {
+    if (t === "overview" || t === "history") return true;
+    if (t === "costs") return !!costs;
+    // Without the shipping module the tab still holds the few shipping values of the order itself.
+    if (t === "shipping") return true;
+    // A stage whose module the company switched off has no tab.
+    return !sections || sections.stages.includes(t as FlowStep);
+  }).map((t): { key: OrderTab; word?: string } => ({ key: t, word: sections?.tabs[t] || undefined }));
+
   return (
     <div>
-      <ScrolledBar
-        bar={
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
-            <span className="flex items-center gap-2 font-medium">
-              {o.refNo} <span className="text-xs">{statusText}</span>{" "}
-              <span className="hidden font-normal text-muted sm:inline">{o.customer.name}</span>
-            </span>
-          </div>
+      {/* The top (header, notice, tabs) and the panel are drawn here once (canvas board "The top and the panel
+          stay; only the body moves"): they stay as the tabs change and while a long tab scrolls. A paper being
+          made takes the page's whole width. */}
+      <RecordFrame
+        wide={["papers"]}
+        panelLabel="Beside the order"
+        panel={<OrderSide id={id} />}
+        top={
+          <RecordTop
+            header={{
+              crumbs: [{ label: "Sales" }, { label: "Orders", href: "/orders" }, { label: o.refNo }],
+              icon: Package,
+              title: orderName(o),
+              record: { kind: RECORD_KIND.order, number: o.refNo },
+              summary: (
+                <p className="min-w-0">
+                  {meta.map((m, i) => (
+                    <span key={i}>
+                      {i > 0 && (
+                        <span aria-hidden className="px-1.5 text-muted">
+                          ·
+                        </span>
+                      )}
+                      {m}
+                    </span>
+                  ))}
+                </p>
+              ),
+              papers: pdf ? (
+                <ButtonLink href={pdf.view} target="_blank" rel="noopener">
+                  <Eye aria-hidden /> Proforma
+                </ButtonLink>
+              ) : undefined,
+              primary,
+              more: <MoreMenu label={`More for ${o.refNo}`} items={[...paperItems, ...moreItems]} />,
+            }}
+            notice={
+              o.cancelled && (
+                <div role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/25 bg-bad-soft p-4 text-sm">
+                  <XCircle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />
+                  <div>
+                    <p className="font-medium">Cancelled{o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.</p>
+                    {o.cancelled.reason && <p className="mt-0.5 text-text-2">{o.cancelled.reason}</p>}
+                    <p className="mt-1 text-muted">The inquiry can be reopened and quoted again. Money already received stays recorded here.</p>
+                  </div>
+                </div>
+              )
+            }
+            tabs={<OrderTabs base={base} tabs={tabs} />}
+          />
         }
       >
-        <PageHeader
-          phoneStack
-          crumbs={[{ label: "Sales" }, { label: "Orders", href: "/orders" }, { label: o.refNo }]}
-          icon={Package}
-          title={orderName(o)}
-          record={{ kind: RECORD_KIND.order, number: o.refNo }}
-          summary={
-            <p className="min-w-0">
-              {meta.map((m, i) => (
-                <span key={i}>
-                  {i > 0 && (
-                    <span aria-hidden className="px-1.5 text-muted">
-                      ·
-                    </span>
-                  )}
-                  {m}
-                </span>
-              ))}
-            </p>
-          }
-          papers={
-            // A page's own main button lands here (HeaderSlot).
-            <span id="order-header-slot" className="contents" />
-          }
-          more={<MoreMenu label={`More for ${o.refNo}`} items={[...paperItems, ...moreItems]} />}
-        />
-
-        {o.cancelled && (
-          <div role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/25 bg-bad-soft p-4 text-sm">
-            <XCircle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />
-            <div>
-              <p className="font-medium">Cancelled{o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.</p>
-              {o.cancelled.reason && <p className="mt-0.5 text-text-2">{o.cancelled.reason}</p>}
-              <p className="mt-1 text-muted">The inquiry can be reopened and quoted again. Money already received stays recorded here.</p>
-            </div>
-          </div>
-        )}
-      </ScrolledBar>
-
-      <OrderTabs
-        base={base}
-        tabs={ORDER_TABS.filter((t) => {
-          if (t === "overview" || t === "history") return true;
-          if (t === "costs") return !!costs;
-          // Without the shipping module the tab still holds the few shipping values of the order itself.
-          if (t === "shipping") return true;
-          // A stage whose module the company switched off has no tab.
-          return !sections || sections.stages.includes(t as FlowStep);
-        }).map((t): { key: OrderTab; word?: string } => ({ key: t, word: sections?.tabs[t] || undefined }))}
-      />
       {/* Documents v3: the same file tools (viewer, menus, dialogs) on every page of the order, and drop anywhere. */}
       <FileToolsProvider
         orderId={o.id}
@@ -159,8 +185,9 @@ export default async function OrderLayout({ children, params }: { children: Reac
         targets={files?.targets ?? []}
         share={{ refNo: o.refNo, greeting: `Dear ${o.customer.name}`, vessel: ship?.vessel ?? null, eta: ship?.eta ? date(ship.eta) : null }}
       >
-        <div className="mt-5">{children}</div>
+        {children}
       </FileToolsProvider>
+      </RecordFrame>
       {files?.canUpload && <OrderDrop orderId={o.id} refNo={o.refNo} />}
       {canCancel && (
         <Suspense fallback={null}>

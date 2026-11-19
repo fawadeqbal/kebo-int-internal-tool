@@ -17,6 +17,7 @@ export function AllDeliveredWindow({ sub, action, today, lines }: { sub: string;
   return (
     <SectionWindow
       button={{ label: "All delivered OK", kind: "main" }}
+      name="all-delivered"
       title="Delivery"
       sub={sub}
       action={action}
@@ -37,6 +38,7 @@ export function SatSignWindow({ sub, action, today, signedBy, points }: { sub: s
   return (
     <SectionWindow
       button={{ label: "Sign off", kind: "main" }}
+      name="sign-off"
       title="Sign off the SAT"
       sub={sub}
       action={action}

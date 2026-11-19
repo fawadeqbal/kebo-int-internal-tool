@@ -171,7 +171,7 @@ test("Back: ← beside a record's title returns to its list as it was left, the 
   expect(errors).toEqual([]);
 });
 
-test("Back on a phone: a record's top bar is ← and its number; the bottom bar stays", async ({ page }) => {
+test("Back on a phone: a record's top bar is ← and its number; the bottom bar stays (or its next step takes its place)", async ({ page }) => {
   const errors = watchErrors(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/inquiries");
@@ -183,10 +183,18 @@ test("Back on a phone: a record's top bar is ← and its number; the bottom bar 
   await expect(bar).toBeVisible();
   await expect(bar).toContainText(/RFQ-\d{4}-\d{4}/);
   await expect(page.locator("[data-shell-top]")).toBeHidden();
-  await expect(page.getByRole("navigation", { name: "Quick" })).toBeVisible();
+  // The bottom bar stays, unless the record's one strong button is pinned in its place (canvas row "Every page's
+  // top on a phone"): which one depends on the inquiry that is first in the list.
+  const quick = page.getByRole("navigation", { name: "Quick" });
+  const dock = page.locator("[data-record-dock]").filter({ has: page.locator("a, button") });
+  if (await dock.count()) {
+    await expect(dock).toBeVisible();
+    await expect(quick).toBeHidden();
+  } else await expect(quick).toBeVisible();
   await bar.getByRole("link", { name: "Back to Inquiries" }).click();
   await expect(page).toHaveURL((u) => u.pathname === "/inquiries");
   await expect(page.locator("[data-shell-top]")).toBeVisible();
+  await expect(quick).toBeVisible();
   expect(errors).toEqual([]);
 });
 

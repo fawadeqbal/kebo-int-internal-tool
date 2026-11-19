@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toMinor } from "@kebo/money";
 import {
   isWarrantyFrom,
@@ -9,7 +8,6 @@ import {
   partsWords,
   paymentCheck,
   planParts,
-  ROUTE_NAME,
   WARRANTY_FROM_LABEL,
   warrantyCheck,
   type OurTerms,
@@ -29,7 +27,6 @@ import { shortName } from "@/components/deals/offer-facts";
  */
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 type Agreed = NonNullable<OrderView["agreed"]>;
 
@@ -64,67 +61,6 @@ export function shipByNote(a: Agreed, shipBy: string | null): { ok: boolean; tex
   if (f.by === "drawings") return { ok: false, text: "type it once the drawings are approved" };
   if (f.by === "order") return shipBy ? { ok: true, text: `worked out: ${plural(a.leadDays ?? 0, "day")} after the order of ${dayMonth(f.on)}` } : null;
   return f.on && shipBy ? { ok: true, text: `worked out: the deposit came in ${dayMonth(f.on)}` } : { ok: false, text: "worked out once the deposit is in" };
-}
-
-/** A part of the plan: paid (on the day it was paid in full), or what is still to come. */
-function partState(i: OrderMoney["plan"]["items"][number], currency: string): string {
-  if (i.status === "paid") {
-    const last = i.request.receipts.at(-1)?.paidOn;
-    return last ? `paid ${dayMonth(last)}` : "paid";
-  }
-  if (Number(i.paid) > 0) return `${money(i.open, currency)} to come`;
-  return money(i.amount, currency);
-}
-
-/**
- * Agreed with the customer: Delivery (the basis, the port, the lead time and ship by, the delivery conditions),
- * Payment (how they pay and the plan's parts, changed on the Payment tab), Warranty and Conditions — the order's
- * own copy, taken when the quotation was accepted (an older order: its quotation's).
- */
-export function AgreedGroups({ o, m, base }: { o: OrderView; m: OrderMoney | null; base: string; satTab: boolean }) {
-  const a = o.agreed!;
-  const note = shipByNote(a, o.shipBy);
-  const from = isWarrantyFrom(a.warrantyFrom) ? a.warrantyFrom : "shipment";
-  const route = m?.route.route ?? null;
-  return (
-    <div className="grid gap-3 px-[18px] pt-1 pb-3.5 md:grid-cols-2">
-      <Group title="Delivery" big={`${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`}>
-        <Fact label="Port of discharge">{a.portOfDischarge}</Fact>
-        <Fact label="Lead time">{a.leadTime}</Fact>
-        <Fact label="Ship by">{o.shipBy ? date(o.shipBy) : null}</Fact>
-        {note && (
-          <p className={cn("flex items-start gap-1 text-xs", note.ok ? "text-ok" : "text-text-2")}>
-            {note.ok && <CheckCircle2 className="mt-px size-3.5 shrink-0" aria-hidden />}
-            {cap(note.text)}
-          </p>
-        )}
-        <Printed text={a.deliveryConditions} />
-      </Group>
-      <Group title="Payment" big={route ? ROUTE_NAME[route] : m ? "How they pay: not decided yet" : "On the Payment tab"}>
-        {m && m.plan.items.length > 0 && (
-          <ul className="flex flex-col gap-0.5">
-            {m.plan.items.map((i) => (
-              <li key={i.id} className="flex min-w-0 items-baseline justify-between gap-3">
-                <span className="min-w-0 text-text-2">{i.label}</span>
-                <b className={cn("shrink-0 font-semibold tabular", i.status === "paid" && "text-ok")}>{partState(i, o.currency)}</b>
-              </li>
-            ))}
-          </ul>
-        )}
-        <Printed text={a.paymentConditions} />
-        <Link href={`${base}/payment`} className="mt-0.5 inline-flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline">
-          Payment tab <ArrowRight className="size-3" aria-hidden />
-        </Link>
-      </Group>
-      <Group title="Warranty" big={a.warrantyMonths !== null ? plural(a.warrantyMonths, "month") : a.warranty ? "As agreed" : "None agreed"}>
-        {a.warrantyMonths !== null && <p className="text-text-2">from {WARRANTY_FROM_LABEL[from]}</p>}
-        {a.warranty && <p className="text-text-2">{cap(a.warranty)}</p>}
-      </Group>
-      <Group title="Conditions" big={a.notes?.trim() ? "Notes" : "None"}>
-        <Printed text={a.notes} />
-      </Group>
-    </div>
-  );
 }
 
 /* ---------------------------------------------------------------- the customer and the factory, side by side */

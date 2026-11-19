@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Button, cn } from "@kebo/ui";
-import { EditButton } from "@/components/common/edit-button";
+import { cn } from "@kebo/ui";
 import { PanelBody, SidePanel } from "@/components/common/panel";
-import { ROW_LINK, type WindowButton } from "./section-window";
+import { useOpenFromLink, WindowOpener, type WindowButton } from "./section-window";
 
 /**
  * A section's window around a form that already exists (the route, the plan,
@@ -19,6 +18,7 @@ export function FormWindow({
   disabled,
   startOpen = false,
   onClosed,
+  name,
   children,
 }: {
   button: WindowButton;
@@ -31,27 +31,19 @@ export function FormWindow({
   startOpen?: boolean;
   /** After it closes, saved or not. */
   onClosed?: () => void;
+  /** A link opens it: ?do=<name> (useOpenFromLink). */
+  name?: string;
   children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(startOpen);
-  const kind = button.kind ?? "edit";
+  useOpenFromLink(name, () => setOpen(true));
   const close = () => {
     setOpen(false);
     onClosed?.();
   };
   return (
     <>
-      {kind === "edit" ? (
-        <EditButton label={button.label} disabled={disabled} onClick={() => setOpen(true)} />
-      ) : kind === "link" ? (
-        <button type="button" disabled={disabled} className={ROW_LINK} onClick={() => setOpen(true)}>
-          {button.label}
-        </button>
-      ) : (
-        <Button size="sm" disabled={disabled} variant={kind === "main" ? "primary" : kind === "danger" ? "danger" : "secondary"} className="h-8 px-2.5 text-[13px]" onClick={() => setOpen(true)}>
-          {button.label}
-        </Button>
-      )}
+      <WindowOpener button={button} disabled={disabled} onClick={() => setOpen(true)} />
       {open && (
         <SidePanel title={title} description={sub} onClose={close} className={cn(size === "sm" && "md:w-[460px]", size === "md" && "md:w-[600px]", size === "xl" && "md:w-[900px]")}>
           <PanelBody className="flex flex-col gap-4">{children(close)}</PanelBody>

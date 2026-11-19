@@ -27,7 +27,13 @@ export function OrderWindow({
   values: Record<"customerRef" | "customerPoOn", string | null>;
 }) {
   return (
-    <SectionWindow button={{ label: "Edit" }} title="Their order" sub={sub} action={action} files={canFiles ? { orderId, section: "order" } : undefined}>
+    <SectionWindow
+      button={{ label: "Edit", what: "their order" }}
+      title="Their order"
+      sub={sub}
+      action={action}
+      files={canFiles ? { orderId, section: "order" } : undefined}
+    >
       {(s) => {
         const v = (k: keyof typeof values) => s.values?.[k] ?? values[k] ?? "";
         return (
@@ -64,8 +70,27 @@ export interface AgreedValues {
 const text = (v: string | null | undefined) => v ?? "";
 const whole = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 
-/** The fields kept in state (the lead time's and the warranty's boxes), sent as hidden fields. */
-function AgreedFields({ state, values, shipHint, payment, paymentHref }: { state: ActionState; values: AgreedValues; shipHint: string; payment: ReactNode; paymentHref: string }) {
+/** Which of the agreed terms a window holds: the Delivery & payment box's, or the Warranty & conditions box's (none: all). */
+export type AgreedPart = "terms" | "conditions";
+
+/** The fields kept in state (the lead time's and the warranty's boxes), sent as hidden fields. Fields not shown are not sent, so they stay as they are. */
+function AgreedFields({
+  state,
+  values,
+  shipHint,
+  payment,
+  paymentHref,
+  part,
+}: {
+  state: ActionState;
+  values: AgreedValues;
+  shipHint: string;
+  payment: ReactNode;
+  paymentHref: string;
+  part?: AgreedPart;
+}) {
+  const terms = part !== "conditions";
+  const conditions = part !== "terms";
   // After "Why?" the form is drawn again from what was typed (state.values).
   const typed = state.values ?? {};
   const pick = (k: keyof AgreedValues, fallback: string) => (k in typed ? (typed[k] ?? "") : fallback);
@@ -85,73 +110,112 @@ function AgreedFields({ state, values, shipHint, payment, paymentHref }: { state
   return (
     <>
       <p className="rounded-md bg-info-soft px-3 py-2 text-xs text-text">
-        The quotation stays exactly as it was sent. What you change here is what the order and its documents use from now on; a document already made final keeps what it said.
+        The quotation stays exactly as it was sent. What you change here is what the order and its documents use from now on; a document
+        already made final keeps what it said.
       </p>
-      <input type="hidden" name="leadDays" value={leadDays.trim()} />
-      <input type="hidden" name="leadFrom" value={leadDays.trim() ? leadFrom : ""} />
-      <input type="hidden" name="warrantyMonths" value={months.trim()} />
-      <input type="hidden" name="warrantyFrom" value={months.trim() ? wFrom : ""} />
-      <input type="hidden" name="warranty" value={covers} />
+      {terms && (
+        <>
+          <input type="hidden" name="leadDays" value={leadDays.trim()} />
+          <input type="hidden" name="leadFrom" value={leadDays.trim() ? leadFrom : ""} />
+        </>
+      )}
+      {conditions && (
+        <>
+          <input type="hidden" name="warrantyMonths" value={months.trim()} />
+          <input type="hidden" name="warrantyFrom" value={months.trim() ? wFrom : ""} />
+          <input type="hidden" name="warranty" value={covers} />
+        </>
+      )}
 
-      <PanelSection title="Delivery" sub="where we hand the goods over, and when" className="md:grid-cols-3" first>
-        <Field label="Incoterm" htmlFor="agr-incoterm">
-          <Input id="agr-incoterm" value={values.incoterm} readOnly className="bg-surface-2 font-semibold" />
-        </Field>
-        <Field label="Place" htmlFor="agr-place" optional error={e.incotermPlace}>
-          <Input id="agr-place" name="incotermPlace" maxLength={80} defaultValue={v("incotermPlace")} />
-        </Field>
-        <Field label="Port of discharge" htmlFor="agr-pod" optional error={e.portOfDischarge}>
-          <Input id="agr-pod" name="portOfDischarge" maxLength={120} defaultValue={v("portOfDischarge")} />
-        </Field>
-        <LeadField
-          id="agr-lead"
-          side="customer"
-          days={leadDays}
-          from={leadFrom}
-          onDays={setLeadDays}
-          onFrom={setLeadFrom}
-          error={e.leadDays ?? e.leadFrom}
-          className="sm:col-span-2"
-        />
-        <Field label="Ship by" htmlFor="agr-shipBy" optional error={e.shipBy} hint={shipHint}>
-          <Input id="agr-shipBy" name="shipBy" type="date" defaultValue={v("shipBy")} />
-        </Field>
-        <Field label="Delivery conditions" htmlFor="agr-delivery" optional error={e.deliveryConditions} className="sm:col-span-2 md:col-span-3">
-          <Textarea id="agr-delivery" name="deliveryConditions" rows={2} className="min-h-0" maxLength={5000} defaultValue={v("deliveryConditions")} />
-        </Field>
-      </PanelSection>
+      {terms && (
+        <>
+          <PanelSection title="Delivery" sub="where we hand the goods over, and when" className="md:grid-cols-3" first>
+            <Field label="Incoterm" htmlFor="agr-incoterm">
+              <Input id="agr-incoterm" value={values.incoterm} readOnly className="bg-surface-2 font-semibold" />
+            </Field>
+            <Field label="Place" htmlFor="agr-place" optional error={e.incotermPlace}>
+              <Input id="agr-place" name="incotermPlace" maxLength={80} defaultValue={v("incotermPlace")} />
+            </Field>
+            <Field label="Port of discharge" htmlFor="agr-pod" optional error={e.portOfDischarge}>
+              <Input id="agr-pod" name="portOfDischarge" maxLength={120} defaultValue={v("portOfDischarge")} />
+            </Field>
+            <LeadField
+              id="agr-lead"
+              side="customer"
+              days={leadDays}
+              from={leadFrom}
+              onDays={setLeadDays}
+              onFrom={setLeadFrom}
+              error={e.leadDays ?? e.leadFrom}
+              className="sm:col-span-2"
+            />
+            <Field label="Ship by" htmlFor="agr-shipBy" optional error={e.shipBy} hint={shipHint}>
+              <Input id="agr-shipBy" name="shipBy" type="date" defaultValue={v("shipBy")} />
+            </Field>
+            <Field
+              label="Delivery conditions"
+              htmlFor="agr-delivery"
+              optional
+              error={e.deliveryConditions}
+              className="sm:col-span-2 md:col-span-3"
+            >
+              <Textarea
+                id="agr-delivery"
+                name="deliveryConditions"
+                rows={2}
+                className="min-h-0"
+                maxLength={5000}
+                defaultValue={v("deliveryConditions")}
+              />
+            </Field>
+          </PanelSection>
 
-      <PanelSection title="Payment" sub="changed in one place: its plan" className="sm:grid-cols-1">
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2/40 px-3 py-2 text-[13px]">
-          <span className="min-w-0">{payment}</span>
-          <ButtonLink href={paymentHref} size="sm" variant="secondary">
-            Open the payment plan
-          </ButtonLink>
-        </div>
-        <Field label="Payment conditions" htmlFor="agr-payment" optional error={e.paymentConditions}>
-          <Textarea id="agr-payment" name="paymentConditions" rows={2} className="min-h-0" maxLength={5000} defaultValue={v("paymentConditions")} />
-        </Field>
-      </PanelSection>
+          <PanelSection title="Payment" sub="changed in one place: its plan" className="sm:grid-cols-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2/40 px-3 py-2 text-[13px]">
+              <span className="min-w-0">{payment}</span>
+              <ButtonLink href={paymentHref} size="sm" variant="secondary">
+                Open the payment plan
+              </ButtonLink>
+            </div>
+            <Field label="Payment conditions" htmlFor="agr-payment" optional error={e.paymentConditions}>
+              <Textarea
+                id="agr-payment"
+                name="paymentConditions"
+                rows={2}
+                className="min-h-0"
+                maxLength={5000}
+                defaultValue={v("paymentConditions")}
+              />
+            </Field>
+          </PanelSection>
+        </>
+      )}
 
-      <PanelSection title="Warranty" className="md:grid-cols-3">
-        <WarrantyFields
-          idPrefix="agr"
-          months={months}
-          from={wFrom}
-          covers={covers}
-          onMonths={setMonths}
-          onFrom={setWFrom}
-          onCovers={setCovers}
-          errors={{ months: e.warrantyMonths, from: e.warrantyFrom, covers: e.warranty }}
-        />
-      </PanelSection>
+      {conditions && (
+        <>
+          <PanelSection title="Warranty" className="md:grid-cols-3" first={!terms}>
+            <WarrantyFields
+              idPrefix="agr"
+              months={months}
+              from={wFrom}
+              covers={covers}
+              onMonths={setMonths}
+              onFrom={setWFrom}
+              onCovers={setCovers}
+              errors={{ months: e.warrantyMonths, from: e.warrantyFrom, covers: e.warranty }}
+            />
+          </PanelSection>
 
-      <PanelSection title="Conditions" className="sm:grid-cols-1">
-        <Field label="Notes" htmlFor="agr-notes" optional error={e.notes}>
-          <Textarea id="agr-notes" name="notes" rows={3} className="min-h-0" maxLength={5000} defaultValue={v("notes")} />
-        </Field>
-      </PanelSection>
-      <p className="text-xs text-text-2">Anything that differs from the quotation asks why when you save; the reason is kept in the order’s history.</p>
+          <PanelSection title="Conditions" className="sm:grid-cols-1">
+            <Field label="Notes" htmlFor="agr-notes" optional error={e.notes}>
+              <Textarea id="agr-notes" name="notes" rows={3} className="min-h-0" maxLength={5000} defaultValue={v("notes")} />
+            </Field>
+          </PanelSection>
+        </>
+      )}
+      <p className="text-xs text-text-2">
+        Anything that differs from the quotation asks why when you save; the reason is kept in the order’s history.
+      </p>
     </>
   );
 }
@@ -168,19 +232,30 @@ export function AgreedWindow({
   shipHint,
   payment,
   paymentHref,
+  part,
 }: {
   title: string;
   sub: string;
   action: Action;
   values: AgreedValues;
   shipHint: string;
+  /** One box's part, opened by that box's Edit (none: all four groups, opened by Change). */
+  part?: AgreedPart;
   /** The plan in a line ("Bank transfer (T/T) · 30% paid · 60% before shipment · …"). */
   payment: ReactNode;
   paymentHref: string;
 }) {
   return (
-    <SectionWindow button={{ label: "Change" }} title={title} sub={sub} action={action} size="md">
-      {(s) => <AgreedFields state={s} values={values} shipHint={shipHint} payment={payment} paymentHref={paymentHref} />}
+    <SectionWindow
+      button={
+        part ? { label: "Edit", what: part === "terms" ? "delivery and payment" : "the warranty and conditions" } : { label: "Change" }
+      }
+      title={title}
+      sub={sub}
+      action={action}
+      size="md"
+    >
+      {(s) => <AgreedFields state={s} values={values} shipHint={shipHint} payment={payment} paymentHref={paymentHref} part={part} />}
     </SectionWindow>
   );
 }

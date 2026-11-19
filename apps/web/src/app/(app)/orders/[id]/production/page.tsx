@@ -50,6 +50,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
           canEdit && (
             <FieldsWindow
               button={{ label: kind === "main" ? "Add" : "Edit", kind }}
+              name={kind === "main" ? "ready-date" : undefined}
               title="Ready date"
               sub={sub}
               action={readyDateAction.bind(null, o.id, fid, r.readyOn)}

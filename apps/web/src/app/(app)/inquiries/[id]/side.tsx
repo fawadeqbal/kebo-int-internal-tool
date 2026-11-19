@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { can, isOpen } from "@kebo/shared";
-import { cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { date } from "@/lib/format";
@@ -10,23 +8,9 @@ import { getPeople } from "@/lib/loaders";
 import type { FollowUpList } from "@/lib/types-notes";
 import { dueText } from "@/components/notes/kinds";
 import { PanelButton } from "@/components/orders/step-view";
-import { RecordBody } from "@/components/records/record-page";
-import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
-import { SideSheet } from "@/components/common/side-sheet";
+import { PanelCard, PanelNotes, PanelWho } from "@/components/records/panel-pieces";
 import { assignAction, noteAction } from "../actions";
 import { AssignForm, AssignSelect, NoteForm } from "./panels";
-
-const quiet = "text-[13px] font-medium text-primary hover:underline";
-
-/** One row of a section: the label on the left, its value on the right. */
-function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
-  return (
-    <li className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
-      <span className="max-w-[60%] shrink-0 text-text-2 [overflow-wrap:anywhere]">{label}</span>
-      <span className="min-w-0 text-right font-medium [overflow-wrap:anywhere]">{children}</span>
-    </li>
-  );
-}
 
 /**
  * The one panel beside every tab of an inquiry (design "the record page", 17 Nov): the work around it — who
@@ -56,78 +40,38 @@ export async function InquirySide({ id }: { id: string }) {
     .join(" · ");
 
   return (
-    <SideSheet title="Inquiry" summary={summary}>
-      <SidePanelCard>
-        <SideSection
-          title="Inquiry"
-          footer={
-            mayAssign ? (
-              <div className="mt-2">
-                <AssignSelect action={assignAction.bind(null, d.id)} people={people} current={d.assignee?.id ?? null} />
-              </div>
-            ) : undefined
-          }
-        >
-          {!mayAssign && (
-            <Row label="Responsible person">
-              {d.assignee?.name ?? "Nobody yet"}
-              {d.allowed.assign && !d.assignee && (
-                <span className="ml-2">
-                  <PanelButton
-                    variant="secondary"
-                    size="sm"
-                    label="Take it"
-                    title="Who handles this inquiry"
-                    description="They get its notifications and the work on its steps."
-                    body={<AssignForm action={assignAction.bind(null, d.id)} people={people} current={null} canAssignOthers={false} meId={me.id} />}
-                  />
-                </span>
-              )}
-            </Row>
-          )}
-          {(nextUp || (followUps && isOpen(d.stage))) && (
-            <Row label="Next follow-up">
-              <Link href={`${base}/history#follow-ups`} className={cn("hover:underline", !nextUp || nextUp.late ? "text-bad" : "text-primary")}>
-                {followUp ?? "None · set one"}
-              </Link>
-            </Row>
-          )}
-        </SideSection>
-
-        <SideSection
-          title="Notes"
-          count={d.notes.length || undefined}
-          action={
-            <Link href={`${base}/history`} className={quiet}>
-              All history
-            </Link>
-          }
-          footer={
-            <div className="mt-2">
-              <NoteForm action={noteAction.bind(null, d.id)} />
-            </div>
-          }
-          empty="No notes yet."
-        >
-          {d.notes.slice(0, 4).map((n) => (
-            <li key={n.id} className="flex flex-col py-1.5">
-              <span className="line-clamp-3 text-sm whitespace-pre-line">{n.body}</span>
-              <span className="text-xs text-text-2">
-                {name(n.authorId)} · {date(n.createdAt)}
-              </span>
-            </li>
-          ))}
-        </SideSection>
-      </SidePanelCard>
-    </SideSheet>
+    <PanelCard title="Inquiry" bar={[summary]}>
+      <PanelWho
+        title="Inquiry"
+        responsible={d.assignee?.name ?? null}
+        picker={mayAssign ? <AssignSelect action={assignAction.bind(null, d.id)} people={people} current={d.assignee?.id ?? null} /> : undefined}
+        take={
+          d.allowed.assign && !d.assignee ? (
+            <PanelButton
+              variant="secondary"
+              size="sm"
+              label="Take it"
+              title="Who handles this inquiry"
+              description="They get its notifications and the work on its steps."
+              body={<AssignForm action={assignAction.bind(null, d.id)} people={people} current={null} canAssignOthers={false} meId={me.id} />}
+            />
+          ) : undefined
+        }
+        followUp={nextUp || (followUps && isOpen(d.stage)) ? { text: followUp ?? "None · set one", late: !nextUp || nextUp.late, href: `${base}/history#follow-ups` } : null}
+      />
+      <PanelNotes
+        notes={d.notes.map((n) => ({ id: n.id, body: n.body, by: name(n.authorId), when: date(n.createdAt) }))}
+        allHref={`${base}/history`}
+        form={<NoteForm action={noteAction.bind(null, d.id)} />}
+      />
+    </PanelCard>
   );
 }
 
-/** Every tab of an inquiry: its boxes, and the inquiry's panel beside them (a bar first on a phone). */
-export function WithSide({ id, top, children }: { id: string; top?: ReactNode; children: ReactNode }) {
-  return (
-    <RecordBody top={top} panel={{ label: "Beside the inquiry", sheet: <InquirySide id={id} /> }}>
-      {children}
-    </RecordBody>
-  );
+/**
+ * A tab of an inquiry: only its boxes. The inquiry's top and its panel are drawn once by its layout
+ * (RecordFrame), so they stay as the tabs change.
+ */
+export function WithSide({ children }: { id?: string; children: ReactNode }) {
+  return <>{children}</>;
 }

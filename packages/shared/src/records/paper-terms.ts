@@ -24,6 +24,8 @@ export interface PaperTerms {
   route?: PaymentRoute | null;
   /** The lead time in words ("35 days after the deposit"). */
   leadWords: string | null;
+  /** When the goods must leave, in words (an order's ship by: "8 Dec 2026"). */
+  shipBy?: string | null;
   parts: TermPart[];
   paymentNote: string | null;
   warranty: WarrantyFacts;
@@ -37,6 +39,7 @@ const ROWS = {
     incoterm: "Incoterm",
     port: "Port of discharge",
     leadTime: "Lead time",
+    shipBy: "Ship by",
     deliveryNote: "Delivery note",
     route: "How they pay",
     payment: "Payment",
@@ -55,6 +58,11 @@ const KINDS = {
   },
   quotation: {
     terms: ["incoterm", "port", "leadTime", "deliveryNote", "route", "payment", "paymentNote"],
+    conditions: ["warranty", "notes"],
+  },
+  /** An order: the quotation it came from, as agreed (and changed since), with the day the goods must leave. */
+  order: {
+    terms: ["incoterm", "port", "leadTime", "shipBy", "deliveryNote", "route", "payment", "paymentNote"],
     conditions: ["warranty", "notes"],
   },
 } as const satisfies Record<string, { [B in PaperTermsBox]: readonly PaperTermsRow<B>[] }>;
@@ -120,6 +128,39 @@ function ofRevision(r: {
   };
 }
 
+/** An order as a paper: what was agreed with the customer (the order's own copy), its ship by in words. */
+function ofOrder(o: {
+  incoterm: Incoterm | null;
+  incotermPlace: string | null;
+  portOfDischarge: string | null;
+  leadTime: string | null;
+  shipBy: string | null;
+  deliveryConditions: string | null;
+  paymentRoute: PaymentRoute | null;
+  paymentParts: TermPart[];
+  paymentConditions: string | null;
+  warranty: string | null;
+  warrantyMonths: number | null;
+  warrantyFrom: string | null;
+  notes: string | null;
+}): PaperTerms {
+  return {
+    side: "customer",
+    incoterm: o.incoterm,
+    place: o.incotermPlace,
+    port: o.portOfDischarge,
+    leadWords: o.leadTime,
+    shipBy: o.shipBy,
+    deliveryNote: o.deliveryConditions,
+    route: o.paymentRoute,
+    parts: o.paymentParts,
+    paymentNote: o.paymentConditions,
+    warranty: { warranty: o.warranty, warrantyMonths: o.warrantyMonths, warrantyFrom: o.warrantyFrom },
+    moq: null,
+    notes: o.notes,
+  };
+}
+
 /** A row's words, or null when the paper says nothing there (the box shows —). Notes are as typed. */
 function text(p: PaperTerms, row: PaperTermsRow): string | null {
   switch (row) {
@@ -129,6 +170,8 @@ function text(p: PaperTerms, row: PaperTermsRow): string | null {
       return p.port || null;
     case "leadTime":
       return p.leadWords || null;
+    case "shipBy":
+      return p.shipBy || null;
     case "deliveryNote":
       return p.deliveryNote || null;
     case "route":
@@ -147,4 +190,4 @@ function text(p: PaperTerms, row: PaperTermsRow): string | null {
 }
 
 /** The papers' terms: the rows' labels, which rows each paper shows, the readers, and a row's words. */
-export const PAPER = { rows: ROWS, kinds: KINDS, optional: OPTIONAL, ofOffer, ofRevision, text } as const;
+export const PAPER = { rows: ROWS, kinds: KINDS, optional: OPTIONAL, ofOffer, ofRevision, ofOrder, text } as const;

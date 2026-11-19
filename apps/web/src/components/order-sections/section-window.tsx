@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { OrderSection } from "@kebo/shared";
+import { Pencil } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -12,13 +14,68 @@ import { WindowFiles } from "./section-files";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-/** A section's button look: "edit" (✎ Edit), "main" (the page's orange one), "plain", "link" (quiet words in a table row). */
-export type WindowButton = { label: string; kind?: "edit" | "main" | "plain" | "danger" | "link" };
+/**
+ * A section's button look: "edit" (✎ Edit), "main" (the page's orange one), "plain", "link" (quiet words in a table
+ * row). `what`: an Edit in a record box's head (the box's quiet ✎ Edit, read out as "Edit <what>").
+ */
+export type WindowButton = { label: string; kind?: "edit" | "main" | "plain" | "danger" | "link"; what?: string };
+
+/** The address a window was last opened from by a link (so one link opens one window, once). */
+let claimed = "";
+
+/**
+ * A window a link can open (the order's next step in the header: …/payment?do=record-payment): the first window
+ * with that `name` on the page opens once it is drawn, and the address forgets the ask (Back does not open it
+ * again). A window without a name is only opened by its button.
+ */
+export function useOpenFromLink(name: string | undefined, open: () => void) {
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const want = params.get("do");
+  useEffect(() => {
+    if (!name || want !== name || claimed === window.location.href) return;
+    claimed = window.location.href;
+    open();
+    const p = new URLSearchParams(params.toString());
+    p.delete("do");
+    const rest = p.toString();
+    router.replace(rest ? `${pathname}?${rest}` : pathname, { scroll: false });
+    // Every window on the page has looked by now; the same link can open it again later.
+    setTimeout(() => {
+      claimed = "";
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the ask arrives
+  }, [name, want]);
+}
 
 /** The quiet words that open a window from a table row. */
 export const ROW_LINK = "text-[13px] font-medium whitespace-nowrap text-primary hover:underline";
 
 const SMALL = "h-8 px-2.5 text-[13px]";
+
+/** The button that opens a window, in its look (WindowButton); the same for every kind of window. */
+export function WindowOpener({ button, disabled, onClick }: { button: WindowButton; disabled?: boolean; onClick: () => void }) {
+  const kind = button.kind ?? "edit";
+  if (kind === "edit" && button.what)
+    return (
+      <Button type="button" variant="ghost" size="xs" disabled={disabled} aria-label={`${button.label} ${button.what}`} aria-haspopup="dialog" className="text-primary hover:text-primary" onClick={onClick}>
+        <Pencil aria-hidden /> {button.label}
+      </Button>
+    );
+  if (kind === "edit") return <EditButton label={button.label} disabled={disabled} onClick={onClick} />;
+  if (kind === "link")
+    return (
+      <button type="button" disabled={disabled} className={ROW_LINK} onClick={onClick}>
+        {button.label}
+      </button>
+    );
+  return (
+    <Button size="sm" disabled={disabled} variant={kind === "main" ? "primary" : kind === "danger" ? "danger" : "secondary"} className={SMALL} onClick={onClick}>
+      {button.label}
+    </Button>
+  );
+}
 
 function Foot({ submit, danger, note }: { submit: string; danger?: boolean; note?: ReactNode }) {
   return (
@@ -45,6 +102,7 @@ export function SectionWindow({
   note,
   files,
   size = "sm",
+  name,
   children,
 }: {
   button: WindowButton;
@@ -61,23 +119,15 @@ export function SectionWindow({
   files?: { orderId: string; section: OrderSection; hint?: string };
   /** sm 460px (a few fields), md 600px (a short table), lg 720px (a wide table). */
   size?: "sm" | "md" | "lg";
+  /** A link opens it: ?do=<name> (useOpenFromLink). */
+  name?: string;
   children?: ReactNode | ((state: ActionState) => ReactNode);
 }) {
   const [open, setOpen] = useState(false);
-  const kind = button.kind ?? "edit";
+  useOpenFromLink(name, () => setOpen(true));
   return (
     <>
-      {kind === "edit" ? (
-        <EditButton label={button.label} onClick={() => setOpen(true)} />
-      ) : kind === "link" ? (
-        <button type="button" className={ROW_LINK} onClick={() => setOpen(true)}>
-          {button.label}
-        </button>
-      ) : (
-        <Button size="sm" variant={kind === "main" ? "primary" : kind === "danger" ? "danger" : "secondary"} className={SMALL} onClick={() => setOpen(true)}>
-          {button.label}
-        </Button>
-      )}
+      <WindowOpener button={button} onClick={() => setOpen(true)} />
       {open && (
         <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && "md:w-[460px]", size === "md" && "md:w-[600px]")}>
           <PanelBody>

@@ -1,74 +1,73 @@
+import type { ReactNode } from "react";
 import { can } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
+import { getPeople } from "@/lib/loaders";
 import { optional } from "@/components/print/data";
 import { date, whole } from "@/lib/format";
-import type { Note } from "@/lib/types-notes";
+import type { FollowUpList, Note } from "@/lib/types-notes";
+import { dueText } from "@/components/notes/kinds";
 import { today } from "@/components/orders/today";
-import { KeyDates, OrderPeople } from "@/components/orders/order-facts";
-import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
+import { keyDates, orderPeople } from "@/components/orders/order-facts";
+import { PanelCard, PanelFacts, PanelLink, PanelNotes, PanelWho } from "@/components/records/panel-pieces";
 import { QuickNote } from "@/components/notes/note-forms";
+import { AssignSelect } from "@/app/(app)/inquiries/[id]/panels";
 import { addNoteAction } from "@/app/(app)/follow-ups/actions";
+import { assignOrderAction } from "@/app/(app)/orders/actions";
 
 /**
- * Beside every tab of an order, always the same: the key dates, the people,
- * the money and the notes. Nothing to tick in it; what it shows is edited in
- * the sections.
+ * Beside every tab of an order, drawn once by its layout (canvas board "One side panel for every record"): who
+ * handles it with the other side and the next follow-up, its key dates, its money and its notes — the shared
+ * panel pieces, and on a phone one bar that opens them.
  */
 export async function OrderSide({ id }: { id: string }) {
   const me = await requireUser();
   const o = await orderOf(id);
-  const [flow, m, notes] = await Promise.all([
+  const mayAssign = can(me, "inquiries.assign") && o.status !== "cancelled";
+  const [flow, m, notes, followUps, people] = await Promise.all([
     optional(() => orderFlowOf(id)),
     can(me, "sourcing.manage") ? optional(() => orderMoneyOf(id)) : Promise.resolve(null),
     optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
+    optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id, open: "true" })),
+    mayAssign ? getPeople().catch(() => []) : Promise.resolve([]),
   ]);
+  const base = `/orders/${o.id}`;
   const paid = (m?.factories?.rows ?? []).filter((r) => Number(r.owed) > 0 || Number(r.paid) > 0);
-  const money: [string, string][] = [
-    ["Order total", whole(o.money.total, o.currency)],
-    ["Received", whole(o.money.received, o.currency)],
-    ["They still owe", whole(o.money.due, o.currency)],
-    ...paid.map((r) => [paid.length > 1 ? `Paid to ${r.factory.name}` : "Paid to supplier", whole(r.paid, r.currency)] as [string, string]),
+  const money = [
+    { label: "Order total", value: whole(o.money.total, o.currency) },
+    { label: "Received", value: whole(o.money.received, o.currency) },
+    { label: "They still owe", value: whole(o.money.due, o.currency) },
+    ...paid.map((r) => ({ label: paid.length > 1 ? `Paid to ${r.factory.name}` : "Paid to supplier", value: whole(r.paid, r.currency) })),
   ];
-  const latest = (notes ?? []).slice(0, 3);
+  const dates = keyDates(o, flow, today());
+  const nextUp = [...(followUps?.rows ?? [])].sort((a, b) => `${a.dueOn}${a.dueAt ?? ""}`.localeCompare(`${b.dueOn}${b.dueAt ?? ""}`))[0];
+  const late = dates.find((d) => d.tone === "late");
+  const due = Number(o.money.due);
+  // The bar on a phone: who, what is late, what is still to come.
+  const bar = [
+    o.inquiry.assignee?.name ?? "Nobody handles it",
+    late ? `${late.label.toLowerCase()} ${late.value}` : null,
+    o.status === "open" && due > 0 ? `${whole(o.money.due, o.currency)} to come` : due <= 0 ? "paid in full" : null,
+  ];
+  const form: ReactNode = o.status !== "cancelled" ? <QuickNote action={addNoteAction.bind(null, { key: "orderId", id: o.id })} /> : undefined;
   return (
-    <aside aria-label="Beside the order" className="flex min-w-0 flex-col gap-4">
-      <SidePanelCard>
-        <KeyDates o={o} flow={flow} now={today()} />
-        <OrderPeople o={o} flow={flow} />
-        <SideSection title="Money">
-          {money.map(([k, v]) => (
-            <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
-              <span className="text-text-2">{k}</span>
-              <span className="text-right font-semibold tabular">{v}</span>
-            </li>
-          ))}
-        </SideSection>
-        <SideSection title="Notes" footer={o.status !== "cancelled" ? <div className="mt-2"><QuickNote action={addNoteAction.bind(null, { key: "orderId", id: o.id })} /></div> : undefined}>
-          {latest.map((n) => (
-            <li key={n.id} className="py-1 text-[13px]">
-              <span className="line-clamp-3 [overflow-wrap:anywhere]">{n.body}</span>
-              <span className="block text-xs text-text-2">
-                {n.author.name} · {date(n.at)}
-              </span>
-            </li>
-          ))}
-        </SideSection>
-      </SidePanelCard>
-    </aside>
+    <PanelCard title="Order" bar={bar}>
+      <PanelWho
+        title="Order"
+        responsible={o.inquiry.assignee?.name ?? null}
+        picker={mayAssign ? <AssignSelect action={assignOrderAction.bind(null, o.id, o.inquiry.id)} people={people} current={o.inquiry.assignee?.id ?? null} /> : undefined}
+        people={orderPeople(o, flow)}
+        followUp={nextUp ? { text: dueText(nextUp.dueOn, nextUp.dueAt), late: nextUp.late, href: `${base}/history#follow-ups` } : null}
+      />
+      <PanelFacts title="Dates" rows={dates} />
+      <PanelFacts title="Money" rows={money} action={o.money ? <PanelLink href={`${base}/costs`}>Costs</PanelLink> : undefined} />
+      <PanelNotes notes={(notes ?? []).map((n) => ({ id: n.id, body: n.body, by: n.author.name, when: date(n.at) }))} allHref={`${base}/history`} form={form} max={3} />
+    </PanelCard>
   );
 }
 
-/**
- * A tab of the order: its sections on the left, the same side panel on the
- * right (under the sections on a narrow screen).
- */
-export function OrderPage({ id, children }: { id: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="flex min-w-0 flex-col gap-4">{children}</div>
-      <OrderSide id={id} />
-    </div>
-  );
+/** A tab of the order: only its boxes. The order's top and panel are drawn once by its layout (RecordFrame). */
+export function OrderPage({ children }: { id?: string; children: ReactNode }) {
+  return <>{children}</>;
 }

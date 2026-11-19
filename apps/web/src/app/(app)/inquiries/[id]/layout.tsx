@@ -9,8 +9,9 @@ import { dealOf } from "@/lib/deal-data";
 import { recordActions, type RecordAction } from "@/components/records/actions";
 import { Notice } from "@/components/records/notice";
 import { InquiryNextButton, InquiryTabs, type InquiryTab } from "@/components/deals/inquiry-nav";
-import { DealBody, DealChrome } from "@/components/deals/deal-chrome";
+import { RecordFrame } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
+import { InquirySide } from "./side";
 import { holdAction, moveStageAction } from "../actions";
 import { offerFactsOf } from "./facts";
 import { DecisionWindows } from "./panels";
@@ -84,7 +85,13 @@ export default async function DealLayout({ children, params }: { children: React
 
   return (
     <div>
-      <DealChrome>
+      {/* The top and the panel are drawn here once, so they stay as the tabs change; a quotation's or an offer's
+          own page has its own top (the frame steps aside there). */}
+      <RecordFrame
+        bare={["quotations", "offers"]}
+        panelLabel="Beside the inquiry"
+        panel={<InquirySide id={id} />}
+        top={
         <RecordTop
           header={{
             crumbs: [{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }],
@@ -117,8 +124,10 @@ export default async function DealLayout({ children, params }: { children: React
           }
           tabs={<InquiryTabs base={base} tabs={tabs} order={order && d.stage === "won" ? { href: `/orders/${order.id}`, refNo: order.refNo } : null} />}
         />
-      </DealChrome>
-      <DealBody>{children}</DealBody>
+        }
+      >
+        {children}
+      </RecordFrame>
       <DecisionWindows
         refNo={d.refNo}
         stage={d.stage}

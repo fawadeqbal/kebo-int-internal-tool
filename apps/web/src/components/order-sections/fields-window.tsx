@@ -2,12 +2,11 @@
 
 import { useState, type ReactNode } from "react";
 import type { OrderSection } from "@kebo/shared";
-import { Button, cn } from "@kebo/ui";
-import { EditButton } from "@/components/common/edit-button";
+import { cn } from "@kebo/ui";
 import { SidePanel, WhatHappens } from "@/components/common/panel";
 import { FieldsForm, type DetailField } from "@/components/orders/step-view";
 import type { ActionState } from "@/lib/actions";
-import type { WindowButton } from "./section-window";
+import { useOpenFromLink, WindowOpener, type WindowButton } from "./section-window";
 import { WindowFiles } from "./section-files";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -31,6 +30,7 @@ export function FieldsWindow({
   size = "sm",
   plain,
   disabled,
+  name,
 }: {
   button: WindowButton;
   title: string;
@@ -44,18 +44,14 @@ export function FieldsWindow({
   /** Never asks why (nothing was saved before). */
   plain?: boolean;
   disabled?: boolean;
+  /** A link opens it: ?do=<name> (useOpenFromLink). */
+  name?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const kind = button.kind ?? "edit";
+  useOpenFromLink(name, () => setOpen(true));
   return (
     <>
-      {kind === "edit" ? (
-        <EditButton label={button.label} disabled={disabled} onClick={() => setOpen(true)} />
-      ) : (
-        <Button size="sm" disabled={disabled} variant={kind === "main" ? "primary" : kind === "danger" ? "danger" : "secondary"} className="h-8 px-2.5 text-[13px]" onClick={() => setOpen(true)}>
-          {button.label}
-        </Button>
-      )}
+      <WindowOpener button={button} disabled={disabled} onClick={() => setOpen(true)} />
       {open && (
         <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && "md:w-[480px]", size === "md" && "md:w-[600px]")}>
           <FieldsForm

@@ -17,6 +17,7 @@ export function RecordBox({
   history,
   edit,
   tools,
+  files,
   children,
 }: {
   title: string;
@@ -32,6 +33,8 @@ export function RecordBox({
   tools?: ReactNode;
   /** The clock (optional, design rules 18 Nov): the box's own changes. */
   history?: ReactNode;
+  /** Its files, at its foot (only when it has some: they are added in its window). */
+  files?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -51,6 +54,7 @@ export function RecordBox({
           )))}
         </div>
         {children}
+        {files}
       </section>
     </Card>
   );
