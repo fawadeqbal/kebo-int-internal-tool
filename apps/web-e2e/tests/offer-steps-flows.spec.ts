@@ -188,17 +188,19 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   await expect(rail.getByRole("button", { name: /Supplier/ })).toHaveAttribute("aria-current", "step");
   await win.getByRole("textbox", { name: "Their reference" }).fill(`HS-${deal.tag}`);
   await expect(rail.getByRole("button", { name: /Supplier/ })).toContainText("1");
-  // One real change: Cancel asks first; Keep editing keeps it.
+  // Something typed (an empty reference filled): Cancel asks first; Keep editing keeps it.
   await win.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("alertdialog", { name: "Discard your change?" })).toBeVisible();
   await page.getByRole("button", { name: "Keep editing" }).click();
   await expect(win.getByRole("textbox", { name: "Their reference" })).toHaveValue(`HS-${deal.tag}`);
   await win.getByRole("button", { name: /^Changes · 1/ }).click();
   const list = win.getByRole("table", { name: "What changed" });
+  await expect(list.getByRole("row").filter({ hasText: "Their reference" }).getByRole("cell").nth(2)).toHaveText("Added");
   await expect(list.getByRole("row").filter({ hasText: "Their reference" }).getByRole("cell").nth(3)).toHaveText(`HS-${deal.tag}`);
   expect(await accessibilityProblems(page), "the offer's Changes step meets WCAG 2.2 AA").toEqual([]);
-  await win.getByRole("button", { name: "Save 1 change" }).click();
-  await answerWhy(page, "Typed wrong");
+  // It was empty: Added is not a change (canvas group 9), so the button just says Save and no reason is asked.
+  await win.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("radiogroup", { name: /Why the change/ })).toHaveCount(0);
   await expect(win).toBeHidden();
   await expect(page.getByRole("region", { name: "Supplier", exact: true })).toContainText(`HS-${deal.tag}`);
 

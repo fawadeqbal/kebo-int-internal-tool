@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { lineNumbers } from "@kebo/shared";
 import { Button, Notice } from "@kebo/ui";
+import { changeCount, changeKind, changeWords } from "@/components/common/change-words";
 import { PanelBody, useReportDirty, WindowFooter } from "@/components/common/panel";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineTableProps, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { insertLines, moveLine, removeLine } from "@/components/lines/local-lines";
@@ -57,18 +58,22 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
       continue;
     }
     const diffs: string[] = [];
+    let onlyAdded = true;
     for (const c of shown) {
       const a = (old.r.values[c.key] ?? "").trim();
       const b = (r.values[c.key] ?? "").trim();
       if (a === b) continue;
       if (!blank(a)) filledChanged = true;
-      const text = (v: string) => (c.options?.find((o) => o.value === v)?.label ?? firstLine(v, 32)) || "empty";
-      diffs.push(`${label(c)} ${text(a)} → ${text(b)}`);
+      // The words for changes (canvas group 9): an empty cell filled is Added, never "empty → 3".
+      const text = (v: string) => (c.options?.find((o) => o.value === v)?.label ?? firstLine(v, 32)) || "";
+      const k = changeKind(text(a), text(b)) ?? "changed";
+      if (k !== "added") onlyAdded = false;
+      diffs.push(k === "added" ? `${label(c)} ${text(b)}` : k === "removed" ? `${label(c)} removed · was ${text(a)}` : `${label(c)} ${text(a)} → ${text(b)}`);
     }
     if (diffs.length) {
       keys.add(r.key);
       byKey[r.key] = diffs;
-      changes.push(`${noAfter[i]} · ${diffs.join(", ")}`);
+      changes.push(`${onlyAdded ? "Added " : ""}${noAfter[i]} · ${diffs.join(", ")}`);
     }
   }
   // The order (or which line a part belongs to) of the lines that stayed.
@@ -221,7 +226,7 @@ export function BatchLines({
   footer,
   above,
   below,
-  saveLabel = "Save changes",
+  saveLabel,
   note,
   fill = true,
   ...table
@@ -251,7 +256,8 @@ export function BatchLines({
   const { rows, local, diff, dirty, run: send, askWhy, add } = useBatchLines({ rows: saved, columns, plain, askOnAdd });
   const run = (reason?: string) => send(handlers, reason);
 
-  const count = diff.changes.length;
+  const added = diff.changes.filter((x) => x.startsWith("Added ")).length;
+  const counts = { changed: diff.changes.length - added, added };
 
   return (
     <PanelBody className="gap-3">
@@ -259,21 +265,24 @@ export function BatchLines({
       <LineTable rows={rows} columns={columns} {...table} {...local} fill={fill} footer={footer?.(rows)} />
       {below}
       {error && <Notice tone="bad">{error}</Notice>}
-      <WindowFooter>
+      <WindowFooter
+        note={
+          <>
+            {diff.changes.length ? `${changeCount(counts)} not saved yet${askWhy ? " · Save asks why" : ""}` : "Nothing changed yet"}
+            {note && <span className="max-md:hidden"> · {note}</span>}
+          </>
+        }
+      >
         <Button
-          size="sm"
+          variant="strong"
           disabled={!dirty || busy}
           onClick={() => {
             setError(null);
             void save({ changes: diff.changes, keys: diff.keys, askWhy, run });
           }}
         >
-          {busy ? "Saving…" : saveLabel}
+          {busy ? "Saving…" : (saveLabel ?? changeWords(counts))}
         </Button>
-        <span className="text-xs text-muted">
-          {count ? `${count} change${count === 1 ? "" : "s"} not saved yet${askWhy ? " · Save asks why" : ""}` : "Nothing changed yet"}
-        </span>
-        {note && <span className="text-xs text-muted max-md:hidden">{note}</span>}
       </WindowFooter>
       {dialog}
     </PanelBody>

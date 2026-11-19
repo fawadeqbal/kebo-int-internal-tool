@@ -19,6 +19,7 @@ import {
 import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice, Badge, EmptyLine } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
+import { ChangeHint, changeCount, changedClassOf, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
 import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens, WindowCancel } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
 import { StepsFrame } from "@/components/common/steps-frame";
@@ -215,7 +216,7 @@ export function DealForm({
           card,
           kind: "edit",
           reason: why.trim(),
-          changes: list.map((c) => `${c.label}: ${c.from} → ${c.to}`),
+          changes: list.map((c) => changeLine(c.label, c.from, c.to)),
           keys: list.map((c) => c.key),
         }).catch(() => undefined);
       }
@@ -280,8 +281,13 @@ export function DealForm({
   );
   const changedOf = (k: keyof DealFormValues) => fieldChanges.find((c) => c.key === k);
   const itemChanges = !create && sheet.dirty ? sheet.diff.changes : [];
-  const total = fieldChanges.length + itemChanges.length + staged.length;
-  const saveLabel = total ? `Save ${total} change${total === 1 ? "" : "s"}` : "No changes";
+  // Added is not a change (canvas group 9): an empty field filled, a new item, a file to add are counted apart,
+  // and only what replaced or cleared a saved value asks Why?.
+  const fieldCounts = countChanges(fieldChanges);
+  const itemsAdded = itemChanges.filter((x) => x.startsWith("Added ")).length;
+  const counts = { changed: fieldCounts.changed + itemChanges.length - itemsAdded, added: fieldCounts.added + itemsAdded + staged.length };
+  const total = counts.changed + counts.added;
+  const saveLabel = changeWords(counts);
   const reasonChoices = REASONS(
     fieldChanges.some((c) => c.key === "customer"),
     itemChanges.length > 0,
@@ -297,7 +303,7 @@ export function DealForm({
           : k === "changes"
             ? total
             : 0;
-  const needWhy = !create && total > 0;
+  const needWhy = !create && counts.changed > 0;
   // Something changed: Save asks why, once, in a sheet (canvas board "Why the change? at Save").
   const canSave = create || total > 0;
   const [askWhy, setAskWhy] = useState(false);
@@ -311,15 +317,12 @@ export function DealForm({
   };
   const changedNote = (k: keyof DealFormValues) => {
     const c = changedOf(k);
-    return c ? (
-      <span className="flex items-center gap-1.5 text-xs font-semibold text-action">
-        <span aria-hidden className="size-1.5 rounded-full bg-action-solid" />
-        Changed · was {c.from}
-      </span>
-    ) : null;
+    return c ? <ChangeHint was={c.from} now={c.to} onUndo={() => undo(k)} /> : null;
   };
-  const changedField = (k: keyof DealFormValues) =>
-    changedOf(k) ? "[&_:is(input,select,textarea)]:border-action/70 [&_[aria-checked=true]]:border-action" : undefined;
+  const changedField = (k: keyof DealFormValues) => {
+    const c = changedOf(k);
+    return c ? changedClassOf(c.from, c.to) : undefined;
+  };
   const whySheet = (
     <ReasonSheet
       open={askWhy && needWhy}
@@ -328,8 +331,8 @@ export function DealForm({
       value={why ?? ""}
       onChange={(r) => setWhy(r)}
       formId={formId}
-      title={total === 1 ? "Why the change?" : "Why these changes?"}
-      what={`${total} change${total === 1 ? "" : "s"}: ${lost.slice(0, 2).join(" · ")}`}
+      title={counts.changed === 1 ? "Why the change?" : "Why these changes?"}
+      what={`${changeCount(counts)}: ${lost.slice(0, 2).join(" · ")}`}
       saveLabel={saveLabel}
     />
   );
@@ -414,7 +417,7 @@ export function DealForm({
                         ? [v.category, PRIORITY_LABEL[v.priority as keyof typeof PRIORITY_LABEL]].filter(Boolean).join(" · ") || undefined
                         : x.key === "review" || x.key === "changes"
                           ? x.key === "changes" && total
-                            ? `${total} change${total === 1 ? "" : "s"}`
+                            ? changeCount(counts)
                             : undefined
                           : files.length + staged.length
                             ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
@@ -932,14 +935,14 @@ export function DealForm({
                             </span>
                             {/* A phone has no room for two more columns: old → new under the name. */}
                             <span className="block sm:hidden">
-                              <s className="text-muted">{c.from}</s> → <b className="font-semibold">{c.to}</b>
+                              <Was was={c.from} /> → <Now now={c.to} />
                             </span>
                           </span>
                           <span role="cell" title={c.from} className="min-w-0 truncate max-sm:hidden">
-                            <s className="text-muted">{c.from}</s>
+                            <Was was={c.from} />
                           </span>
-                          <span role="cell" title={c.to} className="min-w-0 truncate font-semibold max-sm:hidden">
-                            {c.to}
+                          <span role="cell" title={c.to} className="min-w-0 truncate max-sm:hidden">
+                            <Now now={c.to} />
                           </span>
                           <span role="cell" className="text-right">
                             <Button
@@ -1398,18 +1401,18 @@ function changeList(
   b: DealFormValues,
   o: { contacts: ContactOption[]; people: PersonWithRole[]; meId: string },
 ): Change[] {
-  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "none");
+  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "");
   const pr = (p: string) => PRIORITY_LABEL[p as keyof typeof PRIORITY_LABEL] ?? p;
-  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "none");
+  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "");
   const all: Change[] = [
-    { key: "customer", label: "Customer", from: a.customer?.name ?? "none", to: b.customer?.name ?? "none" },
+    { key: "customer", label: "Customer", from: a.customer?.name ?? "", to: b.customer?.name ?? "" },
     { key: "contactId", label: "Contact", from: a.customer?.id === b.customer?.id ? contact(a.contactId) : "", to: contact(b.contactId) },
     { key: "channel", label: "Came by", from: CHANNEL_LABEL[a.channel], to: CHANNEL_LABEL[b.channel] },
     {
       key: "requiredBy",
       label: "Needed by",
-      from: a.requiredBy ? date(a.requiredBy) : "none",
-      to: b.requiredBy ? date(b.requiredBy) : "none",
+      from: a.requiredBy ? date(a.requiredBy) : "",
+      to: b.requiredBy ? date(b.requiredBy) : "",
     },
     {
       key: "assigneeId",
@@ -1418,7 +1421,7 @@ function changeList(
       to: personName(o.people, b.assigneeId, o.meId),
     },
     { key: "title", label: "Inquiry title", from: short(a.title), to: short(b.title) },
-    { key: "category", label: "Category", from: a.category.trim() || "none", to: b.category.trim() || "none" },
+    { key: "category", label: "Category", from: a.category.trim(), to: b.category.trim() },
     { key: "priority", label: "Priority", from: pr(a.priority), to: pr(b.priority) },
     { key: "requirements", label: "What they need", from: short(a.requirements), to: short(b.requirements) },
   ];
@@ -1451,15 +1454,15 @@ function lostLines(
     create: boolean;
   },
 ): string[] {
-  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "none");
+  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "");
   const fields: [string, string, string][] = [
-    ["Customer", a.customer?.name ?? "none", b.customer?.name ?? "none"],
+    ["Customer", a.customer?.name ?? "", b.customer?.name ?? ""],
     ["Contact", contact(a.contactId), contact(b.contactId)],
     ["Came by", CHANNEL_LABEL[a.channel], CHANNEL_LABEL[b.channel]],
-    ["Needed by", a.requiredBy ? date(a.requiredBy) : "none", b.requiredBy ? date(b.requiredBy) : "none"],
+    ["Needed by", a.requiredBy ? date(a.requiredBy) : "", b.requiredBy ? date(b.requiredBy) : ""],
     ["Responsible person", personName(o.people, a.assigneeId, o.meId), personName(o.people, b.assigneeId, o.meId)],
-    ["Inquiry title", a.title.trim() || "none", b.title.trim() || "none"],
-    ["Category", a.category.trim() || "none", b.category.trim() || "none"],
+    ["Inquiry title", a.title.trim(), b.title.trim()],
+    ["Category", a.category.trim(), b.category.trim()],
     [
       "Priority",
       PRIORITY_LABEL[a.priority as keyof typeof PRIORITY_LABEL] ?? a.priority,
@@ -1467,8 +1470,8 @@ function lostLines(
     ],
     [
       "What they need",
-      a.requirements.trim() ? "written" : "none",
-      b.requirements.trim() ? (a.requirements.trim() ? "changed" : "written") : "none",
+      a.requirements.trim() ? "written" : "",
+      b.requirements.trim() ? (a.requirements.trim() ? "changed" : "written") : "",
     ],
   ];
   const out = fields
@@ -1479,9 +1482,9 @@ function lostLines(
           ? a.requirements.trim() !== b.requirements.trim()
           : x !== y,
     )
-    .map(([label, x, y]) => (o.create ? `${label}: ${y}` : `${label}: ${x} → ${y}`));
+    .map(([label, x, y]) => (o.create ? `${label}: ${y}` : changeLine(label, x, y)));
   if (o.create ? o.items.length > 0 : o.itemsDirty)
-    out.push(o.create ? `Items: ${itemsCount(o.items)}` : `Items: ${o.itemChanges} change${o.itemChanges === 1 ? "" : "s"}`);
+    out.push(o.create ? `Items: ${itemsCount(o.items)}` : `Items: ${changeCount({ changed: o.itemChanges })}`);
   if (o.staged) out.push(`Files: ${o.staged} to add`);
   return out;
 }

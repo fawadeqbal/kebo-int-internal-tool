@@ -8,6 +8,7 @@ import { Button, cn, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useChangeCount } from "@/components/common/changes";
+import { changeWords } from "@/components/common/change-words";
 import { PANEL_FORM, PanelBody, SidePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { WindowFiles } from "./section-files";
@@ -99,15 +100,15 @@ function Foot({ submit, danger, note, disabled }: { submit: string; danger?: boo
 
 /**
  * The inside of an Edit window: its fields, counted as they are typed — the button says "No changes" (nothing to
- * save) or "Save 2 changes" (useChangeCount; the same rule as every edit window).
+ * save), "Save" (only added) or "Save 2 changes" (useChangeCount and changeWords, the rule of every edit window).
  */
 function Counted({ children, foot }: { children: ReactNode; foot: (words: string, none: boolean) => ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
-  const { count, recount } = useChangeCount(box);
+  const { changed, added, recount } = useChangeCount(box);
   return (
     <div ref={box} className="contents" onInput={recount} onChange={recount}>
       {children}
-      {foot(count === 0 ? "No changes" : count === 1 ? "Save 1 change" : `Save ${count} changes`, count === 0)}
+      {foot(changeWords({ changed, added }), changed + added === 0)}
     </div>
   );
 }

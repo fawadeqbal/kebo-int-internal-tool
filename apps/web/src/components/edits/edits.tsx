@@ -4,6 +4,7 @@ import { ChoiceChips } from "@/components/common/choice-chips";
 import { useState, type ReactNode } from "react";
 import { REASON_CHOICES } from "@kebo/shared";
 import { Button, Field, Textarea, Badge, Notice } from "@kebo/ui";
+import { ChangeText } from "@/components/common/change-words";
 import { Modal } from "@/components/common/dialog";
 import type { EditCard } from "@/lib/types-edits";
 import { formatDayMonth, formatTime, todayIn, type TimeStyle } from "@kebo/utils";
@@ -34,7 +35,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
         Edited {card.count}×{last?.by && <span className="max-sm:hidden"> · last by {last.by.split(" ")[0]}, {whenText(last.at, style)}</span>}
       </button>
       {open && (
-        <Modal title={`${title} · edited ${card.count}× since first saved`} onClose={() => setOpen(false)}>
+        <Modal title={`${title} · edited ${card.count}× since it was made`} onClose={() => setOpen(false)}>
           <ol className="flex flex-col divide-y divide-line">
             {card.edits.map((e) => (
               <li key={`${e.n}-${e.at}`} className="flex flex-col gap-1 py-3">
@@ -51,7 +52,9 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
                 {e.changes.length > 0 && (
                   <ul className="text-md leading-relaxed text-text-2">
                     {e.changes.slice(0, 12).map((c, i) => (
-                      <li key={i}>{c}</li>
+                      <li key={i}>
+                        <ChangeText text={c} />
+                      </li>
                     ))}
                     {e.changes.length > 12 && <li>and {e.changes.length - 12} more</li>}
                   </ul>
@@ -60,7 +63,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
             ))}
             {card.first && (
               <li className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <Badge size="sm" tone="ok">First saved</Badge>
+                <Badge size="sm" tone="ok">Made</Badge>
                 <b>{card.first.by ?? "Someone"}</b>
                 <span className="text-xs text-muted">{whenText(card.first.at, style)}</span>
               </li>
