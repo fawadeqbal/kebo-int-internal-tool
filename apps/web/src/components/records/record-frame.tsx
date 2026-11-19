@@ -8,6 +8,8 @@ import { cn, RULES } from "@kebo/ui";
 const FOLD_AT = 120;
 /** The app's own top bar, which the record's top sits under (px). */
 const SHELL = 56;
+/** The record's top once folded, on a laptop (px): what the panel has to fit under. */
+const FOLDED = 105;
 
 /**
  * A record with tabs, drawn once by its layout (canvas board "The top and the panel stay; only the body moves"):
@@ -104,6 +106,25 @@ export function RecordShell({ top, panel, panelLabel, children }: { top: ReactNo
     };
   }, [height]);
 
+  // The panel stays in view only while it fits under the folded top (canvas board "One page layout for every
+  // page", rule 4); a taller one scrolls with the page — it never gets a scrollbar of its own.
+  const aside = useRef<HTMLElement>(null);
+  const [fits, setFits] = useState(true);
+  useEffect(() => {
+    const el = aside.current;
+    if (!el) return;
+    // Room under the folded top, less what comes after the boxes (the copyright line), so it stays clear at the end.
+    const check = () => setFits(el.offsetHeight <= window.innerHeight - SHELL - FOLDED - 120);
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    window.addEventListener("resize", check);
+    check();
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", check);
+    };
+  }, []);
+
   const withPanel = !!panel;
   return (
     <div data-record-frame="" className="relative" style={{ "--record-top": `${SHELL + height}px`, overflowAnchor: "none" } as CSSProperties}>
@@ -114,12 +135,14 @@ export function RecordShell({ top, panel, panelLabel, children }: { top: ReactNo
       <div className={cn("mt-4 grid items-start gap-4", withPanel ? RULES.page.withPanel : "grid-cols-[minmax(0,1fr)]")}>
         <div className="flex min-w-0 flex-col gap-4">{children}</div>
         {withPanel && (
-          // On a phone its bar comes first, under the tabs; the panel opens from it. On a laptop it is short enough
-          // to stay under the top at the very end of the page too (the copyright line comes after the boxes).
+          // On a phone its bar comes first, under the tabs; the panel opens from it. On a laptop it stays in view
+          // while it fits (data-fits), else it scrolls with the page.
           <aside
+            ref={aside}
             aria-label={panelLabel}
             data-record-panel=""
-            className="flex min-w-0 flex-col gap-4 max-lg:order-first lg:sticky lg:top-[calc(var(--record-top)+16px)] lg:max-h-[calc(100dvh-var(--record-top)-120px)] lg:overflow-y-auto lg:[scrollbar-width:thin]"
+            data-fits={fits ? "" : undefined}
+            className={cn("flex min-w-0 flex-col gap-4 max-lg:order-first", fits && "lg:sticky lg:top-[calc(var(--record-top)+16px)]")}
           >
             {panel}
           </aside>
