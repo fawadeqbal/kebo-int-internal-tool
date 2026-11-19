@@ -54,8 +54,8 @@ export default async function PurchaseOrdersPage({
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/operations/purchase-orders")}
-        icon={ShoppingCart}
         title="Purchase orders"
         actions={
           <ExportCsv what="purchase-orders" />

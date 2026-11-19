@@ -1,5 +1,5 @@
-import { Bell, Check } from "lucide-react";
-import { Badge, buildHref, ButtonLink, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, toPage } from "@kebo/ui";
+import { Check } from "lucide-react";
+import { Badge, buildHref, ButtonLink, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, toPage, FactsLine } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { dateTime, timeAgo, countOf } from "@/lib/format";
@@ -45,10 +45,9 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   return (
     <>
       <PageHeader
+        kind="list"
         crumbs={[{ label: "Alerts" }]}
-        icon={Bell}
         title="Alerts"
-        summary={unread ? `${unread} new` : "You are all caught up"}
         primary={
           unread > 0 && (
             <ConfirmAction
@@ -63,6 +62,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
           )
         }
       />
+      <FactsLine facts={unread ? [{ label: "New", value: unread }] : []} />
       <LinkTabs
         label="Which alerts"
         className="mb-4"

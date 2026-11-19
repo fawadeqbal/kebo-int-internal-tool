@@ -363,6 +363,7 @@ export function PageHeader({
   primary,
   more,
   actions,
+  kind,
   backHref,
   backLabel,
   back,
@@ -402,13 +403,15 @@ export function PageHeader({
   /** The ⋯ menu (MoreMenu): everything else; delete last, in red. */
   more?: ReactNode;
   actions?: ReactNode;
+  /** A list page (canvas board "One list page for all 25 lists"): no icon tile, its name from the menu. */
+  kind?: "list";
   backHref?: string;
   backLabel?: string;
   children?: ReactNode;
 }) {
   const framed = badge !== undefined || summary !== undefined || primary !== undefined || papers !== undefined || more !== undefined || views !== undefined;
   const right = actions || papers || views || primary || more;
-  const Icon = icon === null ? null : (icon ?? (crumbs?.[0] ? MODULE_ICONS[crumbs[0].label] : undefined));
+  const Icon = icon === null || kind === "list" ? null : (icon ?? (crumbs?.[0] ? MODULE_ICONS[crumbs[0].label] : undefined));
   // The path is the menu's two levels (and the record, on a record's page): "Sales / Inquiries / RFQ-2026-0001".
   const trail = crumbs && crumbs.length > 0 ? crumbs : null;
   // A deeper page goes up to the last link in its path (or where it says), with ← beside its title.

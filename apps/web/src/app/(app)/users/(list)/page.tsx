@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus, ShieldAlert, ShieldCheck } from "lucide-react";
-import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage, FactsLine } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -85,20 +85,16 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/users")}
         title="People"
-        summary={
-          <>
-            {active} {active === 1 ? "person" : "people"} can sign in{users.length > active ? ` · ${users.length - active} switched off` : ""}
-            <span className="max-sm:hidden"> · switch people off when they leave; their work stays</span>
-          </>
-        }
         primary={
           <OpenPanelButton panel="new-user" variant="strong" label="Add person">
             <Plus aria-hidden /> <span className="sm:hidden">Add</span>
             <span className="max-sm:hidden">Add person</span>
           </OpenPanelButton>
         } />
+      <FactsLine facts={[{ label: "Can sign in", value: active }, ...(users.length > active ? [{ label: "Switched off", value: users.length - active }] : [])]} />
       {without.length > 0 && (
         <Card className="mb-4 border-warn/30 bg-warn-soft/40 px-4 py-3">
           <p className="flex items-center gap-2 text-sm font-semibold text-warn">

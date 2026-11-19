@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { crumbsFor } from "@/lib/nav";
-import { Check, Clock, Pencil, Plus, TriangleAlert, User, Users } from "lucide-react";
+import { Check, Pencil, Plus, TriangleAlert, User, Users } from "lucide-react";
 import { Badge, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Td, Th, THead, toPage } from "@kebo/ui";
 import { can, type Tone } from "@kebo/shared";
 import { api } from "@/lib/api";
@@ -116,8 +116,8 @@ export default async function FollowUpsPage({
   return (
     <>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/follow-ups")}
-        icon={Clock}
         title="Follow-ups"
         primary={
           <PanelButton

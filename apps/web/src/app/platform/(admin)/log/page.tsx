@@ -48,6 +48,7 @@ export default async function PlatformLogPage({ searchParams }: { searchParams: 
   return (
     <div>
       <PageHeader
+        kind="list"
         title="Platform log"
       />
       <LinkTabs

@@ -155,6 +155,17 @@ describe("one of each", () => {
     for (const [stage, tone] of Object.entries(INQUIRY_STAGE_TONE)) expect(INQUIRY.states[stage as keyof typeof INQUIRY.states].tone).toBe(tone);
   });
 
+  it("one list top: every list page's PageHeader is kind=\"list\" (no icon tile), its counts in the facts line", () => {
+    const lists = SOURCES.filter(({ file }) => /\/\(list\)\/page\.tsx$|\/(follow-ups|audit|approvals|notifications|money\/due|money\/company-costs|finance\/ledger|access\/sessions|access\/sign-ins|access\/roles|platform\/\(admin\)\/(companies|leads|log|plans))\/page\.tsx$/.test(file));
+    expect(lists.length).toBeGreaterThanOrEqual(18);
+    for (const { file, text } of lists)
+      for (const m of text.matchAll(/<PageHeader\b[\s\S]*?\/>/g)) {
+        expect(m[0], file).toMatch(/kind="list"/);
+        // A list's top says no sentence of its own: its figures are the facts line (payments keep "For <record>").
+        if (!file.includes("payments/")) expect(m[0], file).not.toMatch(/\ssummary=/);
+      }
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

@@ -117,8 +117,8 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/suppliers")}
-        icon={Factory}
         title={labelFor("/suppliers")}
         papers={
           <>

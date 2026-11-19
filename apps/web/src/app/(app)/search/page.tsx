@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SEARCH_KIND_LABEL, SEARCH_KINDS, type SearchItem, type SearchKind, type SearchResult } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, Card, EmptyState, LinkTabs, PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
@@ -36,8 +36,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader
+        kind="list"
         crumbs={[{ label: "Search" }]}
-        icon={Search}
         title="Search"
         summary={asked ? `${countOf(total, "result")} for “${q}” · everything you may see` : "Customers, suppliers, inquiries, quotations, orders, purchase orders and payments"}
       />
