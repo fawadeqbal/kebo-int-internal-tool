@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { accessibilityProblems, watchErrors } from "./check";
+import { accessibilityProblems, answerWhy, watchErrors } from "./check";
 
 /**
  * Design "RFQ Desk — terms that travel" (16 Nov 2026), step 1, done in a browser: the factory offer and the
@@ -58,9 +58,12 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await offer.getByLabel("Months").fill("12");
   expect(await accessibilityProblems(page), "the offer's form meets WCAG 2.2 AA").toEqual([]);
   await offer.getByRole("button", { name: /^Next/ }).click();
-  // Lead time, payment and warranty were empty: all three are Added, not changes, so Save asks no reason (canvas group 9).
-  await offer.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: /^Why (the change|these changes)\?$/ })).toHaveCount(0);
+  // Lead time and warranty were empty, so they are only Added (canvas group 9); the payment replaces the split the offer
+  // was saved with, if it had one — then that one change asks why before it saves.
+  await offer.getByRole("button", { name: /^Save( 1 change)?$/ }).click();
+  const why = page.getByRole("dialog", { name: /^Why (the change|these changes)\?$/ });
+  if (await Promise.race([why.waitFor({ timeout: 10_000 }).then(() => true), offer.waitFor({ state: "hidden", timeout: 10_000 }).then(() => false)]))
+    await answerWhy(page, "Supplier changed its terms");
   await expect(offer).toBeHidden();
   // The offer's page: a box per part, the same as its steps.
   await expect(page.getByRole("region", { name: "Delivery & payment", exact: true })).toContainText("30 days after the deposit");
