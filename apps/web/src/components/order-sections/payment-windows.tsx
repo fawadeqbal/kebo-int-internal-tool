@@ -20,7 +20,7 @@ type Fx = Parameters<typeof ReceivedFields>[0]["fx"];
 export function RouteWindow(props: { sub: string; action: Action; route: PaymentRoute | null; bankRoutes: boolean; terms?: RouteTermsValue; fromQuotation?: boolean; suggest?: PaymentRoute | null }) {
   const { sub, ...form } = props;
   return (
-    <FormWindow button={{ label: props.route ? "Change" : "Choose", kind: props.route ? "plain" : "main" }} name={props.route ? undefined : "route"} title="How they pay" sub={sub} size="md">
+    <FormWindow button={{ label: "Edit", what: "how they pay" }} name={props.route ? undefined : "route"} title="How they pay" sub={sub} size="md">
       {(close) => <RouteForm {...form} onDone={close} />}
     </FormWindow>
   );

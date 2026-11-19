@@ -28,7 +28,14 @@ const SUGGEST: Record<string, PaymentRoute> = {
   against_bl_copy: "informal",
   after_arrival: "informal",
 };
-const CONTRACT_WORD: Record<string, string> = { draft: "Draft", opened: "Open", amended: "Amended", documents_presented: "Documents presented", paid: "Paid", closed: "Closed" };
+const CONTRACT_WORD: Record<string, string> = {
+  draft: "Draft",
+  opened: "Open",
+  amended: "Amended",
+  documents_presented: "Documents presented",
+  paid: "Paid",
+  closed: "Closed",
+};
 
 /**
  * Payment (design "the order, final"): how the customer pays, the bank's paper for the routes that have
@@ -49,7 +56,14 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const lc = route === "letter_of_credit";
   const bankRoute = (route === "bank_contract" || lc) && !!flow?.modules.bankContracts;
   const contract = flow?.payment.bankContract ?? null;
-  const terms = flow && route ? { balanceWhen: flow.payment.balanceWhen, lcTerms: flow.payment.lcTerms, lcDays: flow.payment.lcDays } : { balanceWhen: o.balanceTerms === "against_bl_copy" ? ("against_bl_copy" as const) : ("before_shipment" as const), lcTerms: null, lcDays: null };
+  const terms =
+    flow && route
+      ? { balanceWhen: flow.payment.balanceWhen, lcTerms: flow.payment.lcTerms, lcDays: flow.payment.lcDays }
+      : {
+          balanceWhen: o.balanceTerms === "against_bl_copy" ? ("against_bl_copy" as const) : ("before_shipment" as const),
+          lcTerms: null,
+          lcDays: null,
+        };
   const sub = `${o.refNo} · ${o.customer.name} · ${money(m.total, c)}`;
   const live = p.payments.filter((x) => !x.voided);
   const paid = Number(p.due) <= 0;
@@ -58,7 +72,16 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const openPart = m.plan.items.some((i) => i.request.state !== "paid");
   const pay =
     (canPay || canSend) && !paid
-      ? { action: (canPay ? paymentAction : submitPaymentAction).bind(null, o.id, c), customer: o.customer.name, refNo: o.refNo, due: p.due, depositDue: p.depositDue, fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates }, today: now, verify: !canPay }
+      ? {
+          action: (canPay ? paymentAction : submitPaymentAction).bind(null, o.id, c),
+          customer: o.customer.name,
+          refNo: o.refNo,
+          due: p.due,
+          depositDue: p.depositDue,
+          fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates },
+          today: now,
+          verify: !canPay,
+        }
       : null;
   const record = pay && !openPart && <RecordPaymentWindow main {...pay} currency={c} forWhat={m.plan.next?.label ?? null} />;
   /** The parts of the plan a payment paid ("Deposit 30%"), and its receipt. */
@@ -69,69 +92,97 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
 
   return (
     <OrderPage id={id}>
-      <Section
-        title="How they pay"
-        cols={4}
-        rows={[
-          { label: "Route", value: route ? ROUTE_NAME[route] : null },
-          { label: "Terms", value: flow?.payment.summary ?? BALANCE_TERMS_LABEL[o.balanceTerms] },
-          { label: "Deposit", value: o.money.depositPercent > 0 ? `${o.money.depositPercent}% · ${money(o.money.deposit, c)}` : "None" },
-          { label: "Balance", value: o.money.depositPercent < 100 ? `${100 - o.money.depositPercent}% · ${money(balance, c)}` : "None" },
-        ]}
-        actions={
-          canRoute && (
-            <RouteWindow
-              sub={sub}
-              action={routeAction.bind(null, o.id)}
-              route={route}
-              bankRoutes={!!flow?.modules.bankContracts}
-              terms={terms}
-              fromQuotation={flow?.payment.fromQuotation}
-              suggest={SUGGEST[o.balanceTerms] ?? null}
-            />
-          )
-        }
-      />
+      {/* How they pay beside the bank's paper (the routes that have one): two short boxes side by side. */}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Section
+          title="How they pay"
+          cols={4}
+          rows={[
+            { label: "Route", value: route ? ROUTE_NAME[route] : null },
+            { label: "Terms", value: flow?.payment.summary ?? BALANCE_TERMS_LABEL[o.balanceTerms] },
+            { label: "Deposit", value: o.money.depositPercent > 0 ? `${o.money.depositPercent}% · ${money(o.money.deposit, c)}` : "None" },
+            { label: "Balance", value: o.money.depositPercent < 100 ? `${100 - o.money.depositPercent}% · ${money(balance, c)}` : "None" },
+          ]}
+          actions={
+            canRoute && (
+              <RouteWindow
+                sub={sub}
+                action={routeAction.bind(null, o.id)}
+                route={route}
+                bankRoutes={!!flow?.modules.bankContracts}
+                terms={terms}
+                fromQuotation={flow?.payment.fromQuotation}
+                suggest={SUGGEST[o.balanceTerms] ?? null}
+              />
+            )
+          }
+        />
 
-      {bankRoute &&
-        (contract ? (
-          <Section
-            title={lc ? "The letter of credit" : "The bank contract"}
-            state={`${CONTRACT_WORD[contract.status] ?? contract.status}${contract.openedOn ? ` since ${date(contract.openedOn)}` : ""}`}
-            tone={contract.status === "paid" || contract.status === "opened" ? "ok" : contract.status === "amended" ? "warn" : "neutral"}
-            cols={4}
-            rows={[
-              { label: lc ? "LC no." : "Contract no.", value: contract.number },
-              { label: "Their bank", value: contract.customerBank },
-              { label: "Our bank", value: contract.ourBank },
-              { label: "Amount", value: contract.amount !== null ? money(String(contract.amount), contract.currency ?? c) : null },
-              { label: "Opened on", value: contract.openedOn ? date(contract.openedOn) : null },
-              { label: lc ? "Latest shipment" : "Ship by (latest)", value: contract.latestShipOn ? date(contract.latestShipOn) : null },
-              { label: "Expires", value: contract.expiresOn ? date(contract.expiresOn) : null },
-              { label: lc ? "Terms" : "Note", value: lc ? (flow?.payment.lcTerms === "deferred" ? `Deferred ${flow.payment.lcDays ?? 0} days` : "At sight") : contract.note },
-            ]}
-            actions={
-              canRoute && (
-                <ContractWindow sub={sub} action={bankContractAction.bind(null, o.id)} contract={contract} lc={lc} currency={c} orderId={o.id} canFiles={d.canFiles} />
-              )
-            }
-            files={<SectionFiles orderId={o.id} section={lc ? "lc" : "bank_contract"} canAdd={d.canFiles} />}
-          >
-            {lc && flow?.payment.lcChecks && (
-              <div className="border-t border-line px-[18px] py-3">
-                <LcChecks checks={flow.payment.lcChecks} />
-              </div>
-            )}
-          </Section>
-        ) : (
-          <EmptySection
-            title={lc ? "The letter of credit" : "The bank contract"}
-            text={lc ? "No LC recorded yet." : "No contract recorded yet."}
-            action={
-              canRoute && <ContractWindow sub={sub} action={bankContractAction.bind(null, o.id)} contract={null} lc={lc} currency={c} orderId={o.id} canFiles={d.canFiles} />
-            }
-          />
-        ))}
+        {bankRoute &&
+          (contract ? (
+            <Section
+              title={lc ? "The letter of credit" : "The bank contract"}
+              state={`${CONTRACT_WORD[contract.status] ?? contract.status}${contract.openedOn ? ` since ${date(contract.openedOn)}` : ""}`}
+              tone={contract.status === "paid" || contract.status === "opened" ? "ok" : contract.status === "amended" ? "warn" : "neutral"}
+              cols={4}
+              rows={[
+                { label: lc ? "LC no." : "Contract no.", value: contract.number },
+                { label: "Their bank", value: contract.customerBank },
+                { label: "Our bank", value: contract.ourBank },
+                { label: "Amount", value: contract.amount !== null ? money(String(contract.amount), contract.currency ?? c) : null },
+                { label: "Opened on", value: contract.openedOn ? date(contract.openedOn) : null },
+                { label: lc ? "Latest shipment" : "Ship by (latest)", value: contract.latestShipOn ? date(contract.latestShipOn) : null },
+                { label: "Expires", value: contract.expiresOn ? date(contract.expiresOn) : null },
+                {
+                  label: lc ? "Terms" : "Note",
+                  value: lc
+                    ? flow?.payment.lcTerms === "deferred"
+                      ? `Deferred ${flow.payment.lcDays ?? 0} days`
+                      : "At sight"
+                    : contract.note,
+                },
+              ]}
+              actions={
+                canRoute && (
+                  <ContractWindow
+                    sub={sub}
+                    action={bankContractAction.bind(null, o.id)}
+                    contract={contract}
+                    lc={lc}
+                    currency={c}
+                    orderId={o.id}
+                    canFiles={d.canFiles}
+                  />
+                )
+              }
+              files={<SectionFiles orderId={o.id} section={lc ? "lc" : "bank_contract"} canAdd={d.canFiles} />}
+            >
+              {lc && flow?.payment.lcChecks && (
+                <div className="border-t border-line px-[18px] py-3">
+                  <LcChecks checks={flow.payment.lcChecks} />
+                </div>
+              )}
+            </Section>
+          ) : (
+            <EmptySection
+              title={lc ? "The letter of credit" : "The bank contract"}
+              text={lc ? "No LC recorded yet." : "No contract recorded yet."}
+              action={
+                canRoute && (
+                  <ContractWindow
+                    sub={sub}
+                    action={bankContractAction.bind(null, o.id)}
+                    contract={null}
+                    lc={lc}
+                    currency={c}
+                    orderId={o.id}
+                    canFiles={d.canFiles}
+                  />
+                )
+              }
+            />
+          ))}
+      </div>
 
       <Section
         title="Payment plan"
@@ -139,23 +190,46 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
         tone={paid ? "ok" : "warn"}
         actions={
           m.plan.canEdit &&
-          d.open && <CustomerPlanWindow sub={sub} action={savePlanAction.bind(null, o.id)} plan={m.plan} currency={c} total={m.total} customer={o.customer.name} today={now} />
+          d.open && (
+            <CustomerPlanWindow
+              sub={sub}
+              action={savePlanAction.bind(null, o.id)}
+              plan={m.plan}
+              currency={c}
+              total={m.total}
+              customer={o.customer.name}
+              today={now}
+            />
+          )
         }
       >
         <div className="flex flex-col gap-3 pb-3.5">
           {!m.plan.matchesTotal && (
             <p className="mx-[18px] rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
-              The parts do not add up to the order total ({money(m.plan.difference, c)} {Number(m.plan.difference) > 0 ? "missing" : "too much"}).
+              The parts do not add up to the order total ({money(m.plan.difference, c)}{" "}
+              {Number(m.plan.difference) > 0 ? "missing" : "too much"}).
             </p>
           )}
-          <PaymentPlanTable orderId={o.id} plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} send={sendRequestAction.bind(null, o.id)} pay={pay} />
+          <PaymentPlanTable
+            orderId={o.id}
+            plan={m.plan}
+            currency={c}
+            total={m.total}
+            received={m.received}
+            due={m.due}
+            send={sendRequestAction.bind(null, o.id)}
+            pay={pay}
+          />
           {(canPay || canSend) && (
             <div className="mx-[18px] empty:hidden">
               <WaitingToVerify orderId={o.id} verifies={canPay} />
             </div>
           )}
           {m.charged.length > 0 && (
-            <ul aria-label="Charged to the customer" className="mx-[18px] flex flex-col divide-y divide-line rounded-lg border border-line text-sm">
+            <ul
+              aria-label="Charged to the customer"
+              className="mx-[18px] flex flex-col divide-y divide-line rounded-lg border border-line text-sm"
+            >
               {m.charged.map((x) => (
                 <li key={x.id} className="flex items-baseline justify-between gap-3 px-3 py-2">
                   <span>
@@ -177,7 +251,9 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
           state={`${live.length} payment${live.length === 1 ? "" : "s"}`}
           actions={
             <>
-              {canPay && p.credit.canUse && <UseCredit action={useCreditAction.bind(null, o.id)} credit={p.credit.amount} due={p.due} currency={c} today={now} />}
+              {canPay && p.credit.canUse && (
+                <UseCredit action={useCreditAction.bind(null, o.id)} credit={p.credit.amount} due={p.due} currency={c} today={now} />
+              )}
               {record}
             </>
           }

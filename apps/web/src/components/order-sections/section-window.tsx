@@ -7,7 +7,6 @@ import { Pencil } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { EditButton } from "@/components/common/edit-button";
 import { PANEL_FORM, PanelBody, PanelFooter, SidePanel, WhatHappens } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { WindowFiles } from "./section-files";
@@ -57,21 +56,32 @@ const SMALL = "h-8 px-2.5 text-[13px]";
 /** The button that opens a window, in its look (WindowButton); the same for every kind of window. */
 export function WindowOpener({ button, disabled, onClick }: { button: WindowButton; disabled?: boolean; onClick: () => void }) {
   const kind = button.kind ?? "edit";
-  if (kind === "edit" && button.what)
+  // A box's Edit: the record box's quiet ✎ Edit, the same on every record (read out as "Edit <what>" when said).
+  if (kind === "edit")
     return (
-      <Button type="button" variant="ghost" size="xs" disabled={disabled} aria-label={`${button.label} ${button.what}`} aria-haspopup="dialog" className="text-primary hover:text-primary" onClick={onClick}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        disabled={disabled}
+        aria-label={button.what ? `${button.label} ${button.what}` : undefined}
+        aria-haspopup="dialog"
+        className="text-primary hover:text-primary"
+        onClick={onClick}
+      >
         <Pencil aria-hidden /> {button.label}
       </Button>
     );
-  if (kind === "edit") return <EditButton label={button.label} disabled={disabled} onClick={onClick} />;
   if (kind === "link")
     return (
       <button type="button" disabled={disabled} className={ROW_LINK} onClick={onClick}>
         {button.label}
       </button>
     );
+  // "main" is a box's own act (Record payment, Add): plain like the others — the page's one orange button is the
+  // header's next step (canvas row "The order on the same pieces": no orange buttons in boxes).
   return (
-    <Button size="sm" disabled={disabled} variant={kind === "main" ? "primary" : kind === "danger" ? "danger" : "secondary"} className={SMALL} onClick={onClick}>
+    <Button size="sm" disabled={disabled} variant={kind === "danger" ? "danger" : "secondary"} className={SMALL} onClick={onClick}>
       {button.label}
     </Button>
   );

@@ -12,6 +12,7 @@ import type { ActionState } from "@/lib/actions";
 import { formatDate, type TimeStyle } from "@kebo/utils";
 import { timeStyle } from "@/lib/format";
 import { useTime } from "@/lib/time-client";
+import { useOpenFromLink } from "@/components/order-sections/section-window";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -524,7 +525,10 @@ export function PanelButton({
   icon,
   className,
   panelClassName,
+  name,
 }: {
+  /** A link opens it: ?do=<name> (the order's next step). */
+  name?: string;
   label: ReactNode;
   title: string;
   description?: string;
@@ -537,6 +541,7 @@ export function PanelButton({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  useOpenFromLink(name, () => setOpen(true));
   return (
     <>
       <Button size={size} variant={variant} onClick={() => setOpen(true)} className={className}>
