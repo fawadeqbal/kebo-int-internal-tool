@@ -46,7 +46,7 @@ export default async function DuePage({ searchParams }: { searchParams: Promise<
   const today = companyToday();
   return (
     <div>
-      <PageHeader crumbs={crumbsFor(HERE)} title="To receive and to pay" summary="What customers owe us and what we owe" />
+      <PageHeader crumbs={crumbsFor(HERE)} title="To receive and to pay" />
       {seesSuppliers && (
         <Segmented
           label="Which side"

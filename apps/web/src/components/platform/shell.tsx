@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { Activity, Building2, ClipboardList, Gauge, Inbox, LogOut, Package, ScrollText, Settings } from "lucide-react";
-import { Avatar, cn } from "@kebo/ui";
+import { Avatar, cn, RULES } from "@kebo/ui";
 import { NavMemoryKeeper } from "@kebo/ui/client";
 import { platformLogoutAction } from "@/app/platform/actions";
 
@@ -184,7 +184,7 @@ export function PlatformShell({
           })}
         </nav>
       </header>
-      <main id="main" className="mx-auto w-full max-w-[1400px] px-4 pt-6 pb-16 sm:px-6 lg:px-8">
+      <main id="main" className={cn(RULES.page.frame, "pb-16")}>
         {children}
       </main>
     </div>

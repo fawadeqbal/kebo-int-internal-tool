@@ -124,7 +124,6 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         crumbs={crumbsFor("/orders")}
         icon={Package}
         title="Sales orders"
-        description="An order is made when a customer accepts a quotation"
         actions={
           <>
             <ViewSwitch view="list" mine={mine} />
@@ -350,7 +349,6 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
         crumbs={crumbsFor("/orders")}
         icon={Package}
         title="Sales orders"
-        description="Orders by stage. A card moves when its step is done."
         actions={<ViewSwitch view="board" mine={mine} />}
       />
       <LinkTabs

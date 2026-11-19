@@ -78,7 +78,6 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
       <PageHeader
         crumbs={crumbs}
         title="Company costs"
-        summary="Rent, salaries and the office: what the company spends that is not for one order"
         actions={list.count > 0 ? <ExportCsv what="expenses" query={{ ...span(month), category, q: text }} /> : undefined}
         primary={<AddCost setup={setup} label="Add company cost" icon={null} />}
       />

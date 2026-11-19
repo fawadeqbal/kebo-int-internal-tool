@@ -88,18 +88,6 @@ function ReportTabs({ current, keep, seeMoney }: { current: ReportKind; keep: Re
   );
 }
 
-const DESCRIPTION: Record<ReportKind, string> = {
-  overview: "How the business is doing",
-  profit: "What was sold, what it cost, and what is left",
-  customers: "Who buys, how much, how well they pay",
-  factories: "Who supplies on time and wins our orders",
-  cash: "What came in, what went out, and what each account holds",
-  people: "Who sells, how fast, and against their targets",
-  targets: "Monthly sales targets for the company and each person",
-  funnel: "Where inquiries go, and why we lose them",
-  spending: "Who spends, on what, and what winning and losing cost us",
-};
-
 /**
  * Reports (design "money, simple", boards ROverview to RCash): one page in the menu, its reports as tabs,
  * one period for every figure with the period before to compare. Excel, View / Print and PDF are in the
@@ -161,7 +149,6 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
       <PageHeader
         crumbs={crumbs}
         title={title}
-        description={<span className="max-md:hidden">{DESCRIPTION[kind]}</span>}
         actions={
           periodic ? (
             <div className="no-print flex flex-wrap items-center gap-x-3 gap-y-2 max-md:hidden">

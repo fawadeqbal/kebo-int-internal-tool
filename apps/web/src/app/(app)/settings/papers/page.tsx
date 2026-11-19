@@ -7,7 +7,7 @@ export const metadata = { title: "Document templates" };
 /** System & admin › Document templates: the papers the company uses on its orders. */
 export default async function Page() {
   return (
-    <SettingsPage href="/settings/papers" description="The documents your company makes for its orders. Switched-off documents leave the Documents lists and the counts.">
+    <SettingsPage href="/settings/papers">
       <PapersCard value={(await getSettings()).papers} />
     </SettingsPage>
   );

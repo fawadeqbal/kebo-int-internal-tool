@@ -72,7 +72,6 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       <PageHeader
         crumbs={[{ label: "Money" }, { label: "Ledger" }]}
         title="Ledger"
-        description={view === "balances" ? "Every customer, supplier, account and person with a balance" : `Every money record, posted from its document · ${main} at each entry's rate`}
         actions={
           <>
             {view === "all" && (

@@ -54,7 +54,6 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
     <div>
       <PageHeader
         title="Platform settings"
-        summary="How the platform works for everyone: the website, sign-up and demos, emails, backups, and who runs it."
       />
       <SectionList
         label="Settings sections"
