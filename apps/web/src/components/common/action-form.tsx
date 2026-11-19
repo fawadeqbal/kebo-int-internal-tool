@@ -75,12 +75,15 @@ export function ActionForm({
   id,
   banner,
   fieldId,
+  reveal,
   beforeSend,
 }: {
   /** Checked as the form is sent (a button or Ctrl+Enter): false keeps it here unsent; the form shows why itself. */
   beforeSend?: () => boolean;
   /** Where a field the server names is, when its name is not its field's (a contact's name in a list): its id. */
   fieldId?: (key: string) => string | null | undefined;
+  /** A steps window: shows the step that holds a field (before the cursor goes there). */
+  reveal?: (key: string) => void;
   /** Draws the form's own message instead of the usual one (return null to show nothing). */
   banner?: (state: ActionState) => ReactNode;
   /** The form's id, for a submit button placed outside it (form="…"). */
@@ -152,24 +155,49 @@ export function ActionForm({
   // The save's one-time key (lib/once.ts): the same one until it goes through, so sending it twice saves once.
   const onceKey = useRef<string | null>(null);
   const problems = problemsOf(state);
+  // The field the cursor goes to after a mistake: the first one named. In a steps window it may be on another
+  // step (JumpToStep goes there): it is focused once that step is drawn, after the step's own title took focus.
+  const focusNext = useRef<string | null>(null);
+  useEffect(() => {
+    const key = focusNext.current;
+    if (!key) return;
+    const el = fieldOf(formRef.current, key, fieldId);
+    // Not drawn yet, or on a step that is hidden: wait for the commit that shows it.
+    if (!el || el.closest(".hidden,[hidden]")) return;
+    focusNext.current = null;
+    el.focus();
+  });
   useEffect(() => {
     if (state === seen.current || state.ok === undefined) return;
     seen.current = state;
+    focusNext.current = problemsOf(state)[0]?.name ?? null;
     // A mistake: the fields it names are marked, and the cursor goes to the first one (nothing typed is lost).
-    const form = formRef.current;
-    form?.querySelectorAll("[data-marked]").forEach((el) => {
-      el.removeAttribute("aria-invalid");
-      el.removeAttribute("data-marked");
-    });
-    const named = Object.keys(state.ok === false && state.code !== "reason_needed" ? (state.errors ?? {}) : {})
-      .map((name) => fieldOf(form, name, fieldId))
-      .filter((el): el is HTMLElement => !!el);
-    for (const el of named)
-      if (!el.hasAttribute("aria-invalid")) {
-        el.setAttribute("aria-invalid", "true");
-        el.setAttribute("data-marked", "");
+    // A tick later: a steps window first goes to the step that holds the first one (JumpToStep), then it is found.
+    setTimeout(() => {
+      const form = formRef.current;
+      form?.querySelectorAll("[data-marked]").forEach((el) => {
+        el.removeAttribute("aria-invalid");
+        el.removeAttribute("data-marked");
+      });
+      const named = Object.keys(state.ok === false && state.code !== "reason_needed" ? (state.errors ?? {}) : {})
+        .map((name) => fieldOf(form, name, fieldId))
+        .filter((el): el is HTMLElement => !!el);
+      for (const el of named)
+        if (!el.hasAttribute("aria-invalid")) {
+          el.setAttribute("aria-invalid", "true");
+          el.setAttribute("data-marked", "");
+        }
+      const first = focusNext.current ? fieldOf(form, focusNext.current, fieldId) : null;
+      if (first && !first.closest(".hidden,[hidden]")) {
+        focusNext.current = null;
+        first.focus();
+      } else if (!reveal) {
+        // Not a steps window that shows a field's step: nothing to wait for (the first field found, as before).
+        focusNext.current = null;
+        named[0]?.focus();
       }
-    named[0]?.focus();
+      // Else it waits for its step to be drawn (the effect above).
+    }, 0);
     // No connection: the note says so, with Try again (the window stays, with what was typed).
     if (state.code === "offline")
       toast({
@@ -185,7 +213,7 @@ export function ActionForm({
       onDone?.(state);
       windowDone?.();
     }
-  }, [state, router, onDone, resetOnSuccess, windowDone, banner, fieldId]);
+  }, [state, router, onDone, resetOnSuccess, windowDone, banner, fieldId, reveal]);
   useEffect(
     () => () => {
       const note = unseen.current;
@@ -208,7 +236,17 @@ export function ActionForm({
           <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
             {problems.map((p) => (
               <li key={p.name}>
-                <button type="button" className="text-left underline underline-offset-2 hover:opacity-80" onClick={() => fieldOf(formRef.current, p.name, fieldId)?.focus()}>
+                <button type="button" className="text-left underline underline-offset-2 hover:opacity-80" onClick={() => {
+                    // In a steps window, its step first (`reveal`), then the field.
+                    const here = fieldOf(formRef.current, p.name, fieldId);
+                    if (here && !here.closest(".hidden,[hidden]")) here.focus();
+                    else {
+                      // On another step: focused once that step is drawn.
+                      focusNext.current = p.name;
+                      reveal?.(p.name);
+                    }
+                  }}
+                >
                   {p.message}
                 </button>
               </li>
@@ -243,6 +281,13 @@ export function ActionForm({
       className={className}
       noValidate
       onReset={keepFields ? (e) => e.preventDefault() : undefined}
+      // The person moved on (a click, a key): a field still waiting for its step no longer takes the cursor.
+      onPointerDownCapture={() => {
+        focusNext.current = null;
+      }}
+      onKeyDownCapture={() => {
+        focusNext.current = null;
+      }}
       onSubmit={(e) => {
         if (beforeSend && !beforeSend()) {
           e.preventDefault();

@@ -5,6 +5,13 @@ on:
     branches: [main, "revamp/**"]
   pull_request:
 
+# One run per pull request (or per branch push) at a time: a newer push cancels the older run, so stacked PRs and
+# merges in a row do not fill the runner queue with runs nobody will read. On main a newer merge also cancels the
+# older run: Deploy only follows a run that passed, so main's newest commit is the one deployed.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest

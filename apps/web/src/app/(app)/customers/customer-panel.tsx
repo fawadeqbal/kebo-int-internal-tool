@@ -61,7 +61,7 @@ export function CustomerPanel({
         customer ? "Removing a contact keeps them on past inquiries." : "Opens from Customers, and from “Customer → + New” on a new inquiry"
       }
       onClose={() => panel.close()}
-      className={RULES.window.wideRows}
+      className={RULES.window.items}
     >
       <CustomerForm action={action} customer={customer} currencies={currencies} inPanel onSaved={saved} />
     </SidePanel>
