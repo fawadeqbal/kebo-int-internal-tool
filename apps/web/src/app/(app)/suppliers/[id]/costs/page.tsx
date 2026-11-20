@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Banknote, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 import { can } from "@kebo/shared";
 import { ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
@@ -32,7 +32,7 @@ const amount = (v: number) => (Math.abs(v) < 0.005 ? "" : two(v));
 /**
  * The supplier's Costs tab (board "Supplier — Costs tab (statement)", managers): Bought, Paid, We owe and the
  * other costs on it; then the statement — every purchase and every payment to the factory, with what we owe
- * after each — from the ledger for those who see it, else order by order. Print and Pay supplier above it.
+ * after each — from the ledger for those who see it, else order by order. Print statement above it (Pay supplier is the record's one button, at its top).
  */
 export default async function FactoryCosts({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -120,12 +120,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
                   target="_blank"
                   prefetch={false}
                 >
-                  <Printer aria-hidden /> Print
-                </ButtonLink>
-              )}
-              {(can(me, "payments.record") || can(me, "expenses.manage")) && (
-                <ButtonLink href={`/payments/new?kind=out&factory=${f.id}&back=/suppliers/${f.id}/costs`} variant="secondary" size="sm">
-                  <Banknote aria-hidden /> Pay supplier
+                  <Printer aria-hidden /> Print statement
                 </ButtonLink>
               )}
             </span>

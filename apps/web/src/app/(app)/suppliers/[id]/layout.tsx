@@ -6,6 +6,8 @@ import { factoryOf } from "@/lib/party-data";
 import { RecordTabs } from "@/components/common/record-tabs";
 import { RecordFrame } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
+import { MoreMenu } from "@/components/common/more-menu";
+import { removeFactoryAction } from "../actions";
 
 /**
  * Every page of a supplier shares one top (design: Record): ← Suppliers, the name with a status from what it
@@ -46,13 +48,27 @@ export default async function FactoryLayout({ children, params }: { children: Re
                 <Pencil aria-hidden /> Edit
               </ButtonLink>
             ),
+            // Remove lives in ⋯, last and in red (PageHeader: delete last in ⋯), not under the Overview's boxes.
+            more: can(me, "inquiries.updateAny") ? (
+              <MoreMenu
+                label={`More for ${f.name}`}
+                items={[
+                  {
+                    label: "Remove this supplier",
+                    danger: true,
+                    confirm: { title: `Remove ${f.name}?`, body: "It will no longer appear in lists and pickers. Its past prices stay on their inquiries.", confirmLabel: "Remove" },
+                    action: removeFactoryAction.bind(null, f.id),
+                  },
+                ]}
+              />
+            ) : undefined,
             primary: (
               can(me, "payments.record") || can(me, "expenses.manage") ? (
-                <ButtonLink href={`/payments/new?kind=out&factory=${f.id}`} variant="strong">
+                <ButtonLink href={`/payments/new?kind=out&factory=${f.id}`} variant="primary">
                   <Banknote aria-hidden /> Pay supplier
                 </ButtonLink>
               ) : (
-                <ButtonLink href="/inquiries?stage=sourcing" variant="strong">
+                <ButtonLink href="/inquiries?stage=sourcing" variant="primary">
                   <Search aria-hidden /> Ask for prices
                 </ButtonLink>
               )

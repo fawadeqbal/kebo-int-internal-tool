@@ -215,7 +215,7 @@ describe("Change what we agreed with the supplier", () => {
         payment="Deposit 30%, paid · Balance 70%"
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /Change/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit what we agreed with the supplier" }));
     return screen.getByRole("dialog");
   };
   const hidden = (name: string) => (document.querySelector(`input[type="hidden"][name="${name}"]`) as HTMLInputElement).value;

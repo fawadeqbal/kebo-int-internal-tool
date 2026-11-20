@@ -295,7 +295,8 @@ export function CardHeader({
     // With a description and actions, a phone puts the actions under the text instead of squeezing it; actions
     // that do not fit beside the title (a narrow screen) go under it rather than past the edge.
     <div className={cn(boxHeadClass, "justify-between gap-x-3", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
-      <div className="min-w-0">
+      {/* The words shrink (a long description wraps) so the buttons stay at the right on a laptop. */}
+      <div className="min-w-0 flex-[1_1_12rem]">
         {how ? (
           <div className="flex items-center gap-1">
             {heading}

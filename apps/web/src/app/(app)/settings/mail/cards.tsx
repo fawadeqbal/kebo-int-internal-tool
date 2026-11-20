@@ -4,7 +4,7 @@ import { useState } from "react";
 import { MAIL_PROVIDER_LABEL, MAIL_PROVIDERS, SMTP_PORTS, type MailProvider, type MailSettingsView } from "@kebo/shared";
 import { Card, CardBody, CardHeader, cn, Field, Input, Select } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
-import { ConfirmSubmit } from "@/components/common/dialog";
+
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 
@@ -23,7 +23,7 @@ const SECRET_LABEL: Record<MailProvider, string> = { gmail: "App password", smtp
  * Admin settings › Email sending: the way the company's email goes out (Gmail, an SMTP server or Resend),
  * who it is from, and a test. The password or key is typed in and never shown again.
  */
-export function MailCards({ view, me, saveAction, removeAction, testAction }: { view: MailSettingsView; me: string; saveAction: Action; removeAction: Action; testAction: Action }) {
+export function MailCards({ view, me, saveAction, testAction }: { view: MailSettingsView; me: string; saveAction: Action; testAction: Action }) {
   const [provider, setProvider] = useState<MailProvider>(view.provider ?? "gmail");
   const saved = view.provider === provider;
   const status = view.provider
@@ -132,13 +132,6 @@ export function MailCards({ view, me, saveAction, removeAction, testAction }: { 
         </CardBody>
       </Card>
 
-      {view.provider && (
-        <ActionForm action={removeAction} showSuccess={false}>
-          <ConfirmSubmit variant="ghost" size="sm" pendingText="Removing…" className="text-bad" confirmLabel="Remove" danger message={view.serverDefault ? "Remove this company's own email setting? Its emails will go through the server's own again." : "Remove this company's own email setting? No email will be sent until one is set again."}>
-            Remove this setting
-          </ConfirmSubmit>
-        </ActionForm>
-      )}
     </div>
   );
 }

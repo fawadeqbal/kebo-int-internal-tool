@@ -720,7 +720,8 @@ const subOf = (f: CostFor | null) => (!f ? "Choose what it is for" : f.place ===
 export function AddCost({
   setup,
   label = "Add a cost",
-  variant = "primary",
+  // A box head's add is the outline small button (one look for "+ New …" in a box); "strong" md: a list's top.
+  variant = "secondary",
   size = "sm",
   icon = "plus",
   template,
@@ -728,8 +729,8 @@ export function AddCost({
 }: {
   setup: CostSetup;
   label?: string;
-  variant?: "primary" | "secondary" | "ghost";
-  size?: "xs" | "sm";
+  variant?: "strong" | "secondary" | "ghost";
+  size?: "xs" | "sm" | "md";
   icon?: "plus" | "copy" | null;
   template?: CostToChange & { for?: CostFor };
   className?: string;

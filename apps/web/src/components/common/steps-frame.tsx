@@ -174,7 +174,8 @@ export function StepsFrame<K extends string>({
 /**
  * The one footer of a steps window (design rules 18 Nov; canvas row "Cancel, not ✕"): one strong button only.
  * Left: ‹ Back (or, on the first step, a quiet note such as "Last changed 3 Nov"). Right: Cancel, then on a step a
- * quiet jump (Review, Changes · 3) and Next (soft); on the last step — or a part on its own — the strong save.
+ * quiet jump (Review, Changes · 3) and Next; on the last step — or a part on its own — the save. Next and the save are
+ * the window's one blue button (primary, as in every other window: live audit 20 Nov), never two at once.
  * On a phone the items' total is a line of its own above the buttons, and the buttons share the width.
  *
  * - `onBack`: none on the first step. `backLabel`: "Back to search" in place of "Back".
@@ -224,11 +225,11 @@ export function StepsFooter({
         <>
           {save.also}
           {save.onClick ? (
-            <Button type="button" variant="strong" size="lg" disabled={save.disabled || save.busy} aria-busy={save.busy} onClick={save.onClick} className="max-md:flex-1">
+            <Button type="button" variant="primary" disabled={save.disabled || save.busy} aria-busy={save.busy} onClick={save.onClick} className="max-md:flex-1">
               <Check aria-hidden /> {save.label}
             </Button>
           ) : (
-            <SubmitButton variant="strong" size="lg" pendingText={save.pendingText ?? "Saving…"} disabled={save.disabled} className="max-md:flex-1">
+            <SubmitButton variant="primary" pendingText={save.pendingText ?? "Saving…"} disabled={save.disabled} className="max-md:flex-1">
               <Check aria-hidden /> {save.label}
             </SubmitButton>
           )}
@@ -245,7 +246,7 @@ export function StepsFooter({
                 {jump.label}
               </SubmitButton>
             ))}
-          <Button type="button" variant="soft" onClick={onNext!} className="max-md:flex-1">
+          <Button type="button" variant="primary" onClick={onNext!} className="max-md:flex-1">
             Next <ChevronRight aria-hidden />
           </Button>
         </>

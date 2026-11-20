@@ -79,8 +79,8 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         kind="list"
         crumbs={crumbs}
         title="Company costs"
-        actions={list.count > 0 ? <ExportCsv what="expenses" query={{ ...span(month), category, q: text }} /> : undefined}
-        primary={<AddCost setup={setup} label="Add company cost" icon={null} />}
+        more={list.count > 0 ? <ExportCsv what="expenses" query={{ ...span(month), category, q: text }} /> : undefined}
+        primary={<AddCost setup={setup} label="Add company cost" variant="strong" size="md" />}
       />
       <StatRow facts>
         <StatTile label={month === thisMonth ? "This month" : monthName} value={whole(monthTotal, c)} sub={`${monthCount} cost${monthCount === 1 ? "" : "s"}`} />

@@ -238,7 +238,7 @@ export function FactoryAgreedWindow({
   sent: boolean;
 }) {
   return (
-    <SectionWindow button={{ label: "Change" }} title={title} sub={sub} action={action} size="md">
+    <SectionWindow button={{ label: "Edit", kind: "edit", what: "what we agreed with the supplier" }} title={title} sub={sub} action={action} size="md">
       {(s) => <FactoryAgreedFields state={s} values={values} payment={payment} sent={sent} />}
     </SectionWindow>
   );

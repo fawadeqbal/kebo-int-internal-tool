@@ -102,7 +102,7 @@ export function CustomerSpending({
             )}
           </span>
         }
-        actions={<AddCost setup={setup} label="Add a cost for them" variant="secondary" />}
+        actions={<AddCost setup={setup} label="Add a cost for them" />}
       />
       {first.length === 0 ? (
         <EmptyLine className="border-t border-line px-[18px] py-3.5">Nothing spent on this customer yet.</EmptyLine>

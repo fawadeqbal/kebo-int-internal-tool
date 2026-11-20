@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind, type PaymentMethod } from "@kebo/shared";
-import { Button, Field, Input, Select, Textarea, Notice } from "@kebo/ui";
+import { Button, Field, Input, RULES, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { UrlWindow, WindowFooter } from "@/components/common/panel";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { AccountSelect, RecordedBy } from "./accounts";
 import { FilePicker, useSaveThenSend } from "./attachment";
@@ -22,6 +23,33 @@ const framed = "flex flex-col gap-3 rounded-lg border border-line bg-surface-2/6
 
 
 /* ---------------------------------------------------------------- shared bits */
+
+/**
+ * The same removal as a window, opened from the record's ⋯ ("Remove this payment", ?panel=remove): Why remove it?,
+ * then Remove in red. Delete lives last in ⋯ (PageHeader), never as a button under the boxes.
+ */
+export function VoidWindow({ action, label }: { action: Action; label: string }) {
+  return (
+    <UrlWindow name="remove" title={`Remove ${label}`} description="It stays listed, crossed out, with the reason." className={RULES.window.part}>
+      {(close) => (
+        <ActionForm action={action} onDone={close} className="flex flex-col gap-4">
+          {(s) => (
+            <>
+              <Field label="Why remove it?" htmlFor="void-reason" error={s.errors?.reason}>
+                <Textarea id="void-reason" name="reason" rows={3} defaultValue={s.values?.reason} />
+              </Field>
+              <WindowFooter onCancel={close}>
+                <SubmitButton variant="danger" pendingText="Removing…">
+                  Remove {label}
+                </SubmitButton>
+              </WindowFooter>
+            </>
+          )}
+        </ActionForm>
+      )}
+    </UrlWindow>
+  );
+}
 
 /** Remove a payment or an expense recorded by mistake, with a reason (it stays listed, crossed out). */
 export function VoidForm({ action, label, button = "Remove" }: { action: Action; label: string; /** The closed button's words ("Remove this payment"). */ button?: string }) {

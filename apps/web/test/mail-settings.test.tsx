@@ -10,7 +10,7 @@ const { MailCards } = await import("@/app/(app)/settings/mail/cards");
 
 const none: MailSettingsView = { provider: null, fromName: "", fromEmail: "", host: "", port: null, username: "", hasSecret: false, serverDefault: false, enabled: false };
 const noop = async () => ({ ok: true });
-const show = (view: MailSettingsView) => render(<MailCards view={view} me="admin@kebo.test" saveAction={noop} removeAction={noop} testAction={noop} />);
+const show = (view: MailSettingsView) => render(<MailCards view={view} me="admin@kebo.test" saveAction={noop} testAction={noop} />);
 const field = (id: string) => document.getElementById(id) as HTMLInputElement | null;
 
 describe("the email sending page", () => {
@@ -45,7 +45,8 @@ describe("the email sending page", () => {
     // The test goes to the person signed in unless they type another address.
     expect(field("mail-test-to")!.value).toBe("admin@kebo.test");
     expect((screen.getByRole("button", { name: "Send test" }) as HTMLButtonElement).disabled).toBe(false);
-    expect(screen.getByRole("button", { name: "Remove this setting" })).toBeTruthy();
+    // Removing the setting is the page's ⋯ (last, in red), not a button among the cards.
+    expect(screen.queryByRole("button", { name: "Remove this setting" })).toBeNull();
     fireEvent.click(screen.getByRole("radio", { name: /Gmail/ }));
     expect(screen.queryByText(/Leave empty to keep it/)).toBeNull();
   });

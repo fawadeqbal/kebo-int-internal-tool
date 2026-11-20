@@ -446,7 +446,7 @@ export function PriceSheet({
                   Done
                 </Button>
               ) : (
-                <EditButton size="xs" className="sm:hidden" onClick={() => setChargesOpen(true)} aria-expanded={false} />
+                <EditButton className="sm:hidden" onClick={() => setChargesOpen(true)} aria-expanded={false} />
               )}
             </div>
             {paste !== null && (

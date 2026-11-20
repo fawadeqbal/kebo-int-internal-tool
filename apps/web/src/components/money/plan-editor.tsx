@@ -1,5 +1,6 @@
 "use client";
 
+import { EditButton } from "@/components/common/edit-button";
 import { useId, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
 import { formatMinor, fromMinor, toMinor } from "@kebo/money";
@@ -455,9 +456,7 @@ function PlanEditWindow({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-        {label}
-      </Button>
+      <EditButton label={label} onClick={() => setOpen(true)} />
       {open && (
         <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={RULES.window.wideRows}>
           <PlanEditor {...editor} onDone={() => setOpen(false)} />

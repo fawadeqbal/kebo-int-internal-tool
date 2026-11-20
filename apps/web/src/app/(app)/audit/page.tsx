@@ -152,7 +152,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         kind="list"
         crumbs={crumbsFor("/audit")}
         title="Activity log"
-        actions={<ExportCsv what="audit" query={{ type: sp.type, person: sp.person, q: sp.q }} />}
+        more={<ExportCsv what="audit" query={{ type: sp.type, person: sp.person, q: sp.q }} />}
       />
       <FactsLine facts={[{ label: who ? `Entries by ${who}` : "Entries", value: data.total.toLocaleString("en-US") }]} />
       <LinkTabs label="Which records" className="mb-4" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />

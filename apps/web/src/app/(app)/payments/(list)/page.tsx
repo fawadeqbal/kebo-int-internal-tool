@@ -114,7 +114,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
             "Every amount that came in or went out"
           )
         }
-        actions={
+        more={
           <ExportCsv what="cash-book" query={{ from: allDates ? undefined : pr.from, to: allDates ? undefined : pr.to, account }} />
         }
         primary={
