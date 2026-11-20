@@ -34,9 +34,9 @@ export const COMPANY_TIME_KEYS = ["timeZone", "dateFormat", "timeFormat"] as con
  * and a dark side, and each person still picks light, dark or auto. Green is the default. The colours themselves
  * are in packages/ui/src/styles/theme.css.
  */
-export const COLOUR_SETS = ["green", "graphite", "midnight", "warm"] as const;
+export const COLOUR_SETS = ["green", "graphite", "midnight", "warm", "clay", "teal", "ink", "onyx"] as const;
 export type ColourSet = (typeof COLOUR_SETS)[number];
-export const COLOUR_SET_LABEL: Record<ColourSet, string> = { green: "Green", graphite: "Graphite", midnight: "Midnight", warm: "Warm" };
+export const COLOUR_SET_LABEL: Record<ColourSet, string> = { green: "Green", graphite: "Graphite", midnight: "Midnight", warm: "Warm", clay: "Clay", teal: "Teal", ink: "Ink", onyx: "Onyx" };
 
 export const companySettings = z.object({
   /**

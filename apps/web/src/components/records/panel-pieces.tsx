@@ -19,7 +19,8 @@ const TONE: Record<PanelTone, string> = { late: "font-semibold text-bad", next: 
 /** One row of a panel section: the label on the left, its value on the right (a link when it goes somewhere). */
 export function PanelRow({ label, children, href, tone, sub }: { label: ReactNode; children: ReactNode; href?: string; tone?: PanelTone; sub?: ReactNode }) {
   const value = href ? (
-    <Link href={href} className="hover:underline">
+    // 24px tall at least (WCAG 2.2 target size), as rows sit close together.
+    <Link href={href} className="inline-block leading-6 hover:underline">
       {children}
     </Link>
   ) : (

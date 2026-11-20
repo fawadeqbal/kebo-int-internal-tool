@@ -100,8 +100,8 @@ const PAIRS: [string, string, string, number][] = [
 const EVERY = COLOUR_SETS.flatMap((set) => (["light", "dark"] as const).map((mode) => [set, mode] as const));
 
 describe("the app's colour sets", () => {
-  it("are the four the company can choose, Green first (the default)", () => {
-    expect(COLOUR_SETS).toEqual(["green", "graphite", "midnight", "warm"]);
+  it("are the eight the company can choose, Green first (the default)", () => {
+    expect(COLOUR_SETS).toEqual(["green", "graphite", "midnight", "warm", "clay", "teal", "ink", "onyx"]);
   });
 
   it.each(EVERY)("%s %s: the page and its preview take the same block", (set, mode) => {

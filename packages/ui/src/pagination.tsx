@@ -98,7 +98,7 @@ function Pagination({
               …
             </span>
           ) : p === page ? (
-            <span key={p} aria-current="page" className={cn(box, "border-primary-solid bg-primary-solid font-semibold text-white")}>
+            <span key={p} aria-current="page" className={cn(box, "border-primary-solid bg-primary-solid font-semibold text-primary-fg")}>
               {p}
             </span>
           ) : (

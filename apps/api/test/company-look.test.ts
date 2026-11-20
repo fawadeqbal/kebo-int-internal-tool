@@ -27,7 +27,7 @@ describe("platform: a company's look for its sign-in page", () => {
   it("gives its name, colours and whether it has a logo, without signing in", async () => {
     const body = (await get(`company-look?slug=${slug}`).expect(200)).body;
     expect(typeof body.name).toBe("string");
-    expect(["green", "graphite", "midnight", "warm"]).toContain(body.colours);
+    expect(["green", "graphite", "midnight", "warm", "clay", "teal", "ink", "onyx"]).toContain(body.colours);
     expect(body.logo === null || /^[0-9a-f]{12}$/.test(body.logo)).toBe(true);
     expect(Object.keys(body).sort()).toEqual(["colours", "logo", "name"]);
   });

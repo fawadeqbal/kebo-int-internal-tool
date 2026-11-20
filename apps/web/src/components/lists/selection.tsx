@@ -90,7 +90,7 @@ function Tick({ on, label, mixed, onChange }: { on: boolean; label: string; mixe
       }}
       className={cn(
         "grid size-[18px] place-items-center rounded-[5px] border-[1.5px] align-middle outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-        on || mixed ? "border-primary-solid bg-primary-solid text-white" : "border-line-strong bg-surface",
+        on || mixed ? "border-primary-solid bg-primary-solid text-primary-fg" : "border-line-strong bg-surface",
       )}
     >
       {on ? <Check className="size-3" strokeWidth={3.4} aria-hidden /> : mixed ? <span className="h-0.5 w-2 rounded bg-white" aria-hidden /> : null}
