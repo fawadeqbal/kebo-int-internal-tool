@@ -21,7 +21,7 @@ import { OrderDrop } from "@/components/files/order-drop";
 import { docHref } from "./shared";
 import { CancelOrder } from "./cancel-order";
 import { moveStageAction } from "../actions";
-import { StageActions } from "./forms";
+import { ReopenOrderForm, StageActions } from "./forms";
 
 /**
  * Every page of an order shares one top (design "the order, final"): the path, the order's name, one
@@ -46,12 +46,14 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const now = today();
   const ready = flow?.factory.readyOn ?? o.readyOn;
   const left = o.word !== "Confirmed" && o.word !== "In production";
+  // Every item in from the supplier (Production "received"): no longer "In production · ready …" but ready to ship.
+  const goodsIn = sections?.tabs.production === "received";
   const notes =
     o.status !== "open"
       ? []
       : left
         ? [o.money && Number(o.money.due) <= 0 ? "paid in full" : null]
-        : [ready ? `ready ${dayMonth(ready)}` : null, o.shipBy ? `ship by ${dayMonth(o.shipBy)}` : null];
+        : [goodsIn ? "goods in" : ready ? `ready ${dayMonth(ready)}` : null, o.shipBy ? `ship by ${dayMonth(o.shipBy)}` : null];
   const late = o.status === "open" && !left && !!o.shipBy && o.shipBy < now;
   const tone = o.status === "cancelled" ? "bad" : o.status === "closed" ? "neutral" : late ? "bad" : ORDER.states[o.word].tone;
   const statusText = (
@@ -61,7 +63,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
         tone === "bad" ? "text-bad" : tone === "ok" ? "text-ok" : tone === "neutral" ? "text-text-2" : tone === "info" ? "text-info" : "text-action",
       )}
     >
-      {o.status === "closed" ? `Closed${o.stageSince ? ` ${date(o.stageSince)}` : ""}` : o.word}
+      {o.status === "closed" ? `Closed${o.stageSince ? ` ${date(o.stageSince)}` : ""}` : goodsIn && o.word === "In production" ? "Ready to ship" : o.word}
       {notes.filter(Boolean).map((x) => ` · ${x}`)}
     </span>
   );
@@ -76,20 +78,27 @@ export default async function OrderLayout({ children, params }: { children: Reac
   ]);
   const advice = papers?.papers.find((p) => p.kind === "shipping-advice") ?? null;
   const step = orderNextStep(orderStepFacts(o, flow, sections?.stages ?? null, { update: can(me, "orders.update") }, { money, advice }), now);
+  // Closing with papers not made says so first (Documents "2 of 5"): closed only on a yes.
+  const docs = /^(\d+) of (\d+)$/.exec(sections?.tabs.documents ?? "");
+  const papersLeft = docs ? Number(docs[2]) - Number(docs[1]) : 0;
+  const closeCheck = papersLeft > 0 ? `${papersLeft} of the order's ${docs![2]} documents ${papersLeft === 1 ? "is" : "are"} not made yet (Documents tab). Close ${o.refNo} anyway?` : null;
+  // A closed order's way back is in ⋯ (Reopen the order…), never its main button (pinned at a phone's foot).
+  const reopen = step?.key === "reopen" && o.back ? o.back : null;
   const primary =
-    step?.key === "close" || step?.key === "reopen" ? (
+    step?.key === "close" ? (
       <StageActions
         key={o.stage}
-        next={step.key === "close" ? o.next : null}
-        back={step.key === "reopen" ? o.back : null}
+        next={o.next}
+        back={null}
         action={moveStageAction.bind(null, o.id)}
         today={now}
         readyOn={o.readyOn}
         shippedOn={o.shippedOn}
         blNo={o.blNo}
+        closeCheck={closeCheck}
       />
-    ) : step ? (
-      <ButtonLink href={`${base}${step.tab === "overview" ? "" : `/${step.tab}`}${step.window ? `?do=${step.window}` : ""}`} variant="primary" scroll={false}>
+    ) : step && step.key !== "reopen" ? (
+      <ButtonLink href={`${base}${step.path ? `/${step.path}` : step.tab === "overview" ? "" : `/${step.tab}`}${step.window ? `?do=${step.window}` : ""}`} variant="primary" scroll={false}>
         {step.label} <ArrowRight aria-hidden />
       </ButtonLink>
     ) : undefined;
@@ -108,6 +117,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
     { label: `Open the inquiry ${o.inquiry.refNo}`, href: `/inquiries/${o.inquiry.id}` },
     { label: `Open the customer ${o.customer.name}`, href: `/customers/${o.customer.id}` },
     { label: "Copy link to this order", copy: base },
+    ...(reopen ? ([{ label: "Reopen the order…", panel: "reopen-order" }] satisfies MenuEntry[]) : []),
     ...(canCancel ? ([{ separator: true }, { label: "Cancel the order…", panel: "cancel-order", danger: true }] satisfies MenuEntry[]) : []),
   ];
 
@@ -196,6 +206,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
           <CancelOrder id={o.id} />
         </Suspense>
       )}
+      {reopen && <ReopenOrderForm action={moveStageAction.bind(null, o.id)} back={reopen} refNo={o.refNo} />}
     </div>
   );
 }

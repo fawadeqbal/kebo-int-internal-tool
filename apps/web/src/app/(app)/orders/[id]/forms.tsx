@@ -33,9 +33,12 @@ export function StageActions({
   readyOn,
   shippedOn,
   blNo,
+  closeCheck,
 }: {
   next: OrderNext | null;
   back: { to: string; label: string } | null;
+  /** Closing with something not done (papers not made): said first, and closed only on a yes. */
+  closeCheck?: string | null;
   action: Action;
   today: string;
   readyOn: string | null;
@@ -105,10 +108,16 @@ export function StageActions({
                 </>
               )}
               <div className="flex flex-wrap items-center gap-2">
-                <SubmitButton pendingText="Moving…">
-                  {warn ? "Go ahead anyway" : next.label}
-                  {!warn && <ArrowRight aria-hidden />}
-                </SubmitButton>
+                {closeCheck && next.to === "done" && !warn ? (
+                  <ConfirmSubmit confirmLabel="Close it anyway" pendingText="Moving…" message={closeCheck}>
+                    {next.label} <ArrowRight aria-hidden />
+                  </ConfirmSubmit>
+                ) : (
+                  <SubmitButton pendingText="Moving…">
+                    {warn ? "Go ahead anyway" : next.label}
+                    {!warn && <ArrowRight aria-hidden />}
+                  </SubmitButton>
+                )}
                 {(asks || warn) && (
                   <Button type="button" variant="ghost" onClick={close}>
                     Cancel
@@ -488,5 +497,37 @@ export function CancelOrderForm({
       </Modal>
       )}
     </>
+  );
+}
+
+
+/**
+ * "Reopen the order…" in a closed order's ⋯ (not its main button: a finished order's first button never undoes
+ * it): a window that says where it goes back to and asks why, as every move back does.
+ */
+export function ReopenOrderForm({ action, back, refNo }: { action: Action; back: { to: string; label: string }; refNo: string }) {
+  const { open, close } = useSidePanel("reopen-order");
+  if (!open) return null;
+  return (
+    <SidePanel title={`Reopen ${refNo}`} description={`It goes back to ${back.label.replace(/^Back to /, "")}.`} onClose={() => close()}>
+      <PanelBody>
+        <ActionForm action={action} onDone={() => close()} className="flex flex-col gap-4">
+          {(s) => (
+            <>
+              <input type="hidden" name="to" value={back.to} />
+              <Field label="Why does it open again?" htmlFor="reopen-why" error={s.errors?.reason}>
+                <Textarea id="reopen-why" name="reason" rows={2} className="min-h-0" required defaultValue={s.values?.reason} />
+              </Field>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => close()}>
+                  Cancel
+                </Button>
+                <SubmitButton pendingText="Reopening…">Reopen the order</SubmitButton>
+              </div>
+            </>
+          )}
+        </ActionForm>
+      </PanelBody>
+    </SidePanel>
   );
 }

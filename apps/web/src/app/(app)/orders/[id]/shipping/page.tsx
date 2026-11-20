@@ -64,7 +64,10 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
   const many = shipments.length > 1;
   const packGoods = goodsOf(o);
   const advice = papers?.papers.find((p) => p.kind === "shipping-advice") ?? null;
-  const port = o.agreed?.portOfDischarge ?? o.portOfDischarge;
+  // As agreed; with nothing agreed, the booking's "To" (Shipment 1), so a booked port never shows as a dash.
+  const agreedPort = o.agreed?.portOfDischarge ?? o.portOfDischarge;
+  const bookedPort = shipping?.shipments[0]?.portOfDischarge ?? null;
+  const port = agreedPort ?? bookedPort;
 
   // Shipping instructions (design "terms that travel"): who the goods go to and who is told; they print on the
   // B/L instructions and the shipping papers, and each new shipment starts from them. The port is as agreed.
@@ -81,9 +84,13 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           value: (
             <>
               {port ?? <Dash />} ·{" "}
-              <Link href={`/orders/${o.id}#agreed`} className={linkClass}>
-                as agreed
-              </Link>
+              {agreedPort || !bookedPort ? (
+                <Link href={`/orders/${o.id}#agreed`} className={linkClass}>
+                  as agreed
+                </Link>
+              ) : (
+                "from the booking"
+              )}
             </>
           ),
         },
@@ -203,9 +210,11 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           files?: ReturnType<typeof filesOf>,
           whats?: string[],
           main = false,
+          name?: string,
         ) =>
           canShip && (
             <FieldsWindow
+              name={i === 0 ? name : undefined}
               button={filled ? { label: "Edit" } : { label: "Add", kind: main ? "main" : "plain" }}
               title={title}
               sub={sub}
@@ -314,7 +323,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                 ]
               : [],
             empty: o.shipBy ? `Not booked yet. Ship by ${date(o.shipBy)}.` : "Not booked yet.",
-            action: win("Booking", booking, booked, filesOf("booking", "the booking copy")),
+            action: win("Booking", booking, booked, filesOf("booking", "the booking copy"), undefined, false, "booking"),
             files: row("booking"),
           },
           {
@@ -352,7 +361,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                     <Globe aria-hidden /> Track
                   </a>
                 )}
-                {win(vesselTitle, vessel, sailed, filesOf("vessel", "the B/L copy"))}
+                {win(vesselTitle, vessel, sailed, filesOf("vessel", "the B/L copy"), undefined, false, "vessel")}
               </>
             ),
             files: row("vessel"),
@@ -388,7 +397,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
               ["Cleared on", s.clearedOn ? date(s.clearedOn) : null],
             ],
             empty: "Not arrived yet.",
-            action: win("Arrival and customs", arrival, arrived, filesOf("arrival", "the arrival notice, the customs release")),
+            action: win("Arrival and customs", arrival, arrived, filesOf("arrival", "the arrival notice, the customs release"), undefined, false, "arrival"),
             files: row("arrival"),
           },
         ];

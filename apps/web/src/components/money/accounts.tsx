@@ -71,7 +71,7 @@ const remember = (currency: string, id: string) => {
 /**
  * Which of our accounts the money came into or went from. On every money window, always shown, never
  * required: "Not said" is allowed and can be put right later on Cash & bank. Only accounts in the same
- * currency are offered; the one used last time for that currency is chosen already. With no account in the
+ * currency are offered; the one used last time for that currency (or the only one) is chosen already. With no account in the
  * currency, a manager adds one here without leaving the window.
  */
 export function AccountSelect({
@@ -103,7 +103,9 @@ export function AccountSelect({
   // What the person chose in this window, with the currency it was chosen for: another currency starts again.
   const [chosen, setChosen] = useState<{ currency: string; id: string } | null>(null);
   const [adding, setAdding] = useState(false);
-  const start = given || (last && fits.some((a) => a.id === last && !a.archived) ? last : "");
+  // Given, else the one used last, else the only open account in the currency (so money is not left "Not said").
+  const open = fits.filter((a) => !a.archived);
+  const start = given || (last && open.some((a) => a.id === last) ? last : open.length === 1 ? open[0]!.id : "");
   const value = chosen?.currency === currency ? chosen.id : start;
   const choose = (id: string) => {
     setChosen({ currency, id });

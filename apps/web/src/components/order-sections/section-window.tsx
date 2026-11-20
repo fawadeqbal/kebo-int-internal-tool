@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { OrderSection } from "@kebo/shared";
 import { Pencil } from "lucide-react";
-import { Button, cn, linkClass, RULES } from "@kebo/ui";
+import { Button, cn, Field, linkClass, Notice, RULES, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useChangeCount } from "@/components/common/changes";
@@ -160,22 +160,26 @@ export function SectionWindow({
       {open && (
         <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && RULES.window.part, size === "md" && RULES.window.part)}>
           <PanelBody>
-            <ActionForm action={action} onDone={() => setOpen(false)} showSuccess={false} className={PANEL_FORM}>
+            <ActionForm action={action} onDone={() => setOpen(false)} showSuccess={false} quietCodes={["confirm"]} className={PANEL_FORM}>
               {(s) => {
+                // The order's checks (delivered before it arrived…) answer "confirm": said here, saved only with why.
+                const check = s.code === "confirm";
                 const body = (
                   <>
+                    <input type="hidden" name="ask" value="true" />
                     {typeof children === "function" ? children(s) : children}
+                    {check && <GoAhead message={s.message} reason={s.values?.reason} />}
                     {whats && whats.length > 0 && <WhatHappens lines={whats} />}
                     {files && <WindowFiles {...files} />}
                   </>
                 );
                 // An Edit of saved values counts its changes; a window that does something says what it does.
-                return counts ? (
+                return counts && !check ? (
                   <Counted foot={(words, none) => <Foot submit={words} danger={danger} note={note} disabled={none} />}>{body}</Counted>
                 ) : (
                   <>
                     {body}
-                    <Foot submit={submit} danger={danger} note={note} />
+                    <Foot submit={check ? "Save anyway" : submit} danger={danger} note={note} />
                   </>
                 );
               }}
@@ -184,6 +188,21 @@ export function SectionWindow({
         </SidePanel>
       )}
     </>
+  );
+}
+
+/** An order check that asks first (a date out of order): what it saw, why it is saved anyway, and confirm. */
+function GoAhead({ message, reason }: { message?: string; reason?: string }) {
+  return (
+    <div role="alert" className="flex flex-col gap-2">
+      <Notice tone="todo" title="Check before you save">
+        {message ?? "Something looks out of order."}
+      </Notice>
+      <input type="hidden" name="confirm" value="true" />
+      <Field label="Why save it anyway?" htmlFor="go-ahead-why">
+        <Textarea id="go-ahead-why" name="reason" rows={2} className="min-h-0" required defaultValue={reason} />
+      </Field>
+    </div>
   );
 }
 

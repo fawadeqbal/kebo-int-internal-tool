@@ -42,10 +42,10 @@ describe("the order's next step: the first that is true", () => {
     expect(next({ depositDue: 100 })).toBe("record_deposit");
   });
 
-  it("then the supplier: the PO, its ready date, the goods when the day came", () => {
+  it("then the supplier: the PO, its ready date, then the goods (always a next step)", () => {
     expect(next({})).toBe("send_po");
     expect(next({ poSent: true })).toBe("set_ready");
-    expect(next({ poSent: true, readyOn: "2026-12-20" })).toBe(null);
+    expect(next({ poSent: true, readyOn: "2026-12-20" })).toBe("goods_in");
     expect(next({ poSent: true, readyOn: "2026-11-14" })).toBe("goods_in");
   });
 
@@ -57,17 +57,17 @@ describe("the order's next step: the first that is true", () => {
     expect(next({ ...gone, adviceSent: null })).toBe("arrived");
   });
 
-  it("then the shipment: booked once the goods are in or due within two weeks; the balance; sailed on the ETD", () => {
+  it("then the shipment: booked once the goods are in or due within two weeks; the balance; then the sailing", () => {
     expect(next({ poSent: true, readyOn: "2026-11-30" })).toBe("book");
     expect(next({ poSent: true, goodsIn: true })).toBe("book");
     expect(next({ poSent: true, goodsIn: true, booked: true, balanceBeforeShipment: 500 })).toBe("ask_balance");
-    expect(next({ poSent: true, goodsIn: true, booked: true, etd: "2026-11-25" })).toBe(null);
+    expect(next({ poSent: true, goodsIn: true, booked: true, etd: "2026-11-25" })).toBe("sailed");
     expect(next({ poSent: true, goodsIn: true, booked: true, etd: "2026-11-18" })).toBe("sailed");
   });
 
-  it("then the other end: arrived on the ETA, delivered, the SAT, close", () => {
+  it("then the other end: the arrival, delivered, the SAT, close", () => {
     const gone = { poSent: true, goodsIn: true, booked: true, sailed: true };
-    expect(next({ ...gone, eta: "2026-12-10" })).toBe(null);
+    expect(next({ ...gone, eta: "2026-12-10" })).toBe("arrived");
     expect(next({ ...gone, eta: "2026-11-10" })).toBe("arrived");
     expect(next({ ...gone, arrived: true })).toBe("delivered");
     expect(next({ ...gone, arrived: true, delivered: true, satOpen: true })).toBe("sign_sat");
