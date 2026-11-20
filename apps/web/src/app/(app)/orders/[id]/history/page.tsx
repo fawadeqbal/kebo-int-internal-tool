@@ -13,7 +13,7 @@ import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { orderTitle } from "@/lib/titles";
 import { RecordBox } from "@/components/common/record-box";
-import { linkClass } from "@kebo/ui";
+import { linkClass, RULES } from "@kebo/ui";
 
 export const generateMetadata = orderTitle("History");
 
@@ -57,7 +57,7 @@ export default async function OrderHistory({
   );
   return (
     <OrderPage id={id}>
-      <section aria-label="History" className="min-w-0">
+      <section aria-label="History" className={RULES.page.stack}>
         <FilterCard
           search="Search history…"
           value={sp.q}
@@ -72,7 +72,6 @@ export default async function OrderHistory({
           count={`${rows.length} ${rows.length === 1 ? "change" : "changes"}`}
           what="changes"
           canEdit={false}
-          className="mt-4"
         >
           <HistoryTable
             entries={rows}

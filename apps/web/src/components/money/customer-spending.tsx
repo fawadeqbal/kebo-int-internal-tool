@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, cn, Td, Th, THead, Tr, EmptyLine, linkClass } from "@kebo/ui";
+import { Card, CardHeader, cn, Td, Th, THead, Tr, EmptyLine, linkClass, RULES } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { date, money } from "@/lib/format";
 import type { CustomerAccount, ExpenseList } from "@/lib/types-money";
@@ -105,7 +105,7 @@ export function CustomerSpending({
         actions={<AddCost setup={setup} label="Add a cost for them" />}
       />
       {first.length === 0 ? (
-        <EmptyLine className="border-t border-line px-4 sm:px-5 py-3.5">Nothing spent on this customer yet.</EmptyLine>
+        <EmptyLine className={cn(RULES.box.inset, "border-t border-line py-3.5")}>Nothing spent on this customer yet.</EmptyLine>
       ) : (
         <DataTable label="Spending on this customer">
           <THead>
@@ -161,7 +161,7 @@ export function CustomerSpending({
         </DataTable>
       )}
       {rows.length > first.length && (
-        <p className="border-t border-line px-4 sm:px-5 py-2.5 text-md">
+        <p className={cn(RULES.box.inset, "border-t border-line py-2.5 text-md")}>
           <Link href={`/payments?party=${customerId}&kind=expense`} className={linkClass}>
             All {rows.length} costs in Payments →
           </Link>

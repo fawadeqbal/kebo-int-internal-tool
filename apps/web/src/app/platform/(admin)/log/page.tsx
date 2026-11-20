@@ -2,24 +2,7 @@ import Link from "next/link";
 import { FilterCard } from "@/components/common/filter-card";
 import { FileSpreadsheet } from "lucide-react";
 import { PLATFORM_LOG_KINDS, platformLogKind, type PlatformLogKind } from "@kebo/shared";
-import {
-  Badge,
-  buildHref,
-  buttonClass,
-  Card,
-  DataRow,
-  EmptyState,
-  LinkTabs,
-  PageHeader,
-  Pager,
-  PhoneList,
-  PhoneRow,
-  Td,
-  Th,
-  THead,
-  Tr,
-  toPage,
-} from "@kebo/ui";
+import { Badge, buildHref, buttonClass, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, Tr, toPage, Stack } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { dateTime } from "@/lib/format";
 import type { LogEntry, LogPage } from "@/lib/types-platform";
@@ -46,7 +29,7 @@ export default async function PlatformLogPage({ searchParams }: { searchParams: 
   const href = (patch: Partial<Search>) => buildHref("/platform/log", keep, { page: undefined, ...patch });
   const kinds = [...(Object.keys(PLATFORM_LOG_KINDS) as PlatformLogKind[]), ...((log.counts.other ?? 0) > 0 ? ["other"] : [])];
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         title="Platform log"
@@ -69,7 +52,7 @@ export default async function PlatformLogPage({ searchParams }: { searchParams: 
           </a>
         }
       />
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {log.rows.length === 0 ? (
           <EmptyState
             framed
@@ -141,6 +124,6 @@ export default async function PlatformLogPage({ searchParams }: { searchParams: 
         )}
         <Pager base="/platform/log" params={keep} page={log.page} pageSize={log.pageSize} total={log.total} />
       </Card>
-    </div>
+    </Stack>
   );
 }

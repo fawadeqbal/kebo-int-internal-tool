@@ -215,7 +215,7 @@ export function PanelBody({ children, className, fill }: { children: ReactNode; 
       data-panel-body
       className={cn(
         // `fill`: a steps window fills the panel and scrolls inside itself (its rail and buttons stay put).
-        fill ? "flex min-h-0 flex-1 flex-col overflow-hidden *:min-h-0" : "flex min-h-0 flex-1 flex-col overflow-y-auto p-5 *:shrink-0 sm:px-6",
+        fill ? "flex min-h-0 flex-1 flex-col overflow-hidden *:min-h-0" : cn(RULES.window.body, "flex min-h-0 flex-1 flex-col overflow-y-auto *:shrink-0"),
         className,
       )}
     >
@@ -299,7 +299,8 @@ export function WindowFooter({
     <div
       data-window-footer=""
       className={cn(
-        "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6",
+        RULES.window.inset,
+        "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:-mx-6",
         PHONE_BUTTONS,
         className,
       )}

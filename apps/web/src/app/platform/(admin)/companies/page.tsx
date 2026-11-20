@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FilterCard } from "@/components/common/filter-card";
 import { Plus } from "lucide-react";
 import { COMPANY_KIND_LABEL } from "@kebo/shared";
-import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, LinkTabs, FactsLine } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, LinkTabs, FactsLine, Stack } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { date, dateTime, timeAgo } from "@/lib/format";
 import type { CompanyRow } from "@/lib/types-platform";
@@ -57,7 +57,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
   ];
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         title="Companies & demos"
@@ -71,7 +71,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
       <FactsLine facts={[{ label: "Companies", value: live.length }]} />
       <LinkTabs look="tabs" label="Kinds of company" tabs={chips} />
       <FilterCard search="Name, short name or email" value={sp.q} keep={keep} />
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {shown.length === 0 ? (
           live.length + gone.length === 0 && !sp.q ? (
             <EmptyState
@@ -163,6 +163,6 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
         )}
         <Pager base="/platform/companies" params={keep} page={page} total={rows.length} />
       </Card>
-    </div>
+    </Stack>
   );
 }

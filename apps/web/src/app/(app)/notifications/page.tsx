@@ -66,7 +66,6 @@ export default async function NotificationsPage({ searchParams }: { searchParams
       />
       <LinkTabs
         label="Which alerts"
-        className="mb-4"
         tabs={[
           { href: tab(undefined), label: "All", count: counts?.all, active: show === "all" },
           { href: tab("unread"), label: "Unread", count: counts?.unread ?? unread, alert: (counts?.unread ?? unread) > 0, active: show === "unread" },
@@ -74,7 +73,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
         ]}
       />
       <FilterCard count={countOf(total, "alert")} search="Search alerts…" value={sp.q} keep={{ show: sp.show }} clearHref={tab(sp.show)} />
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {items.length === 0 ? (
           <EmptyState
             framed

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice, linkClass } from "@kebo/ui";
+import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice, linkClass, Stack } from "@kebo/ui";
 import { ArrowRight } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
@@ -68,7 +68,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   const main = (await api.get<LedgerAccounts>("/ledger/accounts")).mainCurrency;
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={[{ label: "Money" }, { label: "Ledger" }]}
@@ -92,7 +92,6 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       />
       <LinkTabs
         label="Ledger views"
-        className="mb-4"
         tabs={VIEWS.map((v) => ({
           href: buildHref(PATH, {}, { view: v.key === "balances" ? undefined : v.key, period: sp.period, from: sp.from, to: sp.to }),
           label: v.label,
@@ -116,7 +115,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
           <EntryBody e={entry} main={main} back={buildHref(PATH, all, { panel: undefined, id: undefined })} />
         </EntryPanel>
       )}
-    </div>
+    </Stack>
   );
 }
 
@@ -165,7 +164,7 @@ async function Entries({
           </Link>
         </Notice>
       )}
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {data.rows.length === 0 ? (
           <EmptyState
             framed
@@ -223,7 +222,7 @@ async function Entries({
 async function OrderPicker() {
   const orders = await api.get<OrderRow[]>("/orders").catch(() => [] as OrderRow[]);
   return (
-    <Card className="overflow-clip p-0">
+    <Card className="overflow-clip">
       {orders.length === 0 ? (
         <EmptyState framed title="No orders yet" description="An order's rows appear here once a customer accepts a quotation." />
       ) : (
@@ -281,7 +280,7 @@ async function Balances({ sp }: { sp: Search }) {
   const fmt = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
     <div className="flex flex-col gap-4">
-      <div>
+      <Stack>
         <FilterCard
           search="Search…"
           value={sp.q}
@@ -293,7 +292,7 @@ async function Balances({ sp }: { sp: Search }) {
             { name: "has", label: "Has balance", value: sp.has, options: [{ value: "all", label: "Any" }], all: "Yes", showDefault: true },
           ]}
         />
-        <Card className="overflow-x-auto p-0">
+        <Card className="overflow-x-auto">
           {shown.length === 0 ? (
             <EmptyState title="Nothing here" description="Balances appear when money is recorded: orders, payments, expenses, transfers." />
           ) : (
@@ -353,7 +352,7 @@ async function Balances({ sp }: { sp: Search }) {
             </>
           )}
         </Card>
-      </div>
+      </Stack>
     </div>
   );
 }
@@ -378,7 +377,7 @@ async function Accounts({ period }: { period: { to: string } }) {
         </Card>
       ) : (
         a.groups.map((g) => (
-          <Card key={g.group} className="overflow-clip p-0">
+          <Card key={g.group} className="overflow-clip">
             <Table aria-label={g.group} className="table-fixed">
               <THead>
                 <tr>
@@ -423,7 +422,7 @@ async function Parties({ side }: { side: "receivable" | "payable" | "staff" }) {
   return (
     <div className="flex flex-col gap-4">
       <AgeingTiles buckets={a.buckets} currency={a.mainCurrency} label={`${what}, by how late`} />
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {a.rows.length === 0 ? (
           <EmptyState
             framed

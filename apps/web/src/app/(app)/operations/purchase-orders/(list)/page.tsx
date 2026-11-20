@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, Boxes, ShoppingCart } from "lucide-react";
-import { buildHref, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { buildHref, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, Stack } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
@@ -52,7 +52,7 @@ export default async function PurchaseOrdersPage({
   const href = (p: Record<string, string | undefined>) => buildHref("/operations/purchase-orders", keep, { ...p, page: undefined });
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/operations/purchase-orders")}
@@ -82,7 +82,6 @@ export default async function PurchaseOrdersPage({
 
       <LinkTabs
         label="Which purchase orders"
-        className="mb-4"
         tabs={CHIPS.map((c) => {
           return {
             href: href({ status: c.key === "all" ? undefined : c.key }),
@@ -170,6 +169,6 @@ export default async function PurchaseOrdersPage({
         )}
       </Card>
       <Pager base="/operations/purchase-orders" params={keep} page={page} pageSize={PAGE} total={data.total} bare />
-    </div>
+    </Stack>
   );
 }

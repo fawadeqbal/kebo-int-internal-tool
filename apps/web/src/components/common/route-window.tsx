@@ -84,7 +84,7 @@ export function RouteWindow({
         className={cn(WINDOW_BOX, WIDTH[size])}
       >
         <WindowHead id={id} title={title} description={description} onClose={request} headRef={head} />
-        <div ref={body} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5 *:shrink-0 sm:px-6">
+        <div ref={body} className={cn(RULES.window.body, "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto *:shrink-0")}>
           <WindowDone.Provider value={leave}>
             <PanelCloseProvider value={(arg) => (arg && typeof arg === "object" && (arg as { ok?: boolean }).ok ? leave() : request())}>{children}</PanelCloseProvider>
           </WindowDone.Provider>

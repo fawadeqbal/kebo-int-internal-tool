@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Badge, RefCode, Table, Td, Th, THead, Tr, Dash } from "@kebo/ui";
+import { Badge, RefCode, Table, Td, Th, THead, Tr, Dash, RULES, cn } from "@kebo/ui";
 import { date, dateTime, dayMonth, money } from "@/lib/format";
 
 /** One payment in an order's list of payments received or made. */
@@ -34,7 +34,7 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
     <>
       <ul aria-label={name} className="flex flex-col divide-y divide-line sm:hidden">
         {rows.map((x) => (
-          <li key={x.id} className={x.voided ? "flex flex-col gap-1.5 px-4 sm:px-5 py-3 text-muted" : "flex flex-col gap-1.5 px-4 sm:px-5 py-3"}>
+          <li key={x.id} className={cn(RULES.box.inset, "flex flex-col gap-1.5 py-3", x.voided && "text-muted")}>
             <span className="flex items-baseline justify-between gap-3">
               <span className="font-semibold">{x.for ?? "Payment"}</span>
               <span className={x.voided ? "tabular line-through" : "font-semibold tabular"}>{money(x.amount, x.currency)}</span>
@@ -50,7 +50,7 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
             </span>
           </li>
         ))}
-        <li className="flex items-baseline justify-between gap-3 px-4 sm:px-5 py-3 font-bold">
+        <li className={cn(RULES.box.inset, "flex items-baseline justify-between gap-3 py-3 font-bold")}>
           <span>{total.label}</span>
           <span className="tabular">{total.amount}</span>
         </li>

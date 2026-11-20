@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus, ShieldAlert, ShieldCheck } from "lucide-react";
-import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage, FactsLine } from "@kebo/ui";
+import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage, FactsLine, Stack } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -83,7 +83,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     .filter((u) => u.isActive && !u.totpEnabledAt && u.id !== me.id)
     .sort((a, b) => Number(b.access.requireTwoStep) - Number(a.access.requireTwoStep) || a.name.localeCompare(b.name));
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/users")}
@@ -96,7 +96,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         } />
       <FactsLine facts={[{ label: "Can sign in", value: active }, ...(users.length > active ? [{ label: "Switched off", value: users.length - active }] : [])]} />
       {without.length > 0 && (
-        <Card className="mb-4 border-warn/30 bg-warn-soft/40 px-4 py-3">
+        <Card className="border-warn/30 bg-warn-soft/40 px-4 py-3">
           <p className="flex items-center gap-2 text-sm font-semibold text-warn">
             <ShieldAlert className="size-4" aria-hidden />
             {without.length === 1 ? "1 person signs in" : `${without.length} people sign in`} without two-step
@@ -124,10 +124,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           })()}
         </Card>
       )}
-      <LinkTabs label="Which people" className="mb-4" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
+      <LinkTabs label="Which people" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
       <FilterCard count={countOf(rows.length, "person", "people")} search="Search name or email…" value={sp.q} keep={{ show: keep.show }} clearHref={href({ q: undefined })} />
 
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {rows.length === 0 ? (
           <EmptyState
             framed
@@ -212,6 +212,6 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       <Pager base="/users" params={keep} page={page} total={rows.length} bare />
 
       {roles && <NewUserPanel action={createUserAction} roles={roles} />}
-    </div>
+    </Stack>
   );
 }

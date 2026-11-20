@@ -130,7 +130,6 @@ export default async function FollowUpsPage({
       />
       <LinkTabs
         label="Which follow-ups"
-        className="mb-4"
         tabs={[
           {
             href: href({ view: undefined, status: undefined, page: undefined }),
@@ -175,7 +174,7 @@ export default async function FollowUpsPage({
         count={countOf(list.total, "follow-up")}
       />
       <div className="flex min-w-0 flex-col gap-4">
-        <Card className="min-w-0 overflow-clip p-0">
+        <Card className="min-w-0 overflow-clip">
           {list.rows.length === 0 ? (
             <EmptyState
               framed

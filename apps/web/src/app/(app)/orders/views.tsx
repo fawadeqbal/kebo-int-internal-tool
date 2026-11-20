@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Board as BoardColumns } from "@/components/lists/board";
 import { Factory, FileText, LayoutGrid, List as ListIcon, Package, PieChart, Ship } from "lucide-react";
 import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
-import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, Segmented, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage } from "@kebo/ui";
+import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, Segmented, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage, Stack } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { DataTable } from "@/components/common/data-table";
@@ -120,7 +120,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
     o.status === "cancelled" ? <span className="text-text-2">—</span> : Number(o.due) > 0 ? money(o.due, o.currency) : <span className="text-text-2">—</span>;
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/orders")}
@@ -163,7 +163,6 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
 
       <LinkTabs
         label="Which orders"
-        className="mb-4"
         tabs={chips.map((x) => {
           return {
             href: x.href,
@@ -187,7 +186,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         ]}
       />
 
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {data.rows.length === 0 ? (
           c.all === 0 && !narrowed ? (
             <EmptyState
@@ -295,7 +294,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         )}
       </Card>
       <Pager base="/orders" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
-    </div>
+    </Stack>
   );
 }
 
@@ -335,7 +334,7 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
     return [who, sub.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d))].filter(Boolean).join(" · ");
   };
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/orders")}
@@ -379,6 +378,6 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
           );
         }}
       />
-    </div>
+    </Stack>
   );
 }

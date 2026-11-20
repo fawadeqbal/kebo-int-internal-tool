@@ -47,7 +47,7 @@ export function ListTable<R>({
   empty: ComponentProps<typeof EmptyState>;
 }) {
   return (
-    <Card className="overflow-clip p-0">
+    <Card className="overflow-clip">
       {rows.length === 0 ? (
         <EmptyState {...empty} />
       ) : (

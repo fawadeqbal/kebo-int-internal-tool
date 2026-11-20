@@ -3,7 +3,7 @@ import { FileText, MessageSquare, Plus, TrendingUp, Users, X } from "lucide-reac
 import { ExportCsv } from "@/components/sheets/export-link";
 import type { OrderGroups } from "@/lib/types-facts";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { RefCode, buildHref, ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { RefCode, buildHref, ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage, Tr, Stack } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { api } from "@/lib/api";
@@ -127,7 +127,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const currencies = currenciesFrom(settings);
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/customers")}
@@ -194,7 +194,6 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
       <LinkTabs
         label="Which customers"
-        className="mb-4"
         tabs={[
           {
             href: href({ show: undefined }),
@@ -264,7 +263,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         ]}
       />
 
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {data.rows.length === 0 ? (
           <EmptyState
             icon={Users}
@@ -403,6 +402,6 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           currencies={currenciesFrom(settings)}
         />
       )}
-    </div>
+    </Stack>
   );
 }

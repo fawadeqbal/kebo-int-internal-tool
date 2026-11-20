@@ -1,6 +1,6 @@
 import { Mail, MessageCircle, Pencil, Phone, Plus } from "lucide-react";
 import { can } from "@kebo/shared";
-import { Badge, EmptyLine } from "@kebo/ui";
+import { Badge, EmptyLine, RULES, cn } from "@kebo/ui";
 import { TabList } from "@/components/lists/tab-list";
 import { requireUser } from "@/lib/session";
 import { customerOf } from "@/lib/party-data";
@@ -51,7 +51,7 @@ export default async function CustomerContacts({ params }: { params: Promise<{ i
       ) : (
         <ul className="divide-y divide-line">
           {people.map((p) => (
-            <li key={p.id} className="flex flex-col gap-2 px-5 py-4 text-sm max-sm:px-4">
+            <li key={p.id} className={cn(RULES.box.inset, "flex flex-col gap-2 py-4 text-sm")}>
               <div className="flex items-start justify-between gap-2">
                 <strong>{p.name}</strong>
                 {p.isPrimary && <Badge tone="ok">Primary</Badge>}

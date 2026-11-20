@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Pencil, ShieldCheck } from "lucide-react";
 import { PERMISSION_GROUPS } from "@kebo/shared";
-import { Avatar, Badge, Card, CardBody, CardHeader, cn, EmptyLine, PageHeader, StatusBadge, capsClass } from "@kebo/ui";
+import { Avatar, Badge, Card, CardBody, CardHeader, cn, EmptyLine, PageHeader, StatusBadge, capsClass, Stack } from "@kebo/ui";
 import { RecordBody } from "@/components/records/record-frame";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
@@ -64,7 +64,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
       </Card>
   );
   return (
-    <div>
+    <Stack>
     {/* A record is titled by its name (the role's), with its kind beside it; the one record body below. */}
     <PageHeader
       crumbs={[...crumbsFor("/access/roles").slice(0, 1), { label: "Roles", href: "/access/roles" }, { label: r.name }]}
@@ -185,7 +185,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
         submitLabel="Save the role"
       />
     </RecordBody>
-    </div>
+    </Stack>
   );
 }
 

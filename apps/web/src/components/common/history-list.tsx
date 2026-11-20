@@ -1,5 +1,5 @@
 import { MessageSquareQuote } from "lucide-react";
-import { cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { cn, Table, Td, Th, THead, Tr, RULES } from "@kebo/ui";
 import type { HistoryEntry } from "@/lib/types";
 import { dateTime } from "@/lib/format";
 import { INQUIRY_STAGE_LABEL, ORDER_STAGE_LABEL } from "@kebo/shared";
@@ -81,7 +81,7 @@ export function HistoryTable({
   /** A last column with one word per change, by its id (an order: the stage it belongs to). */
   tags?: { label: string; of: Record<string, string | undefined> };
 }) {
-  if (!entries.length) return <p className="px-4 py-6 text-sm text-muted sm:px-5">{empty}</p>;
+  if (!entries.length) return <p className={cn(RULES.box.inset, "py-6 text-sm text-muted")}>{empty}</p>;
   return (
     <Table className={cn("", tags && "table-fixed")}>
       <THead>

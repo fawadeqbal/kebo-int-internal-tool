@@ -765,7 +765,7 @@ export function AppShell({
       <div className="min-w-0 flex-1">
         {/* On a phone a record's own top bar (← and its name) takes this one's place (globals.css). */}
         <header data-shell-top="" className="no-print sticky top-0 z-30 border-b border-line bg-surface">
-          <div className="flex h-14 items-center gap-2 px-4 sm:px-6 md:pl-3">
+          <div className={cn(RULES.page.width, RULES.page.sides, "flex h-14 items-center gap-2 md:pl-3")}>
             <button type="button" className={cn(buttonClass("ghost", "icon"), "-ml-2 md:hidden")} onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer}>
               <MenuIcon aria-hidden />
             </button>
@@ -803,7 +803,7 @@ export function AppShell({
 
         <main id="main" className={cn(RULES.page.frame, "pb-28 md:pb-10")}>
           {children}
-          <p className="no-print mt-6 text-xs text-muted">
+          <p className="no-print pt-2 text-xs text-muted">
             © {new Date().getFullYear()} {PRODUCT_NAME} · {companyName}
           </p>
         </main>

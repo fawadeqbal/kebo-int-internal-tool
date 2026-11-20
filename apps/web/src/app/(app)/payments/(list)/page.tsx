@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, Plus } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice, linkClass, Dash } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice, linkClass, Dash, Stack } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
@@ -96,7 +96,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   ];
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/payments")}
@@ -126,7 +126,6 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       {waiting > 0 && (
         <Notice
           tone="todo"
-          className="mb-4"
           title={approver ? `${waiting} waiting to be verified` : `${waiting} sent back to you`}
           action={
             <ButtonLink href={approver ? "/approvals" : "/approvals?status=sent_back"} variant="secondary" size="sm">
@@ -144,7 +143,6 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       </StatRow>
       <LinkTabs
         label="Which payments"
-        className="mb-4"
         tabs={[
           { href: chip({}), label: "All", count: list.counts.all, active: !dir && !status && !kind },
           { href: chip({ dir: "in" }), label: "Money in", count: list.counts.in, active: dir === "in" && !status },
@@ -175,7 +173,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         }}
         count={countOf(list.total, "payment")}
       />
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {list.rows.length === 0 ? (
           <EmptyState
             framed
@@ -240,7 +238,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         )}
       </Card>
       <Pager base="/payments" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} bare />
-    </div>
+    </Stack>
   );
 }
 

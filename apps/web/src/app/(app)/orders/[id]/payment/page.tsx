@@ -19,6 +19,7 @@ import { WaitingToVerify } from "@/components/money/waiting-money";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
 import { BoxNote } from "@/components/common/record-box";
+import { RULES, cn } from "@kebo/ui";
 
 export const generateMetadata = orderTitle("Payment");
 
@@ -159,7 +160,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
               files={<SectionFiles orderId={o.id} section={lc ? "lc" : "bank_contract"} canAdd={d.canFiles} />}
             >
               {lc && flow?.payment.lcChecks && (
-                <div className="border-t border-line px-4 py-3 sm:px-5">
+                <div className={cn(RULES.box.inset, "border-t border-line py-3")}>
                   <LcChecks checks={flow.payment.lcChecks} />
                 </div>
               )}
@@ -230,7 +231,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
               className="flex flex-col divide-y divide-line border-y border-line text-sm"
             >
               {m.charged.map((x) => (
-                <li key={x.id} className="flex items-baseline justify-between gap-3 px-4 py-2 sm:px-5">
+                <li key={x.id} className={cn(RULES.box.inset, "flex items-baseline justify-between gap-3 py-2")}>
                   <span>
                     <span className="text-text-2">Charged to the customer:</span> {x.description}
                   </span>

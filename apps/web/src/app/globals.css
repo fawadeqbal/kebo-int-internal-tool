@@ -158,8 +158,10 @@
 [data-record-top][data-stuck] [data-record-notice] {
   display: none;
 }
+[data-record-top][data-stuck] {
+  row-gap: 0;
+}
 [data-record-top][data-stuck] header {
-  margin-bottom: 0;
   padding-top: 0.625rem;
 }
 [data-record-top][data-stuck] h1 {

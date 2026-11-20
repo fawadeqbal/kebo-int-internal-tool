@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Badge, Card, CardHeader, PageHeader, PhoneList, PhoneRow, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice } from "@kebo/ui";
+import { Badge, Card, CardHeader, PageHeader, PhoneList, PhoneRow, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice, Stack } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
@@ -28,7 +28,7 @@ export default async function RolesPage() {
   const available = PERMISSIONS.filter((p) => permissionInPlan(p, company?.features ?? null)).length;
   const frozen = roles.filter((r) => r.frozen);
   return (
-    <div>
+    <Stack>
       <PageHeader kind="list" crumbs={crumbsFor("/access/roles")} title="Roles" />
       <div className="flex flex-col gap-5">
       <StatRow facts>
@@ -77,7 +77,7 @@ export default async function RolesPage() {
         </Notice>
       )}
 
-      <Card className="overflow-hidden p-0">
+      <Card className="overflow-hidden">
         <CardHeader
           title="Roles"
           description="Each person has one role. A change to a role applies to its people from their next click. The Super Admin always has everything."
@@ -161,6 +161,6 @@ export default async function RolesPage() {
         />
       )}
       </div>
-    </div>
+    </Stack>
   );
 }

@@ -70,7 +70,7 @@ export async function DomainCard({ view }: { view: DomainView | null }) {
     </>
   );
   return (
-    <Card className="mt-4">
+    <Card>
       <CardHeader title="Your own domain" description="Use a domain you own instead of ours." className="max-sm:flex-row max-sm:gap-3" actions={actions} />
       <CardBody className="flex flex-col gap-4">
         {!domain ? (

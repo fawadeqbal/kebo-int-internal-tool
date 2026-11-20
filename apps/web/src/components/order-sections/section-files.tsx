@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { OrderSection } from "@kebo/shared";
 import { FileChip, guessKind, uploadToOrder, useFileTools } from "@/components/files/file-tools";
 import { FileZone } from "@/components/common/file-zone";
+import { RULES, cn } from "@kebo/ui";
 
 /** The files of one section, from the order's one list (the layout loads it once). */
 export function useSectionFiles(section: OrderSection) {
@@ -40,7 +41,7 @@ export function SectionFiles({ orderId, section, canAdd, quiet }: { orderId: str
   // No file and none to add here: nothing at all (no "No file yet" rows: canvas "The order's Overview today", 8).
   if (files.length === 0 && (quiet || !canAdd)) return null;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line px-5 py-2.5 max-sm:px-4" data-section-files={section}>
+    <div className={cn(RULES.box.inset, "flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line py-2.5")} data-section-files={section}>
       {files.map((f) => (
         <FileChip key={f.id} file={f} set={files} />
       ))}

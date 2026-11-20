@@ -3,6 +3,7 @@ import { RecordBox } from "@/components/common/record-box";
 import { LinesView } from "@/components/lines/lines-sheet";
 import type { LineColumn, LineRow } from "@/components/lines/line-table";
 import { PhoneItems, type ItemsPhoneRow } from "./phone-items";
+import { RULES, cn } from "@kebo/ui";
 
 export type { ItemsPhoneRow } from "./phone-items";
 
@@ -76,6 +77,6 @@ export function ItemsBody({
       {totals && <div className="max-sm:border-t max-sm:border-line">{totals}</div>}
     </>
   ) : (
-    <div className="px-5 py-4 text-sm text-muted max-sm:px-4">{empty}</div>
+    <div className={cn(RULES.box.inset, "py-4 text-sm text-muted")}>{empty}</div>
   );
 }

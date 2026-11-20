@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { PLAN_FEATURE_KEYS, planFeatureName } from "@kebo/shared";
-import { Card, DataRow, EmptyState, PageHeader, PhoneList, PhoneRow, StatusBadge, Td, Th, THead } from "@kebo/ui";
+import { Card, DataRow, EmptyState, PageHeader, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, Stack } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { money } from "@/lib/format";
 import type { Plan } from "@/lib/types-platform";
@@ -48,7 +48,7 @@ export default async function PlansPage() {
       : []),
   ];
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         title="Plans"
@@ -58,7 +58,7 @@ export default async function PlansPage() {
           </OpenPanelButton>
         }
       />
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {plans.length === 0 ? (
           <EmptyState
             framed
@@ -130,6 +130,6 @@ export default async function PlansPage() {
         create={createPlanAction}
         update={Object.fromEntries(plans.map((p) => [p.id, updatePlanAction.bind(null, p.id)]))}
       />
-    </div>
+    </Stack>
   );
 }

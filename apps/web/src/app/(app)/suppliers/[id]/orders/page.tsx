@@ -33,7 +33,7 @@ export default async function FactoryOrders({ params }: { params: Promise<{ id: 
   };
 
   return (
-    <Card className="overflow-clip p-0">
+    <Card className="overflow-clip">
       {rows.length === 0 ? (
         <EmptyState
           title="Nothing in production here"
