@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Banknote, Factory, LayoutGrid, Receipt, Target, TrendingUp, User, Users, type LucideIcon } from "lucide-react";
+
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
 import { buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage, Notice } from "@kebo/ui";
@@ -57,15 +57,15 @@ const PATH_OF: Record<ReportKind, string> = {
   spending: "/reports/spending",
 };
 /** One page, its reports as tabs under the title: the same period goes with you. Profit and Cash are for people who see money. */
-const REPORT_TABS: { key: ReportKind; href: string; label: string; icon: LucideIcon; money?: boolean }[] = [
-  { key: "overview", href: "/reports", label: "Overview", icon: LayoutGrid },
-  { key: "profit", href: "/reports/profit", label: "Profit", icon: TrendingUp, money: true },
-  { key: "customers", href: "/reports/customers", label: "Customers", icon: Users },
-  { key: "factories", href: "/reports/factories", label: "Suppliers", icon: Factory },
-  { key: "cash", href: "/reports/cash", label: "Cash", icon: Banknote, money: true },
-  { key: "people", href: "/reports/people", label: "People", icon: User },
-  { key: "funnel", href: "/reports/funnel", label: "Funnel", icon: Target },
-  { key: "spending", href: "/reports/spending", label: "Spending", icon: Receipt, money: true },
+const REPORT_TABS: { key: ReportKind; href: string; label: string; money?: boolean }[] = [
+  { key: "overview", href: "/reports", label: "Overview" },
+  { key: "profit", href: "/reports/profit", label: "Profit", money: true },
+  { key: "customers", href: "/reports/customers", label: "Customers" },
+  { key: "factories", href: "/reports/factories", label: "Suppliers" },
+  { key: "cash", href: "/reports/cash", label: "Cash", money: true },
+  { key: "people", href: "/reports/people", label: "People" },
+  { key: "funnel", href: "/reports/funnel", label: "Funnel" },
+  { key: "spending", href: "/reports/spending", label: "Spending", money: true },
 ];
 /** Targets is a view of People (it opens from there), so People stays the tab. */
 const TAB_OF = (kind: ReportKind): ReportKind => (kind === "targets" ? "people" : kind);
@@ -77,11 +77,7 @@ function ReportTabs({ current, keep, seeMoney }: { current: ReportKind; keep: Re
       className="no-print mt-3"
       tabs={REPORT_TABS.filter((t) => seeMoney || !t.money).map((t) => ({
         href: buildHref(t.href, keep, {}),
-        label: (
-          <>
-            <t.icon aria-hidden /> {t.label}
-          </>
-        ),
+        label: t.label,
         active: t.key === current,
       }))}
     />

@@ -1,4 +1,4 @@
-import { KeyRound, UserRound } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { Badge, Card, CardHeader, PageHeader, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -6,16 +6,7 @@ import { date, timeAgo } from "@/lib/format";
 import type { SessionRow, TwoStepStatus } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { PanelButton } from "@/components/orders/step-view";
-import {
-  changePasswordAction,
-  confirmTwoStepAction,
-  endMySessionAction,
-  newRecoveryCodesAction,
-  renameSelfAction,
-  signOutOthersAction,
-  startTwoStepAction,
-  turnOffTwoStepAction,
-} from "./actions";
+import { changePasswordAction, confirmTwoStepAction, endMySessionAction, newRecoveryCodesAction, renameSelfAction, signOutOthersAction, startTwoStepAction, turnOffTwoStepAction } from "./actions";
 import { PasswordCardForm, ProfileForm, TwoStepPanel } from "./forms";
 import { RecordBody } from "@/components/records/record-frame";
 
@@ -56,7 +47,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const inline = sp.tab === "two-step" || (status.required && !status.on);
   return (
     <>
-      <PageHeader crumbs={[{ label: "My account" }]} icon={UserRound} title="My account" summary={`${me.name} · ${me.roleName}`} />
+      <PageHeader crumbs={[{ label: "My account" }]} title="My account" summary={`${me.name} · ${me.roleName}`} />
       <RecordBody
         panelLabel="Beside your account"
         panel={

@@ -247,6 +247,15 @@ describe("one of each", () => {
     expect(found(/border-2 border-dashed border-line-strong px-3 py-6 text-center text-xs text-muted">Nothing here/g)).toEqual([]);
   });
 
+  it("one page top: no icon tile before a title, no help line on a list, a record titled by its name", () => {
+    expect(found(/data-slot="page-icon"|MODULE_ICONS/g)).toEqual([]);
+    expect(found(/"Every amount that came in or went out"|"Every account and what is in it"/g)).toEqual([]);
+    // The path says the menu's words ("Money", not "Finance").
+    expect(found(/\{ label: "Finance" \}/g)).toEqual([]);
+    // A role's page is titled by the role (not "Roles").
+    expect(found(/title="Roles" \/>/g).filter((f) => f.includes("roles/[key]"))).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

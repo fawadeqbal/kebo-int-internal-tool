@@ -1,4 +1,4 @@
-import { Banknote, Factory, Pencil, Search } from "lucide-react";
+import { Banknote, Pencil, Search } from "lucide-react";
 import { can, RECORD_KIND } from "@kebo/shared";
 import { ButtonLink, RefCode } from "@kebo/ui";
 import { requirePermission, hasFeature } from "@/lib/session";
@@ -28,7 +28,6 @@ export default async function FactoryLayout({ children, params }: { children: Re
         <RecordTop
           header={{
             crumbs: [{ label: "Purchasing" }, { label: "Suppliers", href: "/suppliers" }, { label: f.name }],
-            icon: Factory,
             title: f.name,
             record: { kind: RECORD_KIND.supplier, number: f.supplierCode },
             summary: (
