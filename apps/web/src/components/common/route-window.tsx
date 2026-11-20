@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { lockScroll } from "@/lib/scroll-lock";
-import { ButtonLink, cn, RULES } from "@kebo/ui";
+import { Button, ButtonLink, cn, RULES } from "@kebo/ui";
 import { useChanges, watchChanges } from "./changes";
 import { focusables, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
 import { PanelCloseProvider, WindowFooter } from "./panel";
@@ -105,19 +105,25 @@ export function RouteWindow({
 }
 
 /**
- * A form's Cancel and save: in a window, the window's footer at the bottom right (Cancel closes it, asking
- * first when something changed); as a page, the same buttons at the end of the form (Cancel goes to `cancelHref`).
+ * A form's Cancel and save, the one row every form ends with: in a window, the window's footer at the bottom
+ * right (Cancel closes it, asking first when something changed); in a box or as a page, the same buttons at the
+ * end of the form, at the right, Cancel first (`onCancel` closes the form in place, `cancelHref` goes back).
  */
-export function FormButtons({ children, cancelHref }: { children: ReactNode; cancelHref?: string }) {
+export function FormButtons({ children, cancelHref, onCancel }: { children: ReactNode; cancelHref?: string; onCancel?: () => void }) {
   const inWindow = useWindowDone() !== null;
-  if (inWindow)
-    return <WindowFooter>{children}</WindowFooter>;
+  if (inWindow) return <WindowFooter onCancel={onCancel}>{children}</WindowFooter>;
   return (
-    <div className="flex flex-wrap justify-end gap-3">
-      {cancelHref && (
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      {cancelHref ? (
         <ButtonLink href={cancelHref} variant="ghost">
           Cancel
         </ButtonLink>
+      ) : (
+        onCancel && (
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+        )
       )}
       {children}
     </div>

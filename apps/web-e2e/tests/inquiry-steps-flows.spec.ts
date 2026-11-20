@@ -140,7 +140,10 @@ test("the Customer step: recent customers, Came by as buttons, and a customer no
   await list.getByRole("option", { name: `New customer “Medipharm ${tag}”` }).click();
   const form = win.getByRole("region", { name: "New customer" });
   await expect(form.locator("#qc-name")).toHaveValue(`Medipharm ${tag}`);
-  await form.locator("#qc-country").selectOption("KE");
+  // Country: typed to find it in the list (the one list chooser), then taken.
+  await form.locator("#qc-country").fill("Ken");
+  await page.getByRole("option", { name: "Kenya" }).click();
+  await expect(form.locator("#qc-country")).toHaveValue("Kenya");
   await form.locator("#qc-contact").fill("Joseph Mwangi");
   await form.locator("#qc-phone").fill(`+2547${String(Date.now()).slice(-8)}`);
   await win.getByRole("button", { name: "Add and use" }).click();

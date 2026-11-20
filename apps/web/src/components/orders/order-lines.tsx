@@ -139,7 +139,7 @@ function columnsOf(set: LineSet): LineColumn[] {
           align: "right",
           format: (_v, r) => (r.values.factoryPrice ? formatMinor(toMinor(r.values.factoryPrice), r.values.factoryCurrency || "") : dash),
         },
-        { key: "taxRate", label: "Tax", width: "4.5rem", align: "right", phoneHidden: true, format: (v) => (v.factoryPrice ? n(v.taxRate) : dash) },
+        { key: "taxRate", label: "Tax", width: "4.5rem", align: "right", phoneHidden: true, format: (v) => (v.factoryPrice && Number(v.taxRate) ? `${n(v.taxRate)}%` : dash) },
       ];
     case "received":
       return [

@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind, type PaymentMethod } from "@kebo/shared";
 import { Button, Field, Input, RULES, Select, Textarea, Notice, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
+import { FormButtons } from "@/components/common/route-window";
 import { ActionForm } from "@/components/common/action-form";
 import { UrlWindow, WindowFooter } from "@/components/common/panel";
 import { CurrencySelect } from "@/components/common/currency-select";
@@ -179,7 +180,7 @@ export function EditCustomerPayment({
     <ActionForm action={action} onDone={close} showSuccess={!onClose} className={onClose ? "flex flex-col gap-3" : `${framed} mt-2 w-full`}>
       {(s) => (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className={RULES.form.fields}>
             <Field label="What for" htmlFor="ep-kind" >
               <Choice
                 id="ep-kind"
@@ -209,7 +210,7 @@ export function EditCustomerPayment({
             <Field label="Paid on" htmlFor="ep-paidOn" error={s.errors?.paidOn}>
               <Input id="ep-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? payment.paidOn} />
             </Field>
-            <Field label="Method" htmlFor="ep-method">
+            <Field label="How" htmlFor="ep-method">
               <Choice
                 id="ep-method"
                 name="method"
@@ -218,7 +219,7 @@ export function EditCustomerPayment({
                 value={(s.values?.method as PaymentMethod) ?? payment.method}
               />
             </Field>
-            <Field label="Bank reference" htmlFor="ep-reference" optional>
+            <Field label="Reference" htmlFor="ep-reference" optional>
               <Input id="ep-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment.reference ?? ""} />
             </Field>
             <AccountSelect id="ep-account" label="Into account" currency={received} defaultValue={s.values?.accountId ?? payment.account?.id} error={s.errors?.accountId} />
@@ -226,14 +227,9 @@ export function EditCustomerPayment({
           <input type="hidden" name="paidByName" value={payment.paidByName ?? ""} />
           <input type="hidden" name="note" value={payment.note ?? ""} />
           {onClose && <WhyField id="ep-reason" error={s.errors?.reason} value={s.values?.reason} />}
-          <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Saving…">
-              Save the change
-            </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={close}>
-              Cancel
-            </Button>
-          </div>
+          <FormButtons onCancel={close}>
+            <SubmitButton pendingText="Saving…">Save the change</SubmitButton>
+          </FormButtons>
         </>
       )}
     </ActionForm>
@@ -344,7 +340,7 @@ export function FactoryPaymentForm({
         <>
           {!bare && <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.factory.name}` : "Payment to a supplier"}</p>}
           <input type="hidden" name="factoryId" value={chosen?.factory.id ?? payment?.factory.id ?? ""} />
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className={RULES.form.fields}>
             <Field
               label="Supplier"
               htmlFor="fp-factory"
@@ -442,8 +438,8 @@ export function FactoryPaymentForm({
               </Button>
             </Notice>
           )}
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Method" htmlFor="fp-method">
+          <div className={RULES.form.fields}>
+            <Field label="How" htmlFor="fp-method">
               <Choice
                 id="fp-method"
                 name="method"
@@ -451,6 +447,10 @@ export function FactoryPaymentForm({
                 labels={PAYMENT_METHOD_LABEL}
                 value={(s.values?.method as PaymentMethod) ?? payment?.method ?? "bank_transfer"}
               />
+            </Field>
+            <AccountSelect id="fp-account" label="From account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
+            <Field label="Reference" htmlFor="fp-reference" optional>
+              <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? prefill?.reference ?? ""} />
             </Field>
             <Field
               label="Paid by"
@@ -465,29 +465,20 @@ export function FactoryPaymentForm({
                 none={chosen?.lookedAfterBy ? `${chosen.lookedAfterBy.name} (looks after it)` : "Not said"}
               />
             </Field>
-            <Field label="Bank reference" htmlFor="fp-reference" optional>
-              <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? prefill?.reference ?? ""} />
-            </Field>
-            <AccountSelect id="fp-account" label="From account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
           </div>
           {!payment && (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <FilePicker id="fp-file" label="Proof of payment" file={file} onChange={setFile} className="sm:col-span-2" />
-            </div>
+            <FilePicker id="fp-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} />
           )}
           <Field label="Note" htmlFor="fp-note" optional>
             <Textarea id="fp-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? payment?.note ?? ""} />
           </Field>
           {payment && bare && <WhyField id="fp-reason" error={s.errors?.reason} value={s.values?.reason} />}
           {!payment && <RecordedBy />}
-          <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText={file ? "Saving, sending the file…" : "Saving…"} disabled={mismatch}>
+          <FormButtons onCancel={onClose}>
+            <SubmitButton pendingText={file ? "Saving, sending the file…" : "Saving…"} disabled={mismatch}>
               {payment ? "Save the change" : "Record the payment"}
             </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
+          </FormButtons>
         </>
       )}
     </ActionForm>

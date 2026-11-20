@@ -405,7 +405,7 @@ export function PlanEditor({
         </Button>
       </PanelBody>
       {/* Under the parts, outside the scrolling: the sum stays in view above Save. */}
-      <WindowFooter className="static mx-0 mb-0 sm:mx-0" cancel={false}>
+      <WindowFooter outside cancel={false}>
         <div className={cn("flex basis-full items-center gap-3 rounded-lg px-3 py-2", ok ? "bg-ok-soft" : "bg-bad-soft")}>
           <b role="status" className={cn("text-md whitespace-nowrap tabular", ok ? "text-ok" : "text-bad")}>
             {ok

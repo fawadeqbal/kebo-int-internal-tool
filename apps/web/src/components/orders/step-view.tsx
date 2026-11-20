@@ -133,6 +133,7 @@ export function FieldsForm({
   const close = useClosePanel();
   const id = useId();
   const editable = fields.filter((f) => f.name && !f.cardOnly);
+  const fresh = editable.every((f) => !(f.value ?? "").trim());
   const groups = [...new Set(editable.map((f) => f.group ?? ""))];
   const [errors, setErrors] = useState<Record<string, string>>({});
   const saver = useEditSave({ edit, card, what: "values" });
@@ -225,7 +226,8 @@ export function FieldsForm({
                   label={f.panelLabel ?? f.label}
                   htmlFor={`${id}-${f.name}`}
                   hint={
-                    f.name! in nowOf ? (
+                    // A first fill (nothing saved yet) has nothing to compare: no "Added" on every field.
+                    f.name! in nowOf && !fresh ? (
                       <>
                         <ChangeHint was={changeText(f, (f.value ?? "").trim())} now={changeText(f, nowOf[f.name!]!)} />
                         {f.hint}
@@ -244,7 +246,7 @@ export function FieldsForm({
         ))}
         {extra}
         <WindowFooter note={note ?? (card?.first ? "Changing a saved value asks why." : "Changes show in the step’s Changes.")}>
-          <Button type="submit" variant="strong" disabled={saver.busy || (counting && counts.changed + counts.added === 0)} aria-busy={saver.busy}>
+          <Button type="submit" variant="primary" disabled={saver.busy || (counting && counts.changed + counts.added === 0)} aria-busy={saver.busy}>
             {saver.busy ? "Saving…" : (saveWords ?? "Save")}
           </Button>
         </WindowFooter>

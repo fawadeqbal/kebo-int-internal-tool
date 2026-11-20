@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Mail } from "lucide-react";
 import { SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type SentVia } from "@kebo/shared";
-import { cn, Field, Input, Select, Textarea, linkClass } from "@kebo/ui";
+import { cn, Field, Input, RULES, Select, Textarea, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelBody, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
@@ -149,7 +149,7 @@ export function SendWindow({
       {many ? chosen.map((x) => file(`${nameOf(x)}.pdf`, x.printHref, x.pdfHref)) : file(fileName, printHref, pdfHref)}
     </div>
   );
-  const after = [`The inquiry becomes Quoted. “Do next” becomes “Record ${customer}’s answer”.`];
+  const after = [`The inquiry becomes Quoted; next, record ${customer}’s answer.`];
   const names = namesOf(chosen, true);
   return (
     <PanelBody>
@@ -208,7 +208,7 @@ export function SendWindow({
               <input type="hidden" name="to" value="sent" />
               <input type="hidden" name="via" value={how} />
               <input type="hidden" name="reason" value={`Sent ${SENT_VIA_TEXT[how]}`} />
-              <div className="grid gap-3.5 sm:grid-cols-2">
+              <div className={RULES.form.fields}>
                 <Field label="How" htmlFor="sent-how">
                   <Select id="sent-how" value={how} onChange={(e) => setHow(e.target.value as SentVia)}>
                     {SENT_VIA.map((v) => (

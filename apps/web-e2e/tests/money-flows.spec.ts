@@ -65,9 +65,9 @@ test("Purchase order: what was agreed with the supplier, the plan with Pay on th
 
 test("Payment: the payments received are the same list, cards on a phone", async ({ page }) => {
   const errors = watchErrors(page);
-  await orderWith(page, "payment", (p) => p.getByRole("region", { name: "Payments received" }).getByRole("columnheader", { name: "Into" }));
+  await orderWith(page, "payment", (p) => p.getByRole("region", { name: "Payments received" }).getByRole("columnheader", { name: "How" }));
   const got = page.getByRole("region", { name: "Payments received" });
-  await expect(got.getByRole("columnheader", { name: "Into" })).toBeVisible();
+  await expect(got.getByRole("columnheader", { name: "How" })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(got.getByRole("list", { name: "Payments received" })).toBeVisible();
   await expect(got.getByRole("link", { name: "Receipt" }).first()).toBeVisible();

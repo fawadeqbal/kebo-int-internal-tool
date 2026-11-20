@@ -23,6 +23,10 @@ export const RULES = {
     /** A box's own body: the inset at the sides, 16px above and below. */
     body: "px-4 py-4 sm:px-5",
   },
+  form: {
+    /** A form's fields side by side: as many 14rem columns as fit, one on a phone (a payment in or out alike). */
+    fields: "grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-3",
+  },
   /** The steps window's side bar, like a settings window (rule 11). */
   stepsRail: "md:grid-cols-[248px_minmax(0,1fr)]",
   page: {

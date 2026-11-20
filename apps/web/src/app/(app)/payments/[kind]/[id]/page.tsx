@@ -81,7 +81,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
         ),
       })),
     { label: p.direction === "in" ? "Reached account" : "Account", value: p.account ?? "Not on an account yet" },
-    ...(p.reference ? [{ label: "Bank reference", value: p.reference }] : []),
+    ...(p.reference ? [{ label: "Reference", value: p.reference }] : []),
     { label: p.kind === "submission" ? "Sent by" : "Recorded by", value: `${p.recordedBy ?? "someone"} · ${dateTime(p.recordedAt)}` },
   ];
   const partsTotal = (p.parts ?? []).filter((x) => !x.released).reduce((t, x) => t + Number(x.amount), 0);

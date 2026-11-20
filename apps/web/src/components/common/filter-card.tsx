@@ -313,7 +313,7 @@ function FilterSheet({
           <Button size="lg" onClick={onClear} disabled={!anyOn}>
             Clear
           </Button>
-          <Button size="lg" variant="strong" onClick={onClose} className="flex-1">
+          <Button size="lg" variant="primary" onClick={onClose} className="flex-1">
             {count ? `Show ${count}` : "Show the list"}
           </Button>
         </div>

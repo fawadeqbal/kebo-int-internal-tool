@@ -291,7 +291,7 @@ export function ThrowAwayConfirm({ what, lost, onKeep, onThrow }: { what?: React
           <Button variant="danger-line" onClick={onThrow} className="max-sm:w-full">
             <Trash2 aria-hidden /> Discard
           </Button>
-          <Button size="lg" ref={keep} variant="strong" onClick={onKeep} className="max-sm:w-full">
+          <Button size="lg" ref={keep} variant="primary" onClick={onKeep} className="max-sm:w-full">
             Keep editing
           </Button>
         </div>

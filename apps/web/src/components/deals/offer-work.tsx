@@ -415,7 +415,7 @@ function OfferWindow({
                 tools={
                   <>
                     {items.length > 0 && (
-                      <Button size="sm" variant={empty ? "soft" : "secondary"} onClick={() => batch.add(newLinesOf(fromItems(h.taxRate)))}>
+                      <Button variant="secondary" onClick={() => batch.add(newLinesOf(fromItems(h.taxRate)))}>
                         <Copy aria-hidden /> Copy customer’s items{empty ? ` · ${linesCount(items.map((it) => ({ key: it.id, parentKey: it.parentId, values: {} })))}` : ""}
                       </Button>
                     )}
@@ -837,8 +837,8 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
       ? [
           {
             key: "alternativeOfId",
-            label: "Spec of",
-            width: "4.25rem",
+            label: "Alternative to",
+            width: "6.5rem",
             input: "select" as const,
             options: [{ value: "", label: "—" }, ...mains.map((l) => ({ value: l.id, label: `${l.no} ${l.description.split("\n")[0]!.slice(0, 30)}` }))],
             sheetChoices: [{ value: "", text: "" }, ...mains.map((l) => ({ value: l.id, text: l.no }))],
@@ -1028,7 +1028,7 @@ export function OfferBoxes({
 
 /**
  * "Enter an offer": the New factory offer window (design 18 Nov): Factory · Prices · Delivery & payment · Warranty & conditions,
- * then Review and Confirm and save. The factories asked for this inquiry come first in its picker.
+ * then Review and Add the offer. The factories asked for this inquiry come first in its picker.
  */
 export function AddOfferButton({
   dealId,

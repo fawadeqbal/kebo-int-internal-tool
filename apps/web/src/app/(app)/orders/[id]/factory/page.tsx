@@ -169,7 +169,6 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         title={many ? `Agreed with the supplier · ${po.supplier.name}` : "Agreed with the supplier"}
         actions={
           <>
-            {from && <span className="text-xs text-text-2 max-sm:hidden">From their offer {from}</span>}
             {a.changes > 0 && (
               <Link
                 href={`/orders/${o.id}/history?q=${encodeURIComponent(`${po.number}: what was agreed`)}`}
@@ -209,6 +208,8 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         <BoxFacts
           wide
           rows={[
+            // Where it came from is a fact of the box, not words in its head (the head keeps only its buttons).
+            ...(po.offer ? ([["From their offer", po.offer.reference ?? date(po.offer.receivedOn)]] as [string, ReactNode][]) : []),
             ["Incoterm", a.basis ? `${a.basis}${a.basisPlace ? ` ${a.basisPlace}` : ""}` : null],
             ["Lead time", a.leadTime],
             [

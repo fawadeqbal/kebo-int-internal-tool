@@ -98,7 +98,7 @@ export class RemindersListService {
         detail: `${o.customer.name} · ${o.needs.late ? `${days} day${days === 1 ? "" : "s"} late` : `by ${o.needs.due}`}`,
         due: o.needs.due,
         href: `/orders/${o.id}`,
-        action: "Open the order",
+        action: "Open",
         who: nameOf(o.inquiry.assignee),
       });
     }
@@ -201,7 +201,7 @@ export class RemindersListService {
           detail: `${d.customer.name} · ${d.title}`,
           due: needed,
           href: `/inquiries/${d.id}`,
-          action: "Open the inquiry",
+          action: "Open",
           who: nameOf(d.assignee),
         });
     }
@@ -380,7 +380,7 @@ export class RemindersListService {
             detail: `${ORDER_TAB_LABEL[r.tab]} · ${late} day${late === 1 ? "" : "s"} late`,
             due: r.due,
             href: `/orders/${o.id}/${r.tab}`,
-            action: `Open ${ORDER_TAB_LABEL[r.tab]}`,
+            action: "Open",
             who: nameOf(o.inquiry.assignee),
           });
         }
@@ -430,7 +430,7 @@ export class RemindersListService {
             detail: "Present the documents before it expires, or ask for an extension",
             due: exp,
             href: `/orders/${c.order.id}/documents`,
-            action: "Documents",
+            action: "Open",
             who: nameOf(c.order.inquiry.assignee),
           });
       }
@@ -501,7 +501,7 @@ export class RemindersListService {
             detail: `${o.customer.name} · ${missing.length > 1 ? missing.map((k) => ORDER_DOCUMENT_LABEL[k]).join(", ") : "the documents must reach the customer before the ship"}`,
             due: eta,
             href: `/orders/${o.id}/documents`,
-            action: "Documents",
+            action: "Open",
             who: nameOf(o.inquiry.assignee),
           });
         else {
@@ -515,7 +515,7 @@ export class RemindersListService {
               detail: `${o.customer.name} · so they arrive before the goods`,
               due: eta,
               href: `/orders/${o.id}/documents`,
-              action: "Documents",
+              action: "Open",
               who: nameOf(o.inquiry.assignee),
             });
         }
@@ -568,7 +568,7 @@ export class RemindersListService {
           detail: `${c.order.customer.name} · ${c.status === "with_factory" ? "with the supplier" : "settle it with the supplier and the customer"}`,
           due: opened,
           href: `/orders/${c.order.id}/delivery`,
-          action: "Open the claim",
+          action: "Open",
           who: nameOf(c.order.inquiry.assignee),
         });
       }

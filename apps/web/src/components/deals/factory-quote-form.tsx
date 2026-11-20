@@ -2,7 +2,7 @@
 
 import { Picker } from "@/components/common/picker";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, CircleCheck, Factory, History, ShieldCheck, Tag, Truck } from "lucide-react";
+import { CircleCheck, Factory, History, ShieldCheck, Tag, Truck } from "lucide-react";
 import { fxRate } from "@kebo/money";
 import {
   basisText,
@@ -17,14 +17,14 @@ import {
   type LeadFrom,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, cn, controlClass, Field, Input, Select, Textarea, controlSizes, EmptyLine, linkClass } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, EmptyLine, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
-import { FloatingList } from "@/components/common/floating";
+import { TypeToPick } from "@/components/common/type-to-pick";
 import { ChangeHint, changeCount, changedClassOf, changeKind, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
 import { PANEL_FORM, PanelSection, useReportDirty, useReportLost } from "@/components/common/panel";
 import { StepsFooter, StepsFrame } from "@/components/common/steps-frame";
@@ -48,100 +48,11 @@ import {
 const PORTS = ["Qingdao", "Shanghai", "Ningbo", "Tianjin", "Shenzhen", "Guangzhou", "Xiamen", "Dalian"];
 
 /**
- * The port (or the factory's town for EXW) as its own field: type it, or pick
- * one of the usual ports from the list that opens under this field (drawn
- * above the page, so it never covers or hides under another field).
+ * The port (or the factory's town for EXW) as its own field: type it, or pick one of the usual ports from the
+ * list under it — the one list chooser (TypeToPick), as for a country. For EXW the town is typed, no list.
  */
 export function PortPicker({ id, value, onChange, exw }: { id: string; value: string; onChange: (v: string) => void; exw: boolean }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const typed = value.trim().toLowerCase();
-  const shown = exw ? [] : PORTS.filter((p) => !typed || p.toLowerCase().includes(typed) || PORTS.some((x) => x.toLowerCase() === typed));
-  return (
-    <div ref={box} className="relative">
-      <input
-        id={id}
-        role="combobox"
-        aria-expanded={open && shown.length > 0}
-        aria-controls={`${id}-list`}
-        aria-autocomplete="list"
-        autoComplete="off"
-        value={value}
-        maxLength={60}
-        className={cn(controlClass, controlSizes.md, "pr-9")}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setOpen(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setOpen(false);
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setOpen(true);
-            document.querySelector<HTMLElement>(`#${CSS.escape(id)}-list [role=option]`)?.focus();
-          }
-        }}
-      />
-      {!exw && (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label="Show the usual ports"
-          className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded text-muted hover:text-text pointer-coarse:size-10"
-          onClick={() => setOpen((o) => !o)}
-        >
-          <ChevronDown className="size-4" aria-hidden />
-        </button>
-      )}
-      {open && shown.length > 0 && (
-        <FloatingList anchor={() => box.current} onClose={() => setOpen(false)} className="p-1">
-          <ul id={`${id}-list`} role="listbox" aria-label="Ports" className="max-h-60 overflow-y-auto">
-            {shown.map((p) => (
-              <li
-                key={p}
-                role="option"
-                tabIndex={-1}
-                aria-selected={p.toLowerCase() === typed}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(p);
-                  setOpen(false);
-                }}
-                onKeyDown={(e) => {
-                  const items = [...(e.currentTarget.parentElement?.querySelectorAll<HTMLElement>("[role=option]") ?? [])];
-                  const at = items.indexOf(e.currentTarget);
-                  const input = () => document.getElementById(id)?.focus();
-                  if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    items[at + 1]?.focus();
-                  } else if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    if (at === 0) input();
-                    else items[at - 1]?.focus();
-                  } else if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onChange(p);
-                    setOpen(false);
-                    input();
-                  } else if (e.key === "Escape") {
-                    setOpen(false);
-                    input();
-                  }
-                }}
-                className={cn(
-                  "cursor-pointer rounded-md px-2.5 py-2 text-sm outline-none hover:bg-surface-2 focus:bg-surface-2",
-                  p.toLowerCase() === typed && "bg-primary-soft font-medium text-primary",
-                )}
-              >
-                {p}
-              </li>
-            ))}
-          </ul>
-        </FloatingList>
-      )}
-    </div>
-  );
+  return <TypeToPick id={id} free value={value} onChange={onChange} options={exw ? [] : PORTS.map((p) => ({ value: p, label: p }))} listLabel="Ports" />;
 }
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -157,13 +68,17 @@ export function taxRateNote(lines: { taxRate: number }[], oldRate: number, newRa
 }
 
 /** The basis in the list, with what it means in two or three words. */
-const BASIS_WORDS: Partial<Record<Incoterm, string>> = {
+const BASIS_WORDS: Record<Incoterm, string> = {
   EXW: "at their factory",
   FCA: "to our carrier",
+  FAS: "beside the ship at the port",
   FOB: "on board at the port",
   CFR: "freight paid",
   CIF: "freight and insurance paid",
+  CPT: "carriage paid",
+  CIP: "carriage and insurance paid",
   DAP: "delivered",
+  DPU: "delivered and unloaded",
   DDP: "delivered, duties paid",
 };
 
@@ -393,7 +308,7 @@ export type OfferSaved = { reason?: string; changes: OfferChange[] };
 
 /**
  * The offer's window, the same for a new offer and an edit (design 18 Nov, the inquiry's rules): the steps on the
- * left, two even columns of fields, one strong button. A new offer ends with Review and Confirm and save; an edit
+ * left, two even columns of fields, one strong button. A new offer ends with Review and Add the offer; an edit
  * marks each change, counts them on its parts and its Save, ends with Changes, and asks why once. `only`: one part
  * in a smaller window. The lines (`lines`) and the factory's files (`files`) are the owner's; their changes are
  * counted here (`linesChanges`, `filesAdded`) so the counts, Undo and the leave guard cover them too.
@@ -459,7 +374,7 @@ export function OfferHeaderForm({
   note?: ReactNode;
   /** Left of the buttons on the first step (Remove this offer). */
   footerStart?: ReactNode;
-  /** A new offer: "Save and add another" beside Confirm and save. */
+  /** A new offer: "Save and add another" beside Add the offer. */
   onAnother?: () => void;
   /** Where the window opens. */
   startStep?: OfferStep;
@@ -588,8 +503,9 @@ export function OfferHeaderForm({
       start={footerStart}
       jump={at < STEPS.length - 2 ? { label: "Review", onClick: () => setStep("review") } : null}
       onNext={step === "review" ? null : () => go(at + 1)}
+      nextLabel={at === STEPS.length - 2 ? "Review" : undefined}
       save={{
-        label: "Confirm and save",
+        label: "Add the offer",
         also: onAnother && (
           <SubmitButton variant="ghost" pendingText="Saving…" onClick={() => onAnother()} className="max-md:hidden">
             Save and add another

@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Pencil } from "lucide-react";
 import type { Tone } from "@kebo/shared";
-import { Badge, boxHeadClass, boxTitleClass, Card, cn, Dash } from "@kebo/ui";
+import { Badge, boxHeadClass, boxTitleClass, Card, cn, Dash, RULES } from "@kebo/ui";
 import { OpenPanelButton } from "@/components/common/panel";
 
 /**
@@ -58,14 +58,17 @@ export function RecordBox({
           {word && <Badge tone={word.tone ?? "neutral"}>{word.text}</Badge>}
           {/* On a phone the count goes under the title, so the buttons keep their room. */}
           {count && <span className="text-xs text-text-2 max-sm:order-last max-sm:w-full max-sm:pb-1">{count}</span>}
-          <span className="flex-1" />
-          {tools}
-          {history}
-          {canEdit && (edit ?? (step && (
-            <OpenPanelButton panel="edit-request" id={step} variant="ghost" size="xs" label={`Edit ${what}`} className="text-primary hover:text-primary">
-              <Pencil aria-hidden /> Edit
-            </OpenPanelButton>
-          )))}
+          {/* The buttons are one group at the right: when they do not fit beside the title they go under it
+              together, still at the right (never one left on the title's line and the rest in the body). */}
+          <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+            {tools}
+            {history}
+            {canEdit && (edit ?? (step && (
+              <OpenPanelButton panel="edit-request" id={step} variant="ghost" size="xs" label={`Edit ${what}`} className="text-primary hover:text-primary">
+                <Pencil aria-hidden /> Edit
+              </OpenPanelButton>
+            )))}
+          </span>
         </div>
         {children}
         {files}
@@ -79,7 +82,8 @@ export function BoxFacts({ rows, wide }: { rows: [string, ReactNode][]; wide?: b
   return (
     <dl
       className={cn(
-        "grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 px-5 py-4 text-sm max-sm:px-4",
+        RULES.box.body,
+        "grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm",
         wide && "@3xl:grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1fr)] @3xl:gap-x-6",
       )}
     >
