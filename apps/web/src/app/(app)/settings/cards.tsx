@@ -135,7 +135,7 @@ export function SettingsCard({
         title={card.title}
         description={card.description}
         // ✎ Edit stays top right on a phone too (design system: card header actions).
-        className="max-sm:flex-row max-sm:gap-3"
+        keepRow
         actions={<EditButton aria-label={`Edit ${card.title.toLowerCase()}`} onClick={() => panel.openPanel()} />}
       />
       <CardBody className="flex flex-col gap-4">

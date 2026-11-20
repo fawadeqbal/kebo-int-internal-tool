@@ -83,7 +83,10 @@ export function HistoryTable({
 }) {
   if (!entries.length) return <p className={cn(RULES.box.inset, "py-6 text-sm text-muted")}>{empty}</p>;
   return (
-    <Table className={cn("", tags && "table-fixed")}>
+    // A fixed layout: the columns keep their widths, and on a phone the one column takes the box (in an auto layout a
+    // long change made it wider than the screen).
+    // data-fit: made to fit a phone (one column there), so the phone tables' 36rem minimum does not apply.
+    <Table className="table-fixed" data-fit="">
       <THead>
         <tr>
           {/* On a phone one column: what changed, with when and who under it (three columns squeezed it). */}

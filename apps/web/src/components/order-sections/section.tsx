@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Tone } from "@kebo/shared";
-import { cn, RULES } from "@kebo/ui";
+import { cn, headActionsClass, RULES } from "@kebo/ui";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
 
 /**
@@ -48,7 +48,7 @@ export function Section({
       word={state ? { text: state, tone } : null}
       what={title.toLowerCase()}
       canEdit={!!actions}
-      edit={actions ? <span className="flex flex-wrap items-center justify-end gap-1.5">{actions}</span> : undefined}
+      edit={actions ? <span className={cn(headActionsClass, "flex flex-wrap items-center justify-end gap-1.5")}>{actions}</span> : undefined}
       className={cn("min-w-0", wide && "lg:col-span-full")}
       files={files}
     >

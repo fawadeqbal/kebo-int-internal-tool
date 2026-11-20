@@ -300,9 +300,12 @@ export function CardHeader({
   how,
   howTitle,
   titleId,
+  keepRow,
 }: {
   title: ReactNode;
   description?: ReactNode;
+  /** One small button (✎ Edit): it stays top right on a phone too, beside the title, instead of going under it. */
+  keepRow?: boolean;
   actions?: ReactNode;
   className?: string;
   /** How the card's figures are worked out, behind an ⓘ beside the title (HowMade). */
@@ -312,6 +315,8 @@ export function CardHeader({
   /** The title's id, for a box labelled by it (aria-labelledby). */
   titleId?: string;
 }) {
+  // With words under the title and buttons, a phone puts the buttons under them (unless one small button keeps its row).
+  const stacks = !!(description && actions && !keepRow);
   const heading = (
     <h2 id={titleId} className={boxTitleClass}>
       {title}
@@ -320,12 +325,13 @@ export function CardHeader({
   return (
     // With a description and actions, a phone puts the actions under the text instead of squeezing it; actions
     // that do not fit beside the title (a narrow screen) go under it rather than past the edge.
-    <div className={cn(boxHeadClass, "justify-between gap-x-3", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
+    <div className={cn(boxHeadClass, "justify-between gap-x-3", stacks && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
       {/* The words shrink (a long description wraps) so the buttons stay at the right on a laptop. */}
       {/* 8rem kept for the words before the buttons go under them: a short title keeps its buttons beside it in a
           320px side box ("Money · Statement"), a long one still wraps its words rather than squeezing them. */}
-      {/* Stacked on a phone (a description and buttons), the 8rem is a height: there it takes only its own height. */}
-      <div className={cn("min-w-0 flex-[1_1_8rem]", description && actions && "max-sm:flex-none")}>
+      {/* Stacked on a phone (a description and buttons), the 8rem would be a height: there it sizes to its words
+          (its own height stacked; still shrinking, and wrapping, when a head keeps one row on a phone). */}
+      <div className={cn("min-w-0 flex-[1_1_8rem]", stacks && "max-sm:basis-auto")}>
         {how ? (
           <div className="flex items-center gap-1">
             {heading}
@@ -589,13 +595,18 @@ export function EmptyLine({ inset, className, ...props }: ComponentProps<"p"> & 
 }
 
 /* ---------------------------------------------------------------- Table */
+/**
+ * Every table's own class (Table and the app's DataTable): on a phone the first column (a name) keeps 10rem and the
+ * table scrolls sideways, rather than every column squeezing the names onto four lines (sweep 20 Nov: Reports ›
+ * Customers, Suppliers, People).
+ */
+export const tableClass = "w-full border-collapse text-md max-sm:[&_tbody_td:first-child]:min-w-40 max-sm:[&_thead_th:first-child]:min-w-40";
+
 export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
     <ScrollFade className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
-      {/* On a phone the first column (a name) keeps 9rem and the table scrolls sideways, rather than every column
-          squeezing the names onto four lines (sweep 20 Nov: Reports › Customers, Suppliers, People). */}
-      <table className={cn("w-full border-collapse text-md max-sm:[&_tbody_td:first-child]:min-w-36 max-sm:[&_thead_th:first-child]:min-w-36", className)} {...props} />
+      <table className={cn(tableClass, className)} {...props} />
     </ScrollFade>
   );
 }

@@ -81,8 +81,10 @@ export function RecordBox({
  * The one way facts are drawn (records, Details, settings, a role): the label at the left, quiet; the value beside
  * it. Its dt is `FACT_LABEL`, its dd `FACT_VALUE`.
  */
-export const FACTS_GRID = "grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm";
-export const FACT_LABEL = "text-text-2";
+// The label column fits its words up to 45% of the box, then the label wraps (a settings label like "Remind about a
+// new inquiry after" made a phone page wider than the screen); never under 6.5rem.
+export const FACTS_GRID = "grid grid-cols-[fit-content(45%)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm";
+export const FACT_LABEL = "min-w-[6.5rem] text-text-2";
 export const FACT_VALUE = "min-w-0 font-medium break-words text-text";
 
 /** Label · value rows of a box, the label quiet. `wide`: in two columns of rows once the box is wide enough. */
