@@ -2,25 +2,12 @@ import { redirect } from "next/navigation";
 import { can, ORDER_WORD_TONE } from "@kebo/shared";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { api } from "@/lib/api";
-import type { FactoryGroups, FactoryOrders } from "@/lib/types-facts";
+import type { FactoryOrders } from "@/lib/types-facts";
 import { DataTable } from "@/components/common/data-table";
-import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
-import { ArrowRight, FileText } from "lucide-react";
-import {
-  ButtonLink,
-  Card,
-  CardBody,
-  CardHeader,
-  EmptyState,
-  RefCode,
-  StatusBadge,
-  Table,
-  Td,
-  Th,
-  THead,
-  Tr,
-  type StatusMeaning, EmptyLine } from "@kebo/ui";
-import { date, plural, whole, companyToday } from "@/lib/format";
+import { factoryOf } from "@/lib/party-data";
+import { ArrowRight } from "lucide-react";
+import { ButtonLink, Card, CardHeader, EmptyState, RefCode, StatusBadge, Table, Td, Th, THead, Tr, type StatusMeaning } from "@kebo/ui";
+import { date, whole, companyToday } from "@/lib/format";
 import { getPeople } from "@/lib/loaders";
 import type { Person } from "@/lib/types";
 import { DetailsCard } from "@/components/common/record";
@@ -28,7 +15,6 @@ import { RecordLanding } from "@/components/common/record-nav";
 import { saveFactoryAction } from "../actions";
 import { FactoryPanel } from "../factory-form";
 import { supplierTitle } from "@/lib/titles";
-import { RecordBody } from "@/components/records/record-frame";
 
 export const generateMetadata = supplierTitle();
 
@@ -60,95 +46,17 @@ export default async function FactoryOverview({
   const me = await requirePermission("sourcing.manage");
   const editing = sp.panel === "edit-factory";
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
-  const [f, people, payables, pos, groups] = await Promise.all([
+  const [f, people, pos] = await Promise.all([
     factoryOf(id),
     editing ? getPeople().catch(() => [] as Person[]) : ([] as Person[]),
-    factoryPayablesOf(id),
     money ? api.get<FactoryOrders>("/insights/facts/factory-orders", { factoryId: id }).catch(() => null) : null,
-    money
-      ? api.get<FactoryGroups>("/insights/facts/factories/groups", { period: "all", by: "factory", factoryId: id }).catch(() => null)
-      : null,
   ]);
   const r = f.record;
-  const toPay = payables.filter((p) => Number(p.toPay) > 0.005);
   const today = companyToday();
-  const perf = groups?.rows[0] ?? null;
-  // Bought, paid and owed, per currency, from its orders.
-  const sums = [...new Set((pos?.rows ?? []).map((o) => o.currency))].map((cur) => {
-    const of = (pos?.rows ?? []).filter((o) => o.currency === cur);
-    const add = (k: "owed" | "paid" | "toPay") => of.reduce((t, o) => t + Number(o[k]), 0);
-    return { cur, orders: of.length, owed: add("owed"), paid: add("paid"), toPay: add("toPay") };
-  });
 
   return (
     <div className="flex flex-col gap-4">
       <RecordLanding />
-      <RecordBody
-        panelLabel="At a glance"
-        panel={
-          <>
-          {/* Money (board): bought, paid, what we owe. */}
-          <Card>
-            <CardHeader
-              title="Money"
-              actions={
-                <ButtonLink href={`/suppliers/${f.id}/costs`} variant="link" size="sm">
-                  <FileText aria-hidden /> Statement
-                </ButtonLink>
-              }
-            />
-            <CardBody className="flex flex-col gap-2.5 text-md">
-              {sums.length ? (
-                sums.map((t) => (
-                  <div key={t.cur} className="flex flex-col gap-2.5">
-                    {[
-                      [`Bought (${plural(t.orders, "order")})`, whole(t.owed, t.cur)],
-                      ["Paid", whole(t.paid, t.cur)],
-                      ["We owe", whole(t.toPay, t.cur)],
-                    ].map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-3">
-                        <span className="text-text-2">{k}</span>
-                        <strong className="tabular">{v}</strong>
-                      </div>
-                    ))}
-                  </div>
-                ))
-              ) : toPay.length ? (
-                toPay.map((p) => (
-                  <div key={p.currency} className="flex justify-between gap-3">
-                    <span className="text-text-2">We owe ({plural(p.orders.length, "order")})</span>
-                    <strong className="tabular">{whole(p.toPay, p.currency)}</strong>
-                  </div>
-                ))
-              ) : (
-                <EmptyLine>Nothing bought or owed yet.</EmptyLine>
-              )}
-            </CardBody>
-          </Card>
-
-          {/* How they perform (board). */}
-          <Card>
-            <CardHeader title="How they perform" />
-            <CardBody className="flex flex-col gap-2.5 text-md">
-              {(
-                [
-                  ["Offers sent", String(f.quotes.length)],
-                  ["Chosen in a quotation", String(f.quotes.filter((q) => q.usedIn).length)],
-                  ...(perf ? ([["Won by customer", String(perf.offersWon)]] as const) : []),
-                  ["Avg. reply", r.avgDaysToAnswer === null ? "—" : `${r.avgDaysToAnswer} days`],
-                  ...(perf ? ([["On-time ready", perf.ready.known ? `${perf.ready.onTime} of ${perf.ready.known}` : "—"]] as const) : []),
-                ] as const
-              ).map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-3">
-                  <span className="text-text-2">{k}</span>
-                  <strong className="tabular">{v}</strong>
-                </div>
-              ))}
-            </CardBody>
-          </Card>
-        </>
-        }
-      >
           <DetailsCard
             flash={sp.saved === f.id}
             edit={{ panel: "edit-factory", id: f.id, label: `Edit ${f.name}` }}
@@ -242,7 +150,6 @@ export default async function FactoryOverview({
               <EmptyState title="Nothing in production" description="Orders this supplier makes for us show here." />
             )}
           </Card>
-      </RecordBody>
       {editing && <FactoryPanel action={saveFactoryAction.bind(null, f.id, f.updatedAt)} factory={f} people={people} meId={me.id} onRecord />}
     </div>
   );

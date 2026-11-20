@@ -7,6 +7,7 @@ import { RecordTabs } from "@/components/common/record-tabs";
 import { RecordFrame } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
 import { MoreMenu } from "@/components/common/more-menu";
+import { SupplierSide } from "./side";
 import { removeFactoryAction } from "../actions";
 
 /**
@@ -81,13 +82,15 @@ export default async function FactoryLayout({ children, params }: { children: Re
                 { path: "", label: "Overview" },
                 { path: "orders", label: "Orders", count: r.openOrders.length, alert: r.lateSteps > 0 },
                 { path: "offers", label: "Offers", count: f.quotes.length },
-                ...(managers ? [{ path: "costs", label: "Costs" }] : []),
+                ...(managers ? [{ path: "costs", label: "Money" }] : []),
                 { path: "notes", label: "Notes" },
               ]}
             />
           }
         />
       }
+      panel={<SupplierSide id={f.id} />}
+      panelLabel="At a glance"
     >
       {children}
     </RecordFrame>

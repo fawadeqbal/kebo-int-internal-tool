@@ -256,6 +256,15 @@ describe("one of each", () => {
     expect(found(/title="Roles" \/>/g).filter((f) => f.includes("roles/[key]"))).toEqual([]);
   });
 
+  it("one record: the side panel on every tab, adds open a window, delete in ⋯", () => {
+    // Customer and supplier: the panel comes from the layout (every tab), not from one tab's RecordBody.
+    expect(found(/<RecordBody\b/g).filter((f) => /\/(customers|suppliers)\/\[id\]\//.test(f))).toEqual([]);
+    // No add form always open in a side panel (New contact, Add a note): each opens its window.
+    expect(found(/panelLabel="(?:New contact|Add a note)"/g)).toEqual([]);
+    // Remove a customer or a supplier from its ⋯ (not a red button under the boxes).
+    expect(found(/label="Remove this (?:customer|supplier)"/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

@@ -455,9 +455,20 @@ export function QuickNote({ action }: { action: Action }) {
  */
 export function NoteCardForm({ action, contacts, today }: { action: Action; contacts?: { id: string; name: string }[]; today: string }) {
   const id = useId();
+  // In its window: saved, the window closes (a no-op outside one).
+  const close = useClosePanel();
   const [day, setDay] = useState(today);
   return (
-    <ActionForm action={action} resetOnSuccess showSuccess={false} onDone={() => setDay(today)} className="grid grid-cols-3 gap-4">
+    <ActionForm
+      action={action}
+      resetOnSuccess
+      showSuccess={false}
+      onDone={(s) => {
+        setDay(today);
+        close(s);
+      }}
+      className="grid grid-cols-3 gap-4"
+    >
       {(s) => (
         <>
           <Field label="Kind" htmlFor={`${id}-kind`} error={s.errors?.kind} className={contacts ? undefined : "col-span-2 sm:col-span-1"}>
