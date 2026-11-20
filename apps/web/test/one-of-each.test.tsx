@@ -220,6 +220,18 @@ describe("one of each", () => {
     expect(found(/label: <><\w+ aria-hidden \/> /g)).toEqual([]);
   });
 
+  it("one way for each action: quiet ✎ Edit, outline + in a box, blue next step, orange only to create, delete in ⋯", () => {
+    // ✎ Edit is EditButton (ghost, small, link colour); it has no size of its own.
+    expect(found(/<EditButton[^>]*\ssize=/g)).toEqual([]);
+    // No small orange button: orange is a list's create (md); a record's next step and a window's save are blue.
+    expect(found(/variant="strong" size="sm"/g)).toEqual([]);
+    expect(found(/variant="soft" onClick=\{onNext/g)).toEqual([]);
+    // A record's Remove opens from its ⋯ (VoidWindow), not a red button under its boxes (rows and windows keep theirs).
+    expect(found(/<VoidForm\b/g).filter((f) => f.includes("app/(app)/payments/"))).toEqual([]);
+    // A list's export is ⋯ (Export to Excel, Export as CSV), never a button beside the main one.
+    expect(found(/actions=\{<ExportCsv/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

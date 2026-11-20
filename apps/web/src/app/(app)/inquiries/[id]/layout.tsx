@@ -65,7 +65,7 @@ export default async function DealLayout({ children, params }: { children: React
       place: "primary",
       node:
         order && d.stage === "won" ? (
-          <ButtonLink href={`/orders/${order.id}`} variant="strong">
+          <ButtonLink href={`/orders/${order.id}`} variant="primary">
             Go to the order <ArrowRight aria-hidden />
           </ButtonLink>
         ) : next?.href && next.label ? (

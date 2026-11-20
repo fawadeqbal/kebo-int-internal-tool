@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
+import { buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
 import { ArrowRight } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
@@ -73,26 +73,21 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
         kind="list"
         crumbs={[{ label: "Money" }, { label: "Ledger" }]}
         title="Ledger"
-        actions={
-          <>
-            {view === "all" && (
-              <ExportCsv
-                what="ledger"
-                query={{
-                  from: period.from,
-                  to: period.to,
-                  type: sp.type,
-                  cur: sp.cur,
-                  removed: sp.removed,
-                  account: sp.account,
-                  order: sp.order,
-                }}
-              />
-            )}
-            <ButtonLink href={buildHref(PATH, {}, { view: "customers" })} variant="secondary" size="sm">
-              Statement…
-            </ButtonLink>
-          </>
+        more={
+          view === "all" ? (
+            <ExportCsv
+              what="ledger"
+              query={{
+                from: period.from,
+                to: period.to,
+                type: sp.type,
+                cur: sp.cur,
+                removed: sp.removed,
+                account: sp.account,
+                order: sp.order,
+              }}
+            />
+          ) : undefined
         }
       />
       <LinkTabs

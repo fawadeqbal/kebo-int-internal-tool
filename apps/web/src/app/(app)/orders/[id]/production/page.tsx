@@ -214,7 +214,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
             canEdit && (
               <>
                 <PanelButton
-                  size="sm"
+                  edit
                   label="Edit items"
                   title="Goods from the supplier"
                   description="What has come in on each item, and when. Nothing is saved until Save changes."

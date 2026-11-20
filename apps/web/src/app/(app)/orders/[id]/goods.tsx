@@ -379,7 +379,7 @@ function PackingMarks({
       </dl>
       <span className="flex items-center gap-2">
         <EditsChip card={card} title="Shipping marks" />
-        {canEdit && <EditButton size="xs" label="Change" onClick={() => setEditing(true)} />}
+        {canEdit && <EditButton onClick={() => setEditing(true)} />}
       </span>
       {editing && (
         <SidePanel title="Edit the shipping marks" description="As printed on the cartons. The container is changed on the shipment." onClose={() => setEditing(false)}>

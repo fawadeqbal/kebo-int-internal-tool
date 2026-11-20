@@ -179,10 +179,10 @@ export function FollowUpsCard({
         }
         actions={
           <PanelButton
-            variant="ghost"
+            variant="secondary"
             size="sm"
             icon={<Plus aria-hidden />}
-            label="Follow-up"
+            label="New follow-up"
             title="New follow-up"
             description="Shows on Home with a reminder"
             body={<FollowUpForm action={addFollowUpAction.bind(null, on)} people={people} meId={meId} today={today} record={label} />}

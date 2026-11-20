@@ -4,7 +4,6 @@ import { hasFeature, requirePermission } from "@/lib/session";
 import { api } from "@/lib/api";
 import type { FactoryGroups, FactoryOrders } from "@/lib/types-facts";
 import { DataTable } from "@/components/common/data-table";
-import { ConfirmAction } from "@/components/people/confirm-action";
 import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
 import { ArrowRight, FileText } from "lucide-react";
 import {
@@ -26,7 +25,7 @@ import { getPeople } from "@/lib/loaders";
 import type { Person } from "@/lib/types";
 import { DetailsCard } from "@/components/common/record";
 import { RecordLanding } from "@/components/common/record-nav";
-import { removeFactoryAction, saveFactoryAction } from "../actions";
+import { saveFactoryAction } from "../actions";
 import { FactoryPanel } from "../factory-form";
 import { supplierTitle } from "@/lib/titles";
 import { RecordBody } from "@/components/records/record-frame";
@@ -80,7 +79,6 @@ export default async function FactoryOverview({
     const add = (k: "owed" | "paid" | "toPay") => of.reduce((t, o) => t + Number(o[k]), 0);
     return { cur, orders: of.length, owed: add("owed"), paid: add("paid"), toPay: add("toPay") };
   });
-  const canRemove = can(me, "inquiries.updateAny");
 
   return (
     <div className="flex flex-col gap-4">
@@ -244,18 +242,6 @@ export default async function FactoryOverview({
               <EmptyState title="Nothing in production" description="Orders this supplier makes for us show here." />
             )}
           </Card>
-          {canRemove && (
-            <div className="flex justify-end">
-              <ConfirmAction
-                action={removeFactoryAction.bind(null, f.id)}
-                confirm={`Remove ${f.name}? It will no longer appear in lists and pickers. Its past prices stay on their inquiries.`}
-                label="Remove this supplier"
-                pendingText="Removing…"
-                variant="danger-ghost"
-                size="sm"
-              />
-            </div>
-          )}
       </RecordBody>
       {editing && <FactoryPanel action={saveFactoryAction.bind(null, f.id, f.updatedAt)} factory={f} people={people} meId={me.id} onRecord />}
     </div>

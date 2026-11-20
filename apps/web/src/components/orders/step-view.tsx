@@ -508,7 +508,7 @@ export function LinesCard({
             {actions}
             {editable && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
             {canEdit && editPanel && (
-              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="secondary" size="sm">
+              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="ghost" size="xs" className="text-primary hover:text-primary">
                 <Pencil aria-hidden /> {editLabel}
               </OpenPanelButton>
             )}
@@ -553,9 +553,12 @@ export function PanelButton({
   className,
   panelClassName,
   name,
+  edit,
 }: {
   /** A link opens it: ?do=<name> (the order's next step). */
   name?: string;
+  /** It changes the box it sits in: drawn as the one quiet ✎ Edit (EditButton), its label its words. */
+  edit?: boolean;
   label: ReactNode;
   title: string;
   description?: string;
@@ -571,9 +574,13 @@ export function PanelButton({
   useOpenFromLink(name, () => setOpen(true));
   return (
     <>
-      <Button size={size} variant={variant} onClick={() => setOpen(true)} className={className}>
-        {icon} {label}
-      </Button>
+      {edit ? (
+        <EditButton label={label} onClick={() => setOpen(true)} className={className} />
+      ) : (
+        <Button size={size} variant={variant} onClick={() => setOpen(true)} className={className}>
+          {icon} {label}
+        </Button>
+      )}
       {open && (
         <SidePanel title={title} description={description} onClose={() => setOpen(false)} className={panelClassName}>
           {body}

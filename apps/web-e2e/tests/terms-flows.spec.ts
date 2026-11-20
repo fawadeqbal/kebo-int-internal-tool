@@ -232,7 +232,7 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(factory.getByText("30 days after the deposit")).toBeVisible();
   await expect(factory.getByText("12 months", { exact: true })).toBeVisible();
   expect(await accessibilityProblems(page), "the purchase order meets WCAG 2.2 AA").toEqual([]);
-  await factory.getByRole("button", { name: "Change", exact: true }).click();
+  await factory.getByRole("button", { name: "Edit what we agreed with the supplier" }).click();
   const terms = page.getByRole("dialog", { name: /What we agreed with Jinan Terms/ });
   await expect(terms.getByText(/Not sent yet/)).toBeVisible();
   expect(await accessibilityProblems(page), "the supplier's Change window meets WCAG 2.2 AA").toEqual([]);

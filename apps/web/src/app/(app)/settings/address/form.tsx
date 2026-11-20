@@ -15,7 +15,7 @@ export function AddressEdit({ view }: { view: AddressView }) {
   const panel = useSidePanel("company-address");
   return (
     <>
-      <EditButton label="Change" aria-label="Change the company address" onClick={() => panel.openPanel()} />
+      <EditButton aria-label="Edit the company address" onClick={() => panel.openPanel()} />
       {panel.open && (
         <SidePanel title="Change the company address" description="Where your team signs in and works. Links in emails go here too." onClose={() => panel.close()}>
           <PanelBody>

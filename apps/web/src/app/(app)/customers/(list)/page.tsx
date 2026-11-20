@@ -135,9 +135,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         papers={
           <>
             {canAdd && <PartyExcel kind="customers" importAction={importCustomersAction} />}
-            <ExportCsv what="customers" query={query} />
           </>
         }
+        more={<ExportCsv what="customers" query={query} />}
         primary={
           canAdd && (
             <OpenPanelButton panel="new-customer" variant="strong" label="Add customer">

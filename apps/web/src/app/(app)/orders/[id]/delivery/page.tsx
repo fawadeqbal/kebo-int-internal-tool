@@ -78,7 +78,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
     );
   const linesButton = canEdit && goodsLines.length > 0 && (
     <PanelButton
-      size="sm"
+      edit
       label="Edit items"
       title="Delivery"
       description="How many of each item reached the customer, and in what condition. Nothing is saved until Save changes."

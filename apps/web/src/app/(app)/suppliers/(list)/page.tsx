@@ -104,9 +104,9 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         papers={
           <>
             <PartyExcel kind="factories" importAction={importFactoriesAction} />
-            <ExportCsv what="factories" query={query} />
           </>
         }
+        more={<ExportCsv what="factories" query={query} />}
         primary={
           <OpenPanelButton panel="new-factory" variant="strong" label="Add supplier">
             <Plus aria-hidden /> <span className="sm:hidden">Add</span>

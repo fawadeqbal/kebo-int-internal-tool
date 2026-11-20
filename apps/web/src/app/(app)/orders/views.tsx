@@ -124,12 +124,8 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         kind="list"
         crumbs={crumbsFor("/orders")}
         title="Sales orders"
-        actions={
-          <>
-            <ViewSwitch view="list" mine={mine} />
-            <ExportCsv what="orders" query={{ status, mine: keep.mine, q: sp.q }} />
-          </>
-        }
+        views={<ViewSwitch view="list" mine={mine} />}
+        more={<ExportCsv what="orders" query={{ status, mine: keep.mine, q: sp.q }} />}
       />
 
       <StatRow facts>
@@ -343,7 +339,7 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
         kind="list"
         crumbs={crumbsFor("/orders")}
         title="Sales orders"
-        actions={<ViewSwitch view="board" mine={mine} />}
+        views={<ViewSwitch view="board" mine={mine} />}
       />
       <FilterCard
         search="Search…"

@@ -145,7 +145,7 @@ export default async function QuotationOwnPage({
       place: "primary",
       when: isDraft && !!send,
       node: (
-        <PanelButton variant="strong" size="sm" icon={<Send aria-hidden />} label={`Send R${r.number}`} title={`Send ${quoteRef} to ${d.customer.name}`} description={`Valid until ${date(r.validUntil)}`} panelClassName={RULES.window.part} body={send} />
+        <PanelButton variant="primary" icon={<Send aria-hidden />} label={`Send R${r.number}`} title={`Send ${quoteRef} to ${d.customer.name}`} description={`Valid until ${date(r.validUntil)}`} panelClassName={RULES.window.part} body={send} />
       ),
     },
     {

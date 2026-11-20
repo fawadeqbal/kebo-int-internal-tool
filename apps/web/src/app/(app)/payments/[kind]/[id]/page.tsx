@@ -9,7 +9,8 @@ import { crumbsFor } from "@/lib/nav";
 import { requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
 import type { ReactNode } from "react";
-import { EditCustomerPayment, EditFactoryPayment, VoidForm } from "@/components/money/forms";
+import { EditCustomerPayment, EditFactoryPayment, VoidWindow } from "@/components/money/forms";
+import { MoreMenu } from "@/components/common/more-menu";
 import { AttachedFile } from "@/components/money/attachment";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
 import { getPeople, getSettings } from "@/lib/loaders";
@@ -104,6 +105,9 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
             </ButtonLink>
           ) : undefined
               ),
+              more: p.voidPath ? (
+                <MoreMenu label={`More for ${p.number ?? "this payment"}`} items={[{ label: "Remove this payment", panel: "remove", danger: true }]} />
+              ) : undefined,
             }}
             notice={
         <>
@@ -112,7 +116,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
               tone="todo"
               title="Waiting for verification."
               action={
-                <ButtonLink href="/approvals" variant="strong">
+                <ButtonLink href="/approvals" variant="primary">
                   <Check aria-hidden /> Verify
                 </ButtonLink>
               }
@@ -197,12 +201,8 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
               </Table>
             </Card>
           )}
-          {(change || p.voidPath) && (
-            <div className="flex flex-wrap items-start gap-2">
-              {change}
-              {p.voidPath && <VoidForm action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
-            </div>
-          )}
+          {change && <div className="flex flex-wrap items-start gap-2">{change}</div>}
+          {p.voidPath && <VoidWindow action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
       </RecordShell>
     </div>
   );
