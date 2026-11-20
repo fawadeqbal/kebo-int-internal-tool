@@ -5,6 +5,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import {
   addressOf,
+  CONNECT_SUB,
   companyCreateInput,
   companyStatusInput,
   companyUpdateInput,
@@ -76,6 +77,9 @@ const deleteInput = z.object({
 const tokenInput = z.object({ token: z.string().min(10).max(2000) });
 /** Page views counted per address and minute (POST /platform/public/visit). */
 const VISITS_PER_MINUTE = Number(process.env.SITE_VISITS_PER_MINUTE) || 30;
+/** Domain checks on connect.<BASE_DOMAIN> per address and minute (each is a few DNS look-ups). */
+const CONNECT_CHECKS_PER_MINUTE = 12;
+const ownDomainInput = z.object({ domain: z.string().trim().min(1, "Type the domain").max(260) });
 
 /** Public pages of the platform: request a demo, sign up, confirm, set a password from a link. */
 @ApiTags("platform")
@@ -180,6 +184,8 @@ export class PlatformPublicController {
       a.kind === "root" ||
       a.kind === "admin" ||
       a.kind === "marketing" ||
+      // connect.<BASE_DOMAIN>: where companies' own domains point, with a page that explains it (and checks one).
+      (a.kind === "company" && a.slug === CONNECT_SUB && this.domains.enabled) ||
       (a.kind === "company" && !!(await this.companies.bySlug(a.slug))) ||
       // A company's own domain (not one of ours).
       (a.kind === "other" && (await this.domains.isOwnDomain(domain)));
@@ -232,6 +238,17 @@ export class PlatformPublicController {
     // Switched on (or read-only: its people can still sign in to look); never one that is off or deleted.
     if (!c || (c.status !== "active" && c.status !== "read_only")) throw new NotFoundError("Company");
     return c;
+  }
+
+  /**
+   * connect.<BASE_DOMAIN>'s check: a domain someone is connecting, looked up step by step, with what is
+   * wrong. Any domain may be checked; nothing is said about which company it belongs to.
+   */
+  @Public()
+  @Get("connect-check")
+  connectCheck(@Query("domain") domain = "", @Req() req: Request) {
+    this.visits.check(`connect-check:${clientIp(req)}`, CONNECT_CHECKS_PER_MINUTE, 60_000, "Too many checks. Please try again in a minute.");
+    return this.domains.diagnoseTyped(domain);
   }
 
   /** The company whose own domain an address is (connected ones only): its short name, for the web app. 404: none. */
@@ -335,6 +352,7 @@ export class PlatformController {
     private readonly plans: PlansService,
     private readonly prisma: PrismaService,
     private readonly site: SiteService,
+    private readonly domains: OwnDomainService,
   ) {}
 
   /* ---------------------------------------------------------------- the marketing site */
@@ -534,6 +552,50 @@ export class PlatformController {
     const c = await this.companies.get(id);
     if (body.confirm.trim().toLowerCase() !== c.slug) throw new DomainError(`Type ${c.slug} to confirm.`);
     return this.companies.remove(admin, id, body.reason ?? undefined);
+  }
+
+  /* ---------------------------------------------------------------- a company's web address (claude/own-domains-admin-design.md) */
+
+  /** Its address under ours and its own domain, with a full look-up of the domain (company page › Details). */
+  @PlatformRoute()
+  @Get("companies/:id/domain")
+  async domain(@Param("id", ParseUUIDPipe) id: string) {
+    await this.companies.get(id);
+    const [view, diagnosis] = await Promise.all([this.domains.get(id, true), this.domains.diagnose(id)]);
+    return { enabled: this.domains.enabled, ...view, diagnosis };
+  }
+
+  /** Looks the domain up now and keeps what was found ("Check now"). */
+  @PlatformRoute()
+  @Post("companies/:id/domain/check")
+  @HttpCode(200)
+  async checkDomain(@Param("id", ParseUUIDPipe) id: string) {
+    await this.companies.get(id);
+    await this.domains.check(id);
+    return this.domain(id);
+  }
+
+  /** Connects a domain for the company (asked for by the client): kept, and looked up at once. */
+  @PlatformRoute()
+  @Put("companies/:id/domain")
+  async connectDomain(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(ownDomainInput)) body: { domain: string }) {
+    const c = await this.companies.get(id);
+    const row = await this.domains.connect(id, body.domain);
+    await this.companies.log(admin, "update", `Connected ${c.name}'s own domain ${row.ownDomain}${row.ownDomainStatus === "connected" ? "" : " (waiting for its record)"}`, { companyId: id });
+    return this.domain(id);
+  }
+
+  /** Removes it: the company is at its address under ours only. */
+  @PlatformRoute()
+  @Delete("companies/:id/domain")
+  async removeDomain(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string) {
+    const c = await this.companies.get(id);
+    const before = await this.domains.get(id, true);
+    if (before.domain) {
+      await this.domains.remove(id);
+      await this.companies.log(admin, "update", `Removed ${c.name}'s own domain ${before.domain}; its people are at ${before.ours}`, { companyId: id });
+    }
+    return this.domain(id);
   }
 
   @PlatformRoute()

@@ -25,6 +25,7 @@ import { CopyLink } from "./forms";
 import { headline, SECTIONS, sectionHref, sectionOf } from "./model";
 import { CompanyPanels, type SavedCard } from "./panels";
 import { BillingSection, DetailsSection, HistorySection, OverviewSection, PeopleSection, PlanSection } from "./sections";
+import { CompanyDomainCard } from "./domain-card";
 import { cache } from "react";
 
 /** The company, read once per request (the page and its tab title). */
@@ -203,7 +204,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             removePayment={Object.fromEntries(c.payments.map((p) => [p.id, removePaymentAction.bind(null, id, p.id)]))}
           />
         )}
-        {section === "details" && <DetailsSection c={c} saved={saved} />}
+        {section === "details" && <DetailsSection c={c} saved={saved} domain={<CompanyDomainCard id={c.id} name={c.name} live={live} />} />}
         {section === "history" && history && <HistorySection c={c} history={history} page={toPage(sp.page)} />}
       </SectionList>
 

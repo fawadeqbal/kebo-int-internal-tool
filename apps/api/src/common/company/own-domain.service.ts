@@ -1,7 +1,19 @@
 import { promises as dns } from "node:dns";
 import { Global, Inject, Injectable, Module } from "@nestjs/common";
 import type { CompanyModel as Company } from "@kebo/database";
-import { companyOrigin, connectTarget, domainProblem, ownDomainRecord, tidyDomain, type OwnDomainProblem, type OwnDomainStatus, type OwnDomainView } from "@kebo/shared";
+import {
+  companyOrigin,
+  connectTarget,
+  dnsProvider,
+  domainProblem,
+  ownDomainRecord,
+  tidyDomain,
+  type DomainDiagnosis,
+  type DomainVerdict,
+  type OwnDomainProblem,
+  type OwnDomainStatus,
+  type OwnDomainView,
+} from "@kebo/shared";
 import { ConflictError, DomainError } from "@kebo/utils";
 import { ENV, type Env } from "../../config/env";
 import { PrismaService } from "../../database/prisma.service";
@@ -39,6 +51,68 @@ export class DomainLookup {
       return none(e) ? "not_ours" : "unknown";
     }
   }
+
+  /**
+   * Every step, for people to read (the platform's company page, connect.<BASE_DOMAIN>): does the domain
+   * itself answer, is there a record, where does it point, where does it end up, who keeps the records.
+   */
+  async diagnose(domain: string, target: string, now = new Date()): Promise<DomainDiagnosis> {
+    const zone = domain.split(".").slice(1).join(".");
+    const [cname, addresses, ourAddresses, zoneAddresses, nameservers] = await Promise.all([
+      listOf(() => dns.resolveCname(domain)),
+      listOf(() => dns.resolve4(domain)),
+      listOf(() => dns.resolve4(target)),
+      listOf(() => dns.resolve4(zone)),
+      this.nameservers(zone),
+    ]);
+    const provider = nameservers ? dnsProvider(nameservers) : null;
+    return {
+      domain,
+      zone,
+      target,
+      checkedAt: now.toISOString(),
+      verdict: verdictOf({ cname, addresses, ourAddresses, provider, target }),
+      zoneAddresses,
+      cname: cname?.map(clean) ?? null,
+      addresses,
+      ourAddresses,
+      nameservers: nameservers?.map(clean) ?? null,
+      provider,
+    };
+  }
+
+  /** The nameservers of the zone, or of the first one above it that has any ("a.b.acme.co.uk" → acme.co.uk's). */
+  private async nameservers(zone: string): Promise<string[] | null> {
+    const labels = zone.split(".");
+    for (let i = 0; i < labels.length - 1; i++) {
+      const ns = await listOf(() => dns.resolveNs(labels.slice(i).join(".")));
+      if (ns === null) return null;
+      if (ns.length) return ns;
+    }
+    return [];
+  }
+}
+
+/** A look-up's answer: the list, [] for "there is no such record", null when the look-up itself failed. */
+async function listOf(f: () => Promise<string[]>): Promise<string[] | null> {
+  try {
+    return await f();
+  } catch (e) {
+    return none(e) ? [] : null;
+  }
+}
+
+/** What the steps add up to: the same rule as DomainLookup.find, with the reason when it is not ours. */
+export function verdictOf(f: { cname: string[] | null; addresses: string[] | null; ourAddresses: string[] | null; provider: string | null; target: string }): DomainVerdict {
+  const { cname, addresses, ourAddresses, provider, target } = f;
+  if (cname === null && addresses === null) return "unknown";
+  const names = (cname ?? []).map(clean);
+  if (names.includes(target)) return "right";
+  if (addresses?.length && ourAddresses?.length && addresses.every((ip) => ourAddresses.includes(ip))) return "right";
+  if (names.length) return "wrong_target";
+  if (addresses?.length) return provider === "Cloudflare" ? "proxied" : "other_address";
+  if (addresses === null || cname === null) return "unknown";
+  return "no_record";
 }
 
 type Row = Pick<Company, "id" | "slug" | "name" | "ownDomain" | "ownDomainStatus" | "ownDomainProblem" | "ownDomainCheckedAt" | "ownDomainSince" | "ownDomainLostAt">;
@@ -94,6 +168,22 @@ export class OwnDomainService {
 
   async get(companyId: string, canChange: boolean): Promise<OwnDomainView> {
     return this.view(await this.row(companyId), canChange);
+  }
+
+  /** A full look-up of the company's domain, step by step (null: it has none, or addresses per company are off). */
+  async diagnose(companyId: string): Promise<DomainDiagnosis | null> {
+    const c = await this.row(companyId);
+    if (!c.ownDomain || !this.env.BASE_DOMAIN) return null;
+    return this.lookup.diagnose(c.ownDomain, connectTarget(this.env.BASE_DOMAIN));
+  }
+
+  /** connect.<BASE_DOMAIN>'s check: any domain someone is connecting, looked up step by step. Says nothing about whose it is. */
+  async diagnoseTyped(typed: string): Promise<DomainDiagnosis> {
+    if (!this.enabled) throw new DomainError("Connecting your own domain is not switched on here.");
+    const domain = tidyDomain(typed);
+    const problem = domainProblem(domain, this.env.BASE_DOMAIN!);
+    if (problem) throw new DomainError(problem);
+    return this.lookup.diagnose(domain, connectTarget(this.env.BASE_DOMAIN!));
   }
 
   /** The company whose connected domain this is (the web app asks for an address that is not ours). */

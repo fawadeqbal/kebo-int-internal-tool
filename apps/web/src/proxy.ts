@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { addressOf, adminOrigin, marketingOrigin } from "@kebo/shared";
+import { addressOf, adminOrigin, CONNECT_SUB, marketingOrigin } from "@kebo/shared";
 
 /**
  * Addresses per company (only when BASE_DOMAIN is set; otherwise everything is
@@ -17,6 +17,8 @@ import { addressOf, adminOrigin, marketingOrigin } from "@kebo/shared";
  *    page and is never sent anywhere, so the phone app keeps working.
  *  - get.<BASE_DOMAIN>: the marketing site's old address; sends people on to
  *    the plain one (same page).
+ *  - connect.<BASE_DOMAIN>: what companies' own domains point to; / explains
+ *    it and /check?domain=… looks one up (app/connect).
  *  - any other address: a company's own domain ("erp.acme.com") while it is
  *    connected (Settings › Company address); the company's address under ours
  *    then sends people on to it.
@@ -75,6 +77,12 @@ export async function proxy(req: NextRequest) {
   if (a.kind === "marketing") return NextResponse.redirect(`${marketing}${short}${search}`);
   // The marketing site's pages live at the plain address only, at their short paths.
   if (short !== path) return NextResponse.redirect(`${marketing}${short}${search}`);
+  // connect.<BASE_DOMAIN>, where companies' own domains point: the page that explains it, and its check.
+  if (a.kind === "company" && a.slug === CONNECT_SUB) {
+    if (path === "/") return NextResponse.rewrite(new URL(`/connect${search}`, req.url));
+    if (path === "/check") return NextResponse.rewrite(new URL(`/connect/check${search}`, req.url));
+    return NextResponse.redirect(`https://${host}/`);
+  }
   if (a.kind === "company") {
     const c = await companyAt(a.slug);
     if (!c) return NextResponse.rewrite(new URL("/no-company", req.url));
