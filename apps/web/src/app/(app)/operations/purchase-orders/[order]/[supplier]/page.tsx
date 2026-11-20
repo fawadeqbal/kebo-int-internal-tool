@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, Printer, ShoppingCart } from "lucide-react";
+import { ExternalLink, Printer } from "lucide-react";
 import { PAYMENT_METHOD_LABEL, RECORD_KIND, RECORD_TITLE } from "@kebo/shared";
 import { ButtonLink, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
@@ -126,7 +126,6 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           <RecordTop
             header={{
               crumbs: [{ label: "Purchasing" }, { label: "Purchase orders", href: PURCHASE_ORDERS }, { label: po.number }],
-              icon: ShoppingCart,
               title: RECORD_TITLE.purchaseOrder({ items: lines, supplier: po.supplier.name }),
               record: { kind: RECORD_KIND.purchaseOrder, number: po.number },
               badge: status ? <StatusBadge meaning={status.meaning}>{status.label}</StatusBadge> : undefined,

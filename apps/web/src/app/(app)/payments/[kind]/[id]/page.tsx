@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Banknote, Check, FileText } from "lucide-react";
+import { Check, FileText } from "lucide-react";
 import { can, PAYMENT_RECORD_KINDS, PAYMENT_RECORD_LABEL, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
 import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, RefCode, StatusBadge, Table, Td, Th, THead, Tr, EmptyLine, Notice } from "@kebo/ui";
 import { api } from "@/lib/api";
@@ -92,7 +92,6 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
         top={
           <RecordTop
             header={{
-              icon: Banknote,
               crumbs: [...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }],
               title: title,
               record: { kind: kindOf(p), number: p.number },

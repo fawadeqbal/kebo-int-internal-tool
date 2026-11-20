@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Pencil, ShieldCheck } from "lucide-react";
 import { PERMISSION_GROUPS } from "@kebo/shared";
-import { Avatar, Badge, Card, CardBody, CardHeader, cn, PageHeader, StatusBadge } from "@kebo/ui";
+import { Avatar, Badge, Card, CardBody, CardHeader, cn, EmptyLine, PageHeader, StatusBadge } from "@kebo/ui";
+import { RecordBody } from "@/components/records/record-frame";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import { hasFeature, load, requireUser } from "@/lib/session";
@@ -35,20 +36,49 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
       <Pencil aria-hidden /> Edit
     </OpenPanelButton>
   );
+  const people = (
+    <Card className="overflow-hidden">
+        <CardHeader title={`People in this role (${r.members.length})`} description="Change someone's role under Users." />
+        {r.members.length === 0 ? (
+          <EmptyLine inset>Nobody yet. Give it to someone under Users.</EmptyLine>
+        ) : (
+          <ul className="divide-y divide-line">
+            {r.members.map((m) => (
+              <li key={m.id}>
+                <Link href={`/users/${m.id}`} className={cn("flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/50", !m.isActive && "text-muted")}>
+                  <Avatar name={m.name} size={26} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{m.name}</span>
+                    <span className="block truncate text-xs text-muted">{m.isActive ? (m.lastLoginAt ? `Signed in ${timeAgo(m.lastLoginAt)}` : "Never signed in") : "Switched off"}</span>
+                  </span>
+                  {m.totpEnabledAt ? (
+                    <ShieldCheck className="size-4 text-ok" aria-label="Uses two-step sign-in" />
+                  ) : r.requireTwoStep && m.isActive ? (
+                    <StatusBadge meaning="warn">Must set up</StatusBadge>
+                  ) : null}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+  );
   return (
     <div>
-    <PageHeader crumbs={[...crumbsFor("/access/roles").slice(0, 1), { label: "Roles", href: "/access/roles" }, { label: r.name }]} title="Roles" />
-    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+    {/* A record is titled by its name (the role's), with its kind beside it; the one record body below. */}
+    <PageHeader
+      crumbs={[...crumbsFor("/access/roles").slice(0, 1), { label: "Roles", href: "/access/roles" }, { label: r.name }]}
+      title={r.name}
+      record={{ kind: "Role" }}
+      badge={r.superAdmin ? <Badge tone="primary">Everything</Badge> : r.preset ? <Badge tone="outline">Built in</Badge> : undefined}
+    />
+    <RecordBody panel={people} panelLabel="People in this role">
       <div className="flex min-w-0 flex-col gap-4">
         <Card>
           <CardHeader
             title={
               <span className="flex flex-wrap items-center gap-2">
-                <Link href="/access/roles" className="font-normal text-muted hover:text-text">
-                  Roles ›
-                </Link>
-                {r.name}
-                {r.superAdmin ? <Badge tone="primary">Everything</Badge> : r.preset ? <Badge tone="outline">Built in</Badge> : null}
+                Details
                 {r.frozen && <StatusBadge meaning="warn">Frozen: not in your plan</StatusBadge>}
               </span>
             }
@@ -142,31 +172,6 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
         </Card>
       </div>
 
-      <Card className="overflow-hidden">
-        <CardHeader title={`People in this role (${r.members.length})`} description="Change someone's role under Users." />
-        {r.members.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-muted">Nobody yet. Give it to someone under Users.</p>
-        ) : (
-          <ul className="divide-y divide-line">
-            {r.members.map((m) => (
-              <li key={m.id}>
-                <Link href={`/users/${m.id}`} className={cn("flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/50", !m.isActive && "text-muted")}>
-                  <Avatar name={m.name} size={26} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{m.name}</span>
-                    <span className="block truncate text-xs text-muted">{m.isActive ? (m.lastLoginAt ? `Signed in ${timeAgo(m.lastLoginAt)}` : "Never signed in") : "Switched off"}</span>
-                  </span>
-                  {m.totpEnabledAt ? (
-                    <ShieldCheck className="size-4 text-ok" aria-label="Uses two-step sign-in" />
-                  ) : r.requireTwoStep && m.isActive ? (
-                    <StatusBadge meaning="warn">Must set up</StatusBadge>
-                  ) : null}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
 
       <RolePanel
         name="edit-role"
@@ -179,7 +184,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
         locked={!custom}
         submitLabel="Save the role"
       />
-    </div>
+    </RecordBody>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Eye, Package } from "lucide-react";
+import { ArrowRight, Eye } from "lucide-react";
 import { can, dayMonth, ORDER, ORDER_TABS, orderNextStep, RECORD_KIND, type FlowStep, type OrderTab } from "@kebo/shared";
 import { ButtonLink, cn, Notice } from "@kebo/ui";
 import { Suspense } from "react";
@@ -143,7 +143,6 @@ export default async function OrderLayout({ children, params }: { children: Reac
           <RecordTop
             header={{
               crumbs: [{ label: "Sales" }, { label: "Orders", href: "/orders" }, { label: o.refNo }],
-              icon: Package,
               title: orderName(o),
               record: { kind: RECORD_KIND.order, number: o.refNo },
               summary: (

@@ -88,7 +88,7 @@ export default async function PartyLedgerPage({
     <div>
       <PageHeader
         crumbs={[
-          { label: "Finance" },
+          { label: "Money" },
           { label: "Ledger", href: "/finance/ledger" },
           { label: plural, href: `/finance/ledger?view=${PARTY_PATH[kind]}` },
           { label: p.party.name },

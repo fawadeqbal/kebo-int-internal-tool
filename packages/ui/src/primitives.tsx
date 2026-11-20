@@ -4,7 +4,7 @@ import { BackArrow, ListLink } from "./back";
 import { Pending } from "./pending";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
-import { House, Info, Package, Settings, ShieldCheck, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
+import { Info, Package, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 
 /* ---------------------------------------------------------------- Button */
@@ -332,17 +332,6 @@ export function CardBody({ className, ...props }: ComponentProps<"div">) {
  * `actions` is the older form (a free row of buttons), kept for the pages not yet moved to the frame. There is no
  * help line under a title (rule 15): what a page is for shows in what it holds.
  */
-/** The icon of each group of the menu, shown in the title's tile when the page names no icon of its own. */
-export const MODULE_ICONS: Record<string, LucideIcon> = {
-  Home: House,
-  Sales: Package,
-  Purchasing: ShoppingCart,
-  Money: Wallet,
-  Reports: TrendingUp,
-  Settings: Settings,
-  "Company settings": Settings,
-  "Admin settings": ShieldCheck,
-};
 
 /**
  * A record's one strong button on a phone (canvas row "Every page's top on a phone", option A): pinned at the
@@ -354,7 +343,6 @@ const DOCK =
 
 export function PageHeader({
   title,
-  icon,
   badge,
   summary,
   papers,
@@ -362,7 +350,6 @@ export function PageHeader({
   primary,
   more,
   actions,
-  kind,
   backHref,
   backLabel,
   back,
@@ -378,8 +365,6 @@ export function PageHeader({
    * path ("Inquiries" for an inquiry); false: none. A list and Home have none: they are the top.
    */
   back?: { href: string; label: string; root?: string } | false;
-  /** The icon in the green tile before the title (default: the module's, from the crumbs; none without crumbs). */
-  icon?: LucideIcon | null;
   /** Where the page is in the menu, above the title: "Money / Cash & bank" (the last is this page). */
   crumbs?: { label: string; href?: string }[];
   /** On a phone, the buttons go under the title (record pages, whose names are long). */
@@ -402,7 +387,7 @@ export function PageHeader({
   /** The ⋯ menu (MoreMenu): everything else; delete last, in red. */
   more?: ReactNode;
   actions?: ReactNode;
-  /** A list page (canvas board "One list page for all 25 lists"): no icon tile, its name from the menu. */
+  /** A list page (canvas board "One list page for all 25 lists"): its name from the menu. */
   kind?: "list";
   backHref?: string;
   backLabel?: string;
@@ -410,7 +395,6 @@ export function PageHeader({
 }) {
   const framed = badge !== undefined || summary !== undefined || primary !== undefined || papers !== undefined || more !== undefined || views !== undefined;
   const right = actions || papers || views || primary || more;
-  const Icon = icon === null || kind === "list" ? null : (icon ?? (crumbs?.[0] ? MODULE_ICONS[crumbs[0].label] : undefined));
   // The path is the menu's two levels (and the record, on a record's page): "Sales / Inquiries / RFQ-2026-0001".
   const trail = crumbs && crumbs.length > 0 ? crumbs : null;
   // A deeper page goes up to the last link in its path (or where it says), with ← beside its title.
@@ -458,15 +442,8 @@ export function PageHeader({
             browsers then size the title to its text, so a long line runs past the screen and the page zooms out.) */}
         <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap", phoneStack && "max-sm:flex-col max-sm:flex-nowrap max-sm:items-stretch")}>
           <div className={cn("flex min-w-0 items-start gap-3", framed ? "flex-1 sm:flex-[1_1_18rem]" : "flex-[1_1_18rem]", phoneStack && "max-sm:w-full max-sm:flex-none")}>
-            {up ? (
-              <BackArrow up={up.href} label={up.label} root={up.root} className="max-md:hidden" />
-            ) : (
-              Icon && (
-                <span data-slot="page-icon" className="mt-0.5 hidden size-11 shrink-0 place-items-center rounded-xl bg-primary-solid text-white sm:grid" aria-hidden>
-                  <Icon className="size-[22px]" strokeWidth={2} />
-                </span>
-              )
-            )}
+            {/* No icon tile before a title (live audit 20 Nov): a deeper page has ← here, a top page nothing. */}
+            {up && <BackArrow up={up.href} label={up.label} root={up.root} className="max-md:hidden" />}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                 <h1 className={cn("font-bold text-text", framed ? "text-xl leading-7 sm:text-2xl sm:leading-8" : "text-2xl leading-8 sm:text-2xl sm:leading-8", titleInBar && "max-md:sr-only")}>
