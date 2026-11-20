@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice, linkClass, Stack } from "@kebo/ui";
-import { ArrowRight } from "lucide-react";
+
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
@@ -338,8 +338,9 @@ async function Balances({ sp }: { sp: Search }) {
                       <Td className={cn("text-right font-semibold tabular", Number(r.balance) < 0 && "text-bad")}>{fmt(r.balance)}</Td>
                       <Td className="text-right">
                         {href && (
-                          <Link href={href} className={cn(linkClass, "inline-flex items-center gap-1 text-sm")}>
-                            <ArrowRight className="size-4" aria-hidden /> Statement
+                          // A row's link as on Cash & bank (ROW_LINK): the word, no arrow.
+                          <Link href={href} className={cn(linkClass, "text-md whitespace-nowrap")}>
+                            Statement
                           </Link>
                         )}
                       </Td>

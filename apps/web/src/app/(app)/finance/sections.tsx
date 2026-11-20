@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Banknote, Landmark, Wallet } from "lucide-react";
 import { can, CURRENCIES, MONEY_ACCOUNT_KIND_LABEL } from "@kebo/shared";
-import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice, linkClass, RULES } from "@kebo/ui";
+import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice, linkClass, RULES, EmptyLine } from "@kebo/ui";
 import { convertAmount } from "@kebo/money";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -176,7 +176,7 @@ export async function VaultOverview({ today }: { today: string }) {
             }
           />
           {latest.length === 0 ? (
-            <EmptyState title="Nothing in the last 90 days" description="Money recorded on orders and expenses shows here by its date." />
+            <EmptyLine inset>Nothing in the last 90 days. Money recorded on orders and expenses shows here by its date.</EmptyLine>
           ) : (
             <>
             {/* A phone: a row per move — what, its day and in or out; the balance after it on the right. */}

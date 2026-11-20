@@ -1,6 +1,6 @@
 import { Banknote, Printer } from "lucide-react";
 import { can, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
-import { PhoneList, PhoneRow, ButtonLink, Card, CardHeader, EmptyState, RefCode, Td, Th, THead, Tr } from "@kebo/ui";
+import { PhoneList, PhoneRow, ButtonLink, Card, CardHeader, RefCode, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
 import { getPeople, getSettings } from "@/lib/loaders";
@@ -139,10 +139,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
           }
         />
         {lines.length === 0 ? (
-          <EmptyState
-            title="Nothing to show yet"
-            description="Their orders and payments show here as a statement, with the balance after each."
-          />
+          <EmptyLine inset>Nothing yet: their orders and payments show here as a statement, with the balance after each.</EmptyLine>
         ) : (
           <>
           {/* A phone: a row per line — what, its day and order, what it moved; the balance after it on the right. */}

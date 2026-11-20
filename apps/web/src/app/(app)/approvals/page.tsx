@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Check, Clock, FileText } from "lucide-react";
-import { can, EXPENSE_CATEGORY_LABEL, type ExpenseCategory } from "@kebo/shared";
+import { can, EXPENSE_CATEGORY_LABEL, PAYMENT_METHOD_LABEL, type ExpenseCategory, type PaymentMethod } from "@kebo/shared";
 import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice, linkClass, cn, Stack } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { api } from "@/lib/api";
@@ -273,7 +273,7 @@ function TableRow({ s, choose }: { s: Submission; choose?: boolean }) {
         </span>
         {s.status === "sent_back" && s.reason && <span className="mt-1 block text-xs text-bad">Sent back: {s.reason}</span>}
       </Td>
-      <Td className="text-sm">{s.method ?? "—"}</Td>
+      <Td className="text-sm">{s.method ? (PAYMENT_METHOD_LABEL[s.method as PaymentMethod] ?? s.method) : "—"}</Td>
       <Td className="text-right whitespace-nowrap tabular">{amountOf(s)}</Td>
       <Td className="text-sm">
         <span title={dateTime(s.submittedAt)}>{s.submittedBy.name.split(" ")[0]}</span>

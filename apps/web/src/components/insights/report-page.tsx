@@ -145,22 +145,22 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
       <PageHeader
         crumbs={crumbs}
         title={title}
-        actions={
-          periodic ? (
-            <div className="no-print flex flex-wrap items-center gap-x-3 gap-y-2 max-md:hidden">
-              {periodPicker}
-              <span className="text-xs text-text-2">
-                {p.label} · vs {p.vsLabel}
-              </span>
-              <FileActions
-                excelHref={excel}
-                viewHref={buildHref("/print/report", {}, { from: p.from, to: reportTo })}
-                pdfHref={buildHref("/pdf/report/summary", {}, { from: p.from, to: reportTo })}
-              />
-            </div>
-          ) : undefined
-        }
       >
+        {/* The period and the exports in their own row under the title on every report (Spending, with no Excel,
+            had room beside its title, so its bar stood there: sweep 20 Nov). */}
+        {periodic && (
+          <div className="no-print mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 max-md:hidden">
+            {periodPicker}
+            <span className="text-xs text-text-2">
+              {p.label} · vs {p.vsLabel}
+            </span>
+            <FileActions
+              excelHref={excel}
+              viewHref={buildHref("/print/report", {}, { from: p.from, to: reportTo })}
+              pdfHref={buildHref("/pdf/report/summary", {}, { from: p.from, to: reportTo })}
+            />
+          </div>
+        )}
         <ReportTabs current={TAB_OF(kind)} keep={keep} seeMoney={seeMoney} />
       </PageHeader>
       {periodic && (

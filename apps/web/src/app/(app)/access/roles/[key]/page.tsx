@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FACT_LABEL, FACT_VALUE, FACTS_GRID } from "@/components/common/record-box";
 import { Pencil, ShieldCheck } from "lucide-react";
 import { PERMISSION_GROUPS } from "@kebo/shared";
 import { Avatar, Badge, Card, CardBody, CardHeader, cn, EmptyLine, PageHeader, StatusBadge, capsClass, Stack } from "@kebo/ui";
@@ -110,20 +111,20 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
             }
           />
           <CardBody>
-            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              <div>
-                <dt className="text-xs text-muted">Name</dt>
-                <dd className="mt-0.5 text-sm">{r.name}</dd>
+            <dl className={FACTS_GRID}>
+              <div className="contents">
+                <dt className={FACT_LABEL}>Name</dt>
+                <dd className={FACT_VALUE}>{r.name}</dd>
               </div>
-              <div>
-                <dt className="text-xs text-muted">Two-step sign-in</dt>
-                <dd className="mt-1 text-sm">
+              <div className="contents">
+                <dt className={FACT_LABEL}>Two-step sign-in</dt>
+                <dd className={FACT_VALUE}>
                   {r.requireTwoStep ? <StatusBadge meaning="ok">Required</StatusBadge> : <StatusBadge meaning="neutral">Their choice</StatusBadge>}
                 </dd>
               </div>
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-muted">What it is for</dt>
-                <dd className="mt-0.5 text-sm">
+              <div className="contents">
+                <dt className={FACT_LABEL}>What it is for</dt>
+                <dd className={FACT_VALUE}>
                   {r.description || (
                     <OpenPanelButton panel="edit-role" variant="link" className="font-medium no-underline hover:underline">
                       + Add

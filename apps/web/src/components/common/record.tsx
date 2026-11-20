@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
 import { boxTitleClass, buttonClass, Card, cn, linkClass, Dash, RULES } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
+import { FACT_LABEL, FACT_VALUE, FACTS_GRID } from "./record-box";
 import { TabList } from "@/components/lists/tab-list";
 
 /** A section of a record page, where its links (#section) and old ?tab= links land. */
@@ -83,12 +84,12 @@ export function DetailsCard({
         )}
       </div>
       {/* The record box's rows (BoxFacts): label at the left, the value beside it; two pairs a row on a wide box. */}
-      <dl className={cn(RULES.box.inset, "grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 py-4 text-sm xl:grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1fr)] xl:gap-x-6")}>
+      <dl className={cn(RULES.box.body, FACTS_GRID, "xl:grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1fr)] xl:gap-x-6")}>
         {shown.map((i) => (
           // A wide value (an address, notes) starts its own row, so the pairs after it stay label · value.
           <div key={i.label} className={cn("contents", i.wide && "xl:[&>dt]:col-start-1 xl:[&>dd]:col-span-3")}>
-            <dt className="text-text-2">{i.label}</dt>
-            <dd className="min-w-0 font-medium break-words text-text">{missing(i.value) ? <Dash /> : i.value}</dd>
+            <dt className={FACT_LABEL}>{i.label}</dt>
+            <dd className={FACT_VALUE}>{missing(i.value) ? <Dash /> : i.value}</dd>
           </div>
         ))}
       </dl>

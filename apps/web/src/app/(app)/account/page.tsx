@@ -1,4 +1,4 @@
-import { KeyRound } from "lucide-react";
+import { KeyRound, LogOut } from "lucide-react";
 import { Badge, Card, CardHeader, PageHeader, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -98,9 +98,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                       action={endMySessionAction.bind(null, s.id)}
                       confirm={`Sign out ${s.device}?`}
                       label="Sign out"
+                      icon={<LogOut aria-hidden />}
                       pendingText="Signing out…"
-                      variant="danger-ghost"
-                      size="sm"
+                      variant="secondary"
+                      size="xs"
                       showSuccess={false}
                     />
                   )}
@@ -115,9 +116,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                     action={signOutOthersAction}
                     confirm={`Sign out your ${others} other devices?`}
                     label="Sign out all"
+                    icon={<LogOut aria-hidden />}
                     pendingText="Signing out…"
-                    variant="danger-ghost"
-                    size="sm"
+                    variant="secondary"
+                    size="xs"
                     showSuccess={false}
                   />
                 </li>

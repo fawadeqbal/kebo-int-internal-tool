@@ -6,7 +6,7 @@ import type { FactoryOrders } from "@/lib/types-facts";
 import { DataTable } from "@/components/common/data-table";
 import { factoryOf } from "@/lib/party-data";
 import { ArrowRight } from "lucide-react";
-import { ButtonLink, Card, CardHeader, EmptyState, RefCode, StatusBadge, Table, Td, Th, THead, Tr, type StatusMeaning } from "@kebo/ui";
+import { ButtonLink, Card, CardHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr, type StatusMeaning, EmptyLine } from "@kebo/ui";
 import { date, whole, companyToday } from "@/lib/format";
 import { getPeople } from "@/lib/loaders";
 import type { Person } from "@/lib/types";
@@ -120,10 +120,7 @@ export default async function FactoryOverview({
                     </tbody>
                 </DataTable>
               ) : (
-                <EmptyState
-                  title="No purchase orders yet"
-                  description="When an order buys from this supplier, it shows here with what we owe and paid."
-                />
+                <EmptyLine inset>No purchase orders yet. When an order buys from this supplier, it shows here with what we owe and paid.</EmptyLine>
               )
             ) : r.openOrders.length ? (
               <Table>
@@ -147,7 +144,7 @@ export default async function FactoryOverview({
                 </tbody>
               </Table>
             ) : (
-              <EmptyState title="Nothing in production" description="Orders this supplier makes for us show here." />
+              <EmptyLine inset>Nothing in production. Orders this supplier makes for us show here.</EmptyLine>
             )}
           </Card>
       {editing && <FactoryPanel action={saveFactoryAction.bind(null, f.id, f.updatedAt)} factory={f} people={people} meId={me.id} onRecord />}

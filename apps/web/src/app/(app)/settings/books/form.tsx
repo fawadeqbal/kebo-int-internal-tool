@@ -1,5 +1,6 @@
 "use client";
 
+import { FormButtons } from "@/components/common/route-window";
 import { useState } from "react";
 import { Lock, LockOpen } from "lucide-react";
 import { Field, Input, Select } from "@kebo/ui";
@@ -33,12 +34,12 @@ export function CloseBooksForm({ view, months }: { view: BooksView; months: { va
               <Input id="books-reason" name="reason" required maxLength={500} defaultValue={s.values?.reason ?? ""} />
             </Field>
           )}
-          <div>
+          <FormButtons>
             <SubmitButton pendingText="Saving…" disabled={month === current}>
               {opening ? <LockOpen aria-hidden /> : <Lock aria-hidden />}
               {opening ? "Open again" : "Close the books"}
             </SubmitButton>
-          </div>
+          </FormButtons>
         </>
       )}
     </ActionForm>

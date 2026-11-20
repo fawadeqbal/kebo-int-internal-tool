@@ -337,7 +337,8 @@ export function WhatHappens({ lines }: { lines: ReactNode[] }) {
 
 /** "Ctrl+Enter saves · Esc closes", beside a panel's buttons (not on a phone). */
 export function PanelKeys() {
-  return <span className="text-xs text-muted max-md:hidden">Ctrl+Enter saves · Esc closes</span>;
+  // Wherever it is put in a footer, it goes first, at the left, as the footer's note does: the main button stays last.
+  return <span className="order-first mr-auto text-xs text-muted max-md:hidden">Ctrl+Enter saves · Esc closes</span>;
 }
 
 /* ---------------------------------------------------------------- in the URL */

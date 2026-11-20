@@ -267,7 +267,9 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
  * puts its words on the inset. A link-look button has no room of its own, so in a head it gets the same 10px: its
  * words then end where an Edit's do ("Statement", "All orders" were 10px nearer the edge).
  */
-export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-4 sm:pl-5 [&_[data-variant=link]]:px-2.5";
+export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-4 sm:pl-5 [&_[data-variant=link]]:px-2.5 [&>a:not([data-variant])]:px-2.5";
+/** A head's group of buttons: a plain link among them ("Order board →") gets a small button's room, as a link-look button does. */
+export const headActionsClass = "[&>a:not([data-variant])]:px-2.5";
 export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
 
 /** A heading inside a box or a window, under its title (a group of fields, a part of a list): one look everywhere. */
@@ -322,7 +324,8 @@ export function CardHeader({
       {/* The words shrink (a long description wraps) so the buttons stay at the right on a laptop. */}
       {/* 8rem kept for the words before the buttons go under them: a short title keeps its buttons beside it in a
           320px side box ("Money · Statement"), a long one still wraps its words rather than squeezing them. */}
-      <div className="min-w-0 flex-[1_1_8rem]">
+      {/* Stacked on a phone (a description and buttons), the 8rem is a height: there it takes only its own height. */}
+      <div className={cn("min-w-0 flex-[1_1_8rem]", description && actions && "max-sm:flex-none")}>
         {how ? (
           <div className="flex items-center gap-1">
             {heading}
@@ -334,7 +337,7 @@ export function CardHeader({
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
       </div>
       {/* Never wider than the card: on a small screen the buttons wrap among themselves. */}
-      {actions && <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div>}
+      {actions && <div className={cn(headActionsClass, "ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2")}>{actions}</div>}
     </div>
   );
 }
@@ -486,7 +489,9 @@ export function PageHeader({
           {right && (
             // On a record's page on a phone the buttons leave this row (papers and ⋯ to the bar, the one strong
             // button to the bottom), so the row itself makes no room.
-            <div className={cn("flex items-center gap-2", framed ? "shrink-0 sm:flex-wrap sm:justify-end" : "flex-wrap sm:justify-end", up && !actions && !views && "max-md:contents")}>
+            // At the right at every width: on a phone too, where they wrap under the title (they sat right on some
+            // pages and left on others: sweep 20 Nov).
+            <div className={cn("flex items-center justify-end gap-2", framed ? "shrink-0 sm:flex-wrap" : "flex-wrap", up && !actions && !views && "max-md:contents")}>
               {actions}
               {papers && (
                 <div data-slot="papers" className="flex items-center gap-2 max-sm:hidden">
@@ -588,7 +593,9 @@ export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
     <ScrollFade className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
-      <table className={cn("w-full border-collapse text-md", className)} {...props} />
+      {/* On a phone the first column (a name) keeps 9rem and the table scrolls sideways, rather than every column
+          squeezing the names onto four lines (sweep 20 Nov: Reports › Customers, Suppliers, People). */}
+      <table className={cn("w-full border-collapse text-md max-sm:[&_tbody_td:first-child]:min-w-36 max-sm:[&_thead_th:first-child]:min-w-36", className)} {...props} />
     </ScrollFade>
   );
 }

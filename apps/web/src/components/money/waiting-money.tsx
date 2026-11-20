@@ -47,7 +47,7 @@ export async function WaitingToVerify({
       <ul className="mt-2 divide-y divide-line/70">
         {shown.map((s) => (
           <li key={s.id} className={cn(RULES.box.inset, "flex flex-wrap items-center gap-x-4 gap-y-2 py-3")}>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-[1_1_16rem]">
               <p className="text-sm font-semibold">
                 {amountOf(s)} <span className="font-normal text-text-2">· {whatOf(s)}</span>
                 {!orderId && s.order && (

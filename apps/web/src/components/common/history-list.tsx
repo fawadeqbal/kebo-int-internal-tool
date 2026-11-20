@@ -86,17 +86,18 @@ export function HistoryTable({
     <Table className={cn("", tags && "table-fixed")}>
       <THead>
         <tr>
-          <Th className={tags ? "w-40" : "w-44"}>When</Th>
-          <Th className={tags ? "w-28" : "w-36"}>Who</Th>
+          {/* On a phone one column: what changed, with when and who under it (three columns squeezed it). */}
+          <Th className={cn(tags ? "w-40" : "w-44", "max-sm:hidden")}>When</Th>
+          <Th className={cn(tags ? "w-28" : "w-36", "max-sm:hidden")}>Who</Th>
           <Th>What changed</Th>
-          {tags && <Th className="w-36">{tags.label}</Th>}
+          {tags && <Th className="w-36 max-sm:hidden">{tags.label}</Th>}
         </tr>
       </THead>
       <tbody>
         {entries.map((e) => (
           <Tr key={e.id}>
-            <Td className="align-top whitespace-nowrap">{dateTime(e.at)}</Td>
-            <Td className="align-top">{e.by?.name ?? "System"}</Td>
+            <Td className="align-top whitespace-nowrap max-sm:hidden">{dateTime(e.at)}</Td>
+            <Td className="align-top max-sm:hidden">{e.by?.name ?? "System"}</Td>
             <Td className="[overflow-wrap:anywhere]">
               {showArea && AREA[e.entityType] && <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-text-2">{AREA[e.entityType]}</span>}
               {e.summary ? readableHistory(e.summary) : e.action.replace(/_/g, " ")}
@@ -109,6 +110,10 @@ export function HistoryTable({
                     {fieldLabel(c.field)} {shown(c.from)} → <strong>{shown(c.to)}</strong>
                   </span>
                 ))}
+              <span className="mt-0.5 block text-xs text-muted sm:hidden">
+                {dateTime(e.at)} · {e.by?.name ?? "System"}
+                {tags?.of[e.id] ? ` · ${tags.of[e.id]}` : ""}
+              </span>
               {e.reason && (
                 <span className="mt-0.5 flex items-start gap-1.5 text-xs text-text-2">
                   <MessageSquareQuote className="mt-0.5 size-3.5 shrink-0 text-info" aria-hidden />
@@ -120,7 +125,7 @@ export function HistoryTable({
               )}
             </Td>
             {tags && (
-              <Td className="align-top">
+              <Td className="align-top max-sm:hidden">
                 {tags.of[e.id] && <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-text-2">{tags.of[e.id]}</span>}
               </Td>
             )}

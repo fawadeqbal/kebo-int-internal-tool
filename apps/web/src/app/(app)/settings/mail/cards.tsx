@@ -1,5 +1,6 @@
 "use client";
 
+import { FormButtons } from "@/components/common/route-window";
 import { useState } from "react";
 import { MAIL_PROVIDER_LABEL, MAIL_PROVIDERS, SMTP_PORTS, type MailProvider, type MailSettingsView } from "@kebo/shared";
 import { Card, CardBody, CardHeader, cn, Field, Input, Select } from "@kebo/ui";
@@ -105,9 +106,9 @@ export function MailCards({ view, me, saveAction, testAction }: { view: MailSett
                     <Input id="mail-secret" name="secret" type="password" autoComplete="new-password" placeholder={saved && view.hasSecret ? "••••••••" : undefined} />
                   </Field>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <FormButtons>
                   <SubmitButton>Save</SubmitButton>
-                </div>
+                </FormButtons>
               </>
             )}
           </ActionForm>

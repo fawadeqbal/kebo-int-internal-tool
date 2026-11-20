@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Printer } from "lucide-react";
 import { can } from "@kebo/shared";
-import { PhoneList, PhoneRow, ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
+import { PhoneList, PhoneRow, ButtonLink, Card, CardHeader, RefCode, StatRow, StatTile, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission, hasFeature } from "@/lib/session";
 import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
@@ -117,10 +117,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
           }
         />
         {lines.length === 0 ? (
-          <EmptyState
-            title="Nothing bought yet"
-            description="What we buy from this supplier and what we pay it show here, with what we owe after each."
-          />
+          <EmptyLine inset>Nothing bought yet. What we buy from this supplier and what we pay it show here, with what we owe after each.</EmptyLine>
         ) : (
           <>
           {/* A phone: a row per line — what, its day and order, what it moved; the balance after it on the right. */}

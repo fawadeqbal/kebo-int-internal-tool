@@ -1,14 +1,13 @@
 "use client";
 
-import { PhoneItems } from "@/components/records/phone-items";
 import { Totals, type TotalsRow } from "@/components/records/totals";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { factoryUnitCostMinor, formatMinor, multiplyMinor, toMinor } from "@kebo/money";
 import { LINE_CONDITION_LABEL, LINE_CONDITION_TONE, LINE_CONDITIONS, type LineCondition } from "@kebo/shared";
-import { Badge, cn, EmptyLine, Dash } from "@kebo/ui";
+import { Badge, cn, Dash } from "@kebo/ui";
 import { BatchLines } from "@/components/edits/batch-lines";
 import type { EditCard, EditRef } from "@/lib/types-edits";
-import { LineTable, type LineColumn, type LineResult, type LineRow, type LineValues } from "@/components/lines/line-table";
+import { type LineColumn, type LineResult, type LineRow, type LineValues } from "@/components/lines/line-table";
 import { orderLineAction } from "@/app/(app)/orders/actions";
 import { formatDate } from "@kebo/utils";
 import type { OrderLineView } from "@/lib/types-orders";
@@ -223,84 +222,6 @@ const FIXED: LineResult = {
 const fixed = async () => FIXED;
 
 /**
- * The line table on a step page: the order's goods lines with the step's
- * columns. Each change is saved as it is made (one line, one field); lines are
- * not added, removed or moved here, so the table's add row, paste and row
- * tools are left out.
- */
-export function OrderLines({
-  set,
-  orderId,
-  lines,
-  canEdit,
-  today,
-  footer,
-}: {
-  set: LineSet;
-  orderId: string;
-  /** The order's goods lines (charges are not received, packed or delivered). */
-  lines: OrderLineView[];
-  canEdit: boolean;
-  today: string;
-  /** Under the totals (e.g. the container and the marks). */
-  footer?: ReactNode;
-}) {
-  // What each save answered, until the page brings the same (or newer) lines.
-  const [saved, setSaved] = useState<{ of: OrderLineView[]; byId: Record<string, OrderLineView> }>({ of: lines, byId: {} });
-  const byId = saved.of === lines ? saved.byId : null;
-  const shown = useMemo(() => (byId ? lines.map((l) => byId[l.id] ?? l) : lines), [lines, byId]);
-  const readOnly = !canEdit || set === "factory";
-  const columns = useMemo(() => columnsOf(set), [set]);
-
-  const byNo = new Map(shown.map((l) => [l.no, l.id]));
-  const rows: LineRow[] = shown.map((l) => {
-    const top = l.no.includes(".") ? l.no.split(".")[0]! : null;
-    return { key: l.id, parentKey: top ? (byNo.get(top) ?? null) : null, values: valuesOf(l) };
-  });
-
-  const onEdit = async (key: string, values: LineValues): Promise<LineResult> => {
-    const body = bodyOf(set, values, today);
-    if (typeof body === "string") return { ok: false, message: body };
-    const r = await orderLineAction(orderId, key, body);
-    if (!r.ok) return r;
-    setSaved((s) => ({ of: lines, byId: { ...(s.of === lines ? s.byId : {}), [key]: r.line } }));
-    return { ok: true };
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex flex-col gap-2",
-        // The line table's tools for adding, pasting and moving lines (and its help on them) do not apply here.
-        "[&_tr[aria-label^='New_']]:hidden [&_[role=toolbar]]:hidden [&_button:has(>.lucide-clipboard-paste)]:hidden [&>div>div:has(>details)]:hidden",
-        // …nor its row tools column (its last; a read-only table has none).
-        !readOnly &&
-          "[&_tbody_tr>td:last-child:not(:first-child)]:hidden [&_thead_tr>th:last-child:not(:first-child)]:hidden [&_colgroup>col:last-child]:hidden",
-      )}
-    >
-      <LineTable
-        rows={rows}
-        columns={columns}
-        noun="item"
-        readOnly={readOnly}
-        onAdd={fixed}
-        onRemove={fixed}
-        onMove={fixed}
-        onEdit={onEdit}
-        footer={<StepFigures set={set} lines={shown} extra={footer} />}
-        empty="No items on this order."
-      />
-      {!readOnly && (
-        <p className="text-xs text-muted">
-          Click a cell and type: Enter saves it and goes down, Esc cancels.
-          {set === "received" ? " The date is today unless you type another." : ""}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
  * The step's lines in the edit panel (board "View first, edit on purpose"):
  * the step's columns typed on a copy, saved together with Save changes. Lines
  * are not added, removed or moved here. Filling a value is plain; changing a
@@ -467,21 +388,6 @@ export function OrderLinesView({ set, lines, label }: { set: LineSet; lines: Ord
       phone={phone}
       totals={<StepFigures set={set} lines={lines} />}
       empty="No items on this order."
-    />
-  );
-}
-
-/**
- * The lines as short text lines (a phone's read-only view, board
- * OrderV4Phone): the number and name, then the step's figure.
- */
-export function PhoneLines({ set, lines }: { set: LineSet; lines: OrderLineView[] }) {
-  if (!lines.length) return <EmptyLine>No items on this order.</EmptyLine>;
-  // The one phone item line (PhoneItems), read only: number, name, the step's figure under it.
-  return (
-    <PhoneItems
-      label="Items"
-      rows={lines.map((l) => ({ key: l.id, no: l.no, part: l.no.includes("."), title: head(l.description), sub: phoneLine(set, valuesOf(l)) }))}
     />
   );
 }

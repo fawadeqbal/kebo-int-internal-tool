@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Pencil } from "lucide-react";
 import type { Tone } from "@kebo/shared";
-import { Badge, boxHeadClass, boxTitleClass, Card, cn, Dash, RULES } from "@kebo/ui";
+import { Badge, boxHeadClass, boxTitleClass, Card, cn, Dash, headActionsClass, RULES } from "@kebo/ui";
 import { OpenPanelButton } from "@/components/common/panel";
 
 /**
@@ -60,7 +60,7 @@ export function RecordBox({
           {count && <span className="text-xs text-text-2 max-sm:order-last max-sm:w-full max-sm:pb-1">{count}</span>}
           {/* The buttons are one group at the right: when they do not fit beside the title they go under it
               together, still at the right (never one left on the title's line and the rest in the body). */}
-          <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+          <span className={cn(headActionsClass, "ml-auto flex flex-wrap items-center justify-end gap-1.5")}>
             {tools}
             {history}
             {canEdit && (edit ?? (step && (
@@ -77,20 +77,28 @@ export function RecordBox({
   );
 }
 
+/**
+ * The one way facts are drawn (records, Details, settings, a role): the label at the left, quiet; the value beside
+ * it. Its dt is `FACT_LABEL`, its dd `FACT_VALUE`.
+ */
+export const FACTS_GRID = "grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm";
+export const FACT_LABEL = "text-text-2";
+export const FACT_VALUE = "min-w-0 font-medium break-words text-text";
+
 /** Label · value rows of a box, the label quiet. `wide`: in two columns of rows once the box is wide enough. */
 export function BoxFacts({ rows, wide }: { rows: [string, ReactNode][]; wide?: boolean }) {
   return (
     <dl
       className={cn(
         RULES.box.body,
-        "grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm",
+        FACTS_GRID,
         wide && "@3xl:grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1fr)] @3xl:gap-x-6",
       )}
     >
       {rows.map(([k, v], i) => (
         <div key={`${i}:${k}`} className="contents">
-          <dt className="text-text-2">{k}</dt>
-          <dd className="min-w-0 font-medium break-words">{v === null || v === undefined || v === "" ? <Dash /> : v}</dd>
+          <dt className={FACT_LABEL}>{k}</dt>
+          <dd className={FACT_VALUE}>{v === null || v === undefined || v === "" ? <Dash /> : v}</dd>
         </div>
       ))}
     </dl>

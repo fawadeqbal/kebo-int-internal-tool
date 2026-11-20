@@ -1,5 +1,6 @@
-import { Card, DataRow, EmptyState, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead } from "@kebo/ui";
+import { DataRow, EmptyState, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
+import { TabList } from "@/components/lists/tab-list";
 import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
 import { date, whole } from "@/lib/format";
 import { DataTable } from "@/components/common/data-table";
@@ -33,7 +34,8 @@ export default async function FactoryOrders({ params }: { params: Promise<{ id: 
   };
 
   return (
-    <Card className="overflow-clip">
+    // A list tab as every record's (a customer's Orders): its title and count, then the rows or the empty state.
+    <TabList title="In production" summary={`${rows.length} order${rows.length === 1 ? "" : "s"}`}>
       {rows.length === 0 ? (
         <EmptyState
           title="Nothing in production here"
@@ -79,6 +81,6 @@ export default async function FactoryOrders({ params }: { params: Promise<{ id: 
           </DataTable>
         </>
       )}
-    </Card>
+    </TabList>
   );
 }

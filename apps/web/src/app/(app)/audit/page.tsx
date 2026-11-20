@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr, FactsLine, linkClass, Stack } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr, linkClass, Stack } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -139,7 +139,6 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
     { key: "all", label: "All", count: everything, href: href({ type: undefined }), active: !sp.type },
     ...kinds.map((k) => ({ key: k, label: label(k), count: data.counts[k] ?? 0, href: href({ type: k }), active: sp.type === k })),
   ];
-  const who = sp.person ? people.find((p) => p.id === sp.person)?.name : undefined;
   const rowMenu = (r: AuditRow, to: string | null): MenuEntry[] => [
     ...(to ? [{ label: `Open the ${label(r.entityType).toLowerCase()}`, href: to }] : []),
     { label: `Only ${label(r.entityType).toLowerCase()} entries`, href: href({ type: r.entityType }) },
@@ -154,7 +153,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         title="Activity log"
         more={<ExportCsv what="audit" query={{ type: sp.type, person: sp.person, q: sp.q }} />}
       />
-      <FactsLine facts={[{ label: who ? `Entries by ${who}` : "Entries", value: data.total.toLocaleString("en-US") }]} />
+      {/* How many entries is said once, beside the search (the filter's count), not again in a facts line. */}
       <LinkTabs label="Which records" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
       <FilterCard
         count={countOf(data.total, "entry", "entries")}

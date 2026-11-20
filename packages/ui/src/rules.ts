@@ -46,8 +46,11 @@ export const RULES = {
     gap: "gap-4",
     /** Parts one under another, `gap` apart: a page, a column of boxes. */
     stack: "flex min-w-0 flex-col gap-4",
-    /** The settings pages (and other one-form pages): one centred 720px column (rule 4). */
-    column: "mx-auto flex w-full max-w-[720px] min-w-0 flex-col gap-4",
+    /**
+     * The settings pages (and other one-form pages): one 720px column (rule 4), at the page's left edge like every
+     * other page's title and boxes (centred, its title started mid-page: sweep 20 Nov).
+     */
+    column: "flex w-full max-w-[720px] min-w-0 flex-col gap-4",
     /**
      * A record page (the inquiry, a supplier offer, a quotation): its boxes, and beside them the one side panel,
      * 320px from 1024 on every record and every tab; below that one column, the panel a bar that opens a sheet
