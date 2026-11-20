@@ -1,8 +1,8 @@
 import { Suspense } from "react";
-import { Banknote, Factory, LayoutGrid, Receipt, Target, TrendingUp, User, Users, type LucideIcon } from "lucide-react";
+
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
-import { Alert, buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage } from "@kebo/ui";
+import { buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage, Notice } from "@kebo/ui";
 import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { crumbsFor, labelFor } from "@/lib/nav";
@@ -57,15 +57,15 @@ const PATH_OF: Record<ReportKind, string> = {
   spending: "/reports/spending",
 };
 /** One page, its reports as tabs under the title: the same period goes with you. Profit and Cash are for people who see money. */
-const REPORT_TABS: { key: ReportKind; href: string; label: string; icon: LucideIcon; money?: boolean }[] = [
-  { key: "overview", href: "/reports", label: "Overview", icon: LayoutGrid },
-  { key: "profit", href: "/reports/profit", label: "Profit", icon: TrendingUp, money: true },
-  { key: "customers", href: "/reports/customers", label: "Customers", icon: Users },
-  { key: "factories", href: "/reports/factories", label: "Suppliers", icon: Factory },
-  { key: "cash", href: "/reports/cash", label: "Cash", icon: Banknote, money: true },
-  { key: "people", href: "/reports/people", label: "People", icon: User },
-  { key: "funnel", href: "/reports/funnel", label: "Funnel", icon: Target },
-  { key: "spending", href: "/reports/spending", label: "Spending", icon: Receipt, money: true },
+const REPORT_TABS: { key: ReportKind; href: string; label: string; money?: boolean }[] = [
+  { key: "overview", href: "/reports", label: "Overview" },
+  { key: "profit", href: "/reports/profit", label: "Profit", money: true },
+  { key: "customers", href: "/reports/customers", label: "Customers" },
+  { key: "factories", href: "/reports/factories", label: "Suppliers" },
+  { key: "cash", href: "/reports/cash", label: "Cash", money: true },
+  { key: "people", href: "/reports/people", label: "People" },
+  { key: "funnel", href: "/reports/funnel", label: "Funnel" },
+  { key: "spending", href: "/reports/spending", label: "Spending", money: true },
 ];
 /** Targets is a view of People (it opens from there), so People stays the tab. */
 const TAB_OF = (kind: ReportKind): ReportKind => (kind === "targets" ? "people" : kind);
@@ -77,28 +77,12 @@ function ReportTabs({ current, keep, seeMoney }: { current: ReportKind; keep: Re
       className="no-print mt-3"
       tabs={REPORT_TABS.filter((t) => seeMoney || !t.money).map((t) => ({
         href: buildHref(t.href, keep, {}),
-        label: (
-          <>
-            <t.icon aria-hidden /> {t.label}
-          </>
-        ),
+        label: t.label,
         active: t.key === current,
       }))}
     />
   );
 }
-
-const DESCRIPTION: Record<ReportKind, string> = {
-  overview: "How the business is doing",
-  profit: "What was sold, what it cost, and what is left",
-  customers: "Who buys, how much, how well they pay",
-  factories: "Who supplies on time and wins our orders",
-  cash: "What came in, what went out, and what each account holds",
-  people: "Who sells, how fast, and against their targets",
-  targets: "Monthly sales targets for the company and each person",
-  funnel: "Where inquiries go, and why we lose them",
-  spending: "Who spends, on what, and what winning and losing cost us",
-};
 
 /**
  * Reports (design "money, simple", boards ROverview to RCash): one page in the menu, its reports as tabs,
@@ -161,7 +145,6 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
       <PageHeader
         crumbs={crumbs}
         title={title}
-        description={<span className="max-md:hidden">{DESCRIPTION[kind]}</span>}
         actions={
           periodic ? (
             <div className="no-print flex flex-wrap items-center gap-x-3 gap-y-2 max-md:hidden">
@@ -193,11 +176,11 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
           <input type="hidden" name="period" value="custom" />
           <label className="text-xs text-text-2">
             From
-            <Input name="from" type="date" defaultValue={p.from} className="mt-1 h-9 w-40" />
+            <Input name="from" type="date" defaultValue={p.from} className="mt-1 w-40" />
           </label>
           <label className="text-xs text-text-2">
             To
-            <Input name="to" type="date" defaultValue={p.to} className="mt-1 h-9 w-40" />
+            <Input name="to" type="date" defaultValue={p.to} className="mt-1 w-40" />
           </label>
           <button className={buttonClass("secondary", "sm")}>Show</button>
           <span className="pb-1.5 text-xs text-muted">compared with the same number of days just before</span>
@@ -253,7 +236,7 @@ async function Body({
     }
     case "cash": {
       const { report } = await loadCash(p);
-      if (!report) return <Alert tone="info">Cash &amp; bank is not switched on for the company, so there are no accounts to report on.</Alert>;
+      if (!report) return <Notice tone="info">Cash &amp; bank is not switched on for the company, so there are no accounts to report on.</Notice>;
       return (
         <>
           <Missing rates={report.missingRates} />
@@ -281,7 +264,7 @@ async function Body({
     case "funnel":
       return <FunnelSection d={await loadFunnel(p)} p={p} />;
     case "spending": {
-      if (!(await hasFeature("expenses"))) return <Alert tone="info">Expenses are not switched on for the company, so there is no spending to report on.</Alert>;
+      if (!(await hasFeature("expenses"))) return <Notice tone="info">Expenses are not switched on for the company, so there is no spending to report on.</Notice>;
       return <SpendingSection d={await loadSpending(p)} p={p} />;
     }
   }
@@ -290,9 +273,9 @@ async function Body({
 function Missing({ rates }: { rates: string[] }) {
   if (!rates.length) return null;
   return (
-    <Alert tone="warning" className="mb-4">
+    <Notice tone="todo" className="mb-4">
       There is no exchange rate for {rates.join(", ")} in Settings, so amounts in {rates.length === 1 ? "it are" : "them are"} left out.
-    </Alert>
+    </Notice>
   );
 }
 

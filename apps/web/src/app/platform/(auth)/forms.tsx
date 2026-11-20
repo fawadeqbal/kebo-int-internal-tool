@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Alert, Field, Input } from "@kebo/ui";
+import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { platformLoginAction, platformTwoStepAction } from "../actions";
 
@@ -9,7 +9,7 @@ export function PlatformLoginForm() {
   const [state, action] = useActionState(platformLoginAction, {});
   return (
     <form action={action} className="mt-5 flex flex-col gap-4" noValidate>
-      {state.message && <Alert tone="error">{state.message}</Alert>}
+      {state.message && <Notice tone="bad">{state.message}</Notice>}
       <Field label="Email" htmlFor="email" error={state.errors?.email}>
         <Input id="email" name="email" type="email" autoComplete="username" autoFocus required defaultValue={state.values?.email ?? ""} />
       </Field>
@@ -27,7 +27,7 @@ export function PlatformTwoStepForm() {
   const [state, action] = useActionState(platformTwoStepAction, {});
   return (
     <form action={action} className="mt-5 flex flex-col gap-4" noValidate>
-      {state.message && <Alert tone="error">{state.message}</Alert>}
+      {state.message && <Notice tone="bad">{state.message}</Notice>}
       <Field label="Code" htmlFor="code" hint="The 6 digits from your authenticator app, or a recovery code" error={state.errors?.code}>
         <Input id="code" name="code" inputMode="numeric" autoComplete="one-time-code" autoFocus required />
       </Field>

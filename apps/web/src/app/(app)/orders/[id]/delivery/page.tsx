@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Badge, RULES } from "@kebo/ui";
 import { getPeople } from "@/lib/loaders";
 import { date } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
@@ -21,7 +21,6 @@ import { orderTitle } from "@/lib/titles";
 
 export const generateMetadata = orderTitle("Delivery and SAT");
 
-const SMALL = "h-8 px-2.5 text-md";
 const RESULT_TONE = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" } as const;
 
 /** A day some months later (YYYY-MM-DD), kept inside the month it lands in. */
@@ -79,12 +78,11 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
     );
   const linesButton = canEdit && goodsLines.length > 0 && (
     <PanelButton
-      size="sm"
-      className={SMALL}
+      edit
       label="Edit items"
       title="Delivery"
       description="How many of each item reached the customer, and in what condition. Nothing is saved until Save changes."
-      panelClassName="md:w-[1180px]"
+      panelClassName={RULES.window.items}
       body={<OrderLinesEditor set="delivered" orderId={o.id} lines={goodsLines} today={now} edit={{ type: "order", id: o.id, card: "lines.delivered" }} card={edits.cards["lines.delivered"]} />}
     />
   );
@@ -170,7 +168,6 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
                 {canEdit && (
                   <PanelButton
                     size="sm"
-                    className={SMALL}
                     label="Points"
                     title="The SAT points"
                     description="Each point: Pass, Fail or N/A, and a note."

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 import { COLOUR_SET_LABEL, COLOUR_SETS, type ColourSet } from "@kebo/shared";
-import { Card, CardBody, CardHeader, cn } from "@kebo/ui";
+import { Card, CardBody, CardHeader, cn, Badge } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import type { ActionState } from "@/lib/actions";
 
@@ -170,9 +170,9 @@ export function ColoursCard({
                     {COLOUR_SET_LABEL[set]}
                   </span>
                   {set === "green" && (
-                    <span id={`colours-${set}-default`} className="ml-auto rounded-full bg-surface-3 px-2 py-0.5 text-2xs font-bold text-text-2">
+                    <Badge size="sm" id={`colours-${set}-default`} className="ml-auto">
                       Default
-                    </span>
+                    </Badge>
                   )}
                 </span>
                 <span id={`colours-${set}`} className="px-1 text-xs leading-snug text-text-2">

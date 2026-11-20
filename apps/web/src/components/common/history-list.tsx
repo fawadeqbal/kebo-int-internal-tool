@@ -2,7 +2,8 @@ import { MessageSquareQuote } from "lucide-react";
 import { cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import type { HistoryEntry } from "@/lib/types";
 import { dateTime } from "@/lib/format";
-import { readableDates } from "@/components/insights/readable-dates";
+import { INQUIRY_STAGE_LABEL, ORDER_STAGE_LABEL } from "@kebo/shared";
+import { readableHistory } from "@/components/insights/readable-dates";
 
 /** Field names as people say them. */
 const FIELD: Record<string, string> = {
@@ -41,11 +42,15 @@ const FIELD: Record<string, string> = {
   sentVia: "Sent by",
   step: "Stage",
 };
-/** Not for people: a record's id, and the "yes, save it anyway" a form sends. */
-const HIDDEN = /^(ask|id|.+Id)$/;
+/** Not for people: a record's id (by its name or by its value), and the "yes, save it anyway" a form sends. */
+const HIDDEN = /^(ask|id|.+Id|followUp)$/;
+const IS_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** A stage's word, not its key ("sourcing" → "Sourcing"). */
+const STAGE: Record<string, string> = { ...ORDER_STAGE_LABEL, ...INQUIRY_STAGE_LABEL };
+const hidden = (c: { field: string; from: string | null; to: string | null }) => HIDDEN.test(c.field) || IS_ID.test(c.to ?? "") || IS_ID.test(c.from ?? "");
 const fieldLabel = (f: string) => FIELD[f] ?? f.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 const shown = (v: string | null) =>
-  v === null ? "—" : v === "true" ? "yes" : v === "false" ? "no" : readableDates(v.length > 80 ? `${v.slice(0, 80)}…` : v);
+  v === null ? "—" : v === "true" ? "yes" : v === "false" ? "no" : (STAGE[v] ?? readableHistory(v.length > 80 ? `${v.slice(0, 80)}…` : v));
 
 const AREA: Record<string, string> = {
   factory_quote: "Supplier prices",
@@ -78,7 +83,7 @@ export function HistoryList({
             {showArea && AREA[e.entityType] && (
               <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-text-2">{AREA[e.entityType]}</span>
             )}
-            {e.summary ? readableDates(e.summary) : e.action.replace(/_/g, " ")}
+            {e.summary ? readableHistory(e.summary) : e.action.replace(/_/g, " ")}
           </p>
           {e.reason && (
             <p className="flex items-start gap-1.5 text-sm text-text-2">
@@ -89,9 +94,9 @@ export function HistoryList({
               </span>
             </p>
           )}
-          {e.changes.length > 0 && (
+          {e.changes.some((c) => !hidden(c)) && (
             <ul className="flex flex-col gap-0.5 text-xs text-text-2">
-              {e.changes.slice(0, 8).map((c) => (
+              {e.changes.filter((c) => !hidden(c)).slice(0, 8).map((c) => (
                 <li key={c.field}>
                   <span className="text-muted">{fieldLabel(c.field)}:</span>{" "}
                   <span className="line-through decoration-muted/60">{shown(c.from)}</span> →{" "}
@@ -131,7 +136,7 @@ export function HistoryTable({
 }) {
   if (!entries.length) return <p className="px-4 py-6 text-sm text-muted sm:px-5">{empty}</p>;
   return (
-    <Table className={cn("min-w-[720px]", tags && "table-fixed")}>
+    <Table className={cn("", tags && "table-fixed")}>
       <THead>
         <tr>
           <Th className={tags ? "w-40" : "w-44"}>When</Th>
@@ -147,9 +152,9 @@ export function HistoryTable({
             <Td className="align-top">{e.by?.name ?? "System"}</Td>
             <Td className="[overflow-wrap:anywhere]">
               {showArea && AREA[e.entityType] && <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-text-2">{AREA[e.entityType]}</span>}
-              {e.summary ? readableDates(e.summary) : e.action.replace(/_/g, " ")}
+              {e.summary ? readableHistory(e.summary) : e.action.replace(/_/g, " ")}
               {e.changes
-                .filter((c) => !HIDDEN.test(c.field))
+                .filter((c) => !hidden(c))
                 .slice(0, 8)
                 .map((c) => (
                   <span key={c.field}>

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, FileSpreadsheet, Filter, MoreHorizontal, Plus, Search } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL, REQUEST_CHANNELS } from "@kebo/shared";
-import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea, EmptyLine } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { FloatingMenu } from "@/components/common/floating";
@@ -97,7 +97,7 @@ export function AskWindow({
             {open.length === 0 ? (
               <p className="text-sm text-muted">Every supplier in your list is asked already. Add a new supplier to ask one more.</p>
             ) : shown.length === 0 ? (
-              <p className="text-sm text-muted">No supplier matches “{q}”.</p>
+              <EmptyLine>No supplier matches “{q}”.</EmptyLine>
             ) : (
               <ul className="flex flex-col gap-2">
                 {shown.map((f) => {
@@ -216,7 +216,7 @@ export function RequestMore({
         aria-label={`More for ${name}`}
         disabled={pending}
         // ⋯, the quiet end of a row (design "list pages" 18 Nov).
-        className={buttonClass("ghost", "sm", "size-8 px-0 text-text-2")}
+        className={buttonClass("ghost", "icon-sm", "text-text-2")}
         onClick={() => setOpen((o) => !o)}
       >
         <MoreHorizontal aria-hidden />

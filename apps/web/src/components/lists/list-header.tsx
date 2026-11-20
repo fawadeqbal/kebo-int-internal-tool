@@ -32,13 +32,13 @@ export function ListHeader({
 }) {
   return (
     <PageHeader
+      kind="list"
       crumbs={crumbsFor(path)}
-      icon={null}
       title={labelFor(path)}
       views={
         views && (
           <span className="max-sm:hidden">
-            <ViewSwitch label="View" current={views.current} compact views={views.options} />
+            <ViewSwitch label="View" current={views.current} views={views.options} />
           </span>
         )
       }
@@ -46,7 +46,7 @@ export function ListHeader({
       primary={
         create && (
           <span className="max-sm:hidden">
-            <OpenPanelButton panel={create.panel} variant="primary" label={create.label}>
+            <OpenPanelButton panel={create.panel} variant="strong" label={create.label}>
               <Plus aria-hidden /> {create.label}
             </OpenPanelButton>
           </span>

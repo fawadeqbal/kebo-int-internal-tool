@@ -85,7 +85,7 @@ const saved = (arg: CloseArg) => !!arg && typeof arg === "object" && "ok" in arg
  * other window, see WindowHead), 720px wide unless its form needs more; the whole screen on a phone, with
  * Save pinned at the bottom. Its title says which ("New customer", "Edit customer · Lahore Pharma"); the
  * body is a form in titled groups (PanelSection) with Save / Cancel in a footer that stays in view
- * (PanelActions).
+ * (WindowFooter).
  *
  * For everyone: role=dialog, aria-modal, named by its title; focus starts on
  * the first field, stays inside while it is open and goes back to the button
@@ -205,7 +205,7 @@ export function SidePanel({
 
 /**
  * A panel's scrolling body. A form inside takes its height (`PANEL_FORM`), so
- * its PanelActions stay at the bottom of the panel however short it is.
+ * its WindowFooter stays at the bottom of the panel however short it is.
  */
 export function PanelBody({ children, className, fill }: { children: ReactNode; className?: string; fill?: boolean }) {
   // The form's message after a save (what to fix, no connection) at the top, inside the form, in view.
@@ -225,7 +225,7 @@ export function PanelBody({ children, className, fill }: { children: ReactNode; 
   );
 }
 
-/** The class of a form filling a PanelBody, so its PanelActions sit at the bottom. */
+/** The class of a form filling a PanelBody, so its WindowFooter sits at the bottom. */
 export const PANEL_FORM = "flex flex-1 flex-col gap-5";
 
 /** A section of a panel's form: a small-caps title, then its fields, two columns at most (one on a phone). */
@@ -272,58 +272,46 @@ export function PanelSection({
   );
 }
 
+/** On a phone a footer's buttons share its width, big, under the thumb. */
+const PHONE_BUTTONS = "max-md:[&>a]:min-h-12 max-md:[&>a]:flex-1 max-md:[&>button]:min-h-12 max-md:[&>button]:flex-1";
+
 /**
- * The panel's Save / Cancel, in a footer that stays at the bottom of the panel
- * while the form scrolls (pinned to the very bottom: -bottom-5 makes up for the
- * body's padding, so nothing shows under it); `end`: a quiet action on the
- * right (Remove this offer). On a phone the buttons share its width, big.
+ * The one window footer (canvas group 8): a note, or a quiet / red action, on the left; Cancel; then the saves, the
+ * one that finishes last (strong). It stays at the bottom of the window while the form scrolls (pinned to the very
+ * bottom: -bottom-5 makes up for the body's padding, so nothing shows under it). `onCancel`: a form that leaves in
+ * its own way still has its Cancel here; `cancel={false}`: the buttons already say how to leave.
  */
-export function PanelActions({
-  children,
-  end,
-  className,
+export function WindowFooter({
+  note,
+  onCancel,
   cancel = true,
+  className,
+  children,
 }: {
-  children: ReactNode;
-  end?: ReactNode;
-  className?: string;
-  /** Cancel first, in a window (false: the window's buttons already say how to leave). */
+  note?: ReactNode;
+  onCancel?: () => void;
   cancel?: boolean;
+  className?: string;
+  children: ReactNode;
 }) {
   const inWindow = useContext(InWindow);
   return (
     <div
       data-window-footer=""
       className={cn(
-        "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6",
-        // A phone: the buttons share the width, big, under the thumb.
-        "max-md:[&>a]:min-h-12 max-md:[&>a]:flex-1 max-md:[&>button]:min-h-12 max-md:[&>button]:flex-1",
+        "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6",
+        PHONE_BUTTONS,
         className,
       )}
     >
-      {cancel && inWindow && <WindowCancel />}
+      {note && <span className="mr-auto min-w-0 text-xs text-text-2 max-md:basis-full">{note}</span>}
+      {cancel && (onCancel ? <WindowCancel onClick={onCancel} /> : inWindow && <WindowCancel />)}
       {children}
-      {end && <span className="ml-auto">{end}</span>}
     </div>
   );
 }
 
-/**
- * The footer of a window that makes or edits a record (inquiry, factory offer, quotation), the same in each:
- * a note or the red "Remove…" on the left; Cancel, the quiet saves, then the one orange save on the right.
- */
-export function PanelFooter({ start, onCancel, children }: { start?: ReactNode; onCancel?: () => void; children: ReactNode }) {
-  return (
-    <PanelActions className="justify-end" cancel={false}>
-      {start && <span className="mr-auto min-w-0 text-xs text-text-2 max-md:basis-full">{start}</span>}
-      {/* `onCancel`: a form that leaves in its own way (an editor on the page) still has its Cancel here. */}
-      {onCancel ? <WindowCancel onClick={onCancel} /> : <WindowCancelIn />}
-      {children}
-    </PanelActions>
-  );
-}
-
-/** Cancel, when the footer is in a window (for a footer that places it itself: `cancel={false}` on PanelActions). */
+/** Cancel, when the footer is in a window (for a footer that places it itself: `cancel={false}` on WindowFooter). */
 export function WindowCancelIn() {
   return useContext(InWindow) ? <WindowCancel /> : null;
 }
@@ -412,6 +400,33 @@ export function useSidePanel(name: string) {
   );
 
   return { open, id, href, openPanel, close };
+}
+
+/**
+ * The one window kept in the address (canvas group 8): open while ?panel=<name>, so a link opens it, Back closes it
+ * and a reload keeps it. `children` can take (close, id) for a form that closes itself when saved.
+ */
+export function UrlWindow({
+  name,
+  title,
+  description,
+  className,
+  children,
+}: {
+  name: string;
+  title: string;
+  description?: ReactNode;
+  className?: string;
+  children: ReactNode | ((close: () => void, id: string | null) => ReactNode);
+}) {
+  const panel = useSidePanel(name);
+  if (!panel.open) return null;
+  const close = () => panel.close();
+  return (
+    <SidePanel title={title} description={description} onClose={close} className={className}>
+      {typeof children === "function" ? children(close, panel.id) : children}
+    </SidePanel>
+  );
 }
 
 /** A button that opens a URL side panel (the page's primary "New customer", a row's "Edit"). */

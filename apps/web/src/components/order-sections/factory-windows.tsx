@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { INCOTERMS, isLeadFrom, isWarrantyFrom, type LeadFrom, type WarrantyFrom } from "@kebo/shared";
-import { Alert, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { PanelSection } from "@/components/common/panel";
 import { LeadField, WarrantyFields } from "@/components/deals/terms-fields";
 import type { ActionState } from "@/lib/actions";
@@ -78,7 +78,7 @@ export function PayFactoryWindow({
       <FormWindow button={{ label, kind: main ? "main" : "plain" }} title="Pay the supplier" sub={sub} size="lg" disabled={!p.factories.length} startOpen={startOpen} onClosed={onClosed}>
         {(close) => <FactoryPaymentForm {...fields} bare onClose={close} onFileError={setFileError} />}
       </FormWindow>
-      {fileError && <Alert tone="error">{fileError}</Alert>}
+      {fileError && <Notice tone="bad">{fileError}</Notice>}
     </>
   );
 }
@@ -238,7 +238,7 @@ export function FactoryAgreedWindow({
   sent: boolean;
 }) {
   return (
-    <SectionWindow button={{ label: "Change" }} title={title} sub={sub} action={action} size="md">
+    <SectionWindow button={{ label: "Edit", kind: "edit", what: "what we agreed with the supplier" }} title={title} sub={sub} action={action} size="md">
       {(s) => <FactoryAgreedFields state={s} values={values} payment={payment} sent={sent} />}
     </SectionWindow>
   );

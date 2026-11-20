@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { DEV_LANES, type DevCheck, type DevEvent, type DevLevel, type DevTab } from "@kebo/shared";
-import { Badge, cn } from "@kebo/ui";
+import { Badge, cn, Notice } from "@kebo/ui";
 
 export const TAB_HREF: Record<DevTab, string> = {
   picture: "/platform/dev-tools",
@@ -37,11 +37,9 @@ export function NeedsYou({ checks }: { checks: DevCheck[] }) {
   const needs = checks.filter((c) => c.level === "bad" || c.level === "warn").sort((a, b) => (a.level === b.level ? 0 : a.level === "bad" ? -1 : 1));
   if (!needs.length)
     return (
-      <div className="flex items-center gap-2.5 rounded-xl border border-ok/25 bg-ok-soft px-4 py-3 text-sm" role="status">
-        <Dot level="ok" />
-        <span className="font-semibold">All good.</span>
-        <span className="text-text-2">Nothing needs you. A problem shows here and is emailed to you.</span>
-      </div>
+      <Notice tone="ok" title="All good.">
+        Nothing needs you. A problem shows here and is emailed to you.
+      </Notice>
     );
   const now = needs.some((c) => c.level === "bad");
   return (

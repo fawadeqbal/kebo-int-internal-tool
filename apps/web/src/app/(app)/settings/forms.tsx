@@ -1,5 +1,6 @@
 "use client";
 
+import { FileZone } from "@/components/common/file-zone";
 import { useEffect, useRef, useState } from "react";
 import { restateRates } from "@kebo/money";
 import { brandMarkOf, CURRENCIES, CURRENCY_LABEL } from "@kebo/shared";
@@ -60,7 +61,7 @@ function ImageControl({ f, text, error }: { f: SettingField; text: string; error
           <div className="flex size-24 items-center justify-center rounded-md border border-dashed border-line text-xs text-muted">No {noun}</div>
         )}
         <div className="flex flex-col gap-2">
-          <input id={id} type="file" accept="image/png,image/jpeg,image/webp" className="text-sm" onChange={(e) => choose(e.target.files?.[0])} />
+          <FileZone label={value ? `Replace the ${noun}` : `Add the ${noun}`} inputId={id} optional={false} compact one accept="image/png,image/jpeg,image/webp" hint="PNG, JPG or WebP" onFiles={(fs) => choose(fs[0])} />
           {value && (
             <button type="button" className="self-start text-sm text-bad underline-offset-2 hover:underline" onClick={() => setValue("")}>
               Remove the {noun}
@@ -280,8 +281,7 @@ export function Control({ f, text, checked, error }: { f: SettingField; text: st
         </Select>
       ) : f.kind === "number" ? (
         <div className="flex items-center gap-2">
-          <Input {...common} type="number" inputMode="decimal" min={0} step="any" className="w-28 tabular" />
-          {f.unit && <span className="text-sm text-muted">{f.unit}</span>}
+          <Input {...common} type="number" inputMode="decimal" min={0} step="any" unit={f.unit} className="w-32 tabular" />
         </div>
       ) : (
         <Input {...common} />

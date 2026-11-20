@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
-import { Avatar, buttonClass, cn } from "@kebo/ui";
-import { NavMemoryKeeper } from "@kebo/ui/client";
+import { Avatar, buttonClass, cn, RULES, Badge } from "@kebo/ui";
+import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
 import { PRODUCT_NAME } from "@/lib/product";
@@ -133,20 +133,7 @@ function LookChoice() {
   return (
     <div data-keep-open className="flex h-9 items-center justify-between gap-2 px-2 text-sm text-text-2">
       <span id="look-label">Look</span>
-      <div role="radiogroup" aria-labelledby="look-label" className="inline-flex overflow-hidden rounded-lg border border-line-strong">
-        {options.map(([m, label]) => (
-          <button
-            key={m}
-            type="button"
-            role="radio"
-            aria-checked={mode === m}
-            onClick={() => choose(m)}
-            className={cn("h-7 px-2.5 text-xs text-text-2 hover:bg-surface-2", mode === m && "bg-primary-soft font-semibold text-text hover:bg-primary-soft")}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedChoice label="Look" value={mode} options={options.map(([value, label]) => ({ value, label }))} onChange={choose} />
     </div>
   );
 }
@@ -221,9 +208,9 @@ function NewMenu({ items }: { items: NewItem[] }) {
 /** A count on a page or a closed group: what waits for this person (payments to verify). */
 function Count({ n, label }: { n: number; label: string }) {
   return (
-    <span className="inline-grid h-[18px] min-w-5 place-items-center rounded-full bg-warn-soft px-1.5 text-2xs font-semibold text-warn tabular" aria-label={`${n} ${label}`}>
+    <Badge size="sm" tone="warn" className="min-w-5 justify-center px-1.5 tabular" aria-label={`${n} ${label}`}>
       {n > 99 ? "99+" : n}
-    </span>
+    </Badge>
   );
 }
 
@@ -818,7 +805,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main id="main" className="mx-auto w-full max-w-[1440px] px-4 pt-[18px] pb-28 sm:px-6 md:pb-10">
+        <main id="main" className={cn(RULES.page.frame, "pb-28 md:pb-10")}>
           {children}
           <p className="no-print mt-6 text-xs text-muted">
             © {new Date().getFullYear()} {PRODUCT_NAME} · {companyName}

@@ -10,7 +10,7 @@ import { followUpReopenAction, removeFollowUpAction, removeNoteAction } from "@/
 import Link from "next/link";
 import { ActionForm } from "@/components/common/action-form";
 import { Modal } from "@/components/common/dialog";
-import { PANEL_FORM, PanelActions, PanelBody, PanelSection, useClosePanel, WindowCancel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelSection, useClosePanel, WindowCancel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { NOTE_ICON } from "./kinds";
 import { useTime } from "@/lib/time-client";
@@ -172,11 +172,11 @@ export function FollowUpForm({
                 <Textarea id={`${id}-note`} name="note" rows={3} maxLength={2000} className="min-h-0" defaultValue={s.values?.note} />
               </Field>
             </PanelSection>
-            <PanelActions>
+            <WindowFooter>
               <SubmitButton size="sm" pendingText="Adding…">
                 Add the follow-up
               </SubmitButton>
-            </PanelActions>
+            </WindowFooter>
           </>
         )}
       </ActionForm>
@@ -455,9 +455,20 @@ export function QuickNote({ action }: { action: Action }) {
  */
 export function NoteCardForm({ action, contacts, today }: { action: Action; contacts?: { id: string; name: string }[]; today: string }) {
   const id = useId();
+  // In its window: saved, the window closes (a no-op outside one).
+  const close = useClosePanel();
   const [day, setDay] = useState(today);
   return (
-    <ActionForm action={action} resetOnSuccess showSuccess={false} onDone={() => setDay(today)} className="grid grid-cols-3 gap-4">
+    <ActionForm
+      action={action}
+      resetOnSuccess
+      showSuccess={false}
+      onDone={(s) => {
+        setDay(today);
+        close(s);
+      }}
+      className="grid grid-cols-3 gap-4"
+    >
       {(s) => (
         <>
           <Field label="Kind" htmlFor={`${id}-kind`} error={s.errors?.kind} className={contacts ? undefined : "col-span-2 sm:col-span-1"}>

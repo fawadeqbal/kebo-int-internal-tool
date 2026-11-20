@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardBody, PageHeader } from "@kebo/ui";
+import { Card, CardBody, PageHeader, RULES } from "@kebo/ui";
 import { newCompanyData } from "./data";
 import { NewCompanyForm } from "./form";
 
@@ -9,10 +9,10 @@ export const metadata = { title: "New company or demo" };
 export default async function NewCompanyPage({ searchParams }: { searchParams: Promise<{ lead?: string; kind?: string }> }) {
   const { plans, lead, prefill } = await newCompanyData(await searchParams);
   return (
-    <div className="max-w-3xl">
+    <div className={RULES.page.column}>
       <PageHeader
         title="New company or demo"
-        description={
+        summary={
           lead ? (
             <>
               For{" "}

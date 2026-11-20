@@ -7,40 +7,6 @@ import { cn } from "@kebo/ui";
  * change against the period before, a sparkline, a segmented bar for one whole, bars for a funnel.
  */
 
-export interface SectionItem {
-  href: string;
-  label: string;
-  active: boolean;
-  count?: number | null;
-}
-
-/** The sections, always visible: a list on the left from a laptop up (the phone has a chip row, SectionNav). */
-export function SectionList({ label, items }: { label: string; items: SectionItem[] }) {
-  return (
-    <nav aria-label={label} className="no-print hidden self-start rounded-xl border border-line bg-surface p-2 shadow-card lg:block">
-      <ul className="flex flex-col gap-0.5">
-        {items.map((i) => (
-          <li key={i.href}>
-            <Link
-              href={i.href}
-              aria-current={i.active ? "page" : undefined}
-              className={cn(
-                "flex min-h-9 items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
-                i.active ? "bg-primary-soft font-semibold text-primary" : "text-text hover:bg-surface-2",
-              )}
-            >
-              <span>{i.label}</span>
-              {i.count !== undefined && i.count !== null && (
-                <span className={cn("text-xs tabular", i.active ? "text-primary" : "text-muted")}>{i.count}</span>
-              )}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
-
 /**
  * The change against the period before: an arrow and the size, coloured by whether it went the good way
  * (never by sign alone), with the words for screen readers.

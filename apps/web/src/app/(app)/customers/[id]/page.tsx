@@ -1,50 +1,27 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import {
-  Avatar,
-  Banner,
-  Card,
-  cn,
-  CardBody,
-  CardHeader,
-  RefCode,
-  StatRow,
-  StatTile,
-  StatusBadge,
-  Table,
-  Td,
-  Th,
-  THead,
-  Tr,
-  ButtonLink,
-} from "@kebo/ui";
-import { ArrowRight, FileText } from "lucide-react";
+import { Card, CardBody, CardHeader, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, Tr, ButtonLink, Notice, EmptyLine } from "@kebo/ui";
+import { ArrowRight } from "lucide-react";
 import { ORDER_WORD_TONE } from "@kebo/shared";
-import { customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
-import { date, timeAgo, whole, companyToday } from "@/lib/format";
-import { QuickNote } from "@/components/notes/note-forms";
-import { addNoteAction } from "../../follow-ups/actions";
-import { late } from "./shared";
+import { customerPaymentsOf } from "@/lib/party-data";
+import { date, whole } from "@/lib/format";
+
 import { hasFeature, requireUser } from "@/lib/session";
 import { api } from "@/lib/api";
 import type { OrderGroups } from "@/lib/types-facts";
-import type { CustomerAccount } from "@/lib/types-money";
 import { customerOf } from "@/lib/party-data";
 import { countryName } from "@/lib/countries";
 import { OpenPanelButton } from "@/components/common/panel";
 import { DetailsCard } from "@/components/common/record";
 import { RecordLanding } from "@/components/common/record-nav";
 import { getSettings } from "@/lib/loaders";
-import { removeCustomerAction, saveCustomerAction } from "../actions";
-import { ConfirmAction } from "@/components/people/confirm-action";
+import { saveCustomerAction } from "../actions";
+
 import { CustomerPanel } from "../customer-panel";
 import { currenciesFrom } from "../currencies";
 import { customerTitle } from "@/lib/titles";
 
 export const generateMetadata = customerTitle();
-
-const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 
 /** Old ?tab= links and the history panel → the tab that has them now. */
 const TAB_OF: Record<string, string> = {
@@ -77,33 +54,25 @@ export default async function CustomerOverview({
   const canEdit = can(me, "customers.manage");
   const editing = canEdit && sp.panel === "edit-customer";
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const [c, settings, pay, notes, groups, account] = await Promise.all([
+  const [c, settings, pay, groups] = await Promise.all([
     customerOf(id),
     editing ? getSettings() : null,
     customerPaymentsOf(id),
-    partyNotesOf("customers", id),
     insights
       ? api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", customerId: id }).catch(() => null)
       : null,
-    // What was spent on them and their profit after all costs: managers with expenses.
-    seesCosts ? api.get<CustomerAccount>(`/customers/${id}/account`).catch(() => null) : null,
   ]);
   const facts = groups?.rows[0];
   const latest = [...(pay?.orders ?? [])].sort((a, b) => b.orderedOn.localeCompare(a.orderedOn)).slice(0, 5);
-  const totals = pay?.totals ?? [];
   const openOrders = c.orders.filter((o) => o.status === "open").length;
   const won = c.inquiries.filter((d) => d.stage === "won").length;
   const lost = c.inquiries.filter((d) => d.stage === "lost").length;
-  const primary = c.contacts.find((p) => p.isPrimary) ?? c.contacts[0] ?? null;
   const countryKnown = c.country !== UNKNOWN_COUNTRY;
-  const today = companyToday();
-  const canNote = can(me, "customers.manage");
 
   return (
     <div className="flex flex-col gap-4">
       <RecordLanding />
-      <StatRow>
+      <StatRow facts>
         <StatTile label="Orders" value={c.orders.filter((o) => o.status !== "cancelled").length} sub={`${openOrders} open`} />
         <StatTile
           label="Win rate"
@@ -121,8 +90,6 @@ export default async function CustomerOverview({
           sub="on their orders"
         />
       </StatRow>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-4">
           <DetailsCard
             flash={sp.saved === c.id}
             edit={canEdit ? { panel: "edit-customer", id: c.id, label: `Edit ${c.name}` } : null}
@@ -139,7 +106,7 @@ export default async function CustomerOverview({
             footer={
               <>
                 {!countryKnown && (
-                  <Banner meaning="warn" className="mx-4 mb-4">
+                  <Notice tone="todo" className="mx-4 mb-4">
                     Their country is not set yet — it decides shipping.{" "}
                     {canEdit ? (
                       <OpenPanelButton panel="edit-customer" id={c.id} variant="link" size="sm" className="h-auto font-semibold">
@@ -148,7 +115,7 @@ export default async function CustomerOverview({
                     ) : (
                       "Ask someone who manages customers to add it."
                     )}
-                  </Banner>
+                  </Notice>
                 )}
               </>
             }
@@ -192,157 +159,10 @@ export default async function CustomerOverview({
               </Table>
             ) : (
               <CardBody>
-                <p className="text-sm text-muted">No orders yet. An order is made when they accept a quotation.</p>
+                <EmptyLine>No orders yet. An order is made when they accept a quotation.</EmptyLine>
               </CardBody>
             )}
           </Card>
-          {can(me, "customers.delete") && (
-            <div className="flex justify-end">
-              <ConfirmAction
-                action={removeCustomerAction.bind(null, c.id)}
-                confirm={`Remove ${c.name}? They stay on past inquiries and orders, and can be brought back from Customers › Archived. Not possible while an order is open.`}
-                label="Remove this customer"
-                pendingText="Removing…"
-                variant="danger-ghost"
-                size="sm"
-              />
-            </div>
-          )}
-        </div>
-
-        <aside aria-label="At a glance" className="flex min-w-0 flex-col gap-4">
-          {/* Money (board): sold, received, they owe, credit, per currency. */}
-          <Card>
-            <CardHeader
-              title="Money"
-              actions={
-                <ButtonLink href={`/customers/${c.id}/money`} variant="link" size="sm">
-                  <FileText aria-hidden /> Statement
-                </ButtonLink>
-              }
-            />
-            <CardBody className="flex flex-col gap-2.5 text-md">
-              {totals.length ? (
-                totals.map((t) => {
-                  const lateAmount = (pay?.orders ?? [])
-                    .filter((o) => o.currency === t.currency && late(o, today))
-                    .reduce((sum, o) => sum + Number(o.next?.open ?? 0), 0);
-                  const credit = pay?.credit.balances.find((b) => b.currency === t.currency)?.amount ?? 0;
-                  return (
-                    <div key={t.currency} className="flex flex-col gap-2.5">
-                      {[
-                        [`Sold (${t.orders} order${t.orders === 1 ? "" : "s"})`, whole(t.total, t.currency)],
-                        ["Received", whole(t.received, t.currency)],
-                        ["They owe", whole(t.due, t.currency)],
-                        ["Late", whole(lateAmount, t.currency)],
-                        ["Credit on account", whole(credit, t.currency)],
-                      ].map(([label, value]) => (
-                        <div key={label} className="flex justify-between gap-3">
-                          <span className="text-text-2">{label}</span>
-                          <strong className={cn("tabular", label === "Late" && lateAmount > 0.005 && "text-bad")}>{value}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-muted">No orders yet.</p>
-              )}
-              {account && (Number(account.totals.spent) > 0 || Number(account.totals.sales) > 0) && (
-                <div className="flex flex-col gap-2.5 border-t border-line pt-2.5">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-text-2">Spent on them</span>
-                    <strong className="tabular">{whole(account.totals.spent, account.currency)}</strong>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-text-2">Profit after all costs</span>
-                    <strong className={cn("tabular", Number(account.totals.net) < 0 && "text-bad")}>
-                      {whole(account.totals.net, account.currency)}
-                      {Number(account.totals.sales) > 0 && (
-                        <span className="font-normal text-text-2"> · {((Number(account.totals.net) / Number(account.totals.sales)) * 100).toFixed(1)}%</span>
-                      )}
-                    </strong>
-                  </div>
-                  <Link href={`/customers/${c.id}/money#where`} className="w-fit font-medium text-primary hover:underline">
-                    Where their money went →
-                  </Link>
-                </div>
-              )}
-            </CardBody>
-          </Card>
-
-          {/* Main contact (board). */}
-          <Card>
-            <CardHeader
-              title="Main contact"
-              actions={
-                <ButtonLink href={`/customers/${c.id}/contacts`} variant="link" size="sm">
-                  <ArrowRight aria-hidden /> All {c.contacts.length}
-                </ButtonLink>
-              }
-            />
-            <CardBody className="flex flex-col gap-1 text-sm">
-              {primary ? (
-                <>
-                  <strong>{primary.name}</strong>
-                  {(primary.position || primary.isPrimary) && (
-                    <span className="text-text-2">
-                      {[primary.position, primary.isPrimary ? "primary" : null].filter(Boolean).join(" · ")}
-                    </span>
-                  )}
-                  {primary.email && (
-                    <a href={`mailto:${primary.email}`} className="break-all hover:text-primary">
-                      {primary.email}
-                    </a>
-                  )}
-                  {primary.phone && primary.phone === primary.whatsapp ? (
-                    <a href={waLink(primary.whatsapp)} target="_blank" rel="noreferrer" className="hover:text-primary">
-                      {primary.phone} · WhatsApp
-                    </a>
-                  ) : (
-                    <>
-                      {primary.phone && <a href={`tel:${primary.phone}`}>{primary.phone}</a>}
-                      {primary.whatsapp && (
-                        <a href={waLink(primary.whatsapp)} target="_blank" rel="noreferrer" className="hover:text-primary">
-                          {primary.whatsapp} · WhatsApp
-                        </a>
-                      )}
-                    </>
-                  )}
-                  {primary.wechat && <span>WeChat {primary.wechat}</span>}
-                </>
-              ) : (
-                <span className="text-muted">No contact yet.</span>
-              )}
-            </CardBody>
-          </Card>
-
-          {/* Activity (board): a quick note, then the latest notes and calls. */}
-          <Card>
-            <CardHeader title="Activity" />
-            <CardBody className="flex flex-col gap-3">
-              {canNote && <QuickNote action={addNoteAction.bind(null, { key: "customerId", id: c.id })} />}
-              {notes.length ? (
-                <ol className="flex flex-col gap-3">
-                  {notes.slice(0, 5).map((n) => (
-                    <li key={n.id} className="flex gap-2.5">
-                      <Avatar name={n.author.name} size={30} />
-                      <span className="min-w-0 text-md">
-                        <span className="line-clamp-2">{n.body}</span>
-                        <span className="block text-xs text-muted">
-                          {n.author.name} · {timeAgo(n.at)}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="text-sm text-muted">Nothing yet. Notes, calls and meetings show here.</p>
-              )}
-            </CardBody>
-          </Card>
-        </aside>
-      </div>
       {editing && settings && (
         <CustomerPanel action={saveCustomerAction.bind(null, c.id, c.updatedAt)} customer={c} currencies={currenciesFrom(settings)} onRecord />
       )}

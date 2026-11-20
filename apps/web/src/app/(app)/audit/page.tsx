@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr, FactsLine } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { api } from "@/lib/api";
-import { readableDates } from "@/components/insights/readable-dates";
+import { readableHistory } from "@/components/insights/readable-dates";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
@@ -149,17 +149,12 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/audit")}
         title="Activity log"
-        summary={
-          <>
-            {data.total.toLocaleString("en-US")} {data.total === 1 ? "entry" : "entries"}
-            {who && ` by ${who}`}
-            <span className="max-sm:hidden"> · every change anyone made, newest first; entries cannot be edited or removed</span>
-          </>
-        }
-        actions={<ExportCsv what="audit" query={{ type: sp.type, person: sp.person, q: sp.q }} />}
+        more={<ExportCsv what="audit" query={{ type: sp.type, person: sp.person, q: sp.q }} />}
       />
+      <FactsLine facts={[{ label: who ? `Entries by ${who}` : "Entries", value: data.total.toLocaleString("en-US") }]} />
       <LinkTabs label="Which records" className="mb-4" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
       <FilterCard
         count={countOf(data.total, "entry", "entries")}
@@ -194,7 +189,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 <PhoneRow
                   key={r.id}
                   href={entityHref(r, canUsers) ?? undefined}
-                  title={r.summary ? readableDates(r.summary) : words(r.action)}
+                  title={r.summary ? readableHistory(r.summary) : words(r.action)}
                   line={`${r.userName} · ${label(r.entityType)}`}
                   figure={timeAgo(r.createdAt)}
                   extra={<Changes r={r} />}
@@ -228,10 +223,10 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                           <Badge tone="outline">{label(r.entityType)}</Badge>
                           {to ? (
                             <Link href={to} className="hover:text-primary">
-                              {r.summary ? readableDates(r.summary) : words(r.action)}
+                              {r.summary ? readableHistory(r.summary) : words(r.action)}
                             </Link>
                           ) : (
-                            <span>{r.summary ? readableDates(r.summary) : words(r.action)}</span>
+                            <span>{r.summary ? readableHistory(r.summary) : words(r.action)}</span>
                           )}
                         </p>
                         <Changes r={r} />

@@ -235,7 +235,7 @@ describe("company page: each element only where it can be used", () => {
 
   it("Plan & modules: Change plan; the module switched off says when and by whom; a demo gets its card", () => {
     const { container, unmount } = render(<PlanSection c={company()} modules={noop} />);
-    expect(screen.getByRole("button", { name: "Change plan" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Change plan" })).toBeTruthy();
     expect(screen.getByText(/Switched off for this company on 28 Oct 2026 by Fawad/)).toBeTruthy();
     expect(screen.getAllByText("not in plan").length).toBeGreaterThan(0);
     expect(screen.queryByRole("heading", { name: "Demo" })).toBeNull();
@@ -243,18 +243,18 @@ describe("company page: each element only where it can be used", () => {
     unmount();
     render(<PlanSection c={demo()} modules={noop} />);
     expect(screen.getByRole("heading", { name: "Demo" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Extend…" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Make it a client" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Extend…" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Make it a client" })).toBeTruthy();
   });
 
   it("Billing: + Record payment and ⋯ Remove for a client; a demo has no payments to record; deleted: read-only", () => {
     const { unmount } = render(<BillingSection c={company()} today={today} removePayment={{ pay1: noop }} />);
-    expect(screen.getByRole("button", { name: /Record payment/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Record payment/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Actions for the payment/ })).toBeTruthy();
     expect(screen.getByText("Paid")).toBeTruthy();
     unmount();
     const d = render(<BillingSection c={demo()} today={today} removePayment={{}} />);
-    expect(screen.queryByRole("button", { name: /Record payment/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Record payment/ })).toBeNull();
     expect(screen.getByText("A demo has no payments")).toBeTruthy();
     d.unmount();
     render(<BillingSection c={{ ...deleted(), payments: company().payments }} today={today} removePayment={{ pay1: noop }} />);

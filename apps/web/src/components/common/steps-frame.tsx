@@ -171,76 +171,104 @@ export function StepsFrame<K extends string>({
   );
 }
 
-/** Back · Save · Next: no Back on the first step; on the last, Save is the main button. Adding: the last one adds. */
+/**
+ * The one footer of a steps window (design rules 18 Nov; canvas row "Cancel, not ✕"): one strong button only.
+ * Left: ‹ Back (or, on the first step, a quiet note such as "Last changed 3 Nov"). Right: Cancel, then on a step a
+ * quiet jump (Review, Changes · 3) and Next; on the last step — or a part on its own — the save. Next and the save are
+ * the window's one blue button (primary, as in every other window: live audit 20 Nov), never two at once.
+ * On a phone the items' total is a line of its own above the buttons, and the buttons share the width.
+ *
+ * - `onBack`: none on the first step. `backLabel`: "Back to search" in place of "Back".
+ * - `jump`: the quiet button before Next ({ label, onClick }); not on a phone.
+ * - `onNext`: none on the last step.
+ * - `save`: the last step's strong button. Without `onClick` it submits the form (pending: `pendingText`);
+ *   `also` is a quieter save beside it ("Save and add another").
+ */
 export function StepsFooter({
-  first,
-  last,
   onBack,
-  onNext,
-  saveLabel = "Save",
-  canSave = true,
+  backLabel = "Back",
+  start,
+  cancel = true,
   onCancel,
+  jump,
+  onNext,
+  save,
 }: {
-  first: boolean;
-  last: boolean;
-  onBack: () => void;
-  onNext: () => void;
-  saveLabel?: string;
-  canSave?: boolean;
-  /** Cancel's own way to close (by default it closes the window, asking first when something changed). */
+  onBack?: (() => void) | null;
+  backLabel?: string;
+  start?: ReactNode;
+  /** Cancel beside the buttons (false: the footer already says how to go back). */
+  cancel?: boolean;
   onCancel?: () => void;
+  /** Without `onClick`, the jump saves (submits the form): a quiet Save before the last step. */
+  jump?: { label: ReactNode; onClick?: () => void } | null;
+  onNext?: (() => void) | null;
+  save: { label: ReactNode; disabled?: boolean; pendingText?: string; onClick?: () => void; busy?: boolean; also?: ReactNode };
 }) {
+  const last = !onNext;
   return (
-    // Canvas row "Cancel, not ✕": ‹ (back one step) · Cancel · Next — Next the strong one, Save on the last step; on a
-    // laptop Back on the left, Cancel beside the saves. On a phone a step's own Save waits for the last step.
     <div
       data-window-footer=""
-      className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:px-4 max-sm:flex-wrap max-md:[&>button]:min-h-12 max-md:[&>button:not([data-back])]:flex-1"
+      className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4 max-sm:flex-wrap"
     >
-      {/* A phone: the items' total on its own line above the buttons (design "Items on a small phone"). */}
       <FooterTotal line />
-      {!first && (
-        <Button type="button" variant="secondary" data-back="" aria-label="Back" onClick={onBack} className="max-md:size-12 max-md:px-0">
-          <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
+      {onBack ? (
+        <Button type="button" variant="ghost" data-back="" aria-label={backLabel} onClick={onBack} className={cn(backLabel === "Back" && "max-md:aspect-square max-md:px-0")}>
+          <ChevronLeft aria-hidden /> <span className={cn(backLabel === "Back" && "max-md:hidden")}>{backLabel}</span>
         </Button>
+      ) : (
+        start && <span className="text-xs text-text-2 max-md:hidden">{start}</span>
       )}
       <span className="flex-1 max-md:hidden" />
-      <WindowCancel onClick={onCancel} />
-      <SubmitButton variant={last ? "primary" : "secondary"} pendingText="Saving…" disabled={!canSave} className={cn(!last && "max-md:hidden")}>
-        {saveLabel}
-      </SubmitButton>
-      {!last && (
-        <Button type="button" variant="primary" onClick={onNext}>
-          Next <ChevronRight aria-hidden className="max-md:hidden" />
-        </Button>
+      {cancel && <WindowCancel onClick={onCancel} className="max-md:flex-1" />}
+      {last ? (
+        <>
+          {save.also}
+          {save.onClick ? (
+            <Button type="button" variant="primary" disabled={save.disabled || save.busy} aria-busy={save.busy} onClick={save.onClick} className="max-md:flex-1">
+              <Check aria-hidden /> {save.label}
+            </Button>
+          ) : (
+            <SubmitButton variant="primary" pendingText={save.pendingText ?? "Saving…"} disabled={save.disabled} className="max-md:flex-1">
+              <Check aria-hidden /> {save.label}
+            </SubmitButton>
+          )}
+        </>
+      ) : (
+        <>
+          {jump &&
+            (jump.onClick ? (
+              <Button type="button" variant="ghost" onClick={jump.onClick} className="max-md:hidden">
+                {jump.label}
+              </Button>
+            ) : (
+              <SubmitButton variant="ghost" pendingText="Saving…" className="max-md:hidden">
+                {jump.label}
+              </SubmitButton>
+            ))}
+          <Button type="button" variant="primary" onClick={onNext!} className="max-md:flex-1">
+            Next <ChevronRight aria-hidden />
+          </Button>
+        </>
       )}
     </div>
   );
 }
 
 /**
- * The buttons of one part on its own: Cancel and Save on the right (no "All steps": a part's window is that part;
- * Edit all in ⋯ has every step). On a phone the items' total sits beside Save.
+ * A refused field on another step: every steps window goes to the step that holds it, once per answer (a later
+ * step change by hand is not undone). `stepOf` names the step of an error's field key.
  */
-export function OnePartFooter({
-  onCancel,
-  canSave = true,
-  saveLabel = "Save",
-}: {
-  onCancel?: () => void;
-  canSave?: boolean;
-  saveLabel?: string;
-}) {
-  return (
-    // Canvas row "Cancel, not ✕": Cancel · Save, each half the width on a phone.
-    <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 max-md:flex-wrap max-md:px-4 max-md:[&>button]:min-h-12 max-md:[&>button]:flex-1">
-      {/* A phone: the items' total on its own line, then Cancel · Save (canvas board "Items windows"). */}
-      <FooterTotal line />
-      <span className="flex-1 max-md:hidden" />
-      <WindowCancel onClick={onCancel} />
-      <SubmitButton variant="primary" pendingText="Saving…" disabled={!canSave}>
-        <Check aria-hidden /> {saveLabel}
-      </SubmitButton>
-    </div>
-  );
+export function JumpToStep<K extends string>({ errors, stepOf, onJump }: { errors?: Record<string, string[] | undefined>; stepOf: (field: string) => K; onJump: (step: K) => void }) {
+  const jump = useRef(onJump);
+  const where = useRef(stepOf);
+  useEffect(() => {
+    jump.current = onJump;
+    where.current = stepOf;
+  });
+  useEffect(() => {
+    const first = Object.keys(errors ?? {}).find((k) => errors?.[k]?.length);
+    if (first) jump.current(where.current(first));
+  }, [errors]);
+  return null;
 }

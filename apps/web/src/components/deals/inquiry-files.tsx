@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { useConfirmSubmit } from "@/components/common/dialog";
 import { useRouter } from "next/navigation";
 import { Download, Eye, Trash2 } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, type AttachmentKind } from "@kebo/shared";
@@ -9,7 +10,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
 import type { ActionState } from "@/lib/actions";
-import { send, type Staged } from "./documents-panel";
+import { send, type Staged } from "@/components/files/upload";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -50,7 +51,7 @@ export function AddFilesCard({ dealId }: { dealId: string }) {
           label="Add files"
           onFiles={(f) => void upload(f)}
           kind={
-            <Select aria-label="What kind of file" value={kind} onChange={(e) => setKind(e.target.value as AttachmentKind)} className="h-[34px] w-auto text-md">
+            <Select size="sm" aria-label="What kind of file" value={kind} onChange={(e) => setKind(e.target.value as AttachmentKind)} className="w-auto text-md">
               {CUSTOMER_KINDS.map((k) => (
                 <option key={k} value={k}>
                   {KIND_WORD[k]}
@@ -100,8 +101,10 @@ export interface FileLine {
 /** The inquiry's own files: a click on the kind or note changes them. */
 export function FilesTable({ files }: { files: FileLine[] }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const { onClick: confirmSubmit, dialog } = useConfirmSubmit();
   return (
-    <Table className="min-w-[820px]">
+    <>
+    <Table>
       <THead>
         <tr>
           <Th>File</Th>
@@ -154,7 +157,7 @@ export function FilesTable({ files }: { files: FileLine[] }) {
                           className={buttonClass("ghost", "icon-sm")}
                           aria-label={`Remove ${f.fileName}`}
                           title="Remove"
-                          onClick={(e) => !confirm(`Remove ${f.fileName}?`) && e.preventDefault()}
+                          onClick={confirmSubmit({ question: `Remove ${f.fileName}?`, confirmLabel: "Remove", danger: true })}
                         >
                           <Trash2 aria-hidden />
                         </button>
@@ -190,5 +193,7 @@ export function FilesTable({ files }: { files: FileLine[] }) {
         })}
       </tbody>
     </Table>
+    {dialog}
+    </>
   );
 }

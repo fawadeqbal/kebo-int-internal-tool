@@ -34,7 +34,7 @@ export function TabList({
     views || buttons ? (
       // A phone: the row would wrap, so each goes full width (design rules 4); the switch's halves share it.
       <span className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:flex-col max-sm:items-stretch max-sm:*:w-full max-sm:[&>nav>a]:flex-1 max-sm:[&>nav>a]:justify-center sm:justify-end">
-        {views && <ViewSwitch label={views.label} compact="sm" current={views.current} views={views.options} />}
+        {views && <ViewSwitch label={views.label} current={views.current} views={views.options} />}
         {buttons}
       </span>
     ) : undefined;

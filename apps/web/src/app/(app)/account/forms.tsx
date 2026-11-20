@@ -2,20 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
-import { Alert, Button, Field, Input } from "@kebo/ui";
-import { SubmitButton, toast } from "@kebo/ui/client";
+import { Check, Copy, KeyRound, Smartphone } from "lucide-react";
+import { Button, Field, Input, Notice } from "@kebo/ui";
+import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import {
-  PANEL_FORM,
-  PanelActions,
-  PanelBody,
-  PanelKeys,
-  PanelSection,
-  SidePanel,
-  useSidePanel,
-} from "@/components/common/panel";
+import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PasswordForm } from "@/components/people/password-form";
 import type { ActionState } from "@/lib/actions";
 import type { TwoStepStatus } from "@/lib/types-people";
 
@@ -38,45 +31,6 @@ export function PasswordEdit({ action }: { action: Action }) {
   );
 }
 
-export function PasswordForm({ action, onSaved }: { action: Action; onSaved?: () => void }) {
-  return (
-    <ActionForm
-      action={action}
-      resetOnSuccess
-      showSuccess={false}
-      className={PANEL_FORM}
-      onDone={(r) => {
-        toast(r.message ?? "Password changed");
-        onSaved?.();
-      }}
-    >
-      {(s) => (
-        <>
-          <PanelSection first className="sm:grid-cols-1">
-            <Field label="Current password" htmlFor="current" error={s.errors?.current}>
-              <Input id="current" name="current" type="password" autoComplete="current-password" aria-invalid={!!s.errors?.current} />
-            </Field>
-            <Field
-              label="New password"
-              htmlFor="next"
-              error={s.errors?.next}
-              hint="At least 10 characters, with letters and a number"
-            >
-              <Input id="next" name="next" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.next} />
-            </Field>
-            <Field label="New password again" htmlFor="confirm" error={s.errors?.confirm}>
-              <Input id="confirm" name="confirm" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.confirm} />
-            </Field>
-          </PanelSection>
-          <PanelActions>
-            <SubmitButton pendingText="Changing…">Change my password</SubmitButton>
-            <PanelKeys />
-          </PanelActions>
-        </>
-      )}
-    </ActionForm>
-  );
-}
 
 function CodeField({ id, error, label = "Code from your app" }: { id: string; error?: string[]; label?: string }) {
   return (
@@ -106,13 +60,13 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
   };
   return (
     <div className="flex flex-col gap-3">
-      <Alert tone="warning">
+      <Notice tone="todo">
         <p className="font-medium">Save these recovery codes now. They are shown only once.</p>
         <p className="mt-0.5 text-text-2">
           If you lose your phone, each code lets you sign in one time instead of the code from your app. Keep them somewhere safe, away from
           your phone (a password manager, or printed).
         </p>
-      </Alert>
+      </Notice>
       <ol className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-surface-2/60 p-3 font-mono text-sm tabular sm:grid-cols-2">
         {codes.map((c, i) => (
           <li key={c} className="flex items-baseline gap-2">
@@ -174,18 +128,12 @@ export function TwoStepPanel({
   if (status.on && !setup)
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex items-start gap-3 rounded-lg border border-ok/25 bg-ok-soft p-3">
-          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-ok" aria-hidden />
-          <div className="text-sm">
-            <p className="font-medium">Two-step sign-in is on{sinceText ? ` since ${sinceText}` : ""}.</p>
-            <p className="text-text-2">
-              After your password you enter the code from your authenticator app. {status.recoveryCodesLeft} recovery code
-              {status.recoveryCodesLeft === 1 ? "" : "s"} left.
-            </p>
-          </div>
-        </div>
+        <Notice tone="ok" title={`Two-step sign-in is on${sinceText ? ` since ${sinceText}` : ""}.`}>
+          After your password you enter the code from your authenticator app. {status.recoveryCodesLeft} recovery code
+          {status.recoveryCodesLeft === 1 ? "" : "s"} left.
+        </Notice>
         {status.recoveryCodesLeft <= 3 && (
-          <Alert tone="warning">You are running out of recovery codes. Make new ones so you can still get in if you lose your phone.</Alert>
+          <Notice tone="todo">You are running out of recovery codes. Make new ones so you can still get in if you lose your phone.</Notice>
         )}
         <div className="flex flex-wrap gap-2">
           <Button

@@ -224,13 +224,18 @@ test("a form's mistake: what to fix at the top, each a way to its field, the cur
   await page.goto("/customers");
   await page.getByRole("link", { name: "Add customer" }).click();
   const form = page.getByRole("dialog", { name: "New customer" });
+  // In steps (who they are · address and tax · contacts): the tax number on the second, then save from the last.
+  await form.getByRole("button", { name: /^Next/ }).click();
   await form.getByRole("textbox", { name: "Tax no." }).fill("TX-7781");
-  await form.getByRole("button", { name: /Save customer/ }).click();
+  await form.getByRole("button", { name: /^Next/ }).click();
+  await form.getByRole("button", { name: "Add the customer" }).click();
   const fix = form.getByRole("alert").filter({ hasText: "to fix before saving" });
   await expect(fix).toBeVisible();
+  // The window goes to the step with the first mistake, the cursor in its field.
   const name = form.getByRole("textbox", { name: "Name", exact: true });
   await expect(name).toBeFocused();
   await expect(name).toHaveAttribute("aria-invalid", "true");
+  await form.getByRole("button", { name: /^Next/ }).click();
   await expect(form.getByRole("textbox", { name: "Tax no." })).toHaveValue("TX-7781");
   await expect(form).toBeVisible();
   expect(errors).toEqual([]);
@@ -242,11 +247,14 @@ test("no connection: the save says so with Try again, the form stays with what w
   await page.getByRole("link", { name: "Add customer" }).click();
   const form = page.getByRole("dialog", { name: "New customer" });
   await form.getByRole("textbox", { name: "Name", exact: true }).fill("Kabul Medical Supplies");
+  await form.getByRole("button", { name: /^Next/ }).click();
+  await form.getByRole("button", { name: /^Next/ }).click();
   await context.setOffline(true);
-  await form.getByRole("button", { name: /Save customer/ }).click();
+  await form.getByRole("button", { name: "Add the customer" }).click();
   const note = page.locator("[data-note=fail]");
   await expect(note).toContainText("Not saved: no connection");
   await expect(note.getByRole("button", { name: "Try again" })).toBeVisible();
+  await form.getByRole("navigation", { name: "Steps" }).getByRole("button", { name: /Who they are/ }).click();
   await expect(form.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Kabul Medical Supplies");
   await context.setOffline(false);
   expect(errors).toEqual([]);

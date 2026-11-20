@@ -68,7 +68,7 @@ export function CostSheetTable({
   const c = currency;
   const toPay = Number(totals?.toPay ?? 0);
   return (
-    <Table className="min-w-[640px]">
+    <Table>
       <THead>
         <tr>
           <Th>What for</Th>

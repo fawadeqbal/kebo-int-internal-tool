@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { COMPANY_KIND_LABEL, LEAD_SOURCE_LABEL, LEAD_STATUS_LABEL, suggestSlug } from "@kebo/shared";
-import { ButtonLink, buttonClass, Card, EmptyState, PageHeader, StatusBadge } from "@kebo/ui";
+import { ButtonLink, buttonClass, Card, EmptyState, StatusBadge, EmptyLine, CardHeader } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { loadPlatform } from "@/lib/platform";
 import { date, dateTime } from "@/lib/format";
@@ -10,10 +10,12 @@ import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { GroupCard } from "@/components/platform/group-card";
 import { CompanyStatusBadge } from "@/components/platform/badges";
 import { deleteLeadAction, giveDemoAction, leadNoteAction, updateLeadAction } from "@/app/platform/actions";
-import { PanelButton } from "../../companies/[id]/cards";
+import { OpenPanelButton } from "@/components/common/panel";
 import { NoteForm } from "./forms";
 import { LeadPanels, ProgressSteps } from "./panels";
 import { cache } from "react";
+import { RecordShell } from "@/components/records/record-frame";
+import { RecordTop } from "@/components/records/record-page";
 
 /** The client inquiry, read once per request (the page and its tab title). */
 const leadOf = cache((id: string) => loadPlatform(() => platformApi.get<LeadDetail>(`/leads/${id}`)));
@@ -49,15 +51,15 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const suggested = `${suggestSlug(l.companyName).slice(0, 25)}-demo`;
 
   const primary = !company ? (
-    <ButtonLink href={`/platform/companies/new?lead=${id}&kind=client`} variant="primary">
+    <ButtonLink href={`/platform/companies/new?lead=${id}&kind=client`} variant="strong">
       <Building2 aria-hidden /> Make a company
     </ButtonLink>
   ) : company.kind !== "client" ? (
-    <ButtonLink href={`/platform/companies/${company.id}?section=plan&panel=make-real`} variant="primary">
+    <ButtonLink href={`/platform/companies/${company.id}?section=plan&panel=make-real`} variant="strong">
       <Building2 aria-hidden /> Make it a client
     </ButtonLink>
   ) : (
-    <ButtonLink href={`/platform/companies/${company.id}`} variant="primary">
+    <ButtonLink href={`/platform/companies/${company.id}`} variant="strong">
       <Building2 aria-hidden /> Open their company
     </ButtonLink>
   );
@@ -88,111 +90,43 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        backHref="/platform/leads"
-        backLabel="Client inquiries"
-        phoneStack
-        title={l.companyName}
-        badge={<StatusBadge meaning={MEANING[l.status]}>{LEAD_STATUS_LABEL[l.status]}</StatusBadge>}
-        summary={summary.join(" · ")}
-        primary={primary}
-        papers={!company ? <PanelButton panel="give-demo">Give a demo</PanelButton> : undefined}
-        more={
-          <MoreMenu
-            label={`More for ${l.companyName}`}
-            items={more}
-            phoneItems={!company ? [{ label: "Give a demo", panel: "give-demo" }] : []}
+      <RecordShell
+        top={
+          <RecordTop
+            header={{
+              backHref: "/platform/leads",
+              backLabel: "Client inquiries",
+              title: l.companyName,
+              badge: <StatusBadge meaning={MEANING[l.status]}>{LEAD_STATUS_LABEL[l.status]}</StatusBadge>,
+              summary: summary.join(" · "),
+              primary: primary,
+              papers: !company ? <OpenPanelButton size="sm" panel="give-demo">Give a demo</OpenPanelButton> : undefined,
+              more: (
+                <MoreMenu
+        label={`More for ${l.companyName}`}
+        items={more}
+        phoneItems={!company ? [{ label: "Give a demo", panel: "give-demo" }] : []}
+      />
+              ),
+            }}
           />
         }
-      />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card className="overflow-clip" aria-labelledby="progress-title">
-            <div className="border-b border-line px-4 py-3">
-              <h2 id="progress-title" className="text-sm font-semibold">
-                Progress
-              </h2>
-              <p className="mt-0.5 text-xs text-muted">click a step to move it there</p>
-            </div>
-            <div className="flex flex-col gap-2 px-4 py-3">
-              <ProgressSteps status={l.status} action={updateLeadAction.bind(null, id)} />
-              {l.status === "lost" && l.lostReason && <p className="text-xs text-bad">Lost: {l.lostReason}</p>}
-              <p className="text-xs text-text-2">
-                {l.followUpOn ? (
-                  <>
-                    Next: follow up <b className="text-text">{date(l.followUpOn)}</b>
-                  </>
-                ) : (
-                  "No follow-up yet"
-                )}{" "}
-                ·{" "}
-                <PanelButton panel="follow-up" variant="link" label={l.followUpOn ? "change the follow-up date" : "set a follow-up date"}>
-                  {l.followUpOn ? "change" : "set a follow-up date"}
-                </PanelButton>
-              </p>
-            </div>
-          </Card>
-          <GroupCard
-            id="who"
-            title="Who"
-            description="from their request"
-            panel="edit-who"
-            editLabel="Edit who"
-            items={[
-              { label: "Company", value: l.companyName },
-              { label: "Contact", value: l.name },
-              {
-                label: "Email",
-                value: (
-                  <a href={`mailto:${l.email}`} className="break-all text-primary hover:underline">
-                    {l.email}
-                  </a>
-                ),
-              },
-              { label: "Phone / WhatsApp", value: l.phone },
-              { label: "Country", value: l.country },
-              { label: "Team size", value: l.teamSize },
-            ]}
-          />
-          <GroupCard
-            id="need"
-            title="What they need"
-            description="in their words, and yours"
-            panel="edit-need"
-            editLabel="Edit what they need"
-            columns={2}
-            items={[
-              {
-                label: "What they need",
-                value: l.message ? <span className="font-normal whitespace-pre-wrap">{l.message}</span> : null,
-                wide: true,
-              },
-              { label: "Came from", value: l.channel ?? LEAD_SOURCE_LABEL[l.source], readOnly: true },
-              ...(l.origin?.campaign
-                ? [{ label: "Campaign", value: [l.origin.campaign, l.origin.medium].filter(Boolean).join(", "), readOnly: true }]
-                : []),
-              ...(l.origin?.cta ? [{ label: "Button pressed", value: l.origin.cta, readOnly: true }] : []),
-            ]}
-          />
-        </div>
-        <div className="flex min-w-0 flex-col gap-4">
+        panelLabel="Beside the client inquiry"
+        panel={
+          <>
           <Card className="overflow-clip" aria-labelledby="demo-title">
-            <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-              <div>
-                <h2 id="demo-title" className="text-sm font-semibold">
-                  {company?.kind === "client" ? "Their company" : "Demo"}
-                </h2>
-                <p className="mt-0.5 text-xs text-muted">{company ? "made for them" : "none yet"}</p>
-              </div>
-              {company && (
-                <Link
-                  href={`/platform/companies/${company.id}`}
-                  className={buttonClass("ghost", "sm", "h-8 px-2.5 text-md text-text-2")}
-                >
-                  Open {company.kind === "client" ? "company" : "demo"}
-                </Link>
-              )}
-            </div>
+            <CardHeader
+              titleId="demo-title"
+              title={company?.kind === "client" ? "Their company" : "Demo"}
+              description={company ? "made for them" : "none yet"}
+              actions={
+                company && (
+                  <Link href={`/platform/companies/${company.id}`} className={buttonClass("ghost", "sm", "text-text-2")}>
+                    Open {company.kind === "client" ? "company" : "demo"}
+                  </Link>
+                )
+              }
+            />
             {company ? (
               <dl className="divide-y divide-line px-4">
                 {[
@@ -261,11 +195,80 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 ))}
               </ol>
             ) : (
-              <p className="px-4 py-3 text-sm text-muted">Nothing yet.</p>
+              <EmptyLine className="px-4 py-3">Nothing yet.</EmptyLine>
             )}
           </Card>
-        </div>
-      </div>
+        </>
+        }
+      >
+          <Card className="overflow-clip" aria-labelledby="progress-title">
+            <div className="border-b border-line px-4 py-3">
+              <h2 id="progress-title" className="text-sm font-semibold">
+                Progress
+              </h2>
+              <p className="mt-0.5 text-xs text-muted">click a step to move it there</p>
+            </div>
+            <div className="flex flex-col gap-2 px-4 py-3">
+              <ProgressSteps status={l.status} action={updateLeadAction.bind(null, id)} />
+              {l.status === "lost" && l.lostReason && <p className="text-xs text-bad">Lost: {l.lostReason}</p>}
+              <p className="text-xs text-text-2">
+                {l.followUpOn ? (
+                  <>
+                    Next: follow up <b className="text-text">{date(l.followUpOn)}</b>
+                  </>
+                ) : (
+                  "No follow-up yet"
+                )}{" "}
+                ·{" "}
+                <OpenPanelButton panel="follow-up" variant="link" className="text-xs" label={l.followUpOn ? "change the follow-up date" : "set a follow-up date"}>
+                  {l.followUpOn ? "change" : "set a follow-up date"}
+                </OpenPanelButton>
+              </p>
+            </div>
+          </Card>
+          <GroupCard
+            id="who"
+            title="Who"
+            description="from their request"
+            panel="edit-who"
+            editLabel="Edit who"
+            items={[
+              { label: "Company", value: l.companyName },
+              { label: "Contact", value: l.name },
+              {
+                label: "Email",
+                value: (
+                  <a href={`mailto:${l.email}`} className="break-all text-primary hover:underline">
+                    {l.email}
+                  </a>
+                ),
+              },
+              { label: "Phone / WhatsApp", value: l.phone },
+              { label: "Country", value: l.country },
+              { label: "Team size", value: l.teamSize },
+            ]}
+          />
+          <GroupCard
+            id="need"
+            title="What they need"
+            description="in their words, and yours"
+            panel="edit-need"
+            editLabel="Edit what they need"
+            columns={2}
+            items={[
+              {
+                label: "What they need",
+                value: l.message ? <span className="font-normal whitespace-pre-wrap">{l.message}</span> : null,
+                wide: true,
+              },
+              { label: "Came from", value: l.channel ?? LEAD_SOURCE_LABEL[l.source], readOnly: true },
+              ...(l.origin?.campaign
+                ? [{ label: "Campaign", value: [l.origin.campaign, l.origin.medium].filter(Boolean).join(", "), readOnly: true }]
+                : []),
+              ...(l.origin?.cta ? [{ label: "Button pressed", value: l.origin.cta, readOnly: true }] : []),
+            ]}
+          />
+      </RecordShell>
       <LeadPanels l={l} plans={plans} suggested={suggested} update={updateLeadAction.bind(null, id)} demo={giveDemoAction.bind(null, id)} />
     </div>
   );

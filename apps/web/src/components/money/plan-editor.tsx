@@ -1,14 +1,15 @@
 "use client";
 
+import { EditButton } from "@/components/common/edit-button";
 import { useId, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
 import { formatMinor, fromMinor, toMinor } from "@kebo/money";
 import { addDays } from "@kebo/utils";
-import { Button, cn, Field, Input, Select } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
-import { PanelActions, PanelBody, SidePanel, WindowCancelIn } from "@/components/common/panel";
+import { PanelBody, SidePanel, WindowCancelIn, WindowFooter } from "@/components/common/panel";
 import { money } from "@/lib/format";
 import { useTime } from "@/lib/time-client";
 import type { ActionState } from "@/lib/actions";
@@ -404,7 +405,7 @@ export function PlanEditor({
         </Button>
       </PanelBody>
       {/* Under the parts, outside the scrolling: the sum stays in view above Save. */}
-      <PanelActions className="static mx-0 mb-0 justify-end sm:mx-0" cancel={false}>
+      <WindowFooter className="static mx-0 mb-0 sm:mx-0" cancel={false}>
         <div className={cn("flex basis-full items-center gap-3 rounded-lg px-3 py-2", ok ? "bg-ok-soft" : "bg-bad-soft")}>
           <b role="status" className={cn("text-md whitespace-nowrap tabular", ok ? "text-ok" : "text-bad")}>
             {ok
@@ -435,7 +436,7 @@ export function PlanEditor({
         <span className="mr-auto text-xs text-muted max-md:hidden">Ctrl+Enter saves · Esc closes</span>
         <WindowCancelIn />
         <SubmitButton pendingText="Saving…">Save the plan</SubmitButton>
-      </PanelActions>
+      </WindowFooter>
     </ActionForm>
   );
 }
@@ -455,11 +456,9 @@ function PlanEditWindow({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" variant="secondary" className="h-8 px-2.5 text-md" onClick={() => setOpen(true)}>
-        {label}
-      </Button>
+      <EditButton label={label} onClick={() => setOpen(true)} />
       {open && (
-        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className="md:w-[920px]">
+        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={RULES.window.wideRows}>
           <PlanEditor {...editor} onDone={() => setOpen(false)} />
         </SidePanel>
       )}

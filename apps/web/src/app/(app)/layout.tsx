@@ -4,7 +4,7 @@ import { can } from "@kebo/shared";
 import { Toast } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { getCompany, requireUser, timeStyleOf } from "@/lib/session";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import { FeaturesProvider } from "@/components/common/features";
 import { leaveCompanyAction } from "@/app/platform/actions";
 import { demoMode } from "@/lib/demo";
@@ -90,14 +90,14 @@ export default async function AppLayout({ children, window: win }: { children: R
           </form>
         )}
         {company?.notices.map((n) => (
-          <Alert key={n.text} tone={n.tone === "danger" ? "error" : n.tone === "warn" ? "warning" : "info"} className="no-print mb-4">
+          <Notice key={n.text} tone={n.tone === "danger" ? "bad" : n.tone === "warn" ? "todo" : "info"} className="no-print mb-4">
             {n.text}
-          </Alert>
+          </Notice>
         ))}
         {demoMode() && (
-          <p className="no-print mb-4 rounded-xl border border-info/30 bg-info-soft px-3 py-2 text-sm text-info">
-            <strong className="font-semibold">Demo</strong> · everything here is sample data. Look around and change anything; it is reset regularly.
-          </p>
+          <Notice tone="info" className="no-print mb-4">
+            <strong>Demo</strong> · everything here is sample data. Look around and change anything; it is reset regularly.
+          </Notice>
         )}
         <FeaturesProvider features={company?.features ?? null}>
           <AccountsProvider accounts={accounts} me={me.name} meId={me.id} canAdd={has("expenses.manage") && feature("cash_book")}>

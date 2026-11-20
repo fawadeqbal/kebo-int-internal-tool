@@ -1,11 +1,12 @@
 "use client";
 
+import { FileRow, FileZone } from "@/components/common/file-zone";
 import { useId, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Paperclip, Upload } from "lucide-react";
 import { PAPER_STATE_TONE, paperDone, type PaperState } from "@kebo/shared";
-import { Alert, Badge, Button, buttonClass, Card, CardHeader, cn, Field, Input } from "@kebo/ui";
+import { Badge, Button, buttonClass, Card, CardHeader, cn, Field, Input, Notice, EmptyLine } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { PaperRow } from "@/lib/types-papers";
 
@@ -103,11 +104,11 @@ export function RecordForm({
     });
   return (
     <form action={submit} className="mt-2 flex flex-col gap-3 rounded-lg border border-line bg-surface p-3">
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && <Notice tone="bad">{error}</Notice>}
       {mode === "upload" ? (
-        <Field label="The file" htmlFor={`${id}-file`}>
-          <Input id={`${id}-file`} type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="pt-1.5" />
-        </Field>
+        <FileZone label="The file" inputId={`${id}-file`} optional={false} compact one onFiles={(fs) => setFile(fs[0] ?? null)}>
+            {file && <FileRow name={file.name} />}
+          </FileZone>
       ) : (
         <Field label="Where is it" htmlFor={`${id}-where`}>
           <Input
@@ -317,7 +318,7 @@ export function PapersCard({
           })}
         </ul>
       ) : (
-        <p className="px-4 py-4 text-sm text-muted">No documents on this step yet.</p>
+        <EmptyLine inset>No documents on this step yet.</EmptyLine>
       )}
     </Card>
   );

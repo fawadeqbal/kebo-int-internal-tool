@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { FilePlus2 } from "lucide-react";
-import { Button, ButtonLink, Card, cn, EmptyState } from "@kebo/ui";
+import { Button, ButtonLink, Card, cn, EmptyState, RULES } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import { SidePanel } from "@/components/common/panel";
@@ -114,7 +114,7 @@ export function StartRevision({
     <SidePanel
       title={`New quotation R${draft.number}`}
       description={first ? "Which offers to quote, and the terms. The number is given on save." : `Starts as a copy of R${draft.number - 1}. Change what is different, then save the draft.`}
-      className="md:w-[860px]"
+      className={RULES.window.wideRows}
       onClose={close}
     >
       <TermsPanel number={draft.number} initial={draft} offers={offers} loadOffers={loadOffers} showCosts={showCosts} action={action} create tickAll={first} onSaved={close} />

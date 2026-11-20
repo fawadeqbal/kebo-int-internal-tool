@@ -2,10 +2,10 @@
 
 import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Info, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { factoryTaxMinor, formatMinor, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, lineNumbers, offerTaxText, PAPER, type AttachmentKind } from "@kebo/shared";
-import { Button, cn, Field, RULES, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, RULES, Select, Textarea, Badge, Notice, EmptyLine } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { OpenPanelButton, PanelBody, SidePanel, useClosePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
@@ -15,11 +15,12 @@ import { PaperFacts, PaperLayout } from "@/components/records/paper-boxes";
 import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
 import { recordEditAction } from "@/lib/edit-actions";
 import { ConfirmDialog } from "@/components/common/dialog";
+import { changeLine } from "@/components/common/change-words";
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, dateTime, money as amount } from "@/lib/format";
 import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
-import { send, type Staged } from "./documents-panel";
+import { send, type Staged } from "@/components/files/upload";
 import { FileRow, FileZone } from "@/components/common/file-zone";
 import { fileSize } from "@/lib/format";
 import { convertText, type Fx } from "@/lib/fx";
@@ -290,7 +291,7 @@ function OfferWindow({
     if (saved.reason)
       for (const part of ["factory", "prices", "terms", "conditions"] as OfferPart[]) {
         const list = saved.changes.filter((c) => c.part === part);
-        const added = part === "factory" ? files.map((f) => `Added ${f.name}`) : [];
+        const added = part === "factory" ? files.map((f) => `Added · File: ${f.name}`) : [];
         if (!list.length && !added.length) continue;
         await recordEditAction({
           type: "factory_quote",
@@ -298,7 +299,7 @@ function OfferWindow({
           card: `offer.${part}`,
           kind: "edit",
           reason: saved.reason,
-          changes: [...list.map((c) => `${c.label}: ${c.from} → ${c.to}`), ...added],
+          changes: [...list.map((c) => changeLine(c.label, c.from, c.to)), ...added],
           keys: list.map((c) => c.key),
         }).catch(() => undefined);
       }
@@ -395,10 +396,9 @@ function OfferWindow({
             <div className="flex flex-col gap-3 md:min-h-0 md:flex-1">
               {used && (
                 // On a phone it is one line at the top of the items instead (LineTable's notice).
-                <p className="flex shrink-0 items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm max-sm:hidden">
-                  <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
-                  <span>A quotation is priced from this offer. Its own copy of the items and prices stays as it was.</span>
-                </p>
+                <Notice tone="info" className="shrink-0 max-sm:hidden">
+                  A quotation is priced from this offer. Its own copy of the items and prices stays as it was.
+                </Notice>
               )}
               <LineTable
                 rows={batch.rows}
@@ -497,12 +497,13 @@ function OfferWindow({
                 }
               />
               {h.errors.length > 0 && (
-                <div role="alert" className="flex shrink-0 flex-col gap-0.5 rounded-xl border border-bad/30 bg-bad-soft px-3 py-2.5 text-sm text-bad">
-                  <span className="font-semibold">Nothing was saved yet: fix {h.errors.length === 1 ? "this item" : "these items"} first.</span>
+                <Notice tone="bad" className="shrink-0" title={`Nothing was saved yet: fix ${h.errors.length === 1 ? "this item" : "these items"} first.`}>
                   {h.errors.map((e) => (
-                    <span key={e}>{e}</span>
+                    <span key={e} className="block">
+                      {e}
+                    </span>
                   ))}
-                </div>
+                </Notice>
               )}
             </div>
           );
@@ -581,7 +582,7 @@ function linesCount(rows: { parentKey: string | null }[]) {
 
 /** The lines in Review (a new offer): number, what, how many, the line's total. */
 function LinesReview({ rows, currency, tax }: { rows: LineRow[]; currency: string; tax: Omit<Parameters<typeof OfferTotals>[0], "rows" | "currency"> }) {
-  if (!rows.length) return <p className="px-4 py-3 text-sm text-text-2">No items yet.</p>;
+  if (!rows.length) return <EmptyLine className="px-4 py-3">No items yet.</EmptyLine>;
   const numbers = lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey })));
   return (
     <>
@@ -844,9 +845,9 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
             phoneHidden: true,
             format: (v: LineValues) =>
               v.alternativeOfId ? (
-                <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn" title="Another spec of that item: a choice, left out of the total">
+                <Badge size="sm" tone="warn" title="Another spec of that item: a choice, left out of the total">
                   of {numberOf(v.alternativeOfId)}
-                </span>
+                </Badge>
               ) : (
                 <span className="text-muted">—</span>
               ),
@@ -1085,7 +1086,7 @@ export function AddOfferButton({
           key={round}
           title="New supplier offer"
           description={refNo ? `For ${[refNo, inquiryTitle].filter(Boolean).join(" · ")}` : "Internal, never shown to the customer."}
-          className="md:w-[1180px]"
+          className={RULES.window.items}
           onClose={() => setOpen(false)}
         >
           <OfferWindow

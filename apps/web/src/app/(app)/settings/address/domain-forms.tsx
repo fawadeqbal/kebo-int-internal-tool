@@ -7,7 +7,7 @@ import { Button, Field, Input } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, SidePanel, useSidePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import { checkDomainAction, connectDomainAction, removeDomainAction } from "./actions";
 
 /** "+ Connect a domain" in the card's header, and the window it opens (?panel=own-domain). */
@@ -61,10 +61,10 @@ function ConnectForm({ ours, onSaved }: { ours: string; onSaved: () => void }) {
               "Everyone signs in once more on the new address",
             ]}
           />
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton pendingText="Checking…">Continue</SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>

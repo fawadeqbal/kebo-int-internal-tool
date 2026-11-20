@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { CashBody, moneyAccess, VaultOverview, type Search } from "../sections";
 import { companyToday } from "@/lib/format";
 import Link from "next/link";
-import { Landmark } from "lucide-react";
+
 import { api } from "@/lib/api";
 import { MoveMoney, NewAccount, type AccountRow } from "@/components/money/cash-forms";
 
@@ -27,10 +27,9 @@ export default async function CashBookPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbs}
-        icon={Landmark}
         title={labelFor("/finance/cash-book")}
-        summary={book ? "Every amount in and out: from customers, to suppliers, expenses and moves between our bank accounts." : "Every account and what is in it"}
         actions={<MoveMoney accounts={accounts} today={today} />}
         primary={<NewAccount today={today} />}
       />

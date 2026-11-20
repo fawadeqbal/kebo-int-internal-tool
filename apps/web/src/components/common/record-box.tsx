@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
 import type { Tone } from "@kebo/shared";
-import { Badge, Card, cn } from "@kebo/ui";
+import { Badge, boxHeadClass, boxTitleClass, Card, cn } from "@kebo/ui";
 import { OpenPanelButton } from "@/components/common/panel";
 
 /**
@@ -50,8 +50,8 @@ export function RecordBox({
   return (
     <Card className={cn("@container overflow-visible", className)}>
       <section id={id} aria-label={title}>
-        <div className="flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4">
-          <h2 className="min-w-0 text-lead font-bold text-text">
+        <div className={boxHeadClass}>
+          <h2 className={boxTitleClass}>
             {title}
             {titleMore && <span className="max-sm:hidden"> · {titleMore}</span>}
           </h2>

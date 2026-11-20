@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
-import { Alert, Field, Input } from "@kebo/ui";
+import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import { changeAddressAction, checkAddressAction } from "./actions";
 import type { AddressView } from "./types";
 
@@ -15,7 +15,7 @@ export function AddressEdit({ view }: { view: AddressView }) {
   const panel = useSidePanel("company-address");
   return (
     <>
-      <EditButton label="Change" aria-label="Change the company address" onClick={() => panel.openPanel()} />
+      <EditButton aria-label="Edit the company address" onClick={() => panel.openPanel()} />
       {panel.open && (
         <SidePanel title="Change the company address" description="Where your team signs in and works. Links in emails go here too." onClose={() => panel.close()}>
           <PanelBody>
@@ -101,17 +101,17 @@ export function AddressForm({ view, disabled, onSaved }: { view: AddressView; di
         ) : null}
       </p>
       {free && (
-        <Alert tone="info">
+        <Notice tone="info">
           Everyone signs in again at the new address. The old one keeps sending people there for 30 days (bookmarks, emails, the phone app
           keep working), and only then becomes free for others. The address can change again after 30 days.
-        </Alert>
+        </Notice>
       )}
-      <PanelActions>
+      <WindowFooter>
         <SubmitButton pendingText="Changing…" disabled={disabled || !free}>
           Change the address
         </SubmitButton>
         <PanelKeys />
-      </PanelActions>
+      </WindowFooter>
     </ActionForm>
   );
 }

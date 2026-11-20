@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { Alert, Field, Input } from "@kebo/ui";
+import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { loginAction, twoStepAction } from "./actions";
 
@@ -41,7 +41,7 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
           <p className="pt-1 text-center text-xs text-muted">or sign in with an email</p>
         </div>
       )}
-      {state.message && state.code === "choose_company" && <Alert tone="info">{state.message}</Alert>}
+      {state.message && state.code === "choose_company" && <Notice tone="info">{state.message}</Notice>}
       <input type="hidden" name="next" value={next ?? ""} />
       {state.code === "choose_company" && Array.isArray(state.data) && (
         <fieldset className="flex flex-col gap-2">
@@ -88,10 +88,10 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
         <input type="checkbox" name="keep" defaultChecked className="size-[18px] accent-primary-solid" />
         Keep me signed in
       </label>
-      <SubmitButton pendingText="Signing in…" className="h-11 w-full text-lead">
+      <SubmitButton pendingText="Signing in…" className="w-full">
         Sign in
       </SubmitButton>
-      {state.message && state.code !== "choose_company" && <Alert tone="error">{state.message}</Alert>}
+      {state.message && state.code !== "choose_company" && <Notice tone="bad">{state.message}</Notice>}
     </form>
   );
 }
@@ -150,7 +150,7 @@ export function TwoStepForm({ next }: { next?: string }) {
           {state.errors?.code && <p className="mt-2 text-xs text-bad">{state.errors.code[0]}</p>}
         </fieldset>
       )}
-      {state.message && <Alert tone="error">{state.message}</Alert>}
+      {state.message && <Notice tone="bad">{state.message}</Notice>}
       <SubmitButton pendingText="Checking…" className="w-full">
         Verify
       </SubmitButton>

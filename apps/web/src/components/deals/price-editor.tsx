@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle2, ChevronUp, ClipboardPaste, Lock, Plus, X }
 import { createPortal } from "react-dom";
 import { convertMinor, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import { basisText, BASIS_STEP_LABEL, leadWords, optionLetter } from "@kebo/shared";
-import { Badge, Button, Card, cn, Input, Select, Textarea } from "@kebo/ui";
+import { Badge, Button, Card, cn, Input, Select, Textarea, controlClass, controlSizes } from "@kebo/ui";
 import { EditButton } from "@/components/common/edit-button";
 import { BottomSheet } from "@/components/common/bottom-sheet";
 import { useIsPhone } from "@/components/common/floating";
@@ -20,10 +20,9 @@ import { asLineOf, BasisCosts, Fig, gapOf, marginOf, optionTotals, pricedAll, st
 
 
 /** A price box: right-aligned figures, the whole value selected on focus. */
-const PRICE_BOX =
-  "h-9 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-right text-sm tabular outline-none placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary/30";
+const PRICE_BOX = `${controlClass} ${controlSizes.sm} min-w-0 text-right tabular`;
 /** A plain box in the charges table. */
-const CELL_BOX = "h-9 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-sm outline-none placeholder:text-muted/80 focus:border-primary focus:ring-2 focus:ring-primary/30";
+const CELL_BOX = `${controlClass} ${controlSizes.sm} min-w-0`;
 const TH = "h-9 border-b border-line bg-surface-2 px-3 text-xs font-medium whitespace-nowrap text-text-2";
 const amount2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -231,8 +230,7 @@ export function PriceSheet({
                 <label htmlFor="price-all" className="text-xs text-text-2">
                   Price all at
                 </label>
-                <Input id="price-all" inputMode="decimal" className="h-9 w-16 text-right tabular" value={margin} onChange={(e) => setMargin(e.target.value)} />
-                <span className="text-sm text-muted">%</span>
+                <Input size="sm" id="price-all" inputMode="decimal" unit="%" className="w-20 text-right tabular" value={margin} onChange={(e) => setMargin(e.target.value)} />
                 <Button size="sm" variant="secondary" onClick={priceAll} disabled={!marginOk}>
                   Apply
                 </Button>
@@ -448,7 +446,7 @@ export function PriceSheet({
                   Done
                 </Button>
               ) : (
-                <EditButton size="xs" className="sm:hidden" onClick={() => setChargesOpen(true)} aria-expanded={false} />
+                <EditButton className="sm:hidden" onClick={() => setChargesOpen(true)} aria-expanded={false} />
               )}
             </div>
             {paste !== null && (
@@ -547,7 +545,7 @@ export function PriceTotals({
             </label>
           </dt>
           <dd>
-            <PriceInput id={`disc-${opt.key}${sheet ? "-sheet" : ""}`} className="h-8 w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
+            <PriceInput id={`disc-${opt.key}${sheet ? "-sheet" : ""}`} className="w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
           </dd>
         </div>
         <Fig label={s.options.length > 1 ? `Option ${letter} total` : "Total"} strong>
@@ -604,7 +602,7 @@ export function PriceTotals({
                 <dd>
                   <span className="flex items-center gap-1 text-sm font-semibold">
                     −
-                    <PriceInput id={`disc-${opt.key}`} className="h-8 w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
+                    <PriceInput id={`disc-${opt.key}`} className="w-28" value={opt.discount} placeholder="0.00" onChange={(v) => setOption(at, { discount: v })} />
                   </span>
                 </dd>
               </div>
@@ -685,7 +683,7 @@ function ChargesTable({
 }) {
   const total = (c: ChargeState) => amount2((amountOf(c.unitPrice) * (Number(numberText(c.quantity)) || 0)) / 100);
   const unitSelect = (c: ChargeState, k: number, label: string) => (
-    <Select aria-label={label} className="h-9" value={c.unit} onChange={(e) => onChange(k, { unit: e.target.value })}>
+    <Select size="sm" aria-label={label} value={c.unit} onChange={(e) => onChange(k, { unit: e.target.value })}>
       {[...new Set([c.unit, ...UNITS, "job", "trip", "container"])].filter(Boolean).map((u) => (
         <option key={u} value={u}>
           {u}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, cn, EmptyState } from "@kebo/ui";
+import { THead, Th, Badge, cn, EmptyState } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import type { CustomerPayments } from "@/lib/types-money";
 
@@ -67,31 +67,31 @@ export function CustomerPaymentsBody({ d }: { d: CustomerPayments }) {
         </h2>
         <div className="overflow-hidden rounded-lg border border-line bg-surface">
           <table data-fit="" className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-surface-2 text-left text-xs text-text-2">
-                <th scope="col" className={th}>
+            <THead>
+              <tr>
+                <Th scope="col" className={th}>
                   Order
-                </th>
-                <th scope="col" className={cn(th, "hidden md:table-cell")}>
+                </Th>
+                <Th scope="col" className={cn(th, "hidden md:table-cell")}>
                   Ordered
-                </th>
-                <th scope="col" className={cn(th, "hidden sm:table-cell")}>
+                </Th>
+                <Th scope="col" className={cn(th, "hidden sm:table-cell")}>
                   Status
-                </th>
-                <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>
+                </Th>
+                <Th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>
                   Total
-                </th>
-                <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>
+                </Th>
+                <Th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>
                   Received
-                </th>
-                <th scope="col" className={cn(th, "text-right")}>
+                </Th>
+                <Th scope="col" className={cn(th, "text-right")}>
                   Still due
-                </th>
-                <th scope="col" className={cn(th, "hidden w-36 lg:table-cell")}>
+                </Th>
+                <Th scope="col" className={cn(th, "hidden w-36 lg:table-cell")}>
                   Paid
-                </th>
+                </Th>
               </tr>
-            </thead>
+            </THead>
             <tbody>
               {d.orders.map((o) => {
                 const st = PAY_STATUS[o.payStatus];

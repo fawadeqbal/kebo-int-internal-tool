@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import { apiFetch } from "@/lib/api";
 import { AuthShell } from "@/app/login/auth-shell";
 import { SetPasswordForm } from "./form";
@@ -24,9 +24,9 @@ export default async function SetPasswordPage({ searchParams }: { searchParams: 
       ) : (
         <>
           <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-2xl sm:leading-9">This link does not work</h1>
-          <Alert tone="warning" className="mt-3">
+          <Notice tone="todo" className="mt-3">
             It has expired or was already used. Ask your admin (or the person who sent it) for a new one.
-          </Alert>
+          </Notice>
           <Link href="/login" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
             Go to sign in
           </Link>

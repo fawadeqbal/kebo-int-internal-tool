@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import { FOLLOW_UP_KIND_LABEL } from "@kebo/shared";
-import { Card, CardBody, CardHeader, cn, StatusBadge } from "@kebo/ui";
+import { Card, CardBody, CardHeader, cn, StatusBadge, EmptyLine } from "@kebo/ui";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { PanelButton } from "@/components/orders/step-view";
 import {
@@ -36,14 +36,7 @@ export function NotesCard({
 }) {
   return (
     <Card id="notes" className="scroll-mt-32" aria-labelledby={`notes-${on.id}`}>
-      <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0">
-          <h2 id={`notes-${on.id}`} className="text-lead font-semibold text-text">
-            Notes · {notes.length}
-          </h2>
-          <p className="mt-0.5 text-xs text-muted">Calls, visits and messages, the latest first</p>
-        </div>
-      </div>
+      <CardHeader titleId={`notes-${on.id}`} title={`Notes · ${notes.length}`} description="Calls, visits and messages, the latest first" />
       <CardBody className="flex flex-col gap-4">
         {canAdd && <NoteAddForm action={addNoteAction.bind(null, on)} contacts={contacts} />}
         {notes.length > 0 ? (
@@ -79,7 +72,7 @@ export function NotesCard({
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted">No notes yet.{canAdd ? " Log a call or a visit above." : ""}</p>
+          <EmptyLine>No notes yet.{canAdd ? " Log a call or a visit above." : ""}</EmptyLine>
         )}
         {footer}
       </CardBody>
@@ -186,10 +179,10 @@ export function FollowUpsCard({
         }
         actions={
           <PanelButton
-            variant="ghost"
+            variant="secondary"
             size="sm"
             icon={<Plus aria-hidden />}
-            label="Follow-up"
+            label="New follow-up"
             title="New follow-up"
             description="Shows on Home with a reminder"
             body={<FollowUpForm action={addFollowUpAction.bind(null, on)} people={people} meId={meId} today={today} record={label} />}

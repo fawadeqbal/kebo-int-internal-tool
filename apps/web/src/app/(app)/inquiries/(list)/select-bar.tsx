@@ -22,7 +22,7 @@ export interface BarRow {
   open: boolean;
 }
 
-const BTN = "h-8 border-primary-line px-2.5 text-md";
+const BAR_LINE = "border-primary-line";
 
 /**
  * Select's bar on the inquiries list (design "list pages" 18 Nov): Responsible person, Next follow-up, Put on hold
@@ -71,7 +71,7 @@ export function InquirySelectBar({ rows, people, meId, canAssign, today }: { row
           <>
             {canAssign && (
               <>
-                <Button ref={anchor} variant="secondary" size="sm" className={BTN} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)} disabled={busy}>
+                <Button ref={anchor} variant="secondary" size="sm" className={BAR_LINE} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)} disabled={busy}>
                   <UserRound aria-hidden /> Responsible person <ChevronDown className="opacity-70" aria-hidden />
                 </Button>
                 {menu && (
@@ -91,14 +91,14 @@ export function InquirySelectBar({ rows, people, meId, canAssign, today }: { row
                 )}
               </>
             )}
-            <Button variant="secondary" size="sm" className={BTN} onClick={() => setFollow(true)} disabled={busy}>
+            <Button variant="secondary" size="sm" className={BAR_LINE} onClick={() => setFollow(true)} disabled={busy}>
               <Clock aria-hidden /> Next follow-up
             </Button>
             {open.length > 0 && (
               <Button
                 variant="secondary"
                 size="sm"
-                className={BTN}
+                className={BAR_LINE}
                 disabled={busy}
                 onClick={() => setWhy({ what: { kind: "hold", reason: "" }, title: `Why put ${n(open.length)} on hold?`, choices: REASON_CHOICES.hold, save: `Put ${open.length} on hold` })}
               >
@@ -106,7 +106,7 @@ export function InquirySelectBar({ rows, people, meId, canAssign, today }: { row
               </Button>
             )}
             {excel && (
-              <a href={`/sheets/export/inquiries?ids=${ticked.join(",")}`} download className={cn(buttonClass("secondary", "sm"), BTN)}>
+              <a href={`/sheets/export/inquiries?ids=${ticked.join(",")}`} download className={cn(buttonClass("secondary", "sm"), BAR_LINE)}>
                 <FileSpreadsheet aria-hidden /> Export to Excel
               </a>
             )}

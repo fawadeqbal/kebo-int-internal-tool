@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { cn } from "@kebo/ui";
+import { cn, RULES } from "@kebo/ui";
 import { PanelBody, SidePanel } from "@/components/common/panel";
 import { useOpenFromLink, WindowOpener, type WindowButton } from "./section-window";
 
@@ -45,7 +45,7 @@ export function FormWindow({
     <>
       <WindowOpener button={button} disabled={disabled} onClick={() => setOpen(true)} />
       {open && (
-        <SidePanel title={title} description={sub} onClose={close} className={cn(size === "sm" && "md:w-[460px]", size === "md" && "md:w-[600px]", size === "xl" && "md:w-[900px]")}>
+        <SidePanel title={title} description={sub} onClose={close} className={cn(size === "sm" && RULES.window.part, size === "md" && RULES.window.part, size === "xl" && RULES.window.wideRows)}>
           <PanelBody className="flex flex-col gap-4">{children(close)}</PanelBody>
         </SidePanel>
       )}

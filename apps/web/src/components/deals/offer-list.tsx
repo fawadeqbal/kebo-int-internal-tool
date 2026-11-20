@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { basisText } from "@kebo/shared";
-import { Alert, Badge, cn } from "@kebo/ui";
+import { Badge, cn, Notice } from "@kebo/ui";
 import { date, dayMonth, money, qty } from "@/lib/format";
 import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 
@@ -87,11 +87,11 @@ export function OfferCompare({ view, status, dealId, waiting }: { view: Sourcing
       {(view.missingRates.length > 0 || bases.size > 1) && (
         <div className="flex flex-col gap-2 border-b border-line px-5 py-3">
           {view.missingRates.length > 0 && (
-            <Alert tone="warning">
+            <Notice tone="todo">
               No exchange rate for {view.missingRates.join(", ")} in Settings: those offers cannot be set against the others in {view.currency}.
-            </Alert>
+            </Notice>
           )}
-          {bases.size > 1 && <Alert tone="warning">Not like for like: the offers have different Incoterms ({[...bases].map((b) => (b === "?" ? "not said" : b)).join(", ")}).</Alert>}
+          {bases.size > 1 && <Notice tone="todo">Not like for like: the offers have different Incoterms ({[...bases].map((b) => (b === "?" ? "not said" : b)).join(", ")}).</Notice>}
         </div>
       )}
       <div className="overflow-x-auto">

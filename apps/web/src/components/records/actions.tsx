@@ -66,13 +66,13 @@ export function recordActions(menuLabel: string, list: RecordAction[]): { primar
   if (primary && "node" in primary) strong = primary.node;
   else if (primary && "href" in primary)
     strong = (
-      <a href={primary.href} className={buttonClass("primary", "sm")} aria-label={primary.ariaLabel}>
+      <a href={primary.href} className={buttonClass("primary", "md")} aria-label={primary.ariaLabel}>
         {primary.icon} {primary.label}
       </a>
     );
   else if (primary && "panel" in primary)
     strong = (
-      <OpenPanelButton panel={primary.panel} id={primary.panelId} variant="primary" size="sm" label={primary.ariaLabel}>
+      <OpenPanelButton panel={primary.panel} id={primary.panelId} variant="primary" label={primary.ariaLabel}>
         {primary.icon} {primary.label}
       </OpenPanelButton>
     );

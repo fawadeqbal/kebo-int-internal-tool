@@ -1,3 +1,4 @@
+import { RULES } from "@kebo/ui";
 import { can, dayMonth, FAT_RESULT_LABEL, FAT_RESULT_TONE, FAT_RESULTS, REQUEST_CHANNEL_LABEL, REQUEST_CHANNELS } from "@kebo/shared";
 import { getPeople } from "@/lib/loaders";
 import { orderSectionsOf } from "@/lib/order-data";
@@ -17,7 +18,6 @@ import { orderTitle } from "@/lib/titles";
 
 export const generateMetadata = orderTitle("Production");
 
-const SMALL = "h-8 px-2.5 text-md";
 const DAY = 86_400_000;
 
 /**
@@ -214,12 +214,11 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
             canEdit && (
               <>
                 <PanelButton
-                  size="sm"
-                  className={SMALL}
+                  edit
                   label="Edit items"
                   title="Goods from the supplier"
                   description="What has come in on each item, and when. Nothing is saved until Save changes."
-                  panelClassName="md:w-[1180px]"
+                  panelClassName={RULES.window.items}
                   body={
                     <OrderLinesEditor
                       set="received"

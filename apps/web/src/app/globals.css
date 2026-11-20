@@ -154,7 +154,6 @@
    line (gone on a phone, where the bar keeps the name); the tabs stay. RecordFrame keeps the room it gave up. */
 [data-record-top][data-stuck] nav[aria-label="Breadcrumb"],
 [data-record-top][data-stuck] [data-slot="page-icon"],
-[data-record-top][data-stuck] [data-page-desc],
 [data-record-top][data-stuck] [data-own-pager],
 [data-record-top][data-stuck] [data-record-notice] {
   display: none;

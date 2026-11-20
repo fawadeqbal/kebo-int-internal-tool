@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { can, REVISION_STATUS_LABEL } from "@kebo/shared";
-import { ButtonLink, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
+import { RefCode, ButtonLink, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
 import { Notice } from "@/components/records/notice";
 import { TabList } from "@/components/lists/tab-list";
 import { requireUser } from "@/lib/session";
@@ -152,7 +152,7 @@ export default async function QuotationPage({
                     )}
                   >
                     <span className="min-w-0">
-                      <span className="block font-semibold text-text">{x.refNo}</span>
+                      <RefCode>{x.refNo}</RefCode>
                       <span className="block truncate text-xs text-text-2">{[from, `R${c.number}`].filter(Boolean).join(" · ")}</span>
                       <span className="block text-xs font-semibold tabular md:hidden">{totalText(c)}</span>
                     </span>

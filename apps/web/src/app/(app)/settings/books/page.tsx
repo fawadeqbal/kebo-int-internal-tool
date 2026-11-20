@@ -23,7 +23,7 @@ function monthsUpTo(latest: string, count = 18) {
 export default async function BooksPage() {
   const v = await api.get<BooksView>("/books/close");
   return (
-    <SettingsPage href="/settings/books" description="Close a month once its figures are reported: nobody can then add, change or remove money dated in it.">
+    <SettingsPage href="/settings/books">
       <Card>
         <CardHeader
           title={v.closedThrough ? `Closed through ${date(v.closedThrough)}` : "No month is closed"}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, Columns3, Factory, List } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { Alert, Badge, cn, EmptyState } from "@kebo/ui";
+import { THead, Th, Badge, cn, EmptyState, Notice } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { dayMonth, money, plural, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
@@ -101,11 +101,11 @@ export default async function SourcingPage({
   const waiting = (requests?.items ?? []).filter((r) => !r.factoryQuoteId && r.status === "sent");
 
   const notice = !canEdit && (
-    <Alert tone="info">
+    <Notice tone="info">
       {d.stage === "won" || d.stage === "lost"
         ? "This inquiry is closed, so its supplier prices can no longer change."
         : "Only the person handling this inquiry (or a manager) can change its supplier prices."}
-    </Alert>
+    </Notice>
   );
 
   // One row per supplier: its offer once it is in, else that it was asked (still waiting, declined, no reply), last.
@@ -154,7 +154,9 @@ export default async function SourcingPage({
     ) : (
       dash
     );
-  const th = "px-2 py-2 text-left text-xs font-medium whitespace-nowrap text-text-2 first:pl-5 last:pr-3";
+  // The one table head (Th) with this table's tighter padding. Its status may wrap and the supplier's column has no
+  // fixed width, so the table fits its column on a laptop instead of scrolling sideways.
+  const th = "px-2 first:pl-5 last:pr-3";
   const td = "border-t border-line/70 px-2 py-2.5 align-middle first:pl-5 last:pr-3";
 
   return (
@@ -226,20 +228,20 @@ export default async function SourcingPage({
             </ul>
             <div className="overflow-x-auto max-md:hidden">
               <table aria-label="Supplier offers" className="w-full border-collapse text-md">
-                <thead className="bg-surface-2/60">
+                <THead>
                   <tr>
-                    <th className={cn(th, "min-w-[12rem]")}>Supplier</th>
-                    <th className={cn(th, "text-right")}>Amount</th>
-                    <th className={th}>Covers</th>
-                    <th className={th}>Lead time</th>
-                    <th className={th}>Incoterm</th>
-                    <th className={cn(th, "text-right")}>Deposit</th>
-                    <th className={th}>Status</th>
-                    <th className={th}>
+                    <Th className={th}>Supplier</Th>
+                    <Th className={cn(th, "text-right")}>Amount</Th>
+                    <Th className={th}>Covers</Th>
+                    <Th className={th}>Lead time</Th>
+                    <Th className={th}>Incoterm</Th>
+                    <Th className={cn(th, "text-right")}>Deposit</Th>
+                    <Th className={th}>Status</Th>
+                    <Th className={th}>
                       <span className="sr-only">Open</span>
-                    </th>
+                    </Th>
                   </tr>
-                </thead>
+                </THead>
                 <tbody>
                   {s.quotes.map((x) => {
                     const f = offerFigures(x);
@@ -272,7 +274,7 @@ export default async function SourcingPage({
                         <td className={cn(td, "whitespace-nowrap")}>{two(f.lead)}</td>
                         <td className={cn(td, "whitespace-nowrap")}>{two(f.basis)}</td>
                         <td className={cn(td, "text-right tabular")}>{f.deposit ?? dash}</td>
-                        <td className={cn(td, "whitespace-nowrap")}>{status(x)}</td>
+                        <td className={td}>{status(x)}</td>
                         <td className={cn(td, "w-8 text-text-2")}>
                           <ChevronRight className="size-4" aria-hidden />
                         </td>
@@ -292,7 +294,7 @@ export default async function SourcingPage({
                       <td className={td}>{dash}</td>
                       <td className={td}>{dash}</td>
                       <td className={cn(td, "text-right")}>{dash}</td>
-                      <td className={cn(td, "whitespace-nowrap")}>{requestStatus(r)}</td>
+                      <td className={td}>{requestStatus(r)}</td>
                       <td className={cn(td, "w-8")}>{more(r)}</td>
                     </tr>
                   ))}

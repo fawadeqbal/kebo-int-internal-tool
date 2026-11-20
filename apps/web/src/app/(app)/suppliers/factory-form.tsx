@@ -1,20 +1,32 @@
 "use client";
 
-import { Field, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton, toast } from "@kebo/ui/client";
+import { useState } from "react";
+import { Factory as FactoryIcon, Landmark, Phone } from "lucide-react";
+import { cn, Field, Input, Select, Textarea, RULES } from "@kebo/ui";
+import { toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
-import { Check } from "lucide-react";
+import { PANEL_FORM, PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
+import { JumpToStep, StepsFooter, StepsFrame } from "@/components/common/steps-frame";
 import type { ActionState } from "@/lib/actions";
 import type { Person } from "@/lib/types";
 import type { Factory } from "@/lib/types-people";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
+type SupplierStep = "who" | "contact" | "paying";
+const SUPPLIER_STEPS: { key: SupplierStep; label: string; icon: typeof FactoryIcon }[] = [
+  { key: "who", label: "Supplier", icon: FactoryIcon },
+  { key: "contact", label: "Contact", icon: Phone },
+  { key: "paying", label: "Paying them", icon: Landmark },
+];
+const CONTACT_KEYS = new Set(["contactPerson", "phone", "wechat", "email", "address"]);
+/** The step of a refused field. */
+const stepOfField = (k: string): SupplierStep => (CONTACT_KEYS.has(k) ? "contact" : k === "bankDetails" || k === "notes" ? "paying" : "who");
+
 /**
- * A factory's details in the side panel's titled groups: Who, Contact, For
- * paying them, For the team. After an error the typed values stay
- * (s.values), otherwise the saved ones show.
+ * A supplier's details in steps (three parts, design rule 1): who it is and who looks after it, how to reach it, and
+ * how to pay it. Every step's fields stay in the form (the ones not shown are hidden), so what was typed on a step
+ * stays and is sent with the rest. After an error the typed values stay (s.values), otherwise the saved ones show.
  */
 function FactoryForm({
   action,
@@ -29,15 +41,47 @@ function FactoryForm({
   meId: string;
   onSaved: (s: ActionState) => void;
 }) {
+  const [step, setStep] = useState<SupplierStep>("who");
+  const at = Math.max(0, SUPPLIER_STEPS.findIndex((x) => x.key === step));
+  const last = at === SUPPLIER_STEPS.length - 1;
+  const go = (i: number) => setStep(SUPPLIER_STEPS[Math.max(0, Math.min(SUPPLIER_STEPS.length - 1, i))]!.key);
+  const grid = "grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-3";
   return (
-    <ActionForm action={action} onDone={onSaved} showSuccess={false} className="flex min-h-0 flex-1 flex-col">
-      {(s) => {
-        const val = (k: keyof Factory) => s.values?.[k] ?? (factory?.[k] === null || factory?.[k] === undefined ? "" : String(factory[k]));
-        const invalid = (k: string) => (s.errors?.[k] ? { "aria-invalid": true } : {});
-        return (
-          <PanelBody className={PANEL_FORM}>
-            {/* Board "New supplier window": three columns. */}
-            <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-3">
+    <PanelBody fill>
+      <ActionForm
+        action={action}
+        onDone={onSaved}
+        showSuccess={false}
+        reveal={(k) => setStep(stepOfField(k))}
+        className={cn(PANEL_FORM, "min-h-0 gap-0")}
+        // A new supplier is saved from its last step: Enter on an earlier one goes on to the next.
+        beforeSend={() => {
+          if (factory || last) return true;
+          go(at + 1);
+          return false;
+        }}
+      >
+        {(s) => {
+          const val = (k: keyof Factory) => s.values?.[k] ?? (factory?.[k] === null || factory?.[k] === undefined ? "" : String(factory[k]));
+          const invalid = (k: string) => (s.errors?.[k] ? { "aria-invalid": true } : {});
+          return (
+            <>
+              <JumpToStep errors={s.errors} stepOf={stepOfField} onJump={setStep} />
+              <StepsFrame
+                steps={SUPPLIER_STEPS.map((x, k) => ({ key: x.key, label: x.label, icon: x.icon, done: !factory && k < at }))}
+                at={step}
+                onGo={setStep}
+                footer={
+                  <StepsFooter
+                    onBack={at > 0 ? () => go(at - 1) : null}
+                    // Editing, it can be saved from any step; a new one, from its last.
+                    jump={factory && !last ? { label: "Save now" } : null}
+                    onNext={last ? null : () => go(at + 1)}
+                    save={{ label: factory ? "Save" : "Add the supplier" }}
+                  />
+                }
+              >
+                <div className={cn(grid, step !== "who" && "hidden")}>
               <Field label="Supplier name" required htmlFor="name" error={s.errors?.name} className="sm:col-span-2">
                 <Input id="name" name="name" defaultValue={val("name")} autoComplete="organization" {...invalid("name")} />
               </Field>
@@ -51,6 +95,8 @@ function FactoryForm({
                   ))}
                 </Select>
               </Field>
+                </div>
+                <div className={cn(grid, step !== "contact" && "hidden")}>
               <Field label="Contact person" htmlFor="contactPerson" error={s.errors?.contactPerson}>
                 <Input id="contactPerson" name="contactPerson" defaultValue={val("contactPerson")} />
               </Field>
@@ -66,6 +112,8 @@ function FactoryForm({
               <Field label="Address" htmlFor="address" error={s.errors?.address} className="sm:col-span-2">
                 <Input id="address" name="address" defaultValue={val("address")} />
               </Field>
+                </div>
+                <div className={cn(grid, step !== "paying" && "hidden")}>
               <Field label="Bank details" htmlFor="bankDetails" error={s.errors?.bankDetails} className="sm:col-span-3">
                 <Textarea
                   id="bankDetails"
@@ -77,16 +125,13 @@ function FactoryForm({
               <Field label="Notes" htmlFor="notes" error={s.errors?.notes} className="sm:col-span-3">
                 <Textarea id="notes" name="notes" rows={3} defaultValue={val("notes")} />
               </Field>
-            </div>
-            <PanelActions className="justify-end">
-              <SubmitButton pendingText="Saving…">
-                <Check aria-hidden /> {factory ? "Save changes" : "Save supplier"}
-              </SubmitButton>
-            </PanelActions>
-          </PanelBody>
-        );
-      }}
-    </ActionForm>
+                </div>
+              </StepsFrame>
+            </>
+          );
+        }}
+      </ActionForm>
+    </PanelBody>
   );
 }
 
@@ -129,7 +174,7 @@ export function FactoryPanel({
           : "Opens from Suppliers, from “Ask suppliers”, and from “Supplier → + New” when entering an offer"
       }
       onClose={() => panel.close()}
-      className="md:w-[900px]"
+      className={RULES.window.items}
     >
       <FactoryForm action={action} factory={factory} people={people} meId={meId} onSaved={saved} />
     </SidePanel>
