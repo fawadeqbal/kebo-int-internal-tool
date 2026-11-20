@@ -98,7 +98,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
           />
         ) : (
           <>
-            <DataTable label="Alerts" className="max-sm:hidden" tableClassName="text-md">
+            <DataTable label="Alerts" className="max-sm:hidden">
               <THead>
                 <tr>
                   <Th>

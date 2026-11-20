@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Check, Plus } from "lucide-react";
 import { fromMinor, priceForMargin, toMinor } from "@kebo/money";
 import { CURRENCIES, LOST_REASON_LABEL, LOST_REASONS, quotationLetter, type PaymentRoute } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea, RULES } from "@kebo/ui";
+import { THead, Th, Button, cn, Field, Input, Select, Textarea, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelBody, SidePanel, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
@@ -150,22 +150,22 @@ function NewQuotationsForm({
               {/* Made to fit a phone (data-fit): the tick, the offer and its cost; where it is quoted goes under its name. */}
               <div className="relative overflow-x-auto rounded-xl border border-line">
                 <table data-fit className="w-full border-collapse text-md">
-                  <thead>
-                    <tr className="bg-surface-2 text-left text-xs text-text-2">
-                      <th scope="col" className="w-10 border-b border-line px-3 py-2 max-sm:w-9 max-sm:px-2.5">
+                  <THead>
+                    <tr>
+                      <Th scope="col" className="w-10 max-sm:w-9">
                         <span className="sr-only">Quote it</span>
-                      </th>
-                      <th scope="col" className="border-b border-line px-3 py-2 font-medium">
+                      </Th>
+                      <Th scope="col">
                         Offer
-                      </th>
-                      <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium">
+                      </Th>
+                      <Th scope="col" className="text-right">
                         Cost
-                      </th>
-                      <th scope="col" className="border-b border-line px-3 py-2 font-medium max-sm:hidden">
+                      </Th>
+                      <Th scope="col" className="max-sm:hidden">
                         <span className="sr-only">Quoted in</span>
-                      </th>
+                      </Th>
                     </tr>
-                  </thead>
+                  </THead>
                   <tbody>
                     {(offers?.offers ?? []).map((o) => {
                       const on = ticked.includes(o.factoryQuoteId);
@@ -234,19 +234,19 @@ function NewQuotationsForm({
               {rows.length > 0 && (
                 <div className="relative overflow-x-auto rounded-xl border border-line">
                   <table data-fit className="w-full border-collapse text-md">
-                    <thead>
-                      <tr className="bg-surface-2 text-left text-xs text-text-2">
-                        <th scope="col" className="border-b border-line px-3 py-2 font-medium">
+                    <THead>
+                      <tr>
+                        <Th scope="col">
                           Quotation
-                        </th>
-                        <th scope="col" className="border-b border-line px-3 py-2 font-medium">
+                        </Th>
+                        <Th scope="col">
                           From
-                        </th>
-                        <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium">
+                        </Th>
+                        <Th scope="col" className="text-right">
                           Total
-                        </th>
+                        </Th>
                       </tr>
-                    </thead>
+                    </THead>
                     <tbody>
                       {rows.map((id, i) => {
                         const o = offers?.offers.find((x) => x.factoryQuoteId === id);

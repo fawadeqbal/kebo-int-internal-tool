@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Pencil } from "lucide-react";
-import { Button, cn, Input } from "@kebo/ui";
+import { THead, Th, Button, cn, Input } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -32,22 +32,22 @@ export function TargetsGrid({ rows, people, actions, currency }: { rows: TargetR
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-line text-left text-xs text-muted">
-            <th className="sticky left-0 z-10 bg-surface px-3 py-2 font-medium">Month</th>
-            <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Company ({currency})</th>
+        <THead>
+          <tr>
+            <Th>Month</Th>
+            <Th className="text-right whitespace-nowrap">Company ({currency})</Th>
             {people.map((p) => (
-              <th key={p.id} className="px-3 py-2 text-right font-medium whitespace-nowrap" title={p.name}>
+              <Th key={p.id} title={p.name} className="text-right whitespace-nowrap">
                 {p.name.split(" ")[0]}
-              </th>
+              </Th>
             ))}
-            <th className="px-3 py-2 text-right font-medium">Sold</th>
-            <th className="px-3 py-2 text-right font-medium">Progress</th>
-            <th className="relative w-24 px-3 py-2">
+            <Th className="text-right">Sold</Th>
+            <Th className="text-right">Progress</Th>
+            <Th className="w-24">
               <span className="sr-only">Change</span>
-            </th>
+            </Th>
           </tr>
-        </thead>
+        </THead>
         <tbody>
           {rows.map((r) =>
             editing === r.month ? (

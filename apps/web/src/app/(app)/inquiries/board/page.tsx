@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { NewInquiryWindow } from "../inquiry-windows";
 import { can, INQUIRY } from "@kebo/shared";
-import { Badge, buildHref, RULES } from "@kebo/ui";
+import { RefCode, Badge, buildHref, RULES } from "@kebo/ui";
 import { Board } from "@/components/lists/board";
 import { FilterCard } from "@/components/common/filter-card";
 import { FactLine, FollowUpDay, PriorityTag, Responsible } from "@/components/lists/list-parts";
@@ -27,7 +27,7 @@ function Card({ d, today }: { d: DealRow; today: string }) {
   return (
     <li>
       <Link href={`/inquiries/${d.id}`} className="block rounded-[10px] border border-line bg-surface px-3 py-2.5 text-md leading-[18px] transition-colors hover:border-primary-line">
-        <span className="block text-xs text-muted tabular">{d.refNo}</span>
+        <RefCode>{d.refNo}</RefCode>
         <span className="block text-md font-semibold text-text">
           {d.title}
           <PriorityTag priority={d.priority} />

@@ -156,10 +156,11 @@ export function NextWeeks({ h }: { h: HomeFigures }) {
       <Table data-fit>
         <THead>
           <tr>
-            <Th className={CELL}>Week</Th>
-            <Th className={cn(CELL, "text-right")}>Coming in</Th>
-            <Th className={cn(CELL, "text-right")}>Going out</Th>
-            <Th className={cn(CELL, "text-right")}>Cash after</Th>
+            {/* The box is a third of the page: its heads wrap (two words a line) so every column shows. */}
+            <Th className={cn(CELL, "whitespace-normal")}>Week</Th>
+            <Th className={cn(CELL, "text-right whitespace-normal")}>Coming in</Th>
+            <Th className={cn(CELL, "text-right whitespace-normal")}>Going out</Th>
+            <Th className={cn(CELL, "text-right whitespace-normal")}>Cash after</Th>
           </tr>
         </THead>
         <tbody>
