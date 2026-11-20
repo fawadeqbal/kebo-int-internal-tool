@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function TwoStepPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
   return (
-    <AuthShell tag={false}>
+    <AuthShell tag={false} side>
       <div className="flex flex-col items-center gap-3.5 text-center">
         <span className="grid size-[52px] place-items-center rounded-xl bg-primary-soft text-primary" aria-hidden>
           <ShieldCheck className="size-[26px]" />

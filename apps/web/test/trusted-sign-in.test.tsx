@@ -59,3 +59,18 @@ describe("white label: the company's welcome", () => {
     expect(screen.queryByText("Welcome mark")).toBeNull();
   });
 });
+
+describe("welcome back: the account this device remembers", () => {
+  it("reads back what was remembered, with or without a name", async () => {
+    const { rememberValue, rememberedAccount } = await import("@/lib/remembered");
+    expect(rememberedAccount(rememberValue({ email: "fawad@keboint.com", name: "Fawad Iqbal" }))).toEqual({ email: "fawad@keboint.com", name: "Fawad Iqbal" });
+    expect(rememberedAccount(rememberValue({ email: "a@b.co", name: null }))).toEqual({ email: "a@b.co", name: null });
+  });
+  it("is none for nothing, junk or a value that is not an email", async () => {
+    const { rememberedAccount } = await import("@/lib/remembered");
+    expect(rememberedAccount(undefined)).toBeNull();
+    expect(rememberedAccount("not-base64-json")).toBeNull();
+    expect(rememberedAccount(Buffer.from(JSON.stringify({ e: '<script>"' })).toString("base64url"))).toBeNull();
+    expect(rememberedAccount("x".repeat(700))).toBeNull();
+  });
+});
