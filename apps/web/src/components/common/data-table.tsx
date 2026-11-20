@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { cn } from "@kebo/ui";
+import { cn, tableClass } from "@kebo/ui";
 
 /**
  * A list's table (design system: List frame). Rows are DataRow: a click on a
@@ -75,7 +75,7 @@ export function DataTable({
         className,
       )}
     >
-      <table aria-label={label} className={cn("w-full border-collapse text-md", tableClassName)}>
+      <table aria-label={label} className={cn(tableClass, tableClassName)}>
         {children}
       </table>
     </div>

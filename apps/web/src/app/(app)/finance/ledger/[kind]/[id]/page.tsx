@@ -98,8 +98,9 @@ export default async function PartyLedgerPage({
         phoneStack
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <ExportCsv what="ledger-party" query={{ kind, id, from: period.from, to: period.to, open: open ? "1" : undefined }} />
+            {/* The statement's buttons, then ⋯ (the export) last, as on every page. */}
             <StatementButtons kind={kind} id={id} from={period.from} to={period.to} cur={sp.cur ?? single ?? undefined} back={base} />
+            <ExportCsv what="ledger-party" query={{ kind, id, from: period.from, to: period.to, open: open ? "1" : undefined }} />
           </div>
         }
       />

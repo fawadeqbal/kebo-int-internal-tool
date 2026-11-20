@@ -64,7 +64,8 @@ export default async function DashboardPage() {
             </Suspense>
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {/* At the right, as every page header's buttons, also when they wrap under the greeting on a phone. */}
+        <div className="ml-auto flex flex-wrap justify-end gap-2">
           {can(me, "payments.record") && (
             <ButtonLink href="/payments/new" variant="secondary">
               Record payment

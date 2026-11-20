@@ -1,5 +1,6 @@
 "use client";
 
+import { FormButtons } from "@/components/common/route-window";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound, Smartphone } from "lucide-react";
@@ -322,15 +323,12 @@ export function ProfileForm({
           <Field label="Phone" htmlFor="profile-phone" error={s.errors?.phone}>
             <Input id="profile-phone" name="phone" type="tel" maxLength={40} autoComplete="tel" defaultValue={s.values?.phone ?? phone ?? ""} />
           </Field>
-          <div className="flex items-center gap-2 border-t border-line pt-4 sm:col-span-3">
+          <FormButtons reset className="border-t border-line pt-4 sm:col-span-3">
             <SubmitButton pendingText="Saving…">
               <Check aria-hidden />
               Save changes
             </SubmitButton>
-            <Button type="reset" variant="ghost">
-              Cancel
-            </Button>
-          </div>
+          </FormButtons>
         </>
       )}
     </ActionForm>
@@ -359,12 +357,12 @@ export function PasswordCardForm({ action }: { action: Action }) {
           <Field label="Repeat new password" required htmlFor="confirm" error={s.errors?.confirm}>
             <Input id="confirm" name="confirm" type="password" required autoComplete="new-password" aria-invalid={!!s.errors?.confirm} />
           </Field>
-          <div className="border-t border-surface-2 pt-4 sm:col-span-3">
+          <FormButtons className="border-t border-line pt-4 sm:col-span-3">
             <SubmitButton pendingText="Changing…">
               <Check aria-hidden />
               Change password
             </SubmitButton>
-          </div>
+          </FormButtons>
         </>
       )}
     </ActionForm>

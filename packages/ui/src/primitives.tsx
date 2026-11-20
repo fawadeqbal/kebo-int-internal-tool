@@ -70,7 +70,7 @@ export function Button({
   type = "button",
   ...props
 }: ComponentProps<"button"> & { variant?: ButtonVariant; size?: ButtonSize }) {
-  return <button type={type} className={buttonClass(variant, size, className)} {...props} />;
+  return <button type={type} data-variant={variant} className={buttonClass(variant, size, className)} {...props} />;
 }
 
 export function ButtonLink({
@@ -82,7 +82,7 @@ export function ButtonLink({
   // A file (Excel export, PDF, a print or a download) is made only when clicked: never fetched ahead (a prefetch
   // of an export built the whole file on every visit to the list).
   const file = typeof props.href === "string" && /^\/(sheets|files|pdf|print|api)\//.test(props.href);
-  return <Link className={buttonClass(variant, size, className)} {...(file && props.prefetch === undefined ? { prefetch: false } : {})} {...props} />;
+  return <Link data-variant={variant} className={buttonClass(variant, size, className)} {...(file && props.prefetch === undefined ? { prefetch: false } : {})} {...props} />;
 }
 
 /* ---------------------------------------------------------------- Form controls */
@@ -262,7 +262,14 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
  * The one box head (canvas group 7): a 48px row under a line — the title (15px bold), what stands beside it, and its
  * buttons at the right. CardHeader and the record's boxes (RecordBox) both draw it from these.
  */
-export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-4 sm:pl-5";
+/**
+ * A box's head: its title at the box's inset, its buttons ending 10px in, where a small button's own 10px of room
+ * puts its words on the inset. A link-look button has no room of its own, so in a head it gets the same 10px: its
+ * words then end where an Edit's do ("Statement", "All orders" were 10px nearer the edge).
+ */
+export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-4 sm:pl-5 [&_[data-variant=link]]:px-2.5 [&>a:not([data-variant])]:px-2.5";
+/** A head's group of buttons: a plain link among them ("Order board →") gets a small button's room, as a link-look button does. */
+export const headActionsClass = "[&>a:not([data-variant])]:px-2.5";
 export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
 
 /** A heading inside a box or a window, under its title (a group of fields, a part of a list): one look everywhere. */
@@ -293,9 +300,12 @@ export function CardHeader({
   how,
   howTitle,
   titleId,
+  keepRow,
 }: {
   title: ReactNode;
   description?: ReactNode;
+  /** One small button (✎ Edit): it stays top right on a phone too, beside the title, instead of going under it. */
+  keepRow?: boolean;
   actions?: ReactNode;
   className?: string;
   /** How the card's figures are worked out, behind an ⓘ beside the title (HowMade). */
@@ -305,6 +315,8 @@ export function CardHeader({
   /** The title's id, for a box labelled by it (aria-labelledby). */
   titleId?: string;
 }) {
+  // With words under the title and buttons, a phone puts the buttons under them (unless one small button keeps its row).
+  const stacks = !!(description && actions && !keepRow);
   const heading = (
     <h2 id={titleId} className={boxTitleClass}>
       {title}
@@ -313,9 +325,13 @@ export function CardHeader({
   return (
     // With a description and actions, a phone puts the actions under the text instead of squeezing it; actions
     // that do not fit beside the title (a narrow screen) go under it rather than past the edge.
-    <div className={cn(boxHeadClass, "justify-between gap-x-3", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
+    <div className={cn(boxHeadClass, "justify-between gap-x-3", stacks && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
       {/* The words shrink (a long description wraps) so the buttons stay at the right on a laptop. */}
-      <div className="min-w-0 flex-[1_1_12rem]">
+      {/* 8rem kept for the words before the buttons go under them: a short title keeps its buttons beside it in a
+          320px side box ("Money · Statement"), a long one still wraps its words rather than squeezing them. */}
+      {/* Stacked on a phone (a description and buttons), the 8rem would be a height: there it sizes to its words
+          (its own height stacked; still shrinking, and wrapping, when a head keeps one row on a phone). */}
+      <div className={cn("min-w-0 flex-[1_1_8rem]", stacks && "max-sm:basis-auto")}>
         {how ? (
           <div className="flex items-center gap-1">
             {heading}
@@ -327,7 +343,7 @@ export function CardHeader({
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
       </div>
       {/* Never wider than the card: on a small screen the buttons wrap among themselves. */}
-      {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className={cn(headActionsClass, "ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2")}>{actions}</div>}
     </div>
   );
 }
@@ -479,7 +495,9 @@ export function PageHeader({
           {right && (
             // On a record's page on a phone the buttons leave this row (papers and ⋯ to the bar, the one strong
             // button to the bottom), so the row itself makes no room.
-            <div className={cn("flex items-center gap-2", framed ? "shrink-0 sm:flex-wrap sm:justify-end" : "flex-wrap sm:justify-end", up && !actions && !views && "max-md:contents")}>
+            // At the right at every width: on a phone too, where they wrap under the title (they sat right on some
+            // pages and left on others: sweep 20 Nov).
+            <div className={cn("flex items-center justify-end gap-2", framed ? "shrink-0 sm:flex-wrap" : "flex-wrap", up && !actions && !views && "max-md:contents")}>
               {actions}
               {papers && (
                 <div data-slot="papers" className="flex items-center gap-2 max-sm:hidden">
@@ -577,11 +595,18 @@ export function EmptyLine({ inset, className, ...props }: ComponentProps<"p"> & 
 }
 
 /* ---------------------------------------------------------------- Table */
+/**
+ * Every table's own class (Table and the app's DataTable): on a phone the first column (a name) keeps 10rem and the
+ * table scrolls sideways, rather than every column squeezing the names onto four lines (sweep 20 Nov: Reports ›
+ * Customers, Suppliers, People).
+ */
+export const tableClass = "w-full border-collapse text-md max-sm:[&_tbody_td:first-child]:min-w-40 max-sm:[&_thead_th:first-child]:min-w-40";
+
 export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
     <ScrollFade className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
-      <table className={cn("w-full border-collapse text-md", className)} {...props} />
+      <table className={cn(tableClass, className)} {...props} />
     </ScrollFade>
   );
 }

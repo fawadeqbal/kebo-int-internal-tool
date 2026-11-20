@@ -2,17 +2,17 @@
 
 import { useId, useRef, useState, type ReactNode } from "react";
 
-import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice, subTitleClass, Dash } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice } from "@kebo/ui";
 import { ChangeHint, changeKind, changeLine, changeWords, countChanges } from "@/components/common/change-words";
 import { PanelBody, PanelSection, SidePanel, useClosePanel, WindowFooter } from "@/components/common/panel";
 import { EditButton } from "@/components/common/edit-button";
-import { EditsChip, editedMark } from "@/components/edits/edits";
+
 import { useEditSave } from "@/components/edits/use-edit-save";
 import type { EditCard, EditRef } from "@/lib/types-edits";
 import type { ActionState } from "@/lib/actions";
 import { formatDate, type TimeStyle } from "@kebo/utils";
 import { timeStyle } from "@/lib/format";
-import { useTime } from "@/lib/time-client";
+
 import { useOpenFromLink } from "@/components/order-sections/section-window";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -62,10 +62,6 @@ export interface DetailField {
   /** Filled, it is not changed in place (only in the panel). */
   fixed?: boolean;
 }
-
-const filled = (f: DetailField) => f.value !== null && f.value !== undefined && f.value !== "";
-/** How a filled value reads: its own `show`, a date as "14 Jan 2027", or the value. */
-const shownOf = (f: DetailField, style: TimeStyle): ReactNode => f.show ?? (f.type === "date" && f.value && ISO.test(f.value) ? dayLabel(f.value, style) : f.value);
 
 function Control({ f, id, value, onChange, autoFocus, onKeyDown }: { f: DetailField; id: string; value?: string; onChange?: (v: string) => void; autoFocus?: boolean; onKeyDown?: (e: React.KeyboardEvent) => void }) {
   const common = {
@@ -253,183 +249,6 @@ export function FieldsForm({
       </PanelBody>
       {saver.dialog}
     </form>
-  );
-}
-
-/* ---------------------------------------------------------------- the cards */
-
-/** "8 of 12 filled" and its small bar. */
-function FilledMeter({ n, of, word = "filled" }: { n: number; of: number; word?: string }) {
-  const pct = of ? Math.round((n / of) * 100) : 100;
-  return (
-    <span className="inline-flex items-center gap-2 text-xs text-text-2 tabular">
-      {n} of {of} {word}
-      <span
-        className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-3 max-sm:hidden"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={of}
-        aria-valuenow={n}
-        aria-label={`${n} of ${of} ${word}`}
-      >
-        <span className={cn("block h-full rounded-full", n >= of ? "bg-ok" : "bg-ok/80")} style={{ width: `${pct}%` }} />
-      </span>
-    </span>
-  );
-}
-
-/**
- * A read-only card of a step's view: its title, the header's Edit (the full
- * form in the side panel) for people who may change it, and its content.
- */
-export function ViewCard({
-  id,
-  target,
-  title,
-  description,
-  meter,
-  canEdit,
-  editLabel = "Edit",
-  panel,
-  actions,
-  children,
-  className,
-}: {
-  id?: string;
-  /** A stable name for the card (data-target). */
-  target?: string;
-  title: ReactNode;
-  description?: ReactNode;
-  meter?: { n: number; of: number; word?: string };
-  canEdit: boolean;
-  editLabel?: string;
-  /** The panel the Edit opens. */
-  panel?: { title: string; description?: string; body: ReactNode; className?: string };
-  actions?: ReactNode;
-  children: ReactNode;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Card id={id} data-target={target} data-target-card={target ? "" : undefined} className={cn("scroll-mt-24", className)}>
-      {/* A phone puts wide actions under the title instead of squeezing it to a word a line. */}
-      <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3 max-sm:flex-wrap">
-        <div className="min-w-0 max-sm:grow max-sm:basis-[55%]">
-          <h3 className={subTitleClass}>{title}</h3>
-          {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
-        </div>
-        {/* Never wider than the card; on a phone, under the title they start at its left edge. */}
-        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 max-sm:justify-start">
-          {meter && meter.of > 0 && <FilledMeter {...meter} />}
-          {actions}
-          {canEdit && panel && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
-        </div>
-      </div>
-      {children}
-      {open && panel && (
-        <SidePanel title={panel.title} description={panel.description} onClose={() => setOpen(false)} className={panel.className}>
-          {panel.body}
-        </SidePanel>
-      )}
-    </Card>
-  );
-}
-
-/**
- * The Details card of a step (board OrderV4Shipping): its values as a label /
- * value grid (three columns, two on a phone), "n of m filled" in the header,
- * and Edit for the whole form in the side panel (read only on the page: board
- * "View first, edit on purpose"). "Edited n×" says how often saved values
- * changed, and each changed value is marked. Without the right to change it:
- * the values only.
- */
-export function DetailsCard({
-  id,
-  target,
-  title,
-  description,
-  fields,
-  action,
-  canEdit,
-  panelTitle,
-  panelDescription,
-  panelBody,
-  panelClassName,
-  actions,
-  footer,
-  edits,
-}: {
-  /** The panel's width, when its body needs more than the usual (a window with three columns). */
-  panelClassName?: string;
-  id?: string;
-  /** Stable names (data-target): the card is `target`, each value `target.name`. */
-  target?: string;
-  title: ReactNode;
-  description?: ReactNode;
-  fields: DetailField[];
-  /** Saves the card; none: nothing is changed here. */
-  action?: Action;
-  canEdit: boolean;
-  panelTitle?: string;
-  panelDescription?: string;
-  /** The panel's own body (the section's existing forms) instead of the fields' form. */
-  panelBody?: ReactNode;
-  actions?: ReactNode;
-  footer?: ReactNode;
-  /** Where its edits are kept, and what they are so far ("Edited n×"). */
-  edits?: { ref: EditRef; card?: EditCard | null; plain?: boolean };
-}) {
-  const { style } = useTime();
-  const editable = canEdit && !!action;
-  const shown = fields.filter((f) => !f.panelOnly);
-  const counted = shown.filter((f) => !f.uncounted);
-  const n = counted.filter(filled).length;
-  const hasPanel = !!panelBody || (editable && fields.some((f) => f.name && !f.cardOnly));
-  const name = typeof title === "string" ? title : "This card";
-  return (
-    <ViewCard
-      id={id}
-      target={target}
-      title={title}
-      description={description}
-      meter={{ n, of: counted.length }}
-      canEdit={canEdit && hasPanel}
-      actions={
-        <>
-          <EditsChip card={edits?.card} title={name} />
-          {actions}
-        </>
-      }
-      panel={
-        hasPanel
-          ? {
-              title: panelTitle ?? `Edit ${typeof title === "string" ? title.toLowerCase() : "the details"}`,
-              description: panelDescription ?? "Everything about it in one place.",
-              className: panelClassName,
-              body: panelBody ?? <FieldsForm action={action!} fields={fields} edit={edits?.ref} card={edits?.card} plain={edits?.plain} />,
-            }
-          : undefined
-      }
-    >
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5 px-4 py-4 lg:grid-cols-3">
-        {shown.map((f) => (
-          <div
-            key={f.name ?? f.label}
-            data-target={target ? `${target}.${f.target ?? f.name ?? f.label.toLowerCase()}` : undefined}
-            className="-mx-1.5 flex min-w-0 flex-col gap-0.5 px-1.5 py-0.5"
-          >
-            <dt className="text-xs text-muted">
-              {f.label}
-              {f.name && editedMark(edits?.card, f.name)}
-            </dt>
-            <dd className="min-w-0 text-sm font-medium break-words text-text tabular">
-              {filled(f) ? shownOf(f, style) : f.empty !== undefined ? f.empty : <Dash />}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {footer}
-    </ViewCard>
   );
 }
 

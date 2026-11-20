@@ -109,12 +109,29 @@ export function RouteWindow({
  * right (Cancel closes it, asking first when something changed); in a box or as a page, the same buttons at the
  * end of the form, at the right, Cancel first (`onCancel` closes the form in place, `cancelHref` goes back).
  */
-export function FormButtons({ children, cancelHref, onCancel }: { children: ReactNode; cancelHref?: string; onCancel?: () => void }) {
+export function FormButtons({
+  children,
+  cancelHref,
+  onCancel,
+  reset,
+  className,
+}: {
+  children: ReactNode;
+  cancelHref?: string;
+  onCancel?: () => void;
+  /** Cancel puts the form back as it was (a form that stays on the page, like My account's profile). */
+  reset?: boolean;
+  className?: string;
+}) {
   const inWindow = useWindowDone() !== null;
   if (inWindow) return <WindowFooter onCancel={onCancel}>{children}</WindowFooter>;
   return (
-    <div className="flex flex-wrap items-center justify-end gap-3">
-      {cancelHref ? (
+    <div className={cn("flex flex-wrap items-center justify-end gap-3", className)}>
+      {reset ? (
+        <Button type="reset" variant="ghost">
+          Cancel
+        </Button>
+      ) : cancelHref ? (
         <ButtonLink href={cancelHref} variant="ghost">
           Cancel
         </ButtonLink>

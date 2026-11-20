@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FACT_LABEL, FACT_VALUE, FACTS_GRID } from "@/components/common/record-box";
 import { Pencil, ShieldCheck } from "lucide-react";
 import { PERMISSION_GROUPS } from "@kebo/shared";
 import { Avatar, Badge, Card, CardBody, CardHeader, cn, EmptyLine, PageHeader, StatusBadge, capsClass, Stack } from "@kebo/ui";
@@ -82,7 +83,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
                 {r.frozen && <StatusBadge meaning="warn">Frozen: not in your plan</StatusBadge>}
               </span>
             }
-            className="max-sm:flex-row max-sm:gap-3"
+            keepRow
             description={r.key === me.role ? "This is your own role." : "What it is called, what it is for, and whether its people must use two-step sign-in."}
             actions={
               <>
@@ -110,24 +111,27 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
             }
           />
           <CardBody>
-            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              <div>
-                <dt className="text-xs text-muted">Name</dt>
-                <dd className="mt-0.5 text-sm">{r.name}</dd>
+            <dl className={FACTS_GRID}>
+              <div className="contents">
+                <dt className={FACT_LABEL}>Name</dt>
+                <dd className={FACT_VALUE}>{r.name}</dd>
               </div>
-              <div>
-                <dt className="text-xs text-muted">Two-step sign-in</dt>
-                <dd className="mt-1 text-sm">
+              <div className="contents">
+                <dt className={FACT_LABEL}>Two-step sign-in</dt>
+                <dd className={FACT_VALUE}>
                   {r.requireTwoStep ? <StatusBadge meaning="ok">Required</StatusBadge> : <StatusBadge meaning="neutral">Their choice</StatusBadge>}
                 </dd>
               </div>
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-muted">What it is for</dt>
-                <dd className="mt-0.5 text-sm">
+              <div className="contents">
+                <dt className={FACT_LABEL}>What it is for</dt>
+                <dd className={FACT_VALUE}>
                   {r.description || (
-                    <OpenPanelButton panel="edit-role" variant="link" className="font-medium no-underline hover:underline">
-                      + Add
-                    </OpenPanelButton>
+                    // The 24px tap target on its wrapper (a button takes its height from its size).
+                    <span className="inline-flex min-h-6 items-center">
+                      <OpenPanelButton panel="edit-role" variant="link" className="font-medium no-underline hover:underline">
+                        + Add
+                      </OpenPanelButton>
+                    </span>
                   )}
                 </dd>
               </div>
@@ -139,7 +143,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
           <CardHeader
             title="What people in this role may do"
             description={r.superAdmin ? "Every permission, including any added later." : `${r.permissions.length - r.notInPlan.length} permissions. A change applies to its people from their next click.`}
-            className="max-sm:flex-row max-sm:gap-3"
+            keepRow
             actions={r.superAdmin ? undefined : edit}
           />
           <CardBody className="grid gap-x-6 gap-y-4 md:grid-cols-2">

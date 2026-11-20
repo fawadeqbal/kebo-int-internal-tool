@@ -87,14 +87,15 @@ export function AccountForm({ account, today, onClose }: { account?: AccountRow;
   );
 }
 
-export function NewAccount({ today }: { today: string }) {
+/** "+ Add account": the page's strong button when it is the list's own create (`main`), a plain one in a box. */
+export function NewAccount({ today, main }: { today: string; main?: boolean }) {
   const [open, setOpen] = useState(false);
   return open ? (
     <div className="w-full">
       <AccountForm today={today} onClose={() => setOpen(false)} />
     </div>
   ) : (
-    <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+    <Button size={main ? "md" : "sm"} variant={main ? "strong" : "secondary"} onClick={() => setOpen(true)}>
       <Plus aria-hidden /> Add account
     </Button>
   );
@@ -114,7 +115,7 @@ export function EditAccount({ account, today }: { account: AccountRow; today: st
 }
 
 /** Move money between two of our accounts; asks what arrived when the currencies differ. */
-export function MoveMoney({ accounts, today, startOpen = false }: { accounts: AccountRow[]; today: string; startOpen?: boolean }) {
+export function MoveMoney({ accounts, today, startOpen = false, header }: { accounts: AccountRow[]; today: string; startOpen?: boolean; /** In a page's header: the header's button size. */ header?: boolean }) {
   const open_ = accounts.filter((a) => !a.archived);
   const [open, setOpen] = useState(startOpen);
   const [from, setFrom] = useState(open_[0]?.id ?? "");
@@ -122,7 +123,7 @@ export function MoveMoney({ accounts, today, startOpen = false }: { accounts: Ac
   if (open_.length < 2) return null;
   if (!open)
     return (
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+      <Button size={header ? "md" : "sm"} variant="secondary" onClick={() => setOpen(true)}>
         <ArrowLeftRight aria-hidden /> Move money
       </Button>
     );

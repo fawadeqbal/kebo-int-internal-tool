@@ -30,8 +30,8 @@ export default async function CashBookPage({ searchParams }: { searchParams: Pro
         kind="list"
         crumbs={crumbs}
         title={labelFor("/finance/cash-book")}
-        actions={<MoveMoney accounts={accounts} today={today} />}
-        primary={<NewAccount today={today} />}
+        actions={<MoveMoney accounts={accounts} today={today} header />}
+        primary={<NewAccount today={today} main />}
       />
       {book ? (
         <>

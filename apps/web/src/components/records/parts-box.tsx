@@ -54,7 +54,8 @@ export function PartsBox({
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 @2xl:grid-cols-[12rem_minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <h3 className={subTitleClass}>{p.title}</h3>
-                  {p.word && <Badge tone={p.word.tone ?? "neutral"}>{p.word.text}</Badge>}
+                  {/* The box's word is its furthest part's: that part does not say it a second time. */}
+                  {p.word && p.word.text !== word?.text && <Badge tone={p.word.tone ?? "neutral"}>{p.word.text}</Badge>}
                 </div>
                 <div className={cn("col-span-2 row-start-2 min-w-0 @2xl:col-span-1 @2xl:col-start-2 @2xl:row-start-1")}>
                   {facts.length ? (
@@ -72,7 +73,7 @@ export function PartsBox({
                 </div>
                 {p.action && <div className="col-start-2 row-start-1 flex flex-wrap items-center justify-end gap-1.5 @2xl:col-start-3">{p.action}</div>}
               </div>
-              {p.files && <div className="-mx-5 -mb-3 empty:hidden max-sm:-mx-4">{p.files}</div>}
+              {p.files && <div className="-mx-4 -mb-3 empty:hidden sm:-mx-5">{p.files}</div>}
             </li>
           );
         })}

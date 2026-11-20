@@ -78,6 +78,22 @@ describe("one of each", () => {
     expect(found(/<WindowFooter[^>]*className="static mx-0/g)).toEqual([]);
   });
 
+  it("one page frame: every list page stacks its parts with the page's gap (a bare div left them touching)", () => {
+    const lists = SOURCES.filter((s) => /app\/\(app\)\/.*\(list\)\/page\.tsx$/.test(s.file));
+    expect(lists.length).toBeGreaterThan(5);
+    expect(lists.filter((s) => /return \(\s*<div>/.test(s.text)).map((s) => s.file)).toEqual([]);
+  });
+
+  it("one facts style: label at the left of its value (FACTS_GRID), never a small label above it, in the company app", () => {
+    const above = SOURCES.filter((s) => !/app\/platform\//.test(s.file) && /<dt className="text-xs text-muted/.test(s.text)).map((s) => s.file);
+    expect(above).toEqual([]);
+  });
+
+  it("one empty line inside a titled box: the big empty state stays out of record boxes", () => {
+    const boxes = /customers\/\[id\]\/money\/page|suppliers\/\[id\]\/(page|costs\/page)|users\/\[id\]\/page/;
+    expect(SOURCES.filter((s) => boxes.test(s.file) && /<EmptyState\b/.test(s.text)).map((s) => s.file)).toEqual([]);
+  });
+
   it("one choice: a pick-one is ChoiceChips, a view switch SegmentedChoice — no radio group drawn by hand", () => {
     // The order's payment cards carry a line under each choice (option cards) and the filter sheet is step 5's.
     const allowed = /choice-chips\.tsx|packages\/ui\/src\/client\.tsx|orders\/\[id\]\/forms\.tsx|filter-card\.tsx/;

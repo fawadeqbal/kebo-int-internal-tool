@@ -1,5 +1,6 @@
 "use client";
 
+import { FACT_LABEL, FACT_VALUE, FACTS_GRID } from "@/components/common/record-box";
 import { CURRENCIES, CURRENCY_LABEL, type ColourSet } from "@kebo/shared";
 import { Card, CardBody, CardHeader, cn, linkClass } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
@@ -134,24 +135,26 @@ export function SettingsCard({
         title={card.title}
         description={card.description}
         // ✎ Edit stays top right on a phone too (design system: card header actions).
-        className="max-sm:flex-row max-sm:gap-3"
+        keepRow
         actions={<EditButton aria-label={`Edit ${card.title.toLowerCase()}`} onClick={() => panel.openPanel()} />}
       />
       <CardBody className="flex flex-col gap-4">
         {card.preview && <BrandPreview initial={values} label={null} />}
-        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+        {/* The records' facts: the label at the left, the value beside it (one way to draw facts). */}
+        <dl className={FACTS_GRID}>
           {fields.map((f) => {
             const value = f.kind === "currencies" ? values.currency : values[f.name];
-            const wide = f.wide || f.kind === "currencies";
+            const one = fields.length === 1;
             return (
-              <div key={f.name} className={cn("min-w-0", wide && "sm:col-span-2")}>
-                {/* A card of one value is named by its title already. */}
-                <dt className={cn("text-xs text-muted", fields.length === 1 && "sr-only")}>{f.label}</dt>
-                <dd className="mt-0.5 text-sm text-text">
+              <div key={f.name} className="contents">
+                {/* A card of one value is named by its title already: its value takes the row. */}
+                <dt className={cn(FACT_LABEL, one && "sr-only")}>{f.label}</dt>
+                <dd className={cn(FACT_VALUE, one && "col-span-2")}>
                   {f.kind === "currencies" ? (
                     <CurrenciesText values={values} />
                   ) : empty(value) ? (
-                    <button type="button" onClick={() => panel.openPanel()} className={linkClass}>
+                    // 24px high at least: a tap target of its own in the tight facts rows (WCAG 2.2 target size).
+                    <button type="button" onClick={() => panel.openPanel()} className={cn(linkClass, "inline-flex min-h-6 items-center")}>
                       + Add
                     </button>
                   ) : (

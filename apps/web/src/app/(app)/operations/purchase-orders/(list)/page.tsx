@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, Boxes, ShoppingCart } from "lucide-react";
-import { buildHref, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, Stack } from "@kebo/ui";
+import { buildHref, Card, EmptyState, PhoneList, PhoneRow, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, Stack } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
@@ -120,6 +120,21 @@ export default async function PurchaseOrdersPage({
             description={data.suppliers.length ? "Clear the search or choose All." : "Each supplier on a sales order gets one, numbered PO-2026-0001, when the order is made."}
           />
         ) : (
+          <>
+          {/* Phones: a row per purchase order — supplier, number and order, its status and total (as every list). */}
+          <PhoneList label="Purchase orders">
+            {shown.map((r) => (
+              <PhoneRow
+                key={r.key}
+                href={purchaseOrderHref(r.order.id, r.supplier.id)}
+                title={r.supplier.name}
+                line={`${r.po?.number ?? "PO —"} · for ${r.order.refNo}${r.readyOn ? ` · ready ${date(r.readyOn)}` : ""}`}
+                status={<StatusBadge meaning={STATUS[r.status].meaning}>{STATUS[r.status].label}</StatusBadge>}
+                figure={money(r.owed, r.currency)}
+              />
+            ))}
+          </PhoneList>
+          <div className="max-sm:hidden">
           <Table>
             <THead>
               <tr>
@@ -166,6 +181,8 @@ export default async function PurchaseOrdersPage({
               ))}
             </tbody>
           </Table>
+          </div>
+          </>
         )}
       </Card>
       <Pager base="/operations/purchase-orders" params={keep} page={page} pageSize={PAGE} total={data.total} bare />

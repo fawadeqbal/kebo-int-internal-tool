@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { can } from "@kebo/shared";
-import { StageBadge, StatusBadge, EmptyState, RULES } from "@kebo/ui";
+import { StageBadge, StatusBadge, RULES, EmptyLine } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { date, dateTime, timeAgo, companyToday } from "@/lib/format";
@@ -212,10 +212,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
                   description={inquiries.total ? "New, sourcing and quoted, newest first" : undefined}
                   action={inquiries.total > ROWS && <AllLink href={`/inquiries?assignee=${u.id}`}>All {inquiries.total}</AllLink>}
                   empty={
-                    <EmptyState
-                      title="No open inquiries"
-                      description="Inquiries they handle show here while they are open. Choose them under “Responsible person” on an inquiry."
-                    />
+                    <EmptyLine inset>No open inquiries. Inquiries they handle show here while they are open.</EmptyLine>
                   }
                 >
                   {inquiries.rows.map((d) => (

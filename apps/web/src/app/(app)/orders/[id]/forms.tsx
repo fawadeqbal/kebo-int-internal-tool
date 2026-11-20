@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea, Notice, linkClass, Dash } from "@kebo/ui";
+import { useState } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { Button, cn, Field, Input, Textarea, Notice } from "@kebo/ui";
 import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
 import { SubmitButton } from "@kebo/ui/client";
 import { ConfirmSubmit } from "@/components/common/dialog";
-import { EditButton } from "@/components/common/edit-button";
+
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { OrderNext } from "@/lib/types-orders";
@@ -146,231 +146,6 @@ function Warnings({ text }: { text: string }) {
   );
 }
 
-/* ---------------------------------------------------------------- details */
-
-/**
- * The order's Details card (the overview's right column): terms, dates and
- * shipping in two columns, values wrapping; ✎ Edit in the header opens the
- * form in place; an empty value offers "+ Add" to people who may edit.
- * Shipped on, the B/L and the container are Shipment 1's: with the shipping
- * module they are shown read-only, "from Shipment 1 · edit in Shipping" (a link
- * that lands on the shipment lit up); without it they are typed here (and saved
- * on the shipment). With an LC, ship-by shows the LC's latest shipment date
- * beside ours, warned about when ours is later.
- */
-export function DetailsCard({
-  action,
-  canEdit,
-  today,
-  fixed,
-  values,
-  shown,
-  shipment,
-  lc,
-  suggestShipBy,
-  readyEach,
-  compact,
-  after = [],
-}: {
-  /** Board look: the editable rows show only when they hold something (Ready by always). */
-  compact?: boolean;
-  /** Read-only rows after the rest (delivery terms), full width. */
-  after?: { label: string; value: ReactNode }[];
-  action: Action;
-  canEdit: boolean;
-  today: string;
-  /** Read-only rows (incoterm, payment terms, ordered on). */
-  fixed: { label: string; value: ReactNode }[];
-  values: {
-    shipBy: string | null;
-    readyOn: string | null;
-    shippedOn: string | null;
-    blNo: string | null;
-    containerNo: string | null;
-    documentTitle: string | null;
-    portOfDischarge: string | null;
-    /** The customer's PO (number and day), the consignee, the notify party and where it is delivered. */
-    customerRef?: string | null;
-    customerPoOn?: string | null;
-    consignee?: string | null;
-    notifyParty?: string | null;
-    deliveryAddress?: string | null;
-  };
-  /** The same values, formatted for reading. */
-  shown: { shipBy: string | null; readyOn: string | null; shippedOn: string | null; blNo: string | null };
-  /** Where shipped on / B/L / container are edited: on Shipping (read-only here, `href` lands there), or here (no shipping module). */
-  shipment: { onShipping: boolean; href: string; label: string };
-  /** An LC order: its latest shipment date (as read) and whether our ship-by is later. */
-  lc?: { latest: string | null; late: boolean } | null;
-  /** While ship-by is empty: the deal's "wanted by" (YYYY-MM-DD and as read). */
-  suggestShipBy?: { on: string; shown: string } | null;
-  /** An order from several factories: each gives its own ready date (edited on the Factory step); this is the latest. */
-  readyEach?: { count: number; href: string } | null;
-}) {
-  const [editing, setEditing] = useState(false);
-  const fromShipment = (filled: boolean) =>
-    shipment.onShipping ? (
-      <a href={shipment.href} className={cn(linkClass, "text-xs")}>
-        {filled ? `from ${shipment.label} · edit in Shipping` : "add it in Shipping"}
-      </a>
-    ) : null;
-  const shipBy =
-    shown.shipBy && lc?.latest ? (
-      <span className="flex flex-col gap-0.5">
-        <span>
-          {shown.shipBy} <span className="font-normal text-text-2">· LC latest {lc.latest}</span>
-        </span>
-        {lc.late && (
-          <span className="flex items-center gap-1 text-xs font-medium text-bad">
-            <AlertTriangle className="size-3.5 shrink-0" aria-hidden /> Later than the LC allows
-          </span>
-        )}
-      </span>
-    ) : !shown.shipBy && lc?.latest ? (
-      <span className="font-normal text-text-2">LC latest {lc.latest}</span>
-    ) : (
-      shown.shipBy
-    );
-  const rows: { label: string; value: ReactNode; note?: ReactNode }[] = [
-    ...fixed,
-    { label: "Ship by", value: shipBy },
-    {
-      label: compact ? "Ready by" : "Ready at supplier",
-      value: shown.readyOn,
-      note: readyEach ? (
-        <a href={readyEach.href} className={cn(linkClass, "text-xs")}>
-          the latest of {readyEach.count} suppliers · edit in Supplier
-        </a>
-      ) : undefined,
-    },
-    { label: "Shipped on", value: shown.shippedOn, note: fromShipment(!!shown.shippedOn) },
-    { label: "B/L no.", value: shown.blNo, note: fromShipment(!!shown.blNo) },
-    { label: "Container", value: values.containerNo, note: fromShipment(!!values.containerNo) },
-    { label: "Port of discharge", value: values.portOfDischarge },
-    { label: "Heading on documents", value: values.documentTitle },
-    { label: "Consignee", value: values.consignee ? <span className="whitespace-pre-line">{values.consignee}</span> : null },
-    { label: "Notify party", value: values.notifyParty ? <span className="whitespace-pre-line">{values.notifyParty}</span> : null },
-    { label: "Deliver to", value: values.deliveryAddress ? <span className="whitespace-pre-line">{values.deliveryAddress}</span> : null },
-  ];
-  return (
-    <Card id="details" className="scroll-mt-24">
-      <CardHeader
-        title="The order"
-        actions={canEdit && !editing ? <EditButton onClick={() => setEditing(true)} /> : undefined}
-      />
-      <CardBody>
-        {
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
-            {[
-              ...(compact ? rows.filter((r, i) => i < fixed.length || r.label === "Ready by" || (r.value !== null && r.value !== undefined && r.value !== "")) : rows),
-              ...after.map((r) => ({ ...r, wide: true })),
-            ].map((r) => (
-              <div key={r.label} className={cn("flex min-w-0 flex-col", "wide" in r && "sm:col-span-2 xl:col-span-3")}>
-                <dt className="text-xs text-muted">{r.label}</dt>
-                <dd className="mt-[3px] text-sm [overflow-wrap:anywhere]">
-                  {r.value !== null && r.value !== undefined && r.value !== "" ? r.value : <Dash />}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        }
-        {editing && (
-          <SidePanel title="Edit the order" description="Its dates, the customer's order no., and who the goods go to. Saving updates every page of the order." onClose={() => setEditing(false)}>
-          <PanelBody>
-          <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3">
-            {(s) => (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Customer's order no." htmlFor="d-po" optional error={s.errors?.customerRef}>
-                    <Input id="d-po" name="customerRef" maxLength={80} defaultValue={s.values?.customerRef ?? values.customerRef ?? ""} />
-                  </Field>
-                  <Field label="Customer's order date" htmlFor="d-poOn" optional error={s.errors?.customerPoOn}>
-                    <Input id="d-poOn" name="customerPoOn" type="date" max={today} defaultValue={s.values?.customerPoOn ?? values.customerPoOn ?? ""} />
-                  </Field>
-                </div>
-                <Field label="Consignee" htmlFor="d-consignee" optional error={s.errors?.consignee}>
-                  <Textarea id="d-consignee" name="consignee" rows={2} className="min-h-0" maxLength={500} defaultValue={s.values?.consignee ?? values.consignee ?? ""} />
-                </Field>
-                <Field label="Notify party" htmlFor="d-notify" optional error={s.errors?.notifyParty}>
-                  <Textarea id="d-notify" name="notifyParty" rows={2} className="min-h-0" maxLength={500} defaultValue={s.values?.notifyParty ?? values.notifyParty ?? ""} />
-                </Field>
-                <Field label="Deliver to" htmlFor="d-deliver" optional error={s.errors?.deliveryAddress}>
-                  <Textarea id="d-deliver" name="deliveryAddress" rows={2} className="min-h-0" maxLength={500} defaultValue={s.values?.deliveryAddress ?? values.deliveryAddress ?? ""} />
-                </Field>
-                <Field
-                  label="Ship by"
-                  htmlFor="d-shipBy"
-                  optional
-                  hint={
-                    lc?.latest
-                      ? `Promised to the customer · the LC's latest shipment is ${lc.latest}`
-                      : !values.shipBy && suggestShipBy
-                        ? `Promised to the customer · suggested: the customer wanted it by ${suggestShipBy.shown}`
-                        : undefined
-                  }
-                  error={s.errors?.shipBy}
-                >
-                  <Input id="d-shipBy" name="shipBy" type="date" defaultValue={s.values?.shipBy ?? values.shipBy ?? suggestShipBy?.on ?? ""} />
-                </Field>
-                {readyEach ? (
-                  <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs text-text-2">
-                    Each of the {readyEach.count} suppliers gives its own ready date:{" "}
-                    <a href={readyEach.href} className={linkClass}>
-                      edit them on the Supplier step
-                    </a>
-                    .
-                  </p>
-                ) : (
-                  <Field label="Ready on" htmlFor="d-readyOn" optional error={s.errors?.readyOn}>
-                    <Input id="d-readyOn" name="readyOn" type="date" defaultValue={s.values?.readyOn ?? values.readyOn ?? ""} />
-                  </Field>
-                )}
-                {shipment.onShipping ? (
-                  <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs text-text-2">
-                    Shipped on, the B/L and the container are {shipment.label}&apos;s:{" "}
-                    <a href={shipment.href} className={linkClass}>
-                      edit them in Shipping
-                    </a>
-                    .
-                  </p>
-                ) : (
-                  <>
-                    <Field label="Shipped on" htmlFor="d-shippedOn" optional error={s.errors?.shippedOn}>
-                      <Input id="d-shippedOn" name="shippedOn" type="date" max={today} defaultValue={s.values?.shippedOn ?? values.shippedOn ?? ""} />
-                    </Field>
-                    <Field label="B/L number" htmlFor="d-blNo" optional error={s.errors?.blNo}>
-                      <Input id="d-blNo" name="blNo" maxLength={60} defaultValue={s.values?.blNo ?? values.blNo ?? ""} />
-                    </Field>
-                    <Field label="Container no." htmlFor="d-containerNo" optional error={s.errors?.containerNo}>
-                      <Input id="d-containerNo" name="containerNo" maxLength={120} defaultValue={s.values?.containerNo ?? values.containerNo ?? ""} />
-                    </Field>
-                  </>
-                )}
-                <Field label="Port of discharge" htmlFor="d-pod" optional error={s.errors?.portOfDischarge}>
-                  <Input id="d-pod" name="portOfDischarge" maxLength={120} defaultValue={s.values?.portOfDischarge ?? values.portOfDischarge ?? ""} />
-                </Field>
-                <Field label="Heading on documents" htmlFor="d-title" optional error={s.errors?.documentTitle}>
-                  <Input id="d-title" name="documentTitle" maxLength={200} defaultValue={s.values?.documentTitle ?? values.documentTitle ?? ""} />
-                </Field>
-                <div className="flex gap-2">
-                  <SubmitButton size="sm" pendingText="Saving…">
-                    Save details
-                  </SubmitButton>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </>
-            )}
-          </ActionForm>
-          </PanelBody>
-          </SidePanel>
-        )}
-      </CardBody>
-    </Card>
-  );
-}
-
 /* ---------------------------------------------------------------- payments */
 
 /**
@@ -499,7 +274,6 @@ export function CancelOrderForm({
     </>
   );
 }
-
 
 /**
  * "Reopen the order…" in a closed order's ⋯ (not its main button: a finished order's first button never undoes

@@ -229,7 +229,7 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
               <CardHeader
                 title="Password"
                 description="Changing it signs you out on your other devices."
-                className="max-sm:flex-row max-sm:gap-3"
+                keepRow
                 actions={<PasswordEdit />}
               />
               <CardBody>

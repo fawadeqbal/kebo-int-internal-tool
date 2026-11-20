@@ -1,5 +1,6 @@
 "use client";
 
+import { FACT_LABEL, FACT_VALUE, FACTS_GRID } from "@/components/common/record-box";
 import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@kebo/ui";
@@ -46,11 +47,11 @@ export function PaymentRecord({
       </button>
       {open && (
         <div className="border-t border-line bg-surface-2/40 px-3 py-3">
-          <dl className="grid gap-x-6 gap-y-2.5 sm:grid-cols-3">
+          <dl className={FACTS_GRID}>
             {fields.map((f) => (
-              <div key={f.label} className={cn("min-w-0", f.wide && "sm:col-span-3")}>
-                <dt className="text-xs text-muted">{f.label}</dt>
-                <dd className="break-words">{f.value}</dd>
+              <div key={f.label} className="contents">
+                <dt className={FACT_LABEL}>{f.label}</dt>
+                <dd className={FACT_VALUE}>{f.value}</dd>
               </div>
             ))}
           </dl>

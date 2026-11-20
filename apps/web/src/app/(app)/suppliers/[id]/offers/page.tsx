@@ -116,10 +116,10 @@ export default async function FactoryOffers({
             <DataTable label="Offers" className="max-sm:hidden">
                 <THead>
                   <tr>
+                    {/* Seven columns, so it fits beside the side panel (nine ran past the box at 1440): their ref.
+                        under the inquiry, the validity under the day it came. */}
                     <Th>Inquiry</Th>
-                    <Th>Their ref.</Th>
                     <Th>Received</Th>
-                    <Th>Valid until</Th>
                     <Th>Incoterm</Th>
                     <Th className="text-right">Items</Th>
                     <Th className="text-right">Total</Th>
@@ -134,10 +134,12 @@ export default async function FactoryOffers({
                       <DataRow key={x.id} href={`/inquiries/${x.inquiry.id}/sourcing`}>
                         <Td>
                           <RefCode href={`/inquiries/${x.inquiry.id}/sourcing`}>{x.inquiry.refNo}</RefCode>
+                          {x.reference && <span className="block text-xs text-text-2">their ref. {x.reference}</span>}
                         </Td>
-                        <Td>{x.reference ?? "—"}</Td>
-                        <Td className="whitespace-nowrap">{date(x.receivedOn)}</Td>
-                        <Td className="whitespace-nowrap">{x.validUntil ? date(x.validUntil) : "—"}</Td>
+                        <Td className="whitespace-nowrap">
+                          {date(x.receivedOn)}
+                          {x.validUntil && <span className="block text-xs text-text-2">valid until {date(x.validUntil)}</span>}
+                        </Td>
                         <Td className="whitespace-nowrap">{basis(x)}</Td>
                         <Td className="text-right tabular">{x._count.lines}</Td>
                         <Td className="text-right whitespace-nowrap tabular">{whole(x.total, x.currency)}</Td>

@@ -161,7 +161,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
     advice &&
     (advice.state === "ready" || advice.state === "draft" ? (
       <Section
-        title="Shipping advice to the customer"
+        title="Shipping advice"
         state={advice.stateLabel}
         tone={advice.state === "ready" ? "ok" : "info"}
         rows={[
@@ -177,7 +177,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       />
     ) : (
       <EmptySection
-        title="Shipping advice to the customer"
+        title="Shipping advice"
         text="Not sent yet."
         action={
           advice.makeable && papers?.canMake ? (
@@ -446,7 +446,6 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           marksAction={packingMarksAction.bind(null, o.id)}
           links={o.goods.packed || o.goods.totals.packages > 0 ? docHref(o, { kind: "packing-list", label: "Packing list" }) : undefined}
           today={now}
-          toggle
           edits={edits}
         />
       )}
