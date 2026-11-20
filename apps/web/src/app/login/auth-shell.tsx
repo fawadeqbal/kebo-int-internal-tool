@@ -23,6 +23,7 @@ export async function AuthShell({
   footer,
   tag = true,
   side = false,
+  phoneBrand = true,
 }: {
   children: ReactNode;
   wide?: boolean;
@@ -38,11 +39,14 @@ export async function AuthShell({
    * phone no card, the form fills the screen and the address and © line sit at the bottom.
    */
   side?: boolean;
+  /** The logo on top on a phone (side layout); off when the page shows the logo itself (sign-in). */
+  phoneBrand?: boolean;
 }) {
   const look = await companyLook();
   const colours = look?.colours ?? savedColours((await cookies()).get(COLOURS_COOKIE)?.value);
   const host = (await headers()).get("host");
-  const copyright = `© ${new Date().getFullYear()} ${look ? `${look.name}. All rights reserved.` : PRODUCT_NAME}`;
+  // "Co., Ltd." already ends with a full stop: never "Ltd.. All rights reserved."
+  const copyright = `© ${new Date().getFullYear()} ${look ? `${look.name.replace(/\.+$/, "")}. All rights reserved.` : PRODUCT_NAME}`;
   if (side && look) {
     const brand = (
       <>
@@ -89,8 +93,8 @@ export async function AuthShell({
           <p className="text-md text-muted">{copyright}</p>
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-14 min-w-0 shrink-0 items-center gap-2.5 px-5 lg:hidden">{brand}</header>
-          <main className="flex flex-1 flex-col items-center px-5 pt-5 pb-8 sm:justify-center lg:px-12">
+          {phoneBrand && <header className="flex h-14 min-w-0 shrink-0 items-center gap-2.5 px-5 lg:hidden">{brand}</header>}
+          <main className={`flex flex-1 flex-col items-center px-5 pb-8 sm:justify-center lg:px-12 ${phoneBrand ? "pt-5" : "pt-10"}`}>
             <div className="w-full max-w-[400px]">
               {tag && subtitle && <p className="mb-4 text-sm font-medium text-text-2">{subtitle}</p>}
               {children}
@@ -99,7 +103,7 @@ export async function AuthShell({
           </main>
           <footer className="flex shrink-0 flex-col items-center gap-1.5 border-t border-line px-5 pt-3.5 pb-6 lg:hidden">
             {address}
-            <span className="text-xs text-muted">{copyright}</span>
+            <span className="text-center text-xs text-muted">{copyright}</span>
           </footer>
         </div>
         <Suspense>

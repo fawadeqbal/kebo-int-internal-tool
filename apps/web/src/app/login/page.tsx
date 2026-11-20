@@ -38,6 +38,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <AuthShell
       tag={false}
       side
+      phoneBrand={false}
       footer={
         look ? (
           <p>Only invited members of {look.name} can sign in.</p>
@@ -52,7 +53,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       }
     >
       {!welcomed && !demoMode() && (
-        <Splash footer={`© ${new Date().getFullYear()} ${name}${look ? ". All rights reserved." : ""}`}>
+        <Splash footer={`© ${new Date().getFullYear()} ${look ? `${name.replace(/\.+$/, "")}. All rights reserved.` : name}`}>
           <BrandMark name={name} logoSrc={look?.logoSrc ?? null} size="splash" />
           {!look?.logoSrc && <p className="text-xl font-semibold tracking-tight text-text">{name}</p>}
         </Splash>
