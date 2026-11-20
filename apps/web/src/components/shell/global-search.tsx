@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { createPortal } from "react-dom";
 import { ArrowLeft, Clock, Loader2, Search, X } from "lucide-react";
 import { SEARCH_KIND_LABEL, type SearchKind, type SearchResult } from "@kebo/shared";
-import { Badge, cn, Kbd, controlClass, controlSizes, EmptyLine } from "@kebo/ui";
+import { Badge, cn, Kbd, controlClass, controlSizes, EmptyLine, capsClass } from "@kebo/ui";
 import { useBackGuard } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
 import { kindCount, kindOne, Marked, SEARCH_ICON as ICON, searchHref } from "./search-bits";
@@ -195,7 +195,7 @@ export function TopSearch() {
           <div id={`${base}-list`} role="listbox" aria-label={q.length >= 2 ? `Results for ${q}` : "Recent searches"} className="max-h-[min(70vh,560px)] overflow-y-auto py-1.5">
             {q.length < 2 ? (
               <div role="group" aria-label="Recent searches">
-                <p aria-hidden className="px-4 pt-2 pb-1 text-2xs font-semibold tracking-wide text-text-2 uppercase">
+                <p aria-hidden className={cn(capsClass, "px-4 pt-2 pb-1")}>
                   Recent searches
                 </p>
                 {recentOptions.map((o, i) => (
@@ -210,7 +210,7 @@ export function TopSearch() {
             ) : (
               groups.map((g) => (
                 <div key={g.kind} role="group" aria-label={g.title} className="border-t border-line first:border-t-0">
-                  <p aria-hidden className="px-4 pt-2.5 pb-1 text-2xs font-semibold tracking-wide text-text-2 uppercase">
+                  <p aria-hidden className={cn(capsClass, "px-4 pt-2.5 pb-1")}>
                     {g.title}
                   </p>
                   {g.options.map((o) => {
@@ -386,7 +386,7 @@ function PhoneGroup({ title, all, children }: { title: string; all?: { href: str
   return (
     <section aria-label={title} className="border-b border-line">
       <div className="flex items-center justify-between bg-surface-2/60 px-4 py-1.5">
-        <h2 className="text-2xs font-semibold tracking-wide text-text-2 uppercase">{title}</h2>
+        <h2 className={capsClass}>{title}</h2>
         {all && (
           <Link
             href={all.href}

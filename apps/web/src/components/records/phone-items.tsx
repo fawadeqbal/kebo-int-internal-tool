@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { cn } from "@kebo/ui";
+import { cn, capsClass } from "@kebo/ui";
 import { BottomSheet } from "@/components/common/bottom-sheet";
 
 /** One item as a phone shows it on a record's page: the same item line as in its window, read only. */
@@ -142,7 +142,7 @@ export function SheetFact({ label, children, ours }: { label: string; children: 
 export function SheetPart({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section className="px-4 py-2.5">
-      {title && <h3 className="mb-1.5 text-xs font-bold tracking-wide text-text-2 uppercase">{title}</h3>}
+      {title && <h3 className={cn(capsClass, "mb-1.5")}>{title}</h3>}
       {children}
     </section>
   );

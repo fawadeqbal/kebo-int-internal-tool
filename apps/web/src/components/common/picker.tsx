@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Loader2, Plus, Search } from "lucide-react";
-import { Button, cn, controlClass, controlSizes } from "@kebo/ui";
+import { Button, cn, controlClass, controlSizes, capsClass } from "@kebo/ui";
 
 /** What a picker shows for one choice: its name, a grey line under it, and a short word at the end (a country). */
 export type PickerOption = { id: string; name: string };
@@ -162,7 +162,7 @@ export function Picker<T extends PickerOption>({
     }
   };
   const group = (title: string) => (
-    <li role="presentation" className="px-2.5 pt-1.5 pb-1 text-2xs font-semibold tracking-wide text-text-2 uppercase">
+    <li role="presentation" className={cn(capsClass, "px-2.5 pt-1.5 pb-1")}>
       {title}
     </li>
   );

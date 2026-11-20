@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { Card, cn, DataRow, EmptyState, PageHeader, ButtonLink, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, buttonClass, StatTile, CardHeader, linkClass } from "@kebo/ui";
+import { Card, cn, DataRow, EmptyState, PageHeader, ButtonLink, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, buttonClass, StatTile, CardHeader, linkClass, subTitleClass } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { date, dateTime } from "@/lib/format";
 import type { Dashboard, Overview } from "@/lib/types-platform";
@@ -98,7 +98,7 @@ export default async function PlatformOverviewPage() {
       <div className="grid items-start gap-4 lg:grid-cols-[1fr_1.3fr]">
         <Card className="overflow-clip">
           <div className="border-b border-line px-4 py-3">
-            <h2 className="text-sm font-semibold">Needs attention</h2>
+            <h2 className={subTitleClass}>Needs attention</h2>
             <p className="mt-0.5 text-xs text-muted">{items.length ? "what to deal with, and where" : "nothing waits for you"}</p>
           </div>
           {items.length ? (

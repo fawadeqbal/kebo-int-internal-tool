@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { PERMISSION_FEATURE, PERMISSION_GROUPS, permissionInPlan, planFeatureName, type Permission } from "@kebo/shared";
-import { Checkbox, cn, Field, Input, Textarea, Notice, linkClass } from "@kebo/ui";
+import { Checkbox, cn, Field, Input, Textarea, Notice, linkClass, capsClass } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useFeatures } from "@/components/common/features";
@@ -148,7 +148,7 @@ export function RoleForm({
                 return (
                   <div key={g.title} className="rounded-lg border border-line">
                     <div className="flex items-center justify-between gap-2 border-b border-line bg-surface-2/60 px-3 py-2">
-                      <p className="text-xs font-semibold tracking-wide text-text-2 uppercase">{g.title}</p>
+                      <p className={capsClass}>{g.title}</p>
                       {!fixed && open.length > 1 && (
                         <button
                           type="button"

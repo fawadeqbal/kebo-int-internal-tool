@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Card, cn, linkClass } from "@kebo/ui";
+import { Card, cn, linkClass, subTitleClass } from "@kebo/ui";
 import { EditButton } from "@/components/common/edit-button";
 import { useSidePanel } from "@/components/common/panel";
 
@@ -50,7 +50,7 @@ export function GroupCard({
     <Card id={id} aria-labelledby={`${id}-title`} className={cn("scroll-mt-20", flash && "animate-flash")}>
       <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0">
-          <h2 id={`${id}-title`} className="text-sm font-semibold text-text">
+          <h2 id={`${id}-title`} className={subTitleClass}>
             {title}
           </h2>
           <p className="mt-0.5 text-xs text-muted">{description}</p>

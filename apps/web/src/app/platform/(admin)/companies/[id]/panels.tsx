@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { LIFECYCLE } from "@kebo/shared";
-import { Field, Input, Select, Textarea } from "@kebo/ui";
+import { Field, Input, Select, Textarea, capsClass, cn } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
@@ -388,7 +388,7 @@ export function CompanyPanels({ c, plans, today, actions }: { c: PanelCompany; p
             {(s) => (
               <>
                 <fieldset className="flex flex-col gap-2 text-sm">
-                  <legend className="mb-1 text-2xs font-semibold tracking-wide text-muted uppercase">Their data</legend>
+                  <legend className={cn(capsClass, "mb-1")}>Their data</legend>
                   <label className="flex items-start gap-2">
                     <input type="radio" name="keepData" value="keep" defaultChecked className="mt-1 accent-[var(--color-primary)]" /> Keep
                     everything they made

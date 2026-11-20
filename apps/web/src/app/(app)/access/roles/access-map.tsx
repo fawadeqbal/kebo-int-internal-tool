@@ -1,5 +1,5 @@
 import { PERMISSION_GROUPS } from "@kebo/shared";
-import { Card, CardHeader } from "@kebo/ui";
+import { Card, CardHeader, subTitleClass } from "@kebo/ui";
 
 export type AccessRoute = {
   method: string;
@@ -48,7 +48,7 @@ export function AccessMapCard({ routes }: { routes: AccessRoute[] }) {
       <div className="divide-y divide-line">
         {PERMISSION_GROUPS.map((g) => (
           <section key={g.title} className="px-4 py-3 sm:px-5">
-            <h3 className="text-sm font-semibold text-text">{g.title}</h3>
+            <h3 className={subTitleClass}>{g.title}</h3>
             <ul className="mt-1 flex flex-col">
               {g.items.map((it) => {
                 const need = needs(it.permission);

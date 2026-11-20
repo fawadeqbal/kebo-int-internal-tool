@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EXPENSE_CATEGORY_LABEL, PAYMENT_METHOD_LABEL, type ExpenseCategory, type PaymentMethod } from "@kebo/shared";
-import { Badge, linkClass } from "@kebo/ui";
+import { Badge, linkClass, subTitleClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, dateTime, money } from "@/lib/format";
 import type { Submission, SubmissionList } from "@/lib/types-approvals";
@@ -39,7 +39,7 @@ export async function WaitingToVerify({
   return (
     <section aria-label={title} className="rounded-xl border border-warn/40 bg-warn-soft/40">
       <header className="flex flex-wrap items-baseline justify-between gap-2 px-4 sm:px-5 pt-3.5">
-        <h2 className="text-sm font-bold">
+        <h2 className={subTitleClass}>
           {title} <span className="font-normal text-text-2">· {rows.length}</span>
         </h2>
         <p className="text-xs text-text-2">{verifies ? "It counts on the order once you verify it." : "It counts once a manager verifies it."}</p>

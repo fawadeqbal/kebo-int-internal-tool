@@ -262,6 +262,12 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
 export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4";
 export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
 
+/** A heading inside a box or a window, under its title (a group of fields, a part of a list): one look everywhere. */
+export const subTitleClass = "text-sm font-semibold text-text";
+
+/** A small label in capitals over a group (a menu's group, a list's part, a panel's kind): one look everywhere. */
+export const capsClass = "text-2xs font-semibold tracking-wide text-text-2 uppercase";
+
 /** A link in text (a list's "Show all", a cross-link, "Open the order →"): one look everywhere; its size comes from the text around it. */
 export const linkClass = "font-medium text-primary underline-offset-2 hover:underline";
 

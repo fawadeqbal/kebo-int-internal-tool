@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, Columns3, Factory, List } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { THead, Th, Tr, Badge, cn, EmptyState, Notice } from "@kebo/ui";
+import { THead, Th, Tr, Badge, cn, EmptyState, Notice, subTitleClass } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { dayMonth, money, plural, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
@@ -317,7 +317,7 @@ function NoOffers({ items }: { items: SourcingView["items"] }) {
       />
       {items.length > 0 && (
         <div className="border-t border-line px-5 py-4">
-          <h3 className="text-sm font-semibold">What the suppliers quote on</h3>
+          <h3 className={subTitleClass}>What the suppliers quote on</h3>
           <ul className="mt-1 flex flex-col divide-y divide-line">
             {items.map((it) => (
               <li key={it.id} className={cn("flex items-baseline justify-between gap-3 py-2 text-sm", it.parentId && "pl-5")}>

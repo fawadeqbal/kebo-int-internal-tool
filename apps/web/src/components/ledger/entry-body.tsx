@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { THead, Th, buttonClass, cn, linkClass } from "@kebo/ui";
+import { THead, Th, buttonClass, cn, linkClass, capsClass } from "@kebo/ui";
 import { dateTime, money } from "@/lib/format";
 import type { LedgerEntry } from "@/lib/types-ledger";
 import { amount, TypeBadge } from "./ledger-parts";
@@ -150,7 +150,7 @@ export function EntryBody({ e, main, back }: { e: LedgerEntry; main: string; bac
       </dl>
       {e.related.length > 0 && (
         <div>
-          <h3 className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">The document's other entries</h3>
+          <h3 className={cn(capsClass, "mb-1")}>The document's other entries</h3>
           <ul className="flex flex-col gap-1 text-sm">
             {e.related.map((r) => (
               <li key={r.groupId}>
