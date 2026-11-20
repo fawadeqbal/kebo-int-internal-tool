@@ -73,7 +73,7 @@ export function DataTable({
         // Where every list fits its card (`fits`, see globals.css) the header row sticks under the app's top row
         // while the list scrolls; narrower, a wide table scrolls sideways instead of losing its last columns.
         // relative: a hidden (sr-only) label in a cell is placed inside the scrolling box, never past the screen's edge.
-        "relative w-full overflow-x-auto fits:overflow-x-visible [&_thead_th]:bg-surface-2",
+        "relative w-full overflow-x-auto fits:overflow-x-visible [&_thead_th]:bg-faint",
         "fits:[&_thead_th]:sticky fits:[&_thead_th]:top-14 fits:[&_thead_th]:z-[1] focus-visible:-outline-offset-2",
         className,
       )}
@@ -87,7 +87,7 @@ export function DataTable({
         else router.push(href);
       }}
     >
-      <table aria-label={label} className={cn("w-full border-collapse text-sm", tableClassName)}>
+      <table aria-label={label} className={cn("w-full border-collapse text-md", tableClassName)}>
         {children}
       </table>
     </div>

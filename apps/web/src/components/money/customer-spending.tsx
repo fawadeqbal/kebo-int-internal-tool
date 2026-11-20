@@ -107,7 +107,7 @@ export function CustomerSpending({
       {first.length === 0 ? (
         <EmptyLine className="border-t border-line px-[18px] py-3.5">Nothing spent on this customer yet.</EmptyLine>
       ) : (
-        <DataTable label="Spending on this customer" tableClassName="text-md">
+        <DataTable label="Spending on this customer">
           <THead>
             <tr>
               <Th>Date</Th>

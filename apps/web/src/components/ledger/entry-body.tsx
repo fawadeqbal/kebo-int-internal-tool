@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { buttonClass, cn } from "@kebo/ui";
+import { THead, Th, buttonClass, cn } from "@kebo/ui";
 import { dateTime, money } from "@/lib/format";
 import type { LedgerEntry } from "@/lib/types-ledger";
 import { amount, TypeBadge } from "./ledger-parts";
@@ -100,19 +100,19 @@ export function EntryBody({ e, main, back }: { e: LedgerEntry; main: string; bac
     <>
       <div className="overflow-hidden rounded-lg border border-line">
         <table className="w-full border-collapse text-sm" aria-label={`Entry ${e.entryNo}: both sides`}>
-          <thead className="bg-surface-2/60">
+          <THead>
             <tr>
-              <th scope="col" className="h-9 px-3 text-left text-xs font-medium text-muted">
+              <Th scope="col" className="text-left">
                 Account
-              </th>
-              <th scope="col" className="h-9 px-3 text-right text-xs font-medium text-muted">
+              </Th>
+              <Th scope="col" className="text-right">
                 Debit
-              </th>
-              <th scope="col" className="h-9 px-3 text-right text-xs font-medium text-muted">
+              </Th>
+              <Th scope="col" className="text-right">
                 Credit
-              </th>
+              </Th>
             </tr>
-          </thead>
+          </THead>
           <tbody>
             {e.rows.map((r) => {
               const v = (x: string, base: string) =>

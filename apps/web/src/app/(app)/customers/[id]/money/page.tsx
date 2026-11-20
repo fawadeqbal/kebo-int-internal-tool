@@ -144,7 +144,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
             description="Their orders and payments show here as a statement, with the balance after each."
           />
         ) : (
-          <DataTable label="Statement" tableClassName="text-md">
+          <DataTable label="Statement">
               <THead>
                 <tr>
                   <Th>Date</Th>

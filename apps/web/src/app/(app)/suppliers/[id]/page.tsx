@@ -90,7 +90,7 @@ export default async function FactoryOverview({
             />
             {pos ? (
               pos.rows.length ? (
-                <DataTable label="Purchase orders" tableClassName="text-md">
+                <DataTable label="Purchase orders">
                     <THead>
                       <tr>
                         <Th>Sales order</Th>

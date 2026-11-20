@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Card, cn, ScrollFade, EmptyLine, CardHeader } from "@kebo/ui";
+import { THead, Th, Card, cn, ScrollFade, EmptyLine, CardHeader } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
 import { date, money, dayMonth } from "@/lib/format";
@@ -109,25 +109,25 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
           </p>
           <ScrollFade scrollLabel="Spending, kind by kind" className="overflow-x-auto border-t border-line">
             <table className="w-full border-collapse text-md">
-              <thead>
-                <tr className="bg-surface-2 text-left text-xs text-text-2">
-                  <th scope="col" className="px-4 py-2 font-medium">
+              <THead>
+                <tr>
+                  <Th scope="col">
                     Date
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
+                  </Th>
+                  <Th scope="col">
                     What for
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
+                  </Th>
+                  <Th scope="col">
                     For
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">
+                  </Th>
+                  <Th scope="col" className="text-right">
                     Amount {c}
-                  </th>
-                  <th scope="col" className="px-4 py-2 font-medium">
+                  </Th>
+                  <Th scope="col">
                     Paid
-                  </th>
+                  </Th>
                 </tr>
-              </thead>
+              </THead>
               <tbody>
                 {s.latest.map((e) => (
                   <tr key={e.id} className="border-t border-line">
