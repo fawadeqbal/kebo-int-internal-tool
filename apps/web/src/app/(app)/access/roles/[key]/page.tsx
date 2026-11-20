@@ -126,7 +126,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
                 <dt className={FACT_LABEL}>What it is for</dt>
                 <dd className={FACT_VALUE}>
                   {r.description || (
-                    <OpenPanelButton panel="edit-role" variant="link" className="font-medium no-underline hover:underline">
+                    <OpenPanelButton panel="edit-role" variant="link" className="min-h-6 font-medium no-underline hover:underline">
                       + Add
                     </OpenPanelButton>
                   )}

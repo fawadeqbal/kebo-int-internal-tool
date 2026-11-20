@@ -153,7 +153,8 @@ export function SettingsCard({
                   {f.kind === "currencies" ? (
                     <CurrenciesText values={values} />
                   ) : empty(value) ? (
-                    <button type="button" onClick={() => panel.openPanel()} className={linkClass}>
+                    // 24px high at least: a tap target of its own in the tight facts rows (WCAG 2.2 target size).
+                    <button type="button" onClick={() => panel.openPanel()} className={cn(linkClass, "inline-flex min-h-6 items-center")}>
                       + Add
                     </button>
                   ) : (
