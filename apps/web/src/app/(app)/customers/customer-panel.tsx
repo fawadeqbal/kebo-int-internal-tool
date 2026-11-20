@@ -58,7 +58,7 @@ export function CustomerPanel({
     <SidePanel
       title={customer ? `Edit customer · ${customer.name}` : "New customer"}
       description={
-        customer ? "Removing a contact keeps them on past inquiries." : "Opens from Customers, and from “Customer → + New” on a new inquiry"
+        customer ? "Removing a contact keeps them on past inquiries." : "Who they are, where they are, and the people you talk to."
       }
       onClose={() => panel.close()}
       className={RULES.window.items}

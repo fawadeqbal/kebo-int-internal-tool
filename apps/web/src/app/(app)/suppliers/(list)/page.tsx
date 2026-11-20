@@ -225,7 +225,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                   <Th className="text-right">Offers</Th>
                   {groups && <Th className="text-right">Bought</Th>}
                   {owed && <Th className="text-right">We owe</Th>}
-                  <Th>Now</Th>
+                  <Th>Status</Th>
                 </tr>
               </THead>
               <tbody>

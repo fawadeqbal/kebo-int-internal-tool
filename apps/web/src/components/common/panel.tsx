@@ -285,12 +285,15 @@ export function WindowFooter({
   note,
   onCancel,
   cancel = true,
+  outside,
   className,
   children,
 }: {
   note?: ReactNode;
   onCancel?: () => void;
   cancel?: boolean;
+  /** The footer comes after the PanelBody (not inside it): it sits in its place, the window's own edges. */
+  outside?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -300,7 +303,8 @@ export function WindowFooter({
       data-window-footer=""
       className={cn(
         RULES.window.inset,
-        "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:-mx-6",
+        outside ? "static" : "sticky -bottom-5 -mx-5 -mb-5 mt-auto sm:-mx-6",
+        "z-10 flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]",
         PHONE_BUTTONS,
         className,
       )}

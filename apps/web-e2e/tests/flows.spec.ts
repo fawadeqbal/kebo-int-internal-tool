@@ -51,7 +51,7 @@ test("a new inquiry: New › Inquiry, the customer, what they need, saved", asyn
   for (const step of ["Customer", "Items", "Details", "Files", "Review"]) await expect(rail.getByRole("button", { name: new RegExp(`: ${step}`) })).toBeVisible();
   // One strong button, at the end; Cancel beside it (canvas row "Cancel, not ✕"); no save before Review.
   await expect(window.getByRole("button", { name: "Cancel" })).toHaveCount(1);
-  await expect(window.getByRole("button", { name: "Confirm and save" })).toHaveCount(0);
+  await expect(window.getByRole("button", { name: "Add the inquiry" })).toHaveCount(0);
   await expect(rail.getByRole("button", { name: /Customer/ })).toHaveAttribute("aria-current", "step");
   await window.getByRole("button", { name: /^Next/ }).click();
   // Items: typed in the sheet (the first one, then its quantity), saved with the inquiry.
@@ -67,15 +67,15 @@ test("a new inquiry: New › Inquiry, the customer, what they need, saved", asyn
   // With an item listed, what they need may stay empty.
   await window.getByRole("button", { name: /^Next/ }).click();
   await expect(window.getByText("Add files")).toBeVisible();
-  // Review: the request in its page's boxes, each with Edit; then Confirm and save.
-  await window.getByRole("button", { name: /^Next/ }).click();
+  // Review: the request in its page's boxes, each with Edit; then Add the inquiry. The step before says Review.
+  await window.getByRole("button", { name: /^Review/ }).click();
   await expect(rail.getByRole("button", { name: /: Review/ })).toHaveAttribute("aria-current", "step");
   const items = window.getByRole("region", { name: "Items" });
   await expect(items).toContainText("Bottle filling machine, 2,000 bph");
   await expect(items).toContainText("1 item");
   await expect(window.getByRole("region", { name: "Customer" })).toContainText("Al-Shifa Pharma Ltd");
   await expect(window.getByRole("region", { name: "Details" })).toContainText(title);
-  await window.getByRole("button", { name: "Confirm and save" }).click();
+  await window.getByRole("button", { name: "Add the inquiry" }).click();
 
   await expect(page).toHaveURL(/\/inquiries\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(title);

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Badge, RefCode, Table, Td, Th, THead, Tr, Dash, RULES, cn } from "@kebo/ui";
-import { date, dateTime, dayMonth, money } from "@/lib/format";
+import { Badge, Table, Td, Th, THead, Tr, Dash, RULES, cn } from "@kebo/ui";
+import { date, dateTime, money } from "@/lib/format";
 
 /** One payment in an order's list of payments received or made. */
 export interface PaymentLine {
@@ -56,16 +56,14 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
         </li>
       </ul>
       <div className="hidden sm:block">
-        {/* Snug cells and who recorded it in two short lines: Receipt and Change fit beside the amount. */}
-        <Table className="[&_td]:px-3 [&_th]:px-3">
+        {/* Five columns, so Receipt and Change always fit beside the amount (e2e 20 Nov: with eight, "Bank transfer
+            (T/T)" took three lines and Change was cut off): when and who, what for, how (method, account, reference). */}
+        <Table>
           <THead>
             <tr>
               <Th>Date</Th>
               <Th>For</Th>
               <Th>How</Th>
-              <Th>{account}</Th>
-              <Th>Reference</Th>
-              <Th>Recorded by</Th>
               <Th className="text-right">Amount</Th>
               <Th>
                 <span className="sr-only">Receipt and change</span>
@@ -75,14 +73,17 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
           <tbody>
             {rows.map((x) => (
               <Tr key={x.id} className={x.voided ? "text-muted" : undefined}>
-                <Td className={`whitespace-nowrap tabular ${x.voided ? "line-through" : ""}`}>{date(x.paidOn)}</Td>
+                <Td className="whitespace-nowrap" title={`Recorded by ${x.recordedBy ?? "—"} · ${dateTime(x.recordedAt)}`}>
+                  <span className={cn("tabular", x.voided && "line-through")}>{date(x.paidOn)}</span>
+                  <span className="block text-xs text-muted">{x.recordedBy ?? "—"}</span>
+                </Td>
                 <Td className="font-medium">{x.voided ? <span className="font-normal">{x.voided.reason ?? ""}</span> : (x.for ?? none)}</Td>
-                <Td>{x.how}</Td>
-                <Td>{x.account ?? <Dash />}</Td>
-                <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <Dash />}</Td>
-                <Td className="text-xs text-text-2" title={dateTime(x.recordedAt)}>
-                  {x.recordedBy ?? "—"}
-                  <span className="block whitespace-nowrap text-muted">{dayMonth(x.recordedAt)}</span>
+                <Td>
+                  <span className="whitespace-nowrap">{x.how}</span>
+                  <span className="block text-xs text-text-2">
+                    {account} {x.account ?? "no account"}
+                    {x.reference && <> · {x.reference}</>}
+                  </span>
                 </Td>
                 <Td className="text-right whitespace-nowrap tabular">
                   {x.voided ? (
@@ -94,17 +95,15 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
                     </>
                   )}
                 </Td>
-                <Td className="text-right">{x.voided ? <Badge tone="neutral">Removed</Badge> : <span className="flex items-center justify-end gap-3">{x.actions}</span>}</Td>
+                <Td className="text-right whitespace-nowrap">{x.voided ? <Badge tone="neutral">Removed</Badge> : <span className="flex items-center justify-end gap-3">{x.actions}</span>}</Td>
               </Tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-line-strong font-bold">
-              <td className="px-3.5 py-3" colSpan={6}>
-                {total.label}
-              </td>
-              <td className="px-3.5 py-3 text-right whitespace-nowrap tabular">{total.amount}</td>
-              <td />
+              <Td colSpan={3}>{total.label}</Td>
+              <Td className="text-right whitespace-nowrap tabular">{total.amount}</Td>
+              <Td />
             </tr>
           </tfoot>
         </Table>

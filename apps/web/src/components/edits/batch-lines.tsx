@@ -274,7 +274,7 @@ export function BatchLines({
         }
       >
         <Button
-          variant="strong"
+          variant="primary"
           disabled={!dirty || busy}
           onClick={() => {
             setError(null);

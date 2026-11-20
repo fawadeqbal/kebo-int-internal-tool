@@ -69,7 +69,8 @@ export function FilesBox({
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-muted">None</p>
+        // With the drop zone under it, the zone says there are none: "None" only for someone who cannot add.
+        !canAdd && <p className="text-sm text-muted">None</p>
       )}
       {canAdd && <FileZone label={<span className="sr-only">Add files</span>} optional={false} compact disabled={sending.length > 0} onFiles={(list) => void add(list)} />}
     </div>

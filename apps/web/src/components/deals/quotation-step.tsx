@@ -288,7 +288,7 @@ export function AcceptForm({
               </div>
             )}
           </PanelBody>
-          <WindowFooter className="static mx-0 mb-0">
+          <WindowFooter outside>
             <SubmitButton pendingText="Saving…" disabled={!optionId}>
               <Check aria-hidden /> Accept and make the order
             </SubmitButton>

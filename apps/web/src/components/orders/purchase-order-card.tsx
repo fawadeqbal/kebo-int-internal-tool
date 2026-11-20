@@ -1,10 +1,10 @@
 "use client";
 
-import { Mail } from "lucide-react";
-import { Field, Input, Select, Textarea, Notice } from "@kebo/ui";
+import { Check } from "lucide-react";
+import { Field, Input, RULES, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PanelBody, useClosePanel, WindowFooter } from "@/components/common/panel";
+import { PanelBody, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { Incoterm, LeadFrom, WarrantyFrom } from "@kebo/shared";
 
@@ -67,14 +67,9 @@ export function SendForm({ action, deposit, today, supplierRef }: { action: Acti
                 <strong>Deposit not verified.</strong> {deposit.text}
               </Notice>
             )}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Sent on" htmlFor="po-sent" required error={s.errors?.sentOn}>
-                <Input id="po-sent" name="sentOn" type="date" max={today} defaultValue={s.values?.sentOn ?? today} />
-              </Field>
-              <Field label="Their order no." htmlFor="po-ref" error={s.errors?.supplierRef}>
-                <Input id="po-ref" name="supplierRef" maxLength={60} defaultValue={s.values?.supplierRef ?? supplierRef ?? ""} />
-              </Field>
-              <Field label="Send by" htmlFor="po-how">
+            {/* The same fields, in the same order, as "I sent it myself" on a quotation: How, Sent on. */}
+            <div className={RULES.form.fields}>
+              <Field label="How" htmlFor="po-how">
                 <Select id="po-how" name="how" defaultValue={s.values?.how ?? HOW[0]}>
                   {HOW.map((h) => (
                     <option key={h} value={h}>
@@ -82,6 +77,12 @@ export function SendForm({ action, deposit, today, supplierRef }: { action: Acti
                     </option>
                   ))}
                 </Select>
+              </Field>
+              <Field label="Sent on" htmlFor="po-sent" required error={s.errors?.sentOn}>
+                <Input id="po-sent" name="sentOn" type="date" max={today} defaultValue={s.values?.sentOn ?? today} />
+              </Field>
+              <Field label="Their order no." htmlFor="po-ref" optional error={s.errors?.supplierRef}>
+                <Input id="po-ref" name="supplierRef" maxLength={60} defaultValue={s.values?.supplierRef ?? supplierRef ?? ""} />
               </Field>
             </div>
             {!deposit.verified && (
@@ -94,10 +95,11 @@ export function SendForm({ action, deposit, today, supplierRef }: { action: Acti
                 <Textarea id="po-reason" name="reason" rows={3} maxLength={300} defaultValue={s.values?.reason ?? ""} />
               </Field>
             )}
+            <WhatHappens lines={["Nothing is sent by the system: send the PO yourself, then mark it here.", "The purchase order becomes Sent and is kept exactly as sent."]} />
           </PanelBody>
-          <WindowFooter className="static mx-0 mb-0">
+          <WindowFooter outside>
             <SubmitButton pendingText="Saving…">
-              <Mail aria-hidden /> Send purchase order
+              <Check aria-hidden /> Mark the PO as sent
             </SubmitButton>
           </WindowFooter>
         </>

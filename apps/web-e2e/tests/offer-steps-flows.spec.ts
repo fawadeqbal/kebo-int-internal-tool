@@ -3,7 +3,7 @@ import { accessibilityProblems, watchErrors, answerWhy } from "./check";
 
 /**
  * Design "RFQ Desk — factory offer" (18 Nov 2026, the inquiry's rules): a factory's offer is typed in one steps
- * window — Factory · Prices · Delivery & payment · Conditions, then Review and Confirm and save. A new offer's lines
+ * window — Factory · Prices · Delivery & payment · Conditions, then Review and Add the offer. A new offer's lines
  * go in the same save (a wrong line saves nothing and says which). Its page has a box per part, each with its own
  * Edit (that part only) and history; an edit marks each change, counts them, and asks why once.
  */
@@ -82,7 +82,7 @@ test("a new offer: Factory, Prices, Delivery & payment, Warranty & conditions, R
   await win.getByRole("button", { name: "Review", exact: true }).click();
   await expect(win.getByRole("region", { name: "Prices" })).toContainText("Capsule filling machine");
   expect(await accessibilityProblems(page), "the offer's Review step meets WCAG 2.2 AA").toEqual([]);
-  await win.getByRole("button", { name: "Confirm and save" }).click();
+  await win.getByRole("button", { name: "Add the offer" }).click();
   await expect(rail.getByRole("button", { name: /Prices/ })).toHaveAttribute("aria-current", "step");
   await expect(win.getByRole("alert").filter({ hasText: "Nothing was saved yet" })).toContainText("Item 2:");
   const before = await (await page.request.get(`/api/inquiries/${deal.id}/sourcing`)).json();
@@ -94,7 +94,7 @@ test("a new offer: Factory, Prices, Delivery & payment, Warranty & conditions, R
   await page.getByLabel("Item 2: Quantity").fill("2");
   await page.keyboard.press("Enter");
   await rail.getByRole("button", { name: /Review/ }).click();
-  await win.getByRole("button", { name: "Confirm and save" }).click();
+  await win.getByRole("button", { name: "Add the offer" }).click();
   await expect(win).toBeHidden();
   await expect(page).toHaveURL(/\/offers\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1, name: factory })).toBeVisible();

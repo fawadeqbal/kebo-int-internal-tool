@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, Circle, Info, Lock, Plus, Square } from "lucide-react";
 import { divideMinor, formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
 import { allocateOldestFirst, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type LcCheck, type PaymentMethod } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea, Notice, EmptyLine, RefCode } from "@kebo/ui";
+import { Button, cn, Field, Input, RULES, Select, Textarea, Notice, EmptyLine, RefCode } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
+import { FormButtons } from "@/components/common/route-window";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { MoneyInput } from "@/components/common/money-input";
@@ -180,14 +181,14 @@ export function ReceivedFields({
           <input type="hidden" name="receivedCurrency" value={a.received} />
           <input type="hidden" name="amount" value={fromMinor(Math.max(partMinor, 0))} />
           <input type="hidden" name="method" value={method} />
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-3">
-            <Field label="What was paid" htmlFor="r-amount" error={s.errors?.receivedAmount ?? s.errors?.amount}>
+          <div className={RULES.form.fields}>
+            <Field label="Amount" htmlFor="r-amount" error={s.errors?.receivedAmount ?? s.errors?.amount}>
               <div className="flex flex-col gap-2">
                 <CurrencySelect short aria-label="Currency it arrived in" value={a.received} onChange={(e) => a.setReceived(e.target.value)} className="w-28" />
                 <MoneyInput id="r-amount" name="receivedAmount" currency={a.received} value={a.amount} onChange={(e) => a.setAmount(e.target.value)} placeholder="0.00" />
               </div>
             </Field>
-            <AccountSelect id="r-account" label="Into" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+            <AccountSelect id="r-account" label="Into account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
             <Field label="Paid on" htmlFor="r-paidOn" error={s.errors?.paidOn}>
               <Input id="r-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
             </Field>
@@ -277,17 +278,12 @@ export function ReceivedFields({
             <Textarea id="r-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
           </Field>
           <RecordedBy verify={verify} />
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <FilePicker id="r-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} className="min-w-0 flex-1 basis-56" />
-            <div className="flex gap-2">
-              <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              <SubmitButton size="sm" pendingText={file ? "Sending, with the file…" : verify ? "Sending…" : "Recording…"} disabled={a.countsMinor <= 0 || tooMuch || leftMinor < 0}>
-                {verify ? "Send to verify" : "Record the payment"}
-              </SubmitButton>
-            </div>
-          </div>
+          <FilePicker id="r-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} />
+          <FormButtons onCancel={onClose}>
+            <SubmitButton pendingText={file ? "Sending, with the file…" : verify ? "Sending…" : "Recording…"} disabled={a.countsMinor <= 0 || tooMuch || leftMinor < 0}>
+              {verify ? "Send to verify" : "Record the payment"}
+            </SubmitButton>
+          </FormButtons>
         </>
       )}
     </ActionForm>
@@ -322,14 +318,9 @@ export function UseCredit({ action, credit, due, currency, today }: { action: Ac
               <Input id="uc-on" name="on" type="date" max={today} defaultValue={s.values?.on ?? today} />
             </Field>
           </div>
-          <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Saving…">
-              Use the credit
-            </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-          </div>
+          <FormButtons onCancel={() => setOpen(false)}>
+            <SubmitButton pendingText="Saving…">Use the credit</SubmitButton>
+          </FormButtons>
         </>
       )}
     </ActionForm>
@@ -432,14 +423,14 @@ function ReceiptFields({
           <input type="hidden" name="receivedCurrency" value={a.received} />
           <input type="hidden" name="method" value={method} />
           <input type="hidden" name="parts" value={JSON.stringify(parts)} />
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className={RULES.form.fields}>
             <Field label="Received" htmlFor="rc-amount" error={s.errors?.receivedAmount}>
               <div className="flex flex-col gap-2">
                 <CurrencySelect short aria-label="Currency it arrived in" value={a.received} onChange={(e) => a.setReceived(e.target.value)} className="w-28" />
                 <MoneyInput id="rc-amount" name="receivedAmount" currency={a.received} value={a.amount} onChange={(e) => a.setAmount(e.target.value)} placeholder="0.00" />
               </div>
             </Field>
-            <AccountSelect id="rc-account" label="Into" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+            <AccountSelect id="rc-account" label="Into account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
             <Field label="Paid on" htmlFor="rc-on" error={s.errors?.paidOn}>
               <Input id="rc-on" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
             </Field>
@@ -537,14 +528,11 @@ function ReceiptFields({
               </p>
             )}
           </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <SubmitButton size="sm" pendingText="Recording…" disabled={a.countsMinor <= 0 || leftMinor < 0 || !!over}>
+          <FormButtons onCancel={onClose}>
+            <SubmitButton pendingText="Recording…" disabled={a.countsMinor <= 0 || leftMinor < 0 || !!over}>
               Record the payment
             </SubmitButton>
-          </div>
+          </FormButtons>
         </>
       )}
     </ActionForm>

@@ -96,8 +96,19 @@ export function quotePrices(o: OptionView, currency: string, phone: { edit?: boo
       ) : undefined,
   }));
   const plain: LineColumn[] = [
-    { key: "description", label: "Description", width: "minmax(0,1fr)" },
-    ...(o.lines.some((l) => l.model) ? [{ key: "model", label: "Model / part no.", width: "8rem" }] : []),
+    // The model under the description, as on the order's items (not its own column): the table then fits its box
+    // beside the side panel at 1440 instead of scrolling with the description squeezed (e2e 20 Nov).
+    {
+      key: "description",
+      label: "Description",
+      width: "minmax(0,1fr)",
+      format: (v) => (
+        <>
+          <span className="whitespace-pre-line">{v.description}</span>
+          {v.model && <span className="block text-xs text-muted">Model {v.model}</span>}
+        </>
+      ),
+    },
     { key: "quantity", label: "Quantity", width: "4rem", align: "right" },
     { key: "unit", label: "Unit", width: "4rem" },
     { key: "unitPrice", label: `Unit price ${currency}`, width: "6.5rem", align: "right" },

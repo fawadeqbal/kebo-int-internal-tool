@@ -167,7 +167,7 @@ export function DealForm({
   // Why (an edit with a change): picked in the window's "Why the change?" box, sent with the save.
   const [why, setWhy] = useState<string | null>(null);
   const create = mode === "create";
-  // A new inquiry ends on Review (design rules 18 Nov): the whole request in its page's boxes, then Confirm and save.
+  // A new inquiry ends on Review (design rules 18 Nov): the whole request in its page's boxes, then Add the inquiry.
   // An edit of all parts ends on Changes instead: what changed, old → new, each with Undo, and why.
   const STEPS = REQUEST_STEPS.filter((x) => x.key !== (create ? "changes" : "review"));
   const at = Math.max(
@@ -456,7 +456,8 @@ export function DealForm({
                     onBack={at > 0 ? () => go(at - 1) : null}
                     jump={at < STEPS.length - 2 ? { label: "Review", onClick: () => setStep("review") } : null}
                     onNext={step === "review" || last ? null : () => go(at + 1)}
-                    save={{ label: "Confirm and save", pendingText: uploading ? "Uploading files…" : "Saving…" }}
+                    nextLabel={at === STEPS.length - 2 ? "Review" : undefined}
+                    save={{ label: "Add the inquiry", pendingText: uploading ? "Uploading files…" : "Saving…" }}
                   />
                 )
               }
@@ -543,12 +544,12 @@ export function DealForm({
                         onChange={(e) => set("assigneeId", e.target.value)}
                         disabled={!canAssignOthers && v.assigneeId !== "" && v.assigneeId !== meId}
                       >
+                        <option value="">Nobody yet</option>
                         {assignable.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.id === meId ? `${p.name} (me)` : p.name}
                           </option>
                         ))}
-                        <option value="">Nobody yet</option>
                       </Select>
                       {changedNote("assigneeId")}
                     </Field>
@@ -1184,7 +1185,7 @@ function NewCustomerForm({
           <Input id="qc-name" value={q.name} onChange={(e) => set("name", e.target.value)} maxLength={200} autoFocus />
         </Field>
         <Field label="Country" htmlFor="qc-country" required error={err("country")}>
-          <CountrySelect id="qc-country" value={q.country} onChange={(e) => set("country", e.target.value)} />
+          <CountrySelect id="qc-country" value={q.country} onChange={(code) => set("country", code)} />
         </Field>
       </div>
       <p className={cn(capsClass, "-mb-1")}>Main contact</p>

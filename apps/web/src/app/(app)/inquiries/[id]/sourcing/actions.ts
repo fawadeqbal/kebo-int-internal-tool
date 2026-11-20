@@ -62,7 +62,7 @@ export async function saveFactoryQuoteAction(
   return {
     ...r,
     message: factory ? `Offer from ${factory} ${quoteId ? "saved" : "added"}` : r.message,
-    detail: [lines ? `${lines} ${lines === 1 ? "line" : "lines"}` : null, currency].filter(Boolean).join(" · ") || undefined,
+    detail: [lines ? `${lines} ${lines === 1 ? "item" : "items"}` : null, currency].filter(Boolean).join(" · ") || undefined,
   };
 }
 

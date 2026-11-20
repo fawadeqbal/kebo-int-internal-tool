@@ -15,8 +15,8 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 type SupplierStep = "who" | "contact" | "paying";
 const SUPPLIER_STEPS: { key: SupplierStep; label: string; icon: typeof FactoryIcon }[] = [
-  { key: "who", label: "Supplier", icon: FactoryIcon },
-  { key: "contact", label: "Contact", icon: Phone },
+  { key: "who", label: "Who they are", icon: FactoryIcon },
+  { key: "contact", label: "Contact and address", icon: Phone },
   { key: "paying", label: "Paying them", icon: Landmark },
 ];
 const CONTACT_KEYS = new Set(["contactPerson", "phone", "wechat", "email", "address"]);
@@ -90,7 +90,7 @@ function FactoryForm({
                   <option value="">Nobody yet</option>
                   {people.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {p.id === meId ? `${p.name} (me)` : p.name}
                     </option>
                   ))}
                 </Select>
@@ -171,7 +171,7 @@ export function FactoryPanel({
       description={
         factory
           ? "Changes apply to new prices and orders; past ones keep what was agreed."
-          : "Opens from Suppliers, from “Ask suppliers”, and from “Supplier → + New” when entering an offer"
+          : "Who they are, where they are, and the people you talk to."
       }
       onClose={() => panel.close()}
       className={RULES.window.items}

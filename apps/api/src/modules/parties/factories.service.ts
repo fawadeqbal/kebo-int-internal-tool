@@ -28,9 +28,15 @@ function withContact<T extends { contacts: MainContactRow[] }>(f: T) {
   return { ...rest, contactPerson: c?.name ?? null, phone: c?.phone ?? null, wechat: c?.wechat ?? null, email: c?.email ?? null };
 }
 
-/** "No. 18 Gongye Rd, Licheng, Jinan" → "Jinan": the last part of an address, its city. */
+/** A last part that is the country or a postcode, not the city ("…, Ningbo, Zhejiang 315000, China"). */
+const NOT_CITY = /^(p\.?\s?r\.?\s?)?china$|^prc$|^people'?s republic of china$|^\d[\d\s-]*$/i;
+
+/**
+ * "No. 18 Gongye Rd, Licheng, Jinan" → "Jinan": the last part of an address, its city. A country or postcode at
+ * the end is passed over (e2e 20 Nov: "…, China" made China a city), and a postcode after the city is dropped.
+ */
 export function cityOf(address: string | null | undefined): string | null {
-  const parts = (address ?? "").split(/[,，\n]/).map((p) => p.trim()).filter(Boolean);
+  const parts = (address ?? "").split(/[,，\n]/).map((p) => p.replace(/\s+\d{4,}$/, "").trim()).filter((p) => p && !NOT_CITY.test(p));
   return parts.length ? parts[parts.length - 1]!.slice(0, 60) : null;
 }
 

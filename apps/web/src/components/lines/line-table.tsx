@@ -1261,7 +1261,7 @@ export function LineTable({
       ) : (
         rows.length > 0 && (
           <>
-            <Button type="button" variant="strong" onClick={() => openNew()} aria-label={`Add ${noun}`} className="w-11 shrink-0 px-0 [&_svg]:size-[22px]">
+            <Button type="button" variant="secondary" onClick={() => openNew()} aria-label={`Add ${noun}`} className="w-11 shrink-0 px-0 [&_svg]:size-[22px]">
               <Plus aria-hidden strokeWidth={2.6} />
             </Button>
             <Button
@@ -1339,11 +1339,11 @@ export function LineTable({
       {empty ? <div className="text-sm text-text-2">{empty}</div> : <p className="text-sm text-text-2">Add them one by one, or bring them in at once.</p>}
       {!readOnly && (
         <>
-          <Button size="lg" type="button" variant="strong" onClick={() => openNew()}>
+          <Button size="lg" type="button" variant="primary" onClick={() => openNew()}>
             <Plus aria-hidden /> Add {noun}
           </Button>
-          {ways.map((w, n) => (
-            <Button key={w.key} type="button" variant={n === 0 ? "soft" : "secondary"} onClick={w.onSelect}>
+          {ways.map((w) => (
+            <Button key={w.key} type="button" variant="secondary" onClick={w.onSelect}>
               {w.icon ?? <Copy aria-hidden />} {w.label}
               {w.note ? ` · ${w.note}` : ""}
             </Button>
@@ -1564,7 +1564,7 @@ export function LineTable({
             (phone ? (
               // A phone (design 18 Nov): one big Add, and ⋯ beside it for the other ways in (paste, Excel).
               <div className="flex w-full gap-2">
-                <Button size="lg" variant="strong" onClick={() => openNew()} className="flex-1">
+                <Button size="lg" variant="secondary" onClick={() => openNew()} className="flex-1">
                   <Plus aria-hidden /> Add {noun}
                 </Button>
                 <Button
@@ -1583,7 +1583,7 @@ export function LineTable({
                 {phonePicker.input}
               </div>
             ) : (
-              <Button variant="strong" onClick={addLine}>
+              <Button variant="secondary" onClick={addLine}>
                 <Plus aria-hidden /> Add {noun}
               </Button>
             ))}

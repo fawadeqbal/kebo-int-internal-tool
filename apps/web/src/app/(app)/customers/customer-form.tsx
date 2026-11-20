@@ -183,13 +183,7 @@ export function CustomerForm({
                 ) : undefined
               }
             >
-              <CountrySelect
-                form={DRAFT}
-                id="country"
-                value={draft.country}
-                onChange={(e) => set("country", e.target.value)}
-                {...invalid("country", s.errors?.country)}
-              />
+              <CountrySelect id="country" value={draft.country} onChange={(code) => set("country", code)} invalid={!!s.errors?.country} />
             </Field>
             <Field label="Default currency" htmlFor="defaultCurrency" error={s.errors?.defaultCurrency}>
               <Select
@@ -257,7 +251,8 @@ export function CustomerForm({
       contacts: <>
 
           <div role="group" aria-labelledby="contacts-title" className="flex min-w-0 flex-col gap-3">
-            <h3 id="contacts-title" className="text-lead font-bold">
+            {/* The step is already named Contacts: the heading is for screen readers only (not said twice). */}
+            <h3 id="contacts-title" className="sr-only">
               Contacts
             </h3>
             {s.errors?.contacts && !Object.keys(s.errors).some((k) => k.startsWith("contacts.")) && (

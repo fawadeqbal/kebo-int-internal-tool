@@ -61,9 +61,21 @@ describe("one of each", () => {
   it("one picker, one AutoSelect: the copies stay deleted", () => {
     const names = SOURCES.map((s) => s.file);
     expect(names.filter((f) => /common\/(auto-select|percent-choice)\.tsx$/.test(f))).toEqual([]);
-    // The customer and the supplier pickers draw the one Picker; the port box (any port typed, the usual ones suggested) is the only other.
-    expect(found(/role="combobox"/g).filter((f) => /customer-picker/.test(f))).toEqual([]);
-    expect(found(/role="combobox"/g).filter((f) => /factory-quote-form/.test(f))).toHaveLength(1);
+    // The customer and the supplier pickers draw the one Picker; a long list to choose from (a country, a port) is
+    // the one TypeToPick. No other box is a combobox, and no country is a plain select of 130 choices.
+    const combos = found(/role="combobox"/g);
+    expect(combos.filter((f) => /customer-picker|factory-quote-form|country-select/.test(f))).toEqual([]);
+    expect(combos.filter((f) => /type-to-pick\.tsx:/.test(f))).toHaveLength(1);
+    expect(found(/COUNTRIES\.map\(\(\[code, name\]\) => \(\s*<option/g)).toEqual([]);
+  });
+
+  it("one main button: windows and their adds never use the strong one (it is the page's one big button)", () => {
+    const inWindows = /components\/(orders\/step-view|edits\/batch-lines|common\/dialog|common\/filter-card|lines\/line-table|deals\/offer-work)\.tsx$/;
+    expect(SOURCES.filter((s) => inWindows.test(s.file) && /variant="strong"/.test(s.text)).map((s) => s.file)).toEqual([]);
+  });
+
+  it("one footer: no window footer is pulled out of place by hand (outside, not mx-0)", () => {
+    expect(found(/<WindowFooter[^>]*className="static mx-0/g)).toEqual([]);
   });
 
   it("one choice: a pick-one is ChoiceChips, a view switch SegmentedChoice — no radio group drawn by hand", () => {

@@ -192,6 +192,7 @@ export function StepsFooter({
   onCancel,
   jump,
   onNext,
+  nextLabel = "Next",
   save,
 }: {
   onBack?: (() => void) | null;
@@ -203,13 +204,15 @@ export function StepsFooter({
   /** Without `onClick`, the jump saves (submits the form): a quiet Save before the last step. */
   jump?: { label: ReactNode; onClick?: () => void } | null;
   onNext?: (() => void) | null;
+  /** Next's word: "Review" when the next step is the review (so the way to it is always there). */
+  nextLabel?: string;
   save: { label: ReactNode; disabled?: boolean; pendingText?: string; onClick?: () => void; busy?: boolean; also?: ReactNode };
 }) {
   const last = !onNext;
   return (
     <div
       data-window-footer=""
-      className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4 max-sm:flex-wrap"
+      className={cn(RULES.window.inset, "sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:flex-wrap")}
     >
       <FooterTotal line />
       {onBack ? (
@@ -247,7 +250,7 @@ export function StepsFooter({
               </SubmitButton>
             ))}
           <Button type="button" variant="primary" onClick={onNext!} className="max-md:flex-1">
-            Next <ChevronRight aria-hidden />
+            {nextLabel} <ChevronRight aria-hidden />
           </Button>
         </>
       )}
