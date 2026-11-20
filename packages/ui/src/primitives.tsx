@@ -470,7 +470,7 @@ export function PageHeader({
           {more && <div className="pointer-events-auto shrink-0 [&>button]:size-10 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
         </div>
       )}
-      <header data-page-label={name}>
+      <header data-page-label={name} data-part={record ? "record-top" : "header"}>
         {/* Phone: room for the fixed bar above (inside the header, so the page's gap is not added to it). */}
         {up && <div aria-hidden className="h-14 md:hidden" />}
         {trail && <Breadcrumb items={trail} className={up || titleInBar ? "max-md:hidden" : undefined} />}
@@ -575,7 +575,7 @@ export function EmptyState({
   // Board "Empty list": the same look in a card or on its own (`framed` is kept for the callers).
   void framed;
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-2.5 px-6 py-12 text-center", className)}>
+    <div data-part="empty" className={cn("flex flex-col items-center justify-center gap-2.5 px-6 py-12 text-center", className)}>
       <div className="flex size-14 items-center justify-center rounded-full bg-primary-soft text-primary">
         <Icon className="size-6" aria-hidden />
       </div>
@@ -605,7 +605,7 @@ export const tableClass = "w-full border-collapse text-md max-sm:[&_tbody_td:fir
 export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
-    <ScrollFade className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
+    <ScrollFade data-part="table" className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
       <table className={cn(tableClass, className)} {...props} />
     </ScrollFade>
   );
@@ -659,7 +659,7 @@ export function DataRow(props: ComponentProps<typeof Tr> & { href: string }) {
  */
 export function PhoneList({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <ul aria-label={label} className={cn("divide-y divide-line sm:hidden", className)}>
+    <ul aria-label={label} data-part="table" className={cn("divide-y divide-line sm:hidden", className)}>
       {children}
     </ul>
   );
@@ -848,6 +848,8 @@ export function TabRow({
     <ScrollFade
       as="nav"
       aria-label={label}
+      data-part={chips ? "tabs" : "record-tabs"}
+      data-count={items.length}
       className={cn(
         "no-print flex overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         chips ? "-mx-4 items-center gap-2 px-4 py-0.5 sm:mx-0 sm:items-stretch sm:gap-x-[22px] sm:border-b sm:border-line sm:px-0 sm:py-0" : "items-stretch gap-x-[22px] border-b border-line",
@@ -919,6 +921,8 @@ export function LinkTabs({
     <ScrollFade
       as="nav"
       aria-label={label}
+      data-part="tabs"
+      data-count={tabs.length}
       className={cn(
         "-mx-4 flex items-center gap-2 overflow-x-auto overflow-y-hidden px-4 py-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0.5 [&::-webkit-scrollbar]:hidden",
         className,

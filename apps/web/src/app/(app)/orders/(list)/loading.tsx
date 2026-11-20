@@ -1,6 +1,2 @@
-import { ListPageSkeleton } from "@/components/common/skeletons";
-
-/** The orders list on its way. */
-export default function Loading() {
-  return <ListPageSkeleton tiles={5} chips={8} selects={2} buttons={1} views cols={8} />;
-}
+// The page on its way, in its own shape (lib/page-shapes.ts).
+export { default } from "@/components/common/page-loading";

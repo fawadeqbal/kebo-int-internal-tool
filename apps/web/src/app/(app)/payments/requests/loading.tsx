@@ -1,6 +1,2 @@
-import { RecordSkeleton } from "@/components/common/skeletons";
-
-/** A payment request on its way. */
-export default function Loading() {
-  return <RecordSkeleton tabs={0} />;
-}
+// The page on its way, in its own shape (lib/page-shapes.ts).
+export { default } from "@/components/common/page-loading";

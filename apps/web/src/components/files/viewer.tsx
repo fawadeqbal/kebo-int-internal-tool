@@ -703,10 +703,37 @@ function Stage({
 }) {
   if (kind === "image") return <ImageStage src={src} name={file.name} />;
   if (kind === "pdf") return <iframe src={src} title={file.name} className="size-full border-0 bg-white" />;
-  if (kind === "paper") return <iframe ref={frame} src={src} title={file.name} className="size-full border-0 bg-surface-3" />;
+  if (kind === "paper") return <PaperFrame frame={frame} src={src} title={file.name} />;
   if (kind === "sheet") return <SheetStage href={file.href} />;
   if (kind === "csv" || kind === "text") return <TextStage href={file.href} csv={kind === "csv"} />;
   return <NoPreview file={file} onShare={onShare} />;
+}
+
+/** The sheet's width on screen (A4 at 96 dpi with the grey around it). */
+const SHEET = 860;
+
+/**
+ * One of our papers in its frame, the whole width of the sheet in view on any screen (a phone too): the page inside
+ * is zoomed to the stage's width, and its pages follow one under the other.
+ */
+function PaperFrame({ frame, src, title }: { frame: React.RefObject<HTMLIFrameElement | null>; src: string; title: string }) {
+  const box = useRef<HTMLDivElement>(null);
+  const fit = useCallback(() => {
+    const w = box.current?.clientWidth ?? SHEET;
+    frame.current?.contentDocument?.documentElement.style.setProperty("zoom", String(Math.min(1, (w - 8) / SHEET)));
+  }, [frame]);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fit]);
+  return (
+    <div ref={box} className="absolute inset-0">
+      <iframe ref={frame} src={src} title={title} onLoad={fit} className="size-full border-0 bg-surface-3" />
+    </div>
+  );
 }
 
 /** A photo: fitted to the stage; − + and 100% zoom it, Fit puts it back (design 21 Nov). */

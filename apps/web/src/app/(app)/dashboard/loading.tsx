@@ -1,6 +1,2 @@
-import { DashboardSkeleton } from "@/components/common/skeletons";
-
-/** Home on its way. */
-export default function Loading() {
-  return <DashboardSkeleton />;
-}
+// The page on its way, in its own shape (lib/page-shapes.ts).
+export { default } from "@/components/common/page-loading";

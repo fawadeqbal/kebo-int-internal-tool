@@ -150,7 +150,7 @@ export function RecordBody({ panel, panelLabel, folds, className, children }: { 
   }, []);
   const withPanel = !!panel;
   return (
-    <div className={cn("grid items-start gap-4", withPanel ? RULES.page.withPanel : "grid-cols-[minmax(0,1fr)]", className)}>
+    <div data-part="record-body" data-panel={withPanel ? "" : undefined} className={cn("grid items-start gap-4", withPanel ? RULES.page.withPanel : "grid-cols-[minmax(0,1fr)]", className)}>
       <div className="flex min-w-0 flex-col gap-4">{children}</div>
       {withPanel && (
         // On a phone its bar comes first, under the tabs; the panel opens from it. On a laptop it stays in view

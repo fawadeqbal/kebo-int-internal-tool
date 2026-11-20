@@ -129,7 +129,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         count={countOf(list.count, "cost")}
       />
 
-      <Card className="overflow-hidden">
+      <Card data-part="table" className="overflow-hidden">
         {list.rows.length === 0 ? (
           text ? (
             <EmptyState framed title="No cost matches" description={`Nothing in ${monthName} matches “${text}”. Try other words, or clear the search.`} />

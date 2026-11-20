@@ -63,6 +63,7 @@ export function DataTable({
   return (
     <div
       ref={box}
+      data-part="table"
       tabIndex={scrolls ? 0 : undefined}
       role={scrolls ? "region" : undefined}
       aria-label={scrolls ? label : undefined}
