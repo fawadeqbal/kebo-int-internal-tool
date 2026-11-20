@@ -280,7 +280,7 @@ function TableRow({ s, choose }: { s: Submission; choose?: boolean }) {
       </Td>
       <Td className="text-sm">
         {s.file ? (
-          <a href={`/files/${s.file.id}?view=1`} target="_blank" rel="noopener" className={cn(linkClass, "inline-flex items-center gap-1")}>
+          <a href={`/files/${s.file.id}?view=1`} className={cn(linkClass, "inline-flex items-center gap-1")}>
             <FileText className="size-3.5" aria-hidden /> {s.file.name}
           </a>
         ) : (
@@ -307,12 +307,10 @@ function Photo({ s }: { s: Submission }) {
       </span>
     );
   const href = `/files/${s.file.id}?view=1`;
-  const label = `Open the ${s.kind === "payment" ? "bank slip" : "receipt"} (${s.file.name}) in a new tab`;
+  const label = `Open the ${s.kind === "payment" ? "bank slip" : "receipt"} (${s.file.name})`;
   return (
     <a
       href={href}
-      target="_blank"
-      rel="noopener"
       aria-label={label}
       className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface-2 text-text-2 hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >

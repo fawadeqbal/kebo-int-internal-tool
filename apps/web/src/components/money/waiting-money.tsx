@@ -66,7 +66,7 @@ export async function WaitingToVerify({
                 {s.file && (
                   <>
                     {" · "}
-                    <a href={`/files/${s.file.id}`} target="_blank" rel="noreferrer" className={linkClass}>
+                    <a href={`/files/${s.file.id}?view=1`} className={linkClass}>
                       Open the slip
                     </a>
                   </>

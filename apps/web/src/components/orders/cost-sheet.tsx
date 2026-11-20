@@ -94,7 +94,7 @@ export function CostSheetTable({
                 <span className="font-semibold">{kind}</span>
                 {detail && <span className="block text-xs text-text-2">{detail}</span>}
                 {receipt && (
-                  <a href={`/files/${receipt.id}?view=1`} target="_blank" rel="noreferrer" className={cn(linkClass, "block text-xs")}>
+                  <a href={`/files/${receipt.id}?view=1`} className={cn(linkClass, "block text-xs")}>
                     Their bill
                   </a>
                 )}

@@ -124,7 +124,6 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
                 <ButtonLink
                   href={`/print/ledger/customer/${c.id}?from=${lines[0]?.date ?? today}&to=${today}&cur=${main}`}
                   size="sm"
-                  target="_blank"
                   prefetch={false}
                 >
                   <Printer aria-hidden /> Print statement

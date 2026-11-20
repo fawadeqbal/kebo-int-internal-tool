@@ -50,7 +50,7 @@ export function FilesBox({
               meta={`${ATTACHMENT_KIND_LABEL[f.kind]} · ${f.at}`}
               actions={
                 <>
-                  <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className={buttonClass("ghost", "icon-xs")} aria-label={`View ${f.fileName}`}>
+                  <a href={`/files/${f.id}?view=1`} className={buttonClass("ghost", "icon-xs")} aria-label={`View ${f.fileName}`}>
                     <Eye aria-hidden />
                   </a>
                   <a href={`/files/${f.id}`} className={buttonClass("ghost", "icon-xs")} aria-label={`Download ${f.fileName}`}>

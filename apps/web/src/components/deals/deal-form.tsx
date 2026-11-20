@@ -42,6 +42,7 @@ import type { LineRow } from "@/components/lines/line-table";
 import type { EditCard, EditRef } from "@/lib/types-edits";
 import { ITEM_COLUMNS, itemsBody, useItemRows } from "./items-sheet";
 import { rowKey } from "./form-bits";
+import { useFileViewer } from "@/components/files/viewer";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -140,6 +141,7 @@ export function DealForm({
   onSaved: (r: { id: string; refNo?: string; title?: string; customer?: string; files?: number }) => void;
 }) {
   const router = useRouter();
+  const viewer = useFileViewer();
   const [v, setV] = useState<DealFormValues>(initial);
   const [contacts, setContacts] = useState<ContactOption[]>(initialContacts);
   const [otherCategory, setOtherCategory] = useState(
@@ -742,8 +744,6 @@ export function DealForm({
                               <>
                                 <a
                                   href={`/files/${f.id}?view=1`}
-                                  target="_blank"
-                                  rel="noreferrer"
                                   className={buttonClass("ghost", "icon-xs")}
                                   aria-label={`View ${f.fileName}`}
                                 >
@@ -788,7 +788,7 @@ export function DealForm({
                                 <Button
                                   size="icon-xs"
                                   variant="ghost"
-                                  onClick={() => open(f.file, false)}
+                                  onClick={() => (viewer ? viewer.open([{ key: f.file.name, name: f.file.name, href: blobOf(f.file), type: f.file.type, size: f.file.size }]) : open(f.file, false))}
                                   aria-label={`View ${f.file.name}`}
                                 >
                                   <Eye aria-hidden />
@@ -1020,6 +1020,13 @@ function KindSelect({
       ))}
     </Select>
   );
+}
+
+/** A file not uploaded yet, at a link of this page only (the viewer shows it; freed ten minutes later). */
+function blobOf(file: File) {
+  const url = URL.createObjectURL(file);
+  setTimeout(() => URL.revokeObjectURL(url), 600_000);
+  return url;
 }
 
 /** Shows (or downloads) a file that is not uploaded yet. */

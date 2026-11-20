@@ -10,6 +10,7 @@ import { Badge, Button, buttonClass, Card, CardHeader, cn, capsClass } from "@ke
 import { toast } from "@kebo/ui/client";
 import { useConfirm } from "@/components/common/dialog";
 import { FloatingMenu } from "@/components/common/floating";
+import { useOpenHere } from "@/components/files/viewer";
 import type { ActionState } from "@/lib/actions";
 import type { PaperRow } from "@/lib/types-papers";
 import { downloadHref, FileChip, uploadToOrder, useFileTools } from "@/components/files/file-tools";
@@ -357,7 +358,7 @@ function PaperLine({
     <>
       {issue}
       {print && (
-        <Link href={print.view} target="_blank" className={buttonClass("ghost", "xs", "hidden sm:inline-flex")}>
+        <Link href={print.view} className={buttonClass("ghost", "xs", "hidden sm:inline-flex")}>
           View / Print
         </Link>
       )}
@@ -380,7 +381,7 @@ function PaperLine({
       {r.state === "draft" ? "Continue" : "Make"}
     </Link>
   ) : print && (paperDone(r.state) || r.live || r.kept) ? (
-    <Link href={print.view} target="_blank" className={buttonClass("ghost", "xs")}>
+    <Link href={print.view} className={buttonClass("ghost", "xs")}>
       View / Print
     </Link>
   ) : file ? (
@@ -511,6 +512,8 @@ export function PaperMenu({
   const tools = useFileTools();
   const router = useRouter();
   const [menu, setMenu] = useState(false);
+  const openHere = useOpenHere();
+  const viewPaper = (href: string, name: string) => openHere(href, name) || window.location.assign(href);
   const [busy, start] = useTransition();
   const { ask, dialog } = useConfirm();
   const more = useRef<HTMLButtonElement>(null);
@@ -574,7 +577,7 @@ export function PaperMenu({
           {leading}
           {print && (paperDone(r.state) || r.live || r.kept || r.state === "draft" || !!issuing) && (
             <>
-              {item("View / Print", () => window.open(print.view, "_blank"))}
+              {item("View / Print", () => viewPaper(print.view, r.label))}
               {item("Download PDF", () => downloadHref(print.pdf))}
               {print.internal && item("Internal copy (PDF)", () => downloadHref(print.internal!), "all prices, costs")}
             </>
@@ -626,7 +629,7 @@ export function PaperMenu({
             r.version !== null &&
             r.version > 1 &&
             Array.from({ length: r.version - 1 }, (_, i) => i + 1).map((v) => (
-              <span key={v}>{item(`View version ${v}`, () => window.open(`${print.view}&v=${v}`, "_blank"), "as printed")}</span>
+              <span key={v}>{item(`View version ${v}`, () => viewPaper(`${print.view}&v=${v}`, `${r.label} · version ${v}`), "as printed")}</span>
             ))}
           {canMake &&
             ownDoc(r) &&

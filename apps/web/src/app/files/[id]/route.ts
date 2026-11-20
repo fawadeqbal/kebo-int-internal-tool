@@ -20,7 +20,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const type = (res.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
   if (new URL(req.url).searchParams.get("view") === "1" && VIEWABLE.has(type)) {
     headers.set("content-disposition", (headers.get("content-disposition") ?? "").replace(/^attachment/, "inline") || "inline");
-    headers.set("content-security-policy", "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'");
+    headers.set(
+      "content-security-policy",
+      "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'",
+    );
   }
   return new Response(res.body, { status: 200, headers });
+}
+
+/** What a file is (its type, size and name) without sending it: the in-app viewer asks this when it opens one. */
+export async function HEAD(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const res = await apiFetch(`/files/${id}`, { method: "HEAD" });
+  const headers = new Headers();
+  for (const h of ["content-type", "content-length", "content-disposition", "cache-control"]) {
+    const v = res.headers.get(h);
+    if (v) headers.set(h, v);
+  }
+  return new Response(null, { status: res.ok ? 200 : res.status, headers });
 }

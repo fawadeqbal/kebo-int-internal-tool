@@ -179,7 +179,7 @@ export default async function QuotationOwnPage({
         </ButtonLink>
       ),
     },
-    { id: "print", place: "paper", label: "Print", icon: <Eye aria-hidden />, href: printHref(r), newTab: true },
+    { id: "print", place: "paper", label: "Print", icon: <Eye aria-hidden />, href: printHref(r) },
     { id: "pdf", place: "paper", label: "PDF", phoneLabel: "Download PDF", ariaLabel: `Download ${quoteRef} as PDF`, icon: <Download aria-hidden />, href: pdfHref(r), download: true },
     { id: "edit", place: "more", when: !!editor, label: "Edit all", panel: "edit-quote" },
     { id: "send-again", place: "more", when: r.status === "sent" && !!send, label: "Send again", panel: "send-again" },

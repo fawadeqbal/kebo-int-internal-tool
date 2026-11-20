@@ -248,7 +248,7 @@ export function PapersCard({
                     {r.state === "draft" ? "Continue" : r.kind === "shipping-advice" ? "Make and send" : "Make"}
                   </Link>
                 ) : view ? (
-                  <Link href={view} target={r.source === "upload" ? "_blank" : undefined} className={buttonClass("ghost", "xs")}>
+                  <Link href={view} className={buttonClass("ghost", "xs")}>
                     {r.source === "upload" ? (
                       <>
                         <Paperclip aria-hidden /> View

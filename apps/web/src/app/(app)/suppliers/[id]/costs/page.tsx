@@ -107,7 +107,6 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
                 <ButtonLink
                   href={`/print/ledger/factory/${f.id}?from=${first}&to=${today}&cur=${cur}`}
                   size="sm"
-                  target="_blank"
                   prefetch={false}
                 >
                   <Printer aria-hidden /> Print statement

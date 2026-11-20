@@ -9,6 +9,7 @@ import type { ActionState } from "@/lib/actions";
 import { ConfirmDialog } from "./dialog";
 import { FloatingMenu, useIsPhone } from "./floating";
 import { useOpenPanel } from "./panel";
+import { useOpenHere } from "@/components/files/viewer";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -54,6 +55,7 @@ export function MoreMenu({
   const [busy, setBusy] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const router = useRouter();
+  const openHere = useOpenHere();
   const openPanel = useOpenPanel();
   const phone = useIsPhone();
   const entries = [
@@ -67,6 +69,8 @@ export function MoreMenu({
     setOpen(false);
     if ("separator" in e) return;
     if ("href" in e) {
+      // A file or one of our papers opens over the page (the app's viewer), not in a new tab.
+      if (!e.download && openHere(e.href, e.label)) return;
       if (e.newTab) window.open(e.href, "_blank", "noopener");
       else router.push(e.href);
     } else if ("panel" in e) openPanel(e.panel, e.id);

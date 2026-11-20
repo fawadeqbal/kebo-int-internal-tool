@@ -335,7 +335,7 @@ function OfferWindow({
       {(q?.files ?? []).map((f) => (
         <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-md">
           <span className="min-w-0 truncate">
-            <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className={linkClass}>
+            <a href={`/files/${f.id}?view=1`} className={linkClass}>
               {f.fileName}
             </a>
             <span className="text-text-2">
@@ -931,7 +931,7 @@ export function OfferBoxes({
                 q.files.length ? (
                   <span className="flex flex-col gap-1">
                     {q.files.map((f) => (
-                      <a key={f.id} href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="font-semibold text-primary underline underline-offset-2 [overflow-wrap:anywhere]">
+                      <a key={f.id} href={`/files/${f.id}?view=1`} className="font-semibold text-primary underline underline-offset-2 [overflow-wrap:anywhere]">
                         {f.fileName}
                       </a>
                     ))}

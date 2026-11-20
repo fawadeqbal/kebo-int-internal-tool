@@ -135,7 +135,7 @@ export function SendWindow({
     <div key={name} className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-md">
       <span className="font-semibold">{name}</span>
       <span className="flex gap-4">
-        <a href={print} target="_blank" rel="noreferrer" className={linkClass} aria-label={many ? `See how ${name} prints` : undefined}>
+        <a href={print} className={linkClass} aria-label={many ? `See how ${name} prints` : undefined}>
           See how it prints
         </a>
         <a href={download} className={linkClass} aria-label={many ? `Download ${name}` : undefined}>
