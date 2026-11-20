@@ -1,5 +1,5 @@
 import { connectTarget, type DomainDiagnosis } from "@kebo/shared";
-import { Card, cn, linkClass, StatusBadge } from "@kebo/ui";
+import { Card, cn, linkClass, StatusBadge, subTitleClass } from "@kebo/ui";
 import { DiagnosisList, DiagnosisVerdict } from "@/components/domains/diagnosis";
 import { platformApi } from "@/lib/api";
 import { date, timeAgo } from "@/lib/format";
@@ -45,7 +45,7 @@ export async function CompanyDomainCard({ id, name, live }: { id: string; name: 
     <Card id="own-domain" aria-labelledby="own-domain-title" className="scroll-mt-20">
       <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0">
-          <h2 id="own-domain-title" className="text-sm font-semibold text-text">
+          <h2 id="own-domain-title" className={subTitleClass}>
             Their own domain
           </h2>
           <p className="mt-0.5 text-xs text-muted">

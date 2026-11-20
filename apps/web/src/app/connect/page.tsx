@@ -1,3 +1,4 @@
+import { cn, subTitleClass } from "@kebo/ui";
 import { AuthShell } from "@/app/login/auth-shell";
 import { checkPath, CheckForm, RecordTable, target } from "./parts";
 
@@ -50,7 +51,7 @@ export default async function ConnectPage() {
         </li>
       </ol>
 
-      <h2 className="mt-7 text-sm font-semibold">Mistakes we see most</h2>
+      <h2 className={cn(subTitleClass, "mt-7")}>Mistakes we see most</h2>
       <ul className="mt-2 grid gap-2 sm:grid-cols-2">
         {MISTAKES.map(([title, text]) => (
           <li key={title} className="rounded-lg bg-warn-soft px-3 py-2.5 text-md [overflow-wrap:anywhere]">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { DomainDiagnosis } from "@kebo/shared";
-import { cn, linkClass, Notice } from "@kebo/ui";
+import { cn, linkClass, Notice, subTitleClass } from "@kebo/ui";
 import { AuthShell } from "@/app/login/auth-shell";
 import { DiagnosisList, DiagnosisVerdict } from "@/components/domains/diagnosis";
 import { apiFetch } from "@/lib/api";
@@ -41,12 +41,12 @@ export default async function ConnectCheckPage({ searchParams }: { searchParams:
           <h1 className="text-xl leading-7 font-semibold tracking-tight [overflow-wrap:anywhere]">{r.d.domain}</h1>
           <DiagnosisVerdict d={r.d} />
           <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold">What we looked up</h2>
+            <h2 className={subTitleClass}>What we looked up</h2>
             <DiagnosisList d={r.d} />
           </div>
           {r.d.verdict !== "right" && (
             <div className="flex flex-col gap-2">
-              <h2 className="text-sm font-semibold">The record to add in {r.d.zone}</h2>
+              <h2 className={subTitleClass}>The record to add in {r.d.zone}</h2>
               <RecordTable name={r.d.domain.split(".")[0]} />
             </div>
           )}
