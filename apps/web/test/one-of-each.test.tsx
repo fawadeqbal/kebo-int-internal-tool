@@ -220,11 +220,14 @@ describe("one of each", () => {
     expect(found(/label: <><\w+ aria-hidden \/> /g)).toEqual([]);
   });
 
-  it("one way for each action: quiet ✎ Edit, outline + in a box, blue next step, orange only to create, delete in ⋯", () => {
+  it("one way for each action: quiet ✎ Edit, outline + in a box, one button colour (the theme's), delete in ⋯", () => {
     // ✎ Edit is EditButton (ghost, small, link colour); it has no size of its own.
     expect(found(/<EditButton[^>]*\ssize=/g)).toEqual([]);
-    // No small orange button: orange is a list's create (md); a record's next step and a window's save are blue.
+    // The big button is a list's create (md), never small; it takes the theme colour like every main button.
     expect(found(/variant="strong" size="sm"/g)).toEqual([]);
+    const ui = SOURCES.find(({ file }) => file.endsWith("packages/ui/src/primitives.tsx"))!.text;
+    expect(ui.match(/^\s*strong: "([^"]*)"/m)?.[1]).toContain("bg-primary-solid");
+    expect(found(/bg-action-solid/g).filter((m) => /<(Link|button)\b|variant/.test(m))).toEqual([]);
     expect(found(/variant="soft" onClick=\{onNext/g)).toEqual([]);
     // A record's Remove opens from its ⋯ (VoidWindow), not a red button under its boxes (rows and windows keep theirs).
     expect(found(/<VoidForm\b/g).filter((f) => f.includes("app/(app)/payments/"))).toEqual([]);

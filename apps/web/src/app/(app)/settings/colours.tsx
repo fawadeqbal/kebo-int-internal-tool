@@ -48,7 +48,7 @@ function Mini({ set, mode }: { set: ColourSet; mode: "light" | "dark" }) {
           </span>
           <span className="mt-0.5 flex gap-1">
             <span className="block h-[9px] w-[26px] rounded-[3px] bg-primary-solid" />
-            <span className="block h-[9px] w-[26px] rounded-[3px] bg-action-solid" />
+            <span className="block h-[9px] w-[26px] rounded-[3px] border border-line-strong bg-surface" />
           </span>
         </span>
       </span>

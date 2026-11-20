@@ -12,8 +12,8 @@ import { RULES } from "./rules";
 /**
  * The one button (canvas "RFQ Desk — the pieces", board "The one button: seven kinds, three sizes, every state").
  * Kinds, each one job:
- *   strong    the page's one next step (orange, bold, a glow) — one per screen; on a phone pinned at the bottom
- *   primary   Main: the one way to finish a window — Save, Send, Record (green)
+ *   strong    the page's one big button (a list's + New …): the theme colour like primary, bolder, with a glow — one per screen
+ *   primary   Main: the one way to finish a window — Save, Send, Record (the theme colour)
  *   soft      a step forward that is not the finish: Next in a steps window
  *   secondary Plain: every other act — + Add, Send request, View, Cancel
  *   ghost     Quiet: a box's own ✎ Edit and the clock, a row's tools
@@ -33,10 +33,12 @@ const buttonBase =
 const main = "bg-primary-solid text-primary-fg shadow-card hover:bg-primary-solid-hover";
 const dangerLine = "border border-bad/30 bg-surface text-bad hover:bg-bad-soft";
 const buttonVariants: Record<ButtonVariant, string> = {
-  strong: "bg-action-solid font-bold text-white shadow-[0_6px_16px_color-mix(in_srgb,var(--action-solid)_28%,transparent)] hover:bg-action-solid-hover",
+  // The page's one big button (a list's "+ New …"): the theme's own colour like every main button, only bolder,
+  // so a colour set shows one button colour (orange stays for what needs you: counts, "Today", "Nobody yet").
+  strong: "bg-primary-solid font-bold text-primary-fg shadow-[0_6px_16px_color-mix(in_srgb,var(--primary-solid)_28%,transparent)] hover:bg-primary-solid-hover",
   primary: main,
   brand: main,
-  soft: "border border-action/20 bg-action-soft text-action hover:border-action/45",
+  soft: "border border-primary/20 bg-primary-soft text-primary hover:border-primary/45",
   secondary: "border border-line-strong bg-surface text-text shadow-card hover:bg-surface-2",
   ghost: "text-text-2 hover:bg-surface-2 hover:text-text",
   "danger-line": dangerLine,
