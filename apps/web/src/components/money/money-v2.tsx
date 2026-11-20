@@ -188,7 +188,6 @@ export function ReceivedFields({
                 <MoneyInput id="r-amount" name="receivedAmount" currency={a.received} value={a.amount} onChange={(e) => a.setAmount(e.target.value)} placeholder="0.00" />
               </div>
             </Field>
-            <AccountSelect id="r-account" label="Into account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
             <Field label="Paid on" htmlFor="r-paidOn" error={s.errors?.paidOn}>
               <Input id="r-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
             </Field>
@@ -200,6 +199,10 @@ export function ReceivedFields({
                   </option>
                 ))}
               </Select>
+            </Field>
+            <AccountSelect id="r-account" label="Into account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+            <Field label="Reference" htmlFor="r-reference" optional error={s.errors?.reference}>
+              <Input id="r-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
             </Field>
             <Field label="Paid by" htmlFor="r-paidBy" optional error={s.errors?.paidByName}>
               <Input id="r-paidBy" name="paidByName" maxLength={120} defaultValue={s.values?.paidByName ?? ""} placeholder={customer} />
@@ -213,9 +216,6 @@ export function ReceivedFields({
                 </div>
               </Field>
             )}
-            <Field label="Reference" htmlFor="r-reference" optional error={s.errors?.reference}>
-              <Input id="r-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
-            </Field>
             {method === "bank_transfer" && (
               <Field label="Bank charges" htmlFor="r-charges" optional error={s.errors?.bankCharges}>
                 <MoneyInput id="r-charges" name="bankCharges" currency={currency} value={charges} onChange={(e) => setCharges(e.target.value)} placeholder="0.00" />
@@ -274,11 +274,11 @@ export function ReceivedFields({
               </p>
             )}
           </div>
+          <FilePicker id="r-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} />
           <Field label="Note" htmlFor="r-note" optional error={s.errors?.note}>
             <Textarea id="r-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
           </Field>
           <RecordedBy verify={verify} />
-          <FilePicker id="r-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} />
           <FormButtons onCancel={onClose}>
             <SubmitButton pendingText={file ? "Sending, with the file…" : verify ? "Sending…" : "Recording…"} disabled={a.countsMinor <= 0 || tooMuch || leftMinor < 0}>
               {verify ? "Send to verify" : "Record the payment"}

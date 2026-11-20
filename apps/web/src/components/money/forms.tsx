@@ -448,6 +448,10 @@ export function FactoryPaymentForm({
                 value={(s.values?.method as PaymentMethod) ?? payment?.method ?? "bank_transfer"}
               />
             </Field>
+            <AccountSelect id="fp-account" label="From account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
+            <Field label="Reference" htmlFor="fp-reference" optional>
+              <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? prefill?.reference ?? ""} />
+            </Field>
             <Field
               label="Paid by"
               htmlFor="fp-paidBy"
@@ -461,10 +465,6 @@ export function FactoryPaymentForm({
                 none={chosen?.lookedAfterBy ? `${chosen.lookedAfterBy.name} (looks after it)` : "Not said"}
               />
             </Field>
-            <Field label="Reference" htmlFor="fp-reference" optional>
-              <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? prefill?.reference ?? ""} />
-            </Field>
-            <AccountSelect id="fp-account" label="From account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
           </div>
           {!payment && (
             <FilePicker id="fp-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} />

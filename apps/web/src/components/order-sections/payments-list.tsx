@@ -81,7 +81,7 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
                 <Td>
                   <span className="whitespace-nowrap">{x.how}</span>
                   <span className="block text-xs text-text-2">
-                    {account} {x.account ?? "no account"}
+                    {x.account ? `${account} ${x.account}` : "No account"}
                     {x.reference && <> · {x.reference}</>}
                   </span>
                 </Td>

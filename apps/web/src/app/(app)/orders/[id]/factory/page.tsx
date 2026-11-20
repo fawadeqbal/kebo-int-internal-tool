@@ -209,7 +209,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           wide
           rows={[
             // Where it came from is a fact of the box, not words in its head (the head keeps only its buttons).
-            ...(from ? ([["From their offer", from]] as [string, ReactNode][]) : []),
+            ...(po.offer ? ([["From their offer", po.offer.reference ?? date(po.offer.receivedOn)]] as [string, ReactNode][]) : []),
             ["Incoterm", a.basis ? `${a.basis}${a.basisPlace ? ` ${a.basisPlace}` : ""}` : null],
             ["Lead time", a.leadTime],
             [
