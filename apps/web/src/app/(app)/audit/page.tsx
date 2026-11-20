@@ -5,7 +5,7 @@ import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { api } from "@/lib/api";
-import { readableDates } from "@/components/insights/readable-dates";
+import { readableHistory } from "@/components/insights/readable-dates";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
@@ -189,7 +189,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 <PhoneRow
                   key={r.id}
                   href={entityHref(r, canUsers) ?? undefined}
-                  title={r.summary ? readableDates(r.summary) : words(r.action)}
+                  title={r.summary ? readableHistory(r.summary) : words(r.action)}
                   line={`${r.userName} · ${label(r.entityType)}`}
                   figure={timeAgo(r.createdAt)}
                   extra={<Changes r={r} />}
@@ -223,10 +223,10 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                           <Badge tone="outline">{label(r.entityType)}</Badge>
                           {to ? (
                             <Link href={to} className="hover:text-primary">
-                              {r.summary ? readableDates(r.summary) : words(r.action)}
+                              {r.summary ? readableHistory(r.summary) : words(r.action)}
                             </Link>
                           ) : (
-                            <span>{r.summary ? readableDates(r.summary) : words(r.action)}</span>
+                            <span>{r.summary ? readableHistory(r.summary) : words(r.action)}</span>
                           )}
                         </p>
                         <Changes r={r} />

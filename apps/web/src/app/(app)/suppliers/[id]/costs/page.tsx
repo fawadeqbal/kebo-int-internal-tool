@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Printer } from "lucide-react";
 import { can } from "@kebo/shared";
-import { ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
+import { PhoneList, PhoneRow, ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission, hasFeature } from "@/lib/session";
 import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
@@ -122,6 +122,20 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
             description="What we buy from this supplier and what we pay it show here, with what we owe after each."
           />
         ) : (
+          <>
+          {/* A phone: a row per line — what, its day and order, what it moved; the balance after it on the right. */}
+          <PhoneList label="Statement">
+            {lines.map((l) => (
+              <PhoneRow
+                key={l.key}
+                href={l.order ? `/orders/${l.order.id}` : undefined}
+                title={l.what}
+                line={[(l.date ? date(l.date) : "—"), l.order?.refNo, Math.abs(l.owed) >= 0.005 ? `${"owed"} ${amount(l.owed)}` : null, l.paid ? `paid ${amount(l.paid)}` : null].filter(Boolean).join(" · ")}
+                figure={two(l.balance)}
+              />
+            ))}
+          </PhoneList>
+          <div className="max-sm:hidden">
           <DataTable label="Statement">
               <THead>
                 <tr>
@@ -160,6 +174,8 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
                 </tr>
               </tfoot>
           </DataTable>
+          </div>
+          </>
         )}
       </Card>
     </div>

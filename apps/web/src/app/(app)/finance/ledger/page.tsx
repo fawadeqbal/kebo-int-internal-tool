@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
+import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
 import { ArrowRight } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
@@ -297,6 +297,20 @@ async function Balances({ sp }: { sp: Search }) {
           {shown.length === 0 ? (
             <EmptyState title="Nothing here" description="Balances appear when money is recorded: orders, payments, expenses, transfers." />
           ) : (
+            <>
+            {/* A phone: one row each — who, what they are, the balance (the statement opens from the row). */}
+            <PhoneList label="Balances">
+              {shown.map((r) => (
+                <PhoneRow
+                  key={`${r.account}:${r.currency}`}
+                  href={statement(r) ?? undefined}
+                  title={r.label}
+                  line={`${r.kind === "person" ? "person · own money" : r.kind} · ${r.currency}`}
+                  figure={<span className={cn(Number(r.balance) < 0 && "text-bad")}>{fmt(r.balance)}</span>}
+                />
+              ))}
+            </PhoneList>
+            <div className="max-sm:hidden">
             <Table>
               <THead>
                 <tr>
@@ -335,6 +349,8 @@ async function Balances({ sp }: { sp: Search }) {
                 })}
               </tbody>
             </Table>
+            </div>
+            </>
           )}
         </Card>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { SideSheet } from "@/components/common/side-sheet";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useSelectedLayoutSegments } from "next/navigation";
 import { cn, RULES } from "@kebo/ui";
@@ -25,6 +26,7 @@ export function RecordFrame({
   top,
   panel,
   panelLabel,
+  folds,
   bare = [],
   wide = [],
   children,
@@ -32,6 +34,8 @@ export function RecordFrame({
   top: ReactNode;
   panel?: ReactNode;
   panelLabel?: string;
+  /** The panel folds itself into its bar on a phone (a SideSheet: inquiry, order). Else RecordBody folds it. */
+  folds?: boolean;
   bare?: string[];
   wide?: string[];
   children: ReactNode;
@@ -41,7 +45,7 @@ export function RecordFrame({
   const noPanel = wide.includes(segments[0] ?? "");
   if (own) return <>{children}</>;
   return (
-    <RecordShell top={top} panel={noPanel ? null : panel} panelLabel={panelLabel}>
+    <RecordShell top={top} panel={noPanel ? null : panel} panelLabel={panelLabel} folds={folds}>
       {children}
     </RecordShell>
   );
@@ -52,7 +56,7 @@ export function RecordFrame({
  * with the panel beside them, which stays too. RecordFrame (a record with tabs) and RecordPage (a record on one
  * page: a quotation, a supplier offer) both draw it.
  */
-export function RecordShell({ top, panel, panelLabel, children }: { top: ReactNode; panel?: ReactNode; panelLabel?: string; children: ReactNode }) {
+export function RecordShell({ top, panel, panelLabel, folds, children }: { top: ReactNode; panel?: ReactNode; panelLabel?: string; folds?: boolean; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const mark = useRef<HTMLSpanElement>(null);
   const [stuck, setStuck] = useState(false);
@@ -112,7 +116,7 @@ export function RecordShell({ top, panel, panelLabel, children }: { top: ReactNo
       <div ref={box} data-record-top="" data-stuck={stuck ? "" : undefined} className="sticky top-0 z-20 -mx-4 bg-bg px-4 sm:-mx-6 sm:px-6 md:top-14" style={{ marginBottom: keep }}>
         {top}
       </div>
-      <RecordBody panel={panel} panelLabel={panelLabel} className="mt-4">
+      <RecordBody panel={panel} panelLabel={panelLabel} folds={folds} className="mt-4">
         {children}
       </RecordBody>
     </div>
@@ -127,7 +131,7 @@ export function RecordShell({ top, panel, panelLabel, children }: { top: ReactNo
  * scrollbar of its own. RecordShell draws it under the record's top that stays; a page with its own PageHeader draws
  * it on its own.
  */
-export function RecordBody({ panel, panelLabel, className, children }: { panel?: ReactNode; panelLabel?: string; className?: string; children: ReactNode }) {
+export function RecordBody({ panel, panelLabel, folds, className, children }: { panel?: ReactNode; panelLabel?: string; folds?: boolean; className?: string; children: ReactNode }) {
   const aside = useRef<HTMLElement>(null);
   const [fits, setFits] = useState(true);
   useEffect(() => {
@@ -158,7 +162,9 @@ export function RecordBody({ panel, panelLabel, className, children }: { panel?:
           data-fits={fits ? "" : undefined}
           className={cn("flex min-w-0 flex-col gap-4 max-lg:order-first", fits && "lg:sticky lg:top-[calc(var(--record-top,56px)+16px)]")}
         >
-          {panel}
+          {/* On a phone every record's panel is one bar under its top that opens it (live audit 20 Nov: a payment's
+              history, a purchase order's dates came before the record itself). */}
+          {folds ? panel : <SideSheet title={panelLabel ?? "More"} summary={null}>{panel}</SideSheet>}
         </aside>
       )}
     </div>

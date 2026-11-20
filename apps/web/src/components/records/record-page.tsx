@@ -45,6 +45,7 @@ export function RecordPage({
       top={<RecordTop pager={pager} header={header} />}
       panelLabel={panel?.label}
       panel={panel ? ("sheet" in panel ? panel.sheet : <RecordPanel sections={panel.sections} summary={panel.summary} />) : null}
+      folds
     >
       {children}
     </RecordShell>

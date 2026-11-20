@@ -5,7 +5,7 @@ import { boxTitleClass, buttonClass, Card, cn } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
 import { TabList } from "@/components/lists/tab-list";
 
-/** A section of a record page, where its chip (RecordNav) and old ?tab= links land. */
+/** A section of a record page, where its links (#section) and old ?tab= links land. */
 export function RecordSection({ id, children, className }: { id: string; children: ReactNode; className?: string }) {
   return (
     <div id={id} data-record-section="" className={cn("scroll-mt-32 md:scroll-mt-20", className)}>

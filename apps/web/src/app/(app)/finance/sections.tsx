@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Banknote, Landmark, Wallet } from "lucide-react";
 import { can, CURRENCIES, MONEY_ACCOUNT_KIND_LABEL } from "@kebo/shared";
-import { Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice } from "@kebo/ui";
+import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice } from "@kebo/ui";
 import { convertAmount } from "@kebo/money";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -101,7 +101,19 @@ export async function VaultOverview({ today }: { today: string }) {
               </>
             }
           />
-          <div>
+          {/* A phone: a row per account — its name and kind, its balance; the row opens its statement. */}
+          <PhoneList label="Bank accounts">
+            {open.map((a) => (
+              <PhoneRow
+                key={a.id}
+                href={`/finance/cash-book?acct=${a.id}`}
+                title={a.name}
+                line={MONEY_ACCOUNT_KIND_LABEL[a.kind]}
+                figure={<span className={cn(Number(a.balance) < 0 && "text-bad")}>{money(a.balance, a.currency)}</span>}
+              />
+            ))}
+          </PhoneList>
+          <div className="max-sm:hidden">
             <Table>
               <THead>
                 <tr>
@@ -166,6 +178,25 @@ export async function VaultOverview({ today }: { today: string }) {
           {latest.length === 0 ? (
             <EmptyState title="Nothing in the last 90 days" description="Money recorded on orders and expenses shows here by its date." />
           ) : (
+            <>
+            {/* A phone: a row per move — what, its day and in or out; the balance after it on the right. */}
+            <PhoneList label="Latest moves">
+              {latest.map((r) => {
+                const n = Number(r.amount);
+                const two = (v: number) => Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2 });
+                return (
+                  <PhoneRow
+                    key={r.key}
+                    href={r.href ?? undefined}
+                    muted={!!r.voided}
+                    title={r.what}
+                    line={`${date(r.on)} · ${n > 0 ? `in ${two(n)}` : `out ${two(n)}`}`}
+                    figure={r.balance ? Number(r.balance).toLocaleString("en-US", { minimumFractionDigits: 2 }) : undefined}
+                  />
+                );
+              })}
+            </PhoneList>
+            <div className="max-sm:hidden">
             <Table>
               <THead>
                 <tr>
@@ -191,6 +222,8 @@ export async function VaultOverview({ today }: { today: string }) {
                 })}
               </tbody>
             </Table>
+            </div>
+            </>
           )}
         </Card>
       )}

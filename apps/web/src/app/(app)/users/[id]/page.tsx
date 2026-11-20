@@ -12,7 +12,7 @@ import { OpenPanelButton } from "@/components/common/panel";
 import { AllLink, DetailsCard, RecordListCard, RecordRow, RecordSection } from "@/components/common/record";
 import { RecordShell } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
-import { RecordLanding, RecordNav } from "@/components/common/record-nav";
+import { RecordLanding } from "@/components/common/record-nav";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { changeRows, compactChanges } from "@/components/common/change-lines";
 import { RoleBadge } from "@/components/people/role-badge";
@@ -156,17 +156,6 @@ export default async function UserPage({ params, searchParams }: { params: Promi
               )),
                 more: <MoreMenu items={more} phoneItems={isMe ? [] : [{ label: "Set a new password", panel: "user-password" }]} label={`More for ${u.name}`} />,
               }}
-              tabs={
-                <RecordNav
-                  label="Person sections"
-                  items={[
-                    { id: "overview", label: "Overview" },
-                    ...(spending ? [{ id: "spending", label: "Spending", count: spending.count }] : []),
-                    ...(inquiries ? [{ id: "inquiries", label: "Inquiries", count: inquiries.total }] : []),
-                    ...(changes ? [{ id: "changes", label: "Changes", count: changes.length }] : []),
-                  ]}
-                />
-              }
             />
           }
           panelLabel="Changes"

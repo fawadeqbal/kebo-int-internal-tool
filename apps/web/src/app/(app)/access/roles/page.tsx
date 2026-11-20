@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Badge, Card, CardHeader, PageHeader, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice } from "@kebo/ui";
+import { Badge, Card, CardHeader, PageHeader, PhoneList, PhoneRow, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
@@ -90,6 +90,19 @@ export default async function RolesPage() {
             )
           }
         />
+        {/* A phone: a row per role — its name, how many people, its two-step rule. */}
+        <PhoneList label="Roles">
+          {roles.map((r) => (
+            <PhoneRow
+              key={r.key}
+              href={`/access/roles/${r.key}`}
+              title={r.name}
+              line={`${r.people} ${r.people === 1 ? "person" : "people"} · ${r.superAdmin ? "every permission" : `${r.permissions.length - r.notInPlan.length} of ${available} permissions`}`}
+              status={<StatusBadge meaning={r.requireTwoStep ? (r.withoutTwoStep > 0 ? "warn" : "ok") : "neutral"}>{r.requireTwoStep ? "Two-step required" : "Two-step their choice"}</StatusBadge>}
+            />
+          ))}
+        </PhoneList>
+        <div className="max-sm:hidden">
         <Table>
           <THead>
             <tr>
@@ -134,6 +147,7 @@ export default async function RolesPage() {
             ))}
           </tbody>
         </Table>
+        </div>
       </Card>
       {access && <AccessMapCard routes={access} />}
       {custom && (
