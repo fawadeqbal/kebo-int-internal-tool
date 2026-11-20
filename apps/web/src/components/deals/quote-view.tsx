@@ -96,25 +96,28 @@ export function quotePrices(o: OptionView, currency: string, phone: { edit?: boo
       ) : undefined,
   }));
   const plain: LineColumn[] = [
-    // The model under the description, as on the order's items (not its own column): the table then fits its box
-    // beside the side panel at 1440 instead of scrolling with the description squeezed (e2e 20 Nov).
-    {
-      key: "description",
-      label: "Description",
-      width: "minmax(0,1fr)",
-      format: (v) => (
-        <>
-          <span className="whitespace-pre-line">{v.description}</span>
-          {v.model && <span className="block text-xs text-muted">Model {v.model}</span>}
-        </>
-      ),
-    },
+    // The model under the description (its format below), as on the order's items, not its own column: the table
+    // then fits its box beside the side panel at 1440 instead of scrolling (e2e 20 Nov). `plain` has no functions:
+    // it goes to the client as it is.
+    { key: "description", label: "Description", width: "minmax(0,1fr)" },
     { key: "quantity", label: "Quantity", width: "4rem", align: "right" },
     { key: "unit", label: "Unit", width: "4rem" },
     { key: "unitPrice", label: `Unit price ${currency}`, width: "6.5rem", align: "right" },
     { key: "lineTotal", label: `Amount ${currency}`, width: "7.5rem", align: "right" },
   ];
   const columns: LineColumn[] = plain.flatMap((c): LineColumn[] => {
+    if (c.key === "description")
+      return [
+        {
+          ...c,
+          format: (v) => (
+            <>
+              <span className="whitespace-pre-line">{v.description}</span>
+              {v.model && <span className="block text-xs text-muted">Model {v.model}</span>}
+            </>
+          ),
+        },
+      ];
     if (c.key === "quantity") return [{ ...c, format: (v) => qty(v.quantity!) }];
     if (c.key === "unitPrice")
       return [
