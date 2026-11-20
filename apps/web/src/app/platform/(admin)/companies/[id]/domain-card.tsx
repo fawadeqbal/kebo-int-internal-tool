@@ -1,5 +1,5 @@
 import { connectTarget, type DomainDiagnosis } from "@kebo/shared";
-import { Card, StatusBadge } from "@kebo/ui";
+import { Card, cn, linkClass, StatusBadge } from "@kebo/ui";
 import { DiagnosisList, DiagnosisVerdict } from "@/components/domains/diagnosis";
 import { platformApi } from "@/lib/api";
 import { date, timeAgo } from "@/lib/format";
@@ -62,7 +62,7 @@ export async function CompanyDomainCard({ id, name, live }: { id: string; name: 
         <div className="flex flex-col gap-4 px-4 py-3.5">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {status === "connected" ? (
-              <a href={`https://${domain}`} className="font-mono text-base font-medium text-primary hover:underline">
+              <a href={`https://${domain}`} className={cn(linkClass, "font-mono text-base")}>
                 {domain}
               </a>
             ) : (

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { DomainDiagnosis } from "@kebo/shared";
-import { Notice } from "@kebo/ui";
+import { cn, linkClass, Notice } from "@kebo/ui";
 import { AuthShell } from "@/app/login/auth-shell";
 import { DiagnosisList, DiagnosisVerdict } from "@/components/domains/diagnosis";
 import { apiFetch } from "@/lib/api";
@@ -57,7 +57,7 @@ export default async function ConnectCheckPage({ searchParams }: { searchParams:
         </div>
       )}
 
-      <Link href={home} className="mt-6 inline-block text-sm font-medium text-primary hover:underline">
+      <Link href={home} className={cn(linkClass, "mt-6 inline-block text-sm")}>
         How connecting a domain works
       </Link>
     </AuthShell>
