@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { PERMISSION_FEATURE, PERMISSION_GROUPS, permissionInPlan, planFeatureName, type Permission } from "@kebo/shared";
-import { Checkbox, cn, Field, Input, Textarea, Notice } from "@kebo/ui";
+import { Checkbox, cn, Field, Input, Textarea, Notice, linkClass } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useFeatures } from "@/components/common/features";
@@ -152,7 +152,7 @@ export function RoleForm({
                       {!fixed && open.length > 1 && (
                         <button
                           type="button"
-                          className="text-xs font-medium text-primary hover:underline"
+                          className={cn(linkClass, "text-xs")}
                           onClick={() => open.forEach((i) => toggle(i.permission, !all))}
                           aria-label={`${all ? "Clear" : "Choose"} all in ${g.title}`}
                         >

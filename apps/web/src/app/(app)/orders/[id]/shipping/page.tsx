@@ -14,7 +14,7 @@ import {
   type FreightTerms,
   type OrderSection,
 } from "@kebo/shared";
-import { Badge, buttonClass, ButtonLink, cn } from "@kebo/ui";
+import { Badge, buttonClass, ButtonLink, cn, linkClass } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
 import { orderPapersOf } from "@/lib/order-data";
@@ -81,7 +81,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           value: (
             <>
               {port ?? <span className="font-normal text-muted">—</span>} ·{" "}
-              <Link href={`/orders/${o.id}#agreed`} className="font-normal text-primary hover:underline">
+              <Link href={`/orders/${o.id}#agreed`} className={linkClass}>
                 as agreed
               </Link>
             </>

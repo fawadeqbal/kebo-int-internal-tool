@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mail, Printer } from "lucide-react";
 import { can, PAYMENT_METHOD_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
-import { ButtonLink, RefCode, RULES } from "@kebo/ui";
+import { ButtonLink, RefCode, RULES, linkClass, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf } from "@/lib/order-data";
@@ -171,7 +171,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
             {a.changes > 0 && (
               <Link
                 href={`/orders/${o.id}/history?q=${encodeURIComponent(`${po.number}: what was agreed`)}`}
-                className="text-xs font-medium text-primary hover:underline"
+                className={cn(linkClass, "text-xs")}
               >
                 Changed {a.changes}×
               </Link>
@@ -283,7 +283,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
               {
                 label: "Supplier",
                 value: (
-                  <Link href={`/suppliers/${po.supplier.id}`} className="text-primary hover:underline">
+                  <Link href={`/suppliers/${po.supplier.id}`} className={linkClass}>
                     {po.supplier.name}
                   </Link>
                 ),

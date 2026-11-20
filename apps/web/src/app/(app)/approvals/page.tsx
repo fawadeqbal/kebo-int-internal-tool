@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Check, Clock, FileText } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, type ExpenseCategory } from "@kebo/shared";
-import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice } from "@kebo/ui";
+import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice, linkClass, cn } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
@@ -196,7 +196,7 @@ function Row({ s }: { s: Submission }) {
         </p>
         <p className="mt-0.5 text-sm text-text-2">
           {s.order ? (
-            <Link href={`/orders/${s.order.id}`} className="font-medium text-primary hover:underline">
+            <Link href={`/orders/${s.order.id}`} className={linkClass}>
               {s.order.refNo}
             </Link>
           ) : (
@@ -281,7 +281,7 @@ function TableRow({ s, choose }: { s: Submission; choose?: boolean }) {
       </Td>
       <Td className="text-sm">
         {s.file ? (
-          <a href={`/files/${s.file.id}?view=1`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-primary hover:underline">
+          <a href={`/files/${s.file.id}?view=1`} target="_blank" rel="noopener" className={cn(linkClass, "inline-flex items-center gap-1")}>
             <FileText className="size-3.5" aria-hidden /> {s.file.name}
           </a>
         ) : (

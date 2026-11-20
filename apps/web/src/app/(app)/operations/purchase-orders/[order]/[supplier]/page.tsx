@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, Printer } from "lucide-react";
 import { PAYMENT_METHOD_LABEL, RECORD_KIND, RECORD_TITLE } from "@kebo/shared";
-import { ButtonLink, StatusBadge } from "@kebo/ui";
+import { ButtonLink, StatusBadge, linkClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderFilesOf, orderMoneyOf, orderOf } from "@/lib/order-data";
@@ -109,7 +109,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
     </Link>,
     <span key="o">
       for{" "}
-      <Link href={orderHref} className="font-medium text-primary hover:underline">
+      <Link href={orderHref} className={linkClass}>
         {o.refNo}
       </Link>
     </span>,
@@ -207,7 +207,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             </SideSection>
             <SideSection title="Changed on the order">
               <li className="py-1 text-md">
-                <Link href={orderHref} className="font-semibold text-primary hover:underline">
+                <Link href={orderHref} className={linkClass}>
                   Open {o.refNo} › Purchase order
                 </Link>
               </li>
@@ -225,7 +225,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               {
                 label: "Supplier",
                 value: (
-                  <Link href={`/suppliers/${po.supplier.id}`} className="text-primary hover:underline">
+                  <Link href={`/suppliers/${po.supplier.id}`} className={linkClass}>
                     {po.supplier.name}
                   </Link>
                 ),

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Download, LogIn } from "lucide-react";
 import { COMPANY_KIND_LABEL } from "@kebo/shared";
-import { buttonClass, PageHeader, SectionList, StatusBadge, toPage, Notice } from "@kebo/ui";
+import { buttonClass, PageHeader, SectionList, StatusBadge, toPage, Notice, linkClass } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { platformApi } from "@/lib/api";
 import { loadPlatform, readFlash } from "@/lib/platform";
@@ -128,7 +128,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
               <>
                 {" "}
                 ·{" "}
-                <Link href={`/platform/leads/${lead.id}`} className="font-medium text-primary underline-offset-2 hover:underline">
+                <Link href={`/platform/leads/${lead.id}`} className={linkClass}>
                   from client inquiry {lead.name} →
                 </Link>
               </>

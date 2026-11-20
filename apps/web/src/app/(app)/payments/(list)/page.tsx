@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, Plus } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice, linkClass } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
@@ -106,7 +106,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           order || party ? (
             <>
               For {list.scope ?? "this record"} ·{" "}
-              <Link href="/payments" className="font-medium text-primary hover:underline">
+              <Link href="/payments" className={linkClass}>
                 All payments
               </Link>
             </>

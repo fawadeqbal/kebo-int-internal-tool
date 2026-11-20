@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { SEARCH_KIND_LABEL, SEARCH_KINDS, type SearchItem, type SearchKind, type SearchResult } from "@kebo/shared";
-import { boxHeadClass, boxTitleClass, cn, Badge, buildHref, ButtonLink, Card, EmptyState, LinkTabs, PageHeader } from "@kebo/ui";
+import { boxHeadClass, boxTitleClass, cn, Badge, buildHref, ButtonLink, Card, EmptyState, LinkTabs, PageHeader, linkClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { countOf } from "@/lib/format";
@@ -95,7 +95,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                     {SEARCH_KIND_LABEL[g.kind]} <span className="font-normal text-muted">· {g.total}</span>
                   </h2>
                   {!kind && (
-                    <Link href={tab(g.kind)} className="inline-flex min-h-8 items-center text-md font-medium text-primary hover:underline">
+                    <Link href={tab(g.kind)} className={cn(linkClass, "inline-flex min-h-8 items-center text-md")}>
                       {g.total > g.items.length ? `See all ${kindCount(g.kind, g.total)}` : `Only ${SEARCH_KIND_LABEL[g.kind].toLowerCase()}`}
                     </Link>
                   )}

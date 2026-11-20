@@ -1,7 +1,7 @@
 "use client";
 
 import { CURRENCIES, CURRENCY_LABEL, type ColourSet } from "@kebo/shared";
-import { Card, CardBody, CardHeader, cn } from "@kebo/ui";
+import { Card, CardBody, CardHeader, cn, linkClass } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
@@ -151,7 +151,7 @@ export function SettingsCard({
                   {f.kind === "currencies" ? (
                     <CurrenciesText values={values} />
                   ) : empty(value) ? (
-                    <button type="button" onClick={() => panel.openPanel()} className="font-medium text-primary hover:underline">
+                    <button type="button" onClick={() => panel.openPanel()} className={linkClass}>
                       + Add
                     </button>
                   ) : (

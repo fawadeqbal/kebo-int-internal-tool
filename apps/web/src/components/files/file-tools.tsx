@@ -21,7 +21,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Download, Eye, FileText, Image as ImageIcon, MoreHorizontal, Share2, X } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, ATTACHMENT_KINDS, fileSize, FLOW_STEP_LABEL, type AttachmentKind } from "@kebo/shared";
-import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice } from "@kebo/ui";
+import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice, linkClass } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
 import type { AttachTarget, OrderFile } from "@/lib/types-files";
@@ -408,7 +408,7 @@ function FileViewer({
         {file.can.describe && (
           <button
             type="button"
-            className="ml-1.5 text-primary underline-offset-2 hover:underline"
+            className={cn(linkClass, "ml-1.5")}
             onClick={() => open({ kind: "describe", file })}
           >
             change
@@ -526,7 +526,7 @@ function FileViewer({
                     <span className="min-w-0 truncate">
                       v{v.version} · {v.name}
                     </span>
-                    <a href={v.href} download className="shrink-0 text-xs text-primary hover:underline">
+                    <a href={v.href} download className={cn(linkClass, "shrink-0 text-xs")}>
                       {t.date(v.at)} · Download
                     </a>
                   </li>

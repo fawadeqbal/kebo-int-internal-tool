@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
+import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice, linkClass } from "@kebo/ui";
 import { ArrowRight } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
@@ -339,7 +339,7 @@ async function Balances({ sp }: { sp: Search }) {
                       <Td className={cn("text-right font-semibold tabular", Number(r.balance) < 0 && "text-bad")}>{fmt(r.balance)}</Td>
                       <Td className="text-right">
                         {href && (
-                          <Link href={href} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                          <Link href={href} className={cn(linkClass, "inline-flex items-center gap-1 text-sm")}>
                             <ArrowRight className="size-4" aria-hidden /> Statement
                           </Link>
                         )}

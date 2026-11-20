@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import { FOLLOW_UP_KIND_LABEL } from "@kebo/shared";
-import { Card, CardBody, CardHeader, cn, StatusBadge, EmptyLine } from "@kebo/ui";
+import { Card, CardBody, CardHeader, cn, StatusBadge, EmptyLine, linkClass } from "@kebo/ui";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { PanelButton } from "@/components/orders/step-view";
 import {
@@ -112,7 +112,7 @@ export function FollowUpRow({
           {showRecord && f.target && (
             <span>
               ·{" "}
-              <Link href={f.link} className="font-medium text-primary hover:underline">
+              <Link href={f.link} className={linkClass}>
                 {f.target.label}
               </Link>
             </span>

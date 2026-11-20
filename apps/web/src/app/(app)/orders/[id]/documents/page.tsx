@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BANK_STEP_LABEL, can, dayMonth, type BankStepKind } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Badge, linkClass } from "@kebo/ui";
 import { getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderPapersOf, orderPaymentsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
@@ -156,7 +156,7 @@ export default async function OrderDocuments({
         {
           label: "Shipping marks",
           value: (
-            <Link href={`/orders/${o.id}/shipping`} className="font-normal text-primary hover:underline">
+            <Link href={`/orders/${o.id}/shipping`} className={linkClass}>
               On Shipping › Packing
             </Link>
           ),
@@ -164,7 +164,7 @@ export default async function OrderDocuments({
         {
           label: "Letterhead and stamp",
           value: can(me, "settings.manage") ? (
-            <Link href="/settings/company" className="font-normal text-primary hover:underline">
+            <Link href="/settings/company" className={linkClass}>
               Company settings
             </Link>
           ) : (

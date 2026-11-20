@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthShell } from "@/app/login/auth-shell";
+import { linkClass, cn } from "@kebo/ui";
 
 export const metadata = { title: "No company here" };
 
@@ -11,7 +12,7 @@ export default function NoCompanyPage() {
       <p className="mt-2 text-sm text-muted">
         Check the address you were given. If your company used to be here, ask your admin for its new address.
       </p>
-      <Link href="/request-a-demo" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
+      <Link href="/request-a-demo" className={cn(linkClass, "mt-4 inline-block text-sm")}>
         New here? Request a demo
       </Link>
     </AuthShell>

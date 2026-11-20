@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Card, cn } from "@kebo/ui";
+import { Card, cn, linkClass } from "@kebo/ui";
 import { EditButton } from "@/components/common/edit-button";
 import { useSidePanel } from "@/components/common/panel";
 
@@ -73,7 +73,7 @@ export function GroupCard({
                     type="button"
                     onClick={() => p.openPanel()}
                     aria-label={`Add ${i.label.toLowerCase()}`}
-                    className="font-semibold text-primary hover:underline"
+                    className={linkClass}
                   >
                     + Add
                   </button>

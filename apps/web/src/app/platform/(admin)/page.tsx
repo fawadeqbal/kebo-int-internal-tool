@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { Card, cn, DataRow, EmptyState, PageHeader, ButtonLink, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, buttonClass, StatTile, CardHeader } from "@kebo/ui";
+import { Card, cn, DataRow, EmptyState, PageHeader, ButtonLink, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, buttonClass, StatTile, CardHeader, linkClass } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { date, dateTime } from "@/lib/format";
 import type { Dashboard, Overview } from "@/lib/types-platform";
@@ -112,7 +112,7 @@ export default async function PlatformOverviewPage() {
                   </span>
                   <Link
                     href={i.href}
-                    className="inline-flex min-h-6 shrink-0 items-center text-xs font-medium text-primary underline-offset-2 hover:underline"
+                    className={cn(linkClass, "inline-flex min-h-6 shrink-0 items-center text-xs")}
                   >
                     {i.link} <span aria-hidden>&nbsp;→</span>
                   </Link>

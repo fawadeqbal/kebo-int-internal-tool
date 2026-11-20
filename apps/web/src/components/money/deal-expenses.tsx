@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LOST_REASON_LABEL, type InquiryStage, type LostReason } from "@kebo/shared";
-import { Badge, EmptyLine } from "@kebo/ui";
+import { Badge, EmptyLine, linkClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, money, companyToday } from "@/lib/format";
 import type { CostSheetRow, ExpenseList } from "@/lib/types-money";
@@ -118,7 +118,7 @@ export async function DealExpensesCard({
         {deal.order && live.length > 0 && (
           <p className="border-t border-line px-4 sm:px-5 py-2.5 text-xs text-text-2">
             Won: these show on{" "}
-            <Link href={`/orders/${deal.order.id}/costs`} className="font-medium text-primary hover:underline">
+            <Link href={`/orders/${deal.order.id}/costs`} className={linkClass}>
               order {deal.order.refNo}
             </Link>{" "}
             as spent before the order.

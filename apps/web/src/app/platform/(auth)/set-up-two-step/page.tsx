@@ -5,6 +5,7 @@ import type { PlatformAdmin } from "@/lib/types-platform";
 import { AuthShell } from "@/app/login/auth-shell";
 import { TwoStepPanel } from "@/app/(app)/account/forms";
 import { platformConfirmTwoStepAction, platformLogoutAction, platformNoopAction, platformStartTwoStepAction } from "../../actions";
+import { linkClass, cn } from "@kebo/ui";
 
 export const metadata = { title: "Set up two-step sign-in" };
 
@@ -34,7 +35,7 @@ export default async function PlatformSetUpTwoStepPage() {
       />
       {me.twoStepOn ? (
         <div className="mt-6 border-t border-line pt-4 text-center">
-          <Link href="/platform" className="text-sm font-medium text-primary hover:underline">
+          <Link href="/platform" className={cn(linkClass, "text-sm")}>
             Go to the platform
           </Link>
         </div>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LIFECYCLE } from "@kebo/shared";
-import { Notice } from "@kebo/ui";
+import { Notice, linkClass, cn } from "@kebo/ui";
 import { apiFetch } from "@/lib/api";
 import { headers } from "next/headers";
 import { AuthShell } from "@/app/login/auth-shell";
@@ -22,7 +22,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
       footer={
         <>
           Already have an account?{" "}
-          <a href={sitePath("/sign-in")} className="font-medium text-primary hover:underline">
+          <a href={sitePath("/sign-in")} className={linkClass}>
             Sign in
           </a>
         </>
@@ -41,7 +41,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
           <Notice tone="info" className="mt-3">
             Sign-up is not open yet. Request a demo and we will set one up for you.
           </Notice>
-          <Link href="/request-a-demo" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
+          <Link href="/request-a-demo" className={cn(linkClass, "mt-4 inline-block text-sm")}>
             Request a demo
           </Link>
         </>

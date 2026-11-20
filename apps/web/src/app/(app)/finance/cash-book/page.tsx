@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { PageHeader } from "@kebo/ui";
+import { PageHeader, linkClass, cn } from "@kebo/ui";
 import { PlanOff } from "@/components/common/plan-off";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { requirePermission } from "@/lib/session";
@@ -35,7 +35,7 @@ export default async function CashBookPage({ searchParams }: { searchParams: Pro
       />
       {book ? (
         <>
-          <Link href="/finance/cash-book" className="mb-3 inline-block text-sm font-medium text-primary hover:underline">
+          <Link href="/finance/cash-book" className={cn(linkClass, "mb-3 inline-block text-sm")}>
             ← All bank accounts
           </Link>
           <CashBody sp={sp} today={today} />

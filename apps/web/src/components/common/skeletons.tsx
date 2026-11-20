@@ -159,7 +159,7 @@ export function TableSkeleton({ rows = 8, cols = 6, className }: { rows?: number
 export function CardSkeleton({ lines = 4, title = true, className }: { lines?: number; title?: boolean; className?: string }) {
   const widths = ["w-full", "w-11/12", "w-3/4", "w-5/6", "w-2/3", "w-1/2"];
   return (
-    <div className={cn("overflow-hidden rounded-xl border border-line bg-surface shadow-card", className)}>
+    <div className={cn("overflow-hidden rounded-2xl border border-line bg-surface", className)}>
       {title && (
         <div className="flex h-[52px] items-center justify-between border-b border-line px-5">
           <Bar className="w-32" />
@@ -347,7 +347,7 @@ export function ReportSkeleton({ tiles = 4, charts = 4 }: { tiles?: number; char
       {tiles > 0 && <TilesSkeleton count={tiles} className="mb-4" />}
       <div className="grid gap-4 lg:grid-cols-2">
         {Array.from({ length: charts }, (_, i) => (
-          <div key={i} className="rounded-xl border border-line bg-surface p-5 shadow-card">
+          <div key={i} className="rounded-2xl border border-line bg-surface p-5">
             <Bar className="mb-1 w-36" />
             <Bar className="mb-5 h-3 w-52" />
             <div className="flex h-44 items-end gap-2">

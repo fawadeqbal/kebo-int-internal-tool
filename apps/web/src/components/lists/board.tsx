@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import type { Tone } from "@kebo/shared";
-import { Badge, EmptyLine, LinkTabs } from "@kebo/ui";
+import { Badge, EmptyLine, LinkTabs, linkClass, cn } from "@kebo/ui";
 
 /** One column of a board: a state of the record type, its count, the cards it shows and where the rest are. */
 export interface BoardColumn<R> {
@@ -73,7 +73,7 @@ export function Board<R>({
         <EmptyLine className="px-1 pt-1 pb-2">{c.empty}</EmptyLine>
       )}
       {c.total > c.rows.length && (
-        <Link href={c.moreHref} className="px-1 text-md font-semibold text-primary hover:underline">
+        <Link href={c.moreHref} className={cn(linkClass, "px-1 text-md")}>
           Show {c.total - c.rows.length} more
         </Link>
       )}

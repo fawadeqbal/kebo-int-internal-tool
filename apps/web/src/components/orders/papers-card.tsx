@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Paperclip, Upload } from "lucide-react";
 import { PAPER_STATE_TONE, paperDone, type PaperState } from "@kebo/shared";
-import { Badge, Button, buttonClass, Card, CardHeader, cn, Field, Input, Notice, EmptyLine } from "@kebo/ui";
+import { Badge, Button, buttonClass, Card, CardHeader, cn, Field, Input, Notice, EmptyLine, linkClass } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { PaperRow } from "@/lib/types-papers";
 
@@ -214,7 +214,7 @@ export function PapersCard({
                 <li key={`more-${r.more}`} className={cn("py-2.5", main && "px-2")}>
                   <button
                     type="button"
-                    className="text-sm font-medium text-primary hover:underline"
+                    className={cn(linkClass, "text-sm")}
                     onClick={() => setExpanded((e) => new Set(e).add(r.more))}
                   >
                     Show {r.hidden} earlier {r.label.toLowerCase()}

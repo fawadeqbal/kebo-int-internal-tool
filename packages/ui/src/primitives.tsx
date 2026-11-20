@@ -262,8 +262,13 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
 export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4";
 export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
 
+/** A link in text (a list's "Show all", a cross-link, "Open the order →"): one look everywhere; its size comes from the text around it. */
+export const linkClass = "font-medium text-primary underline-offset-2 hover:underline";
+
+/** A card's look, for the few boxes that cannot be a Card element (the side panel, which measures itself). */
+export const cardClass = "rounded-2xl border border-line bg-surface";
 export function Card({ className, ...props }: ComponentProps<"section">) {
-  return <section className={cn("rounded-2xl border border-line bg-surface", className)} {...props} />;
+  return <section className={cn(cardClass, className)} {...props} />;
 }
 
 export function CardHeader({

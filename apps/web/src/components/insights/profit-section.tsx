@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ORDER_STAGE_LABEL, type OrderStage } from "@kebo/shared";
-import { Badge, Card, CardHeader, cn, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
+import { Badge, Card, CardHeader, cn, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine, linkClass } from "@kebo/ui";
 import { plural } from "@/lib/format";
 import { bigMoney, change, monthYearOf, type Period } from "@/lib/insights-period";
 import { PROFIT_SORT_LABEL, PROFIT_SORTS, type loadProfit, type ProfitSort } from "@/lib/insights-data";
@@ -163,7 +163,7 @@ export function ProfitSection({
               {shown.map((o) => (
                 <Tr key={o.orderId} href={`/orders/${o.orderId}/costs`}>
                   <Td>
-                    <Link href={`/orders/${o.orderId}/costs`} className="-my-1 inline-block py-1 font-semibold text-primary hover:underline">
+                    <Link href={`/orders/${o.orderId}/costs`} className={cn(linkClass, "-my-1 inline-block py-1")}>
                       {o.refNo}
                     </Link>
                     <span className="block text-xs text-text-2 sm:hidden">{o.customer}</span>

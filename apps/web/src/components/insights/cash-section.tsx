@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, Notice } from "@kebo/ui";
+import { Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, Notice, linkClass } from "@kebo/ui";
 import { date, plural } from "@/lib/format";
 import { bigMoney, monthYearOf, type Period } from "@/lib/insights-period";
 import type { CashReport } from "@/lib/types-facts";
@@ -94,7 +94,7 @@ export function CashSection({ r, p }: { r: CashReport; p: Period }) {
         {r.accounts.length === 0 ? (
           <p className="p-4 text-sm text-muted">
             No account yet.{" "}
-            <Link href="/finance/cash-book" className="font-medium text-primary hover:underline">
+            <Link href="/finance/cash-book" className={linkClass}>
               Add the first one on Cash &amp; bank
             </Link>
           </p>
@@ -113,7 +113,7 @@ export function CashSection({ r, p }: { r: CashReport; p: Period }) {
               {r.accounts.map((a) => (
                 <Tr key={a.id} href={`/finance/cash-book?acct=${a.id}`}>
                   <Td>
-                    <Link href={`/finance/cash-book?acct=${a.id}`} className="-my-1 inline-block py-1 font-semibold text-primary hover:underline">
+                    <Link href={`/finance/cash-book?acct=${a.id}`} className={cn(linkClass, "-my-1 inline-block py-1")}>
                       {a.name} · {a.currency}
                     </Link>
                     {(a.openedOn || a.archived) && (

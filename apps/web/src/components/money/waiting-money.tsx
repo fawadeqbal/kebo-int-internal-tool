@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EXPENSE_CATEGORY_LABEL, PAYMENT_METHOD_LABEL, type ExpenseCategory, type PaymentMethod } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Badge, linkClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, dateTime, money } from "@/lib/format";
 import type { Submission, SubmissionList } from "@/lib/types-approvals";
@@ -53,7 +53,7 @@ export async function WaitingToVerify({
                 {!orderId && s.order && (
                   <>
                     {" · "}
-                    <Link href={`/orders/${s.order.id}/payment`} className="font-medium text-primary hover:underline">
+                    <Link href={`/orders/${s.order.id}/payment`} className={linkClass}>
                       {s.order.refNo}
                     </Link>
                   </>
@@ -66,7 +66,7 @@ export async function WaitingToVerify({
                 {s.file && (
                   <>
                     {" · "}
-                    <a href={`/files/${s.file.id}`} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                    <a href={`/files/${s.file.id}`} target="_blank" rel="noreferrer" className={linkClass}>
                       Open the slip
                     </a>
                   </>
@@ -91,7 +91,7 @@ export async function WaitingToVerify({
       </ul>
       {shown.length < rows.length && (
         <p className="border-t border-line/70 px-4 sm:px-5 py-2.5 text-sm">
-          <Link href="/approvals" className="font-medium text-primary hover:underline">
+          <Link href="/approvals" className={linkClass}>
             {rows.length - shown.length} more →
           </Link>
         </p>

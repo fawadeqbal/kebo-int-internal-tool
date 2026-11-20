@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { can, PAPER, ROUTE_NAME, type Tone } from "@kebo/shared";
-import { Badge, cn, Notice } from "@kebo/ui";
+import { Badge, cn, Notice, linkClass } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
 import { orderName } from "@/lib/titles";
@@ -207,7 +207,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   // Changed after the quotation was accepted: how often, to the history (said once, on Delivery & payment).
   const changed =
     a && a.changes > 0 ? (
-      <Link href={`${base}/history?q=${encodeURIComponent("agreed with the customer")}`} className="px-1 text-xs font-medium text-primary hover:underline">
+      <Link href={`${base}/history?q=${encodeURIComponent("agreed with the customer")}`} className={cn(linkClass, "px-1 text-xs")}>
         Changed {a.changes}×
       </Link>
     ) : undefined;

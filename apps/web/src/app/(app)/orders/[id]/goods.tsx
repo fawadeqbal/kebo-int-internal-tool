@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Button, Card, CardBody, CardHeader, cn, RULES } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, cn, RULES, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -357,7 +357,7 @@ function PackingMarks({
 }) {
   const [editing, setEditing] = useState(false);
   const fromShipment = containerHref ? (
-    <a href={containerHref} className="text-xs font-normal text-primary hover:underline">
+    <a href={containerHref} className={cn(linkClass, "text-xs")}>
       {containerNo ? "from Shipment 1 · change it there" : "add it on the shipment"}
     </a>
   ) : null;

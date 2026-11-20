@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Button, buttonClass } from "@kebo/ui";
+import { Button, buttonClass, linkClass, cn } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { Modal } from "@/components/common/dialog";
@@ -65,7 +65,7 @@ export function SendDialog({ what, after = "links", onClose }: { what: SendWhat;
             href={requestPrintHref(orderId, refId, { now: true })}
             target="_blank"
             rel="noreferrer"
-            className="w-fit text-sm font-medium text-primary hover:underline"
+            className={cn(linkClass, "w-fit text-sm")}
           >
             See how it prints
           </a>
