@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { can } from "@kebo/shared";
-import { StageBadge, StatusBadge, EmptyState } from "@kebo/ui";
+import { StageBadge, StatusBadge, EmptyState, RULES } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { date, dateTime, timeAgo, companyToday } from "@/lib/format";
@@ -180,7 +180,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
           }
         >
           <>
-            <RecordSection id="overview" className="flex flex-col gap-5">
+            <RecordSection id="overview" className={RULES.page.stack}>
               <PerformanceCard kind="user" id={u.id} me={me} />
               <DetailsCard
                 flash={sp.saved === u.id}
@@ -198,7 +198,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
             </RecordSection>
 
             {spending && (
-              <RecordSection id="spending" className="flex flex-col gap-5">
+              <RecordSection id="spending" className={RULES.page.stack}>
                 <PersonSpendingCard s={spending} year={today.slice(0, 4)} />
                 <PersonOwedCard s={spending} today={today} canPay />
               </RecordSection>
