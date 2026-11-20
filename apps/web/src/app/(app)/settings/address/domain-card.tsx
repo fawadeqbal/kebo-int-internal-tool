@@ -1,5 +1,5 @@
 import type { OwnDomainView } from "@kebo/shared";
-import { THead, Th, Card, CardBody, CardHeader, ScrollFade, StatusBadge, linkClass, cn } from "@kebo/ui";
+import { THead, Th, Card, CardBody, CardHeader, ScrollFade, StatusBadge, linkClass, cn, capsClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { CheckDomain, ConnectDomain, CopyValue, RemoveDomain } from "./domain-forms";
 import { date } from "@/lib/format";
@@ -75,12 +75,12 @@ export async function DomainCard({ view }: { view: DomainView | null }) {
       <CardBody className="flex flex-col gap-4">
         {!domain ? (
           <div>
-            <p className="text-xs font-medium tracking-wide text-muted uppercase">Now</p>
+            <p className={capsClass}>Now</p>
             <p className="mt-1 text-sm text-text-2">Not connected. Your team uses {ours}.</p>
           </div>
         ) : status === "connected" ? (
           <div>
-            <p className="text-xs font-medium tracking-wide text-muted uppercase">Now</p>
+            <p className={capsClass}>Now</p>
             <p className="mt-1 flex flex-wrap items-center gap-2.5">
               <a href={`https://${domain}`} className={cn(linkClass, "font-mono text-base")}>
                 {domain}

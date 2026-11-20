@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState, type ReactNode } from "react";
 
-import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice } from "@kebo/ui";
+import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice, subTitleClass } from "@kebo/ui";
 import { ChangeHint, changeKind, changeLine, changeWords, countChanges } from "@/components/common/change-words";
 import { PanelBody, PanelSection, SidePanel, useClosePanel, WindowFooter } from "@/components/common/panel";
 import { EditButton } from "@/components/common/edit-button";
@@ -313,7 +313,7 @@ export function ViewCard({
       {/* A phone puts wide actions under the title instead of squeezing it to a word a line. */}
       <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3 max-sm:flex-wrap">
         <div className="min-w-0 max-sm:grow max-sm:basis-[55%]">
-          <h3 className="text-sm font-semibold text-text">{title}</h3>
+          <h3 className={subTitleClass}>{title}</h3>
           {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
         {/* Never wider than the card; on a phone, under the title they start at its left edge. */}

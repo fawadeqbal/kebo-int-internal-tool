@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Clock, X } from "lucide-react";
 import type { CSSProperties } from "react";
-import { Button, cn, linkClass } from "@kebo/ui";
+import { Button, cn, linkClass, subTitleClass } from "@kebo/ui";
 import { ChangeText } from "@/components/common/change-words";
 
 /** One change in a box's or a line's history: what changed (a line each), why, who and when. */
@@ -72,7 +72,7 @@ export function HistoryButton({ title, entries, allHref }: { title: string; entr
               className="fixed z-[95] overflow-hidden border border-line bg-surface text-left shadow-pop max-sm:inset-x-0 max-sm:bottom-0 max-sm:rounded-t-2xl max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:top-(--top) sm:left-(--left) sm:w-[380px] sm:rounded-xl"
             >
               <div className="flex items-center justify-between gap-2 border-b border-line py-1.5 pr-1.5 pl-4">
-                <h3 className="text-sm font-bold">{title} · history</h3>
+                <h3 className={subTitleClass}>{title} · history</h3>
                 <Button size="icon-xs" variant="ghost" onClick={() => setOpen(false)} aria-label="Close">
                   <X aria-hidden />
                 </Button>

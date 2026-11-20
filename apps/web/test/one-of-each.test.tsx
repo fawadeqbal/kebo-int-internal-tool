@@ -345,6 +345,11 @@ describe("one of each", () => {
     expect(found(/rounded-xl border border-line bg-surface shadow-card"/g)).toEqual([]);
   });
 
+  it("one small caps label (capsClass) and one sub-heading (subTitleClass): no page types its own", () => {
+    expect(found(/className="[^"]*\btracking-wide\b[^"]*\buppercase\b[^"]*"/g).filter((m) => !m.includes("font-doc-display"))).toEqual([]);
+    expect(found(/<h[234]\b[^>]*className="[^"]*\btext-sm\b[^"]*\bfont-(semibold|bold)\b[^"]*"/g).filter((m) => !/text-muted|text-text-2|uppercase/.test(m))).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

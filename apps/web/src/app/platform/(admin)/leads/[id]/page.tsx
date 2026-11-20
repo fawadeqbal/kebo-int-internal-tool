@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { COMPANY_KIND_LABEL, LEAD_SOURCE_LABEL, LEAD_STATUS_LABEL, suggestSlug } from "@kebo/shared";
-import { ButtonLink, buttonClass, Card, EmptyState, StatusBadge, EmptyLine, CardHeader, linkClass, cn } from "@kebo/ui";
+import { ButtonLink, buttonClass, Card, EmptyState, StatusBadge, EmptyLine, CardHeader, linkClass, cn, subTitleClass } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { loadPlatform } from "@/lib/platform";
 import { date, dateTime } from "@/lib/format";
@@ -155,7 +155,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           </Card>
           <Card className="overflow-clip" aria-labelledby="notes-title">
             <div className="border-b border-line px-4 py-3">
-              <h2 id="notes-title" className="text-sm font-semibold">
+              <h2 id="notes-title" className={subTitleClass}>
                 Notes · {l.notes.length}
               </h2>
               <p className="mt-0.5 text-xs text-muted">calls, emails, what they said</p>
@@ -178,7 +178,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           </Card>
           <Card className="overflow-clip" aria-labelledby="history-title">
             <div className="border-b border-line px-4 py-3">
-              <h2 id="history-title" className="text-sm font-semibold">
+              <h2 id="history-title" className={subTitleClass}>
                 History
               </h2>
               <p className="mt-0.5 text-xs text-muted">what was done on the platform</p>
@@ -203,7 +203,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       >
           <Card className="overflow-clip" aria-labelledby="progress-title">
             <div className="border-b border-line px-4 py-3">
-              <h2 id="progress-title" className="text-sm font-semibold">
+              <h2 id="progress-title" className={subTitleClass}>
                 Progress
               </h2>
               <p className="mt-0.5 text-xs text-muted">click a step to move it there</p>

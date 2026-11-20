@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Notice, linkClass, cn } from "@kebo/ui";
+import { Card, CardBody, CardHeader, Notice, linkClass, cn, capsClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date } from "@/lib/format";
 import { AddressEdit } from "./form";
@@ -21,7 +21,7 @@ export async function AddressCard({ sendsTo }: { /** The company's own domain, w
       />
       <CardBody className="flex flex-col gap-5">
         <div>
-          <p className="text-xs font-medium tracking-wide text-muted uppercase">Now</p>
+          <p className={capsClass}>Now</p>
           <a href={view.url} className={cn(linkClass, "mt-1 inline-block font-mono text-base")}>
             {host}
           </a>

@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle2, ChevronUp, ClipboardPaste, Lock, Plus, X }
 import { createPortal } from "react-dom";
 import { convertMinor, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import { basisText, BASIS_STEP_LABEL, leadWords, optionLetter } from "@kebo/shared";
-import { Badge, Button, Card, cn, Input, Select, Textarea, controlClass, controlSizes } from "@kebo/ui";
+import { Badge, Button, Card, cn, Input, Select, Textarea, controlClass, controlSizes, subTitleClass } from "@kebo/ui";
 import { EditButton } from "@/components/common/edit-button";
 import { BottomSheet } from "@/components/common/bottom-sheet";
 import { useIsPhone } from "@/components/common/floating";
@@ -241,10 +241,10 @@ export function PriceSheet({
           {/* The open option's lines. */}
           <Card aria-label={`Option ${letter} items`}>
             <div className="border-b border-line px-4 py-3">
-              <h3 className="text-sm font-semibold max-sm:hidden">
+              <h3 className={cn(subTitleClass, "max-sm:hidden")}>
                 Option {letter} · {opt.factoryQuoteId ? (offer ? `items from ${offer.factory.name}'s offer` : "an offer that was removed") : "the customer's items"}
               </h3>
-              <h3 className="text-sm font-semibold sm:hidden">Items</h3>
+              <h3 className={cn(subTitleClass, "sm:hidden")}>Items</h3>
               <p className="mt-0.5 text-xs text-muted max-sm:hidden">
                 {offer?.coverage.missing.length ? (
                   <span className="inline-flex items-center gap-1 text-warn">
@@ -361,7 +361,7 @@ export function PriceSheet({
             <Card aria-label={`Getting it to ${ours}`}>
               <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold">Getting it to {ours}</h3>
+                  <h3 className={subTitleClass}>Getting it to {ours}</h3>
                   <p className="mt-0.5 text-xs text-muted">
                     <Lock className="mr-1 inline size-3" aria-hidden />
                     Internal: added to the cost of the items above, never printed.
@@ -433,7 +433,7 @@ export function PriceSheet({
           <Card aria-label="Charges">
             <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
               <div className="min-w-0">
-                <h3 className="text-sm font-semibold">
+                <h3 className={subTitleClass}>
                   Charges<span className="sm:hidden"> · {opt.charges.length}</span>
                 </h3>
                 <p className="mt-0.5 text-xs text-muted max-sm:hidden">Our own charges (freight, inspection…): printed on the quotation.{showCosts ? " Cost is internal." : ""}</p>

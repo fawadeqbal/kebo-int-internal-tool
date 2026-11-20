@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { PAPER_SWITCH_GROUPS, PAPER_SWITCH_LABEL, PAPER_SWITCH_NOTE } from "@kebo/shared";
 import { SwitchList } from "@/components/common/switch-list";
 import type { ActionState } from "@/lib/actions";
+import { capsClass } from "@kebo/ui";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -28,7 +29,7 @@ export function PapersEditor({ off: initial, action }: { off: string[]; action: 
       {PAPER_SWITCH_GROUPS.map((g) => (
         <section key={g.title} aria-labelledby={`papers-${g.title}`} className="flex flex-col border-t border-line first:border-t-0">
           <div className="px-4 pt-3 pb-1">
-            <h3 id={`papers-${g.title}`} className="text-2xs font-semibold tracking-wide text-muted uppercase">
+            <h3 id={`papers-${g.title}`} className={capsClass}>
               {g.title}
             </h3>
             <p className="text-xs text-muted">{g.hint}</p>

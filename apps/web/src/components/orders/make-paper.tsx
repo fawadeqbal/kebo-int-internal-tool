@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Mail, MessageCircle, RefreshCw, X } from "lucide-react";
 import { FLOW_STEP_LABEL, inSentence, type PaperCheck } from "@kebo/shared";
-import { Badge, Button, buttonClass, Card, Checkbox, cn, Input, controlClass, controlSizes, Notice, chipClass, linkClass } from "@kebo/ui";
+import { Badge, Button, buttonClass, Card, Checkbox, cn, Input, controlClass, controlSizes, Notice, chipClass, linkClass, capsClass, subTitleClass } from "@kebo/ui";
 import { FileActions } from "@/components/common/file-actions";
 import type { ActionState } from "@/lib/actions";
 import type { PaperChecks } from "@/lib/types-papers";
@@ -258,7 +258,7 @@ function BuyerBox({
   return (
     <section aria-labelledby="buyer" className="rounded-lg border border-line p-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 id="buyer" className="text-2xs font-semibold tracking-wide text-muted uppercase">
+        <h3 id="buyer" className={capsClass}>
           Buyer as on the order
         </h3>
         {editing && p.canRefreshBuyer && (
@@ -301,7 +301,7 @@ function TermsBox({ p }: { p: PaperChecks }) {
   if (!t) return null;
   return (
     <section aria-labelledby="terms" className="rounded-lg border border-warn/40 bg-warn-soft p-3">
-      <h3 id="terms" className="text-2xs font-semibold tracking-wide text-muted uppercase">
+      <h3 id="terms" className={capsClass}>
         Payment terms
       </h3>
       <p className="mt-1 text-sm">
@@ -436,7 +436,7 @@ export function MakePaper({
         {notice && <Notice tone="ok">{notice}</Notice>}
 
         <section aria-labelledby="filled">
-          <h3 id="filled" className="text-2xs font-semibold tracking-wide text-muted uppercase">
+          <h3 id="filled" className={capsClass}>
             Filled from the order
           </h3>
           <ul className="mt-1 flex flex-col divide-y divide-line">
@@ -465,7 +465,7 @@ export function MakePaper({
 
         {editing && p.options.length > 0 && (
           <fieldset>
-            <legend className="text-2xs font-semibold tracking-wide text-muted uppercase">Options</legend>
+            <legend className={capsClass}>Options</legend>
             <div className="mt-1.5 flex flex-col gap-2">
               {p.options.map((o) => (
                 <label key={o.key} className="flex items-center gap-2.5 text-sm">
@@ -536,7 +536,7 @@ export function MakePaper({
 
         {p.versions.length > 1 && (
           <section aria-labelledby="versions">
-            <h3 id="versions" className="text-2xs font-semibold tracking-wide text-muted uppercase">
+            <h3 id="versions" className={capsClass}>
               Versions
             </h3>
             <ul className="mt-1 flex flex-col gap-1 text-xs">
@@ -561,7 +561,7 @@ export function MakePaper({
 
         {send && final && (
           <section aria-labelledby="send" className="flex flex-col gap-2 rounded-lg border border-line bg-surface-2 p-3">
-            <h3 id="send" className="text-sm font-semibold">
+            <h3 id="send" className={subTitleClass}>
               Send it to the customer
             </h3>
             <p className="text-xs text-muted">Download the PDF, then send it with this text.</p>
