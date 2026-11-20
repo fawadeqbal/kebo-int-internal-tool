@@ -10,6 +10,7 @@ import { WELCOMED_COOKIE } from "@/lib/welcome";
 import { companyLook } from "@/lib/company-look";
 import { demoMode } from "@/lib/demo";
 import { PRODUCT_NAME } from "@/lib/product";
+import { REMEMBERED_COOKIE, rememberedAccount } from "@/lib/remembered";
 
 const DEMO_LOGINS = [
   { label: "Owner", hint: "Sees everything: money, profit, settings", email: "admin@example.com", password: "Admin@12345" },
@@ -29,10 +30,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const look = await companyLook();
   const name = look?.name ?? PRODUCT_NAME;
   // The welcome, only the first time this device opens the sign-in page (the splash sets the cookie).
-  const welcomed = (await cookies()).has(WELCOMED_COOKIE);
+  const jar = await cookies();
+  const welcomed = jar.has(WELCOMED_COOKIE);
+  // Welcome back: the account this device remembers (only at a company's own address, never in the demo).
+  const remembered = look && !demoMode() ? rememberedAccount(jar.get(REMEMBERED_COOKIE)?.value) : null;
   return (
     <AuthShell
       tag={false}
+      side
       footer={
         look ? (
           <p>Only invited members of {look.name} can sign in.</p>
@@ -57,23 +62,44 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           This is your company&apos;s new address. Sign in once more here, and bookmark it.
         </Notice>
       )}
-      {/* Who you are signing in to: the company's logo, or its initials (board "Trusted sign in", White label). */}
-      <div className="flex flex-col items-center gap-4 text-center">
-        <BrandMark name={name} logoSrc={look?.logoSrc ?? null} size="card" />
-        <div>
-          <h1 className="text-xl leading-7 font-semibold tracking-tight text-text">Sign in</h1>
-          <p className="mt-1 text-sm text-muted">
-            {demoMode() ? (
-              "This is a demo with sample data. Pick a person below to look around."
-            ) : (
-              <>
-                to <strong className="font-semibold text-text">{name}</strong>
-              </>
-            )}
-          </p>
+      {/* Who you are signing in to: at a company's address the panel (laptop) or the top (phone) has its logo;
+          the heading says it again. Elsewhere the product's mark on the card (board "Trusted sign-in, refined"). */}
+      {look ? (
+        <div className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
+          <span className="lg:hidden">
+            <BrandMark name={name} logoSrc={look.logoSrc} size="card" />
+          </span>
+          <div>
+            <h1 className="text-2xl leading-8 font-semibold tracking-tight text-text">{remembered ? "Welcome back" : "Sign in"}</h1>
+            <p className="mt-1.5 text-base text-text-2">
+              {remembered ? (
+                "Sign in to carry on where you left off."
+              ) : (
+                <>
+                  to <strong className="font-semibold text-text">{name}</strong>
+                </>
+              )}
+            </p>
+          </div>
         </div>
-      </div>
-      <LoginForm next={next} demo={demoMode() ? DEMO_LOGINS : undefined} />
+      ) : (
+        <div className="flex flex-col items-center gap-4 text-center">
+          <BrandMark name={name} logoSrc={null} size="card" />
+          <div>
+            <h1 className="text-xl leading-7 font-semibold tracking-tight text-text">Sign in</h1>
+            <p className="mt-1 text-sm text-muted">
+              {demoMode() ? (
+                "This is a demo with sample data. Pick a person below to look around."
+              ) : (
+                <>
+                  to <strong className="font-semibold text-text">{name}</strong>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+      <LoginForm next={next} demo={demoMode() ? DEMO_LOGINS : undefined} remembered={remembered} />
     </AuthShell>
   );
 }

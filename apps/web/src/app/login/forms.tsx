@@ -1,9 +1,12 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
+import { KeyRound, Mail } from "lucide-react";
 import { Field, Input, Notice, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
-import { loginAction, twoStepAction } from "./actions";
+import { forgetAccountAction, loginAction, twoStepAction } from "./actions";
+import { initialsOf } from "@/lib/initials";
+import type { RememberedAccount } from "@/lib/remembered";
 
 export interface DemoLogin {
   label: string;
@@ -12,7 +15,7 @@ export interface DemoLogin {
   password: string;
 }
 
-export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] }) {
+export function LoginForm({ next, demo, remembered }: { next?: string; demo?: DemoLogin[]; remembered?: RememberedAccount | null }) {
   const [state, action] = useActionState(loginAction, {});
   const [showPassword, setShowPassword] = useState(false);
   const form = useRef<HTMLFormElement>(null);
@@ -24,7 +27,7 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
     f.requestSubmit();
   };
   return (
-    <form ref={form} action={action} className="mt-5 flex flex-col gap-4" noValidate>
+    <form ref={form} action={action} className="mt-6 flex flex-col gap-4.5" noValidate>
       {demo && (
         <div className="flex flex-col gap-2">
           {demo.map((d) => (
@@ -58,9 +61,36 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
         </fieldset>
       )}
       {state.code !== "choose_company" && state.values?.company && <input type="hidden" name="company" value={state.values.company} />}
-      <Field label="Work email" required htmlFor="email" error={state.errors?.email}>
-        <Input id="email" name="email" type="email" autoComplete="username" autoFocus required defaultValue={state.values?.email ?? ""} />
-      </Field>
+      {remembered ? (
+        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-surface px-3.5 py-3">
+          <input type="hidden" name="email" value={remembered.email} />
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary-soft text-md font-semibold text-primary" aria-hidden>
+            {initialsOf(remembered.name ?? remembered.email)}
+          </span>
+          <span className="min-w-0 flex-1">
+            {remembered.name && <span className="block truncate text-base font-semibold text-text">{remembered.name}</span>}
+            <span className={remembered.name ? "block truncate text-md text-text-2" : "block truncate text-base font-semibold text-text"}>{remembered.email}</span>
+          </span>
+          {/* Not a submit button: Enter in the password field must sign in, not forget the account. */}
+          <button type="button" onClick={() => void forgetAccountAction()} className={`${linkClass} min-h-11 shrink-0 px-1 text-sm font-medium`}>
+            Not you?
+          </button>
+        </div>
+      ) : (
+        <Field label="Work email" required htmlFor="email" error={state.errors?.email}>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="username"
+            autoFocus
+            required
+            defaultValue={state.values?.email ?? ""}
+            leading={<Mail aria-hidden />}
+            className="pl-10"
+          />
+        </Field>
+      )}
       <Field label="Password" required htmlFor="password" error={state.errors?.password}>
         <div className="relative">
           <Input
@@ -69,9 +99,12 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             required
-            autoFocus={state.code === "choose_company"}
-            className="pr-16"
+            autoFocus={state.code === "choose_company" || !!remembered}
+            className="pr-16 pl-10"
           />
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted" aria-hidden>
+            <KeyRound className="size-4" />
+          </span>
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
@@ -84,11 +117,11 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
         </div>
       </Field>
       <input type="hidden" name="keepAsked" value="1" />
-      <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
+      <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-text lg:min-h-0">
         <input type="checkbox" name="keep" defaultChecked className="size-[18px] accent-primary-solid" />
         Keep me signed in
       </label>
-      <SubmitButton pendingText="Signing in…" className="w-full">
+      <SubmitButton pendingText="Signing in…" size="lg" className="w-full">
         Sign in
       </SubmitButton>
       {state.message && state.code !== "choose_company" && <Notice tone="bad">{state.message}</Notice>}
