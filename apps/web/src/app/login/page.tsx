@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Notice } from "@kebo/ui";
+import { Notice, linkClass } from "@kebo/ui";
 import { AuthShell } from "./auth-shell";
 import { BrandMark } from "./brand-mark";
 import { LoginForm } from "./forms";
@@ -39,7 +39,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         ) : (
           <p>
             New company?{" "}
-            <Link href="/request-a-demo" className="font-semibold text-primary hover:underline">
+            <Link href="/request-a-demo" className={linkClass}>
               Request a demo
             </Link>
           </p>

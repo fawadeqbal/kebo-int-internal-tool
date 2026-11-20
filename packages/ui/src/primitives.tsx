@@ -262,8 +262,13 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
 export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4";
 export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
 
+/** A link in text (a list's "Show all", a cross-link, "Open the order →"): one look everywhere; its size comes from the text around it. */
+export const linkClass = "font-medium text-primary underline-offset-2 hover:underline";
+
+/** A card's look, for the few boxes that cannot be a Card element (the side panel, which measures itself). */
+export const cardClass = "rounded-2xl border border-line bg-surface";
 export function Card({ className, ...props }: ComponentProps<"section">) {
-  return <section className={cn("rounded-2xl border border-line bg-surface", className)} {...props} />;
+  return <section className={cn(cardClass, className)} {...props} />;
 }
 
 export function CardHeader({
@@ -576,25 +581,34 @@ export function Th({ className, ...props }: ComponentProps<"th">) {
 export function Td({ className, ...props }: ComponentProps<"td">) {
   return <td className={cn("h-[52px] border-b border-line px-3.5 py-3 align-middle text-text", className)} {...props} />;
 }
-export function Tr({ className, ...props }: ComponentProps<"tr">) {
-  return <tr className={cn("transition-colors last:[&>td]:border-b-0", className)} {...props} />;
-}
-
 /**
- * A list row that opens its record (inside the app's DataTable): a click
- * anywhere on it goes to `href` (Ctrl/⌘-click: a new tab), the row lights on
- * hover, and its first cell should hold a real link to the same place for the
- * keyboard (Enter) and screen readers. `flash`: just saved, lit for 2 seconds.
+ * A table row. With `href` it opens its record (one rule in every table, the
+ * app's RowClicks): a click anywhere on it goes to `href` (Ctrl/⌘-click: a new
+ * tab), a click on a link, button or field in it does its own thing, the row
+ * lights on hover, and its first cell should hold a real link to the same place
+ * for the keyboard (Enter) and screen readers. `flash`: just saved, lit for 2 seconds.
+ * `stay`: the page keeps its place (a row that opens its parts under it).
  */
-export function DataRow({ href, flash, className, ...props }: ComponentProps<"tr"> & { href: string; flash?: boolean }) {
+export function Tr({ href, flash, stay, className, ...props }: ComponentProps<"tr"> & { href?: string; flash?: boolean; stay?: boolean }) {
   return (
     <tr
       data-href={href}
       data-flash={flash ? "" : undefined}
-      className={cn("group cursor-pointer transition-colors last:[&>td]:border-b-0 hover:bg-primary-soft/60", flash && "animate-flash", className)}
+      data-stay={href && stay ? "" : undefined}
+      className={cn(
+        "transition-colors last:[&>td]:border-b-0",
+        href && "group cursor-pointer hover:bg-primary-soft/60",
+        flash && "animate-flash",
+        className,
+      )}
       {...props}
     />
   );
+}
+
+/** A list's row (DataTable): a Tr that always opens its record. */
+export function DataRow(props: ComponentProps<typeof Tr> & { href: string }) {
+  return <Tr {...props} />;
 }
 
 /**

@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-
-import { PanelBody, UrlWindow } from "./panel";
 
 /**
  * Old links to a record's tabs (?tab=orders) land on that section, now that
@@ -31,16 +29,4 @@ export function RecordLanding({ section, clearParam = "saved" }: { section?: str
     return () => clearTimeout(t);
   }, [once, clearParam, pathname, router]);
   return null;
-}
-
-/**
- * "All history" of a record, read-only in the side panel (?panel=history):
- * every change with who, when, old → new and the reason when one was asked.
- */
-export function HistoryPanel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <UrlWindow name="history" title={title} description="Every change, newest first, with the reason when one was asked.">
-      <PanelBody>{children}</PanelBody>
-    </UrlWindow>
-  );
 }

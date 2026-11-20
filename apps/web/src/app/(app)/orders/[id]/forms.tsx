@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea, Notice } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea, Notice, linkClass } from "@kebo/ui";
 import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
 import { SubmitButton } from "@kebo/ui/client";
 import { ConfirmSubmit } from "@/components/common/dialog";
@@ -201,7 +201,7 @@ export function DetailsCard({
   const [editing, setEditing] = useState(false);
   const fromShipment = (filled: boolean) =>
     shipment.onShipping ? (
-      <a href={shipment.href} className="text-xs font-normal text-primary hover:underline">
+      <a href={shipment.href} className={cn(linkClass, "text-xs")}>
         {filled ? `from ${shipment.label} · edit in Shipping` : "add it in Shipping"}
       </a>
     ) : null;
@@ -229,7 +229,7 @@ export function DetailsCard({
       label: compact ? "Ready by" : "Ready at supplier",
       value: shown.readyOn,
       note: readyEach ? (
-        <a href={readyEach.href} className="text-xs font-normal text-primary hover:underline">
+        <a href={readyEach.href} className={cn(linkClass, "text-xs")}>
           the latest of {readyEach.count} suppliers · edit in Supplier
         </a>
       ) : undefined,
@@ -306,7 +306,7 @@ export function DetailsCard({
                 {readyEach ? (
                   <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs text-text-2">
                     Each of the {readyEach.count} suppliers gives its own ready date:{" "}
-                    <a href={readyEach.href} className="font-medium text-primary hover:underline">
+                    <a href={readyEach.href} className={linkClass}>
                       edit them on the Supplier step
                     </a>
                     .
@@ -319,7 +319,7 @@ export function DetailsCard({
                 {shipment.onShipping ? (
                   <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs text-text-2">
                     Shipped on, the B/L and the container are {shipment.label}&apos;s:{" "}
-                    <a href={shipment.href} className="font-medium text-primary hover:underline">
+                    <a href={shipment.href} className={linkClass}>
                       edit them in Shipping
                     </a>
                     .

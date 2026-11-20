@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { can, PAPER, ROUTE_NAME, type Tone } from "@kebo/shared";
-import { Badge, cn } from "@kebo/ui";
+import { Badge, cn, Notice, linkClass } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
 import { orderName } from "@/lib/titles";
@@ -16,7 +16,6 @@ import { ItemsBox, type ItemsPhoneRow } from "@/components/records/items-box";
 import { PaperFacts, PaperLayout } from "@/components/records/paper-boxes";
 import { SheetFact, SheetPart } from "@/components/records/phone-items";
 import { Totals } from "@/components/records/totals";
-import { Notice } from "@/components/records/notice";
 import type { LineColumn, LineRow } from "@/components/lines/line-table";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import { AgreedWindow, OrderWindow } from "@/components/order-sections/overview-windows";
@@ -208,7 +207,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   // Changed after the quotation was accepted: how often, to the history (said once, on Delivery & payment).
   const changed =
     a && a.changes > 0 ? (
-      <Link href={`${base}/history?q=${encodeURIComponent("agreed with the customer")}`} className="px-1 text-xs font-medium text-primary hover:underline">
+      <Link href={`${base}/history?q=${encodeURIComponent("agreed with the customer")}`} className={cn(linkClass, "px-1 text-xs")}>
         Changed {a.changes}×
       </Link>
     ) : undefined;

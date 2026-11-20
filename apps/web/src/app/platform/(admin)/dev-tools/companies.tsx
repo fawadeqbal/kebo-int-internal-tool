@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { agoText, type DevCompaniesView } from "@kebo/shared";
-import { Card, CardHeader, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Card, CardHeader, EmptyState, Table, Td, Th, THead, Tr, linkClass } from "@kebo/ui";
 import { LevelBadge, mbText } from "./parts";
 
 /** Companies: how each one is doing (trouble or no use first), and the busiest hours of the day. */
@@ -34,9 +34,9 @@ export function CompaniesTab({ v, all }: { v: DevCompaniesView; all: boolean }) 
             </THead>
             <tbody>
               {rows.map((c) => (
-                <Tr key={c.id}>
+                <Tr key={c.id} href={`/platform/companies/${c.id}`}>
                   <Td>
-                    <Link href={`/platform/companies/${c.id}`} className="font-medium text-primary hover:underline">
+                    <Link href={`/platform/companies/${c.id}`} className={linkClass}>
                       {c.name}
                     </Link>
                     <span className="block text-xs text-muted">
@@ -63,7 +63,7 @@ export function CompaniesTab({ v, all }: { v: DevCompaniesView; all: boolean }) 
         {!all && v.companies.length > SHOWN && (
           <p className="border-t border-line bg-surface-2 px-4 py-2.5 text-sm">
             {v.companies.length - SHOWN} more, all fine or switched off.{" "}
-            <Link href="/platform/dev-tools?tab=companies&all=1" className="font-medium text-primary hover:underline">
+            <Link href="/platform/dev-tools?tab=companies&all=1" className={linkClass}>
               Show all {v.companies.length}
             </Link>
           </p>

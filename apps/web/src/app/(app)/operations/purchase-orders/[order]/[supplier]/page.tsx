@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, Printer } from "lucide-react";
 import { PAYMENT_METHOD_LABEL, RECORD_KIND, RECORD_TITLE } from "@kebo/shared";
-import { ButtonLink, StatusBadge } from "@kebo/ui";
+import { ButtonLink, StatusBadge, linkClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderFilesOf, orderMoneyOf, orderOf } from "@/lib/order-data";
@@ -26,6 +26,7 @@ import { stageData } from "../../../../orders/[id]/stage-data";
 import { cache } from "react";
 import { RecordShell } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
+import { BoxNote } from "@/components/common/record-box";
 
 /** The order's purchase orders, read once per request (the page and its tab title). */
 const purchaseOrdersOf = cache((order: string) => optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${order}/purchase-orders`)));
@@ -108,7 +109,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
     </Link>,
     <span key="o">
       for{" "}
-      <Link href={orderHref} className="font-medium text-primary hover:underline">
+      <Link href={orderHref} className={linkClass}>
         {o.refNo}
       </Link>
     </span>,
@@ -206,7 +207,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             </SideSection>
             <SideSection title="Changed on the order">
               <li className="py-1 text-md">
-                <Link href={orderHref} className="font-semibold text-primary hover:underline">
+                <Link href={orderHref} className={linkClass}>
                   Open {o.refNo} › Purchase order
                 </Link>
               </li>
@@ -224,7 +225,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               {
                 label: "Supplier",
                 value: (
-                  <Link href={`/suppliers/${po.supplier.id}`} className="text-primary hover:underline">
+                  <Link href={`/suppliers/${po.supplier.id}`} className={linkClass}>
                     {po.supplier.name}
                   </Link>
                 ),
@@ -275,9 +276,9 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               >
                 <div className="flex flex-col gap-3 pb-3.5">
                   {plan.differs && (
-                    <p className="mx-[18px] rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
+                    <BoxNote tone="warn">
                       The parts do not add up to what we owe ({money(plan.differs, plan.currency)} {Number(plan.differs) > 0 ? "missing" : "too much"}): prices changed since. Open the order&apos;s Purchase order and save the plan again.
-                    </p>
+                    </BoxNote>
                   )}
                   <SupplierPlanTable
                     plan={plan}

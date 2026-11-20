@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Banknote, Landmark, Wallet } from "lucide-react";
 import { can, CURRENCIES, MONEY_ACCOUNT_KIND_LABEL } from "@kebo/shared";
-import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice } from "@kebo/ui";
+import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice, linkClass } from "@kebo/ui";
 import { convertAmount } from "@kebo/money";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -130,7 +130,7 @@ export async function VaultOverview({ today }: { today: string }) {
                 {open.map((a) => {
                   const eq = a.currency === main ? Number(a.balance) : convertAmount(Number(a.balance), a.currency, main, main, rates);
                   return (
-                    <Tr key={a.id}>
+                    <Tr key={a.id} href={`/finance/cash-book?acct=${a.id}`}>
                       <Td>
                         <Link href={`/finance/cash-book?acct=${a.id}`} className="font-semibold hover:text-primary">
                           {a.name}
@@ -140,7 +140,7 @@ export async function VaultOverview({ today }: { today: string }) {
                       <Td className={cn("text-right whitespace-nowrap tabular", Number(a.balance) < 0 && "font-semibold text-bad")}>{money(a.balance, a.currency)}</Td>
                       <Td className="text-right whitespace-nowrap tabular">{eq === null ? <span className="text-muted">no rate</span> : eq.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
                       <Td className="text-right">
-                        <Link href={`/finance/cash-book?acct=${a.id}`} className="text-md font-medium whitespace-nowrap text-primary hover:underline">
+                        <Link href={`/finance/cash-book?acct=${a.id}`} className={cn(linkClass, "text-md whitespace-nowrap")}>
                           Statement
                         </Link>
                       </Td>
@@ -170,7 +170,7 @@ export async function VaultOverview({ today }: { today: string }) {
               </>
             }
             actions={
-              <Link href={`/finance/cash-book?acct=${first.id}`} className="text-sm font-medium text-primary hover:underline">
+              <Link href={`/finance/cash-book?acct=${first.id}`} className={cn(linkClass, "text-sm")}>
                 Full statement →
               </Link>
             }
@@ -211,7 +211,7 @@ export async function VaultOverview({ today }: { today: string }) {
                 {latest.map((r) => {
                   const n = Number(r.amount);
                   return (
-                    <Tr key={r.key} className={r.voided ? "text-muted line-through" : undefined}>
+                    <Tr key={r.key} href={r.href ?? undefined} className={r.voided ? "text-muted line-through" : undefined}>
                       <Td className="whitespace-nowrap">{date(r.on)}</Td>
                       <Td>{r.href ? <Link href={r.href} className="hover:text-primary">{r.what}</Link> : r.what}</Td>
                       <Td className="text-right tabular">{n > 0 ? Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 }) : ""}</Td>
@@ -228,7 +228,7 @@ export async function VaultOverview({ today }: { today: string }) {
         </Card>
       )}
       <p className="text-sm text-text-2">
-        <Link href="/finance/cash-book?book=1" className="font-medium text-primary hover:underline">
+        <Link href="/finance/cash-book?book=1" className={linkClass}>
           The whole cash book
         </Link>{" "}
         · every amount in and out by month, every account, and what is not on an account yet.
@@ -424,7 +424,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
                   const n = Number(r.amount);
                   const isMove = r.kind === "transfer_in" || r.kind === "transfer_out";
                   return (
-                    <Tr key={r.key} className={cn("align-top", r.voided && "text-muted line-through")}>
+                    <Tr key={r.key} href={r.href ?? undefined} className={cn("align-top", r.voided && "text-muted line-through")}>
                       <Td className="text-sm whitespace-nowrap">{date(r.on)}</Td>
                       <Td className="min-w-56">
                         {r.href ? (

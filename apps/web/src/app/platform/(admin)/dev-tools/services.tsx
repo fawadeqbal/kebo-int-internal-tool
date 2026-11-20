@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { agoText, type DevServicesView } from "@kebo/shared";
-import { Card, CardHeader, EmptyState, Table, Td, Th, THead, Tr, cn } from "@kebo/ui";
+import { Card, CardHeader, EmptyState, Table, Td, Th, THead, Tr, cn, linkClass } from "@kebo/ui";
 import { Facts, LevelBadge, UseBar, mbText } from "./parts";
 import { LiveLog } from "./live-log";
 
@@ -44,9 +44,9 @@ export function ServicesTab({ v, picked }: { v: DevServicesView; picked?: string
             {v.services.map((s) => {
               const pct = s.memMb && s.memLimitMb ? (100 * s.memMb) / s.memLimitMb : null;
               return (
-                <Tr key={s.key} className={cn(s.key === service.key && "bg-primary-soft")}>
+                <Tr key={s.key} href={`/platform/dev-tools?tab=services&service=${s.key}`} stay className={cn(s.key === service.key && "bg-primary-soft")}>
                   <Td>
-                    <Link href={`/platform/dev-tools?tab=services&service=${s.key}`} scroll={false} className="font-medium text-primary hover:underline" aria-current={s.key === service.key ? "true" : undefined}>
+                    <Link href={`/platform/dev-tools?tab=services&service=${s.key}`} scroll={false} className={linkClass} aria-current={s.key === service.key ? "true" : undefined}>
                       {s.label}
                     </Link>
                     <span className="block text-xs text-muted">{s.role}</span>

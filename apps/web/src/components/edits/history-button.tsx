@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Clock, X } from "lucide-react";
 import type { CSSProperties } from "react";
-import { Button, cn } from "@kebo/ui";
+import { Button, cn, linkClass } from "@kebo/ui";
 import { ChangeText } from "@/components/common/change-words";
 
 /** One change in a box's or a line's history: what changed (a line each), why, who and when. */
@@ -99,7 +99,7 @@ export function HistoryButton({ title, entries, allHref }: { title: string; entr
                 ))}
               </ol>
               {allHref && (
-                <Link href={allHref} className="block border-t border-line px-4 py-2.5 text-sm font-semibold text-primary hover:underline">
+                <Link href={allHref} className={cn(linkClass, "block border-t border-line px-4 py-2.5 text-sm")}>
                   All history
                 </Link>
               )}

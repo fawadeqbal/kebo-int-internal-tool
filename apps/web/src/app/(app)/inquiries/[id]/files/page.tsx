@@ -1,6 +1,6 @@
 import { Download, Eye, File as FileIcon } from "lucide-react";
 import { can } from "@kebo/shared";
-import { buttonClass, Card, CardBody, CardHeader, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
+import { buttonClass, Card, CardBody, CardHeader, Table, Td, Th, THead, Tr, EmptyLine, linkClass, cn } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { date, fileSize } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
@@ -118,7 +118,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
           <CardBody className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-x-3 gap-y-1.5">
               {made.map((r) => (
-                <a key={r.id} href={`/pdf/revisions/${r.id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                <a key={r.id} href={`/pdf/revisions/${r.id}`} className={cn(linkClass, "inline-flex items-center gap-1 text-xs")}>
                   <FileIcon className="size-3.5" aria-hidden />
                   {r.refNo} R{r.number}.pdf
                 </a>

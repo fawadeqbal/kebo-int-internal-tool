@@ -49,9 +49,6 @@ export const useMe = () => {
   return { id: meId, name: me };
 };
 
-/** Our accounts (empty when none are set up). */
-export const useAccounts = () => useContext(DeskContext).accounts;
-
 /** The account last chosen for a currency on this computer: the next window starts with it. */
 const KEY = (currency: string) => `kebo:last-account:${currency}`;
 const remembered = (currency: string) => {

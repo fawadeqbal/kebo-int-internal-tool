@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { cn } from "@kebo/ui";
+import { cn, linkClass } from "@kebo/ui";
 import { SideSheet } from "@/components/common/side-sheet";
 import { SideSection } from "@/components/orders/side-panel-parts";
+import { SidePanelCard } from "@/components/orders/side-panel-parts";
 
 /**
  * The record panel's pieces (canvas board "One side panel for every record"): every record's panel is made of the
@@ -41,7 +42,7 @@ const PanelSection = SideSection;
 /** A quiet link beside a section's title ("All history", "Costs"). */
 export function PanelLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="text-md font-medium text-primary hover:underline">
+    <Link href={href} className={cn(linkClass, "text-md")}>
       {children}
     </Link>
   );
@@ -54,7 +55,7 @@ export function PanelLink({ href, children }: { href: string; children: ReactNod
 export function PanelCard({ title, bar, children }: { title: string; bar: (string | null | undefined | false)[]; children: ReactNode }) {
   return (
     <SideSheet title={title} summary={bar.filter(Boolean).join(" · ")}>
-      <div className="rounded-xl border border-line bg-surface shadow-card">{children}</div>
+      <SidePanelCard>{children}</SidePanelCard>
     </SideSheet>
   );
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LOST_REASON_LABEL, type InquiryStage, type LostReason } from "@kebo/shared";
-import { Badge, EmptyLine } from "@kebo/ui";
+import { Badge, EmptyLine, linkClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, money, companyToday } from "@/lib/format";
 import type { CostSheetRow, ExpenseList } from "@/lib/types-money";
@@ -73,7 +73,7 @@ export async function DealExpensesCard({
   return (
     <div className="flex flex-col gap-4">
       {deal.stage === "lost" && (
-        <p className="rounded-xl border border-line bg-surface-2 px-[18px] py-3 text-md text-text-2">
+        <p className="rounded-xl border border-line bg-surface-2 px-4 sm:px-5 py-3 text-md text-text-2">
           <strong className="text-text">
             Lost{deal.closedAt ? ` on ${date(deal.closedAt)}` : ""}
             {deal.lostReason ? `, ${LOST_REASON_LABEL[deal.lostReason].toLowerCase()}` : ""}.
@@ -113,19 +113,19 @@ export async function DealExpensesCard({
             }}
           />
         ) : (
-          <EmptyLine className="border-t border-line px-[18px] py-3.5">Nothing spent on this inquiry yet.</EmptyLine>
+          <EmptyLine className="border-t border-line px-4 sm:px-5 py-3.5">Nothing spent on this inquiry yet.</EmptyLine>
         )}
         {deal.order && live.length > 0 && (
-          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">
+          <p className="border-t border-line px-4 sm:px-5 py-2.5 text-xs text-text-2">
             Won: these show on{" "}
-            <Link href={`/orders/${deal.order.id}/costs`} className="font-medium text-primary hover:underline">
+            <Link href={`/orders/${deal.order.id}/costs`} className={linkClass}>
               order {deal.order.refNo}
             </Link>{" "}
             as spent before the order.
           </p>
         )}
         {removed.length > 0 && (
-          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">
+          <p className="border-t border-line px-4 sm:px-5 py-2.5 text-xs text-text-2">
             Removed:{" "}
             {removed.map((e, i) => (
               <span key={e.id}>

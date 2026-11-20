@@ -17,7 +17,7 @@ import {
   type ExpenseCategory,
   type InquiryStage,
 } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea, Notice, RULES } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Notice, RULES, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
@@ -362,7 +362,7 @@ export function CostForm({
                   {forLabel}
                 </span>
                 {!send && !month && (
-                  <button type="button" onClick={() => setChoosing(true)} className="shrink-0 text-md font-semibold text-primary hover:underline">
+                  <button type="button" onClick={() => setChoosing(true)} className={cn(linkClass, "shrink-0 text-md")}>
                     Change
                   </button>
                 )}
@@ -459,7 +459,7 @@ export function CostForm({
                 </button>
               ))}
               {!allKinds && (
-                <button type="button" onClick={() => setAllKinds(true)} className="h-8 px-2 text-md font-medium text-primary hover:underline">
+                <button type="button" onClick={() => setAllKinds(true)} className={cn(linkClass, "h-8 px-2 text-md")}>
                   More kinds
                 </button>
               )}
@@ -666,7 +666,7 @@ function Receipt({ file, onChange, kept, label }: { file: File | null; onChange:
         compact
         one
         accept="image/*,application/pdf"
-        hint={kept ? <a href={`/files/${kept.id}?view=1`} target="_blank" rel="noreferrer" className="text-primary hover:underline">Kept: {kept.name} · a new one replaces it</a> : "Their bill or a photo"}
+        hint={kept ? <a href={`/files/${kept.id}?view=1`} target="_blank" rel="noreferrer" className={linkClass}>Kept: {kept.name} · a new one replaces it</a> : "Their bill or a photo"}
         onFiles={(fs) => onChange(fs[0] ?? null)}
       />
     );

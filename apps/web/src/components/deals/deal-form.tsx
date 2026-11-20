@@ -16,7 +16,7 @@ import {
   UNKNOWN_COUNTRY,
   type AttachmentKind,
 } from "@kebo/shared";
-import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice, Badge, EmptyLine } from "@kebo/ui";
+import { boxHeadClass, boxTitleClass, Button, buttonClass, Card, cn, Field, Input, Select, Textarea, Notice, Badge, EmptyLine, linkClass } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { ChangeHint, changeCount, changedClassOf, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
@@ -1227,7 +1227,7 @@ function NewCustomerForm({
         type="button"
         aria-expanded={more}
         onClick={() => setMore((m) => !m)}
-        className="flex items-center gap-1.5 self-start text-sm font-semibold text-primary hover:underline"
+        className={cn(linkClass, "flex items-center gap-1.5 self-start text-sm")}
       >
         <ChevronRight aria-hidden className={cn("size-4 transition-transform", more && "rotate-90")} /> More: address, tax no., currency,
         initials
@@ -1517,9 +1517,9 @@ function ReviewBoxes({
 /** One box of the Review step: its name (and count), Edit, then what it holds. */
 export function ReviewBox({ title, count, onEdit, children }: { title: string; count?: string; onEdit: () => void; children: ReactNode }) {
   return (
-    <section aria-label={title} className="min-w-0 overflow-hidden rounded-xl border border-line bg-surface">
-      <header className="flex items-center gap-2 border-b border-line py-1.5 pr-1.5 pl-4">
-        <h4 className="text-sm font-bold">{title}</h4>
+    <Card aria-label={title} className="min-w-0 overflow-hidden">
+      <header className={boxHeadClass}>
+        <h4 className={boxTitleClass}>{title}</h4>
         {count && <span className="text-xs text-text-2">{count}</span>}
         <span className="flex-1" />
         <Button type="button" size="xs" variant="ghost" onClick={onEdit} className="text-primary hover:text-primary">
@@ -1527,7 +1527,7 @@ export function ReviewBox({ title, count, onEdit, children }: { title: string; c
         </Button>
       </header>
       {children}
-    </section>
+    </Card>
   );
 }
 

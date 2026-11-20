@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { FileSpreadsheet, Plus } from "lucide-react";
 import { COMPANY_KIND_LABEL, COMPANY_LOG_KINDS, LIFECYCLE, planFeatureName, type CompanyLogKind } from "@kebo/shared";
-import { Badge, buildHref, buttonClass, Card, cn, EmptyState, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile, LinkTabs, EmptyLine, CardHeader } from "@kebo/ui";
+import { Badge, buildHref, buttonClass, Card, cn, EmptyState, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile, LinkTabs, EmptyLine, CardHeader, linkClass } from "@kebo/ui";
 import type { ISODate } from "@kebo/utils";
 import { RowMenu } from "@/components/common/more-menu";
 import { date, dateTime, money, timeAgo } from "@/lib/format";
@@ -163,7 +163,7 @@ export function OverviewSection({ c, today }: { c: CompanyDetail; today: ISODate
                   <Link
                     href={i.href}
                     scroll={false}
-                    className="inline-flex min-h-6 shrink-0 items-center text-xs font-medium text-primary underline-offset-2 hover:underline"
+                    className={cn(linkClass, "inline-flex min-h-6 shrink-0 items-center text-xs")}
                   >
                     {i.link} <span aria-hidden>&nbsp;→</span>
                   </Link>
@@ -552,7 +552,7 @@ export function DetailsSection({ c, saved, domain }: { c: CompanyDetail; saved?:
           live ? (
             <>
               Change them with the plan:{" "}
-              <Link href={sectionHref(c.id, "plan")} className="font-medium text-primary underline-offset-2 hover:underline">
+              <Link href={sectionHref(c.id, "plan")} className={linkClass}>
                 Plan & modules →
               </Link>
             </>

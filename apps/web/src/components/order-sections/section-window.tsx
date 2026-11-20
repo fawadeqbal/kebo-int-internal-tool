@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { OrderSection } from "@kebo/shared";
 import { Pencil } from "lucide-react";
-import { Button, cn, RULES } from "@kebo/ui";
+import { Button, cn, linkClass, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useChangeCount } from "@/components/common/changes";
@@ -51,7 +51,7 @@ export function useOpenFromLink(name: string | undefined, open: () => void) {
 }
 
 /** The quiet words that open a window from a table row. */
-export const ROW_LINK = "text-md font-medium whitespace-nowrap text-primary hover:underline";
+export const ROW_LINK = cn(linkClass, "text-md whitespace-nowrap");
 
 
 /** The button that opens a window, in its look (WindowButton); the same for every kind of window. */

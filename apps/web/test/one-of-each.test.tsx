@@ -286,6 +286,65 @@ describe("one of each", () => {
     expect(found(/readableDates\(e\.summary\)|readableDates\(r\.summary\)/g)).toEqual([]);
   });
 
+  it("a row that stands for a record opens from a click anywhere on it (Tr href), never only from a link in one cell", () => {
+    // A row (<tr>/<Tr>) whose first cells hold a link to a page, with no href on the row itself. Kept: rows whose
+    // link opens a file in a new tab (a receipt, an inquiry's files), and the approvals queue (no page of its own).
+    const KEPT = ["orders/cost-sheet.tsx", "deals/inquiry-files.tsx", "inquiries/[id]/files/page.tsx", "approvals/page.tsx"];
+    const bad = SOURCES.filter(({ file }) => !KEPT.some((k) => file.replaceAll("\\", "/").includes(k))).flatMap(({ file, text }) => {
+      const lines = text.split("\n");
+      return lines.flatMap((line, i) => {
+        if (!/<(tr|Tr)\b(?![^>]*href)[^>]*\bkey=/.test(line)) return [];
+        const next = lines.slice(i + 1, i + 7).join("\n");
+        return /<Link[^>]*href=|<RefCode href=/.test(next) ? [`${file}:${i + 1}`] : [];
+      });
+    });
+    expect(bad).toEqual([]);
+    // One handler for every table (RowClicks, in the app's and the platform's frames), not a link stretched over a row.
+    expect(found(/closest[^(]*\(\s*["'`]tr\[data-href\]/g).map((m) => m.split(":")[0])).toEqual(["apps/web/src/components/common/row-clicks.tsx"]);
+    expect(found(/<(tr|Tr)\b[^>]*\brelative\b/g)).toEqual([]);
+    for (const frame of ["app/(app)/layout.tsx", "app/platform/(admin)/layout.tsx"])
+      expect(SOURCES.find(({ file }) => file.replaceAll("\\", "/").endsWith(frame))?.text).toContain("<RowClicks />");
+  });
+
+  it("no box inside a box: a box's note is BoxNote, a phone list in a box is rows across it, one inset (px-4 sm:px-5)", () => {
+    // A rounded, tinted or framed note inside a box (mx-… rounded-md bg-warn-soft) is a box in a box on a phone.
+    expect(found(/mx-\S+ rounded-md bg-(warn|surface-2|info)-soft|mx-\S+ [^"]*rounded-md bg-surface-2/g)).toEqual([]);
+    // A phone's list of parts inside a box is not framed again.
+    expect(found(/divide-y divide-line rounded-lg border border-line sm:hidden/g)).toEqual([]);
+    // A box's own inset is the card's (px-4 sm:px-5), never 18px.
+    expect(found(/\b(px|mx|max-sm:px)-\[18px\]/g)).toEqual([]);
+  });
+
+  it("nothing is kept that nothing uses: every export of the app and the design system is used somewhere else", () => {
+    // Next.js reads these by name from a page, a layout or a route.
+    const NEXT = new Set(["default", "metadata", "generateMetadata", "dynamic", "revalidate", "GET", "POST", "PUT", "DELETE", "PATCH", "generateStaticParams", "viewport", "runtime", "config", "proxy"]);
+    const TESTS = resolve(process.cwd(), "test");
+    const tests = files(TESTS).map((f) => readFileSync(f, "utf8"));
+    // Every file reads (the printed papers and the site use the app's pieces too), the tests as well.
+    const all = ROOTS.flatMap(files).map((f) => ({ file: relative(resolve(process.cwd(), "../.."), f), text: readFileSync(f, "utf8") }));
+    const texts = all.map((x) => x.text).concat(tests);
+    const bad = all.flatMap(({ file, text }, i) =>
+      [...text.matchAll(/^export (?:async )?(?:function|const|class|interface|type|enum) (\w+)/gm)]
+        .map((m) => m[1]!)
+        .filter((n) => !NEXT.has(n))
+        .filter((n) => {
+          const word = new RegExp(`\\b${n}\\b`, "g");
+          // Used again in its own file (only the export is extra), or by another file: kept.
+          if ((text.match(word) ?? []).length > 1) return false;
+          return !texts.some((t, j) => j !== i && new RegExp(`\\b${n}\\b`).test(t));
+        })
+        .map((n) => `${file}: ${n}`),
+    );
+    expect(bad).toEqual([]);
+  });
+
+  it("one text link (linkClass) and one card look (Card, cardClass): no page types its own", () => {
+    // A link in text: text-primary with hover:underline typed by hand (font-medium, -semibold, -normal…).
+    expect(found(/className="[^"]*\btext-primary\b[^"]*\bhover:underline\b[^"]*"/g).filter((m) => !/hover:text-/.test(m))).toEqual([]);
+    // A box drawn by hand with the card's frame (rounded-xl … shadow-card): Card, or cardClass where it cannot be one.
+    expect(found(/rounded-xl border border-line bg-surface shadow-card"/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

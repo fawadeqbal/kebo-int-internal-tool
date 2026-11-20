@@ -7,6 +7,7 @@ import { confirmTwoStepAction, newRecoveryCodesAction, startTwoStepAction, turnO
 import { TwoStepPanel } from "@/app/(app)/account/forms";
 import { logoutAction } from "../actions";
 import { AuthShell } from "../auth-shell";
+import { linkClass, cn } from "@kebo/ui";
 
 export const metadata = { title: "Set up two-step sign-in" };
 
@@ -43,7 +44,7 @@ export default async function SetUpTwoStepPage() {
       />
       {status.on ? (
         <div className="mt-6 border-t border-line pt-4 text-center">
-          <Link href="/dashboard" className="text-sm font-medium text-primary hover:underline">
+          <Link href="/dashboard" className={cn(linkClass, "text-sm")}>
             Go to the app
           </Link>
         </div>

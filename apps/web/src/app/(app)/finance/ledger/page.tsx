@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
+import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice, linkClass } from "@kebo/ui";
 import { ArrowRight } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
@@ -328,7 +328,7 @@ async function Balances({ sp }: { sp: Search }) {
                 {shown.map((r) => {
                   const href = statement(r);
                   return (
-                    <Tr key={`${r.account}:${r.currency}`}>
+                    <Tr key={`${r.account}:${r.currency}`} href={href ?? undefined}>
                       <Td>
                         <span className="block font-semibold">{r.label}</span>
                         <span className="block text-xs text-text-2">{r.kind === "person" ? "person · own money" : r.kind}</span>
@@ -339,7 +339,7 @@ async function Balances({ sp }: { sp: Search }) {
                       <Td className={cn("text-right font-semibold tabular", Number(r.balance) < 0 && "text-bad")}>{fmt(r.balance)}</Td>
                       <Td className="text-right">
                         {href && (
-                          <Link href={href} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                          <Link href={href} className={cn(linkClass, "inline-flex items-center gap-1 text-sm")}>
                             <ArrowRight className="size-4" aria-hidden /> Statement
                           </Link>
                         )}
@@ -389,7 +389,7 @@ async function Accounts({ period }: { period: { to: string } }) {
               </THead>
               <tbody>
                 {g.accounts.map((acc) => (
-                  <Tr key={acc.account}>
+                  <Tr key={acc.account} href={buildHref(PATH, {}, { account: acc.account, period: "all" })}>
                     <Td>
                       <Link href={buildHref(PATH, {}, { account: acc.account, period: "all" })} className="font-medium hover:text-primary">
                         {acc.label}

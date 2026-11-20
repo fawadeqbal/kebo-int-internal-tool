@@ -5,28 +5,6 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 import { HowMade } from "./primitives";
 
-/*
- * Building blocks from the RFQ Desk design system
- * (https://claude.ai/artifact/VyarwgZ53b9SQ2EhEaTYa8): one component per job,
- * so every screen shows the same thing the same way.
- */
-
-export interface CheckItem {
-  key: string;
-  text: ReactNode;
-  /** A button (xs, secondary) that goes to the fix. */
-  action?: ReactNode;
-}
-
-export interface DetailItem {
-  label: string;
-  value: ReactNode;
-  /** Missing and needed: warn fill, `warn` text in place of the value. */
-  warn?: string;
-  /** Hidden when empty (no "+ Add" box), e.g. for read-only viewers. */
-  hideEmpty?: boolean;
-}
-
 /* ---------------------------------------------------------------- SelectCard */
 
 /** A row of SelectCards: scrolls sideways on phones and laptops, a column beside its panel from 1536px when `column`. */
@@ -305,7 +283,6 @@ export function RankedBars({ rows, label }: { rows: { key: string; label: ReactN
     </ul>
   );
 }
-
 
 /* ---------------------------------------------------------------- SectionNav */
 

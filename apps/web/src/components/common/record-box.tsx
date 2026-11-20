@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { Pencil } from "lucide-react";
 import type { Tone } from "@kebo/shared";
 import { Badge, boxHeadClass, boxTitleClass, Card, cn } from "@kebo/ui";
@@ -91,4 +91,12 @@ export function BoxFacts({ rows, wide }: { rows: [string, ReactNode][]; wide?: b
       ))}
     </dl>
   );
+}
+
+/**
+ * A note across a box (the parts do not add up, what the customer has paid): a tinted strip from edge to edge
+ * at the box's own inset, never a smaller box inside the box.
+ */
+export function BoxNote({ tone = "neutral", className, ...props }: ComponentProps<"p"> & { tone?: "neutral" | "warn" }) {
+  return <p className={cn("px-4 py-2 text-sm sm:px-5", tone === "warn" ? "bg-warn-soft" : "bg-surface-2", className)} {...props} />;
 }

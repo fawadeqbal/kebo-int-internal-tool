@@ -114,7 +114,7 @@ export default async function RolesPage() {
           </THead>
           <tbody>
             {roles.map((r) => (
-              <Tr key={r.key} className="hover:bg-surface-2/50">
+              <Tr key={r.key} href={`/access/roles/${r.key}`}>
                 <Td className="max-w-md">
                   <Link href={`/access/roles/${r.key}`} className="group block">
                     <span className="flex items-center gap-2 font-medium group-hover:text-primary">

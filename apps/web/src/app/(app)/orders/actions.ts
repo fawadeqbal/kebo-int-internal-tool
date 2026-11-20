@@ -282,24 +282,6 @@ export async function customerReceiptAction(customerId: string, _prev: ActionSta
   return r;
 }
 
-/** Pays the customer's credit back (managers). */
-export async function refundCreditAction(customerId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const body = { amount: v.amount, currency: v.currency, on: v.on, accountId: v.accountId || null, note: v.note?.trim() || null };
-  const r = await attempt(form, () => api.post(`/customers/${customerId}/credit/refund`, body, { once: onceOf(form) }), "Refund recorded.");
-  if (r.ok) refreshCustomer(customerId);
-  return r;
-}
-
-/** A refund or a transfer recorded by mistake (managers). */
-export async function voidCreditAction(customerId: string, kind: "credit" | "receipt", id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const path = kind === "credit" ? `/customer-credits/${id}/void` : `/customer-receipts/${id}/void`;
-  const r = await attempt(form, () => api.post(path, { reason: v.reason }), "Removed.");
-  if (r.ok) refreshCustomer(customerId);
-  return r;
-}
-
 /** Who handles the order (the panel's picker): the person on its inquiry, saved there; both pages show it now. */
 export async function assignOrderAction(orderId: string, inquiryId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);

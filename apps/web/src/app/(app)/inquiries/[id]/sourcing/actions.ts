@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { factoryQuoteInput } from "@kebo/shared";
 import { api, ApiError } from "@/lib/api";
-import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
+import { attempt, formBody, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
 import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 
@@ -18,7 +18,6 @@ export async function searchFactoriesAction(q: string): Promise<FactoryOption[]>
     return [];
   }
 }
-
 
 /**
  * The API reports a problem inside a price line under one key ("lines"). Point
@@ -117,48 +116,4 @@ export async function removeOfferLineAction(dealId: string, lineId: string, reas
 
 export async function copyOfferLinesAction(dealId: string, quoteId: string, fromQuoteId: string) {
   return lineCall(dealId, () => api.post<FactoryQuoteView>(`/factory-quotes/${quoteId}/copy-lines`, { fromQuoteId }));
-}
-
-const OFFER_FIELDS = ["reference", "validUntil", "basis", "basisPlace", "leadTime", "moq", "paymentTerms", "advancePercent", "warranty", "notes"] as const;
-
-/**
- * One or a few of an offer's details ("+ Add" in place on its card): the offer
- * as it is now, with what was sent put in, saved with the same PUT as the
- * offer's form (its lines are left as they are).
- */
-export async function offerFieldsAction(dealId: string, quoteId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const r = await attempt(
-    form,
-    async () => {
-      const q = await api.get<FactoryQuoteView>(`/factory-quotes/${quoteId}`);
-      const body: Record<string, unknown> = {
-        factoryId: q.factory.id,
-        reference: q.reference,
-        receivedOn: q.receivedOn,
-        validUntil: q.validUntil,
-        currency: q.currency,
-        basis: q.basis,
-        basisPlace: q.basisPlace,
-        leadTime: q.leadTime,
-        leadDays: q.leadDays,
-        leadFrom: q.leadFrom,
-        moq: q.moq,
-        paymentTerms: q.paymentTerms,
-        paymentParts: q.paymentParts,
-        warranty: q.warranty,
-        warrantyMonths: q.warrantyMonths,
-        warrantyFrom: q.warrantyFrom,
-        notes: q.notes,
-      };
-      for (const k of OFFER_FIELDS) if (k in v) body[k] = v[k]!.trim() === "" ? null : v[k]!.trim();
-      // Words typed for the lead time, or an advance %, replace the days and the parts they were worked out from.
-      if ("leadTime" in v) body.leadDays = null;
-      if ("advancePercent" in v) delete body.paymentParts;
-      return api.put(`/factory-quotes/${quoteId}`, { ...body, reason: reasonOf(form) });
-    },
-    "Saved.",
-  );
-  if (r.ok) refresh(dealId);
-  return r;
 }

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Fragment, Suspense } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, expenseShort, FACTORY_DUE_RULE_LABEL } from "@kebo/shared";
-import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr, linkClass } from "@kebo/ui";
 import { addDays, daysBetween } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, money, companyToday } from "@/lib/format";
@@ -176,7 +176,7 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
                   const toggle = href({ open: open ? undefined : o.id, do: undefined });
                   return (
                     <Fragment key={o.id}>
-                      <Tr id={`o-${o.id}`} className={open ? "bg-primary-soft/40" : undefined}>
+                      <Tr id={`o-${o.id}`} href={toggle} stay className={open ? "bg-primary-soft/40" : undefined}>
                         <Td className="pr-0">
                           <Link href={toggle} scroll={false} aria-expanded={open} aria-label={`${open ? "Close" : "Open"} the parts of ${o.refNo}`} className="flex size-7 items-center justify-center rounded-md text-text-2 hover:bg-surface-2 hover:text-text">
                             {open ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}
@@ -247,10 +247,10 @@ async function OrderParts({ id, me, today, back, auto }: { id: string; me: Me; t
       : null;
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-hidden rounded-lg border border-line bg-surface pt-1 pb-3">
+      <div className="pb-1">
         <PlanInList orderId={o.id} plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} send={sendRequestAction.bind(null, o.id)} pay={pay} back={back} auto={auto} />
       </div>
-      <Link href={`/orders/${o.id}/payment`} className="w-fit text-md font-medium text-primary hover:underline">
+      <Link href={`/orders/${o.id}/payment`} className={cn(linkClass, "w-fit text-md")}>
         Open the order →
       </Link>
     </div>
@@ -393,7 +393,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
               </THead>
               <tbody>
                 {shown.map((r) => (
-                  <Tr key={r.key} id={r.key}>
+                  <Tr key={r.key} id={r.key} href={r.order ? `/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}` : undefined}>
                     <Td className="font-semibold">
                       {r.who}
                       {/* A phone: what for, the order and when, under the name (their columns are a laptop's). */}
@@ -408,7 +408,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
                     </Td>
                     <Td className="max-sm:hidden">
                       {r.order ? (
-                        <Link href={`/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}`} className="font-medium text-primary hover:underline">
+                        <Link href={`/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}`} className={linkClass}>
                           {r.order.refNo}
                         </Link>
                       ) : (
@@ -422,7 +422,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
                     <Td className="text-right">
                       {r.part ? (
                         !parts.canPay ? (
-                          <Link href={`/orders/${r.part.order.id}/factory`} className="text-md font-medium text-primary hover:underline">
+                          <Link href={`/orders/${r.part.order.id}/factory`} className={cn(linkClass, "text-md")}>
                             Open
                           </Link>
                         ) : sp.pay === r.key ? (

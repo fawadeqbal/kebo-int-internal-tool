@@ -4,7 +4,7 @@ import { can } from "@kebo/shared";
 import { Toast } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { getCompany, requireUser, timeStyleOf } from "@/lib/session";
-import { Notice } from "@kebo/ui";
+import { Notice, linkClass, cn } from "@kebo/ui";
 import { FeaturesProvider } from "@/components/common/features";
 import { leaveCompanyAction } from "@/app/platform/actions";
 import { demoMode } from "@/lib/demo";
@@ -15,6 +15,7 @@ import { AccountsProvider, type AccountOption } from "@/components/money/account
 import { CompanyTime } from "@/lib/time-client";
 import { RememberColours } from "./remember-colours";
 import { getSettings } from "@/lib/loaders";
+import { RowClicks } from "@/components/common/row-clicks";
 
 /** The company's own logo (Settings → Company), at a link that changes when the logo does; none: the app's icon. */
 function logoUrl(logo: string | undefined) {
@@ -84,7 +85,7 @@ export default async function AppLayout({ children, window: win }: { children: R
             <span>
               <strong className="font-semibold">Platform admin</strong> · you are working in {company?.name ?? "this company"}. Everything you do is in its history under your name.
             </span>
-            <button type="submit" className="text-sm font-medium text-primary hover:underline">
+            <button type="submit" className={cn(linkClass, "text-sm")}>
               Back to the platform
             </button>
           </form>
@@ -108,6 +109,7 @@ export default async function AppLayout({ children, window: win }: { children: R
       </AppShell>
       <Suspense>
         <Toast />
+        <RowClicks />
       </Suspense>
       <KeyboardShortcuts canCreate={has("inquiries.create")} />
     </CompanyTime>

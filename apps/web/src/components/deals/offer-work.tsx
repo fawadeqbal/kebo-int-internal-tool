@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { factoryTaxMinor, formatMinor, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, lineNumbers, offerTaxText, PAPER, type AttachmentKind } from "@kebo/shared";
-import { Button, cn, Field, RULES, Select, Textarea, Badge, Notice, EmptyLine } from "@kebo/ui";
+import { Button, cn, Field, RULES, Select, Textarea, Badge, Notice, EmptyLine, linkClass } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { OpenPanelButton, PanelBody, SidePanel, useClosePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
@@ -335,7 +335,7 @@ function OfferWindow({
       {(q?.files ?? []).map((f) => (
         <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-md">
           <span className="min-w-0 truncate">
-            <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
+            <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className={linkClass}>
               {f.fileName}
             </a>
             <span className="text-text-2">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, cn, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
+import { Card, CardHeader, cn, Td, Th, THead, Tr, EmptyLine, linkClass } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { date, money } from "@/lib/format";
 import type { CustomerAccount, ExpenseList } from "@/lib/types-money";
@@ -41,7 +41,7 @@ export function WhereMoneyWent({ a }: { a: CustomerAccount }) {
     ["visits, gifts, samples", t.otherCosts],
   ].filter(([, v]) => Number(v) > 0);
   return (
-    <section id="where" aria-label="Where their money went" className="scroll-mt-24 overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+    <Card id="where" aria-label="Where their money went" className="scroll-mt-24 overflow-hidden">
       <CardHeader title="Where their money went" description={`In ${c}, each cost at its own rate`} />
       <dl className="flex flex-col px-4 py-2 text-md">
         {lines.map((l) => (
@@ -66,7 +66,7 @@ export function WhereMoneyWent({ a }: { a: CustomerAccount }) {
         {parts.length > 0 && ` — ${parts.map(([l, v]) => `${l} ${money(v, c)}`).join(" · ")}`}. The orders&apos; profit is the same number as on each order and in
         Reports; only the costs outside the orders are taken off here.
       </p>
-    </section>
+    </Card>
   );
 }
 
@@ -105,7 +105,7 @@ export function CustomerSpending({
         actions={<AddCost setup={setup} label="Add a cost for them" />}
       />
       {first.length === 0 ? (
-        <EmptyLine className="border-t border-line px-[18px] py-3.5">Nothing spent on this customer yet.</EmptyLine>
+        <EmptyLine className="border-t border-line px-4 sm:px-5 py-3.5">Nothing spent on this customer yet.</EmptyLine>
       ) : (
         <DataTable label="Spending on this customer">
           <THead>
@@ -122,7 +122,7 @@ export function CustomerSpending({
           </THead>
           <tbody>
             {first.map((e) => (
-              <Tr key={e.id}>
+              <Tr key={e.id} href={e.order ? `/orders/${e.order.id}/costs` : e.deal ? `/inquiries/${e.deal.id}/costs` : undefined}>
                 <Td className="whitespace-nowrap text-text-2">{date(e.spentOn)}</Td>
                 <Td>
                   {e.description}
@@ -161,8 +161,8 @@ export function CustomerSpending({
         </DataTable>
       )}
       {rows.length > first.length && (
-        <p className="border-t border-line px-[18px] py-2.5 text-md">
-          <Link href={`/payments?party=${customerId}&kind=expense`} className="font-medium text-primary hover:underline">
+        <p className="border-t border-line px-4 sm:px-5 py-2.5 text-md">
+          <Link href={`/payments?party=${customerId}&kind=expense`} className={linkClass}>
             All {rows.length} costs in Payments →
           </Link>
         </p>

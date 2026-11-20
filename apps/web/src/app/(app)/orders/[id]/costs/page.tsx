@@ -35,7 +35,7 @@ function Figure({
   first?: boolean;
 }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-0.5 px-[18px] py-3.5", !first && "border-line max-sm:border-t sm:border-l")}>
+    <div className={cn("flex min-w-0 flex-col gap-0.5 px-4 sm:px-5 py-3.5", !first && "border-line max-sm:border-t sm:border-l")}>
       <span className="text-xs text-text-2">{label}</span>
       <span
         className={cn(
@@ -185,7 +185,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
         files={<SectionFiles orderId={o.id} section="expenses" canAdd={d.canFiles} />}
       >
         {sheet.rows.length === 0 ? (
-          <EmptyLine className="border-t border-line px-[18px] py-3.5">No cost known yet.</EmptyLine>
+          <EmptyLine className="border-t border-line px-4 sm:px-5 py-3.5">No cost known yet.</EmptyLine>
         ) : (
           <CostSheetTable
             rows={sheet.rows}
@@ -201,7 +201,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
           />
         )}
         {Number(sheet.uncosted) > 0 && (
-          <p className="border-t border-line px-[18px] py-2.5 text-xs text-text-2">
+          <p className="border-t border-line px-4 sm:px-5 py-2.5 text-xs text-text-2">
             {money(sheet.uncosted, c)} of the order is on items without a cost: left out of the profit.
           </p>
         )}
@@ -217,11 +217,11 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
             </Link>
           }
         >
-          <p className="border-t border-line px-[18px] pt-2.5 text-xs text-text-2">
+          <p className="border-t border-line px-4 sm:px-5 pt-2.5 text-xs text-text-2">
             {dealSpent[0]?.deal ? `From ${dealSpent[0].deal.refNo}. ` : ""}Not in Profit now, which stays the number the Orders list and
             Reports use. It counts on {o.customer.name} after all costs.
           </p>
-          <ul className="flex flex-col divide-y divide-line px-[18px]">
+          <ul className="flex flex-col divide-y divide-line px-4 sm:px-5">
             {dealSpent.map((e) => {
               const how = [e.paidBy?.name, paidHow(e)].filter(Boolean).join(" · ");
               return (

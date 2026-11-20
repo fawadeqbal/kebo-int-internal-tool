@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BANK_STEP_LABEL, can, dayMonth, type BankStepKind } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Badge, linkClass } from "@kebo/ui";
 import { getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderPapersOf, orderPaymentsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
@@ -156,7 +156,7 @@ export default async function OrderDocuments({
         {
           label: "Shipping marks",
           value: (
-            <Link href={`/orders/${o.id}/shipping`} className="font-normal text-primary hover:underline">
+            <Link href={`/orders/${o.id}/shipping`} className={linkClass}>
               On Shipping › Packing
             </Link>
           ),
@@ -164,7 +164,7 @@ export default async function OrderDocuments({
         {
           label: "Letterhead and stamp",
           value: can(me, "settings.manage") ? (
-            <Link href="/settings/company" className="font-normal text-primary hover:underline">
+            <Link href="/settings/company" className={linkClass}>
               Company settings
             </Link>
           ) : (
@@ -260,7 +260,7 @@ export default async function OrderDocuments({
             {bankSteps.map((b) => (
               <li
                 key={b.step}
-                className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-[18px] py-2 text-md sm:grid-cols-[220px_120px_minmax(0,1fr)_auto]"
+                className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-4 sm:px-5 py-2 text-md sm:grid-cols-[220px_120px_minmax(0,1fr)_auto]"
               >
                 <b className="font-semibold">{b.label}</b>
                 <span className="justify-self-end sm:justify-self-start">

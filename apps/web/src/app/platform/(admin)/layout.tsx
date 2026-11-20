@@ -4,6 +4,7 @@ import { platformApi } from "@/lib/api";
 import { requirePlatformAdmin } from "@/lib/platform";
 import { PlatformShell } from "@/components/platform/shell";
 import type { PlatformCounts } from "@/lib/types-platform";
+import { RowClicks } from "@/components/common/row-clicks";
 
 export const metadata = { title: { template: "%s · Platform", default: "Platform" } };
 
@@ -18,6 +19,7 @@ export default async function PlatformLayout({ children, window: win }: { childr
       </PlatformShell>
       <Suspense>
         <Toast />
+        <RowClicks />
       </Suspense>
     </>
   );

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
-import { Badge, RULES } from "@kebo/ui";
+import { Badge, RULES, linkClass, cn } from "@kebo/ui";
 import { getPeople } from "@/lib/loaders";
 import { date } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
@@ -180,7 +180,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
             files={<SectionFiles orderId={o.id} section="sat" canAdd={d.canFiles} />}
           >
             {dv.sat.length > 0 && (
-              <ul className="flex flex-col divide-y divide-line border-t border-line px-[18px]">
+              <ul className="flex flex-col divide-y divide-line border-t border-line px-4 sm:px-5">
                 {dv.sat.map((c) => (
                   <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 py-2">
                     <span className="min-w-0 text-md">
@@ -210,7 +210,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
               { label: "Ends on", value: until ? date(until) : null },
             ]}
             actions={
-              <Link href={`/orders/${o.id}#agreed`} className="text-md font-medium whitespace-nowrap text-primary hover:underline">
+              <Link href={`/orders/${o.id}#agreed`} className={cn(linkClass, "text-md whitespace-nowrap")}>
                 As agreed with the customer
               </Link>
             }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { DEV_LANES, type DevCheck, type DevEvent, type DevLevel, type DevTab } from "@kebo/shared";
-import { Badge, cn, Notice } from "@kebo/ui";
+import { Badge, cn, Notice, linkClass } from "@kebo/ui";
 
 export const TAB_HREF: Record<DevTab, string> = {
   picture: "/platform/dev-tools",
@@ -59,7 +59,7 @@ export function NeedsYou({ checks }: { checks: DevCheck[] }) {
               <span className="font-medium">{c.name}:</span> {c.line}.{c.fix && <span className="text-text-2"> {c.fix}</span>}
             </span>
             {c.tab !== "picture" && (
-              <Link href={TAB_HREF[c.tab]} className="font-medium text-primary hover:underline">
+              <Link href={TAB_HREF[c.tab]} className={linkClass}>
                 Open
               </Link>
             )}

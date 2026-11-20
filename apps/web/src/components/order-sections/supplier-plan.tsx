@@ -5,6 +5,7 @@ import { Badge, cn, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { date, dayMonth, dueText, money } from "@/lib/format";
 import type { FactoryPaymentView, FactoryPlanView } from "@/lib/types-money";
 import { ROW_LINK } from "./section-window";
+import { BoxNote } from "@/components/common/record-box";
 
 type Row = FactoryPlanView["rows"][number];
 
@@ -20,13 +21,6 @@ export function supplierRule(r: { dueRule: FactoryDueRule; dueDays?: number | nu
 
 /** "Advance" of "Advance 30%": the part's name without its share. */
 export const partName = (r: Pick<Row, "label">) => r.label.replace(/\s+\d+(?:\.\d+)?%$/, "") || r.label;
-
-/** "30% when we order · CNY 19,170.00", "50% on 12/12/2026 · CNY 31,950.00". */
-export function partWords(r: Row, currency: string) {
-  const share = r.percent !== null ? `${Number(r.percent.toFixed(2))}% ` : "";
-  const when = supplierRule(r) ?? (r.dueOn ? `on ${date(r.dueOn)}` : "on a date not set yet");
-  return `${share}${when} · ${money(r.amount, currency)}`;
-}
 
 /** The plan in a few words: "Advance 30% when we order · Balance 70% when they say ready". */
 export const supplierPlanWords = (plan: FactoryPlanView) =>
@@ -95,7 +89,7 @@ export function SupplierPlanTable({
   after?: ReactNode;
 }) {
   const c = plan.currency;
-  if (!plan.rows.length) return <EmptyLine className="px-[18px]">No plan yet.</EmptyLine>;
+  if (!plan.rows.length) return <EmptyLine className="px-4 sm:px-5">No plan yet.</EmptyLine>;
   const next = plan.rows.find((r) => r.status !== "paid");
   const paidBy = (r: Row) => r.payments.map((x) => payments.get(x.id)).filter((x): x is FactoryPaymentView => !!x);
   /** Under a part's name: their invoice for it, and how it was paid. */
@@ -129,9 +123,9 @@ export function SupplierPlanTable({
   return (
     <div className="flex flex-col gap-3">
       {/* Phones: one block per part, so where it stands and what to do are never off the screen. */}
-      <ul className="flex flex-col divide-y divide-line rounded-lg border border-line sm:hidden" aria-label={`Parts to pay ${plan.factory.name}`}>
+      <ul className="flex flex-col divide-y divide-line border-b border-line sm:hidden" aria-label={`Parts to pay ${plan.factory.name}`}>
         {plan.rows.map((r, i) => (
-          <li key={r.id ?? i} className="flex flex-col gap-1.5 px-3 py-3">
+          <li key={r.id ?? i} className="flex flex-col gap-1.5 px-4 py-3">
             <span className="flex items-baseline justify-between gap-3">
               <span className="font-semibold">{r.label}</span>
               <span className="font-semibold tabular">{grouped(r.amount)}</span>
@@ -182,7 +176,7 @@ export function SupplierPlanTable({
           </tbody>
         </Table>
       </div>
-      <div data-target="factory.payments" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-[18px] text-sm sm:px-3.5">
+      <div data-target="factory.payments" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-4 text-sm sm:px-3.5">
         <span className="text-muted">
           We owe <span className="font-semibold text-text tabular">{money(plan.owed, c)}</span>
         </span>
@@ -195,7 +189,7 @@ export function SupplierPlanTable({
         </span>
       </div>
       {(Number(plan.takenOff ?? 0) > 0 || overpaid) && (
-        <div className="flex flex-col gap-1 px-[18px] text-xs sm:px-3.5">
+        <div className="flex flex-col gap-1 px-4 text-xs sm:px-3.5">
           {Number(plan.takenOff ?? 0) > 0 && <p className="text-muted">Paid counts {money(plan.takenOff!, c)} of costs this supplier bears, taken off what we owe it.</p>}
           {overpaid && <p className="text-warn">Paid {money(overpaid, c)} more than its prices add up to.</p>}
         </div>
@@ -261,11 +255,11 @@ export function CustomerMoneyLine({
       </>
     );
   return (
-    <p data-target="factory.customer" className={cn("mx-[18px] flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-md bg-surface-2 px-3 py-2 text-md", warn && "text-warn")}>
+    <BoxNote data-target="factory.customer" tone={warn ? "warn" : "neutral"} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
       <span className={warn ? "font-medium" : "text-text-2"}>{text}</span>
       <Link href={`/orders/${orderId}/payment`} className={ROW_LINK}>
         Payment tab
       </Link>
-    </p>
+    </BoxNote>
   );
 }

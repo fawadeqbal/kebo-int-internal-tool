@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+
 import { toMinor } from "@kebo/money";
 import {
   isWarrantyFrom,
@@ -14,7 +14,7 @@ import {
   type TermsCheck,
   type TheirTerms,
 } from "@kebo/shared";
-import { Badge, cn } from "@kebo/ui";
+
 import type { OrderView } from "@/lib/types-orders";
 import type { OrderMoney } from "@/lib/types-money";
 import { date, dayMonth, money } from "@/lib/format";
@@ -175,75 +175,4 @@ export function sideBySide(o: OrderView, m: OrderMoney | null): SideTable[] {
       look: shown.filter((r) => r.check?.ok === false).length,
     };
   });
-}
-
-function CheckWord({ check }: { check: NonNullable<SideRow["check"]> }) {
-  return (
-    <span className="flex flex-col items-start gap-1">
-      <Badge tone={check.ok === true ? "ok" : check.ok === false ? "warn" : "neutral"}>
-        {check.ok === true ? <CheckCircle2 className="size-3" aria-hidden /> : check.ok === false ? <AlertTriangle className="size-3" aria-hidden /> : null}
-        {check.word}
-      </Badge>
-      {check.text && <span className="text-xs text-text-2">{check.text}</span>}
-    </span>
-  );
-}
-
-/**
- * The customer and the factory, side by side: one table per factory offer. On a phone each row is a short card:
- * what it is, what we promised, what the factory gives, then the check.
- */
-export function SideBySideTable({ table, customer, many }: { table: SideTable; customer: string; many: boolean }) {
-  const cell = "px-3.5 py-2.5 align-top max-sm:p-0";
-  return (
-    <div className="min-w-0 border-t border-line">
-      {many && (
-        <p className="px-[18px] pt-2.5 text-xs text-text-2">
-          <b className="font-semibold text-text">{table.factory}</b> · {table.offer}
-        </p>
-      )}
-      {/* Made to fit a phone (each row a short card there): no phone-width minimum. */}
-      <table data-fit="" className="w-full table-fixed text-md max-sm:block">
-        <caption className="sr-only">
-          What we promised {customer}, beside what {table.factory} gives us ({table.offer})
-        </caption>
-        <thead className="max-sm:sr-only">
-          <tr className="text-left text-xs text-text-2">
-            <th scope="col" className="w-[130px] px-3.5 py-2 pl-[18px] font-medium">
-              <span className="sr-only">Term</span>
-            </th>
-            <th scope="col" className="px-3.5 py-2 font-medium">
-              What we promised {customer}
-            </th>
-            <th scope="col" className="px-3.5 py-2 font-medium">
-              What {table.factory} gives us
-            </th>
-            <th scope="col" className="w-[32%] px-3.5 py-2 pr-[18px] font-medium">
-              <span className="sr-only">Check</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody className="max-sm:block">
-          {table.rows.map((r) => (
-            <tr key={r.key} className="border-t border-line max-sm:flex max-sm:flex-col max-sm:gap-1 max-sm:px-[18px] max-sm:py-2.5">
-              <th scope="row" className={cn(cell, "pl-[18px] text-left font-semibold max-sm:pl-0")}>
-                {r.label}
-              </th>
-              <td className={cell}>
-                <span className="text-xs text-text-2 sm:hidden">We promised: </span>
-                {r.ours ?? <span className="text-muted">—</span>}
-                {r.oursSub && <span className="block text-xs text-text-2">{r.oursSub}</span>}
-              </td>
-              <td className={cell}>
-                <span className="text-xs text-text-2 sm:hidden">{table.factory} gives: </span>
-                {r.theirs ?? <span className="text-muted">—</span>}
-                {r.theirsSub && <span className="block text-xs text-text-2">{r.theirsSub}</span>}
-              </td>
-              <td className={cn(cell, "pr-[18px] max-sm:pr-0")}>{r.check ? <CheckWord check={r.check} /> : <span className="text-muted max-sm:hidden">—</span>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }

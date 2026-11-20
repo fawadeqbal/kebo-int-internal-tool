@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { boxTitleClass, buttonClass, Card, cn } from "@kebo/ui";
+import { boxTitleClass, buttonClass, Card, cn, linkClass } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
 import { TabList } from "@/components/lists/tab-list";
 
@@ -65,7 +65,7 @@ export function DetailsCard({
           {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
         {editHref && (
-          <Link href={editHref} className="tap inline-flex items-center gap-1.5 text-md font-semibold text-primary hover:underline">
+          <Link href={editHref} className={cn(linkClass, "tap inline-flex items-center gap-1.5 text-md")}>
             <Pencil className="size-4" aria-hidden /> Edit
           </Link>
         )}
