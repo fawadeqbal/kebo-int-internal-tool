@@ -247,7 +247,7 @@ async function OrderParts({ id, me, today, back, auto }: { id: string; me: Me; t
       : null;
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-hidden rounded-lg border border-line bg-surface pt-1 pb-3">
+      <div className="pb-1">
         <PlanInList orderId={o.id} plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} send={sendRequestAction.bind(null, o.id)} pay={pay} back={back} auto={auto} />
       </div>
       <Link href={`/orders/${o.id}/payment`} className="w-fit text-md font-medium text-primary hover:underline">

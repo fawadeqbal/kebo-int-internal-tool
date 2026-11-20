@@ -26,6 +26,7 @@ import { stageData } from "../../../../orders/[id]/stage-data";
 import { cache } from "react";
 import { RecordShell } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
+import { BoxNote } from "@/components/common/record-box";
 
 /** The order's purchase orders, read once per request (the page and its tab title). */
 const purchaseOrdersOf = cache((order: string) => optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${order}/purchase-orders`)));
@@ -275,9 +276,9 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               >
                 <div className="flex flex-col gap-3 pb-3.5">
                   {plan.differs && (
-                    <p className="mx-[18px] rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
+                    <BoxNote tone="warn">
                       The parts do not add up to what we owe ({money(plan.differs, plan.currency)} {Number(plan.differs) > 0 ? "missing" : "too much"}): prices changed since. Open the order&apos;s Purchase order and save the plan again.
-                    </p>
+                    </BoxNote>
                   )}
                   <SupplierPlanTable
                     plan={plan}
