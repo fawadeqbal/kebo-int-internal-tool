@@ -348,7 +348,7 @@ describe("one of each", () => {
 
   it("nothing is kept that nothing uses: every export of the app and the design system is used somewhere else", () => {
     // Next.js reads these by name from a page, a layout or a route.
-    const NEXT = new Set(["default", "metadata", "generateMetadata", "dynamic", "revalidate", "GET", "POST", "PUT", "DELETE", "PATCH", "generateStaticParams", "viewport", "runtime", "config", "proxy"]);
+    const NEXT = new Set(["default", "metadata", "generateMetadata", "dynamic", "revalidate", "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "generateStaticParams", "viewport", "runtime", "config", "proxy"]);
     const TESTS = resolve(process.cwd(), "test");
     const tests = files(TESTS).map((f) => readFileSync(f, "utf8"));
     // Every file reads (the printed papers and the site use the app's pieces too), the tests as well.
@@ -368,6 +368,17 @@ describe("one of each", () => {
     );
     expect(bad).toEqual([]);
   }, 30_000); // It reads every export against every file: a slow CI machine needs more than the default 5 s.
+
+  it("files and papers open in the app's viewer, never in a new tab (only WhatsApp, tracking and the live site do)", () => {
+    // A link to a stored file or one of our papers, told to open a new tab (or window.open on one).
+    const tabs = SOURCES.flatMap(({ file, text }) =>
+      [...text.matchAll(/<(?:a|Link|ButtonLink)\b[^>]*target=(?:"_blank"|\{[^}]*_blank)[^>]*>/g)]
+        .filter((m) => !/wa\.me|waLink|track\.url|href=\{live\}|\/platform\/preview|\/customers\/\$\{m\.id\}/.test(m[0]))
+        .map((m) => `${file}: ${m[0].slice(0, 90)}`),
+    );
+    expect(tabs).toEqual([]);
+    expect(found(/window\.open\([^)]*(print|files)/g)).toEqual([]);
+  });
 
   it("one text link (linkClass) and one card look (Card, cardClass): no page types its own", () => {
     // A link in text: text-primary with hover:underline typed by hand (font-medium, -semibold, -normal…).

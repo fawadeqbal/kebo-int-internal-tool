@@ -42,7 +42,7 @@ export function SendDialog({ what, after = "links", onClose }: { what: SendWhat;
         <div className="flex flex-col gap-4">
           <p className="text-sm text-text-2">Now give it to the customer. This copy stays the same whatever changes on the order later.</p>
           <div className="flex flex-wrap gap-2">
-            <a href={requestPrintHref(orderId, refId)} target="_blank" rel="noreferrer" className={buttonClass("primary", "sm")}>
+            <a href={requestPrintHref(orderId, refId)} className={buttonClass("primary", "sm")}>
               View / Print
             </a>
             <a href={requestPdfHref(orderId, refId)} className={buttonClass("secondary", "sm")}>
@@ -63,8 +63,6 @@ export function SendDialog({ what, after = "links", onClose }: { what: SendWhat;
           </p>
           <a
             href={requestPrintHref(orderId, refId, { now: true })}
-            target="_blank"
-            rel="noreferrer"
             className={cn(linkClass, "w-fit text-sm")}
           >
             See how it prints

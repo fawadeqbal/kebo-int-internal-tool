@@ -1,7 +1,7 @@
 "use client";
 
 import { FileRow as ChosenFile, FileZone } from "@/components/common/file-zone";
-import { lockScroll } from "@/lib/scroll-lock";
+
 import { useTime } from "@/lib/time-client";
 import {
   createContext,
@@ -19,12 +19,13 @@ import {
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Download, Eye, FileText, Image as ImageIcon, MoreHorizontal, Share2, X } from "lucide-react";
+import { Download, Eye, FileText, Image as ImageIcon, MoreHorizontal } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, ATTACHMENT_KINDS, fileSize, FLOW_STEP_LABEL, type AttachmentKind } from "@kebo/shared";
 import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice, linkClass } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
 import type { AttachTarget, OrderFile } from "@/lib/types-files";
+import { useFileViewer, type ViewFile } from "@/components/files/viewer";
 import { fileAttachAction, fileRemoveAction, filesShareAction, fileUpdateAction } from "@/app/(app)/orders/files-actions";
 
 /* ---------------------------------------------------------------- helpers */
@@ -137,29 +138,24 @@ export function FileToolsProvider({
   share: ShareContext;
   children: ReactNode;
 }) {
-  const [viewing, setViewing] = useState<{ id: string; set: string[] } | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const view = useCallback((file: OrderFile, set?: OrderFile[]) => {
-    if (!file.viewHref) return downloadHref(file.href);
-    setViewing({ id: file.id, set: (set ?? [file]).filter((f) => f.viewHref).map((f) => f.id) });
-  }, []);
+  const viewer = useFileViewer();
+  const t = useTime();
+  const view = useCallback(
+    (file: OrderFile, set?: OrderFile[]) => {
+      if (!viewer) return downloadHref(file.href);
+      const all = set?.some((f) => f.id === file.id) ? set : [file];
+      viewer.open(
+        all.map((f) => toView(f, t, setDialog, viewer.close)),
+        all.findIndex((f) => f.id === file.id),
+      );
+    },
+    [viewer, t],
+  );
   const tools = useMemo<Tools>(() => ({ orderId, files, targets, share, view, open: setDialog }), [orderId, files, targets, share, view]);
-  const current = viewing ? files.find((f) => f.id === viewing.id) : undefined;
   return (
     <FileToolsContext.Provider value={tools}>
       {children}
-      {current && viewing && (
-        <FileViewer
-          file={current}
-          set={viewing.set.map((id) => files.find((f) => f.id === id)).filter((f): f is OrderFile => !!f)}
-          onMove={(f) => setViewing({ ...viewing, id: f.id })}
-          onClose={() => setViewing(null)}
-          open={(d) => {
-            if (d.kind === "delete") setViewing(null);
-            setDialog(d);
-          }}
-        />
-      )}
       {dialog && <FileDialog dialog={dialog} tools={tools} onClose={() => setDialog(null)} />}
     </FileToolsContext.Provider>
   );
@@ -215,7 +211,7 @@ export function FileMenu({
         </div>
       }
     >
-      {file.viewHref && <MenuItem label="View" onClick={run(() => tools.view(file, set))} />}
+      <MenuItem label="View" onClick={run(() => tools.view(file, set))} />
       <MenuItem label="Download" onClick={run(() => downloadHref(file.href))} />
       <MenuItem label="Share…" onClick={run(() => tools.open({ kind: "share", files: [file], papers: [] }))} />
       {(file.can.rename || file.can.describe || file.can.attach || file.can.replace) && <Sep />}
@@ -227,13 +223,11 @@ export function FileMenu({
           onClick={run(() => tools.open({ kind: "describe", file }))}
         />
       )}
-      {file.can.attach && (
-        <MenuItem label="Attach to…" onClick={run(() => tools.open({ kind: "attach", file }))} />
-      )}
+      {file.can.attach && <MenuItem label="Attach to…" onClick={run(() => tools.open({ kind: "attach", file }))} />}
       {file.can.replace && (
         <MenuItem
           label="Replace with a newer one"
-          
+
           onClick={run(() => tools.open({ kind: "replace", file }))}
         />
       )}
@@ -301,9 +295,8 @@ export function FileChip({
   if (!tools || !full)
     return (
       <a
-        href={file.viewHref ?? file.href}
-        target="_blank"
-        rel="noreferrer"
+        href={file.viewHref ?? `${file.href}?view=1`}
+        data-file-name={file.name}
         className={cn(pill, "pr-2.5 hover:border-line-strong", className)}
       >
         <FileText className="size-3.5 shrink-0 text-muted" aria-hidden />
@@ -329,22 +322,20 @@ export function FileChip({
         type="button"
         className="inline-flex min-w-0 items-center gap-1.5 py-0.5 text-left"
         onClick={() => (phone ? setMenu(true) : tools.view(full, set))}
-        title={full.viewHref ? "Open it here" : "Download"}
+        title="Open it here"
       >
         <FileIcon file={full} className="size-3.5" />
         <span className="truncate">{full.name}</span>
       </button>
       <span className="hidden items-center sm:inline-flex">
-        {full.viewHref && (
-          <button
-            type="button"
-            className={buttonClass("ghost", "icon-sm")}
-            aria-label={`View ${full.name}`}
-            onClick={() => tools.view(full, set)}
-          >
-            <Eye aria-hidden />
-          </button>
-        )}
+        <button
+          type="button"
+          className={buttonClass("ghost", "icon-sm")}
+          aria-label={`View ${full.name}`}
+          onClick={() => tools.view(full, set)}
+        >
+          <Eye aria-hidden />
+        </button>
         <a href={full.href} download className={buttonClass("ghost", "icon-sm")} aria-label={`Download ${full.name}`}>
           <Download aria-hidden />
         </a>
@@ -358,190 +349,52 @@ export function FileChip({
 /* ---------------------------------------------------------------- the viewer */
 
 /**
- * "View opens here": PDFs and photos in a side panel (the whole screen on a
- * phone), ‹ › through the others of the same set, the file's tools and what it
- * is, where it is attached, who added it and when, and its size.
+ * An order's file as the app's viewer shows it (components/files/viewer.tsx): where it belongs, what it is, who
+ * added it, its earlier versions, and Share, Replace and Delete. What it is and where it is attached change
+ * from its Details.
  */
-function FileViewer({
-  file,
-  set,
-  onMove,
-  onClose,
-  open,
-}: {
-  file: OrderFile;
-  set: OrderFile[];
-  onMove: (f: OrderFile) => void;
-  onClose: () => void;
-  open: (d: Dialog) => void;
-}) {
-  const t = useTime();
-  const id = useId();
-  const mounted = useMounted();
-  const at = set.findIndex((f) => f.id === file.id);
-  const prev = at > 0 ? set[at - 1] : null;
-  const next = at >= 0 && at < set.length - 1 ? set[at + 1] : null;
-  const head = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    const keys = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft" && prev) onMove(prev);
-      else if (e.key === "ArrowRight" && next) onMove(next);
-    };
-    window.addEventListener("keydown", keys);
-    const unlock = lockScroll();
-    return () => {
-      window.removeEventListener("keydown", keys);
-      unlock();
-    };
-  }, [onClose, onMove, prev, next]);
-  useEffect(() => {
-    if (mounted) head.current?.focus();
-  }, [mounted, file.id]);
-  if (!mounted) return null;
-  const image = file.type.startsWith("image/");
-  const facts: [string, ReactNode][] = [
-    [
-      "What it is",
-      <span key="w">
-        {[file.note, file.kindLabel].filter(Boolean).join(" · ") || "—"}
-        {file.can.describe && (
-          <button
-            type="button"
-            className={cn(linkClass, "ml-1.5")}
-            onClick={() => open({ kind: "describe", file })}
-          >
-            change
-          </button>
-        )}
-      </span>,
-    ],
-    [
-      "Attached to",
-      <Link key="a" href={file.attachedTo.href} className="hover:text-primary hover:underline" onClick={onClose}>
-        {file.attachedTo.label}
-      </Link>,
-    ],
-    ["Added", `${file.by?.name ?? "System"} · ${t.dateTime(file.at)}`],
-    ["Size", `${fileSize(file.size)} · ${typeLabel(file)}`],
-  ];
-  return createPortal(
-    <div className="fixed inset-0 z-[80] flex justify-end">
-      <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${id}-t`}
-        className="relative flex h-dvh w-full flex-col border-l border-line bg-surface shadow-pop sm:w-[560px]"
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
-          <div className="min-w-0">
-            <h2 id={`${id}-t`} ref={head} tabIndex={-1} className="truncate text-base font-semibold outline-none">
-              {file.name}
-            </h2>
-            <p className="mt-0.5 truncate text-xs text-muted">
-              {set.length > 1 ? `${at + 1} of ${set.length} · ` : ""}
-              {[file.stepLabel, file.attachedTo.label].join(" · ")}
-            </p>
-          </div>
-          <Button size="icon-sm" variant="ghost" aria-label="Close the viewer" onClick={onClose}>
-            <X aria-hidden />
-          </Button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="relative flex h-[min(56dvh,520px)] items-center justify-center bg-surface-3">
-            {file.viewHref ? (
-              image ? (
-                // eslint-disable-next-line @next/next/no-img-element -- a file of the order, served by our own /files route
-                <img src={file.viewHref} alt={file.name} className="max-h-full max-w-full object-contain" />
-              ) : (
-                <iframe key={file.id} src={file.viewHref} title={file.name} className="size-full border-0 bg-white" />
-              )
-            ) : (
-              <p className="px-6 text-center text-sm text-muted">This kind of file does not open here. Download it to open it.</p>
-            )}
-            {prev && (
-              <button
-                type="button"
-                aria-label={`Previous: ${prev.name}`}
-                onClick={() => onMove(prev)}
-                className="absolute top-1/2 left-3 grid size-9 -translate-y-1/2 place-items-center rounded-lg border border-line bg-surface shadow-card hover:bg-surface-2"
-              >
-                <ChevronLeft className="size-4" aria-hidden />
-              </button>
-            )}
-            {next && (
-              <button
-                type="button"
-                aria-label={`Next: ${next.name}`}
-                onClick={() => onMove(next)}
-                className="absolute top-1/2 right-3 grid size-9 -translate-y-1/2 place-items-center rounded-lg border border-line bg-surface shadow-card hover:bg-surface-2"
-              >
-                <ChevronRight className="size-4" aria-hidden />
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
-            <a href={file.href} download className={buttonClass("secondary", "sm")}>
-              <Download aria-hidden /> Download
-            </a>
-            <Button size="sm" variant="secondary" onClick={() => open({ kind: "share", files: [file], papers: [] })}>
-              <Share2 aria-hidden /> Share…
-            </Button>
-            {file.can.replace && (
-              <Button size="sm" variant="ghost" onClick={() => open({ kind: "replace", file })}>
-                Replace
-              </Button>
-            )}
-            {file.can.remove && (
-              <Button size="sm" variant="ghost" onClick={() => open({ kind: "delete", files: [file] })}>
-                Delete
-              </Button>
-            )}
-            {file.viewHref && (
-              <a
-                href={file.viewHref}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-auto text-xs text-muted hover:text-primary hover:underline"
-              >
-                Open in a new tab
-              </a>
-            )}
-          </div>
-          <dl className="flex flex-col gap-2 px-5 py-4 text-sm">
-            {facts.map(([k, v]) => (
-              <div key={k} className="flex items-baseline justify-between gap-4">
-                <dt className="shrink-0 text-xs text-muted">{k}</dt>
-                <dd className="min-w-0 text-right">{v}</dd>
-              </div>
-            ))}
-          </dl>
-          {file.versions.length > 0 && (
-            <div className="border-t border-line px-5 py-3">
-              <p className="text-xs font-medium text-muted">Earlier versions</p>
-              <ul className="mt-1 flex flex-col gap-1 text-sm">
-                {file.versions.map((v) => (
-                  <li key={v.id} className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate">
-                      v{v.version} · {v.name}
-                    </span>
-                    <a href={v.href} download className={cn(linkClass, "shrink-0 text-xs")}>
-                      {t.date(v.at)} · Download
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+function toView(file: OrderFile, t: ReturnType<typeof useTime>, open: (d: Dialog) => void, close: () => void): ViewFile {
+  const then = (d: Dialog) => () => {
+    close();
+    open(d);
+  };
+  return {
+    key: file.id,
+    name: file.name,
+    href: file.href,
+    viewHref: file.viewHref,
+    type: file.type,
+    size: file.size,
+    where: [file.stepLabel, file.attachedTo.label].filter(Boolean).join(" · "),
+    facts: [
+      [
+        "What it is",
+        <span key="w">
+          {[file.note, file.kindLabel].filter(Boolean).join(" · ") || "—"}
+          {file.can.describe && (
+            <button type="button" className={cn(linkClass, "ml-1.5")} onClick={then({ kind: "describe", file })}>
+              change
+            </button>
           )}
-          <p className="px-5 pb-5 text-xs text-muted">
-            PDFs and photos open here; Excel and Word download. ‹ › go through the others of the same set.
-          </p>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
+        </span>,
+      ],
+      [
+        "Attached to",
+        <Link key="a" href={file.attachedTo.href} className={linkClass}>
+          {file.attachedTo.label}
+        </Link>,
+      ],
+      ["Added", `${file.by?.name ?? "System"} · ${t.dateTime(file.at)}`],
+      ["Size", `${fileSize(file.size)} · ${typeLabel(file)}`],
+    ],
+    versions: file.versions.map((v) => ({ key: v.id, label: `v${v.version} · ${v.name} · ${t.date(v.at)}`, href: v.href })),
+    onShare: then({ kind: "share", files: [file], papers: [] }),
+    actions: [
+      ...(file.can.rename ? [{ label: "Rename", onClick: then({ kind: "rename", file }) }] : []),
+      ...(file.can.replace ? [{ label: "Replace", onClick: then({ kind: "replace", file }) }] : []),
+      ...(file.can.remove ? [{ label: "Delete", danger: true, onClick: then({ kind: "delete", files: [file] }) }] : []),
+    ],
+  };
 }
 
 /* ---------------------------------------------------------------- dialogs */

@@ -547,8 +547,6 @@ export function MakePaper({
                   </span>
                   <a
                     href={`/print/orders/${p.orderId}/${p.kind}?${new URLSearchParams({ v: String(v.version), ...(p.ref ? { ref: p.ref } : {}) })}`}
-                    target="_blank"
-                    rel="noreferrer"
                     className={linkClass}
                   >
                     View

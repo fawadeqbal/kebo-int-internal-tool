@@ -666,7 +666,7 @@ function Receipt({ file, onChange, kept, label }: { file: File | null; onChange:
         compact
         one
         accept="image/*,application/pdf"
-        hint={kept ? <a href={`/files/${kept.id}?view=1`} target="_blank" rel="noreferrer" className={linkClass}>Kept: {kept.name} · a new one replaces it</a> : "Their bill or a photo"}
+        hint={kept ? <a href={`/files/${kept.id}?view=1`} className={linkClass}>Kept: {kept.name} · a new one replaces it</a> : "Their bill or a photo"}
         onFiles={(fs) => onChange(fs[0] ?? null)}
       />
     );

@@ -95,7 +95,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
                   <Td>
                     <span className="flex justify-end gap-0.5">
                       {VIEWABLE.test(f.mimeType) && (
-                        <a href={`/files/${f.id}?view=1`} target="_blank" rel="noopener" className={buttonClass("ghost", "icon-sm")} aria-label={`View ${f.fileName}`} title="View">
+                        <a href={`/files/${f.id}?view=1`} className={buttonClass("ghost", "icon-sm")} aria-label={`View ${f.fileName}`} title="View">
                           <Eye aria-hidden />
                         </a>
                       )}

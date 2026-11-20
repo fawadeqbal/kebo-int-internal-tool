@@ -108,7 +108,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const paperItems: MenuEntry[] = [{ label: "Documents", href: `${base}/documents` }];
   const proformaItems: MenuEntry[] = pdf
     ? [
-        { label: "View / Print the proforma", href: pdf.view, newTab: true },
+        { label: "View / Print the proforma", href: pdf.view },
         { label: "Download the proforma PDF", href: pdf.pdf, download: true },
       ]
     : [];
@@ -171,7 +171,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
                 </p>
               ),
               papers: pdf ? (
-                <ButtonLink href={pdf.view} target="_blank" rel="noopener">
+                <ButtonLink href={pdf.view}>
                   <Eye aria-hidden /> Proforma
                 </ButtonLink>
               ) : undefined,

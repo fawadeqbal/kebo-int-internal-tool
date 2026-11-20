@@ -49,7 +49,7 @@ export function FileActions({
           </a>
         ))}
       {viewHref && (
-        <Link href={viewHref} target="_blank" className={b}>
+        <Link href={viewHref} className={b}>
           {/* The words on the button start its name (what voice control users say); "of" only adds to it. */}
           <Printer aria-hidden /> View / Print{of && <span className="sr-only"> the {of}</span>}
         </Link>

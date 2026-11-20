@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Download, FileSpreadsheet, Loader2, Printer } from "lucide-react";
 import { Button, buttonClass } from "@kebo/ui";
 
@@ -27,8 +27,23 @@ export function PrintToolbar({
 }) {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
+  // Shown in the app's file viewer: it draws these buttons itself, so the paper tells it what they are.
+  useEffect(() => {
+    if (window.self === window.top) return;
+    const abs = (h: string) => new URL(h, window.location.href).pathname + new URL(h, window.location.href).search;
+    window.parent.postMessage(
+      {
+        type: "kebo-paper",
+        title,
+        pdfHref: abs(pdfHref),
+        excelHref: excelHref && abs(excelHref),
+        copies: copies && { current: copies.current, customer: abs(copies.customer), internal: abs(copies.internal) },
+      },
+      window.location.origin,
+    );
+  }, [title, pdfHref, excelHref, copies]);
   return (
-    <div className="no-print sticky top-0 z-20 mb-6 border-b border-[#d0d7e2] bg-white/90 backdrop-blur">
+    <div className="no-print sticky [html[data-embedded]_&]:hidden top-0 z-20 mb-6 border-b border-[#d0d7e2] bg-white/90 backdrop-blur">
       <div className="mx-auto flex w-[210mm] max-w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-[#16151c]">
         <div className="flex min-w-0 items-center gap-2">
           <Link
@@ -69,7 +84,11 @@ export function PrintToolbar({
             </div>
           )}
           {excelHref && (
-            <a href={excelHref} download className={buttonClass("secondary", "sm", "border-[#e4e4ea] bg-white text-[#16151c] hover:bg-[#f2f2f5]")}>
+            <a
+              href={excelHref}
+              download
+              className={buttonClass("secondary", "sm", "border-[#e4e4ea] bg-white text-[#16151c] hover:bg-[#f2f2f5]")}
+            >
               <FileSpreadsheet aria-hidden /> Excel
             </a>
           )}

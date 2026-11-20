@@ -170,7 +170,7 @@ export function AttachedFile({
       {file ? (
         <div className="flex flex-wrap items-center gap-3">
           {viewable && file.type.startsWith("image/") ? (
-            <a href={`${href}?view=1`} target="_blank" rel="noreferrer" className="block shrink-0" aria-label={`Open ${file.name}`}>
+            <a href={`${href}?view=1`} className="block shrink-0" aria-label={`Open ${file.name}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- a private file from our own route, not an optimisable image */}
               <img src={`${href}?view=1`} alt={`${what}: ${file.name}`} className="h-20 w-28 rounded-md border border-line object-cover" />
             </a>
@@ -185,9 +185,8 @@ export function AttachedFile({
               <FileChip file={orderFile} />
             ) : (
               <a
-                href={`${href}${viewable ? "?view=1" : ""}`}
-                target={viewable ? "_blank" : undefined}
-                rel="noreferrer"
+                href={`${href}?view=1`}
+                data-file-name={file.name}
                 className="block truncate font-medium hover:text-primary"
               >
                 {file.name}

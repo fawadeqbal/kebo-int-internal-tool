@@ -93,8 +93,8 @@ export const timeAgo = (d: Date | string) => ago(d, timeStyle());
 export const num2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** A plain whole number, grouped: "12,480". */
 export const num0 = (v: string | number) => Math.round(Number(v)).toLocaleString("en-US");
-/** A file the browser can show itself (a PDF or a picture): opened in a tab, not downloaded. */
-export const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
+/** A file the app's viewer shows (a PDF, a picture, an Excel sheet, a CSV or text file): View opens it over the page. */
+export const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp)|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|text\/(csv|plain))$/;
 export const qty = (q: string | number) => Number(q).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 
