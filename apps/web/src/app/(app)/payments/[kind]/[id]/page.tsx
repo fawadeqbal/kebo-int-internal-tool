@@ -181,7 +181,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
                 </THead>
                 <tbody>
                   {p.parts.map((x, i) => (
-                    <Tr key={i} className={x.released ? "text-muted line-through" : undefined}>
+                    <Tr key={i} href={x.href} className={x.released ? "text-muted line-through" : undefined}>
                       <Td>
                         <Link href={x.href}>
                           <RefCode>{x.order}</RefCode>

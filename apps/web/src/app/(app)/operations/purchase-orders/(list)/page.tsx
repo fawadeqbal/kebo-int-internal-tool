@@ -135,7 +135,7 @@ export default async function PurchaseOrdersPage({
             </THead>
             <tbody>
               {shown.map((r) => (
-                <Tr key={r.key}>
+                <Tr key={r.key} href={purchaseOrderHref(r.order.id, r.supplier.id)}>
                   <Td>
                     <Link href={purchaseOrderHref(r.order.id, r.supplier.id)} className="hover:opacity-80">
                       <RefCode>{r.po?.number ?? "PO —"}</RefCode>

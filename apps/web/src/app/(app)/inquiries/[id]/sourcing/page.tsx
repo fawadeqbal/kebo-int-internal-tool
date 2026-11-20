@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, Columns3, Factory, List } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { THead, Th, Badge, cn, EmptyState, Notice } from "@kebo/ui";
+import { THead, Th, Tr, Badge, cn, EmptyState, Notice } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { dayMonth, money, plural, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
@@ -247,10 +247,9 @@ export default async function SourcingPage({
                     const f = offerFigures(x);
                     const href = `/inquiries/${d.id}/offers/${x.id}`;
                     return (
-                      <tr key={x.id} className="group relative hover:bg-surface-2/60">
+                      <Tr key={x.id} href={href}>
                         <td className={td}>
-                          {/* The whole row opens the offer (the name is its link, stretched over the row). */}
-                          <Link href={href} className="font-semibold text-text after:absolute after:inset-0 hover:text-primary focus-visible:outline-2 focus-visible:outline-text">
+                          <Link href={href} className="font-semibold text-text hover:text-primary">
                             {x.factory.name}
                           </Link>
                           <span className="block text-xs text-text-2">{offerLine(x)}</span>
@@ -278,11 +277,11 @@ export default async function SourcingPage({
                         <td className={cn(td, "w-8 text-text-2")}>
                           <ChevronRight className="size-4" aria-hidden />
                         </td>
-                      </tr>
+                      </Tr>
                     );
                   })}
                   {others.map((r) => (
-                    <tr key={r.id}>
+                    <Tr key={r.id} href={`/suppliers/${r.factory.id}`}>
                       <td className={td}>
                         <Link href={`/suppliers/${r.factory.id}`} className="font-semibold text-text hover:text-primary">
                           {r.factory.name}
@@ -296,7 +295,7 @@ export default async function SourcingPage({
                       <td className={cn(td, "text-right")}>{dash}</td>
                       <td className={td}>{requestStatus(r)}</td>
                       <td className={cn(td, "w-8")}>{more(r)}</td>
-                    </tr>
+                    </Tr>
                   ))}
                 </tbody>
               </table>

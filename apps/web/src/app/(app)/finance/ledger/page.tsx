@@ -328,7 +328,7 @@ async function Balances({ sp }: { sp: Search }) {
                 {shown.map((r) => {
                   const href = statement(r);
                   return (
-                    <Tr key={`${r.account}:${r.currency}`}>
+                    <Tr key={`${r.account}:${r.currency}`} href={href ?? undefined}>
                       <Td>
                         <span className="block font-semibold">{r.label}</span>
                         <span className="block text-xs text-text-2">{r.kind === "person" ? "person · own money" : r.kind}</span>
@@ -389,7 +389,7 @@ async function Accounts({ period }: { period: { to: string } }) {
               </THead>
               <tbody>
                 {g.accounts.map((acc) => (
-                  <Tr key={acc.account}>
+                  <Tr key={acc.account} href={buildHref(PATH, {}, { account: acc.account, period: "all" })}>
                     <Td>
                       <Link href={buildHref(PATH, {}, { account: acc.account, period: "all" })} className="font-medium hover:text-primary">
                         {acc.label}

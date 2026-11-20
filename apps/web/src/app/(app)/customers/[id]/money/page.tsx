@@ -172,7 +172,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
               </THead>
               <tbody>
                 {lines.map((l) => (
-                  <Tr key={l.key}>
+                  <Tr key={l.key} href={l.order ? `/orders/${l.order.id}` : undefined}>
                     <Td className="whitespace-nowrap">{date(l.date)}</Td>
                     <Td>
                       <span className={l.paid ? "block font-semibold" : "block"}>{l.what}</span>

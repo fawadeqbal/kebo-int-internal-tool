@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { THead, Th, Badge, cn, EmptyState } from "@kebo/ui";
+import { THead, Th, Tr, Badge, cn, EmptyState } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import type { CustomerPayments } from "@/lib/types-money";
 
@@ -98,7 +98,7 @@ export function CustomerPaymentsBody({ d }: { d: CustomerPayments }) {
                 const cancelled = o.status === "cancelled";
                 const pct = Number(o.total) > 0 ? Math.min(100, Math.round((Number(o.received) / Number(o.total)) * 100)) : 0;
                 return (
-                  <tr key={o.id} className={cn("border-t border-line", cancelled && "text-muted")}>
+                  <Tr key={o.id} href={`/orders/${o.id}/payment`} className={cn("border-t border-line", cancelled && "text-muted")}>
                     <td className={td}>
                       <Link href={`/orders/${o.id}/payment`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                         {o.refNo}
@@ -139,7 +139,7 @@ export function CustomerPaymentsBody({ d }: { d: CustomerPayments }) {
                       </div>
                       <span className="text-xs text-muted">{cancelled ? "cancelled" : `${pct}%`}</span>
                     </td>
-                  </tr>
+                  </Tr>
                 );
               })}
             </tbody>

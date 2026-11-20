@@ -176,7 +176,7 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
                   const toggle = href({ open: open ? undefined : o.id, do: undefined });
                   return (
                     <Fragment key={o.id}>
-                      <Tr id={`o-${o.id}`} className={open ? "bg-primary-soft/40" : undefined}>
+                      <Tr id={`o-${o.id}`} href={toggle} stay className={open ? "bg-primary-soft/40" : undefined}>
                         <Td className="pr-0">
                           <Link href={toggle} scroll={false} aria-expanded={open} aria-label={`${open ? "Close" : "Open"} the parts of ${o.refNo}`} className="flex size-7 items-center justify-center rounded-md text-text-2 hover:bg-surface-2 hover:text-text">
                             {open ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}
@@ -393,7 +393,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
               </THead>
               <tbody>
                 {shown.map((r) => (
-                  <Tr key={r.key} id={r.key}>
+                  <Tr key={r.key} id={r.key} href={r.order ? `/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}` : undefined}>
                     <Td className="font-semibold">
                       {r.who}
                       {/* A phone: what for, the order and when, under the name (their columns are a laptop's). */}

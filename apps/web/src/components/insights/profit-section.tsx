@@ -161,7 +161,7 @@ export function ProfitSection({
             </THead>
             <tbody>
               {shown.map((o) => (
-                <Tr key={o.orderId}>
+                <Tr key={o.orderId} href={`/orders/${o.orderId}/costs`}>
                   <Td>
                     <Link href={`/orders/${o.orderId}/costs`} className="-my-1 inline-block py-1 font-semibold text-primary hover:underline">
                       {o.refNo}

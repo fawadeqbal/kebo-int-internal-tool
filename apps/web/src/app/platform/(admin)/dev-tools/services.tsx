@@ -44,7 +44,7 @@ export function ServicesTab({ v, picked }: { v: DevServicesView; picked?: string
             {v.services.map((s) => {
               const pct = s.memMb && s.memLimitMb ? (100 * s.memMb) / s.memLimitMb : null;
               return (
-                <Tr key={s.key} className={cn(s.key === service.key && "bg-primary-soft")}>
+                <Tr key={s.key} href={`/platform/dev-tools?tab=services&service=${s.key}`} stay className={cn(s.key === service.key && "bg-primary-soft")}>
                   <Td>
                     <Link href={`/platform/dev-tools?tab=services&service=${s.key}`} scroll={false} className="font-medium text-primary hover:underline" aria-current={s.key === service.key ? "true" : undefined}>
                       {s.label}

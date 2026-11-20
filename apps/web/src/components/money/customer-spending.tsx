@@ -122,7 +122,7 @@ export function CustomerSpending({
           </THead>
           <tbody>
             {first.map((e) => (
-              <Tr key={e.id}>
+              <Tr key={e.id} href={e.order ? `/orders/${e.order.id}/costs` : e.deal ? `/inquiries/${e.deal.id}/costs` : undefined}>
                 <Td className="whitespace-nowrap text-text-2">{date(e.spentOn)}</Td>
                 <Td>
                   {e.description}
