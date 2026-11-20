@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Pencil, ShieldCheck } from "lucide-react";
 import { PERMISSION_GROUPS } from "@kebo/shared";
-import { Avatar, Badge, Card, CardBody, CardHeader, cn, EmptyLine, PageHeader, StatusBadge } from "@kebo/ui";
+import { Avatar, Badge, Card, CardBody, CardHeader, cn, EmptyLine, PageHeader, StatusBadge, capsClass } from "@kebo/ui";
 import { RecordBody } from "@/components/records/record-frame";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
@@ -147,7 +147,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
               const allowed = g.items.filter((i) => r.superAdmin || has.has(i.permission));
               return (
                 <div key={g.title} className="min-w-0">
-                  <p className="text-2xs font-semibold tracking-wide text-muted uppercase">
+                  <p className={capsClass}>
                     {g.title} <span className="font-normal tabular">{allowed.length}/{g.items.length}</span>
                   </p>
                   {allowed.length ? (

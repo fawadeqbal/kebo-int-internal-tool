@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "@kebo/ui";
+import { cn, Dash } from "@kebo/ui";
 
 /*
  * The Dashboard frame's pieces (design system: Dashboard): the section list on the left, tiles with their
@@ -50,7 +50,7 @@ export function Tiles({ children, className }: { children: ReactNode; className?
 
 /** A small trend line (no axes), last point marked; the figures are in the table and Excel. */
 export function Spark({ values, label }: { values: number[]; label: string }) {
-  if (values.length < 2) return <span className="text-muted">—</span>;
+  if (values.length < 2) return <Dash />;
   const w = 88;
   const h = 24;
   const max = Math.max(...values);

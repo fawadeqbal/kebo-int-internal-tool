@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { FileSpreadsheet, Plus } from "lucide-react";
 import { COMPANY_KIND_LABEL, COMPANY_LOG_KINDS, LIFECYCLE, planFeatureName, type CompanyLogKind } from "@kebo/shared";
-import { Badge, buildHref, buttonClass, Card, cn, EmptyState, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile, LinkTabs, EmptyLine, CardHeader, linkClass } from "@kebo/ui";
+import { Badge, buildHref, buttonClass, Card, cn, EmptyState, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile, LinkTabs, EmptyLine, CardHeader, linkClass, subTitleClass } from "@kebo/ui";
 import type { ISODate } from "@kebo/utils";
 import { RowMenu } from "@/components/common/more-menu";
 import { date, dateTime, money, timeAgo } from "@/lib/format";
@@ -349,7 +349,7 @@ export function PlanSection({ c, modules, saved }: { c: CompanyDetail; modules: 
 
       <Card id="modules" aria-labelledby="modules-title" className="overflow-clip">
         <div className="border-b border-line px-4 py-3">
-          <h2 id="modules-title" className="text-sm font-semibold">
+          <h2 id="modules-title" className={subTitleClass}>
             Modules
           </h2>
           <p className="mt-0.5 text-xs text-muted">

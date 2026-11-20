@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { DEV_LANES, type DevCheck, type DevEvent, type DevLevel, type DevTab } from "@kebo/shared";
-import { Badge, cn, Notice, linkClass } from "@kebo/ui";
+import { Badge, cn, Notice, linkClass, capsClass, subTitleClass, Dash } from "@kebo/ui";
 
 export const TAB_HREF: Record<DevTab, string> = {
   picture: "/platform/dev-tools",
@@ -48,7 +48,7 @@ export function NeedsYou({ checks }: { checks: DevCheck[] }) {
       className={cn("rounded-xl border px-4 py-3", now ? "border-bad/25 bg-bad-soft" : "border-warn/30 bg-warn-soft")}
       role="status"
     >
-      <h2 className="text-sm font-semibold">
+      <h2 className={subTitleClass}>
         {needs.length === 1 ? "1 thing needs you" : `${needs.length} things need you`}
       </h2>
       <ul className="mt-2 flex flex-col gap-2">
@@ -76,7 +76,7 @@ export function CheckMap({ checks }: { checks: DevCheck[] }) {
     <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-5 lg:gap-0 lg:px-2">
       {DEV_LANES.map((lane, n) => (
         <div key={lane.key} className={cn("flex flex-col gap-2 lg:px-2", n > 0 && "lg:border-l lg:border-dashed lg:border-line-strong")}>
-          <h3 className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
+          <h3 className={cn(capsClass, "flex items-center gap-1.5")}>
             <span className="grid size-[18px] place-items-center rounded-md bg-primary-soft text-2xs text-primary">{n + 1}</span>
             {lane.label}
           </h3>
@@ -210,7 +210,7 @@ export function Facts({ items }: { items: { label: string; value: ReactNode }[] 
       {items.map((i) => (
         <div key={i.label} className="flex items-baseline justify-between gap-4 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
           <dt className="text-text-2">{i.label}</dt>
-          <dd className="text-right font-medium">{i.value ?? <span className="text-muted">—</span>}</dd>
+          <dd className="text-right font-medium">{i.value ?? <Dash />}</dd>
         </div>
       ))}
     </dl>

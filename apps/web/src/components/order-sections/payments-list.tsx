@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Badge, RefCode, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, RefCode, Table, Td, Th, THead, Tr, Dash } from "@kebo/ui";
 import { date, dateTime, dayMonth, money } from "@/lib/format";
 
 /** One payment in an order's list of payments received or made. */
@@ -29,7 +29,7 @@ export interface PaymentLine {
  * card with what it was for, its amount, when and how, and its Receipt and Change.
  */
 export function PaymentsList({ name, account, total, rows }: { name: string; account: "Into" | "From"; total: { label: string; amount: ReactNode }; rows: PaymentLine[] }) {
-  const none = <span className="font-normal text-muted">—</span>;
+  const none = <Dash />;
   return (
     <>
       <ul aria-label={name} className="flex flex-col divide-y divide-line sm:hidden">
@@ -78,8 +78,8 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
                 <Td className={`whitespace-nowrap tabular ${x.voided ? "line-through" : ""}`}>{date(x.paidOn)}</Td>
                 <Td className="font-medium">{x.voided ? <span className="font-normal">{x.voided.reason ?? ""}</span> : (x.for ?? none)}</Td>
                 <Td>{x.how}</Td>
-                <Td>{x.account ?? <span className="text-muted">—</span>}</Td>
-                <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <span className="text-muted">—</span>}</Td>
+                <Td>{x.account ?? <Dash />}</Td>
+                <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <Dash />}</Td>
                 <Td className="text-xs text-text-2" title={dateTime(x.recordedAt)}>
                   {x.recordedBy ?? "—"}
                   <span className="block whitespace-nowrap text-muted">{dayMonth(x.recordedAt)}</span>

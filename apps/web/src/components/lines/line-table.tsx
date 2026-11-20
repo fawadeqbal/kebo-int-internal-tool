@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { lineNumbers } from "@kebo/shared";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { Button, cn, Input, Textarea, Badge } from "@kebo/ui";
+import { Button, cn, Input, Textarea, Badge, Dash } from "@kebo/ui";
 import { parseList, type PastedItem } from "@/components/deals/paste-list";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
 import { downloadSheet, ExcelMenu, useSheetPicker } from "@/components/sheets/excel-menu";
@@ -1967,14 +1967,14 @@ export function LineTable({
                           ) : isChoice(c) && !readOnly ? (
                             <span className="flex items-center justify-between gap-1">
                               <span className="min-w-0 truncate">
-                                {c.format ? c.format(Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)])), r) : value || <span className="text-muted">—</span>}
+                                {c.format ? c.format(Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)])), r) : value || <Dash />}
                               </span>
                               <ChevronDown className="size-3.5 shrink-0 text-muted" aria-hidden />
                             </span>
                           ) : c.format ? (
                             c.format(Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)])), r)
                           ) : (
-                            value || <span className="text-muted">—</span>
+                            value || <Dash />
                           )}
                         </td>
                       );

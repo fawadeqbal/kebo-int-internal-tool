@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { LOST_REASON_LABEL } from "@kebo/shared";
-import { Card, CardHeader, StatTile, Table, Td, Th, THead, Tr, EmptyLine, linkClass } from "@kebo/ui";
+import { Card, CardHeader, StatTile, Table, Td, Th, THead, Tr, EmptyLine, linkClass, Dash } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
-import { money } from "@/lib/format";
+import { money, num0 as n0 } from "@/lib/format";
 import { bigMoney, change, type Period } from "@/lib/insights-period";
 import type { loadSpending } from "@/lib/insights-data";
 import { BarList, Delta, Tiles } from "./frame";
 import { how, reportSpan } from "@/lib/figures";
 
-const n0 = (v: string | number) => Math.round(Number(v)).toLocaleString("en-US");
-const dash = <span className="text-muted">—</span>;
+const dash = <Dash />;
 /** Spent for every 100 sold, two decimals; a dash with nothing sold. */
 const per100 = (spent: number, sold: number) => (sold > 0 ? ((spent / sold) * 100).toFixed(2) : null);
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });

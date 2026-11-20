@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { factoryTaxMinor, formatMinor, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, lineNumbers, offerTaxText, PAPER, type AttachmentKind } from "@kebo/shared";
-import { Button, cn, Field, RULES, Select, Textarea, Badge, Notice, EmptyLine, linkClass } from "@kebo/ui";
+import { Button, cn, Field, RULES, Select, Textarea, Badge, Notice, EmptyLine, linkClass, Dash } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { OpenPanelButton, PanelBody, SidePanel, useClosePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
@@ -598,7 +598,7 @@ function LinesReview({ rows, currency, tax }: { rows: LineRow[]; currency: strin
                 <td className="w-24 px-3 py-2 text-right tabular">
                   {r.values.quantity} {r.values.unit}
                 </td>
-                <td className="w-32 px-4 py-2 text-right font-semibold tabular">{p && Number.isFinite(p * n) ? formatMinor(Math.round(toMinor(p) * n), currency) : <span className="font-normal text-muted">—</span>}</td>
+                <td className="w-32 px-4 py-2 text-right font-semibold tabular">{p && Number.isFinite(p * n) ? formatMinor(Math.round(toMinor(p) * n), currency) : <Dash />}</td>
               </tr>
             );
           })}
@@ -773,7 +773,7 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
   const lineTotal = (v: LineValues) => {
     const p = Number((v.unitPrice ?? "").replace(/,/g, ""));
     const n = Number((v.quantity ?? "").replace(/,/g, ""));
-    if (!Number.isFinite(p) || !Number.isFinite(n) || !p) return <span className="text-muted">—</span>;
+    if (!Number.isFinite(p) || !Number.isFinite(n) || !p) return <Dash />;
     const t = plainAmount(Math.round(toMinor(p) * n));
     return v.alternativeOfId ? <span className="text-muted" title="Another spec: not in the total">({t})</span> : t;
   };
@@ -803,7 +803,7 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
         Number(v.unitPrice) ? (
           Number(v.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         ) : (
-          <span className="text-muted">—</span>
+          <Dash />
         ),
     },
     ...(showTax
@@ -819,7 +819,7 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
             // On a phone a line's tax is said only when it has its own (the offer's % is said above the lines).
             summary: (v: LineValues) => (rateOf(v) === taxRate ? null : `Tax ${rateOf(v)}%`),
             format: (v: LineValues, row?: LineRow) => {
-              if (row?.parentKey && !Number(v.unitPrice)) return <span className="text-muted">—</span>;
+              if (row?.parentKey && !Number(v.unitPrice)) return <Dash />;
               const r = rateOf(v);
               return r === taxRate ? (
                 <span className="text-text-2">{r}%</span>
@@ -849,7 +849,7 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
                   of {numberOf(v.alternativeOfId)}
                 </Badge>
               ) : (
-                <span className="text-muted">—</span>
+                <Dash />
               ),
           },
         ]

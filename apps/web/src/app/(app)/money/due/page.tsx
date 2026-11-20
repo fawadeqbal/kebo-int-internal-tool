@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { Fragment, Suspense } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, expenseShort, FACTORY_DUE_RULE_LABEL } from "@kebo/shared";
-import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr, linkClass } from "@kebo/ui";
+import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr, linkClass, Dash } from "@kebo/ui";
 import { addDays, daysBetween } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { date, money, companyToday } from "@/lib/format";
+import { date, money, companyToday, num2 as n2 } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
@@ -27,7 +27,6 @@ const HERE = "/money/due";
 const PAGE = PAGE_SIZE;
 type Search = { side?: string; show?: string; q?: string; who?: string; page?: string; open?: string; do?: string; pay?: string };
 
-const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
 
 const add = (m: Map<string, number>, currency: string, v: string | number) => m.set(currency, (m.get(currency) ?? 0) + Number(v));
@@ -201,7 +200,7 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
                           {n2(o.due)}
                           <span className="block text-xs font-normal text-text-2">{o.currency}</span>
                         </Td>
-                        <Td className="text-sm max-sm:hidden">{o.next ? `${o.next.label}${Number(o.next.open) !== Number(o.due) ? ` · ${n2(o.next.open)}` : ""}` : <span className="text-muted">—</span>}</Td>
+                        <Td className="text-sm max-sm:hidden">{o.next ? `${o.next.label}${Number(o.next.open) !== Number(o.due) ? ` · ${n2(o.next.open)}` : ""}` : <Dash />}</Td>
                         <Td className={cn("text-sm max-sm:hidden", o.daysLate > 0 ? "font-semibold text-bad" : soon(o) ? "font-medium text-warn" : "text-text")}>
                           {o.daysLate > 0 ? `${days(o.daysLate)} late` : o.next?.dueOn ? `${date(o.next.dueOn)}${o.next.dueOn >= today ? ` · in ${days(daysBetween(today, o.next.dueOn))}` : ""}` : (o.next?.when ?? "No date yet")}
                         </Td>

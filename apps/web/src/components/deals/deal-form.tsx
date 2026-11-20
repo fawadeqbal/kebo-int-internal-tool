@@ -16,7 +16,7 @@ import {
   UNKNOWN_COUNTRY,
   type AttachmentKind,
 } from "@kebo/shared";
-import { boxHeadClass, boxTitleClass, Button, buttonClass, Card, cn, Field, Input, Select, Textarea, Notice, Badge, EmptyLine, linkClass } from "@kebo/ui";
+import { boxHeadClass, boxTitleClass, Button, buttonClass, Card, cn, Field, Input, Select, Textarea, Notice, Badge, EmptyLine, linkClass, capsClass } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { ChangeHint, changeCount, changedClassOf, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
@@ -1187,7 +1187,7 @@ function NewCustomerForm({
           <CountrySelect id="qc-country" value={q.country} onChange={(e) => set("country", e.target.value)} />
         </Field>
       </div>
-      <p className="-mb-1 text-xs font-semibold tracking-wide text-text-2 uppercase">Main contact</p>
+      <p className={cn(capsClass, "-mb-1")}>Main contact</p>
       <div className="grid gap-x-4 gap-y-3.5 md:grid-cols-3">
         <Field label="Name" htmlFor="qc-contact" required={q.type !== "individual"} error={contactErr("name")}>
           <Input id="qc-contact" value={q.contact} onChange={(e) => set("contact", e.target.value)} maxLength={120} />

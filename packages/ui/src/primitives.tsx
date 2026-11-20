@@ -262,6 +262,12 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
 export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4";
 export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
 
+/** A heading inside a box or a window, under its title (a group of fields, a part of a list): one look everywhere. */
+export const subTitleClass = "text-sm font-semibold text-text";
+
+/** A small label in capitals over a group (a menu's group, a list's part, a panel's kind): one look everywhere. */
+export const capsClass = "text-2xs font-semibold tracking-wide text-text-2 uppercase";
+
 /** A link in text (a list's "Show all", a cross-link, "Open the order →"): one look everywhere; its size comes from the text around it. */
 export const linkClass = "font-medium text-primary underline-offset-2 hover:underline";
 
@@ -731,6 +737,30 @@ export function Avatar({ name, size = 32, className }: { name: string; size?: nu
 }
 
 /** A record's number (SO-2026-0035, RFQ-2026-0058) as the grey monospace chip of the tables; a link when given `href`. */
+/** An empty value in a table or a list of facts: a quiet dash. */
+export function Dash() {
+  return <span className="font-normal text-muted">—</span>;
+}
+
+/**
+ * A count in a small round bubble: unread notifications (the bell, the phone's tab), filters chosen. Over 9: "9+".
+ * `tone`: action (something waits for you, the default) or primary (what you chose).
+ */
+export function CountDot({ n, tone = "action", className, ...props }: ComponentProps<"span"> & { n: number; tone?: "action" | "primary" }) {
+  return (
+    <span
+      className={cn(
+        "grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-2xs leading-none font-bold text-white tabular",
+        tone === "action" ? "bg-action-solid" : "bg-primary-solid",
+        className,
+      )}
+      {...props}
+    >
+      {n > 9 ? "9+" : n}
+    </span>
+  );
+}
+
 export function RefCode({ children, href, className }: { children: ReactNode; href?: string; className?: string }) {
   const cls = cn("inline-block rounded-md bg-surface-2 px-[7px] py-0.5 font-mono text-xs font-semibold whitespace-nowrap text-text-2", href && "hover:text-primary", className);
   return href ? (

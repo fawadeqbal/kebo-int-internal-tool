@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, Notice, linkClass } from "@kebo/ui";
-import { date, plural } from "@/lib/format";
+import { date, plural, num2 as n2 } from "@/lib/format";
 import { bigMoney, monthYearOf, type Period } from "@/lib/insights-period";
 import type { CashReport } from "@/lib/types-facts";
 import { how, reportSpan } from "@/lib/figures";
 
-const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const signed = (v: string | number) => (Number(v) < 0 ? `− ${n2(-Number(v))}` : n2(v));
 
 /**

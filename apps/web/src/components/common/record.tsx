@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { boxTitleClass, buttonClass, Card, cn, linkClass } from "@kebo/ui";
+import { boxTitleClass, buttonClass, Card, cn, linkClass, Dash } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
 import { TabList } from "@/components/lists/tab-list";
 
@@ -87,7 +87,7 @@ export function DetailsCard({
         {shown.map((i) => (
           <div key={i.label} className={cn("contents", i.wide && "xl:[&>dd]:col-span-3")}>
             <dt className="text-text-2">{i.label}</dt>
-            <dd className="min-w-0 font-medium break-words text-text">{missing(i.value) ? <span className="font-normal text-muted">—</span> : i.value}</dd>
+            <dd className="min-w-0 font-medium break-words text-text">{missing(i.value) ? <Dash /> : i.value}</dd>
           </div>
         ))}
       </dl>

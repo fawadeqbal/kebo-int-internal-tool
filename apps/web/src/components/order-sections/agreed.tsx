@@ -19,6 +19,7 @@ import type { OrderView } from "@/lib/types-orders";
 import type { OrderMoney } from "@/lib/types-money";
 import { date, dayMonth, money } from "@/lib/format";
 import { shortName } from "@/components/deals/offer-facts";
+import { Dash } from "@kebo/ui";
 
 /*
  * The order's Overview, design "RFQ Desk — terms that travel" (16 Nov 2026): what was agreed with the customer
@@ -45,7 +46,7 @@ export function Group({ title, big, children }: { title: string; big: ReactNode;
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <p className="text-text-2">
-      {label} {children === null || children === undefined || children === "" ? <span className="text-muted">—</span> : <b className="font-semibold text-text">{children}</b>}
+      {label} {children === null || children === undefined || children === "" ? <Dash /> : <b className="font-semibold text-text">{children}</b>}
     </p>
   );
 }

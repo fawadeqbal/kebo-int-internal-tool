@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, FileText, MoreHorizontal, Plus, Share2 } from "lucide-react";
 import { paperDone, type FlowStep, type PaperKind } from "@kebo/shared";
-import { Badge, Button, buttonClass, Card, CardHeader, cn } from "@kebo/ui";
+import { Badge, Button, buttonClass, Card, CardHeader, cn, capsClass } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { useConfirm } from "@/components/common/dialog";
 import { FloatingMenu } from "@/components/common/floating";
@@ -195,7 +195,7 @@ export function PapersTable({
                 if (!list.length) return null;
                 return (
                   <div key={g.label} role="rowgroup">
-                    <p className="px-2 pt-3 pb-1 text-2xs font-semibold tracking-wide text-muted uppercase">{g.label}</p>
+                    <p className={cn(capsClass, "px-2 pt-3 pb-1")}>{g.label}</p>
                     {list.map(row)}
                   </div>
                 );

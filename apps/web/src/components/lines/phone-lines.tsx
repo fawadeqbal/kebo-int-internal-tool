@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Plus } from "lucide-react";
-import { Button, cn, Field, Input, Select, Textarea, Badge, Notice } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Badge, Notice, capsClass, Dash } from "@kebo/ui";
 import { FIT_VIEW, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
 import { FloatingMenu } from "@/components/common/floating";
@@ -342,7 +342,7 @@ export function PhoneLineRow({
               {needs && needs !== "No price" && missingMark}
               {badge}
             </span>
-            <span className="shrink-0 text-sm font-bold whitespace-nowrap text-text">{amount || <span className="font-normal text-muted">—</span>}</span>
+            <span className="shrink-0 text-sm font-bold whitespace-nowrap text-text">{amount || <Dash />}</span>
           </span>
         </span>
       </>
@@ -472,7 +472,7 @@ function UnitPicker({ c, id, value, set, error, used }: { c: LineColumn; id: str
       {value === u && <Check aria-hidden className="size-4" />}
     </button>
   );
-  const group = (title: string) => <p className="px-2.5 pt-2 pb-1 text-xs font-bold tracking-wide text-text-2 uppercase">{title}</p>;
+  const group = (title: string) => <p className={cn(capsClass, "px-2.5 pt-2 pb-1")}>{title}</p>;
   return (
     <Field label={c.label} htmlFor={id} required={!!c.required} error={error}>
       {typing ? (
@@ -500,7 +500,7 @@ function UnitPicker({ c, id, value, set, error, used }: { c: LineColumn; id: str
           onClick={() => setOpen((o) => !o)}
           className="flex h-12 w-full items-center justify-between gap-2 rounded-[10px] border border-line-strong bg-surface px-3 text-left text-base shadow-card focus-visible:border-primary-solid focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
         >
-          <span className="min-w-0 truncate">{value || <span className="text-muted">—</span>}</span>
+          <span className="min-w-0 truncate">{value || <Dash />}</span>
           <ChevronDown aria-hidden className="size-4 shrink-0 text-muted" />
         </button>
       )}

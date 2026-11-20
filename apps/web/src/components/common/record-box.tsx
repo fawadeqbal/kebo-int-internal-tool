@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Pencil } from "lucide-react";
 import type { Tone } from "@kebo/shared";
-import { Badge, boxHeadClass, boxTitleClass, Card, cn } from "@kebo/ui";
+import { Badge, boxHeadClass, boxTitleClass, Card, cn, Dash } from "@kebo/ui";
 import { OpenPanelButton } from "@/components/common/panel";
 
 /**
@@ -86,7 +86,7 @@ export function BoxFacts({ rows, wide }: { rows: [string, ReactNode][]; wide?: b
       {rows.map(([k, v], i) => (
         <div key={`${i}:${k}`} className="contents">
           <dt className="text-text-2">{k}</dt>
-          <dd className="min-w-0 font-medium break-words">{v === null || v === undefined || v === "" ? <span className="font-normal text-muted">—</span> : v}</dd>
+          <dd className="min-w-0 font-medium break-words">{v === null || v === undefined || v === "" ? <Dash /> : v}</dd>
         </div>
       ))}
     </dl>

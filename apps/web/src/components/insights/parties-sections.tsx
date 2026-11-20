@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CHANNEL_LABEL, type InquiryChannel } from "@kebo/shared";
-import { Card, CardHeader, DataRow, FilterChip, Meter, Pager, Table, Td, Th, THead, Tr, cn, StatTile, EmptyLine } from "@kebo/ui";
+import { Card, CardHeader, DataRow, FilterChip, Meter, Pager, Table, Td, Th, THead, Tr, cn, StatTile, EmptyLine, Dash } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { countryName } from "@/lib/countries";
 import { companyToday, money, plural, daysText } from "@/lib/format";
@@ -343,7 +343,7 @@ export function PeopleSection({
                         </span>
                       </span>
                     ) : (
-                      <span className="text-muted">—</span>
+                      <Dash />
                     )}
                   </Td>
                   <Td className="text-right tabular">{amountCell(r.profit)}</Td>

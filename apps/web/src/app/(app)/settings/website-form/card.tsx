@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Notice } from "@kebo/ui";
+import { Card, CardBody, CardHeader, Notice, capsClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { CopyBlock, NewKeyButton } from "./form";
 import type { WebsiteFormView } from "./types";
@@ -41,12 +41,12 @@ export async function WebsiteFormCard() {
               <Notice tone="todo">Your plan does not include the website form. Inquiries sent with this key are refused.</Notice>
             )}
             <div>
-              <p className="text-xs font-medium tracking-wide text-muted uppercase">Key</p>
+              <p className={capsClass}>Key</p>
               <CopyBlock text={view.key} label="Website form key" />
               <p className="mt-1 text-sm text-text-2">Keep it on your website only. Anyone with it can send inquiries to your company.</p>
             </div>
             <div>
-              <p className="text-xs font-medium tracking-wide text-muted uppercase">Snippet to paste before &lt;/body&gt;</p>
+              <p className={capsClass}>Snippet to paste before &lt;/body&gt;</p>
               <CopyBlock text={snippet(view)} label="Website form snippet" multiline />
             </div>
           </>

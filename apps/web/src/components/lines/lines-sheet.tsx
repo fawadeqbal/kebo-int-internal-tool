@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "@kebo/ui";
+import { cn, Dash } from "@kebo/ui";
 import type { LineColumn, LineRow } from "./line-table";
 
 /**
@@ -31,7 +31,7 @@ export function LinesView({
     if (c.format) return c.format(r.values, r);
     if (c.input === "select") return c.options?.find((o) => o.value === r.values[c.key])?.label ?? r.values[c.key];
     const v = r.values[c.key];
-    return v ? v : <span className="text-muted">—</span>;
+    return v ? v : <Dash />;
   };
   return (
     <div

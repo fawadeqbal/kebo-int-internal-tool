@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
-import { Avatar, buttonClass, cn, RULES, Badge } from "@kebo/ui";
+import { Avatar, buttonClass, cn, RULES, Badge, CountDot } from "@kebo/ui";
 import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
@@ -720,9 +720,7 @@ export function AppShell({
         <Icon className="size-[22px]" strokeWidth={active ? 2.25 : 1.75} aria-hidden />
         {label}
         {!!badge && (
-          <span className="absolute top-1 left-1/2 ml-2 min-w-4 rounded-full bg-bad-solid px-1 text-center text-2xs leading-4 font-semibold text-white" aria-label={`${badge} unread`}>
-            {badge > 9 ? "9+" : badge}
-          </span>
+          <CountDot n={badge} className="absolute top-1 left-1/2 ml-2" aria-label={`${badge} unread`} />
         )}
       </Link>
     );
@@ -795,9 +793,7 @@ export function AppShell({
                 <Bell aria-hidden />
                 <span className="sr-only">{unread ? `Notifications, ${unread} unread` : "Notifications"}</span>
                 {!!unread && (
-                  <span className="absolute top-0.5 right-0 min-w-[18px] rounded-full bg-action-solid px-1 text-center text-2xs leading-[18px] font-bold text-white" aria-hidden>
-                    {unread > 9 ? "9+" : unread}
-                  </span>
+                  <CountDot n={unread} className="absolute top-0.5 right-0" aria-hidden />
                 )}
               </Link>
               <AccountMenu user={user} companyName={companyName} />
