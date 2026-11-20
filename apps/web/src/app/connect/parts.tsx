@@ -40,7 +40,7 @@ export function CheckForm({ action, value = "", label = "Check the record" }: { 
 export function RecordTable({ name = "the first part, e.g. staff" }: { name?: string }) {
   return (
     <ScrollFade scrollLabel="The record to add" className="overflow-x-auto rounded-lg border border-line">
-      <table className="w-full min-w-[460px] text-left text-[13px]">
+      <table className="w-full min-w-[460px] text-left text-md">
         <thead className="bg-surface-2 text-xs text-text-2">
           <tr>
             <th className="px-3.5 py-2 font-semibold">Type</th>

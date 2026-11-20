@@ -7,7 +7,7 @@ import { Button, Field, Input } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useSidePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, SidePanel, useSidePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import { platformCheckDomainAction, platformConnectDomainAction, platformRemoveDomainAction } from "./domain-actions";
 
 /** "Check now" for the platform admin: the company's domain is looked up again on the spot. */
@@ -75,10 +75,10 @@ export function PlatformConnectDomain({ id, name, ours }: { id: string; name: st
                       "Written in their history",
                     ]}
                   />
-                  <PanelActions>
+                  <WindowFooter>
                     <SubmitButton pendingText="Checking…">Add and check</SubmitButton>
                     <PanelKeys />
-                  </PanelActions>
+                  </WindowFooter>
                 </>
               )}
             </ActionForm>

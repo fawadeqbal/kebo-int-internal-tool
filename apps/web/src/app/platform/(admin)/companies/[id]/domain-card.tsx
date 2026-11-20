@@ -85,7 +85,7 @@ export async function CompanyDomainCard({ id, name, live }: { id: string; name: 
             <>
               <DiagnosisVerdict d={d} who="client" />
               <div className="flex flex-col gap-2">
-                <h3 className="text-[13px] font-semibold text-text-2">What the look-up found just now</h3>
+                <h3 className="text-md font-semibold text-text-2">What the look-up found just now</h3>
                 <DiagnosisList d={d} />
               </div>
             </>

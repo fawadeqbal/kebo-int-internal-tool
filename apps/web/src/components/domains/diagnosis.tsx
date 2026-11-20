@@ -1,6 +1,6 @@
 import { Check, Info, Minus, X } from "lucide-react";
 import { DOMAIN_VERDICT_WORDS, type DomainDiagnosis } from "@kebo/shared";
-import { Alert, cn } from "@kebo/ui";
+import { cn, Notice } from "@kebo/ui";
 
 /** One step of a domain's look-up: passed, failed, not reached yet (because an earlier one failed), or only for your information. */
 export type StepMark = "ok" | "bad" | "wait" | "info";
@@ -77,14 +77,14 @@ const MARK = {
 /** The verdict in a sentence and what to do, for the platform admin or whoever looks after the DNS. */
 export function DiagnosisVerdict({ d, who = "you" }: { d: DomainDiagnosis; who?: "you" | "client" }) {
   const w = DOMAIN_VERDICT_WORDS[d.verdict];
-  const tone = d.verdict === "right" ? "success" : d.verdict === "unknown" ? "neutral" : d.verdict === "no_record" ? "warning" : "error";
+  const tone = d.verdict === "right" ? "ok" : d.verdict === "unknown" ? "neutral" : d.verdict === "no_record" ? "todo" : "bad";
   const ask = who === "client" && d.verdict !== "right" && d.verdict !== "unknown";
   const where = d.verdict === "no_record" && d.provider ? ` For ${d.zone} that is ${d.provider}.` : "";
   return (
-    <Alert tone={tone}>
-      <strong>{w.title}.</strong> {ask ? `Ask the client to ${w.next.charAt(0).toLowerCase()}${w.next.slice(1)}` : w.next}
+    <Notice tone={tone} title={`${w.title}.`}>
+      {ask ? `Ask the client to ${w.next.charAt(0).toLowerCase()}${w.next.slice(1)}` : w.next}
       {where}
-    </Alert>
+    </Notice>
   );
 }
 
@@ -105,7 +105,7 @@ export function DiagnosisList({ d, className }: { d: DomainDiagnosis; className?
               <span className="sr-only">{m.word}:</span>
             </span>
             <span className="min-w-[12rem] flex-1 font-medium">{s.label}</span>
-            <span className="min-w-0 flex-[2_1_16rem] font-mono text-[13px] text-text-2 [overflow-wrap:anywhere]">{s.found}</span>
+            <span className="min-w-0 flex-[2_1_16rem] font-mono text-md text-text-2 [overflow-wrap:anywhere]">{s.found}</span>
           </li>
         );
       })}

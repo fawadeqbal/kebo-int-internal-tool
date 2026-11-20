@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { DomainDiagnosis } from "@kebo/shared";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import { AuthShell } from "@/app/login/auth-shell";
 import { DiagnosisList, DiagnosisVerdict } from "@/components/domains/diagnosis";
 import { apiFetch } from "@/lib/api";
@@ -31,9 +31,9 @@ export default async function ConnectCheckPage({ searchParams }: { searchParams:
       <CheckForm action={action} value={typed} label={typed ? "Check again" : "Check the record"} />
 
       {r && "error" in r && (
-        <Alert tone="error" className="mt-5">
+        <Notice tone="bad" className="mt-5">
           {r.error}
-        </Alert>
+        </Notice>
       )}
 
       {r && "d" in r && (

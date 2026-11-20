@@ -53,7 +53,7 @@ export default async function ConnectPage() {
       <h2 className="mt-7 text-sm font-semibold">Mistakes we see most</h2>
       <ul className="mt-2 grid gap-2 sm:grid-cols-2">
         {MISTAKES.map(([title, text]) => (
-          <li key={title} className="rounded-lg bg-warn-soft px-3 py-2.5 text-[13px] [overflow-wrap:anywhere]">
+          <li key={title} className="rounded-lg bg-warn-soft px-3 py-2.5 text-md [overflow-wrap:anywhere]">
             <strong className="block text-warn">{title}</strong>
             {text}
           </li>
