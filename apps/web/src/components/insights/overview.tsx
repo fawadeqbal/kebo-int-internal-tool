@@ -152,7 +152,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
               </THead>
               <tbody>
                 {d.month.orders.map((o) => (
-                  <Tr key={o.orderId}>
+                  <Tr key={o.orderId} href={`/orders/${o.orderId}`}>
                     <Td>
                       <Link href={`/orders/${o.orderId}`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                         {o.refNo}

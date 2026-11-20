@@ -111,7 +111,7 @@ export function CashSection({ r, p }: { r: CashReport; p: Period }) {
             </THead>
             <tbody>
               {r.accounts.map((a) => (
-                <Tr key={a.id}>
+                <Tr key={a.id} href={`/finance/cash-book?acct=${a.id}`}>
                   <Td>
                     <Link href={`/finance/cash-book?acct=${a.id}`} className="-my-1 inline-block py-1 font-semibold text-primary hover:underline">
                       {a.name} · {a.currency}

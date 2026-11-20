@@ -143,7 +143,7 @@ export default async function CustomerOverview({
                 </THead>
                 <tbody>
                   {latest.map((o) => (
-                    <Tr key={o.id}>
+                    <Tr key={o.id} href={`/orders/${o.id}`}>
                       <Td>
                         <RefCode href={`/orders/${o.id}`}>{o.refNo}</RefCode>
                       </Td>

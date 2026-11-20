@@ -150,7 +150,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
               </THead>
               <tbody>
                 {lines.map((l) => (
-                  <Tr key={l.key}>
+                  <Tr key={l.key} href={l.order ? `/orders/${l.order.id}` : undefined}>
                     <Td className="whitespace-nowrap">{l.date ? date(l.date) : "—"}</Td>
                     <Td>
                       <span className={l.paid && !l.owed ? "block font-semibold" : "block"}>{l.what}</span>

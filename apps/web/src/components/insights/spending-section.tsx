@@ -93,7 +93,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
             </THead>
             <tbody>
               {d.people.map((x) => (
-                <Tr key={x.person.id}>
+                <Tr key={x.person.id} href={`/users/${x.person.id}#spending`}>
                   <Td className="font-semibold">
                     <Link href={`/users/${x.person.id}#spending`} className="hover:text-primary">
                       {x.person.name}
@@ -188,7 +188,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
                 </THead>
                 <tbody>
                   {d.costing.map((x) => (
-                    <Tr key={x.customer.id}>
+                    <Tr key={x.customer.id} href={`/customers/${x.customer.id}/money#where`}>
                       <Td className="font-semibold">
                         <Link href={`/customers/${x.customer.id}/money#where`} className="hover:text-primary">
                           {x.customer.name}
@@ -220,7 +220,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
               </THead>
               <tbody>
                 {d.factories.map((f) => (
-                  <Tr key={f.factory.id}>
+                  <Tr key={f.factory.id} href={`/suppliers/${f.factory.id}`}>
                     <Td className="font-semibold">
                       <Link href={`/suppliers/${f.factory.id}`} className="hover:text-primary">
                         {f.factory.name}

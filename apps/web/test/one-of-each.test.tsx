@@ -286,6 +286,26 @@ describe("one of each", () => {
     expect(found(/readableDates\(e\.summary\)|readableDates\(r\.summary\)/g)).toEqual([]);
   });
 
+  it("a row that stands for a record opens from a click anywhere on it (Tr href), never only from a link in one cell", () => {
+    // A row (<tr>/<Tr>) whose first cells hold a link to a page, with no href on the row itself. Kept: rows whose
+    // link opens a file in a new tab (a receipt, an inquiry's files), and the approvals queue (no page of its own).
+    const KEPT = ["orders/cost-sheet.tsx", "deals/inquiry-files.tsx", "inquiries/[id]/files/page.tsx", "approvals/page.tsx"];
+    const bad = SOURCES.filter(({ file }) => !KEPT.some((k) => file.replaceAll("\\", "/").includes(k))).flatMap(({ file, text }) => {
+      const lines = text.split("\n");
+      return lines.flatMap((line, i) => {
+        if (!/<(tr|Tr)\b(?![^>]*href)[^>]*\bkey=/.test(line)) return [];
+        const next = lines.slice(i + 1, i + 7).join("\n");
+        return /<Link[^>]*href=|<RefCode href=/.test(next) ? [`${file}:${i + 1}`] : [];
+      });
+    });
+    expect(bad).toEqual([]);
+    // One handler for every table (RowClicks, in the app's and the platform's frames), not a link stretched over a row.
+    expect(found(/closest[^(]*\(\s*["'`]tr\[data-href\]/g).map((m) => m.split(":")[0])).toEqual(["apps/web/src/components/common/row-clicks.tsx"]);
+    expect(found(/<(tr|Tr)\b[^>]*\brelative\b/g)).toEqual([]);
+    for (const frame of ["app/(app)/layout.tsx", "app/platform/(admin)/layout.tsx"])
+      expect(SOURCES.find(({ file }) => file.replaceAll("\\", "/").endsWith(frame))?.text).toContain("<RowClicks />");
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

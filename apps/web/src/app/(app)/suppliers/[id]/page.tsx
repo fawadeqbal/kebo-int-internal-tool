@@ -104,7 +104,7 @@ export default async function FactoryOverview({
                       {pos.rows.slice(0, 5).map((o) => {
                         const st = poState(o, today);
                         return (
-                          <Tr key={o.orderId}>
+                          <Tr key={o.orderId} href={`/orders/${o.orderId}`}>
                             <Td>
                               <RefCode href={`/orders/${o.orderId}`}>{o.refNo}</RefCode>
                             </Td>
@@ -136,7 +136,7 @@ export default async function FactoryOverview({
                 </THead>
                 <tbody>
                   {r.openOrders.map((o) => (
-                    <Tr key={o.id}>
+                    <Tr key={o.id} href={`/orders/${o.id}`}>
                       <Td>
                         <RefCode href={`/orders/${o.id}`}>{o.refNo}</RefCode>
                       </Td>

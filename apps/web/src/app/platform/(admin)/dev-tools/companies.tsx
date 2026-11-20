@@ -34,7 +34,7 @@ export function CompaniesTab({ v, all }: { v: DevCompaniesView; all: boolean }) 
             </THead>
             <tbody>
               {rows.map((c) => (
-                <Tr key={c.id}>
+                <Tr key={c.id} href={`/platform/companies/${c.id}`}>
                   <Td>
                     <Link href={`/platform/companies/${c.id}`} className="font-medium text-primary hover:underline">
                       {c.name}

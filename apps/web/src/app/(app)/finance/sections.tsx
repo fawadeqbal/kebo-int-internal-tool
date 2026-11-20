@@ -130,7 +130,7 @@ export async function VaultOverview({ today }: { today: string }) {
                 {open.map((a) => {
                   const eq = a.currency === main ? Number(a.balance) : convertAmount(Number(a.balance), a.currency, main, main, rates);
                   return (
-                    <Tr key={a.id}>
+                    <Tr key={a.id} href={`/finance/cash-book?acct=${a.id}`}>
                       <Td>
                         <Link href={`/finance/cash-book?acct=${a.id}`} className="font-semibold hover:text-primary">
                           {a.name}
@@ -211,7 +211,7 @@ export async function VaultOverview({ today }: { today: string }) {
                 {latest.map((r) => {
                   const n = Number(r.amount);
                   return (
-                    <Tr key={r.key} className={r.voided ? "text-muted line-through" : undefined}>
+                    <Tr key={r.key} href={r.href ?? undefined} className={r.voided ? "text-muted line-through" : undefined}>
                       <Td className="whitespace-nowrap">{date(r.on)}</Td>
                       <Td>{r.href ? <Link href={r.href} className="hover:text-primary">{r.what}</Link> : r.what}</Td>
                       <Td className="text-right tabular">{n > 0 ? Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 }) : ""}</Td>
@@ -424,7 +424,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
                   const n = Number(r.amount);
                   const isMove = r.kind === "transfer_in" || r.kind === "transfer_out";
                   return (
-                    <Tr key={r.key} className={cn("align-top", r.voided && "text-muted line-through")}>
+                    <Tr key={r.key} href={r.href ?? undefined} className={cn("align-top", r.voided && "text-muted line-through")}>
                       <Td className="text-sm whitespace-nowrap">{date(r.on)}</Td>
                       <Td className="min-w-56">
                         {r.href ? (

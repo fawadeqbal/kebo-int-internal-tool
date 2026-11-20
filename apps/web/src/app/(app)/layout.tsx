@@ -15,6 +15,7 @@ import { AccountsProvider, type AccountOption } from "@/components/money/account
 import { CompanyTime } from "@/lib/time-client";
 import { RememberColours } from "./remember-colours";
 import { getSettings } from "@/lib/loaders";
+import { RowClicks } from "@/components/common/row-clicks";
 
 /** The company's own logo (Settings → Company), at a link that changes when the logo does; none: the app's icon. */
 function logoUrl(logo: string | undefined) {
@@ -108,6 +109,7 @@ export default async function AppLayout({ children, window: win }: { children: R
       </AppShell>
       <Suspense>
         <Toast />
+        <RowClicks />
       </Suspense>
       <KeyboardShortcuts canCreate={has("inquiries.create")} />
     </CompanyTime>

@@ -4,12 +4,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@kebo/ui";
 
-/** Clicks on these do their own thing, not the row's. */
-const OWN = "a,button,input,select,textarea,label,summary,[role=menu],[role=menuitem],[data-no-row]";
-
 /**
  * A list's table (design system: List frame). Rows are DataRow: a click on a
- * row opens it, hover lights it, its first cell's link opens it from the
+ * row opens it (RowClicks, mounted by the app's frame), hover lights it, its first cell's link opens it from the
  * keyboard (Enter), and its ⋯ (RowMenu) sits in the last cell. The header
  * stays in view while the page scrolls (where the list fits; on a narrower
  * page a wide table scrolls sideways instead). Not for tables of lines you edit
@@ -77,15 +74,6 @@ export function DataTable({
         "fits:[&_thead_th]:sticky fits:[&_thead_th]:top-14 fits:[&_thead_th]:z-[1] focus-visible:-outline-offset-2",
         className,
       )}
-      onClick={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.closest(OWN) || window.getSelection()?.toString()) return;
-        const tr = target.closest<HTMLElement>("tr[data-href]");
-        if (!tr || !box.current?.contains(tr)) return;
-        const href = tr.dataset.href!;
-        if (e.metaKey || e.ctrlKey) window.open(href, "_blank", "noopener");
-        else router.push(href);
-      }}
     >
       <table aria-label={label} className={cn("w-full border-collapse text-md", tableClassName)}>
         {children}

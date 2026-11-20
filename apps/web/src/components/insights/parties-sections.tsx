@@ -310,7 +310,7 @@ export function PeopleSection({
             </THead>
             <tbody>
               {d.rows.map((r) => (
-                <Tr key={r.id}>
+                <Tr key={r.id} href={`/users/${r.id}`}>
                   <Td className="font-semibold">
                     {r.id === "nobody" ? (
                       <span className="font-normal text-muted">Nobody</span>
