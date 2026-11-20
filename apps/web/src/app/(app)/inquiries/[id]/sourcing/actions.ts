@@ -5,9 +5,49 @@ import { factoryQuoteInput } from "@kebo/shared";
 import { api, ApiError } from "@/lib/api";
 import { attempt, formBody, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
+import { requireUser } from "@/lib/session";
 import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
+
+/** A new supplier typed in the offer window (as a new customer in the inquiry's): its name and how to reach them. */
+export type QuickSupplier = {
+  name: string;
+  contactPerson: string;
+  phone: string;
+  wechat: string;
+  email: string;
+  address: string;
+  bankDetails: string;
+  notes: string;
+};
+export type QuickSupplierResult = { ok: true; factory: FactoryOption } | { ok: false; message: string; errors?: Record<string, string[] | undefined> };
+
+/**
+ * "New supplier" in the offer window: added to the supplier list now, looked after by whoever adds it (as on
+ * Suppliers), and chosen for the offer. Same rules as the Suppliers page's own window (sourcing.manage).
+ */
+export async function quickSupplierAction(v: QuickSupplier): Promise<QuickSupplierResult> {
+  const me = await requireUser();
+  const blank = (x: string) => x.trim() || null;
+  const r = await attempt(null, () =>
+    api.post<{ id: string; name: string; contactPerson: string | null }>("/factories", {
+      name: v.name.trim(),
+      contactPerson: blank(v.contactPerson),
+      phone: blank(v.phone),
+      wechat: blank(v.wechat),
+      email: blank(v.email),
+      address: blank(v.address),
+      bankDetails: blank(v.bankDetails),
+      notes: blank(v.notes),
+      ownerId: me.id,
+    }),
+  );
+  if (!r.ok) return { ok: false, message: r.message ?? "Could not add the supplier.", errors: r.errors };
+  const f = r.data as { id: string; name: string; contactPerson: string | null };
+  revalidatePath("/suppliers");
+  return { ok: true, factory: { id: f.id, name: f.name, contactPerson: f.contactPerson ?? (blank(v.contactPerson) as string | null) } };
+}
 
 /** Factory picker: search the factory list by name or contact person. */
 export async function searchFactoriesAction(q: string): Promise<FactoryOption[]> {

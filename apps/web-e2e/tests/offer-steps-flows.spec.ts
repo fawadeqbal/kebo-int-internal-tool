@@ -45,7 +45,16 @@ test("a new offer: Factory, Prices, Delivery & payment, Warranty & conditions, R
   const factory = `Wuxi Steps ${deal.tag}`;
   await win.getByRole("combobox", { name: /Supplier/ }).fill(factory);
   await win.getByRole("option", { name: `New supplier “${factory}”` }).click();
-  await expect(win.getByText("New supplier — added when you save")).toBeVisible();
+  // The New supplier form, as a new customer on an inquiry: the name typed, how to reach them; Add and use adds it now.
+  const form = win.getByRole("region", { name: "New supplier" });
+  await expect(form.getByLabel("Name")).toHaveValue(factory);
+  await form.getByLabel("Contact person").fill("Mr Chen");
+  await form.getByLabel("WeChat").fill(`chen-${deal.tag}`);
+  expect(await accessibilityProblems(page), "the New supplier form meets WCAG 2.2 AA").toEqual([]);
+  await win.getByRole("button", { name: "Add and use" }).click();
+  await expect(form).toHaveCount(0);
+  await expect(win.getByText(factory)).toBeVisible();
+  await expect(win.getByText("Mr Chen")).toBeVisible();
   await win.getByRole("button", { name: /^Next/ }).click();
 
   // Prices: the customer's items copied with the other ways in (never inside the table); prices typed in the sheet.
