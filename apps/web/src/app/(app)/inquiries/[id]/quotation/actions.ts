@@ -8,27 +8,13 @@ import { withChromium } from "@/app/pdf/render";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail } from "@/lib/types";
 import { LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
-import type { NewQuotationsResult, QuotationView, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
+import type { NewQuotationsResult, QuotationView, QuoteOffers } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
 /** What a revision answer says about itself: "QUO-2026-0051 R1", and how many options it has. */
 type RevisionAnswer = { number?: number; quotation?: { refNo?: string }; options?: unknown[] };
 const revisionName = (d: RevisionAnswer | undefined) => (d?.number ? `${d.quotation?.refNo ? `${d.quotation.refNo} ` : ""}R${d.number}` : null);
-
-/** Start the next revision as a draft (JSON in `payload`, from …/quotation/draft and the person's changes). */
-export async function createRevisionAction(dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.post<{ number: number }>(`/inquiries/${dealId}/quotation/revisions`, formBody(form)));
-  if (!r.ok) return r;
-  refresh(dealId);
-  const d = r.data as RevisionAnswer;
-  const options = d.options?.length ?? 0;
-  return {
-    ...r,
-    message: `Quotation ${revisionName(d) ?? `R${d.number}`} drafted`,
-    detail: `${options > 1 ? `${options} options · ` : ""}Check it, then send it`,
-  };
-}
 
 /**
  * New quotations: one draft for each offer ticked (or own prices), lettered A, B, C… The window sends the offers
@@ -86,12 +72,6 @@ export async function deleteDraftAction(dealId: string, quotationId: string, rev
   refresh(dealId);
   const left = await api.get<QuotationView>(`/inquiries/${dealId}/quotation`).catch(() => null);
   redirect(left?.quotations.some((q) => q.id === quotationId) ? `/inquiries/${dealId}/quotations/${quotationId}` : `/inquiries/${dealId}/quotation`);
-}
-
-export async function deleteRevisionAction(dealId: string, revisionId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
-  const r = await attempt(null, () => api.delete(`/revisions/${revisionId}`), "Draft deleted.");
-  if (r.ok) refresh(dealId);
-  return r;
 }
 
 const DONE: Record<string, string> = {
@@ -196,25 +176,6 @@ export async function saidNoAction(dealId: string, revisionId: string, _prev: Ac
   refresh(dealId);
   const name = revisionName(r.data as RevisionAnswer);
   return { ...r, message: name ? `${name}: the customer said no` : "Recorded: the customer said no", detail: why };
-}
-
-const TERM_FIELDS = ["validUntil", "incotermPlace", "paymentTerms", "deliveryTerms", "warranty", "notes"] as const;
-
-/** One of a draft's terms ("+ Add" on the terms card): the draft's values with it put in, saved with the same PUT as the editor. */
-export async function revisionFieldsAction(dealId: string, revisionId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const r = await attempt(
-    form,
-    async () => {
-      const values = await api.get<RevisionDraft>(`/revisions/${revisionId}/values`);
-      const body: Record<string, unknown> = { ...values };
-      for (const k of TERM_FIELDS) if (k in v) body[k] = v[k]!.trim() === "" ? null : v[k]!.trim();
-      return api.put(`/revisions/${revisionId}`, { ...body, reason: reasonOf(form) });
-    },
-    "Draft saved.",
-  );
-  if (r.ok) refresh(dealId);
-  return r;
 }
 
 /**

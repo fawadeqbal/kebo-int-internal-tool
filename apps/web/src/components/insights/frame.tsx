@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@kebo/ui";
 
@@ -74,86 +73,6 @@ export function Spark({ values, label }: { values: number[]; label: string }) {
   );
 }
 
-/** One-hue ramp, light to dark: for ordered parts (not due → over 60 days). */
-export const RAMP = [
-  "color-mix(in oklab, var(--chart-1) 22%, var(--surface))",
-  "color-mix(in oklab, var(--chart-1) 45%, var(--surface))",
-  "color-mix(in oklab, var(--chart-1) 75%, var(--surface))",
-  "color-mix(in oklab, var(--chart-1) 100%, black 18%)",
-];
-
-/**
- * One whole split into ordered parts (owed by age): a thin segmented bar, then each part's name and amount
- * under its swatch. A part can link to its list.
- */
-export function SegmentBar({
-  label,
-  total,
-  parts,
-}: {
-  label: string;
-  total: ReactNode;
-  parts: { key: string; label: string; value: number; text: string; href?: string; active?: boolean }[];
-}) {
-  const sum = parts.reduce((t, p) => t + Math.max(0, p.value), 0);
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-text-2">Total</span>
-        <span className="font-semibold tabular">{total}</span>
-      </div>
-      <div
-        className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-surface-3"
-        role="img"
-        aria-label={`${label}: ${parts.map((p) => `${p.label} ${p.text}`).join(", ")}`}
-      >
-        {sum > 0 &&
-          parts
-            .filter((p) => p.value > 0)
-            .map((p) => (
-              <span
-                key={p.key}
-                className="h-full first:rounded-l-full last:rounded-r-full"
-                style={{ width: `${(p.value / sum) * 100}%`, background: RAMP[parts.indexOf(p)] }}
-              />
-            ))}
-      </div>
-      <ul className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
-        {parts.map((p, i) => {
-          const body = (
-            <>
-              <span className="flex items-center gap-1.5 text-xs text-text-2">
-                <span aria-hidden className="size-2.5 shrink-0 rounded-sm" style={{ background: RAMP[i] }} />
-                {p.label}
-              </span>
-              <span className="text-sm font-semibold tabular">{p.text}</span>
-            </>
-          );
-          return (
-            <li key={p.key}>
-              {p.href ? (
-                <Link
-                  href={p.href}
-                  scroll={false}
-                  aria-current={p.active ? "true" : undefined}
-                  className={cn(
-                    "-m-1 flex flex-col gap-0.5 rounded-md p-1 hover:bg-surface-2",
-                    p.active && "bg-primary-soft ring-1 ring-primary/40",
-                  )}
-                >
-                  {body}
-                </Link>
-              ) : (
-                <div className="flex flex-col gap-0.5">{body}</div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
 /** Ranked horizontal bars, one hue, the value at the end and an optional second line under the name. */
 export function BarList({
   label,
@@ -185,9 +104,4 @@ export function BarList({
       ))}
     </ul>
   );
-}
-
-/** A small heading over a group of cards ("The same figures on each customer's page"). */
-export function GroupHeading({ children }: { children: ReactNode }) {
-  return <h2 className="mt-1 text-xs font-semibold tracking-wide text-muted uppercase">{children}</h2>;
 }

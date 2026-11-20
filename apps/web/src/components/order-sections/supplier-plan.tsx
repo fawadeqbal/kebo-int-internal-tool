@@ -22,13 +22,6 @@ export function supplierRule(r: { dueRule: FactoryDueRule; dueDays?: number | nu
 /** "Advance" of "Advance 30%": the part's name without its share. */
 export const partName = (r: Pick<Row, "label">) => r.label.replace(/\s+\d+(?:\.\d+)?%$/, "") || r.label;
 
-/** "30% when we order · CNY 19,170.00", "50% on 12/12/2026 · CNY 31,950.00". */
-export function partWords(r: Row, currency: string) {
-  const share = r.percent !== null ? `${Number(r.percent.toFixed(2))}% ` : "";
-  const when = supplierRule(r) ?? (r.dueOn ? `on ${date(r.dueOn)}` : "on a date not set yet");
-  return `${share}${when} · ${money(r.amount, currency)}`;
-}
-
 /** The plan in a few words: "Advance 30% when we order · Balance 70% when they say ready". */
 export const supplierPlanWords = (plan: FactoryPlanView) =>
   plan.rows.map((r) => `${r.label} ${supplierRule(r) ?? (r.due ? `on ${date(r.due)}` : "on a date")}`).join(" · ");

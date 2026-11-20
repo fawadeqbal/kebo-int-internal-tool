@@ -113,8 +113,6 @@ export interface FactoryGroups {
   rows: FactoryGroupRow[];
 }
 
-export type AgeBucket = "notDue" | "d30" | "d60" | "d90" | "older";
-
 export interface Aging {
   side: "receivable" | "payable";
   currency: string;
@@ -171,19 +169,6 @@ export interface FactOrders {
   currency: string;
   seeMoney: boolean;
   rows: FactOrderRow[];
-}
-
-export interface FactsNow {
-  currency: string;
-  today: string;
-  seeMoney: boolean;
-  seeExpenses: boolean;
-  openQuotes: { count: number; value: string; winRate: number | null; likely: string | null };
-  expiring: { count: number; value: string };
-  overdue: { customers: number; amount: string; list: { customerId: string; name: string; amount: string; days: number }[] };
-  lateFactories: { factoryId: string; name: string; days: number; orders: number }[];
-  lowMargin: { orders: number; costsOverPlan: string | null };
-  byCurrency: { currency: string; toReceive: string; toPay: string }[] | null;
 }
 
 /** GET /insights/facts/factory-orders?factoryId: one factory's orders (the supplier's "Purchase orders"). */

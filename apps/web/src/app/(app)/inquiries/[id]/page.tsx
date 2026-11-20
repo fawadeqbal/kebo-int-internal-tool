@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { EditRequestWindow } from "../inquiry-windows";
 import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
-import { Badge, Card, CardBody, CardHeader, RefCode } from "@kebo/ui";
+import { Badge, Card, CardBody, CardHeader, RefCode, Notice } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import { dealHistoryOf, dealOf, quotationOf } from "@/lib/deal-data";
@@ -9,7 +9,6 @@ import { optional } from "@/components/print/data";
 import { shortName } from "@/components/deals/offer-facts";
 import { holdAction, moveStageAction } from "../actions";
 import { DecisionButtons } from "./panels";
-import { Notice } from "@/components/records/notice";
 import { ItemsCard } from "./items-card";
 import { FilesCard, RequestBoxes } from "./request-card";
 import { WithSide } from "./side";

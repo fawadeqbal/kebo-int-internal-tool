@@ -315,6 +315,29 @@ describe("one of each", () => {
     expect(found(/\b(px|mx|max-sm:px)-\[18px\]/g)).toEqual([]);
   });
 
+  it("nothing is kept that nothing uses: every export of the app and the design system is used somewhere else", () => {
+    // Next.js reads these by name from a page, a layout or a route.
+    const NEXT = new Set(["default", "metadata", "generateMetadata", "dynamic", "revalidate", "GET", "POST", "PUT", "DELETE", "PATCH", "generateStaticParams", "viewport", "runtime", "config", "proxy"]);
+    const TESTS = resolve(process.cwd(), "test");
+    const tests = files(TESTS).map((f) => readFileSync(f, "utf8"));
+    // Every file reads (the printed papers and the site use the app's pieces too), the tests as well.
+    const all = ROOTS.flatMap(files).map((f) => ({ file: relative(resolve(process.cwd(), "../.."), f), text: readFileSync(f, "utf8") }));
+    const texts = all.map((x) => x.text).concat(tests);
+    const bad = all.flatMap(({ file, text }, i) =>
+      [...text.matchAll(/^export (?:async )?(?:function|const|class|interface|type|enum) (\w+)/gm)]
+        .map((m) => m[1]!)
+        .filter((n) => !NEXT.has(n))
+        .filter((n) => {
+          const word = new RegExp(`\\b${n}\\b`, "g");
+          // Used again in its own file (only the export is extra), or by another file: kept.
+          if ((text.match(word) ?? []).length > 1) return false;
+          return !texts.some((t, j) => j !== i && new RegExp(`\\b${n}\\b`).test(t));
+        })
+        .map((n) => `${file}: ${n}`),
+    );
+    expect(bad).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });
