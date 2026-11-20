@@ -32,6 +32,8 @@ import { ChoiceChips } from "@/components/common/choice-chips";
 import { ReasonSheet } from "@/components/edits/reason-chips";
 import { date, money } from "@/lib/format";
 import { Facts, ReviewBox } from "./deal-form";
+import { NewSupplierForm } from "./new-supplier-form";
+import { quickSupplierAction } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import {
   LeadField,
   PartsField,
@@ -204,18 +206,25 @@ const OFFER_PRESETS: PartsPreset[] = [
 export type AskedFactory = FactoryOption & { note?: string };
 
 /**
- * Choose a known supplier, or type a new one's name (it is added to the supplier list on save). The suppliers asked
- * for this inquiry come first (design 18 Nov); typing searches them all. Drawn by the one Picker.
+ * Choose a known supplier, or "+ New supplier" with what was typed: the window's New supplier form (`onNew`), as a
+ * new customer is added on an inquiry. The suppliers asked for this inquiry come first (design 18 Nov); typing
+ * searches them all. Drawn by the one Picker.
  */
 export function FactoryPicker({
   value,
   onChange,
+  onNew,
+  contact,
   search,
   asked = [],
   error,
 }: {
   value: QuoteState["factory"];
+  /** The chosen one's contact person, when it is not among those asked (a supplier just added). */
+  contact?: string | null;
   onChange: (f: QuoteState["factory"], known?: FactoryOption) => void;
+  /** "+ New supplier": opens the New supplier form with what was typed (without it: added on save, by name). */
+  onNew?: (typed: string) => void;
   search: (q: string) => Promise<FactoryOption[]>;
   asked?: AskedFactory[];
   error?: string[];
@@ -227,7 +236,7 @@ export function FactoryPicker({
       placeholder="Search suppliers"
       listLabel="Suppliers"
       icon={<Factory />}
-      chosen={value && { name: value.name, sub: !value.id ? "New supplier — added when you save" : (known?.note ?? known?.contactPerson ?? "") }}
+      chosen={value && { name: value.name, sub: !value.id ? "New supplier — added when you save" : (known?.note ?? known?.contactPerson ?? contact ?? "") }}
       onClear={() => onChange(null)}
       onPick={(f) => onChange({ id: f.id, name: f.name }, f)}
       search={search}
@@ -235,7 +244,7 @@ export function FactoryPicker({
       othersTitle="Other suppliers"
       line={(f) => ({ sub: f.contactPerson })}
       newLabel="New supplier"
-      onNew={(typed) => onChange({ id: null, name: typed })}
+      onNew={onNew ?? ((typed) => onChange({ id: null, name: typed }))}
       newOnlyWhenTyped
       empty={(typed) => (typed ? `No supplier matches “${typed}”` : "No suppliers yet: type the name of the first one.")}
       error={error}
@@ -391,6 +400,11 @@ export function OfferHeaderForm({
     ...(!quote && defaults ? { taxIncluded: defaults.taxIncluded, taxRate: String(defaults.taxRate) } : {}),
   }));
   const [s, setS] = useState<QuoteState>(start);
+  // "+ New supplier" (as "+ New customer" on an inquiry): the Supplier step is the New supplier form meanwhile.
+  const [adding, setAdding] = useState<string | null>(null);
+  const [addingBusy, setAddingBusy] = useState(false);
+  const [addedContact, setAddedContact] = useState<string | null>(null);
+  const newSupplier = useRef<{ save: () => void } | null>(null);
   const set = <K extends keyof QuoteState>(k: K, v: QuoteState[K]) => setS((st) => ({ ...st, [k]: v }));
   const STEPS = OFFER_STEPS.filter((x) => x.key !== (create ? "changes" : "review"));
   const [stepOwn, setStepOwn] = useState<OfferStep>(startStep ?? (create ? "factory" : "prices"));
@@ -497,7 +511,14 @@ export function OfferHeaderForm({
   const warrantyWordsWere = quote && quote.warrantyMonths === null && quote.warranty && parseWarranty(quote.warranty) ? quote.warranty : null;
 
   // The one steps footer (StepsFooter): ‹ Back (or a note), Cancel, a quiet jump, Next — or the strong save.
-  const footer = create ? (
+  const footer = step === "factory" && adding !== null ? (
+    <StepsFooter
+      cancel={false}
+      onBack={() => setAdding(null)}
+      backLabel="Back to search"
+      save={{ label: addingBusy ? "Adding…" : "Add and use", busy: addingBusy, onClick: () => newSupplier.current?.save() }}
+    />
+  ) : create ? (
     <StepsFooter
       onBack={!only && at > 0 ? () => go(at - 1) : null}
       start={footerStart}
@@ -583,7 +604,23 @@ export function OfferHeaderForm({
             {/* A refused field on another part: every step, at that one. */}
             <JumpToError st={st} onJump={setStep} />
 
-            {step === "factory" && (
+            {step === "factory" && adding !== null && (
+              <NewSupplierForm
+                initialName={adding}
+                add={quickSupplierAction}
+                search={searchFactories}
+                onReady={(api) => {
+                  newSupplier.current = api;
+                }}
+                onBusy={setAddingBusy}
+                onUse={(f) => {
+                  setAdding(null);
+                  setAddedContact(f.contactPerson);
+                  set("factory", { id: f.id, name: f.name });
+                }}
+              />
+            )}
+            {step === "factory" && adding === null && (
               <PanelSection quiet title="Who sent it, and when" first className={grid}>
                 <Field
                   label="Supplier"
@@ -592,7 +629,7 @@ export function OfferHeaderForm({
                   error={st.errors?.factoryId ?? st.errors?.newFactoryName}
                   className={cn("md:col-span-2", changedField("factory"))}
                 >
-                  <FactoryPicker value={s.factory} search={searchFactories} asked={asked} error={st.errors?.factoryId} onChange={(f) => set("factory", f)} />
+                  <FactoryPicker value={s.factory} search={searchFactories} asked={asked} error={st.errors?.factoryId} onChange={(f) => set("factory", f)} onNew={setAdding} contact={addedContact} />
                   {changedNote("factory")}
                 </Field>
                 <Field label="Received on" htmlFor="receivedOn" required error={st.errors?.receivedOn} className={changedField("receivedOn")}>
