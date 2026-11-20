@@ -44,7 +44,7 @@ const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.
 type PaperQuery = { v?: string; opts?: string; ref?: string; now?: string; embed?: string; back?: string };
 const paperQuery = (sp: PaperQuery) =>
   Object.fromEntries(
-    (["v", "opts", "ref", "now"] as const).flatMap((k) => (sp[k] && /^[\w,.-]{1,60}$/.test(sp[k]!) ? [[k, sp[k]!]] : [])),
+    (["v", "opts", "ref", "now"] as const).flatMap((k) => (sp[k] && /^[\w,.-]{1,200}$/.test(sp[k]!) ? [[k, sp[k]!]] : [])),
   ) as Record<string, string>;
 
 async function getPaper(id: string, kind: PaperKind, sp: PaperQuery) {

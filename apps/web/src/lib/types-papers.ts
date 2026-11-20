@@ -65,7 +65,8 @@ export interface PaperChecks {
   checks: PaperCheck[];
   hsLines: { id: string; description: string }[];
   fixes: Partial<Record<string, { label: string; type: "text" | "date"; saves: string }>>;
-  options: { key: PaperOption; label: string; on: boolean }[];
+  /** What shows on the paper: its own options, and the parts it has that can be hidden (field: true). */
+  options: { key: PaperOption; label: string; on: boolean; field?: boolean }[];
   paper: PaperVersion | null;
   versions: PaperVersion[];
   /** The buyer the paper prints (as on the order) and what differs from the customer now; null: a paper to a factory. */

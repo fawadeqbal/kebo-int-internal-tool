@@ -31,6 +31,10 @@ import {
   PER_FACTORY_PAPERS,
   paperNumber,
   paperOptionsOf,
+  paperFieldsOf,
+  withPaperFields,
+  PAPER_FIELD_OPTIONS,
+  type PaperOption,
   parsePaperOptions,
   documentsInUse,
   paperUsed,
@@ -286,11 +290,14 @@ export class PapersService implements OnModuleInit {
   }
 
   /** The paper and its checks, made from the order as it is now. */
-  private build(kind: PaperKind, c: PaperCtx): { doc: PaperDoc; checks: PaperCheck[] } {
+  private build(kind: PaperKind, c: PaperCtx): { doc: PaperDoc; checks: PaperCheck[]; fields: PaperOption[] } {
     const b = BUILDERS[kind](c);
-    const { party, ...rest } = b.doc;
+    // The parts the Make window can hide (models, reference numbers, terms, bank, signatures): those it has, then hidden as asked.
+    const fields = paperFieldsOf(b.doc);
+    const { party, ...rest } = withPaperFields(b.doc, c.options);
     return {
       checks: b.checks,
+      fields,
       doc: {
         kind,
         title: PAPER_TITLE[kind],
@@ -369,7 +376,11 @@ export class PapersService implements OnModuleInit {
       return { ...head, doc: row.snapshot as unknown as PaperDoc, final: true, watermark: cancelled ?? (gone ? "CANCELLED" : null) };
     }
     const options = this.optionsOf(kind, o, row && !kept ? asOptions(row.options) : null, parsePaperOptions(kind, q.opts));
-    const { doc } = this.build(kind, { ...(await this.ctx(user, o, kind, options, ref)), revision: kind === "payment-request" ? this.revisionOf(rows) : null });
+    const { doc } = this.build(kind, {
+      ...(await this.ctx(user, o, kind, options, ref)),
+      revision: kind === "payment-request" ? this.revisionOf(rows) : null,
+      preview: !LIVE_PAPERS.includes(kind) && !kept,
+    });
     const live = LIVE_PAPERS.includes(kind);
     return { ...head, doc, final: false, watermark: cancelled ?? (live || kind === "payment-receipt" ? null : kind === "payment-request" ? "NOT SENT" : "DRAFT") };
   }
@@ -392,7 +403,7 @@ export class PapersService implements OnModuleInit {
     const latest = rows.at(-1) ?? null;
     const options = this.optionsOf(kind, o, latest ? asOptions(latest.options) : null, null);
     const c = await this.ctx(user, o, kind, options, ref);
-    const { checks, doc } = this.build(kind, c);
+    const { checks, doc, fields } = this.build(kind, c);
     const ready = checks.every((x) => x.ok || !x.required);
     return {
       orderId: o.id,
@@ -412,7 +423,9 @@ export class PapersService implements OnModuleInit {
       /** Lines without an HS code, for the HS check's inputs. */
       hsLines: checks.some((x) => x.key === "hs" && !x.ok) ? hsMissing(c) : [],
       fixes: Object.fromEntries(checks.filter((x) => x.fix).map((x) => [x.key, PAPER_FIX_LABEL[x.fix!]])),
-      options: paperOptionsOf(kind).map((k) => ({ key: k, label: PAPER_OPTION_LABEL[k], on: options[k] !== false })),
+      options: paperOptionsOf(kind)
+        .filter((k) => !(PAPER_FIELD_OPTIONS as readonly string[]).includes(k) || fields.includes(k))
+        .map((k) => ({ key: k, label: PAPER_OPTION_LABEL[k], on: options[k] !== false, field: (PAPER_FIELD_OPTIONS as readonly string[]).includes(k) })),
       paper: this.paperView(latest),
       versions: rows.map((p) => this.paperView(p)!),
       /** The buyer the paper prints (as on the order) and what differs from the customer now: "Refresh from customer". */
