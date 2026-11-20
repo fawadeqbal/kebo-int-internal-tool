@@ -313,7 +313,8 @@ export function KeboDoc<T>({
 @media screen and (max-width: 600px) { .kebo-doc { zoom: 0.58; } }
 @media screen and (max-width: 480px) { .kebo-doc { zoom: 0.47; } }
 @media screen and (max-width: 400px) { .kebo-doc { zoom: 0.42; } }
-@media screen and (max-width: 360px) { .kebo-doc { zoom: 0.38; } }`}</style>
+@media screen and (max-width: 360px) { .kebo-doc { zoom: 0.38; } }
+html[data-embedded] .kebo-doc { zoom: 1 !important; }`}</style>
       {watermark && (
         // The stamp (DRAFT, VOID, PREVIEW) is meant to be faint behind the paper, so it is drawn (CSS content) and
         // not text a contrast check reads as hard to read: decoration in WCAG 1.4.3's sense. Its word is still
@@ -515,19 +516,22 @@ export function KeboDoc<T>({
       {/* Terms and bank details, with the stamp */}
       <section style={{ marginTop: "26px", display: "flex", justifyContent: "space-between", gap: "24px", alignItems: "flex-end" }}>
         <div style={{ lineHeight: 1.6, minWidth: 0, flex: 1 }}>
-          <div style={{ breakInside: "avoid" }}>
-            <div style={{ ...label, color: BLUE }}>{noColon(boxTitle)}</div>
-            <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
-              {bullets.map((b, i) => (
-                <li key={i} style={{ display: "flex", gap: "4px", whiteSpace: "pre-line" }}>
-                  <span style={{ flexShrink: 0 }}>{i + 1}.</span>
-                  <span style={{ minWidth: 0 }}>{b}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
+          {/* Hidden on the Make window ("Terms and notes" off): no empty heading left behind. */}
+          {bullets.length > 0 && (
+            <div style={{ breakInside: "avoid", marginBottom: "16px" }}>
+              <div style={{ ...label, color: BLUE }}>{noColon(boxTitle)}</div>
+              <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                {bullets.map((b, i) => (
+                  <li key={i} style={{ display: "flex", gap: "4px", whiteSpace: "pre-line" }}>
+                    <span style={{ flexShrink: 0 }}>{i + 1}.</span>
+                    <span style={{ minWidth: 0 }}>{b}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
           {bank && (
-            <div style={{ marginTop: "16px", breakInside: "avoid" }}>
+            <div style={{ breakInside: "avoid" }}>
               <div style={{ ...label, color: BLUE }}>Bank details</div>
               <div style={{ whiteSpace: "pre-line" }}>{bank}</div>
             </div>

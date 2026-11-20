@@ -38,7 +38,7 @@ describe("order documents", () => {
     canMake: boolean;
     checks: Check[];
     hsLines: { id: string; description: string }[];
-    options: { key: string; on: boolean }[];
+    options: { key: string; on: boolean; field?: boolean }[];
     paper: { id: string; version: number; status: string; number: string } | null;
     versions: { version: number; status: string }[];
   };
@@ -164,7 +164,9 @@ describe("order documents", () => {
     expect(c.state).toBe("wait");
     expect(c.checks.find((x) => x.key === "blNo")).toMatchObject({ ok: false, required: true, fix: "blNo" });
     expect(c.checks.find((x) => x.key === "lc")).toMatchObject({ ok: false, fix: "lcNo" });
-    expect(c.options.map((o) => o.key)).toEqual(["prices", "showHs", "lcStatement", "advance", "stamp"]);
+    // Its own options, then the parts it has that can be hidden (its reference numbers, its declaration box).
+    expect(c.options.map((o) => o.key)).toEqual(["prices", "showHs", "lcStatement", "advance", "stamp", "meta", "terms"]);
+    expect(c.options.filter((o) => o.field).map((o) => o.key)).toEqual(["meta", "terms"]);
     // The preview is a draft, with "needed" where data is missing.
     let d = await doc("commercial-invoice");
     expect(d.watermark).toBe("DRAFT");
@@ -173,7 +175,12 @@ describe("order documents", () => {
       { label: "B/L No.", value: null },
     ]);
     expect(d.doc.rows[0].item.item).toContain("DPP-260");
-    expect(d.doc.columns.map((x: { key: string }) => x.key)).toEqual(["no", "item", "qty", "amount"]);
+    // A part switched off on the Make window leaves the page: here the reference numbers and the declaration.
+    const hidden = await doc("commercial-invoice", "?opts=prices,showHs,stamp,-meta,-terms");
+    expect(hidden.doc.meta).toEqual([]);
+    expect(hidden.doc.bullets).toEqual([]);
+    // The preview shows the HS column even before any item has its code, so the missing ones show where they go.
+    expect(d.doc.columns.map((x: { key: string }) => x.key)).toEqual(["no", "item", "hs", "qty", "amount"]);
 
     // Save as draft; final is refused while data is missing.
     const saved = (

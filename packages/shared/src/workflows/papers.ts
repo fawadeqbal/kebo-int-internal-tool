@@ -348,7 +348,7 @@ export function buyerChanges(onOrder: Partial<BuyerSnapshot> | null, now: Partia
 
 /* ---------------------------------------------------------------- options */
 
-export const PAPER_OPTIONS = ["prices", "showHs", "lcStatement", "advance", "stamp"] as const;
+export const PAPER_OPTIONS = ["prices", "showHs", "lcStatement", "advance", "stamp", "models", "meta", "terms", "bank", "signatures"] as const;
 export type PaperOption = (typeof PAPER_OPTIONS)[number];
 export type PaperOptions = Partial<Record<PaperOption, boolean>>;
 
@@ -358,23 +358,63 @@ export const PAPER_OPTION_LABEL: Record<PaperOption, string> = {
   lcStatement: "LC statement at the bottom",
   advance: "Deposit received and the balance",
   stamp: "Stamp and signature",
+  models: "Item models",
+  meta: "Reference numbers",
+  terms: "Terms and notes",
+  bank: "Bank details",
+  signatures: "Signature lines",
 };
+
+/**
+ * The parts of a paper that can be shown or hidden on the Make window (Fawad 21 Nov), whatever the kind: each is
+ * offered only when the paper has it (an item with a model, a terms box, bank details…). On by default.
+ */
+export const PAPER_FIELD_OPTIONS = ["models", "meta", "terms", "bank", "signatures"] as const satisfies readonly PaperOption[];
+
+/** Which of the parts a paper made as it is now has (before any is hidden). */
+export function paperFieldsOf(doc: Pick<PaperDoc, "rows" | "meta" | "bullets" | "bank" | "signatures">): PaperOption[] {
+  const has: Record<(typeof PAPER_FIELD_OPTIONS)[number], boolean> = {
+    models: doc.rows.some((r) => Object.values(r).some((v) => !!v && typeof v === "object" && "item" in v && !!v.model)),
+    meta: doc.meta.length > 0,
+    terms: doc.bullets.length > 0,
+    bank: !!doc.bank,
+    signatures: !!doc.signatures,
+  };
+  return PAPER_FIELD_OPTIONS.filter((k) => has[k]);
+}
+
+/** The paper with the parts its options hide taken out. */
+export function withPaperFields<D extends Pick<PaperDoc, "rows" | "meta" | "bullets" | "bank" | "signatures">>(doc: D, o: PaperOptions): D {
+  return {
+    ...doc,
+    rows: o.models === false ? doc.rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v && typeof v === "object" && "item" in v ? { item: v.item } : v]))) : doc.rows,
+    meta: o.meta === false ? [] : doc.meta,
+    bullets: o.terms === false ? [] : doc.bullets,
+    bank: o.bank === false ? null : doc.bank,
+    signatures: o.signatures === false ? null : doc.signatures,
+  };
+}
 
 /** The options a kind has (the Make page's checkboxes). */
 export function paperOptionsOf(kind: PaperKind): PaperOption[] {
-  if (kind === "commercial-invoice") return ["prices", "showHs", "lcStatement", "advance", "stamp"];
-  if (kind === "sales-contract") return ["prices", "showHs", "stamp"];
-  return ["stamp"];
+  const own: PaperOption[] = kind === "commercial-invoice" ? ["prices", "showHs", "lcStatement", "advance", "stamp"] : kind === "sales-contract" ? ["prices", "showHs", "stamp"] : ["stamp"];
+  return [...own, ...PAPER_FIELD_OPTIONS];
 }
 
-/** Options from "prices,stamp" (the Make page's preview); unknown words are ignored. */
+const isField = (k: PaperOption) => (PAPER_FIELD_OPTIONS as readonly PaperOption[]).includes(k);
+
+/**
+ * Options from "prices,stamp,-terms" (the Make window's preview): an option is on when named; a part of the paper
+ * (models, terms…) is shown unless named with a minus. Unknown words are ignored.
+ */
 export function parsePaperOptions(kind: PaperKind, list: string | null | undefined): PaperOptions | null {
   if (list === null || list === undefined) return null;
-  const on = new Set(list.split(",").map((s) => s.trim()));
-  return Object.fromEntries(paperOptionsOf(kind).map((o) => [o, on.has(o)]));
+  const words = new Set(list.split(",").map((s) => s.trim()));
+  return Object.fromEntries(paperOptionsOf(kind).map((o) => [o, isField(o) ? !words.has(`-${o}`) : words.has(o)]));
 }
 
-export const paperOptionsQuery = (o: PaperOptions) => PAPER_OPTIONS.filter((k) => o[k]).join(",");
+export const paperOptionsQuery = (o: PaperOptions) =>
+  PAPER_OPTIONS.flatMap((k) => (isField(k) ? (o[k] === false ? [`-${k}`] : []) : o[k] ? [k] : [])).join(",");
 
 /* ---------------------------------------------------------------- numbers */
 

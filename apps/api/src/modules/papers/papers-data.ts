@@ -144,6 +144,8 @@ export interface PaperCtx {
   number?: string | null;
   /** A payment request sent again: its revision (2, 3…) and the day the one before it was sent. */
   revision?: { n: number; replaces: ISODate } | null;
+  /** Made from the order to look at, not kept (the Make window's preview): the HS column shows with the codes still missing. */
+  preview?: boolean;
 }
 
 /** What a builder makes: the Make page's checks and the paper itself (title, number and company are added after). */
@@ -308,7 +310,8 @@ function itemRows(c: PaperCtx, onlyGoods = false) {
 function hsOf(c: PaperCtx) {
   const goods = c.o.lines.filter((l) => l.type === "goods");
   const withHs = goods.filter((l) => l.hsCode).length;
-  const show = c.options.showHs !== false && withHs > 0;
+  // Shown when some item has one; in the preview also when none has yet, so the missing ones show where they go.
+  const show = c.options.showHs !== false && (withHs > 0 || (!!c.preview && goods.length > 0));
   const chk = check(
     "hs",
     "HS codes",

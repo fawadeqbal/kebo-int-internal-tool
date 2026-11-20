@@ -60,7 +60,8 @@ export function PaperSheet({ doc, brand, watermark }: { doc: PaperDoc; brand: Do
     width: c.width,
     align: c.align,
     wrap: c.wrap,
-    render: (r) => cell(r[c.key]),
+    // A draft shows an HS code still missing as "needed", where it will print (the Make window's amber).
+    render: (r) => (c.key === "hs" && !r[c.key] && watermark === "DRAFT" ? <Needed /> : cell(r[c.key])),
   }));
   const first = doc.foot ? doc.columns.findIndex((c) => c.key in doc.foot!.cells) : -1;
   const foot =
