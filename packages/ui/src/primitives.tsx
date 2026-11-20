@@ -430,7 +430,6 @@ export function PageHeader({
       {up && (
         // Phone: the top bar becomes the way back, with the record's name and what it is under; ⋯ beside it.
         <>
-          <div aria-hidden className="h-14 md:hidden" />
           <div data-record-bar="" className="no-print fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-1 border-b border-line bg-surface pr-1.5 pl-1 md:hidden">
             <BackArrow up={up.href} label={up.label} root={up.root} bar />
             <div className="min-w-0 flex-1 pl-0.5">
@@ -454,6 +453,8 @@ export function PageHeader({
         </div>
       )}
       <header data-page-label={name}>
+        {/* Phone: room for the fixed bar above (inside the header, so the page's gap is not added to it). */}
+        {up && <div aria-hidden className="h-14 md:hidden" />}
         {trail && <Breadcrumb items={trail} className={up || titleInBar ? "max-md:hidden" : undefined} />}
         {/* phoneStack: one column on a phone, each row the screen's width. (Not a wrapping column: some phone
             browsers then size the title to its text, so a long line runs past the screen and the page zooms out.) */}

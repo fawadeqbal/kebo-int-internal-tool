@@ -105,7 +105,6 @@ export default async function PartyLedgerPage({
       />
       <Segmented
         label="Ledger views"
-        className="mb-3"
         options={[
           { key: "all", label: "All entries" },
           { key: "accounts", label: "By account" },
@@ -223,7 +222,7 @@ export default async function PartyLedgerPage({
           </DataTable>
         )}
       </Card>
-      <p className="mt-2 px-1 text-xs text-muted">
+      <p className="px-1 text-xs text-muted">
         {kind === "customer" ? "Balance: what they owe us." : "Balance: what we owe them."} In {main}: {money(p.closing.base, main)} at each
         entry&rsquo;s rate.
         {sp.removed === "1" ? " Removed entries and their reversals are shown." : ""}{" "}

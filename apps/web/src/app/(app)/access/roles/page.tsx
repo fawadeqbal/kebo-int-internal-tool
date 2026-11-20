@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Badge, Card, CardHeader, PageHeader, PhoneList, PhoneRow, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice, Stack } from "@kebo/ui";
+import { Badge, Card, CardHeader, PageHeader, PhoneList, PhoneRow, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice, Stack, RULES } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
@@ -30,7 +30,7 @@ export default async function RolesPage() {
   return (
     <Stack>
       <PageHeader kind="list" crumbs={crumbsFor("/access/roles")} title="Roles" />
-      <div className="flex flex-col gap-5">
+      <div className={RULES.page.stack}>
       <StatRow facts>
         <StatTile label="Signed in now" value={o.liveSessions} sub="Browsers and phones" href="/access/sessions" />
         <StatTile

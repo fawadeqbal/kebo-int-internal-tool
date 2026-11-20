@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Banknote, Landmark, Wallet } from "lucide-react";
 import { can, CURRENCIES, MONEY_ACCOUNT_KIND_LABEL } from "@kebo/shared";
-import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice, linkClass } from "@kebo/ui";
+import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice, linkClass, RULES } from "@kebo/ui";
 import { convertAmount } from "@kebo/money";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -258,7 +258,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
   const kindOf = (k: CashRow["kind"]) => (k === "in" ? "From a customer" : k === "factory" ? "To a supplier" : k === "expense" ? "Expense" : "Between our accounts");
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className={RULES.page.stack}>
       <Card>
         <CardHeader
           title="Our bank accounts"

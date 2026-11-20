@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "@kebo/ui";
+import { cn, RULES } from "@kebo/ui";
 
 /** One line of the totals: its label and amount; `big` is the total, `quiet` a line under it (≈ in USD). */
 export interface TotalsRow {
@@ -19,9 +19,10 @@ export interface TotalsRow {
 export function Totals({ rows, ours, label = "Totals" }: { rows: TotalsRow[]; ours?: TotalsRow[] | null; label?: string }) {
   const line = "flex items-baseline justify-between gap-4";
   return (
-    <div role="group" aria-label={label} className="flex flex-col gap-2.5 px-3 py-2.5">
+    <div role="group" aria-label={label} className="flex flex-col gap-2.5 py-2.5">
       {ours && ours.length > 0 && (
-        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 rounded-lg bg-info-soft/60 px-3 py-2 text-md">
+        // A strip across the box at its inset (not a rounded box inside it), like BoxNote.
+        <div className={cn(RULES.box.inset, "flex flex-wrap items-baseline gap-x-5 gap-y-1 bg-info-soft/60 py-2 text-md")}>
           <p className="font-semibold text-text-2 max-sm:w-full">Ours only</p>
           <dl aria-label="Ours only" className="contents">
             {ours.map((o, i) => (
@@ -33,7 +34,7 @@ export function Totals({ rows, ours, label = "Totals" }: { rows: TotalsRow[]; ou
           </dl>
         </div>
       )}
-      <dl className="ml-auto flex w-full max-w-[22rem] flex-col gap-1 text-sm">
+      <dl className={cn(RULES.box.inset, "ml-auto flex w-full max-w-[24rem] flex-col gap-1 text-sm")}>
         {rows.map((r, i) =>
           r.quiet ? (
             <div key={i} className="text-right text-xs text-text-2 tabular">
