@@ -136,6 +136,7 @@ export class SearchService {
         kind: "customers",
         id: r.id,
         title: r.name,
+        ref: null,
         sub: line(countryName(r.country), r.contacts[0]?.name, r.contacts[0]?.phone, `${r._count.orders} order${r._count.orders === 1 ? "" : "s"}`),
         badge: null,
         href: `/customers/${r.id}`,
@@ -179,6 +180,7 @@ export class SearchService {
           kind: "suppliers",
           id: r.id,
           title: r.name,
+          ref: null,
           sub: line(countryName(r.country), r.contacts[0]?.name, r.owner ? `looked after by ${r.owner.name}` : null),
           badge: null,
           href: `/factories/${r.id}`,
@@ -218,7 +220,8 @@ export class SearchService {
         .map((r) => ({
           kind: "inquiries",
           id: r.id,
-          title: `${r.refNo} · ${r.title}`,
+          title: r.title,
+          ref: r.refNo,
           sub: line(r.customer?.name, `came ${dayMonth(r.createdAt)}`),
           badge: r.onHold && r.stage !== "won" && r.stage !== "lost" ? { label: "On hold", tone: "neutral" } : { label: INQUIRY_STAGE_LABEL[r.stage], tone: INQUIRY_STAGE_TONE[r.stage] },
           href: `/inquiries/${r.id}`,
@@ -261,7 +264,8 @@ export class SearchService {
           return {
             kind: "quotations",
             id: r.id,
-            title: `${r.refNo} R${rev.number} · ${r.inquiry.title}`,
+            title: r.inquiry.title,
+            ref: `${r.refNo} R${rev.number}`,
             sub: line(r.inquiry.customer?.name, rev.sentOn ? `sent ${dayMonth(rev.sentOn)}` : null),
             badge: { label: REVISION_STATUS_LABEL[rev.status], tone: REVISION_STATUS_TONE[rev.status] },
             href: `/inquiries/${r.inquiryId}/quotation`,
@@ -312,7 +316,8 @@ export class SearchService {
         .map((r) => ({
           kind: "orders",
           id: r.id,
-          title: `${r.refNo} · ${r.documentTitle ?? r.inquiry.title}`,
+          title: r.documentTitle ?? r.inquiry.title,
+          ref: r.refNo,
           sub: line(r.customer.name, formatMinor(toMinor(r.total.toFixed(2)), r.currency)),
           badge: r.status === "cancelled" ? { label: "Cancelled", tone: "neutral" } : { label: ORDER_STAGE_LABEL[r.stage], tone: ORDER_STAGE_TONE[r.stage] },
           href: `/orders/${r.id}`,
@@ -344,7 +349,8 @@ export class SearchService {
         .map((r) => ({
           kind: "purchase_orders",
           id: r.id,
-          title: `${r.number} · ${r.supplier.name}`,
+          title: r.supplier.name,
+          ref: r.number,
           sub: line(`for ${r.order.refNo}`, r.order.customer.name),
           badge: r.sentOn ? { label: `Sent ${dayMonth(r.sentOn)}`, tone: "ok" } : { label: "Not sent", tone: "neutral" },
           href: `/operations/purchase-orders/${r.orderId}/${r.supplierId}`,
@@ -362,8 +368,10 @@ export class SearchService {
       items: list.rows.slice(0, take).map((r) => ({
         kind: "payments",
         id: r.id,
-        title: line(r.number, formatMinor(toMinor(r.amount), r.currency)),
-        sub: line(r.party ? `${r.direction === "in" ? "from" : "to"} ${r.party.label}` : null, dayMonth(new Date(`${r.on}T00:00:00Z`)), r.what),
+        // What it was and who: "USD 3,000.00 from Gulf Foods"; its number apart, then the day and what for.
+        title: line(formatMinor(toMinor(r.amount), r.currency), r.party ? `${r.direction === "in" ? "from" : "to"} ${r.party.label}` : null),
+        ref: r.number,
+        sub: line(dayMonth(new Date(`${r.on}T00:00:00Z`)), r.what),
         badge: r.status === "void" ? { label: "Removed", tone: "neutral" } : r.status === "to_verify" ? { label: "To verify", tone: "warn" } : null,
         href: `/payments/${r.kind}/${r.id}`,
       })),
