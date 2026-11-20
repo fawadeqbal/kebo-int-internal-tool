@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { CheckCircle2, Circle, Info, Lock, Plus, Square } from "lucide-react";
 import { divideMinor, formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
-import { allocateOldestFirst, CREDIT_KIND_LABEL, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type LcCheck, type PaymentMethod } from "@kebo/shared";
+import { allocateOldestFirst, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type LcCheck, type PaymentMethod } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, Textarea, Notice, EmptyLine } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -11,7 +11,7 @@ import { CurrencySelect } from "@/components/common/currency-select";
 import { MoneyInput } from "@/components/common/money-input";
 import { rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
-import type { CustomerCreditView } from "@/lib/types-money";
+
 import { AccountSelect, RecordedBy } from "./accounts";
 import { FilePicker, useSaveThenSend } from "./attachment";
 import { useTime } from "@/lib/time-client";
@@ -541,208 +541,6 @@ function ReceiptFields({
               Record the payment
             </SubmitButton>
           </div>
-        </>
-      )}
-    </ActionForm>
-  );
-}
-
-/* ---------------------------------------------------------------- the customer's credit */
-
-/**
- * "Customer credit" (MoneyV2Split, right): what we hold for the customer, its
- * ledger, and the two things to do with it: use it on an order, or refund it.
- */
-export function CustomerCredit({
-  customer,
-  credit,
-  orders,
-  useActions,
-  refundAction,
-  voidActions,
-  canManage,
-  today,
-}: {
-  customer: string;
-  credit: CustomerCreditView;
-  /** Open orders the credit can pay (with what they still owe). */
-  orders: { id: string; refNo: string; currency: string; due: string }[];
-  useActions: Record<string, Action>;
-  refundAction: Action;
-  voidActions: Record<string, Action>;
-  canManage: boolean;
-  today: string;
-}) {
-  const { dayMonth } = useTime();
-  const [doing, setDoing] = useState<"use" | "refund" | null>(null);
-  const [orderId, setOrderId] = useState("");
-  const main = credit.balances[0] ?? null;
-  const usable = orders.filter((o) => credit.balances.some((b) => b.currency === o.currency && Number(b.amount) > 0) && Number(o.due) > 0);
-  const chosen = usable.find((o) => o.id === orderId) ?? usable[0];
-  const sign = (k: string) => (k === "in" ? 1 : k === "fee" ? 0 : -1);
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="rounded-xl border border-line bg-surface px-4 py-3">
-        <p className="text-xs text-text-2">{customer} has credit</p>
-        <p className="text-2xl font-semibold tabular">
-          {credit.balances.length ? credit.balances.map((b) => fmt(toMinor(b.amount), b.currency)).join(" + ") : "None"}
-        </p>
-        <p className="text-xs text-muted">Shown on Money › Customers owe us as a minus, and offered when their next order wants a deposit.</p>
-      </div>
-      {credit.entries.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[20rem] border-collapse text-sm">
-            <thead>
-              <tr className="text-left text-xs text-text-2">
-                <th scope="col" className="py-1.5 pr-2 font-medium">When</th>
-                <th scope="col" className="py-1.5 pr-2 font-medium">What</th>
-                <th scope="col" className="py-1.5 text-right font-medium">Credit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {credit.entries.map((e) => (
-                <tr key={e.id} className={cn("border-t border-line", e.voided && "text-muted line-through")}>
-                  <td className="py-2 pr-2 whitespace-nowrap">{dayMonth(e.on)}</td>
-                  <td className="py-2 pr-2">
-                    {e.kind === "in" && e.receipt ? `Left over from ${e.receipt.received.replace(/[\d.]+$/, (n) => grouped(n))}` : (e.note ?? CREDIT_KIND_LABEL[e.kind])}
-                    {e.account && <span className="block text-xs text-muted">from {e.account.name}</span>}
-                    {canManage && !e.voided && e.kind === "refund" && voidActions[e.id] && <RemoveEntry action={voidActions[e.id]!} />}
-                  </td>
-                  <td className="py-2 text-right tabular">
-                    {sign(e.kind) === 0 ? <span className="text-muted">fee {grouped(e.amount)}</span> : `${sign(e.kind) > 0 ? "+" : "−"}${grouped(e.amount)}`}
-                  </td>
-                </tr>
-              ))}
-              {main && (
-                <tr className="border-t border-line font-semibold">
-                  <td />
-                  <td className="py-2 pr-2">Balance</td>
-                  <td className="py-2 text-right tabular">{credit.balances.map((b) => fmt(toMinor(b.amount), b.currency)).join(" + ")}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {credit.canRecord && main && doing === null && (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setDoing("use")} disabled={!usable.length}>
-            Use on an order
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setDoing("refund")}>
-            Refund it
-          </Button>
-        </div>
-      )}
-      {doing === "use" && chosen && (
-        <ActionForm key={chosen.id} action={useActions[chosen.id]!} onDone={() => setDoing(null)} className={framed}>
-          {(s) => (
-            <>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Order" htmlFor="cu-order">
-                  <Select id="cu-order" value={chosen.id} onChange={(e) => setOrderId(e.target.value)}>
-                    {usable.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.refNo} · {fmt(toMinor(o.due), o.currency)} due
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Amount" htmlFor="cu-amount" error={s.errors?.amount}>
-                  <MoneyInput
-                    id="cu-amount"
-                    name="amount"
-                    currency={chosen.currency}
-                    defaultValue={fromMinor(Math.min(toMinor(chosen.due), toMinor(credit.balances.find((b) => b.currency === chosen.currency)?.amount ?? "0")))}
-                  />
-                </Field>
-                <Field label="On" htmlFor="cu-on">
-                  <Input id="cu-on" name="on" type="date" max={today} defaultValue={today} />
-                </Field>
-              </div>
-              <div className="flex gap-2">
-                <SubmitButton size="sm" pendingText="Saving…">
-                  Use the credit
-                </SubmitButton>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setDoing(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </>
-          )}
-        </ActionForm>
-      )}
-      {doing === "refund" && main && <RefundForm action={refundAction} balances={credit.balances} today={today} onClose={() => setDoing(null)} />}
-    </div>
-  );
-}
-
-function RefundForm({ action, balances, today, onClose }: { action: Action; balances: { currency: string; amount: string }[]; today: string; onClose: () => void }) {
-  const [currency, setCurrency] = useState(balances[0]!.currency);
-  const most = balances.find((b) => b.currency === currency)?.amount ?? "0";
-  return (
-    <ActionForm action={action} onDone={onClose} keepFields className={framed}>
-      {(s) => (
-        <>
-          <p className="text-sm font-medium">Refund the credit</p>
-          <input type="hidden" name="currency" value={currency} />
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Amount" htmlFor="cr-amount" hint={`Up to ${fmt(toMinor(most), currency)}`} error={s.errors?.amount}>
-              <div className="flex gap-2">
-                {balances.length > 1 && (
-                  <Select aria-label="Currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-24 shrink-0">
-                    {balances.map((b) => (
-                      <option key={b.currency}>{b.currency}</option>
-                    ))}
-                  </Select>
-                )}
-                <MoneyInput key={currency} id="cr-amount" name="amount" currency={currency} defaultValue={fromMinor(toMinor(most))} />
-              </div>
-            </Field>
-            <AccountSelect id="cr-account" label="Paid from" currency={currency} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
-            <Field label="On" htmlFor="cr-on" error={s.errors?.on}>
-              <Input id="cr-on" name="on" type="date" max={today} defaultValue={s.values?.on ?? today} />
-            </Field>
-          </div>
-          <Field label="Note" htmlFor="cr-note" optional>
-            <Input id="cr-note" name="note" maxLength={500} defaultValue={s.values?.note ?? ""} />
-          </Field>
-          <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Saving…">
-              Record the refund
-            </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </>
-      )}
-    </ActionForm>
-  );
-}
-
-/** Remove a refund (or a transfer) recorded by mistake, with a reason. */
-export function RemoveEntry({ action, label = "Remove" }: { action: Action; label?: string }) {
-  const [open, setOpen] = useState(false);
-  if (!open)
-    return (
-      <Button size="xs" variant="danger-ghost" onClick={() => setOpen(true)}>
-        {label}
-      </Button>
-    );
-  return (
-    <ActionForm action={action} onDone={() => setOpen(false)} className="mt-1 flex flex-wrap items-end gap-2">
-      {(s) => (
-        <>
-          <Field label="Why?" htmlFor="re-reason" error={s.errors?.reason} className="min-w-0 flex-1">
-            <Input id="re-reason" name="reason" />
-          </Field>
-          <SubmitButton size="sm" variant="danger" pendingText="Removing…">
-            Remove
-          </SubmitButton>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-            Keep
-          </Button>
         </>
       )}
     </ActionForm>

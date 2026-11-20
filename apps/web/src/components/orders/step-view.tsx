@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Pencil } from "lucide-react";
-import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice, RULES } from "@kebo/ui";
+import { useId, useRef, useState, type ReactNode } from "react";
+
+import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice } from "@kebo/ui";
 import { ChangeHint, changeKind, changeLine, changeWords, countChanges } from "@/components/common/change-words";
-import { OpenPanelButton, PanelBody, PanelSection, SidePanel, useClosePanel, WindowFooter } from "@/components/common/panel";
+import { PanelBody, PanelSection, SidePanel, useClosePanel, WindowFooter } from "@/components/common/panel";
 import { EditButton } from "@/components/common/edit-button";
 import { EditsChip, editedMark } from "@/components/edits/edits";
 import { useEditSave } from "@/components/edits/use-edit-save";
@@ -428,116 +428,6 @@ export function DetailsCard({
       </dl>
       {footer}
     </ViewCard>
-  );
-}
-
-/**
- * A view card for a set of lines (board "View first, edit on purpose"): read
- * only, always. "Edit lines" in its header opens the lines in the wide edit
- * panel (`edit`, e.g. BatchLines), where changes are kept until Save changes;
- * "#edit-lines" in the address opens it too. "Edited n×" beside it says how
- * often the saved lines changed. On a phone, the lines are short text lines.
- */
-export function LinesCard({
-  title,
-  description,
-  canEdit,
-  view,
-  edit,
-  phone,
-  actions,
-  editLabel = "Edit items",
-  target,
-  panelTitle,
-  panelDescription,
-  edits,
-  editPanel,
-  window: ownWindow,
-}: {
-  /** Edit opens a window of the page instead (?panel=…&id=…), e.g. the inquiry's window on its Items step. */
-  editPanel?: { panel: string; id?: string };
-  /** Edit opens this window instead of the edit panel: its own SidePanel (the offer's, on its lines only). */
-  window?: (close: () => void) => ReactNode;
-  title: ReactNode;
-  description?: ReactNode;
-  canEdit: boolean;
-  view: ReactNode;
-  /** The edit panel's body (BatchLines, or an editor that saves as a whole). */
-  edit?: ReactNode;
-  /** The lines as short text lines on a phone (read-only). */
-  phone?: ReactNode;
-  actions?: ReactNode;
-  editLabel?: string;
-  /** A stable name for the card ("lines.packing"; data-target). */
-  target?: string;
-  panelTitle?: string;
-  panelDescription?: ReactNode;
-  /** The card's saved edits: "Edited n×". */
-  edits?: EditCard | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const editable = canEdit && (!!edit || !!ownWindow);
-  useEffect(() => {
-    if (!editable) return;
-    const check = () => {
-      if (window.location.hash === "#edit-lines") {
-        setOpen(true);
-        ref.current?.scrollIntoView({ block: "start" });
-      }
-    };
-    check();
-    window.addEventListener("hashchange", check);
-    return () => window.removeEventListener("hashchange", check);
-  }, [editable]);
-  const close = () => {
-    setOpen(false);
-    if (window.location.hash === "#edit-lines") history.replaceState(null, "", window.location.pathname + window.location.search);
-  };
-  const name = typeof title === "string" ? title : "the items";
-  return (
-    <div ref={ref} id="lines" className="scroll-mt-24">
-      <ViewCard
-        title={title}
-        target={target}
-        description={description}
-        canEdit={false}
-        actions={
-          <>
-            <EditsChip card={edits} title={name} />
-            {actions}
-            {editable && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
-            {canEdit && editPanel && (
-              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="ghost" size="xs" className="text-primary hover:text-primary">
-                <Pencil aria-hidden /> {editLabel}
-              </OpenPanelButton>
-            )}
-          </>
-        }
-      >
-        <div className="p-4">
-          {phone ? (
-            <>
-              <div className="sm:hidden">{phone}</div>
-              <div className="max-sm:hidden">{view}</div>
-            </>
-          ) : (
-            view
-          )}
-        </div>
-      </ViewCard>
-      {open && editable && ownWindow && ownWindow(close)}
-      {open && editable && !ownWindow && (
-        <SidePanel
-          title={panelTitle ?? `Edit ${name.toLowerCase().startsWith("lines") ? name.toLowerCase() : name}`}
-          description={panelDescription}
-          onClose={close}
-          className={RULES.window.items}
-        >
-          {edit}
-        </SidePanel>
-      )}
-    </div>
   );
 }
 

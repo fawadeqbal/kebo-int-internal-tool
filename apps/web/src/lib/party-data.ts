@@ -4,7 +4,7 @@ import { api } from "./api";
 import { load } from "./session";
 import type { CustomerDetail, FactoryDetail } from "./types-people";
 import type { CustomerPayments, Payable } from "./types-money";
-import type { HistoryEntry } from "./types";
+
 import type { Note } from "./types-notes";
 
 /**
@@ -18,8 +18,4 @@ export const customerPaymentsOf = cache((id: string) => api.get<CustomerPayments
 export const factoryOf = cache((id: string) => load(() => api.get<FactoryDetail>(`/factories/${id}`)));
 /** What we still owe this supplier (Finance › Payables, one row per supplier and currency). */
 export const factoryPayablesOf = cache(async (id: string) => (await api.get<Payable[]>("/money/payables", { factory: id }).catch(() => [] as Payable[])) ?? []);
-
-export const partyHistoryOf = cache((type: "customer" | "factory", id: string) =>
-  api.get<HistoryEntry[]>("/history", { type, id }).catch(() => [] as HistoryEntry[]),
-);
 export const partyNotesOf = cache((kind: "customers" | "factories", id: string) => api.get<Note[]>(`/${kind}/${id}/notes`).catch(() => [] as Note[]));

@@ -56,16 +56,6 @@ export interface PersonWithRole {
   role: string;
 }
 
-export interface SalesSettings {
-  currency: string;
-  exchangeRates: Record<string, number>;
-  defaultMarginPercent: number;
-  categories: string[];
-  /** New factory offers start with these: prices with tax included or not, and the tax %. */
-  factoryTaxIncluded: boolean;
-  factoryTaxRate: number;
-}
-
 /* ---------------------------------------------------------------- inquiry form */
 
 export interface DealFormValues {

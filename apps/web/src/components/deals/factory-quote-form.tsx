@@ -17,7 +17,7 @@ import {
   type LeadFrom,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea, controlSizes, EmptyLine } from "@kebo/ui";
+import { Button, cn, controlClass, Field, Input, Select, Textarea, controlSizes, EmptyLine } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -146,56 +146,6 @@ export function PortPicker({ id, value, onChange, exw }: { id: string; value: st
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-/**
- * The offer's tax (board Fix27Tax): "Their prices are" without tax (added on
- * top) or tax included, and the tax % its lines take. `note` says what a
- * change does to the lines already there.
- */
-export function TaxBox({
-  idPrefix,
-  included,
-  rate,
-  onIncluded,
-  onRate,
-  error,
-  note,
-  className,
-}: {
-  idPrefix: string;
-  included: boolean;
-  rate: string;
-  onIncluded: (v: boolean) => void;
-  onRate: (v: string) => void;
-  error?: string[];
-  note?: ReactNode;
-  className?: string;
-}) {
-  // One tick (Fawad, 17 Nov): ticked, their prices already have the tax in them; not ticked, it is added on top.
-  return (
-    <fieldset className={cn("grid gap-x-3 gap-y-2 sm:grid-cols-2", className)}>
-      <legend className="sr-only">Tax</legend>
-      <Field label="Tax %" htmlFor={`${idPrefix}-tax-rate`} error={error}>
-        <span className="flex items-center gap-2">
-          <Input
-            id={`${idPrefix}-tax-rate`}
-            inputMode="decimal"
-            unit="%"
-            className="w-28 text-right tabular"
-            value={rate}
-            onChange={(e) => onRate(e.target.value.replace(/[^\d.]/g, ""))}
-            placeholder="0"
-          />
-        </span>
-      </Field>
-      <label htmlFor={`${idPrefix}-tax-included`} className="flex min-h-11 cursor-pointer items-start gap-2.5 text-sm sm:mt-[26px]">
-        <Checkbox id={`${idPrefix}-tax-included`} checked={included} onChange={(e) => onIncluded(e.target.checked)} className="mt-0.5 size-[18px]" />
-        <span className="font-medium">Tax included in their prices</span>
-      </label>
-      {note && <p className="text-xs text-text-2 sm:col-span-2">{note}</p>}
-    </fieldset>
-  );
-}
-
 /** What changing the offer's % does to its lines: those at the old % follow, the others keep theirs. */
 export function taxRateNote(lines: { taxRate: number }[], oldRate: number, newRate: string): ReactNode {
   const next = Number(newRate || 0);
@@ -205,17 +155,6 @@ export function taxRateNote(lines: { taxRate: number }[], oldRate: number, newRa
   if (!follow) return `No item is at ${oldRate}%, so no item changes: each keeps its own %.`;
   return `${follow === lines.length ? `All ${follow}` : follow} item${follow === 1 ? "" : "s"} at ${oldRate}% change to ${next}%${own ? `; ${own} with ${own === 1 ? "its" : "their"} own % stay${own === 1 ? "s" : ""} as ${own === 1 ? "it is" : "they are"}` : ""}.`;
 }
-
-/** What each basis means for us, in a few words. */
-export const BASIS_HINT: Partial<Record<Incoterm, string>> = {
-  EXW: "At their factory: we pay transport to the port and everything after",
-  FCA: "Handed to our carrier, export cleared: we pay the freight and after",
-  FOB: "On board at the port: we pay the sea freight and after",
-  CFR: "Freight paid to the destination port: we pay insurance and after",
-  CIF: "Freight and insurance paid to the destination port",
-  DAP: "Delivered to the named place, not import cleared",
-  DDP: "Delivered, duties paid",
-};
 
 /** The basis in the list, with what it means in two or three words. */
 const BASIS_WORDS: Partial<Record<Incoterm, string>> = {
@@ -915,7 +854,6 @@ export function OfferHeaderForm({
                 </Field>
               </PanelSection>
             )}
-
 
             {step === "review" && (
               <div className="flex flex-col gap-3.5">

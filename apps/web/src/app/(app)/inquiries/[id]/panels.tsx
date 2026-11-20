@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useConfirmSubmit } from "@/components/common/dialog";
+
 import { Clock } from "lucide-react";
 import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from "@kebo/shared";
 import { Field, Select, Textarea, RULES } from "@kebo/ui";
@@ -272,23 +272,6 @@ export function NoteForm({ action }: { action: Action }) {
           </div>
         </>
       )}
-    </ActionForm>
-  );
-}
-
-export function RemoveFile({ action, name }: { action: Action; name: string }) {
-  const { onClick: confirmSubmit, dialog } = useConfirmSubmit();
-  return (
-    <ActionForm action={action} showSuccess={false} className="inline">
-      <button
-        type="submit"
-        className="text-xs text-muted hover:text-bad"
-        aria-label={`Remove ${name}`}
-        onClick={confirmSubmit({ question: `Remove ${name}?`, confirmLabel: "Remove", danger: true })}
-      >
-        Remove
-      </button>
-      {dialog}
     </ActionForm>
   );
 }

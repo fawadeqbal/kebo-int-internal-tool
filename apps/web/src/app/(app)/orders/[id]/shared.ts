@@ -1,4 +1,3 @@
-import { BALANCE_TERMS_LABEL } from "@kebo/shared";
 import { date } from "@/lib/format";
 import type { OrderView } from "@/lib/types-orders";
 import type { GoodsLine } from "./goods";
@@ -25,12 +24,3 @@ export const goodsOf = (o: OrderView): GoodsLine[] =>
       receivedOn: l.receivedOn ? date(l.receivedOn) : null,
       packing: l.packing,
     }));
-
-/** "30% deposit, balance before shipment": the deposit the plan asks for (a plan edited to 50% says 50%). */
-export function termsOf(o: OrderView) {
-  const balance = BALANCE_TERMS_LABEL[o.balanceTerms];
-  const pct = o.money.depositPercent ?? o.depositPercent;
-  return pct > 0 ? `${pct}% deposit, ${balance.charAt(0).toLowerCase()}${balance.slice(1)}` : balance;
-}
-
-export const incotermOf = (o: OrderView) => `${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`;
