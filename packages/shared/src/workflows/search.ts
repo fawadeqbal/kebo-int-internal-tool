@@ -26,11 +26,16 @@ export const searchQuery = z.object({
 });
 export type SearchQuery = z.infer<typeof searchQuery>;
 
-/** One thing found: what it is, a line about it, where it stands, and its page. */
+/**
+ * One thing found: what it is in words (a title, a name: what people look for), its number apart (shown small, first
+ * on the line under it, never ahead of the words), a line about it, where it stands, and its page.
+ */
 export interface SearchItem {
   kind: SearchKind;
   id: string;
   title: string;
+  /** Its number (RFQ-2026-0013, QUO-2026-0012-A R1, SO-2026-0010…), or null (a customer, a supplier). */
+  ref: string | null;
   sub: string;
   badge: { label: string; tone: Tone } | null;
   href: string;

@@ -5,7 +5,7 @@ import { api, signIn, startApp } from "./app";
 type Result = {
   q: string;
   exact: { kind: string; label: string; href: string } | null;
-  groups: { kind: string; total: number; items: { kind: string; title: string; sub: string; href: string; badge: { label: string } | null }[] }[];
+  groups: { kind: string; total: number; items: { kind: string; title: string; ref: string | null; sub: string; href: string; badge: { label: string } | null }[] }[];
 };
 
 /**
@@ -59,7 +59,8 @@ describe("search everything", () => {
     expect(group(r, "customers")).toMatchObject({ total: 1, items: [{ title: `Kabul ${tag} Medical`, href: `/customers/${customerId}` }] });
     expect(group(r, "customers")!.items[0]!.sub).toContain("Afghanistan");
     expect(group(r, "inquiries")).toMatchObject({ total: 1, items: [{ href: `/inquiries/${inquiry.id}`, badge: { tone: expect.any(String) } }] });
-    expect(group(r, "inquiries")!.items[0]!.title).toBe(`${inquiry.refNo} · Tablet press ${tag}`);
+    // Words first: the title is what it is; its number is apart (shown small under it).
+    expect(group(r, "inquiries")!.items[0]).toMatchObject({ title: `Tablet press ${tag}`, ref: inquiry.refNo });
     expect(r.exact).toBeNull();
     // By the contact's phone, however it is typed.
     expect(group(await find(sana, `${phone.slice(-8, -4)} ${phone.slice(-4)}`), "customers")?.items.some((i) => i.href === `/customers/${customerId}`)).toBe(true);

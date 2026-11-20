@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { countOf } from "@/lib/format";
 import { FilterCard } from "@/components/common/filter-card";
-import { kindCount, kindOne, Marked, SEARCH_ICON } from "@/components/shell/search-bits";
+import { kindCount, kindOne, ResultText, SEARCH_ICON } from "@/components/shell/search-bits";
 
 export const metadata = { title: "Search" };
 
@@ -126,14 +126,7 @@ function ResultRow({ x, q }: { x: SearchItem; q: string }) {
         <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-text-2">
           <Icon className="size-[18px]" />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-text">
-            <Marked text={x.title} q={q} />
-          </span>
-          <span className="block truncate text-md text-text-2">
-            <Marked text={x.sub} q={q} />
-          </span>
-        </span>
+        <ResultText title={x.title} refNo={x.ref} sub={x.sub} q={q} />
         {x.badge && (
           <Badge tone={x.badge.tone} className="shrink-0">
             {x.badge.label}

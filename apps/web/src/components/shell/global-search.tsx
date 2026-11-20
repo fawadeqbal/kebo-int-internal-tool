@@ -9,7 +9,7 @@ import { SEARCH_KIND_LABEL, type SearchKind, type SearchResult } from "@kebo/sha
 import { Badge, cn, Kbd, controlClass, controlSizes, EmptyLine, capsClass } from "@kebo/ui";
 import { useBackGuard } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
-import { kindCount, kindOne, Marked, SEARCH_ICON as ICON, searchHref } from "./search-bits";
+import { ResultText, kindCount, kindOne, SEARCH_ICON as ICON, searchHref } from "./search-bits";
 
 const PAUSE_MS = 220;
 const RECENT_KEY = "kebo:recent-searches";
@@ -61,7 +61,18 @@ function useResults(text: string) {
   return { result: current, loading: q.length >= 2 && (state.loading || state.q !== q) && !state.failed, failed: q.length >= 2 && state.failed };
 }
 
-type Option = { id: string; href: string; label: ReactNode; sub?: ReactNode; kind?: SearchKind; badge?: ReactNode; quiet?: boolean; words?: string };
+type Option = {
+  id: string;
+  href: string;
+  label: ReactNode;
+  sub?: ReactNode;
+  kind?: SearchKind;
+  badge?: ReactNode;
+  quiet?: boolean;
+  words?: string;
+  /** A thing found: drawn by ResultText (its words first, its number small under them). */
+  found?: { title: string; refNo: string | null; sub: string; q: string };
+};
 
 /** The results as one list of options: the record a number names first, then each kind with "See all". */
 function optionsOf(result: SearchResult | null, q: string, base: string): { groups: { kind: SearchKind | "exact"; title: string; options: Option[] }[]; flat: Option[] } {
@@ -78,8 +89,8 @@ function optionsOf(result: SearchResult | null, q: string, base: string): { grou
       id: `${base}-${g.kind}-${i}`,
       href: x.href,
       kind: g.kind,
-      label: <Marked text={x.title} q={q} />,
-      sub: <Marked text={x.sub} q={q} />,
+      label: x.title,
+      found: { title: x.title, refNo: x.ref, sub: x.sub, q },
       badge: x.badge && (
         <Badge tone={x.badge.tone} className="shrink-0">
           {x.badge.label}
@@ -253,10 +264,14 @@ function Row({ o, on, onPick, onHover, icon }: { o: Option; on: boolean; onPick:
       <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-text-2">
         {icon ?? (Icon ? <Icon className="size-4" /> : <Search className="size-4" />)}
       </span>
-      <span className="min-w-0 flex-1">
-        <span className={cn("block truncate text-md", o.quiet ? "font-medium text-primary" : "font-semibold text-text")}>{o.label}</span>
-        {o.sub && <span className="block truncate text-xs text-text-2">{o.sub}</span>}
-      </span>
+      {o.found ? (
+        <ResultText {...o.found} />
+      ) : (
+        <span className="min-w-0 flex-1">
+          <span className={cn("block truncate text-md", o.quiet ? "font-medium text-primary" : "font-semibold text-text")}>{o.label}</span>
+          {o.sub && <span className="block truncate text-xs text-text-2">{o.sub}</span>}
+        </span>
+      )}
       {o.badge}
     </div>
   );
@@ -353,13 +368,13 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
           <>
             {result.exact && (
               <PhoneGroup title="Open">
-                <PhoneRow href={result.exact.href} kind={result.exact.kind} title={`Open ${result.exact.label}`} sub={kindOne(result.exact.kind)} q={q} onGo={() => go(result.exact!.href, result.exact!.label)} />
+                <PhoneRow href={result.exact.href} kind={result.exact.kind} title={`Open ${result.exact.label}`} refNo={null} sub={kindOne(result.exact.kind)} q={q} onGo={() => go(result.exact!.href, result.exact!.label)} />
               </PhoneGroup>
             )}
             {result.groups.map((g) => (
               <PhoneGroup key={g.kind} title={SEARCH_KIND_LABEL[g.kind]} all={g.total > g.items.length ? { href: searchHref(q, g.kind), label: `See all ${g.total}`, onGo: () => go(searchHref(q, g.kind)) } : undefined}>
                 {g.items.map((x) => (
-                  <PhoneRow key={x.href} href={x.href} kind={g.kind} title={x.title} sub={x.sub} badge={x.badge} q={q} onGo={() => go(x.href, x.title)} />
+                  <PhoneRow key={x.href} href={x.href} kind={g.kind} title={x.title} refNo={x.ref} sub={x.sub} badge={x.badge} q={q} onGo={() => go(x.href, x.title)} />
                 ))}
               </PhoneGroup>
             ))}
@@ -405,7 +420,7 @@ function PhoneGroup({ title, all, children }: { title: string; all?: { href: str
   );
 }
 
-function PhoneRow({ href, kind, title, sub, badge, q, onGo }: { href: string; kind: SearchKind; title: string; sub: string; badge?: SearchResult["groups"][number]["items"][number]["badge"]; q: string; onGo: () => void }) {
+function PhoneRow({ href, kind, title, refNo, sub, badge, q, onGo }: { href: string; kind: SearchKind; title: string; refNo: string | null; sub: string; badge?: SearchResult["groups"][number]["items"][number]["badge"]; q: string; onGo: () => void }) {
   const Icon = ICON[kind];
   return (
     <li className="border-t border-line first:border-t-0">
@@ -420,14 +435,7 @@ function PhoneRow({ href, kind, title, sub, badge, q, onGo }: { href: string; ki
         <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-text-2">
           <Icon className="size-[18px]" />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-lead font-semibold text-text">
-            <Marked text={title} q={q} />
-          </span>
-          <span className="block truncate text-md text-text-2">
-            <Marked text={sub} q={q} />
-          </span>
-        </span>
+        <ResultText title={title} refNo={refNo} sub={sub} q={q} size="lg" />
         {badge && (
           <Badge tone={badge.tone} className="shrink-0">
             {badge.label}

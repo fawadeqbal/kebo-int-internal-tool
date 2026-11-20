@@ -1,5 +1,6 @@
 import { Building2, ClipboardList, Factory, FileText, Package, ShoppingCart, Wallet, type LucideIcon } from "lucide-react";
 import { SEARCH_KIND_LABEL, type SearchKind } from "@kebo/shared";
+import { cn, RefCode } from "@kebo/ui";
 
 /** Each kind's icon, the same in the top bar's list, on a phone and on Search. */
 export const SEARCH_ICON: Record<SearchKind, LucideIcon> = {
@@ -46,5 +47,35 @@ export function Marked({ text, q }: { text: string; q: string }) {
         ),
       )}
     </>
+  );
+}
+
+/**
+ * One thing found, in words first (the top bar's list, a phone's search, the Search page alike): what it is — its
+ * title or name, bold, on up to two lines — then under it its number as the number pill, and who and when. The
+ * number is there to be recognised and searched by, never ahead of the words (phone 21 Nov: "RFQ-2026-0013 ·
+ * Centrifugal w…" left no room for what the inquiry was).
+ */
+export function ResultText({ title, refNo, sub, q, size = "md" }: { title: string; refNo?: string | null; sub: string; q: string; size?: "md" | "lg" }) {
+  return (
+    <span className="min-w-0 flex-1">
+      <span className={cn("line-clamp-2 font-semibold text-text", size === "lg" ? "text-lead" : "text-md")}>
+        <Marked text={title} q={q} />
+      </span>
+      {(refNo || sub) && (
+        <span className={cn("mt-0.5 flex min-w-0 items-center gap-1.5 text-text-2", size === "lg" ? "text-md" : "text-xs")}>
+          {refNo && (
+            <RefCode className="shrink-0 py-0 text-2xs">
+              <Marked text={refNo} q={q} />
+            </RefCode>
+          )}
+          {sub && (
+            <span className="min-w-0 truncate">
+              <Marked text={sub} q={q} />
+            </span>
+          )}
+        </span>
+      )}
+    </span>
   );
 }
