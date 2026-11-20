@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { cn } from "@kebo/ui";
+import { cn, segmentClass, segmentsClass } from "@kebo/ui";
 
 export interface SwitchView {
   key: string;
@@ -12,35 +12,22 @@ export interface SwitchView {
   tone?: string;
   /** An icon before the label (List, Board). */
   icon?: ReactNode;
+  /** A count after the label ("Missing 2"), shown on a phone too. */
+  count?: number;
 }
 
 /**
- * One of a few views of the same thing (an order's or a customer's money):
- * a segmented switch of links, so each view has its own address.
+ * One of a few views of the same thing (List | Board, List | Compare, an order's or a customer's money): the one
+ * switch (segmentClass, the same as Segmented and SegmentedChoice), as links, so each view has its own address.
  */
-export function ViewSwitch({ label, views, current, compact }: { label: string; views: SwitchView[]; current: string; compact?: boolean | "sm" }) {
+export function ViewSwitch({ label, views, current, className }: { label: string; views: SwitchView[]; current: string; className?: string }) {
   return (
-    // compact: as tall as the buttons beside it (the header's 40 px; "sm": a card's 36 px).
-    <nav
-      aria-label={label}
-      className={cn(
-        "inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-surface-3 p-1",
-        compact === "sm" ? "h-9 rounded-[10px] p-0.5 [&>a]:h-8 [&>a]:px-2.5 [&>a]:text-md [&_svg]:size-4" : compact && "h-10 [&>a]:h-8 [&_svg]:size-4",
-      )}
-    >
+    <nav aria-label={label} className={cn(segmentsClass, className)}>
       {views.map((v) => (
-        <Link
-          key={v.key}
-          href={v.href}
-          scroll={false}
-          aria-current={v.key === current ? "page" : undefined}
-          className={cn(
-            "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm whitespace-nowrap transition-colors",
-            v.key === current ? "bg-surface font-semibold text-text shadow-sm" : "text-text-2 hover:text-text",
-          )}
-        >
+        <Link key={v.key} href={v.href} scroll={false} aria-current={v.key === current ? "page" : undefined} className={segmentClass(v.key === current)}>
           {v.icon}
           {v.label}
+          {v.count !== undefined && <span className="tabular text-text-2">{v.count}</span>}
           {v.hint && <span className={cn("hidden text-xs font-medium sm:inline", v.tone ?? "text-muted")}>{v.hint}</span>}
         </Link>
       ))}

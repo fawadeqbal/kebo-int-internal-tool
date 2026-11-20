@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { crumbsFor } from "@/lib/nav";
-import { Check, Pencil, Plus, TriangleAlert, User, Users } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { Badge, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Td, Th, THead, toPage } from "@kebo/ui";
 import { can, type Tone } from "@kebo/shared";
 import { api } from "@/lib/api";
@@ -19,8 +19,6 @@ import { addFollowUpAction, editFollowUpAction, followUpDoneAction, followUpReop
 import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Follow-ups" };
-
-
 
 const ON_LABEL = { inquiry: "Inquiry", order: "Order", customer: "Customer", factory: "Supplier" } as const;
 const ABOUT = [
@@ -136,12 +134,7 @@ export default async function FollowUpsPage({
         tabs={[
           {
             href: href({ view: undefined, status: undefined, page: undefined }),
-            label: (
-              <>
-                <User aria-hidden />
-                Mine
-              </>
-            ),
+            label: "Mine",
             count: everyone ? other?.counts.open : list.counts.open,
             active: status === "open" && !everyone,
           },
@@ -149,12 +142,7 @@ export default async function FollowUpsPage({
             ? [
                 {
                   href: href({ view: "everyone", status: undefined, page: undefined }),
-                  label: (
-                    <>
-                      <Users aria-hidden />
-                      Everyone
-                    </>
-                  ),
+                  label: "Everyone",
                   count: everyone ? list.counts.open : other?.counts.open,
                   active: status === "open" && everyone,
                 },
@@ -162,24 +150,14 @@ export default async function FollowUpsPage({
             : []),
           {
             href: href({ status: "late", page: undefined }),
-            label: (
-              <>
-                <TriangleAlert aria-hidden />
-                Late
-              </>
-            ),
+            label: "Late",
             count: list.counts.late,
             alert: list.counts.late > 0,
             active: status === "late",
           },
           {
             href: href({ status: "done", page: undefined }),
-            label: (
-              <>
-                <Check aria-hidden />
-                Done
-              </>
-            ),
+            label: "Done",
             count: list.counts.done,
             active: status === "done",
           },

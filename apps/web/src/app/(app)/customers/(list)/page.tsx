@@ -1,41 +1,9 @@
 import Link from "next/link";
-import {
-  Archive,
-  FileText,
-  LayoutGrid,
-  List,
-  MessageSquare,
-  Plus,
-  TrendingUp,
-  TriangleAlert,
-  UserRound,
-  Users,
-  X,
-} from "lucide-react";
+import { FileText, MessageSquare, Plus, TrendingUp, Users, X } from "lucide-react";
 import { ExportCsv } from "@/components/sheets/export-link";
 import type { OrderGroups } from "@/lib/types-facts";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import {
-  RefCode,
-  buildHref,
-  ButtonLink,
-  Card,
-  DataRow,
-  EmptyState,
-  LinkTabs,
-  PageHeader,
-  Pager,
-  PhoneList,
-  PhoneRow,
-  StatRow,
-  StatTile,
-  StatusBadge,
-  Td,
-  Th,
-  THead,
-  toPage,
-  Tr,
-} from "@kebo/ui";
+import { RefCode, buildHref, ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { api } from "@/lib/api";
@@ -230,34 +198,19 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         tabs={[
           {
             href: href({ show: undefined }),
-            label: (
-              <>
-                <List aria-hidden />
-                All
-              </>
-            ),
+            label: "All",
             count: tabCounts?.all,
             active: show === "all",
           },
           {
             href: href({ show: "company" }),
-            label: (
-              <>
-                <LayoutGrid aria-hidden />
-                Companies
-              </>
-            ),
+            label: "Companies",
             count: tabCounts?.company,
             active: show === "company",
           },
           {
             href: href({ show: "individual" }),
-            label: (
-              <>
-                <UserRound aria-hidden />
-                People
-              </>
-            ),
+            label: "People",
             count: tabCounts?.individual,
             active: show === "individual",
           },
@@ -265,12 +218,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             ? [
                 {
                   href: href({ show: "owing" }),
-                  label: (
-                    <>
-                      <TriangleAlert aria-hidden />
-                      Owe money
-                    </>
-                  ),
+                  label: "Owe money",
                   count: owingCount ?? undefined,
                   alert: (owingCount ?? 0) > 0,
                   active: show === "owing",
@@ -281,12 +229,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             ? [
                 {
                   href: href({ show: "archived" }),
-                  label: (
-                    <>
-                      <Archive aria-hidden />
-                      Archived
-                    </>
-                  ),
+                  label: "Archived",
                   count: tabCounts?.archived,
                   active: show === "archived",
                 },

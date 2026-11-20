@@ -1,26 +1,7 @@
 import Link from "next/link";
-import { Clock, Factory, FileText, List, Plus, ShoppingCart, TrendingUp, UserRound, X } from "lucide-react";
+import { Clock, Factory, type List, Plus, ShoppingCart, TrendingUp, X } from "lucide-react";
 import { can } from "@kebo/shared";
-import {
-  RefCode,
-  buildHref,
-  ButtonLink,
-  Card,
-  LinkTabs,
-  DataRow,
-  EmptyState,
-  PageHeader,
-  Pager,
-  PhoneList,
-  PhoneRow,
-  StatRow,
-  StatTile,
-  StatusBadge,
-  Td,
-  Th,
-  THead,
-  toPage,
-} from "@kebo/ui";
+import { RefCode, buildHref, ButtonLink, Card, LinkTabs, DataRow, EmptyState, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { PartyExcel } from "@/components/sheets/party-excel";
@@ -178,10 +159,10 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         label="Which suppliers"
         className="mb-4"
         tabs={[
-          { href: buildHref("/suppliers", keep, { status: undefined, show: undefined, page: undefined }), label: <><List aria-hidden /> All</>, count: data.counts?.all, active: !status && !mineTab },
-          { href: buildHref("/suppliers", keep, { status: "offers", show: undefined, page: undefined }), label: <><FileText aria-hidden /> Offers in</>, count: data.counts?.offers, active: status === "offers" && !mineTab },
-          { href: buildHref("/suppliers", keep, { status: "none", show: undefined, page: undefined }), label: <><Clock aria-hidden /> No offers yet</>, count: data.counts?.none, active: status === "none" && !mineTab },
-          { href: buildHref("/suppliers", keep, { status: undefined, show: "mine", page: undefined }), label: <><UserRound aria-hidden /> Mine</>, count: data.counts?.mine, active: mineTab },
+          { href: buildHref("/suppliers", keep, { status: undefined, show: undefined, page: undefined }), label: "All", count: data.counts?.all, active: !status && !mineTab },
+          { href: buildHref("/suppliers", keep, { status: "offers", show: undefined, page: undefined }), label: "Offers in", count: data.counts?.offers, active: status === "offers" && !mineTab },
+          { href: buildHref("/suppliers", keep, { status: "none", show: undefined, page: undefined }), label: "No offers yet", count: data.counts?.none, active: status === "none" && !mineTab },
+          { href: buildHref("/suppliers", keep, { status: undefined, show: "mine", page: undefined }), label: "Mine", count: data.counts?.mine, active: mineTab },
         ]}
       />
 

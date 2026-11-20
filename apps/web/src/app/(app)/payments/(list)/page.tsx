@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, List, Plus, TriangleAlert } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Banknote, Plus } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
@@ -21,7 +21,6 @@ export const metadata = { title: "Payments" };
 type Search = { tab?: string; mine?: string; p?: string; dir?: string; status?: string; kind?: string; q?: string; order?: string; party?: string; account?: string; method?: string; page?: string };
 const STATUS_MEANING = { to_verify: "warn", sent_back: "bad", recorded: "ok", void: "neutral" } as const;
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-
 
 /** The row's status: money in reads "Received", a supplier payment "Paid", an expense "Expense", a transfer "Transfer". */
 function statusOf(r: PaymentRow) {
@@ -149,12 +148,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         label="Which payments"
         className="mb-4"
         tabs={[
-          { href: chip({}), label: <><List aria-hidden /> All</>, count: list.counts.all, active: !dir && !status && !kind },
-          { href: chip({ dir: "in" }), label: <><ArrowDownToLine aria-hidden /> Money in</>, count: list.counts.in, active: dir === "in" && !status },
-          { href: chip({ dir: "out" }), label: <><ArrowUpFromLine aria-hidden /> Money out</>, count: list.counts.out, active: dir === "out" && !status && !kind },
-          { href: chip({ kind: "expense" }), label: <><Banknote aria-hidden /> Expenses</>, count: list.counts.expense, active: kind === "expense" },
-          { href: chip({ dir: "move" }), label: <><ArrowLeftRight aria-hidden /> Transfers</>, count: list.counts.move, active: dir === "move" },
-          ...(list.counts.to_verify ? [{ href: chip({ status: "to_verify" }), label: <><TriangleAlert aria-hidden /> To verify</>, count: list.counts.to_verify, alert: true, active: status === "to_verify" }] : []),
+          { href: chip({}), label: "All", count: list.counts.all, active: !dir && !status && !kind },
+          { href: chip({ dir: "in" }), label: "Money in", count: list.counts.in, active: dir === "in" && !status },
+          { href: chip({ dir: "out" }), label: "Money out", count: list.counts.out, active: dir === "out" && !status && !kind },
+          { href: chip({ kind: "expense" }), label: "Expenses", count: list.counts.expense, active: kind === "expense" },
+          { href: chip({ dir: "move" }), label: "Transfers", count: list.counts.move, active: dir === "move" },
+          ...(list.counts.to_verify ? [{ href: chip({ status: "to_verify" }), label: "To verify", count: list.counts.to_verify, alert: true, active: status === "to_verify" }] : []),
           { href: chip({ status: "void" }), label: "Removed", count: list.counts.void, active: status === "void" },
         ]}
       />

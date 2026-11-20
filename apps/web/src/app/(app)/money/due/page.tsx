@@ -46,17 +46,23 @@ export default async function DuePage({ searchParams }: { searchParams: Promise<
   const today = companyToday();
   return (
     <div>
-      <PageHeader kind="list" crumbs={crumbsFor(HERE)} title="To receive and to pay" />
-      {seesSuppliers && (
-        <Segmented
-          label="Which side"
-          className="mb-4"
-          options={[
-            { href: HERE, label: "Customers owe us", active: !suppliers },
-            { href: `${HERE}?side=suppliers`, label: "We owe suppliers and bills", active: suppliers },
-          ]}
-        />
-      )}
+      {/* The two sides are the page's views (beside the title, like List | Board), so one row of tabs is left. */}
+      <PageHeader
+        kind="list"
+        crumbs={crumbsFor(HERE)}
+        title="To receive and to pay"
+        views={
+          seesSuppliers ? (
+            <Segmented
+              label="Which side"
+              options={[
+                { href: HERE, label: "Customers owe us", active: !suppliers },
+                { href: `${HERE}?side=suppliers`, label: "We owe suppliers and bills", active: suppliers },
+              ]}
+            />
+          ) : undefined
+        }
+      />
       {suppliers ? <WeOwe sp={sp} me={me} today={today} /> : <CustomersOwe sp={sp} me={me} today={today} />}
     </div>
   );

@@ -824,7 +824,7 @@ export function LinkTabs({
   className,
   label,
   replace,
-  look = "chips",
+  look = "tabs",
 }: {
   tabs: { href: string; label: ReactNode; count?: number; active: boolean; alert?: boolean }[];
   className?: string;
@@ -832,8 +832,9 @@ export function LinkTabs({
   /** Switch in place (no new history step): tabs inside a window. */
   replace?: boolean;
   /**
-   * "tabs" (design "list pages" 18 Nov: a list's stages): on a laptop underlined tabs like a record's, with their
-   * counts; on a phone round chips that slide sideways. "chips": chips everywhere.
+   * "tabs" (the default; design "list pages" 18 Nov: a page's stages or views): on a laptop underlined tabs like a
+   * record's, with their counts; on a phone round chips that slide sideways. "chips": chips everywhere — only for a
+   * filter inside a box.
    */
   look?: "chips" | "tabs";
 }) {
@@ -895,21 +896,27 @@ export function FilterChip({ href, active, count, children }: { href: string; ac
   );
 }
 
+/**
+ * The one switch between a few views (List | Board, Month | Quarter, For the bank | All): its track and its
+ * segments. Segmented (links), SegmentedChoice (buttons) and the app's ViewSwitch all draw these two.
+ */
+export const segmentsClass = "inline-flex max-w-full overflow-x-auto rounded-[10px] border border-line bg-surface-2 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+export const segmentClass = (active: boolean) =>
+  cn(
+    "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-md font-medium whitespace-nowrap text-muted transition-colors hover:text-text max-sm:h-10 [&_svg]:size-4",
+    active && "bg-surface font-semibold text-primary shadow-card",
+  );
+
 /** Pill links for a small set of options (e.g. This month / Last month). */
 export function Segmented({ options, className, label }: { options: { href: string; label: ReactNode; active: boolean }[]; className?: string; label: string }) {
   return (
     <ScrollFade
       as="nav"
       aria-label={label}
-      className={cn("inline-flex max-w-full overflow-x-auto rounded-[10px] border border-line bg-surface-2 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+      className={cn(segmentsClass, className)}
     >
       {options.map((o) => (
-        <Link
-          key={o.href}
-          href={o.href}
-          aria-current={o.active ? "page" : undefined}
-          className={cn("inline-flex h-8 items-center rounded-lg px-3 text-md font-medium whitespace-nowrap text-muted transition-colors hover:text-text", o.active && "bg-surface font-semibold text-primary shadow-card")}
-        >
+        <Link key={o.href} href={o.href} scroll={false} aria-current={o.active ? "page" : undefined} className={segmentClass(o.active)}>
           {o.label}
         </Link>
       ))}
