@@ -2,7 +2,7 @@ import { Download, Eye, File as FileIcon } from "lucide-react";
 import { can } from "@kebo/shared";
 import { buttonClass, Card, CardBody, CardHeader, Table, Td, Th, THead, Tr, EmptyLine, linkClass, cn } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
-import { date, fileSize } from "@/lib/format";
+import { date, fileSize, VIEWABLE } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { optional } from "@/components/print/data";
 import { AddFilesCard, FilesTable } from "@/components/deals/inquiry-files";
@@ -11,7 +11,6 @@ import { inquiryTitle } from "@/lib/titles";
 
 export const generateMetadata = inquiryTitle("Files");
 
-const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
 
 /**
  * Files: add the customer's URS, drawings and photos (with a note), the

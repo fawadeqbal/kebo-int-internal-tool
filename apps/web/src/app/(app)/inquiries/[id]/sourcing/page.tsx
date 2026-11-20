@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, Columns3, Factory, List } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { THead, Th, Tr, Badge, cn, EmptyState, Notice, subTitleClass } from "@kebo/ui";
+import { THead, Th, Tr, Badge, cn, EmptyState, Notice, subTitleClass, Dash } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { dayMonth, money, plural, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
@@ -144,7 +144,7 @@ export default async function SourcingPage({
   };
   const more = (r: (typeof others)[number]) =>
     canEdit && <RequestMore name={r.factory.name} status={r.status} setStatus={factoryRequestStatusAction.bind(null, d.id, r.id)} remove={removeFactoryRequestAction.bind(null, d.id, r.id)} />;
-  const dash = <span className="text-muted">—</span>;
+  const dash = <Dash />;
   const two = (v: { main: string; sub: string | null } | null) =>
     v ? (
       <>

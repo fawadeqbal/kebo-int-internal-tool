@@ -2,7 +2,7 @@ import Form from "next/form";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CURRENCIES, LEDGER_ENTRY_TYPE_LABEL, LEDGER_ENTRY_TYPES, type LedgerEntryType, type LedgerPartyKind } from "@kebo/shared";
-import { Badge, buildHref, cn, FactsLine, FilterChip } from "@kebo/ui";
+import { Badge, buildHref, cn, FactsLine, FilterChip, Dash } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
 import { addDays } from "@kebo/utils";
 import { date, money, dayMonth } from "@/lib/format";
@@ -197,13 +197,13 @@ export function entryCells(r: LedgerListRow, main: string, today: string, open: 
         {reversal && <span aria-label=" (correction)"> ↺</span>}
       </Link>
     ),
-    with: r.with ? struck(r.with.name) : <span className="text-muted">—</span>,
+    with: r.with ? struck(r.with.name) : <Dash />,
     order: r.order ? (
       <Link href={`/orders/${r.order.id}`} className="tabular hover:text-primary">
         {r.order.refNo}
       </Link>
     ) : (
-      <span className="text-muted">—</span>
+      <Dash />
     ),
     what: struck(what),
     base: struck(amount(base)),

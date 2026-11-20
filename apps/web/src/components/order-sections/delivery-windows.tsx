@@ -1,7 +1,7 @@
 "use client";
 
 import { CLAIM_BEARER_LABEL, CLAIM_STATUS_TONE, type ClaimBearer } from "@kebo/shared";
-import { Badge, Field, Input, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, Field, Input, Table, Td, Th, THead, Tr, Dash } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { ClaimView } from "@/lib/types-flow";
 import { money } from "@/lib/format";
@@ -92,8 +92,8 @@ export function ClaimsTable({ claims, currency, sub, actions }: { claims: ClaimV
               {c.resolution && <span className="block text-xs text-text-2">Settled: {c.resolution}</span>}
             </Td>
             <Td className="whitespace-nowrap tabular">{date(c.openedOn)}</Td>
-            <Td className="text-right whitespace-nowrap tabular">{c.amount ? money(c.amount, c.currency ?? currency) : <span className="text-muted">—</span>}</Td>
-            <Td>{c.bearer ? (CLAIM_BEARER_LABEL[c.bearer as ClaimBearer] ?? c.bearer) : <span className="text-muted">—</span>}</Td>
+            <Td className="text-right whitespace-nowrap tabular">{c.amount ? money(c.amount, c.currency ?? currency) : <Dash />}</Td>
+            <Td>{c.bearer ? (CLAIM_BEARER_LABEL[c.bearer as ClaimBearer] ?? c.bearer) : <Dash />}</Td>
             <Td>
               <Badge tone={CLAIM_STATUS_TONE[c.status]}>
                 {c.statusLabel}

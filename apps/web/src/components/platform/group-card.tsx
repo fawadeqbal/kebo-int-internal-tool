@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Card, cn, linkClass, subTitleClass } from "@kebo/ui";
+import { Card, cn, linkClass, subTitleClass, Dash } from "@kebo/ui";
 import { EditButton } from "@/components/common/edit-button";
 import { useSidePanel } from "@/components/common/panel";
 
@@ -78,7 +78,7 @@ export function GroupCard({
                     + Add
                   </button>
                 ) : (
-                  <span className="text-muted">—</span>
+                  <Dash />
                 )
               ) : (
                 i.value

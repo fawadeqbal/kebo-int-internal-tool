@@ -10,8 +10,8 @@ import { saveThenSend } from "@kebo/utils";
 import type { ActionState } from "@/lib/actions";
 import type { AttachedFileInfo } from "@/lib/types-money";
 import { FileChip, useFileTools } from "@/components/files/file-tools";
+import { VIEWABLE } from "@/lib/format";
 
-const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 
 /**

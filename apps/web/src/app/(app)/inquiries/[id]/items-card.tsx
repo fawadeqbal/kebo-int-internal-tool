@@ -1,6 +1,6 @@
 import { ChevronRight, Pencil } from "lucide-react";
 import { can } from "@kebo/shared";
-import { Badge, EmptyLine } from "@kebo/ui";
+import { Badge, EmptyLine, Dash } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { dateTime, money, qty } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
@@ -43,7 +43,7 @@ export async function ItemsCard({ id }: { id: string }) {
   // The one set of item columns; the model only when an item has one, the offers only for people who source.
   const columns: LineColumn[] = [
     ...ITEM_COLUMNS.filter((c) => c.key !== "model" || d.items.some((i) => i.model)).map((c) =>
-      c.key === "quantity" ? { ...c, format: (v: LineRow["values"]) => qty(v.quantity!) } : c.key === "targetPrice" ? { ...c, phoneHidden: false, format: (v: LineRow["values"]) => price(v.targetPrice!) || <span className="text-muted">—</span> } : c,
+      c.key === "quantity" ? { ...c, format: (v: LineRow["values"]) => qty(v.quantity!) } : c.key === "targetPrice" ? { ...c, phoneHidden: false, format: (v: LineRow["values"]) => price(v.targetPrice!) || <Dash /> } : c,
     ),
     ...(sourcing
       ? [

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { basisText } from "@kebo/shared";
-import { Badge, cn, Notice } from "@kebo/ui";
+import { Badge, cn, Notice, Dash } from "@kebo/ui";
 import { date, dayMonth, money, qty } from "@/lib/format";
 import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 
@@ -140,11 +140,11 @@ export function OfferCompare({ view, status, dealId, waiting }: { view: Sourcing
             />
           ))}
           {group("Terms")}
-          {row("Lead time", (q) => q.leadTime ?? <span className="text-muted">—</span>, { id: fastest, word: "Fastest" })}
-          {row("Incoterm", (q) => basisText(q.basis, q.basisPlace) ?? <span className="text-muted">—</span>)}
-          {row("Deposit", (q) => fig.get(q.id)!.deposit ?? <span className="text-muted">—</span>)}
-          {row("Warranty", (q) => warrantyWords(q) ?? <span className="text-muted">—</span>, { id: longest, word: "Longest" })}
-          {row("Valid until", (q) => (q.validUntil ? date(q.validUntil) : <span className="text-muted">—</span>))}
+          {row("Lead time", (q) => q.leadTime ?? <Dash />, { id: fastest, word: "Fastest" })}
+          {row("Incoterm", (q) => basisText(q.basis, q.basisPlace) ?? <Dash />)}
+          {row("Deposit", (q) => fig.get(q.id)!.deposit ?? <Dash />)}
+          {row("Warranty", (q) => warrantyWords(q) ?? <Dash />, { id: longest, word: "Longest" })}
+          {row("Valid until", (q) => (q.validUntil ? date(q.validUntil) : <Dash />))}
           {offers.some((q) => q.unpriced) && row("Items without a price", (q) => (q.unpriced ? <span className="text-warn">{q.unpriced}</span> : "None"))}
           {row("Their quotation file", (q) => (q.files.length ? "Attached" : <span className="text-warn">Missing</span>))}
         </div>

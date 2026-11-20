@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
 import { Badge, Button, cn, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
-import { dueText, money } from "@/lib/format";
+import { dueText, money, num2 as grouped } from "@/lib/format";
 import { useTime } from "@/lib/time-client";
 import type { ActionState } from "@/lib/actions";
 import type { OrderMoney } from "@/lib/types-money";
@@ -17,7 +17,6 @@ type Send = (ref: string, prev: ActionState, form: FormData) => Promise<ActionSt
 type Item = OrderMoney["plan"]["items"][number];
 type Sending = Parameters<typeof SendDialog>[0]["what"];
 
-const grouped = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Where a part stands, as a badge: paid (and when), part paid, sent (how), not sent. */
 function Stand({ i }: { i: Item }) {

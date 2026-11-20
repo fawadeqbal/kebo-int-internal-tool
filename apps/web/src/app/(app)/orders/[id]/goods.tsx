@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Button, Card, CardBody, CardHeader, cn, RULES, linkClass } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, cn, RULES, linkClass, Dash } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -367,14 +367,14 @@ function PackingMarks({
       <dl className="flex min-w-0 flex-wrap gap-x-6 gap-y-1">
         <div className="flex flex-wrap items-baseline gap-1.5">
           <dt className="text-muted">Container</dt>
-          <dd className="font-medium">{containerNo ?? <span className="text-muted">—</span>}</dd>
+          <dd className="font-medium">{containerNo ?? <Dash />}</dd>
           {fromShipment && <dd>{fromShipment}</dd>}
         </div>
         <div className="flex min-w-0 gap-1.5">
           <dt className="shrink-0 text-muted">
             Shipping marks{edit && editedMark(card, "shippingMarks")}
           </dt>
-          <dd className="min-w-0 font-medium whitespace-pre-line">{shippingMarks ?? <span className="text-muted">—</span>}</dd>
+          <dd className="min-w-0 font-medium whitespace-pre-line">{shippingMarks ?? <Dash />}</dd>
         </div>
       </dl>
       <span className="flex items-center gap-2">

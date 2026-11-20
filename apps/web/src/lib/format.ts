@@ -89,6 +89,12 @@ export const time = (d: Date | string | null | undefined) => formatTime(d ?? nul
 /** A typed time of day ("15:30"), the company's way. */
 export const clockTime = (hhmm: string | null | undefined) => formatClock(hhmm, timeStyle());
 export const timeAgo = (d: Date | string) => ago(d, timeStyle());
+/** A plain number with two decimals, grouped: "12,480.00" (a table's amount column, the currency in its head). */
+export const num2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** A plain whole number, grouped: "12,480". */
+export const num0 = (v: string | number) => Math.round(Number(v)).toLocaleString("en-US");
+/** A file the browser can show itself (a PDF or a picture): opened in a tab, not downloaded. */
+export const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
 export const qty = (q: string | number) => Number(q).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 

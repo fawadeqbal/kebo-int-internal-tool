@@ -2,14 +2,13 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { PAYMENT_METHOD_LABEL, type CustomerMoneyState, type FactoryDueRule, type PaymentRoute, type Tone } from "@kebo/shared";
 import { Badge, cn, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
-import { date, dayMonth, dueText, money } from "@/lib/format";
+import { date, dayMonth, dueText, money, num2 as grouped } from "@/lib/format";
 import type { FactoryPaymentView, FactoryPlanView } from "@/lib/types-money";
 import { ROW_LINK } from "./section-window";
 import { BoxNote } from "@/components/common/record-box";
 
 type Row = FactoryPlanView["rows"][number];
 
-const grouped = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** When a part of a supplier's plan falls due, in the words the customer's plan uses (a fixed date: none, its date says it). */
 export function supplierRule(r: { dueRule: FactoryDueRule; dueDays?: number | null }): string | null {

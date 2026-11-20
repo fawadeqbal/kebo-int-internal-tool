@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState, type ReactNode } from "react";
 
-import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice, subTitleClass } from "@kebo/ui";
+import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice, subTitleClass, Dash } from "@kebo/ui";
 import { ChangeHint, changeKind, changeLine, changeWords, countChanges } from "@/components/common/change-words";
 import { PanelBody, PanelSection, SidePanel, useClosePanel, WindowFooter } from "@/components/common/panel";
 import { EditButton } from "@/components/common/edit-button";
@@ -421,7 +421,7 @@ export function DetailsCard({
               {f.name && editedMark(edits?.card, f.name)}
             </dt>
             <dd className="min-w-0 text-sm font-medium break-words text-text tabular">
-              {filled(f) ? shownOf(f, style) : f.empty !== undefined ? f.empty : <span className="font-normal text-muted">—</span>}
+              {filled(f) ? shownOf(f, style) : f.empty !== undefined ? f.empty : <Dash />}
             </dd>
           </div>
         ))}

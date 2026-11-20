@@ -1,15 +1,14 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { cn, Table, Td, Th, THead, Tr, linkClass } from "@kebo/ui";
+import { cn, Table, Td, Th, THead, Tr, linkClass, Dash } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
 import { Section } from "@/components/order-sections/section";
-import { date, money } from "@/lib/format";
+import { date, money, num2 as n2 } from "@/lib/format";
 import type { CostSheetRow, ExpenseView } from "@/lib/types-money";
 import { COST_FROM } from "./cost-words";
 
-const n2 = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const dash = <span className="text-muted">—</span>;
+const dash = <Dash />;
 
 /** How a cost was paid, under "Comes from": "Sana's own money", "Office cash", "not paid yet". */
 export function paidHow(e: Pick<ExpenseView, "ownMoney" | "payLater" | "paidBy" | "account" | "repaid">): string | null {
