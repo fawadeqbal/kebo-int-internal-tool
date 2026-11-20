@@ -263,7 +263,7 @@ export function PhoneLineRow({
   const body = (
     <>
       {pick && (
-        <span aria-hidden className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border-[1.5px]", pick.on ? "border-primary-solid bg-primary-solid text-white" : "border-line-strong bg-surface")}>
+        <span aria-hidden className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border-[1.5px]", pick.on ? "border-primary-solid bg-primary-solid text-primary-fg" : "border-line-strong bg-surface")}>
           {pick.on && <Check className="size-3.5" strokeWidth={3} />}
         </span>
       )}

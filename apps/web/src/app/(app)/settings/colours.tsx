@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 import { COLOUR_SET_LABEL, COLOUR_SETS, type ColourSet } from "@kebo/shared";
-import { Card, CardBody, CardHeader, cn, Badge } from "@kebo/ui";
+import { Card, CardBody, CardHeader, cn, Select } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import type { ActionState } from "@/lib/actions";
 
@@ -17,6 +17,10 @@ const SET_LINE: Record<ColourSet, string> = {
   graphite: "Plain greys, no tint. Green only where it means something.",
   midnight: "Cool blue-grey with blue links and buttons.",
   warm: "Warm paper greys with copper links.",
+  clay: "Warm paper with terracotta. Near-black warm charcoal in dark.",
+  teal: "Fresh green-blue greys with teal. Near-black in dark.",
+  ink: "Soft greys with charcoal, no colour. Black with light grey in dark.",
+  onyx: "Pure white and black. Pure black with white in dark.",
 };
 
 /** The whole app in these colours, at once (the frame's marker; the saved choice follows). */
@@ -57,9 +61,9 @@ function Mini({ set, mode }: { set: ColourSet; mode: "light" | "dark" }) {
 }
 
 /**
- * Company settings › The app's colours: the four sets side by side, each light and dark as they really are.
- * Choosing one shows it on the whole app at once and saves it for everyone in the company (arrowing through
- * the choices saves only where it stops); the note says so, with Undo. Each person still picks light, dark
+ * Company settings › The app's colours: a dropdown of the sets, and the chosen one drawn light and dark as it
+ * really is. Choosing one shows it on the whole app at once and saves it for everyone in the company (arrowing
+ * through the dropdown saves only where it stops); the note says so, with Undo. Each person still picks light, dark
  * or auto under their name.
  */
 export function ColoursCard({
@@ -85,7 +89,7 @@ export function ColoursCard({
     setChosen(value);
   }
   const wait = useRef<number | undefined>(undefined);
-  // The colours saved before this run of choices (arrowing through the four is one change).
+  // The colours saved before this run of choices (arrowing through the dropdown is one change).
   const from = useRef<ColourSet>(value);
 
   const back = (set: ColourSet) => {
@@ -135,53 +139,34 @@ export function ColoursCard({
     <Card id="colours" className="scroll-mt-20">
       <CardHeader title={title} description={description} />
       <CardBody className="flex flex-col gap-4">
-        <fieldset className="min-w-0">
-          <legend className="sr-only">{title}</legend>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {COLOUR_SETS.map((set) => (
-              <label
-                key={set}
-                className={cn(
-                  "flex cursor-pointer flex-col gap-2.5 rounded-[14px] border border-line-strong bg-surface p-2.5 pb-3.5 transition-shadow hover:border-text-2",
-                  chosen === set && "border-primary-solid ring-1 ring-primary-solid hover:border-primary-solid",
-                )}
-              >
-                <span className="grid grid-cols-2 gap-1.5">
-                  <Mini set={set} mode="light" />
-                  <Mini set={set} mode="dark" />
-                </span>
-                <span aria-hidden className="grid grid-cols-2 gap-1.5 text-center text-2xs text-muted">
-                  <span>Light</span>
-                  <span>Dark</span>
-                </span>
-                <span className="flex items-center gap-2 px-1">
-                  <input
-                    type="radio"
-                    name="colours"
-                    value={set}
-                    checked={chosen === set}
-                    onChange={() => choose(set)}
-                    // Named by the set alone; what it looks like (and "Default") is its description.
-                    aria-labelledby={`colours-${set}-name`}
-                    aria-describedby={set === "green" ? `colours-${set}-default colours-${set}` : `colours-${set}`}
-                    className="size-4 shrink-0 accent-primary-solid"
-                  />
-                  <span id={`colours-${set}-name`} className="text-sm font-semibold text-text">
-                    {COLOUR_SET_LABEL[set]}
-                  </span>
-                  {set === "green" && (
-                    <Badge size="sm" id={`colours-${set}-default`} className="ml-auto">
-                      Default
-                    </Badge>
-                  )}
-                </span>
-                <span id={`colours-${set}`} className="px-1 text-xs leading-snug text-text-2">
-                  {SET_LINE[set]}
-                </span>
-              </label>
-            ))}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-5">
+          <div className="flex min-w-0 flex-col gap-1.5 sm:w-64">
+            <label htmlFor="colours-set" className="text-sm font-medium text-text">
+              Colours
+            </label>
+            <Select id="colours-set" name="colours" value={chosen} onChange={(e) => choose(e.target.value as ColourSet)} aria-describedby="colours-line">
+              {COLOUR_SETS.map((set) => (
+                <option key={set} value={set}>
+                  {COLOUR_SET_LABEL[set]}
+                  {set === "green" ? " (Default)" : ""}
+                </option>
+              ))}
+            </Select>
+            <p id="colours-line" className="text-xs leading-snug text-text-2">
+              {SET_LINE[chosen]}
+            </p>
           </div>
-        </fieldset>
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:max-w-md">
+            <Mini set={chosen} mode="light" />
+            <Mini set={chosen} mode="dark" />
+            <span aria-hidden className="text-center text-2xs text-muted">
+              Light
+            </span>
+            <span aria-hidden className="text-center text-2xs text-muted">
+              Dark
+            </span>
+          </div>
+        </div>
         <p className="flex items-start gap-2.5 rounded-xl bg-surface-2 px-3.5 py-3 text-md text-text-2">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>

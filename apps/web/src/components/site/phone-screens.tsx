@@ -683,7 +683,7 @@ function ShippingScreen() {
               <div key={x.t} className={cn("flex gap-3", last ? "min-h-6" : "min-h-11")}>
                 <div className="flex w-[22px] flex-col items-center">
                   {x.st === "done" ? (
-                    <span className="grid size-[22px] place-items-center rounded-full bg-primary-solid text-white">
+                    <span className="grid size-[22px] place-items-center rounded-full bg-primary-solid text-primary-fg">
                       <Check className="size-[13px]" strokeWidth={3} />
                     </span>
                   ) : x.st === "next" ? (

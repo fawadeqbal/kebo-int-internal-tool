@@ -3,12 +3,12 @@ import { accessibilityProblems, watchErrors } from "./check";
 import { MANAGER, signIn } from "./people";
 
 /**
- * The app's colours (design "the app's colours: four sets, light and dark"): a company picks one of four sets on
- * Company settings; the whole app changes at once, for everyone in the company, and Undo puts it back. Every set,
+ * The app's colours (design "the app's colours: four sets, light and dark", now eight): a company picks one of the
+ * sets from a dropdown on Company settings; the whole app changes at once, for everyone in the company, and Undo puts it back. Every set,
  * light and dark, meets WCAG AA on the pages people use most.
  */
 
-const SETS = ["green", "graphite", "midnight", "warm"] as const;
+const SETS = ["green", "graphite", "midnight", "warm", "clay", "teal", "ink", "onyx"] as const;
 type Set = (typeof SETS)[number];
 /** Each set's ground, light and dark (packages/ui/src/styles/theme.css): tells which colours the page has. */
 const GROUND: Record<Set, { light: string; dark: string }> = {
@@ -16,31 +16,34 @@ const GROUND: Record<Set, { light: string; dark: string }> = {
   graphite: { light: "#f4f5f6", dark: "#0f1012" },
   midnight: { light: "#f3f6fa", dark: "#0b1018" },
   warm: { light: "#f7f5f1", dark: "#131211" },
+  clay: { light: "#faf9f5", dark: "#0a0a09" },
+  teal: { light: "#f3f8f7", dark: "#050807" },
+  ink: { light: "#f6f6f5", dark: "#000000" },
+  onyx: { light: "#ffffff", dark: "#000000" },
 };
 const ground = (page: Page) => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bg").trim());
-const LABEL: Record<Set, string> = { green: "Green", graphite: "Graphite", midnight: "Midnight", warm: "Warm" };
+const LABEL: Record<Set, string> = { green: "Green", graphite: "Graphite", midnight: "Midnight", warm: "Warm", clay: "Clay", teal: "Teal", ink: "Ink", onyx: "Onyx" };
 
 /** Company settings › The app's colours: chooses one and waits until it is saved (the note says so). */
 async function choose(page: Page, set: Set) {
-  const group = page.getByRole("group", { name: "The app's colours" });
-  await group.getByRole("radio", { name: LABEL[set], exact: true }).check();
+  await page.getByRole("combobox", { name: "Colours" }).selectOption(set);
   await expect(page.getByRole("status").filter({ hasText: `The app's colours are now ${LABEL[set]}` })).toBeVisible();
 }
 
 test("the app's colours: the whole app changes at once, stays, is everyone's, and Undo puts it back", async ({ page, browser }, info) => {
   const errors = watchErrors(page);
   await page.goto("/settings/company");
-  const group = page.getByRole("group", { name: "The app's colours" });
-  await expect(group.getByRole("radio")).toHaveCount(4);
-  // Each set shows its light and dark side, and Green says it is the default.
-  await expect(group.locator('[data-colours="graphite"][data-mode="dark"]')).toHaveCount(1);
-  await expect(group.getByText("Default")).toBeVisible();
-  if (!(await group.getByRole("radio", { name: "Green", exact: true }).isChecked())) await choose(page, "green");
+  const select = page.getByRole("combobox", { name: "Colours" });
+  await expect(select.locator("option")).toHaveCount(SETS.length);
+  // Green says it is the default; the chosen set is drawn light and dark.
+  await expect(select.locator("option", { hasText: "Green (Default)" })).toHaveCount(1);
+  if ((await select.inputValue()) !== "green") await choose(page, "green");
+  await expect(page.locator('#colours [data-colours="green"][data-mode="dark"]')).toHaveCount(1);
   expect(await ground(page)).toBe(GROUND.green.light);
 
   try {
     // At once: the page has the new colours before the save has answered.
-    await group.getByRole("radio", { name: "Graphite", exact: true }).check();
+    await select.selectOption("graphite");
     expect(await ground(page)).toBe(GROUND.graphite.light);
     await expect(page.getByRole("status").filter({ hasText: "The app's colours are now Graphite" })).toBeVisible();
     expect(await accessibilityProblems(page), "Company settings in Graphite meets WCAG 2.2 AA").toEqual([]);
@@ -60,23 +63,23 @@ test("the app's colours: the whole app changes at once, stays, is everyone's, an
 
     // Arrowing through the choices saves only where it stops; Undo puts the one before back.
     await page.goto("/settings/company");
-    await group.getByRole("radio", { name: "Graphite", exact: true }).focus();
-    await page.keyboard.press("ArrowRight");
-    await page.keyboard.press("ArrowRight");
-    await expect(group.getByRole("radio", { name: "Warm", exact: true })).toBeChecked();
+    await select.focus();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    await expect(select).toHaveValue("warm");
     expect(await ground(page)).toBe(GROUND.warm.light);
     const note = page.getByRole("status").filter({ hasText: "The app's colours are now Warm" });
     await expect(note).toBeVisible();
     await note.getByRole("button", { name: "Undo" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Undone" })).toBeVisible();
-    await expect(group.getByRole("radio", { name: "Graphite", exact: true })).toBeChecked();
+    await expect(select).toHaveValue("graphite");
     expect(await ground(page)).toBe(GROUND.graphite.light);
     await page.reload();
-    await expect(group.getByRole("radio", { name: "Graphite", exact: true })).toBeChecked();
+    await expect(select).toHaveValue("graphite");
   } finally {
     // Back to the default, for the other checks.
     await page.goto("/settings/company");
-    if (!(await group.getByRole("radio", { name: "Green", exact: true }).isChecked())) await choose(page, "green");
+    if ((await select.inputValue()) !== "green") await choose(page, "green");
   }
   expect(await ground(page)).toBe(GROUND.green.light);
   expect(errors, "errors in the browser").toEqual([]);
