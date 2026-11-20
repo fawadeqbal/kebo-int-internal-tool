@@ -31,6 +31,7 @@ import { factoryTermsAction } from "../../actions";
 import { fieldsAction } from "../../light-actions";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
+import { BoxNote } from "@/components/common/record-box";
 
 export const generateMetadata = orderTitle("Purchase order");
 
@@ -401,10 +402,10 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           >
             <div className="flex flex-col gap-3 pb-3.5">
               {plan.differs && (
-                <p className="mx-[18px] rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
+                <BoxNote tone="warn">
                   The parts do not add up to what we owe ({money(plan.differs, plan.currency)}{" "}
                   {Number(plan.differs) > 0 ? "missing" : "too much"}): prices changed since. Open Edit plan and save it again.
-                </p>
+                </BoxNote>
               )}
               <SupplierPlanTable
                 plan={plan}

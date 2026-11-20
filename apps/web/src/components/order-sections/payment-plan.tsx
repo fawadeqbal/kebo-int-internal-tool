@@ -134,9 +134,9 @@ export function PaymentPlanTable({
   return (
     <div className="flex flex-col gap-3">
       {/* Phones: one block per part, so where it stands and what to do are never off the screen. */}
-      <ul className="flex flex-col divide-y divide-line rounded-lg border border-line sm:hidden" aria-label="Payment plan">
+      <ul className="flex flex-col divide-y divide-line border-b border-line sm:hidden" aria-label="Payment plan">
         {plan.items.map((i) => (
-          <li key={i.id} className="flex flex-col gap-1.5 px-3 py-3">
+          <li key={i.id} className="flex flex-col gap-1.5 px-4 py-3">
             <span className="flex items-baseline justify-between gap-3">
               <span className="font-semibold">{i.label}</span>
               <span className="font-semibold tabular">{grouped(i.amount)}</span>
@@ -153,7 +153,7 @@ export function PaymentPlanTable({
           </li>
         ))}
         {plan.cancelled.map((c) => (
-          <li key={c.paperId} className="flex items-center justify-between gap-3 px-3 py-3 text-sm text-muted">
+          <li key={c.paperId} className="flex items-center justify-between gap-3 px-4 py-3 text-sm text-muted">
             <span>
               {c.number} · {c.label ?? "Payment request"} · cancelled
             </span>
@@ -224,7 +224,7 @@ export function PaymentPlanTable({
           <RecordPaymentWindow main {...pay} currency={currency} forWhat={next.label} amount={next.open} startOpen onClosed={onAutoClosed} />
         </span>
       )}
-      <div data-target="payments.received" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-[18px] text-sm sm:px-3.5">
+      <div data-target="payments.received" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-4 text-sm sm:px-3.5">
         <span className="text-muted">
           Order total <span className="font-semibold text-text tabular">{money(total, currency)}</span>
         </span>

@@ -306,6 +306,15 @@ describe("one of each", () => {
       expect(SOURCES.find(({ file }) => file.replaceAll("\\", "/").endsWith(frame))?.text).toContain("<RowClicks />");
   });
 
+  it("no box inside a box: a box's note is BoxNote, a phone list in a box is rows across it, one inset (px-4 sm:px-5)", () => {
+    // A rounded, tinted or framed note inside a box (mx-… rounded-md bg-warn-soft) is a box in a box on a phone.
+    expect(found(/mx-\S+ rounded-md bg-(warn|surface-2|info)-soft|mx-\S+ [^"]*rounded-md bg-surface-2/g)).toEqual([]);
+    // A phone's list of parts inside a box is not framed again.
+    expect(found(/divide-y divide-line rounded-lg border border-line sm:hidden/g)).toEqual([]);
+    // A box's own inset is the card's (px-4 sm:px-5), never 18px.
+    expect(found(/\b(px|mx|max-sm:px)-\[18px\]/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

@@ -19,7 +19,7 @@ export function RepeatingRow({ w, setup }: { w: Waiting; setup: CostSetup }) {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   return (
-    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-[18px] py-3">
+    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:px-5 py-3">
       <span className="min-w-0">
         <span className="block text-sm font-semibold">{w.description}</span>
         <span className="block text-xs text-text-2">

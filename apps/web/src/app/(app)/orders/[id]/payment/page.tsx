@@ -18,6 +18,7 @@ import { paymentAction, submitPaymentAction, useCreditAction } from "../../actio
 import { WaitingToVerify } from "@/components/money/waiting-money";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
+import { BoxNote } from "@/components/common/record-box";
 
 export const generateMetadata = orderTitle("Payment");
 
@@ -158,7 +159,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
               files={<SectionFiles orderId={o.id} section={lc ? "lc" : "bank_contract"} canAdd={d.canFiles} />}
             >
               {lc && flow?.payment.lcChecks && (
-                <div className="border-t border-line px-[18px] py-3">
+                <div className="border-t border-line px-4 py-3 sm:px-5">
                   <LcChecks checks={flow.payment.lcChecks} />
                 </div>
               )}
@@ -184,6 +185,9 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
           ))}
       </div>
 
+      {/* Money sent for a manager to verify: its own box above the plan, never a box inside it. */}
+      {(canPay || canSend) && <WaitingToVerify orderId={o.id} verifies={canPay} />}
+
       <Section
         title="Payment plan"
         state={paid ? "Paid in full" : `${money(p.due, c)} to come`}
@@ -205,10 +209,10 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       >
         <div className="flex flex-col gap-3 pb-3.5">
           {!m.plan.matchesTotal && (
-            <p className="mx-[18px] rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
+            <BoxNote tone="warn">
               The parts do not add up to the order total ({money(m.plan.difference, c)}{" "}
               {Number(m.plan.difference) > 0 ? "missing" : "too much"}).
-            </p>
+            </BoxNote>
           )}
           <PaymentPlanTable
             orderId={o.id}
@@ -220,18 +224,13 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
             send={sendRequestAction.bind(null, o.id)}
             pay={pay}
           />
-          {(canPay || canSend) && (
-            <div className="mx-[18px] empty:hidden">
-              <WaitingToVerify orderId={o.id} verifies={canPay} />
-            </div>
-          )}
           {m.charged.length > 0 && (
             <ul
               aria-label="Charged to the customer"
-              className="mx-[18px] flex flex-col divide-y divide-line rounded-lg border border-line text-sm"
+              className="flex flex-col divide-y divide-line border-y border-line text-sm"
             >
               {m.charged.map((x) => (
-                <li key={x.id} className="flex items-baseline justify-between gap-3 px-3 py-2">
+                <li key={x.id} className="flex items-baseline justify-between gap-3 px-4 py-2 sm:px-5">
                   <span>
                     <span className="text-text-2">Charged to the customer:</span> {x.description}
                   </span>

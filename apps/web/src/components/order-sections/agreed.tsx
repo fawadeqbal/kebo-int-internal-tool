@@ -198,7 +198,7 @@ export function SideBySideTable({ table, customer, many }: { table: SideTable; c
   return (
     <div className="min-w-0 border-t border-line">
       {many && (
-        <p className="px-[18px] pt-2.5 text-xs text-text-2">
+        <p className="px-4 sm:px-5 pt-2.5 text-xs text-text-2">
           <b className="font-semibold text-text">{table.factory}</b> · {table.offer}
         </p>
       )}
@@ -225,7 +225,7 @@ export function SideBySideTable({ table, customer, many }: { table: SideTable; c
         </thead>
         <tbody className="max-sm:block">
           {table.rows.map((r) => (
-            <tr key={r.key} className="border-t border-line max-sm:flex max-sm:flex-col max-sm:gap-1 max-sm:px-[18px] max-sm:py-2.5">
+            <tr key={r.key} className="border-t border-line max-sm:flex max-sm:flex-col max-sm:gap-1 max-sm:px-4 max-sm:py-2.5">
               <th scope="row" className={cn(cell, "pl-[18px] text-left font-semibold max-sm:pl-0")}>
                 {r.label}
               </th>

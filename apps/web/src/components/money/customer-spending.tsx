@@ -105,7 +105,7 @@ export function CustomerSpending({
         actions={<AddCost setup={setup} label="Add a cost for them" />}
       />
       {first.length === 0 ? (
-        <EmptyLine className="border-t border-line px-[18px] py-3.5">Nothing spent on this customer yet.</EmptyLine>
+        <EmptyLine className="border-t border-line px-4 sm:px-5 py-3.5">Nothing spent on this customer yet.</EmptyLine>
       ) : (
         <DataTable label="Spending on this customer">
           <THead>
@@ -161,7 +161,7 @@ export function CustomerSpending({
         </DataTable>
       )}
       {rows.length > first.length && (
-        <p className="border-t border-line px-[18px] py-2.5 text-md">
+        <p className="border-t border-line px-4 sm:px-5 py-2.5 text-md">
           <Link href={`/payments?party=${customerId}&kind=expense`} className="font-medium text-primary hover:underline">
             All {rows.length} costs in Payments →
           </Link>
