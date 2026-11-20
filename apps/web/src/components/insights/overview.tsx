@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
+import { Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine, RULES } from "@kebo/ui";
 import { date, money, plural, whole } from "@/lib/format";
 import { amountCell, bigMoney, change, monthYearOf, percent, type Period } from "@/lib/insights-period";
 import type { loadOverview } from "@/lib/insights-data";
@@ -109,7 +109,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             ) : (
               <ul className="divide-y divide-line">
                 {d.cash.byCurrency.map((x) => (
-                  <li key={x.currency} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                  <li key={x.currency} className={cn(RULES.box.inset, "flex items-center justify-between gap-3 py-3")}>
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold">{x.currency}</span>
                       <span className="block text-xs text-text-2">
@@ -262,7 +262,7 @@ function ShortList({
         <ul className="divide-y divide-line">
           {rows.map((r) => (
             <li key={r.key}>
-              <Link href={r.href} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2/60 sm:px-5">
+              <Link href={r.href} className={cn(RULES.box.inset, "flex items-center justify-between gap-3 py-3 hover:bg-surface-2/60")}>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold">{r.name}</span>
                   <span className="block truncate text-xs text-text-2">{r.sub}</span>

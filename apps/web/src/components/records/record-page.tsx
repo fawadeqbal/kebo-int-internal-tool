@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { boxTitleClass, cn, PageHeader } from "@kebo/ui";
+import { boxTitleClass, cn, PageHeader, RULES } from "@kebo/ui";
 import { OwnPagerTop, OwnPagerUnder } from "@/components/deals/own-pager";
 import { SideSheet } from "@/components/common/side-sheet";
 import { RecordShell } from "./record-frame";
@@ -91,7 +91,7 @@ export function RecordPanel({ sections, summary }: { sections: PanelSection[]; s
     <SideSheet title={title} summary={summary}>
       <SidePanelCard>
         {sections.map((s) => (
-          <section key={s.id} aria-labelledby={s.id} className="flex flex-col gap-1 border-b border-line px-4 pt-3.5 pb-3 last:border-b-0 sm:px-5">
+          <section key={s.id} aria-labelledby={s.id} className={cn(RULES.box.inset, "flex flex-col gap-1 border-b border-line pt-3.5 pb-3 last:border-b-0")}>
             <h2 id={s.id} className={cn(boxTitleClass, "mb-1")}>
               {s.title}
             </h2>

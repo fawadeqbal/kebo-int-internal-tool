@@ -134,7 +134,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
         }
         panelLabel="Beside the payment"
         panel={
-          <Card className="p-0">
+          <Card>
           <CardHeader title="History" />
           <CardBody className="flex flex-col gap-3 text-sm">
             <HistoryLine who={p.recordedBy} what={p.kind === "submission" ? "Sent for verification" : "Recorded"} at={p.recordedAt} />
@@ -148,13 +148,13 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
         </Card>
         }
       >
-          <Card className="p-0">
+          <Card>
             <CardHeader title="Payment" />
             <CardBody>
               <DetailList columns={3} items={fieldItems} />
             </CardBody>
           </Card>
-          <Card className="p-0">
+          <Card>
             <CardHeader title="Proof" />
             <CardBody>
               {proof ? (
@@ -169,7 +169,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
             </CardBody>
           </Card>
           {p.parts && p.parts.length > 0 && (
-            <Card className="p-0">
+            <Card>
               <CardHeader title="Where it goes" />
               <Table>
                 <THead>

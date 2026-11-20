@@ -6,6 +6,7 @@ import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
 import { Info, Package, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
+import { RULES } from "./rules";
 
 /* ---------------------------------------------------------------- Button */
 /**
@@ -259,7 +260,7 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
  * The one box head (canvas group 7): a 48px row under a line — the title (15px bold), what stands beside it, and its
  * buttons at the right. CardHeader and the record's boxes (RecordBox) both draw it from these.
  */
-export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4";
+export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-4 sm:pl-5";
 export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
 
 /** A heading inside a box or a window, under its title (a group of fields, a part of a list): one look everywhere. */
@@ -273,6 +274,11 @@ export const linkClass = "font-medium text-primary underline-offset-2 hover:unde
 
 /** A card's look, for the few boxes that cannot be a Card element (the side panel, which measures itself). */
 export const cardClass = "rounded-2xl border border-line bg-surface";
+/** Parts one under another, RULES.page.gap apart: a page's header, tabs, filters and boxes. */
+export function Stack({ className, ...props }: ComponentProps<"div">) {
+  return <div className={cn(RULES.page.stack, className)} {...props} />;
+}
+
 export function Card({ className, ...props }: ComponentProps<"section">) {
   return <section className={cn(cardClass, className)} {...props} />;
 }
@@ -325,7 +331,7 @@ export function CardHeader({
 }
 
 export function CardBody({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("p-4 sm:p-5", className)} {...props} />;
+  return <div className={cn(RULES.box.body, className)} {...props} />;
 }
 
 
@@ -447,7 +453,7 @@ export function PageHeader({
           {more && <div className="pointer-events-auto shrink-0 [&>button]:size-10 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
         </div>
       )}
-      <header className="mb-4" data-page-label={name}>
+      <header data-page-label={name}>
         {trail && <Breadcrumb items={trail} className={up || titleInBar ? "max-md:hidden" : undefined} />}
         {/* phoneStack: one column on a phone, each row the screen's width. (Not a wrapping column: some phone
             browsers then size the title to its text, so a long line runs past the screen and the page zooms out.) */}
@@ -564,7 +570,7 @@ export function EmptyState({
  * payments yet." A whole empty list with its one way to add is EmptyState. `inset`: with the box's own padding.
  */
 export function EmptyLine({ inset, className, ...props }: ComponentProps<"p"> & { inset?: boolean }) {
-  return <p className={cn("text-sm text-muted", inset && "p-4 sm:px-5", className)} {...props} />;
+  return <p className={cn("text-sm text-muted", inset && RULES.box.body, className)} {...props} />;
 }
 
 /* ---------------------------------------------------------------- Table */
@@ -579,13 +585,15 @@ export function Table({ className, ...props }: ComponentProps<"table">) {
 export function THead({ className, ...props }: ComponentProps<"thead">) {
   return <thead className={cn("bg-faint", className)} {...props} />;
 }
+/** A table's first and last cells start where its box's title does (RULES.box.inset), not 14px in. */
+const EDGE = "first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5";
 export function Th({ className, ...props }: ComponentProps<"th">) {
   // relative: a hidden (sr-only) name inside is placed in its cell, so a table that scrolls
   // sideways keeps it in its box instead of widening the page.
-  return <th scope="col" className={cn("relative h-[42px] border-b border-line px-3.5 text-left text-md font-semibold whitespace-nowrap text-muted", className)} {...props} />;
+  return <th scope="col" className={cn("relative h-[42px] border-b border-line px-3.5 text-left text-md font-semibold whitespace-nowrap text-muted", EDGE, className)} {...props} />;
 }
 export function Td({ className, ...props }: ComponentProps<"td">) {
-  return <td className={cn("h-[52px] border-b border-line px-3.5 py-3 align-middle text-text", className)} {...props} />;
+  return <td className={cn("h-[52px] border-b border-line px-3.5 py-3 align-middle text-text", EDGE, className)} {...props} />;
 }
 /**
  * A table row. With `href` it opens its record (one rule in every table, the

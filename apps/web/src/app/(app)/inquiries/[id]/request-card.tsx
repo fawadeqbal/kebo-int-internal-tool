@@ -1,6 +1,6 @@
 import { Mail, MessageCircle, Phone } from "lucide-react";
 import { CHANNEL_LABEL, PRIORITY_LABEL } from "@kebo/shared";
-import { buttonClass, Badge, EmptyLine } from "@kebo/ui";
+import { buttonClass, Badge, EmptyLine, RULES, cn } from "@kebo/ui";
 import { date, dateTime } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import type { EditsView } from "@/lib/types-edits";
@@ -31,7 +31,7 @@ export function RequestBoxes({ d, edits }: { d: DealDetail; edits?: EditsView })
     <div className="grid items-start gap-4 lg:grid-cols-2">
       <RecordBox title="Customer" step="customer" what="who asked" canEdit={canEdit} history={history("request.customer", "Customer")}>
         {contact ? (
-          <div className="flex flex-col gap-1 px-5 pt-4 max-sm:px-4">
+          <div className={cn(RULES.box.inset, "flex flex-col gap-1 pt-4")}>
             <span className="flex flex-wrap items-center gap-2 text-lead font-semibold text-text">
               {contact.name}
               {contact.isPrimary && <Badge size="sm" tone="primary">Main contact</Badge>}
@@ -56,7 +56,7 @@ export function RequestBoxes({ d, edits }: { d: DealDetail; edits?: EditsView })
             </span>
           </div>
         ) : (
-          <EmptyLine className="px-5 pt-4 max-sm:px-4">No contact named</EmptyLine>
+          <EmptyLine className={cn(RULES.box.inset, "pt-4")}>No contact named</EmptyLine>
         )}
         <Facts
           rows={[
@@ -72,7 +72,7 @@ export function RequestBoxes({ d, edits }: { d: DealDetail; edits?: EditsView })
             ["Priority", PRIORITY_LABEL[d.priority]],
           ]}
         />
-        <div className="flex flex-col gap-1 px-5 pb-4 max-sm:px-4">
+        <div className={cn(RULES.box.inset, "flex flex-col gap-1 pb-4")}>
           <span className="text-sm text-text-2">What they need</span>
           {d.requirements ? <p className="text-sm leading-relaxed whitespace-pre-line text-text">{d.requirements}</p> : <span className="text-sm text-muted">—</span>}
         </div>

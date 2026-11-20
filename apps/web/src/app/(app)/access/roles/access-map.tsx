@@ -1,5 +1,5 @@
 import { PERMISSION_GROUPS } from "@kebo/shared";
-import { Card, CardHeader, subTitleClass } from "@kebo/ui";
+import { Card, CardHeader, subTitleClass, RULES, cn } from "@kebo/ui";
 
 export type AccessRoute = {
   method: string;
@@ -47,7 +47,7 @@ export function AccessMapCard({ routes }: { routes: AccessRoute[] }) {
       />
       <div className="divide-y divide-line">
         {PERMISSION_GROUPS.map((g) => (
-          <section key={g.title} className="px-4 py-3 sm:px-5">
+          <section key={g.title} className={cn(RULES.box.inset, "py-3")}>
             <h3 className={subTitleClass}>{g.title}</h3>
             <ul className="mt-1 flex flex-col">
               {g.items.map((it) => {
@@ -73,7 +73,7 @@ export function AccessMapCard({ routes }: { routes: AccessRoute[] }) {
             </ul>
           </section>
         ))}
-        <section className="px-4 py-3 sm:px-5">
+        <section className={cn(RULES.box.inset, "py-3")}>
           <details>
             <summary className="tap cursor-pointer text-sm font-semibold text-text">
               Open to anyone signed in <span className="ml-1 text-xs font-normal text-muted">{open.length} calls</span>
@@ -86,7 +86,7 @@ export function AccessMapCard({ routes }: { routes: AccessRoute[] }) {
             ))}
           </details>
         </section>
-        <section className="px-4 py-3 sm:px-5">
+        <section className={cn(RULES.box.inset, "py-3")}>
           <details>
             <summary className="tap cursor-pointer text-sm font-semibold text-text">
               Open to anyone <span className="ml-1 text-xs font-normal text-muted">{publicCalls.length} calls: signing in, the website&apos;s form</span>

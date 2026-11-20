@@ -125,7 +125,7 @@ export function PlatformShell({
       {/* Phone and tablet: a bar on top, the menu as chips. */}
       {/* On a phone a record's own top bar (← and its name) takes this one's place (globals.css). */}
       <header data-shell-top="" className="no-print sticky top-0 z-20 border-b border-line bg-bg/85 backdrop-blur-md lg:hidden">
-        <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+        <div className={cn(RULES.page.width, RULES.page.sides, "flex h-14 items-center gap-3")}>
           <Link href="/platform" className="flex shrink-0 items-center gap-2">
             <span className="grid size-8 place-items-center rounded-lg bg-primary-solid text-primary-fg">
               <ClipboardList className="size-4.5" aria-hidden />
@@ -156,7 +156,7 @@ export function PlatformShell({
         </div>
         <nav
           aria-label="Platform (small screens)"
-          className="flex gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden"
+          className={cn(RULES.page.width, RULES.page.sides, "flex gap-1 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}
         >
           {NAV.map((n) => {
             const on = active(n.href, "exact" in n && n.exact);

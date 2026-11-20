@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { buttonClass, Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
+import { buttonClass, Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine, RULES } from "@kebo/ui";
 import { date, plural, whole, num0 as n0 } from "@/lib/format";
 import { bigMoney, change, monthShortOf, percent } from "@/lib/insights-period";
 import type { HomeFigures, HomeStage, Receivables, Reminders } from "@/lib/types-insights";
@@ -97,7 +97,7 @@ export function NeedsYou({ r }: { r: Reminders }) {
       ) : (
         <ul className="divide-y divide-line">
           {top.map((i) => (
-            <li key={i.key} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+            <li key={i.key} className={cn(RULES.box.inset, "flex items-center gap-3 py-3")}>
               <span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[i.level] ?? "bg-info")} />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold">{readableDates(i.title)}</span>
@@ -111,7 +111,7 @@ export function NeedsYou({ r }: { r: Reminders }) {
         </ul>
       )}
       {rest > 0 && (
-        <p className="border-t border-line px-4 py-3 sm:px-5">
+        <p className={cn(RULES.box.inset, "border-t border-line py-3")}>
           <More href="/notifications">{rest} more</More>
         </p>
       )}
@@ -129,7 +129,7 @@ export function StandsOut({ h }: { h: HomeFigures }) {
       ) : (
         <ul className="divide-y divide-line">
           {h.standout.map((s) => (
-            <li key={s.key} className="flex items-start gap-3 px-4 py-3.5 sm:px-5">
+            <li key={s.key} className={cn(RULES.box.inset, "flex items-start gap-3 py-3.5")}>
               <span aria-hidden className={cn("mt-1.5 size-2 shrink-0 rounded-full", DOT[s.level])} />
               <p className="min-w-0 flex-1 text-sm">
                 <strong className="font-semibold">{s.lead}</strong> {s.text}
@@ -173,7 +173,7 @@ export function NextWeeks({ h }: { h: HomeFigures }) {
           ))}
         </tbody>
       </Table>
-      <p className="border-t border-line px-4 py-3 text-xs text-text-2 sm:px-5 [&_a]:text-xs">
+      <p className={cn(RULES.box.inset, "border-t border-line py-3 text-xs text-text-2 [&_a]:text-xs")}>
         If everyone pays on their date. Lowest: <strong className={cn("font-semibold", Number(lowest.after) < 0 ? "text-bad" : "text-text")}>{signed(Number(lowest.after), c)}</strong>{" "}
         {at === 0 ? "this week" : `in the week of ${short(lowest.from)}`}. <More href="/money/due">To receive and to pay</More>
       </p>
@@ -204,7 +204,7 @@ function Stages({ rows, currency, href }: { rows: HomeStage[]; currency: string;
     <ul className="divide-y divide-line">
       {rows.map((s) => (
         <li key={s.key}>
-          <Link href={href(s.key)} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/60 sm:px-5">
+          <Link href={href(s.key)} className={cn(RULES.box.inset, "flex items-center gap-3 py-3 hover:bg-surface-2/60")}>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-2 text-sm font-semibold">
                 {s.label}
@@ -242,7 +242,7 @@ export function InquiriesNow({ h }: { h: HomeFigures }) {
     <Card>
       <CardHeader title="Inquiries now" description={`${h.inquiries.open} open`} actions={<More href="/inquiries">Inquiries</More>} how={how.inquiriesNow} />
       <Stages rows={h.inquiries.stages} currency={h.currency} href={(k) => `/inquiries?stage=${k}`} />
-      <p className="border-t border-line px-4 py-3 text-xs text-text-2 sm:px-5">
+      <p className={cn(RULES.box.inset, "border-t border-line py-3 text-xs text-text-2")}>
         {w.answered === 0 ? (
           "No inquiry was answered in the last three months."
         ) : (
@@ -258,12 +258,12 @@ export function InquiriesNow({ h }: { h: HomeFigures }) {
 
 /** A short list of at most four lines, each opening its record. */
 function Lines({ rows, empty }: { rows: { key: string; href: string; name: string; sub: string; value: string; tone?: "bad" | "warn" }[]; empty: string }) {
-  if (rows.length === 0) return <p className="p-4 text-sm text-muted sm:px-5">{empty}</p>;
+  if (rows.length === 0) return <p className={cn(RULES.box.body, "text-sm text-muted")}>{empty}</p>;
   return (
     <ul className="divide-y divide-line">
       {rows.map((r) => (
         <li key={r.key}>
-          <Link href={r.href} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2/60 sm:px-5">
+          <Link href={r.href} className={cn(RULES.box.inset, "flex items-center justify-between gap-3 py-3 hover:bg-surface-2/60")}>
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold">{r.name}</span>
               <span className="block truncate text-xs text-text-2">{r.sub}</span>
@@ -325,7 +325,7 @@ export function ThinProfit({ h }: { h: HomeFigures }) {
         }))}
       />
       {t.count > 0 && (
-        <p className="border-t border-line px-4 py-3 text-xs text-text-2 sm:px-5">
+        <p className={cn(RULES.box.inset, "border-t border-line py-3 text-xs text-text-2")}>
           {t.count > t.rows.length && `${t.count - t.rows.length} more under 10%. `}
           {t.others > 0 ? `The other ${plural(t.others, "open order")} ${t.others === 1 ? "makes" : "make"} 10% or more.` : "No other open order has a cost yet."}
         </p>

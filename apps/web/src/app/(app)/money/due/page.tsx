@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Fragment, Suspense } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, expenseShort, FACTORY_DUE_RULE_LABEL } from "@kebo/shared";
-import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr, linkClass, Dash } from "@kebo/ui";
+import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr, linkClass, Dash, Stack } from "@kebo/ui";
 import { addDays, daysBetween } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, money, companyToday, num2 as n2 } from "@/lib/format";
@@ -44,7 +44,7 @@ export default async function DuePage({ searchParams }: { searchParams: Promise<
   const suppliers = seesSuppliers && sp.side === "suppliers";
   const today = companyToday();
   return (
-    <div>
+    <Stack>
       {/* The two sides are the page's views (beside the title, like List | Board), so one row of tabs is left. */}
       <PageHeader
         kind="list"
@@ -63,7 +63,7 @@ export default async function DuePage({ searchParams }: { searchParams: Promise<
         }
       />
       {suppliers ? <WeOwe sp={sp} me={me} today={today} /> : <CustomersOwe sp={sp} me={me} today={today} />}
-    </div>
+    </Stack>
   );
 }
 
@@ -129,7 +129,6 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
       </StatRow>
       <LinkTabs
         label="Which orders"
-        className="mb-4"
         tabs={CUSTOMER_CHIPS.map((c) => ({
           href: href({ show: c.key === "all" ? undefined : c.key, page: undefined, open: undefined }),
           label: c.label,
@@ -145,7 +144,7 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
         clearHref={href({ q: undefined, page: undefined })}
         selects={people.length > 1 ? [{ name: "who", label: "Whose orders", value: sp.who, options: people.map(([id, name]) => ({ value: id, label: name })), all: "Everyone’s orders" }] : []}
       />
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {shown.length === 0 ? (
           <EmptyState framed title={r.rows.length ? "No order matches" : "Nothing to receive"} description={r.rows.length ? "Clear the search or choose All open." : "Every customer has paid what they owe."} />
         ) : (
@@ -360,7 +359,6 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
       </StatRow>
       <LinkTabs
         label="Which ones"
-        className="mb-4"
         tabs={OWE_CHIPS.filter((c) => seesBills || (c.key !== "bills" && c.key !== "repay")).map((c) => ({
           href: href({ show: c.key === "all" ? undefined : c.key, page: undefined, pay: undefined }),
           label: c.label,
@@ -370,7 +368,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
         }))}
       />
       <FilterCard search="Search supplier or order…" value={sp.q} keep={{ side: "suppliers", show: keep.show }} clearHref={href({ q: undefined, page: undefined })} />
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {shown.length === 0 ? (
           <EmptyState framed title={all.length ? "Nothing matches" : "Nothing to pay"} description={all.length ? "Clear the search or choose All open." : "Every supplier and every bill is paid."} />
         ) : (

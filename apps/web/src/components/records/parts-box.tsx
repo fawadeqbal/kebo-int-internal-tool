@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Tone } from "@kebo/shared";
-import { Badge, cn, subTitleClass } from "@kebo/ui";
+import { Badge, cn, subTitleClass, RULES } from "@kebo/ui";
 import { RecordBox } from "@/components/common/record-box";
 
 /** One part of a box: its name, a word for where it stands, what it holds so far, and its one button. */
@@ -50,7 +50,7 @@ export function PartsBox({
         {parts.map((p) => {
           const facts = p.facts.filter(([, v]) => said(v));
           return (
-            <li key={p.key} aria-label={p.title} className="flex flex-col gap-2 px-5 py-3 max-sm:px-4">
+            <li key={p.key} aria-label={p.title} className={cn(RULES.box.inset, "flex flex-col gap-2 py-3")}>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 @2xl:grid-cols-[12rem_minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <h3 className={subTitleClass}>{p.title}</h3>

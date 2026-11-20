@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr, FactsLine, linkClass } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr, FactsLine, linkClass, Stack } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -147,7 +147,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   ];
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/audit")}
@@ -155,7 +155,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         more={<ExportCsv what="audit" query={{ type: sp.type, person: sp.person, q: sp.q }} />}
       />
       <FactsLine facts={[{ label: who ? `Entries by ${who}` : "Entries", value: data.total.toLocaleString("en-US") }]} />
-      <LinkTabs label="Which records" className="mb-4" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
+      <LinkTabs label="Which records" tabs={chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }))} />
       <FilterCard
         count={countOf(data.total, "entry", "entries")}
         search="Search what, who or why…"
@@ -166,7 +166,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           { name: "person", label: "Person", all: "Anyone", value: sp.person, options: people.map((p) => ({ value: p.id, label: p.name })) },
         ]}
       />
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {data.rows.length === 0 ? (
           filtered ? (
             <EmptyState
@@ -252,6 +252,6 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         )}
       </Card>
       <Pager base="/audit" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
-    </div>
+    </Stack>
   );
 }

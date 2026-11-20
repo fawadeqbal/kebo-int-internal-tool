@@ -33,7 +33,7 @@ export function MailCards({ view, me, saveAction, testAction }: { view: MailSett
       : { tone: "warn" as const, text: "Not set: no email is sent" };
   return (
     <div className="flex flex-col gap-4">
-      <Card className="overflow-hidden p-0">
+      <Card className="overflow-hidden">
         <CardHeader title="How email is sent" description={<span className={cn("font-medium", status.tone === "ok" ? "text-ok" : status.tone === "warn" ? "text-warn" : undefined)}>{status.text}</span>} />
         <CardBody>
           <ActionForm action={saveAction} keepFields className="flex flex-col gap-4">
@@ -114,7 +114,7 @@ export function MailCards({ view, me, saveAction, testAction }: { view: MailSett
         </CardBody>
       </Card>
 
-      <Card className="overflow-hidden p-0">
+      <Card className="overflow-hidden">
         <CardHeader title="Send a test email" description={view.enabled ? "One email, sent the way it is saved now." : "Save how email is sent first."} />
         <CardBody>
           <ActionForm action={testAction} keepFields className="flex flex-col gap-3">

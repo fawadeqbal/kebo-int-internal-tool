@@ -93,7 +93,7 @@ export async function VaultOverview({ today }: { today: string }) {
       {open.length === 0 ? (
         <EmptyState framed title="No bank accounts yet" description="Add the office cash box, each bank account and wallet, with what is in it today." />
       ) : (
-        <Card className="overflow-clip p-0">
+        <Card className="overflow-clip">
           <CardHeader
             title={
               <>
@@ -162,7 +162,7 @@ export async function VaultOverview({ today }: { today: string }) {
         </Card>
       )}
       {first && book && (
-        <Card className="p-0">
+        <Card>
           <CardHeader
             title={
               <>

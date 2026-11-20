@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EXPENSE_CATEGORY_LABEL, PAYMENT_METHOD_LABEL, type ExpenseCategory, type PaymentMethod } from "@kebo/shared";
-import { Badge, linkClass, subTitleClass } from "@kebo/ui";
+import { Badge, linkClass, subTitleClass, RULES, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, dateTime, money } from "@/lib/format";
 import type { Submission, SubmissionList } from "@/lib/types-approvals";
@@ -38,7 +38,7 @@ export async function WaitingToVerify({
   const shown = limit ? rows.slice(0, limit) : rows;
   return (
     <section aria-label={title} className="rounded-xl border border-warn/40 bg-warn-soft/40">
-      <header className="flex flex-wrap items-baseline justify-between gap-2 px-4 sm:px-5 pt-3.5">
+      <header className={cn(RULES.box.inset, "flex flex-wrap items-baseline justify-between gap-2 pt-3.5")}>
         <h2 className={subTitleClass}>
           {title} <span className="font-normal text-text-2">· {rows.length}</span>
         </h2>
@@ -46,7 +46,7 @@ export async function WaitingToVerify({
       </header>
       <ul className="mt-2 divide-y divide-line/70">
         {shown.map((s) => (
-          <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 sm:px-5 py-3">
+          <li key={s.id} className={cn(RULES.box.inset, "flex flex-wrap items-center gap-x-4 gap-y-2 py-3")}>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">
                 {amountOf(s)} <span className="font-normal text-text-2">· {whatOf(s)}</span>
@@ -90,7 +90,7 @@ export async function WaitingToVerify({
         ))}
       </ul>
       {shown.length < rows.length && (
-        <p className="border-t border-line/70 px-4 sm:px-5 py-2.5 text-sm">
+        <p className={cn(RULES.box.inset, "border-t border-line/70 py-2.5 text-sm")}>
           <Link href="/approvals" className={linkClass}>
             {rows.length - shown.length} more →
           </Link>

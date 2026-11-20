@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Check, Clock, FileText } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, type ExpenseCategory } from "@kebo/shared";
-import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice, linkClass, cn } from "@kebo/ui";
+import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice, linkClass, cn, Stack } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
@@ -75,7 +75,7 @@ export default async function ApprovalsPage({
   const oldest = firstWait === undefined ? null : Math.max(0, Math.round((now - firstWait) / 86_400_000));
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={[{ label: "Money" }, { label: "Payments", href: "/payments" }, { label: "To verify" }]}
@@ -109,7 +109,6 @@ export default async function ApprovalsPage({
       )}
       <LinkTabs
         label="Which ones"
-        className="mb-4"
         tabs={STATUSES.map((s) => ({
           label: mine || s !== "pending" ? STATUS_LABEL[s] : "To approve",
           count: list.counts[s],
@@ -123,7 +122,7 @@ export default async function ApprovalsPage({
           They added it; you approve it. Nothing counts until you do.
         </Notice>
       )}
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {list.rows.length === 0 ? (
           <EmptyState
             framed
@@ -177,7 +176,7 @@ export default async function ApprovalsPage({
         )}
       </Card>
       <Pager base="/approvals" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} bare />
-    </div>
+    </Stack>
   );
 }
 

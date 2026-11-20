@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { LIFECYCLE, marketingOrigin } from "@kebo/shared";
-import { buttonClass, Card, CardBody, CardHeader, EmptyState, PageHeader, SectionList, StatusBadge, Table, Td, Th, THead, Tr, Notice } from "@kebo/ui";
+import { buttonClass, Card, CardBody, CardHeader, EmptyState, PageHeader, SectionList, StatusBadge, Table, Td, Th, THead, Tr, Notice, Stack } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { requirePlatformAdmin } from "@/lib/platform";
 import { dateTime, timeAgo } from "@/lib/format";
@@ -51,7 +51,7 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
   };
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         title="Platform settings"
       />
@@ -292,6 +292,6 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
           </Card>
         )}
       </SectionList>
-    </div>
+    </Stack>
   );
 }

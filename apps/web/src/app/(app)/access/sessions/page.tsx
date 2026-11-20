@@ -1,5 +1,5 @@
 import { MonitorSmartphone } from "lucide-react";
-import { buildHref, Card, CardHeader, EmptyState, PAGE_SIZE, Pager, toPage } from "@kebo/ui";
+import { buildHref, Card, CardHeader, EmptyState, PAGE_SIZE, Pager, toPage, Stack } from "@kebo/ui";
 import { PageHeader } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
@@ -26,7 +26,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
   const href = (patch: Record<string, string | undefined>) => buildHref("/access/sessions", keep, { page: undefined, ...patch });
   const filtered = !!(person || sp.q);
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/access/sessions")}
@@ -44,7 +44,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
         clearHref={href({ q: undefined })}
         selects={[{ name: "person", label: "Person", all: "Everyone", value: person, options: people.map((p) => ({ value: p.id, label: p.name })) }]}
       />
-      <Card className="overflow-hidden p-0">
+      <Card className="overflow-hidden">
         <CardHeader
           title={who ? `${who.name}: signed in on ${list.total} device${list.total === 1 ? "" : "s"}` : `${list.total} device${list.total === 1 ? "" : "s"} signed in, ${list.people} ${list.people === 1 ? "person" : "people"}`}
           description="A session ends after 30 days unused, and after 90 days whatever happens. Signing out takes effect at their next click."
@@ -60,6 +60,6 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
         )}
       </Card>
       <Pager base="/access/sessions" params={keep} page={list.page} pageSize={list.pageSize} total={list.total} bare />
-    </div>
+    </Stack>
   );
 }

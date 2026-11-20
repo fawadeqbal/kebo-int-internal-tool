@@ -126,7 +126,7 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
   return (
     <>
       {plan && kind === "in" && plan.plan.items.length > 0 && (
-        <Card className="p-0">
+        <Card>
           <CardHeader
             title={`${plan.refNo ?? "The order"} · payment requests`}
             description={(() => {
@@ -161,7 +161,7 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
         </Card>
       )}
       {plan && kind === "out" && plan.factories && plan.factories.rows.length > 0 && (
-        <Card className="p-0">
+        <Card>
           <CardHeader title={`${plan.refNo ?? "The order"} · we owe`} />
           <Table>
             <THead>
@@ -181,7 +181,7 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
           </Table>
         </Card>
       )}
-      <Card className="p-0">
+      <Card>
         <CardHeader title="Next" />
         <CardBody className="text-sm text-text-2">{next[kind]}</CardBody>
       </Card>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Children, useEffect, useRef, useState, type ReactNode } from "react";
-import { boxTitleClass, cardClass, cn, EmptyLine, linkClass } from "@kebo/ui";
+import { boxTitleClass, cardClass, cn, EmptyLine, linkClass, RULES } from "@kebo/ui";
 
 /** How many rows a section shows before it folds behind "Show all n" (phone); on a wide screen it scrolls after about six. */
 const ROWS = 5;
@@ -82,7 +82,7 @@ export function SideSection({
     return () => ro.disconnect();
   }, [rows.length]);
   return (
-    <section aria-label={title} data-target={target} data-target-card={target ? "" : undefined} className="border-b border-line px-4 sm:px-5 pt-3.5 pb-3 last:border-b-0">
+    <section aria-label={title} data-target={target} data-target-card={target ? "" : undefined} className={cn(RULES.box.inset, "border-b border-line pt-3.5 pb-3 last:border-b-0")}>
       <div className="mb-1 flex min-h-8 items-center justify-between gap-2">
         <h3 className={boxTitleClass}>
           {title}

@@ -89,7 +89,7 @@ export interface Fact {
 export function FactsLine({ facts, className }: { facts: Fact[]; className?: string }) {
   if (!facts.length) return null;
   return (
-    <dl aria-label="Facts" className={cn("mb-4 flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>
+    <dl aria-label="Facts" className={cn("flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>
       {facts.map((f, i) => {
         return (
           <div key={i} className={cn("flex items-baseline gap-1.5 px-3.5 text-md whitespace-nowrap text-muted", i > 0 && "border-l border-line")}>

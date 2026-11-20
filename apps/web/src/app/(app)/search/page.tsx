@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { SEARCH_KIND_LABEL, SEARCH_KINDS, type SearchItem, type SearchKind, type SearchResult } from "@kebo/shared";
-import { boxHeadClass, boxTitleClass, cn, Badge, buildHref, ButtonLink, Card, EmptyState, LinkTabs, PageHeader, linkClass } from "@kebo/ui";
+import { boxHeadClass, boxTitleClass, cn, Badge, buildHref, ButtonLink, Card, EmptyState, LinkTabs, PageHeader, linkClass, RULES } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { countOf } from "@/lib/format";
@@ -45,7 +45,6 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       {asked && (
         <LinkTabs
           label="Which kind"
-          className="mb-4"
           tabs={[
             { href: tab(undefined), label: "All", count: total, active: !kind },
             ...SEARCH_KINDS.filter((k) => countFor(k) > 0 || k === kind).map((k) => ({ href: tab(k), label: SEARCH_KIND_LABEL[k], count: countFor(k), active: k === kind })),
@@ -53,7 +52,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         />
       )}
       {counts?.exact && (
-        <Card className="mb-4 flex flex-wrap items-center gap-3 px-4 py-3 sm:px-5">
+        <Card className={cn(RULES.box.inset, "flex flex-wrap items-center gap-3 py-3")}>
           <span className="min-w-0 flex-1 text-sm">
             <span className="font-semibold">{counts.exact.label}</span> <span className="text-text-2">· {kindOne(counts.exact.kind)}</span>
           </span>
@@ -63,7 +62,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         </Card>
       )}
       {!asked ? (
-        <Card className="p-0">
+        <Card>
           <EmptyState
             framed
             title="Search everything"
@@ -71,7 +70,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           />
         </Card>
       ) : !found || found.groups.length === 0 ? (
-        <Card className="p-0">
+        <Card>
           <EmptyState
             framed
             title={`Nothing found for “${q}”`}
@@ -88,7 +87,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       ) : (
         <div className="flex max-w-[960px] flex-col gap-4">
           {found.groups.map((g) => (
-            <Card key={g.kind} className="overflow-clip p-0">
+            <Card key={g.kind} className="overflow-clip">
               <section aria-label={SEARCH_KIND_LABEL[g.kind]}>
                 <div className={cn(boxHeadClass, "justify-between gap-3")}>
                   <h2 className={boxTitleClass}>
@@ -106,7 +105,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                   ))}
                 </ul>
                 {kind && g.total > g.items.length && (
-                  <p className="border-t border-line px-4 py-2.5 text-md text-text-2 sm:px-5">
+                  <p className={cn(RULES.box.inset, "border-t border-line py-2.5 text-md text-text-2")}>
                     The first {g.items.length} of {g.total}: add words to narrow it.
                   </p>
                 )}
@@ -123,7 +122,7 @@ function ResultRow({ x, q }: { x: SearchItem; q: string }) {
   const Icon = SEARCH_ICON[x.kind];
   return (
     <li className="border-t border-line first:border-t-0">
-      <Link href={x.href} className="flex min-h-14 items-center gap-3 px-4 py-2.5 hover:bg-surface-2/60 sm:px-5">
+      <Link href={x.href} className={cn(RULES.box.inset, "flex min-h-14 items-center gap-3 py-2.5 hover:bg-surface-2/60")}>
         <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-text-2">
           <Icon className="size-[18px]" />
         </span>

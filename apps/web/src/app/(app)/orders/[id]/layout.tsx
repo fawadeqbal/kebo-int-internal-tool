@@ -170,7 +170,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
             }}
             notice={
               o.cancelled && (
-                <Notice tone="bad" className="mt-4" title={`Cancelled${o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.`}>
+                <Notice tone="bad" title={`Cancelled${o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.`}>
                   {o.cancelled.reason && <p>{o.cancelled.reason}</p>}
                   <p className="mt-1">The inquiry can be reopened and quoted again. Money already received stays recorded here.</p>
                 </Notice>

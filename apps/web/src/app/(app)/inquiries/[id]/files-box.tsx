@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Eye } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, type AttachmentKind } from "@kebo/shared";
-import { buttonClass } from "@kebo/ui";
+import { buttonClass, RULES, cn } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { FileRow, FileZone } from "@/components/common/file-zone";
 import { send } from "@/components/files/upload";
@@ -40,7 +40,7 @@ export function FilesBox({
     router.refresh();
   };
   return (
-    <div className="flex flex-col gap-2 px-5 py-4 max-sm:px-4">
+    <div className={cn(RULES.box.inset, "flex flex-col gap-2 py-4")}>
       {files.length > 0 || sending.length > 0 ? (
         <ul className="flex flex-col gap-1.5">
           {files.map((f) => (

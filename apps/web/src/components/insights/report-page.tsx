@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
-import { buildHref, buttonClass, cardClass, cn, Input, LinkTabs, PageHeader, Segmented, toPage, Notice } from "@kebo/ui";
+import { buildHref, buttonClass, cardClass, cn, Input, LinkTabs, PageHeader, Segmented, toPage, Notice, Stack } from "@kebo/ui";
 import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { crumbsFor, labelFor } from "@/lib/nav";
@@ -141,7 +141,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
   const periodic = kind !== "targets";
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         crumbs={crumbs}
         title={title}
@@ -164,7 +164,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
         <ReportTabs current={TAB_OF(kind)} keep={keep} seeMoney={seeMoney} />
       </PageHeader>
       {periodic && (
-        <div className="mb-4 md:hidden">
+        <div className="md:hidden">
           {periodPicker}
           <p className="mt-1.5 text-xs text-text-2">
             {p.label} · vs {p.vsLabel}
@@ -172,7 +172,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
         </div>
       )}
       {periodic && p.kind === "custom" && (
-        <form action={path} className={cn(cardClass, "no-print mb-4 flex flex-wrap items-end gap-2 px-4 py-3 sm:px-5")}>
+        <form action={path} className={cn(cardClass, "no-print flex flex-wrap items-end gap-2 px-4 py-3 sm:px-5")}>
           <input type="hidden" name="period" value="custom" />
           <label className="text-xs text-text-2">
             From
@@ -189,7 +189,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
       <Suspense key={`${kind}-${p.from}-${p.to}`} fallback={<SectionSkeleton />}>
         <Body kind={kind} p={p} sp={sp} today={today} seeMoney={seeMoney} href={href} keep={keep} path={path} />
       </Suspense>
-    </div>
+    </Stack>
   );
 }
 
@@ -273,7 +273,7 @@ async function Body({
 function Missing({ rates }: { rates: string[] }) {
   if (!rates.length) return null;
   return (
-    <Notice tone="todo" className="mb-4">
+    <Notice tone="todo">
       There is no exchange rate for {rates.join(", ")} in Settings, so amounts in {rates.length === 1 ? "it are" : "them are"} left out.
     </Notice>
   );

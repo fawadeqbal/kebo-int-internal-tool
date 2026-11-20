@@ -1,4 +1,4 @@
-import { Card } from "@kebo/ui";
+import { Card, Stack } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { getPeople } from "@/lib/loaders";
@@ -30,17 +30,17 @@ export default async function DealHistory({ params, searchParams }: { params: Pr
   return (
     // The same panel as every tab of the inquiry, beside its history.
     <WithSide id={id}>
-      <div>
+      <Stack>
       <FilterCard search="Search history…" value={sp.q} clearHref={sp.who ? `?who=${sp.who}` : "?"} selects={[{ name: "who", label: "Who", value: sp.who, options: people }]} />
       <Card>
         <HistoryTable entries={shown} showArea empty={q || sp.who ? "Nothing matches. Clear the search or choose everyone." : "Nothing has changed yet."} />
       </Card>
       {followUps && (
-        <div className="mt-4">
+        <div>
           <FollowUpsCard on={{ key: "inquiryId", id }} label={`${d.refNo} · ${d.customer.name}`} rows={followUps.rows} people={staff} meId={me.id} />
         </div>
       )}
-      </div>
+      </Stack>
     </WithSide>
   );
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { cn, Table, Td, Th, THead, Tr, linkClass, Dash } from "@kebo/ui";
+import { cn, Table, Td, Th, THead, Tr, linkClass, Dash, RULES } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
 import { Section } from "@/components/order-sections/section";
@@ -177,7 +177,7 @@ export function OwedBack({ owed, where, orderId, today, canPay, canFiles = false
         {owed.map((o) => {
           const amount = money(o.amount, o.currency);
           return (
-            <li key={`${o.person.id}:${o.currency}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:px-5 py-3">
+            <li key={`${o.person.id}:${o.currency}`} className={cn(RULES.box.inset, "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3")}>
               <span className="min-w-0 text-md">
                 <span className="block font-semibold">{o.person.name}</span>
                 <span className="block text-text-2">

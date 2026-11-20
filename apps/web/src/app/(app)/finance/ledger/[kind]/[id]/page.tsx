@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { LedgerPartyKind } from "@kebo/shared";
-import { buildHref, Card, cn, DataRow, EmptyState, FilterChip, PageHeader, Segmented, Td, Th, THead } from "@kebo/ui";
+import { buildHref, Card, cn, DataRow, EmptyState, FilterChip, PageHeader, Segmented, Td, Th, THead, Stack } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
 import { money, companyToday } from "@/lib/format";
@@ -85,7 +85,7 @@ export default async function PartyLedgerPage({
   const bal = (v: string, cur: string) => (single ? Number(v).toLocaleString("en-US", { minimumFractionDigits: 2 }) : money(v, cur));
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         crumbs={[
           { label: "Money" },
@@ -137,14 +137,14 @@ export default async function PartyLedgerPage({
           </span>
         }
       />
-      <div className="mb-4">
+      <div>
         <AgeingTiles
           buckets={p.ageing.buckets}
           currency={main}
           label={kind === "customer" ? "What they owe, by how late" : "What we owe, by how late"}
         />
       </div>
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {rows.length === 0 && currencies.every((c) => Number(c.opening) === 0) ? (
           <EmptyState
             framed
@@ -239,6 +239,6 @@ export default async function PartyLedgerPage({
           <EntryBody e={entry} main={main} back={base} />
         </EntryPanel>
       )}
-    </div>
+    </Stack>
   );
 }

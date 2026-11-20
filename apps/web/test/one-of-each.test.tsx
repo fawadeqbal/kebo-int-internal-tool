@@ -358,6 +358,22 @@ describe("one of each", () => {
     expect(found(/^const VIEWABLE = \//gm)).toEqual([]);
   });
 
+  it("spacing is set once (RULES): the frame's width and sides, the gap between a page's parts, a box's and a window's inset", () => {
+    // The page and the top bar take RULES.page.width and sides; nothing caps a page at its own width.
+    expect(found(/max-w-\[1440px\]/g)).toEqual([]);
+    // A page's parts are spaced by the frame or a Stack (RULES.page.gap), not by a margin on each part.
+    const pageParts = found(/<(PageHeader|FilterCard|LinkTabs|StatRow|Notice|Card|SelectBar)\b[^>]*className="[^"]*\b(mb|mt)-(4|5|6)\b/g);
+    // (The sign-in pages keep their own short card, AuthShell.)
+    expect(pageParts.filter((m) => !/src\/app\/(login|connect)\//.test(m))).toEqual([]);
+    expect(found(/<header className="mb-4" data-page-label/g)).toEqual([]);
+    // A box's inset and a window's inset are typed once (RULES.box, RULES.window).
+    expect(found(/className="[^"]*\bpx-4 sm:px-5\b[^"]*"|className="[^"]*\bpx-5 max-sm:px-4\b[^"]*"/g)).toEqual([]);
+    expect(found(/className="[^"]*\bp-5 [^"]*sm:px-6\b[^"]*"/g).filter((m) => !/\/(site|print)\//.test(m) && !m.includes("follow-ups") && !m.includes("note-forms"))).toEqual([]);
+    // A table's first and last cells line up with its box's title.
+    const ui = SOURCES.find(({ file }) => file.endsWith("packages/ui/src/primitives.tsx"))!.text;
+    expect(ui).toMatch(/const EDGE = "first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5"/);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

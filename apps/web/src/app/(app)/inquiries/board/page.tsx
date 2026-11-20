@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { NewInquiryWindow } from "../inquiry-windows";
 import { can, INQUIRY } from "@kebo/shared";
-import { RefCode, Badge, buildHref, RULES } from "@kebo/ui";
+import { RefCode, Badge, buildHref, RULES, Stack } from "@kebo/ui";
 import { Board } from "@/components/lists/board";
 import { FilterCard } from "@/components/common/filter-card";
 import { FactLine, FollowUpDay, PriorityTag, Responsible } from "@/components/lists/list-parts";
@@ -85,7 +85,7 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
   );
 
   return (
-    <div>
+    <Stack>
       <InquiriesHeader me={me} view="board" excel={excel} query={keep} />
       <FactLine facts={inquiryFacts(funnel, counts.late_follow_ups ?? 0, settings.sales.currency)} />
       <FilterCard
@@ -105,6 +105,6 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
       />
 
       {sp.panel === "new-inquiry" && <NewInquiryWindow customerId={sp.for} />}
-    </div>
+    </Stack>
   );
 }

@@ -72,7 +72,6 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
       <LinkTabs
         label="Which inquiries"
         look="tabs"
-        className="mb-4"
         tabs={TABS.filter((t) => t !== "overdue" || count(t) > 0 || tab === t).map((t) => ({
           href: href({ stage: t === "open" ? undefined : t }),
           label: TAB_LABEL[t],

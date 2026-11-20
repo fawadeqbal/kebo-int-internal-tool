@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { boxTitleClass, buttonClass, Card, cn, linkClass, Dash } from "@kebo/ui";
+import { boxTitleClass, buttonClass, Card, cn, linkClass, Dash, RULES } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
 import { TabList } from "@/components/lists/tab-list";
 
@@ -57,7 +57,7 @@ export function DetailsCard({
   const shown = items.filter((i) => !(i.optional && missing(i.value)));
   return (
     <Card className={cn(flash && "animate-flash")} aria-labelledby="details-title">
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
+      <div className={cn(RULES.box.inset, "flex items-center justify-between gap-3 border-b border-line py-3.5")}>
         <div className="min-w-0">
           <h2 id="details-title" className={boxTitleClass}>
             {title}
@@ -83,7 +83,7 @@ export function DetailsCard({
         )}
       </div>
       {/* The record box's rows (BoxFacts): label at the left, the value beside it; two pairs a row on a wide box. */}
-      <dl className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 px-5 py-4 text-sm max-sm:px-4 xl:grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1fr)] xl:gap-x-6">
+      <dl className={cn(RULES.box.inset, "grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 py-4 text-sm xl:grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1fr)] xl:gap-x-6")}>
         {shown.map((i) => (
           <div key={i.label} className={cn("contents", i.wide && "xl:[&>dd]:col-span-3")}>
             <dt className="text-text-2">{i.label}</dt>

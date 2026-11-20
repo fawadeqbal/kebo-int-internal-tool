@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import type { Tone } from "@kebo/shared";
-import { Badge, EmptyLine, LinkTabs, linkClass, cn } from "@kebo/ui";
+import { Badge, EmptyLine, LinkTabs, linkClass, cn, RULES } from "@kebo/ui";
 
 /** One column of a board: a state of the record type, its count, the cards it shows and where the rest are. */
 export interface BoardColumn<R> {
@@ -81,15 +81,14 @@ export function Board<R>({
   );
   return (
     <>
-      <div className="xl:hidden">
+      <div className={cn(RULES.page.stack, "xl:hidden")}>
         <LinkTabs
           label="Stage"
           look="tabs"
-          className="mb-4"
           tabs={columns.map((c) => ({ href: phoneHref(c.key), label: c.label, count: c.total, active: c.key === phoneKey }))}
         />
         {column(columns.find((c) => c.key === phoneKey) ?? columns[0]!, true)}
-        {closed && <div className="mt-3">{closed}</div>}
+        {closed && <div>{closed}</div>}
       </div>
       <div className={`hidden items-start gap-3 xl:grid ${closed ? (GRID[columns.length] ?? GRID[4]) : (GRID_OPEN[columns.length] ?? GRID_OPEN[4])}`}>
         {columns.map((c) => column(c))}

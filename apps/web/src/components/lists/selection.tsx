@@ -124,7 +124,7 @@ export function SelectCell({ id, label }: { id: string; label: string }) {
 export function SelectBar({ children }: { children: (ticked: string[]) => ReactNode }) {
   const s = useSelection();
   return (
-    <div role="toolbar" aria-label="Ticked rows" className="mb-4 flex min-h-11 flex-wrap items-center gap-2 rounded-[10px] border border-primary-line bg-primary-soft py-1.5 pr-1.5 pl-3.5 text-sm text-text">
+    <div role="toolbar" aria-label="Ticked rows" className="flex min-h-11 flex-wrap items-center gap-2 rounded-[10px] border border-primary-line bg-primary-soft py-1.5 pr-1.5 pl-3.5 text-sm text-text">
       <b className="mr-1.5 font-bold text-primary" aria-live="polite">
         {s.ticked.length ? `${s.ticked.length} selected` : "Tick the rows"}
       </b>

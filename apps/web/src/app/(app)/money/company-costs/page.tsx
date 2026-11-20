@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@kebo/shared";
-import { buildHref, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, StatRow, StatTile, toPage } from "@kebo/ui";
+import { buildHref, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, StatRow, StatTile, toPage, Stack } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { money, whole, companyToday, countOf } from "@/lib/format";
@@ -74,7 +74,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const biggest = month0.byCategory[0];
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbs}
@@ -90,7 +90,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
       </StatRow>
 
       {month === thisMonth && repeating.waiting.length > 0 && (
-        <div className="mb-4">
+        <div>
           <Section title="To confirm this month" state={`${repeating.waiting.length} waiting`} tone="warn">
             <ul className="flex flex-col divide-y divide-line border-t border-line">
               {repeating.waiting.map((w) => (
@@ -101,7 +101,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         </div>
       )}
 
-      <div className="mb-4">
+      <div>
         <LinkTabs
           label="Which kind"
           tabs={[
@@ -129,7 +129,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         count={countOf(list.count, "cost")}
       />
 
-      <Card className="overflow-hidden p-0">
+      <Card className="overflow-hidden">
         {list.rows.length === 0 ? (
           text ? (
             <EmptyState framed title="No cost matches" description={`Nothing in ${monthName} matches “${text}”. Try other words, or clear the search.`} />
@@ -153,6 +153,6 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         )}
       </Card>
       <Pager base={HERE} params={keep} page={list.page} pageSize={list.pageSize} total={list.listed} bare />
-    </div>
+    </Stack>
   );
 }

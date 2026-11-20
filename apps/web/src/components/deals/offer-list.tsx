@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { basisText } from "@kebo/shared";
-import { Badge, cn, Notice, Dash } from "@kebo/ui";
+import { Badge, cn, Notice, Dash, RULES } from "@kebo/ui";
 import { date, dayMonth, money, qty } from "@/lib/format";
 import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 
@@ -68,7 +68,7 @@ export function OfferCompare({ view, status, dealId, waiting }: { view: Sourcing
   const cell = "border-b border-line/70 px-3 py-2 text-md leading-[19px] max-sm:px-2 max-sm:text-md max-sm:leading-[18px]";
   const label = cn(cell, "pl-5 text-md text-text-2 max-sm:pl-4 max-sm:text-xs");
   const group = (name: string) => (
-    <div className="col-span-full border-b border-line/70 bg-surface-2/70 px-5 py-1.5 text-xs font-bold tracking-[.03em] text-text-2 uppercase max-sm:px-4">{name}</div>
+    <div className={cn(RULES.box.inset, "col-span-full border-b border-line/70 bg-surface-2/70 py-1.5 text-xs font-bold tracking-[.03em] text-text-2 uppercase")}>{name}</div>
   );
   const row = (name: ReactNode, value: (q: FactoryQuoteView) => ReactNode, best?: { id: string | null; word: string }, num = false) => (
     <>

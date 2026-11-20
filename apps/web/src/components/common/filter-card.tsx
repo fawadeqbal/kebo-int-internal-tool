@@ -414,7 +414,7 @@ export function FilterCard({
   };
 
   return (
-    <div role="search" aria-label="Filter the list" aria-busy={pending} className="mb-4 flex flex-wrap items-center gap-2">
+    <div role="search" aria-label="Filter the list" aria-busy={pending} className="flex flex-wrap items-center gap-2">
       <label className={cn(searchFrameClass, controlSizes.md, "relative flex min-w-0 flex-[0_1_340px] items-center", selects.length ? "max-sm:flex-1" : "max-sm:basis-full")}>
         <span className="sr-only">{search.replace(/…$/, "")}</span>
         {pending ? (

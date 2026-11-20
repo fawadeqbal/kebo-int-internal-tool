@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { Card, CardBody, CardHeader, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, Tr, ButtonLink, Notice, EmptyLine } from "@kebo/ui";
+import { Card, CardBody, CardHeader, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, Tr, ButtonLink, EmptyLine } from "@kebo/ui";
 import { ArrowRight } from "lucide-react";
 import { ORDER_WORD_TONE } from "@kebo/shared";
 import { customerPaymentsOf } from "@/lib/party-data";
@@ -20,6 +20,7 @@ import { saveCustomerAction } from "../actions";
 import { CustomerPanel } from "../customer-panel";
 import { currenciesFrom } from "../currencies";
 import { customerTitle } from "@/lib/titles";
+import { BoxNote } from "@/components/common/record-box";
 
 export const generateMetadata = customerTitle();
 
@@ -106,7 +107,7 @@ export default async function CustomerOverview({
             footer={
               <>
                 {!countryKnown && (
-                  <Notice tone="todo" className="mx-4 mb-4">
+                  <BoxNote tone="warn">
                     Their country is not set yet — it decides shipping.{" "}
                     {canEdit ? (
                       <OpenPanelButton panel="edit-customer" id={c.id} variant="link" size="sm" className="h-auto font-semibold">
@@ -115,7 +116,7 @@ export default async function CustomerOverview({
                     ) : (
                       "Ask someone who manages customers to add it."
                     )}
-                  </Notice>
+                  </BoxNote>
                 )}
               </>
             }

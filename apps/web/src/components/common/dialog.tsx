@@ -384,7 +384,7 @@ export function WindowHead({
     // A window closes with ✕ on the right on a laptop. On a phone (the form fills the screen) its Cancel beside Save
     // does it, and the ✕ steps aside (canvas row "Cancel, not ✕", globals.css); a window without a Cancel keeps it,
     // at the top left.
-    <div data-window-head="" className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 max-md:min-h-14 max-md:items-center max-md:justify-start max-md:gap-1 max-md:py-1.5 max-md:pr-4 max-md:pl-1 sm:px-6">
+    <div data-window-head="" className={cn(RULES.window.inset, "flex items-start justify-between gap-3 border-b border-line py-4 max-md:min-h-14 max-md:items-center max-md:justify-start max-md:gap-1 max-md:py-1.5 max-md:pr-4 max-md:pl-1")}>
       <div className="min-w-0 max-md:order-2 max-md:flex-1">
         <h2 id={`${id}-title`} ref={headRef} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none max-md:line-clamp-2 max-md:text-base max-md:leading-snug">
           {title}
@@ -403,8 +403,7 @@ export function WindowHead({
 }
 
 /** A window's buttons: Cancel and the save on the right, at the bottom, always in view. */
-export const WINDOW_FOOTER =
-  "flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-6";
+export const WINDOW_FOOTER = cn(RULES.window.inset, "flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]");
 
 const MODAL_WIDTH = { md: RULES.window.part, lg: RULES.window.wideRows } as const;
 
@@ -466,7 +465,7 @@ export function Modal({
         className={`${WINDOW_BOX} ${MODAL_WIDTH[size]}`}
       >
         <WindowHead id={id} title={title} description={sub} onClose={close} disabled={busy} />
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 *:shrink-0 sm:px-6">{children}</div>
+        <div className={cn(RULES.window.body, "flex min-h-0 flex-1 flex-col overflow-y-auto *:shrink-0")}>{children}</div>
         {footer && (
           <div className={cn(WINDOW_FOOTER, "max-md:[&>button]:min-h-12 max-md:[&>button]:flex-1")}>
             {cancel && (

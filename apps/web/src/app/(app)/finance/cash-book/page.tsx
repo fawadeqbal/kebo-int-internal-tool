@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { PageHeader, linkClass, cn } from "@kebo/ui";
+import { PageHeader, linkClass, cn, Stack } from "@kebo/ui";
 import { PlanOff } from "@/components/common/plan-off";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { requirePermission } from "@/lib/session";
@@ -25,7 +25,7 @@ export default async function CashBookPage({ searchParams }: { searchParams: Pro
   const book = !!(sp.acct || sp.p || sp.cur || (sp as { book?: string }).book);
   const accounts = await api.get<AccountRow[]>("/money/accounts");
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbs}
@@ -43,6 +43,6 @@ export default async function CashBookPage({ searchParams }: { searchParams: Pro
       ) : (
         <VaultOverview today={today} />
       )}
-    </div>
+    </Stack>
   );
 }

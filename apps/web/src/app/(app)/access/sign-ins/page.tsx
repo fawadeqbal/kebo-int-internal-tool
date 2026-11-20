@@ -1,5 +1,5 @@
 import { History } from "lucide-react";
-import { buildHref, ButtonLink, Card, EmptyState, LinkTabs, PAGE_SIZE, Pager, toPage } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, EmptyState, LinkTabs, PAGE_SIZE, Pager, toPage, Stack } from "@kebo/ui";
 import { PageHeader } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
@@ -25,11 +25,10 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
   const href = (patch: Record<string, string | undefined>) => buildHref("/access/sign-ins", keep, { page: undefined, ...patch });
   const filtered = !!(sp.person || failed || sp.q);
   return (
-    <div>
+    <Stack>
       <PageHeader kind="list" crumbs={crumbsFor("/access/sign-ins")} title="Sign-ins" />
       <LinkTabs
         label="Which attempts"
-        className="mb-4"
         tabs={[
           { href: href({ failed: undefined }), label: "All", count: counts.all, active: !failed },
           { href: href({ failed: "1" }), label: "Failed", count: counts.failed, alert: counts.failed > 0, active: failed },
@@ -42,7 +41,7 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
         clearHref={href({ q: undefined })}
         selects={[{ name: "person", label: "Person", all: "Anyone", value: sp.person, options: people.map((p) => ({ value: p.id, label: p.name })) }]}
       />
-      <Card className="overflow-hidden p-0">
+      <Card className="overflow-hidden">
         {data.rows.length === 0 ? (
           <EmptyState
             icon={History}
@@ -55,6 +54,6 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
         )}
       </Card>
       <Pager base="/access/sign-ins" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
-    </div>
+    </Stack>
   );
 }

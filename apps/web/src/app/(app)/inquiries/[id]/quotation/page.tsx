@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { can, REVISION_STATUS_LABEL } from "@kebo/shared";
-import { RefCode, ButtonLink, cn, RevisionBadge, StatusBadge, Notice } from "@kebo/ui";
+import { RefCode, ButtonLink, cn, RevisionBadge, StatusBadge, Notice, RULES } from "@kebo/ui";
 import { TabList } from "@/components/lists/tab-list";
 import { requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
@@ -116,7 +116,7 @@ export default async function QuotationPage({
 
       {quotations.length === 0 ? (
         <TabList title="Quotations" buttons={newButton("primary")}>
-          <p className="border-t border-line px-5 py-4 text-sm text-text-2 max-sm:px-4">
+          <p className={cn(RULES.box.inset, "border-t border-line py-4 text-sm text-text-2")}>
             {manage
               ? "None yet. New quotations makes one draft for each supplier offer you tick, or one priced by hand."
               : (q.whyNotStart ?? "The person handling this inquiry makes the quotations.")}

@@ -25,7 +25,7 @@ function ButtonShape({ className }: { className?: string }) {
 /** The whole page on its way: a status for screen readers, the parts for the eye. */
 function Loading({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div role="status" aria-label="Loading" className={className}>
+    <div role="status" aria-label="Loading" className={cn(RULES.page.stack, className)}>
       {children}
       <span className="sr-only">Loading…</span>
     </div>
@@ -40,7 +40,7 @@ function Loading({ children, className }: { children: React.ReactNode; className
  */
 export function HeaderSkeleton({ buttons = 1, record = false, line = true, icon = true }: { buttons?: number; record?: boolean; line?: boolean; icon?: boolean }) {
   return (
-    <div className="mb-4">
+    <div>
       <div className="mb-2 flex h-4 items-center gap-1.5">
         <Bar className="h-3 w-10" />
         <Bar className="h-3 w-16" />
@@ -223,10 +223,10 @@ export function ListPageSkeleton({
   return (
     <Loading>
       <HeaderSkeleton buttons={buttons + (views ? 1 : 0)} />
-      {segment && <Block className="mb-4 h-[38px] w-[335px] max-w-full rounded-[10px]" />}
-      {tiles > 0 && <TilesSkeleton count={tiles} className="mb-4" />}
-      {chips > 0 && <ChipsSkeleton count={chips} className="mb-4" />}
-      {filter && <FilterSkeleton selects={selects} className="mb-4" />}
+      {segment && <Block className="h-[38px] w-[335px] max-w-full rounded-[10px]" />}
+      {tiles > 0 && <TilesSkeleton count={tiles} />}
+      {chips > 0 && <ChipsSkeleton count={chips} />}
+      {filter && <FilterSkeleton selects={selects} />}
       <TableSkeleton rows={rows} cols={cols} />
       <PagerSkeleton />
     </Loading>
@@ -237,7 +237,7 @@ export function ListPageSkeleton({
 export function RecordTabsSkeleton({ count = 6 }: { count?: number }) {
   const widths = ["w-16", "w-24", "w-20", "w-14", "w-20", "w-24", "w-16", "w-20", "w-14"];
   return (
-    <div aria-hidden className="mt-4 flex h-[42px] gap-x-[22px] overflow-hidden border-b border-line">
+    <div aria-hidden className="flex h-[42px] gap-x-[22px] overflow-hidden border-b border-line">
       {Array.from({ length: count }, (_, i) => (
         <span key={i} className={cn("flex shrink-0 items-center border-b-2", i === 0 ? "border-line-strong" : "border-transparent")}>
           <Bar className={cn("h-3", widths[i % widths.length])} />
@@ -253,7 +253,7 @@ export function RecordTabsSkeleton({ count = 6 }: { count?: number }) {
  */
 export function TabSkeleton({ side = true, tiles = 0, table = false }: { side?: boolean; tiles?: number; table?: boolean }) {
   return (
-    <Loading className="flex flex-col gap-4">
+    <Loading>
       {tiles > 0 && <TilesSkeleton count={tiles} />}
       <div className={cn("grid items-start gap-4", side && RULES.page.withPanel)}>
         <div className="flex min-w-0 flex-col gap-4">
@@ -278,7 +278,7 @@ export function RecordSkeleton({ tabs = 6, tiles = 0, side = true }: { tabs?: nu
     <Loading>
       <HeaderSkeleton record buttons={2} />
       {tabs > 0 && <RecordTabsSkeleton count={tabs} />}
-      <div className={tabs > 0 ? "mt-5" : undefined}>
+      <div>
         <TabSkeleton tiles={tiles} side={side} />
       </div>
     </Loading>
@@ -290,8 +290,8 @@ export function BoardSkeleton({ columns = 5, chips = 3 }: { columns?: number; ch
   return (
     <Loading>
       <HeaderSkeleton buttons={2} />
-      {chips > 0 && <ChipsSkeleton count={chips} className="mb-4" />}
-      <FilterSkeleton selects={1} className="mb-4" />
+      {chips > 0 && <ChipsSkeleton count={chips} />}
+      <FilterSkeleton selects={1} />
       <div className="flex gap-3 overflow-hidden">
         {Array.from({ length: columns }, (_, c) => (
           <div key={c} className="flex w-[272px] shrink-0 flex-col gap-2.5 rounded-2xl border border-line bg-surface-2/60 p-2.5">
@@ -343,8 +343,8 @@ export function ReportSkeleton({ tiles = 4, charts = 4 }: { tiles?: number; char
   return (
     <Loading>
       <HeaderSkeleton buttons={3} />
-      <ChipsSkeleton count={7} className="mb-4" />
-      {tiles > 0 && <TilesSkeleton count={tiles} className="mb-4" />}
+      <ChipsSkeleton count={7} />
+      {tiles > 0 && <TilesSkeleton count={tiles} />}
       <div className="grid gap-4 lg:grid-cols-2">
         {Array.from({ length: charts }, (_, i) => (
           <div key={i} className="rounded-2xl border border-line bg-surface p-5">
@@ -366,7 +366,7 @@ export function ReportSkeleton({ tiles = 4, charts = 4 }: { tiles?: number; char
 export function DashboardSkeleton() {
   return (
     <Loading>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-2.5">
           <Bar className="h-6 w-56" />
           <Bar className="h-3 w-72 max-w-full" />
@@ -377,8 +377,8 @@ export function DashboardSkeleton() {
           <ButtonShape className="w-32" />
         </div>
       </div>
-      <CardSkeleton lines={4} className="mb-4" />
-      <TilesSkeleton count={4} className="mb-4" />
+      <CardSkeleton lines={4} />
+      <TilesSkeleton count={4} />
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <CardSkeleton lines={6} />
         <CardSkeleton lines={4} />

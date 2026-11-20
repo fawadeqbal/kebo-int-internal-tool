@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Clock, Factory, type List, Plus, ShoppingCart, TrendingUp, X } from "lucide-react";
 import { can } from "@kebo/shared";
-import { RefCode, buildHref, ButtonLink, Card, LinkTabs, DataRow, EmptyState, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { RefCode, buildHref, ButtonLink, Card, LinkTabs, DataRow, EmptyState, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage, Stack } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { PartyExcel } from "@/components/sheets/party-excel";
@@ -96,7 +96,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   };
 
   return (
-    <div>
+    <Stack>
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/suppliers")}
@@ -157,7 +157,6 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
 
       <LinkTabs
         label="Which suppliers"
-        className="mb-4"
         tabs={[
           { href: buildHref("/suppliers", keep, { status: undefined, show: undefined, page: undefined }), label: "All", count: data.counts?.all, active: !status && !mineTab },
           { href: buildHref("/suppliers", keep, { status: "offers", show: undefined, page: undefined }), label: "Offers in", count: data.counts?.offers, active: status === "offers" && !mineTab },
@@ -178,7 +177,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         ]}
       />
 
-      <Card className="overflow-clip p-0">
+      <Card className="overflow-clip">
         {data.rows.length === 0 ? (
           <EmptyState
             icon={Factory}
@@ -275,6 +274,6 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
           meId={me.id}
         />
       )}
-    </div>
+    </Stack>
   );
 }
