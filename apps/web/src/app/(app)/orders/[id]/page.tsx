@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { can, PAPER, ROUTE_NAME, type Tone } from "@kebo/shared";
-import { Badge, cn, Notice, linkClass } from "@kebo/ui";
+import { Badge, cn, Notice, linkClass, Dash } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
 import { orderName } from "@/lib/titles";
@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: orderName(o) };
 }
 
-const DASH = <span className="text-muted">—</span>;
+const DASH = <Dash />;
 const two = (v: string | number) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

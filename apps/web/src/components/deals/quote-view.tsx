@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2, Lock, Pencil } from "lucide-react";
 import { toMinor } from "@kebo/money";
 import { isWarrantyFrom, LINE_TYPE_LABEL, partsWords, partWhen, percentText, termsChecks, warrantyLine, type TermsCheck, type WarrantyFrom } from "@kebo/shared";
-import { Badge, cn } from "@kebo/ui";
+import { Badge, cn, Dash } from "@kebo/ui";
 import { money, qty } from "@/lib/format";
 import type { OptionView, RevisionView } from "@/lib/types-deals";
 import type { LineColumn, LineRow } from "@/components/lines/line-table";
@@ -75,7 +75,7 @@ const marginOf = (price: string, cost: string | null | undefined) => {
   return p > 0 && Number.isFinite(k) ? ((p - k) / p) * 100 : null;
 };
 const marginTone = (m: number | null) => (m === null ? "text-text-2" : m < 0 ? "text-bad" : m < 5 ? "text-warn" : undefined);
-const dash = <span className="text-muted">—</span>;
+const dash = <Dash />;
 
 /**
  * An option's prices for the one items box (canvas board "The quotation, from the pieces"): the columns from the one

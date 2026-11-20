@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, Plus } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice, linkClass } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice, linkClass, Dash } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
@@ -214,7 +214,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                 <tbody>
                   {list.rows.map((r) => (
                     <DataRow key={`${r.kind}:${r.id}`} href={paymentHref(r)} className={cn(r.status === "void" && "text-muted line-through")}>
-                      <Td className="whitespace-nowrap">{r.number ? <RefCode>{r.number}</RefCode> : <span className="text-muted">—</span>}</Td>
+                      <Td className="whitespace-nowrap">{r.number ? <RefCode>{r.number}</RefCode> : <Dash />}</Td>
                       <Td className="text-sm whitespace-nowrap">{date(r.on)}</Td>
                       <Td className="min-w-64">
                         <Link href={paymentHref(r)} className="text-sm font-semibold hover:text-primary">
@@ -224,12 +224,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                           {[r.for.map((f) => f.label).join(", "), r.party ? r.what : null, r.reference ? `ref. ${r.reference}` : null].filter(Boolean).join(" · ")}
                         </span>
                       </Td>
-                      <Td className="text-sm whitespace-nowrap">{r.method ?? <span className="text-muted">—</span>}</Td>
-                      <Td className="text-sm">{r.account ?? <span className="text-muted">—</span>}</Td>
+                      <Td className="text-sm whitespace-nowrap">{r.method ?? <Dash />}</Td>
+                      <Td className="text-sm">{r.account ?? <Dash />}</Td>
                       <Td className="text-right text-sm whitespace-nowrap">
                         <Amount r={r} />
                       </Td>
-                      <Td className="text-sm">{r.by ?? <span className="text-muted">—</span>}</Td>
+                      <Td className="text-sm">{r.by ?? <Dash />}</Td>
                       <Td>{statusOf(r)}</Td>
                     </DataRow>
                   ))}

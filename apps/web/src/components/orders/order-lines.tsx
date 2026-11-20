@@ -5,7 +5,7 @@ import { Totals, type TotalsRow } from "@/components/records/totals";
 import { useMemo, useState, type ReactNode } from "react";
 import { factoryUnitCostMinor, formatMinor, multiplyMinor, toMinor } from "@kebo/money";
 import { LINE_CONDITION_LABEL, LINE_CONDITION_TONE, LINE_CONDITIONS, type LineCondition } from "@kebo/shared";
-import { Badge, cn, EmptyLine } from "@kebo/ui";
+import { Badge, cn, EmptyLine, Dash } from "@kebo/ui";
 import { BatchLines } from "@/components/edits/batch-lines";
 import type { EditCard, EditRef } from "@/lib/types-edits";
 import { LineTable, type LineColumn, type LineResult, type LineRow, type LineValues } from "@/components/lines/line-table";
@@ -30,7 +30,7 @@ const cbmOf = (v: string | number) => Number(v).toLocaleString("en-US", { minimu
 /** A number as it is typed (no thousands commas, no trailing zeros). */
 const raw = (v: string | number | null | undefined) => (v === null || v === undefined || v === "" ? "" : String(Number(v)));
 const head = (d: string) => d.split("\n")[0] ?? d;
-const dash = <span className="text-muted">—</span>;
+const dash = <Dash />;
 
 type GoodsState = "waiting" | "partly" | "in";
 const stateOf = (got: number, of: number): GoodsState => (got >= of && of > 0 ? "in" : got > 0 ? "partly" : "waiting");

@@ -1,5 +1,5 @@
 import { agoText, type DevJobsView } from "@kebo/shared";
-import { Card, CardHeader, EmptyState, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Card, CardHeader, EmptyState, StatRow, StatTile, Table, Td, Th, THead, Tr, Dash } from "@kebo/ui";
 import { LevelBadge } from "./parts";
 import { msText } from "./speed";
 
@@ -57,7 +57,7 @@ export function JobsTab({ v }: { v: DevJobsView }) {
                 <Td className="whitespace-nowrap">{j.lastAt ? agoText(j.lastAt) : "—"}</Td>
                 <Td className="text-right tabular">{j.tookMs === null ? "—" : msText(j.tookMs)}</Td>
                 <Td className="max-w-[340px] text-sm">
-                  {j.result ?? <span className="text-muted">—</span>}
+                  {j.result ?? <Dash />}
                   {j.failed7d > 0 && <span className="block text-xs text-bad">failed {j.failed7d === 1 ? "once" : `${j.failed7d} times`} in 7 days</span>}
                 </Td>
                 <Td>

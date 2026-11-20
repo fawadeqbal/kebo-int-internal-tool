@@ -3,7 +3,7 @@ import Link from "next/link";
 import { THead, Th, Card, cn, ScrollFade, EmptyLine, CardHeader } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
-import { date, money, dayMonth } from "@/lib/format";
+import { date, money, dayMonth, num0 as n0 } from "@/lib/format";
 import type { PersonCost, PersonSpendFor, PersonSpending } from "@/lib/types-money";
 
 const FOR_LABEL: Record<PersonSpendFor, string> = {
@@ -15,7 +15,6 @@ const FOR_LABEL: Record<PersonSpendFor, string> = {
   company: "For the company",
 };
 
-const n0 = (v: string | number) => Math.round(Number(v)).toLocaleString("en-US");
 
 /** The header of a card on a person's page (as RecordListCard's). */
 function Head({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {

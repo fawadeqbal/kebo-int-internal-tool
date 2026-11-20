@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, Circle, Info, Lock, Plus, Square } from "lucide-react";
 import { divideMinor, formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
 import { allocateOldestFirst, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type LcCheck, type PaymentMethod } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea, Notice, EmptyLine } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Notice, EmptyLine, RefCode } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
@@ -238,7 +238,9 @@ export function ReceivedFields({
                 </thead>
                 <tbody>
                   <tr className="border-t border-line">
-                    <td className="py-2 pr-2 font-mono text-xs">{refNo}</td>
+                    <td className="py-2 pr-2">
+                      <RefCode>{refNo}</RefCode>
+                    </td>
                     <td className="py-2 pr-2">{forWhat ?? "Balance"}</td>
                     <td className="py-2 pr-2 text-right tabular">{fmt(dueMinor, currency)}</td>
                     <td className="py-2 text-right">
@@ -496,7 +498,9 @@ function ReceiptFields({
                   <tbody>
                     {order.map((o) => (
                       <tr key={o.id} className="border-t border-line">
-                        <td className="py-2 pr-2 font-mono text-xs">{o.refNo}</td>
+                        <td className="py-2 pr-2">
+                          <RefCode>{o.refNo}</RefCode>
+                        </td>
                         <td className="py-2 pr-2">
                           {o.next?.label ?? "Balance"}
                           {o.next?.dueOn && <span className="block text-xs text-muted">due {dayMonth(o.next.dueOn)}</span>}

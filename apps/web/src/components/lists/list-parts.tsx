@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Avatar, Badge, cn } from "@kebo/ui";
+import { Avatar, Badge, cn, Dash } from "@kebo/ui";
 
 /*
  * The pieces every list page is made of (design "RFQ Desk — list pages", 18 Nov 2026): the facts line under the
@@ -30,7 +30,7 @@ export interface NextUp {
 
 /** A next follow-up: Today in orange, late in red with its date, else its day; none: a grey dash. */
 export function FollowUpDay({ next, day }: { next: NextUp | null | undefined; day: (iso: string) => string }) {
-  if (!next) return <span className="text-muted">—</span>;
+  if (!next) return <Dash />;
   if (next.today) return <span className="font-semibold whitespace-nowrap text-action">Today</span>;
   if (next.late) return <span className="font-semibold whitespace-nowrap text-bad">Late · {day(next.dueOn)}</span>;
   return <span className="whitespace-nowrap text-text">{day(next.dueOn)}</span>;

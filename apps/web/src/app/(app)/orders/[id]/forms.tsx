@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea, Notice, linkClass } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea, Notice, linkClass, Dash } from "@kebo/ui";
 import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
 import { SubmitButton } from "@kebo/ui/client";
 import { ConfirmSubmit } from "@/components/common/dialog";
@@ -259,7 +259,7 @@ export function DetailsCard({
               <div key={r.label} className={cn("flex min-w-0 flex-col", "wide" in r && "sm:col-span-2 xl:col-span-3")}>
                 <dt className="text-xs text-muted">{r.label}</dt>
                 <dd className="mt-[3px] text-sm [overflow-wrap:anywhere]">
-                  {r.value !== null && r.value !== undefined && r.value !== "" ? r.value : <span className="text-muted">—</span>}
+                  {r.value !== null && r.value !== undefined && r.value !== "" ? r.value : <Dash />}
                 </dd>
               </div>
             ))}

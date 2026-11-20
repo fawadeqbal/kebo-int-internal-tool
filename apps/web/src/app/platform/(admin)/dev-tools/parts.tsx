@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { DEV_LANES, type DevCheck, type DevEvent, type DevLevel, type DevTab } from "@kebo/shared";
-import { Badge, cn, Notice, linkClass, capsClass, subTitleClass } from "@kebo/ui";
+import { Badge, cn, Notice, linkClass, capsClass, subTitleClass, Dash } from "@kebo/ui";
 
 export const TAB_HREF: Record<DevTab, string> = {
   picture: "/platform/dev-tools",
@@ -210,7 +210,7 @@ export function Facts({ items }: { items: { label: string; value: ReactNode }[] 
       {items.map((i) => (
         <div key={i.label} className="flex items-baseline justify-between gap-4 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
           <dt className="text-text-2">{i.label}</dt>
-          <dd className="text-right font-medium">{i.value ?? <span className="text-muted">—</span>}</dd>
+          <dd className="text-right font-medium">{i.value ?? <Dash />}</dd>
         </div>
       ))}
     </dl>

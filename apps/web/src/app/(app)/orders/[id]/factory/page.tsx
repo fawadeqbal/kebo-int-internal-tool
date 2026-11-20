@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mail, Printer } from "lucide-react";
 import { can, PAYMENT_METHOD_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
-import { ButtonLink, RefCode, RULES, linkClass, cn } from "@kebo/ui";
+import { ButtonLink, RefCode, RULES, linkClass, cn, Dash } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf } from "@/lib/order-data";
@@ -79,7 +79,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
     if (!manyFactories) return parts;
     return (
       <>
-        {parts ?? <span className="font-normal text-muted">—</span>}
+        {parts ?? <Dash />}
         <span className="block text-xs font-normal text-muted">{x.factory.name}</span>
       </>
     );
@@ -213,7 +213,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
               "Ready by",
               (r && "readyOn" in r && r.readyOn) || readyNote ? (
                 <span className="flex flex-col">
-                  {r && "readyOn" in r && r.readyOn ? date(r.readyOn) : <span className="font-normal text-muted">—</span>}
+                  {r && "readyOn" in r && r.readyOn ? date(r.readyOn) : <Dash />}
                   {readyNote && <span className="text-xs font-normal text-text-2">{readyNote}</span>}
                 </span>
               ) : null,

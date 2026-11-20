@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { PAPER, type PaperTerms, type PaperTermsBox, type PaperTermsKind, type PaperTermsRow } from "@kebo/shared";
 import { BoxFacts } from "@/components/common/record-box";
+import { Dash } from "@kebo/ui";
 
 /** Rows typed at length are clamped in a box (their window holds the whole text). */
 const CLAMP: Record<string, string> = { paymentNote: "line-clamp-3", notes: "line-clamp-4" };
@@ -30,7 +31,7 @@ export function PaperFacts({
     if (!words && PAPER.optional.includes(r)) return [];
     const said = values?.[r] ?? (words && CLAMP[r] ? <span className={`${CLAMP[r]} whitespace-pre-line`}>{words}</span> : words);
     const more = after?.[r];
-    return [[labels[r]!, more ? <span className="flex flex-col items-start gap-0.5">{said ?? <span className="font-normal text-muted">—</span>}{more}</span> : said]];
+    return [[labels[r]!, more ? <span className="flex flex-col items-start gap-0.5">{said ?? <Dash />}{more}</span> : said]];
   });
   return <BoxFacts rows={rows} />;
 }

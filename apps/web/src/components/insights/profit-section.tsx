@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ORDER_STAGE_LABEL, type OrderStage } from "@kebo/shared";
 import { Badge, Card, CardHeader, cn, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine, linkClass } from "@kebo/ui";
-import { plural } from "@/lib/format";
+import { plural, num2 as n2 } from "@/lib/format";
 import { bigMoney, change, monthYearOf, type Period } from "@/lib/insights-period";
 import { PROFIT_SORT_LABEL, PROFIT_SORTS, type loadProfit, type ProfitSort } from "@/lib/insights-data";
 import { Delta } from "./frame";
@@ -10,7 +10,6 @@ import { how, reportSpan } from "@/lib/figures";
 type Data = Awaited<ReturnType<typeof loadProfit>>;
 
 const PAGE = 25;
-const n2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** A minus as a real minus sign, set apart, so a loss is not read as a dash. */
 const signed = (v: number) => (v < 0 ? `− ${n2(-v)}` : n2(v));
 /** "14.6%", "− 9.1%"; a loss too small to show a digit is "0%". */

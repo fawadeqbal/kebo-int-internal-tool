@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { buttonClass, Card, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
-import { date, plural, whole } from "@/lib/format";
+import { date, plural, whole, num0 as n0 } from "@/lib/format";
 import { bigMoney, change, monthShortOf, percent } from "@/lib/insights-period";
 import type { HomeFigures, HomeStage, Receivables, Reminders } from "@/lib/types-insights";
 import { Delta } from "@/components/insights/frame";
@@ -23,7 +23,6 @@ const short = (iso: string) => `${Number(iso.slice(8, 10))} ${monthShortOf(iso)}
 const weekLabel = (from: string, to: string) => (from.slice(0, 7) === to.slice(0, 7) ? `${Number(from.slice(8, 10))} – ${short(to)}` : `${short(from)} – ${short(to)}`);
 /** Four columns in a third of the page: less air between them, the card's own edge kept. */
 const CELL = "px-2 first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5";
-const n0 = (v: string | number) => Math.round(Number(v)).toLocaleString("en-US");
 const signed = (v: number, c: string) => (v < 0 ? `− ${whole(-v, c)}` : whole(v, c));
 
 function More({ href, children }: { href: string; children: ReactNode }) {

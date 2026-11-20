@@ -11,13 +11,13 @@ import { ActionForm } from "@/components/common/action-form";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
 import type { ActionState } from "@/lib/actions";
 import { send, type Staged } from "@/components/files/upload";
+import { VIEWABLE } from "@/lib/format";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /** The kinds a customer's file can be, in the select's order. */
 export const CUSTOMER_KINDS: AttachmentKind[] = ["urs", "drawing", "photo", "specification", "other"];
 export const KIND_WORD: Partial<Record<AttachmentKind, string>> = { urs: "URS (requirements)", drawing: "Drawing", photo: "Photo", specification: "Specification", other: "Other" };
-const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
 
 /** "Add files": what they are and a note, then they go up as soon as they are dropped. */
 export function AddFilesCard({ dealId }: { dealId: string }) {

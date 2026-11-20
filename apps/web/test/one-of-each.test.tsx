@@ -350,6 +350,14 @@ describe("one of each", () => {
     expect(found(/<h[234]\b[^>]*className="[^"]*\btext-sm\b[^"]*\bfont-(semibold|bold)\b[^"]*"/g).filter((m) => !/text-muted|text-text-2|uppercase/.test(m))).toEqual([]);
   });
 
+  it("one empty dash (Dash), one count bubble (CountDot), one copy of each number helper (lib/format)", () => {
+    expect(found(/<span className="(font-normal )?text-muted">—<\/span>/g).filter((m) => !m.startsWith("packages/ui/src/primitives.tsx"))).toEqual([]);
+    expect(found(/rounded-full bg-(bad|action|primary)-solid px-1[^"]*text-white/g).filter((m) => !m.startsWith("packages/ui/src/primitives.tsx"))).toEqual([]);
+    // Two decimals grouped, whole numbers grouped, files a browser shows: num2, num0, VIEWABLE.
+    expect(found(/^const (n2|grouped|n0) = \(v: string( \| number)?\) => (Number|Math)/gm)).toEqual([]);
+    expect(found(/^const VIEWABLE = \//gm)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

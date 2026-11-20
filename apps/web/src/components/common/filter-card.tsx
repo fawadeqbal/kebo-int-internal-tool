@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
-import { cn, RULES, searchFrameClass, controlSizes, EmptyLine, Button, linkClass } from "@kebo/ui";
+import { cn, RULES, searchFrameClass, controlSizes, EmptyLine, Button, linkClass, CountDot } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "./floating";
 
 export interface FilterSelect {
@@ -462,7 +462,7 @@ export function FilterCard({
           )}
         >
           <ListFilter className="size-4" aria-hidden /> Filters
-          {chosen > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary-solid px-1 text-2xs font-bold text-white">{chosen}</span>}
+          {chosen > 0 && <CountDot n={chosen} tone="primary" />}
         </button>
       )}
       {(selects.length > 0 || month || anyOn) && (
