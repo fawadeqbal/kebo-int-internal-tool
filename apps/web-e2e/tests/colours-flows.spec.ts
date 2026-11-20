@@ -21,7 +21,12 @@ const GROUND: Record<Set, { light: string; dark: string }> = {
   ink: { light: "#f6f6f5", dark: "#000000" },
   onyx: { light: "#ffffff", dark: "#000000" },
 };
-const ground = (page: Page) => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bg").trim());
+/** The page's --bg as #rrggbb (the built CSS may write #ffffff as #fff). */
+const ground = (page: Page) =>
+  page.evaluate(() => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim().toLowerCase();
+    return /^#[0-9a-f]{3}$/.test(v) ? `#${[...v.slice(1)].map((c) => c + c).join("")}` : v;
+  });
 const LABEL: Record<Set, string> = { green: "Green", graphite: "Graphite", midnight: "Midnight", warm: "Warm", clay: "Clay", teal: "Teal", ink: "Ink", onyx: "Onyx" };
 
 /** Company settings › The app's colours: chooses one and waits until it is saved (the note says so). */
