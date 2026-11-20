@@ -75,7 +75,7 @@ export async function VaultOverview({ today }: { today: string }) {
   const latest = (book?.rows ?? []).slice(-6).reverse();
   return (
     <div className="flex flex-col gap-4">
-      <StatRow>
+      <StatRow facts>
         <StatTile icon={Landmark} iconColor={1} label="All money" value={`≈ ${whole(all, main)}`} sub={missing ? "some rates missing" : "at today's rates"} />
         {[...byCurrency.entries()].slice(0, 3).map(([c, v]) => {
           const n = open.filter((x) => x.currency === c).length;

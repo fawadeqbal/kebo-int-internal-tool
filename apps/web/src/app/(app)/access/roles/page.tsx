@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Badge, Card, CardHeader, PageHeader, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice } from "@kebo/ui";
+import { Badge, Card, CardHeader, PageHeader, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
@@ -31,7 +31,7 @@ export default async function RolesPage() {
     <div>
       <PageHeader kind="list" crumbs={crumbsFor("/access/roles")} title="Roles" />
       <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatRow facts>
         <StatTile label="Signed in now" value={o.liveSessions} sub="Browsers and phones" href="/access/sessions" />
         <StatTile
           label="Two-step sign-in"
@@ -41,7 +41,7 @@ export default async function RolesPage() {
         />
         <StatTile label="Failed sign-ins" value={o.failedLastDay} sub="In the last 24 hours" tone={o.failedLastDay >= 10 ? "bad" : o.failedLastDay ? "warn" : undefined} href="/access/sign-ins?failed=1" />
         <StatTile label="Blocked addresses" value={o.blockedIpsLastDay} sub="Too many attempts, last 24 hours" tone={o.blockedIpsLastDay ? "bad" : undefined} href="/access/sign-ins?failed=1" />
-      </div>
+      </StatRow>
 
       {o.mustSetUp.length > 0 && (
         <Notice tone="todo">

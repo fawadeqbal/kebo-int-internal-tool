@@ -2,7 +2,7 @@ import Form from "next/form";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CURRENCIES, LEDGER_ENTRY_TYPE_LABEL, LEDGER_ENTRY_TYPES, type LedgerEntryType, type LedgerPartyKind } from "@kebo/shared";
-import { Badge, buildHref, cn, FilterChip } from "@kebo/ui";
+import { Badge, buildHref, cn, FactsLine, FilterChip } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
 import { addDays } from "@kebo/utils";
 import { date, money, dayMonth } from "@/lib/format";
@@ -221,9 +221,12 @@ export function entryCells(r: LedgerListRow, main: string, today: string, open: 
 
 /* ---------------------------------------------------------------- ageing */
 
-const AGE_TONE: Record<string, string> = { d1_30: "text-warn", d31_60: "text-warn", d61_90: "text-bad", d90_plus: "text-bad" };
+const AGE_TONE: Record<string, "warn" | "bad"> = { d1_30: "warn", d31_60: "warn", d61_90: "bad", d90_plus: "bad" };
 
-/** The five ageing tiles: not due, 1–30, 31–60, 61–90, 90+ days late (in the main currency), each with what is in it. */
+/**
+ * The five ageing figures: not due, 1–30, 31–60, 61–90, 90+ days late (in the main currency), each with what is in
+ * it — as the one facts line (FactsLine), not five tiles (live audit 20 Nov).
+ */
 export function AgeingTiles({
   buckets,
   currency,
@@ -234,27 +237,19 @@ export function AgeingTiles({
   label?: string;
 }) {
   return (
-    <section aria-label={label} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-      {buckets.map((b) => {
-        const items = "items" in b && b.items ? b.items : [];
-        const hint = items.length
-          ? items
-              .slice(0, 2)
-              .map((i) => [i.refNo, i.label].filter(Boolean).join(" · "))
-              .join(", ") + (items.length > 2 ? ` +${items.length - 2}` : "")
-          : "";
-        return (
-          <div key={b.bucket} className="rounded-xl border border-line bg-surface p-3 sm:p-4">
-            <p className="text-xs font-medium text-muted">{b.label}</p>
-            <p className={cn("mt-1 truncate text-lg font-semibold tabular sm:text-xl", Number(b.base) > 0 && AGE_TONE[b.bucket])}>
-              {money(b.base, currency)}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-muted" title={hint || undefined}>
-              {hint || " "}
-            </p>
-          </div>
-        );
-      })}
+    <section aria-label={label}>
+      <FactsLine
+        facts={buckets.map((b) => {
+          const items = "items" in b && b.items ? b.items : [];
+          const hint = items.length
+            ? items
+                .slice(0, 2)
+                .map((i) => [i.refNo, i.label].filter(Boolean).join(" · "))
+                .join(", ") + (items.length > 2 ? ` +${items.length - 2}` : "")
+            : undefined;
+          return { label: b.label, value: money(b.base, currency), sub: hint, tone: Number(b.base) > 0 ? AGE_TONE[b.bucket] : undefined };
+        })}
+      />
     </section>
   );
 }

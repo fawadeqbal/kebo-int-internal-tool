@@ -87,7 +87,7 @@ export default async function CustomerOverview({
   return (
     <div className="flex flex-col gap-4">
       <RecordLanding />
-      <StatRow>
+      <StatRow facts>
         <StatTile label="Orders" value={c.orders.filter((o) => o.status !== "cancelled").length} sub={`${openOrders} open`} />
         <StatTile
           label="Win rate"

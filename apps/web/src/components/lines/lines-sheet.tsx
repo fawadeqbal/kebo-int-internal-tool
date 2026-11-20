@@ -7,6 +7,9 @@ import type { LineColumn, LineRow } from "./line-table";
  * line table's columns — no tool row, nothing to click — and its totals.
  * The export lives in the card header (LinesExcel).
  */
+/** A column head: the one table's (Th in @kebo/ui). */
+const TH = "h-[42px] border-b border-line px-3.5 text-md font-semibold whitespace-nowrap text-muted";
+
 export function LinesView({
   rows,
   columns,
@@ -35,17 +38,19 @@ export function LinesView({
       tabIndex={0}
       role="region"
       aria-label={label}
-      className="overflow-x-auto rounded-lg border border-line focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+      // The one table (Th, Td: live audit 20 Nov): inside its box, no frame and no lines between columns.
+      className="overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
     >
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-surface-2 text-xs text-text-2">
-            <th className="w-12 border-b border-line px-2 py-2 text-left font-medium">No.</th>
+      <table className="w-full border-collapse text-md">
+        <thead className="bg-faint">
+          <tr>
+            <th scope="col" className={cn(TH, "w-14 pl-5 max-sm:pl-4")}>No.</th>
             {columns.map((c) => (
               <th
                 key={c.key}
+                scope="col"
                 className={cn(
-                  "border-b border-l border-line px-2 py-2 font-medium whitespace-nowrap",
+                  TH,
                   c.align === "right" ? "text-right" : "text-left",
                   c.phoneHidden && "max-sm:hidden",
                   c.shade && "bg-info-soft/60",
@@ -55,7 +60,7 @@ export function LinesView({
               </th>
             ))}
             {after && (
-              <th className="w-10 border-b border-l border-line px-1 py-2">
+              <th scope="col" className={cn(TH, "w-10 px-1")}>
                 <span className="sr-only">{after.label}</span>
               </th>
             )}
@@ -64,15 +69,15 @@ export function LinesView({
         <tbody>
           {rows.map((r, i) => (
             <tr key={r.key} aria-rowindex={i + 1} className="border-b border-line last:border-b-0">
-              <td className="px-2 pt-[0.6rem] pb-2 align-top text-xs text-muted tabular">{numbers[i]}</td>
+              <td className="py-2.5 pr-3.5 pl-5 align-top text-muted tabular max-sm:pl-4">{numbers[i]}</td>
               {columns.map((c, k) => (
                 <td
                   key={c.key}
                   className={cn(
-                    "border-l border-line px-2 py-2 align-top",
+                    "px-3.5 py-2.5 align-top",
                     c.align === "right" ? "text-right whitespace-nowrap tabular" : "",
                     k === 0 && "whitespace-pre-line",
-                    k === 0 && r.parentKey && "pl-5",
+                    k === 0 && r.parentKey && "pl-7",
                     c.phoneHidden && "max-sm:hidden",
                     c.shade && "bg-info-soft/40",
                   )}
@@ -81,7 +86,7 @@ export function LinesView({
                   {k === 0 && r.badge}
                 </td>
               ))}
-              {after && <td className="border-l border-line px-1 py-1 text-center align-top">{after.cell(r, i)}</td>}
+              {after && <td className="px-1 py-1 text-center align-top">{after.cell(r, i)}</td>}
             </tr>
           ))}
         </tbody>
