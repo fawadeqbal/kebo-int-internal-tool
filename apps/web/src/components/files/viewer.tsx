@@ -4,6 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useId, useMemo, useR
 import { createPortal } from "react-dom";
 import {
   ChevronLeft,
+  Copy,
+  Mail,
+  MessageCircle,
   ChevronRight,
   Download,
   FileSpreadsheet,
@@ -22,6 +25,7 @@ import { Button, buttonClass, capsClass, cn, linkClass } from "@kebo/ui";
 import { useIsPhone, FloatingMenu } from "@/components/common/floating";
 import { useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
+import { toast } from "@kebo/ui/client";
 
 /* ---------------------------------------------------------------- what is shown */
 
@@ -248,6 +252,7 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
   const [details, setDetails] = useState(!phone && !!file.facts?.length);
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
+  const [sharing, setSharing] = useState<HTMLElement | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   // What the paper in the frame said, and the copy picked: both for this file only.
@@ -311,6 +316,10 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
     .join(" · ");
   const download = kind === "paper" ? (paper?.pdfHref ?? null) : file.href;
   const canPrint = kind === "paper" || kind === "image";
+  // Share: an order's file has its own (noted in History); any other file or paper, the share menu here.
+  const shareThis = download ? { href: download, name: kind === "paper" ? `${title}.pdf` : file.name } : null;
+  const share = (e: { currentTarget: HTMLElement }) => (file.onShare ? file.onShare() : setSharing(e.currentTarget));
+  const canShare = !!file.onShare || !!shareThis;
   const print = () => {
     if (kind === "paper") frame.current?.contentWindow?.print();
     else printImage(file.viewHref ?? file.href, title);
@@ -398,8 +407,8 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
                 <Download aria-hidden /> {kind === "paper" ? "Download PDF" : "Download"}
               </a>
             )}
-            {file.onShare && (
-              <Button variant="secondary" onClick={file.onShare}>
+            {canShare && (
+              <Button variant="secondary" onClick={share} aria-haspopup={file.onShare ? "dialog" : "menu"} aria-expanded={!!sharing}>
                 <Share2 aria-hidden /> Share
               </Button>
             )}
@@ -436,6 +445,7 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
           <Button size="icon-sm" variant="ghost" aria-label="Close the viewer (Esc)" onClick={onClose} className="max-sm:hidden">
             <X aria-hidden />
           </Button>
+          {sharing && shareThis && <ShareMenu file={shareThis} anchor={sharing} phone={phone} onClose={() => setSharing(null)} />}
           {more && (
             <FloatingMenu anchor={() => moreRef.current} onClose={() => setMore(false)} label="More">
               {phone && canPrint && <MenuItem label="Print" onClick={print} close={() => setMore(false)} />}
@@ -467,7 +477,14 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
           {/* The stage: the file on grey, ‹ › at its sides on a phone. */}
           <div className="relative flex min-w-0 flex-1 flex-col bg-surface-3">
             <div className="relative min-h-0 flex-1">
-              <Stage key={`${given.key}:${shown}`} file={file} kind={kind} src={shown} frame={frame} onPrint={print} />
+              <Stage
+                key={`${given.key}:${shown}`}
+                file={file}
+                kind={kind}
+                src={shown}
+                frame={frame}
+                onShare={canShare ? share : undefined}
+              />
               {set.length > 1 && phone && (
                 <>
                   {prev !== null && (
@@ -539,15 +556,16 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
                     <Download className="size-5" aria-hidden /> {kind === "paper" ? "PDF" : "Download"}
                   </a>
                 ) : null}
-                {file.onShare ? (
+                {canShare && (
                   <button
                     type="button"
-                    onClick={file.onShare}
+                    onClick={share}
                     className="flex h-14 min-w-20 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium"
                   >
                     <Share2 className="size-5" aria-hidden /> Share
                   </button>
-                ) : canPrint ? (
+                )}
+                {canPrint && !hasDetails ? (
                   <button
                     type="button"
                     onClick={print}
@@ -675,21 +693,20 @@ function Stage({
   kind,
   src,
   frame,
-  onPrint,
+  onShare,
 }: {
   file: ViewFile;
   kind: ViewKind;
   src: string;
   frame: React.RefObject<HTMLIFrameElement | null>;
-  onPrint: () => void;
+  onShare?: (e: { currentTarget: HTMLElement }) => void;
 }) {
   if (kind === "image") return <ImageStage src={src} name={file.name} />;
   if (kind === "pdf") return <iframe src={src} title={file.name} className="size-full border-0 bg-white" />;
   if (kind === "paper") return <iframe ref={frame} src={src} title={file.name} className="size-full border-0 bg-surface-3" />;
   if (kind === "sheet") return <SheetStage href={file.href} />;
   if (kind === "csv" || kind === "text") return <TextStage href={file.href} csv={kind === "csv"} />;
-  void onPrint;
-  return <NoPreview file={file} />;
+  return <NoPreview file={file} onShare={onShare} />;
 }
 
 /** A photo: fitted to the stage; − + and 100% zoom it, Fit puts it back (design 21 Nov). */
@@ -932,7 +949,7 @@ function StageNote({ children }: { children: ReactNode }) {
 }
 
 /** A file with no preview here (Word, zip…): what it is, and Download (design 21 Nov). */
-function NoPreview({ file }: { file: ViewFile }) {
+function NoPreview({ file, onShare }: { file: ViewFile; onShare?: (e: { currentTarget: HTMLElement }) => void }) {
   const ext = (file.name.split(".").pop() ?? "").toUpperCase();
   const word = /^DOCX?$/.test(ext) ? "Word document" : ext ? `${ext} file` : "File";
   return (
@@ -951,13 +968,150 @@ function NoPreview({ file }: { file: ViewFile }) {
         <a href={file.href} download={file.name} className={buttonClass("primary", "lg", "w-full")}>
           <Download aria-hidden /> Download
         </a>
-        {file.onShare && (
-          <Button size="lg" variant="secondary" className="w-full" onClick={file.onShare}>
+        {onShare && (
+          <Button size="lg" variant="secondary" className="w-full" onClick={onShare}>
             <Share2 aria-hidden /> Share
           </Button>
         )}
       </div>
     </div>
+  );
+}
+
+/** A file as itself, to hand to the phone's share sheet. */
+async function fileOf(href: string, name: string) {
+  const res = await fetch(href);
+  if (!res.ok) throw new Error(`The file could not be fetched (${res.status}).`);
+  const blob = await res.blob();
+  return new File([blob], name, { type: blob.type });
+}
+
+/** Can this browser hand files to the system's share sheet (WhatsApp, email, Teams, AirDrop…)? */
+const sharesFiles = () =>
+  typeof navigator !== "undefined" &&
+  "canShare" in navigator &&
+  navigator.canShare({ files: [new File([""], "x.pdf", { type: "application/pdf" })] });
+
+/**
+ * Share a file or a paper outside the app (Fawad 21 Nov): the share sheet with the file itself where the browser
+ * has one (phones, Windows, Mac), WhatsApp or email with the file downloaded to attach, or the link for the team.
+ * The app sends nothing itself.
+ */
+function ShareMenu({
+  file,
+  anchor,
+  phone,
+  onClose,
+}: {
+  file: { href: string; name: string };
+  anchor: HTMLElement;
+  phone: boolean;
+  onClose: () => void;
+}) {
+  const text = `Please find attached: ${file.name.replace(/\.[a-z0-9]+$/i, "")}.`;
+  const sheet = sharesFiles();
+  const download = () => {
+    const a = document.createElement("a");
+    a.href = file.href;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+  const viaSheet = async () => {
+    toast({ message: "Getting the file ready…", kind: "wait" });
+    try {
+      const f = await fileOf(file.href, file.name);
+      await navigator.share({ files: [f], title: file.name, text });
+      toast("Shared.");
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return toast("Not shared.");
+      toast({
+        message:
+          e instanceof Error && e.message.startsWith("The file")
+            ? e.message
+            : "This browser could not share the file. Download it and attach it instead.",
+        kind: "fail",
+      });
+    }
+  };
+  const run = (fn: () => void | Promise<void>) => () => {
+    onClose();
+    void fn();
+  };
+  const item =
+    "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-md hover:bg-surface-2 focus:bg-surface-2 focus:outline-none";
+  return (
+    <FloatingMenu anchor={() => anchor} onClose={onClose} label={`Share ${file.name}`} width={300}>
+      {sheet && (
+        <button type="button" role="menuitem" className={item} onClick={run(viaSheet)}>
+          <Share2 className="size-4 shrink-0 text-text-2" aria-hidden />
+          <span className="min-w-0">
+            <span className="block font-medium">Share the file…</span>
+            <span className="block text-xs text-muted">WhatsApp, email, WeChat and the rest, with the file attached</span>
+          </span>
+        </button>
+      )}
+      <button
+        type="button"
+        role="menuitem"
+        className={item}
+        onClick={run(() => {
+          // A phone with a share sheet sends the file itself; a computer downloads it to attach in WhatsApp.
+          if (phone && sheet) return viaSheet();
+          download();
+          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+          toast(`${file.name} downloaded: attach it in WhatsApp (the 📎).`);
+        })}
+      >
+        <MessageCircle className="size-4 shrink-0 text-text-2" aria-hidden />
+        <span className="min-w-0">
+          <span className="block font-medium">WhatsApp</span>
+          <span className="block text-xs text-muted">
+            {phone && sheet ? "Pick WhatsApp in the share sheet" : "Downloads the file, then opens WhatsApp to attach it"}
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={item}
+        onClick={run(() => {
+          if (phone && sheet) return viaSheet();
+          download();
+          window.location.assign(`mailto:?subject=${encodeURIComponent(file.name)}&body=${encodeURIComponent(text)}`);
+          toast(`${file.name} downloaded: attach it to the email.`);
+        })}
+      >
+        <Mail className="size-4 shrink-0 text-text-2" aria-hidden />
+        <span className="min-w-0">
+          <span className="block font-medium">Email</span>
+          <span className="block text-xs text-muted">
+            {phone && sheet ? "Pick your mail app in the share sheet" : "Downloads the file and opens a new email"}
+          </span>
+        </span>
+      </button>
+      <span role="separator" className="my-1 block h-px bg-line" />
+      <button
+        type="button"
+        role="menuitem"
+        className={item}
+        onClick={run(async () => {
+          try {
+            await navigator.clipboard.writeText(new URL(file.href, window.location.href).toString());
+            toast("Link copied: it opens for people signed in to the app.");
+          } catch {
+            toast("Could not copy the link.");
+          }
+        })}
+      >
+        <Copy className="size-4 shrink-0 text-text-2" aria-hidden />
+        <span className="min-w-0">
+          <span className="block font-medium">Copy link for the team</span>
+          <span className="block text-xs text-muted">Only people signed in to the app can open it</span>
+        </span>
+      </button>
+    </FloatingMenu>
   );
 }
 
