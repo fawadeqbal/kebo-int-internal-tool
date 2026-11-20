@@ -351,7 +351,7 @@ describe("one of each", () => {
         .map((n) => `${file}: ${n}`),
     );
     expect(bad).toEqual([]);
-  });
+  }, 30_000); // It reads every export against every file: a slow CI machine needs more than the default 5 s.
 
   it("one text link (linkClass) and one card look (Card, cardClass): no page types its own", () => {
     // A link in text: text-primary with hover:underline typed by hand (font-medium, -semibold, -normal…).
