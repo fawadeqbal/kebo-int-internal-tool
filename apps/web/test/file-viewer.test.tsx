@@ -96,4 +96,17 @@ describe("the file viewer", () => {
     expect(screen.getByText(/does not open in the app/)).toBeTruthy();
     expect(screen.getAllByRole("link", { name: /Download/ })[0]!.getAttribute("href")).toBe("/files/eee");
   });
+
+  it("shares any file outside the app: WhatsApp, email, or the link for the team", () => {
+    render(
+      <FileViewerProvider>
+        <a href="/files/fff?view=1">Bank slip.pdf</a>
+      </FileViewerProvider>,
+    );
+    fireEvent.click(screen.getByText("Bank slip.pdf"));
+    fireEvent.click(screen.getAllByRole("button", { name: /Share/ })[0]!);
+    expect(screen.getByRole("menuitem", { name: /WhatsApp/ })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /Email/ })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /Copy link for the team/ })).toBeTruthy();
+  });
 });

@@ -773,17 +773,44 @@ function ShareDialog({
   return (
     <Modal
       title={`Share ${count === 1 ? names[0] : `${count} files`}`}
-      description="On a phone this opens the share sheet with the files themselves (WhatsApp, email, WeChat). On a computer the files download (several as one zip) and the message is copied for you to paste."
+      description="Share opens the share sheet with the files themselves (WhatsApp, email, WeChat) where the device has one. WhatsApp and Email download the files (several as one zip) and open the chat or a new email with the message, to attach them."
       onClose={onClose}
     >
       {error && <Notice tone="bad">{error}</Notice>}
-      {copied && <Notice tone="ok">Downloaded, and the message is copied: paste it in WhatsApp or your email.</Notice>}
+      {copied && <Notice tone="ok">Downloaded, and the message is copied: attach the file in WhatsApp or your email (📎).</Notice>}
       <Field label="Message" htmlFor={`${id}-m`}>
         <Textarea id={`${id}-m`} rows={4} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
       </Field>
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="primary" disabled={pending} onClick={share}>
           {pending ? "Preparing…" : "Share"}
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              // WhatsApp with the message written; the files download to attach (the app sends nothing).
+              window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener");
+              await downloadOnly();
+            })
+          }
+        >
+          WhatsApp
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              await downloadOnly();
+              window.location.assign(`mailto:?subject=${encodeURIComponent(tools.share.refNo)}&body=${encodeURIComponent(message)}`);
+            })
+          }
+        >
+          Email
         </Button>
         <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(downloadOnly)}>
           Download only
