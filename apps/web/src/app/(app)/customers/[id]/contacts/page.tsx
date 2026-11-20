@@ -1,6 +1,7 @@
-import { Mail, MessageCircle, Pencil, Phone } from "lucide-react";
+import { Mail, MessageCircle, Pencil, Phone, Plus } from "lucide-react";
 import { can } from "@kebo/shared";
-import { Badge, Card, CardHeader, EmptyState } from "@kebo/ui";
+import { Badge, EmptyLine } from "@kebo/ui";
+import { TabList } from "@/components/lists/tab-list";
 import { requireUser } from "@/lib/session";
 import { customerOf } from "@/lib/party-data";
 import { PanelButton } from "@/components/orders/step-view";
@@ -13,7 +14,7 @@ export const generateMetadata = customerTitle("Contacts");
 
 /**
  * The customer's Contacts tab (board "Customer — Contacts tab"): a card per person (the primary first, marked),
- * each way to reach them, Edit and Make primary; the New contact card at the side.
+ * each way to reach them, Edit and Make primary; New contact opens its window.
  */
 export default async function CustomerContacts({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,23 +24,39 @@ export default async function CustomerContacts({ params }: { params: Promise<{ i
   const people = [...c.contacts].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-      {people.length === 0 ? (
-        <Card>
-          <EmptyState
-            title="No contacts yet"
-            description="Add the people you deal with there: how to reach them shows on their documents and in Overview."
+    // One list (TabList, the list inside a record): a row per person, the primary first; New contact opens its
+    // window, like every other add (no form always open beside the list).
+    <TabList
+      title="Contacts"
+      summary={`${people.length} ${people.length === 1 ? "person" : "people"}`}
+      add={
+        canEdit ? (
+          <PanelButton
+            size="sm"
+            icon={<Plus aria-hidden />}
+            label="New contact"
+            title="New contact"
+            description="Give at least one way to reach them."
+            body={
+              <div className="p-5">
+                <ContactForm action={saveContactAction.bind(null, c.id, null)} />
+              </div>
+            }
           />
-        </Card>
+        ) : undefined
+      }
+    >
+      {people.length === 0 ? (
+        <EmptyLine inset>No contacts yet. How to reach them shows on their documents and in Overview.</EmptyLine>
       ) : (
-        <div className="grid items-start gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))]">
+        <ul className="divide-y divide-line">
           {people.map((p) => (
-            <Card key={p.id} className="flex flex-col gap-2 p-5 text-sm">
+            <li key={p.id} className="flex flex-col gap-2 px-5 py-4 text-sm max-sm:px-4">
               <div className="flex items-start justify-between gap-2">
                 <strong>{p.name}</strong>
                 {p.isPrimary && <Badge tone="ok">Primary</Badge>}
               </div>
-              {p.position && <span className="text-[13px] text-text-2">{p.position}</span>}
+              {p.position && <span className="text-md text-text-2">{p.position}</span>}
               {p.email && (
                 <a href={`mailto:${p.email}`} className="flex items-center gap-2 break-all hover:text-primary">
                   <Mail className="size-[15px] shrink-0 text-muted" aria-hidden />
@@ -103,18 +120,10 @@ export default async function CustomerContacts({ params }: { params: Promise<{ i
                   )}
                 </div>
               )}
-            </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-      {canEdit && (
-        <Card>
-          <CardHeader title="New contact" />
-          <div className="p-5">
-            <ContactForm action={saveContactAction.bind(null, c.id, null)} />
-          </div>
-        </Card>
-      )}
-    </div>
+    </TabList>
   );
 }

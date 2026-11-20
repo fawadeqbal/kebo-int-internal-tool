@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { AlertTriangle, Check, Factory, FileText, LayoutGrid, List as ListIcon, Lock, MessageSquare, Package, PieChart, Ship, X } from "lucide-react";
-import { ORDER_STAGE_LABEL, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
+import { Board as BoardColumns } from "@/components/lists/board";
+import { Factory, FileText, LayoutGrid, List as ListIcon, Package, PieChart, Ship } from "lucide-react";
+import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
 import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, Segmented, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
@@ -98,14 +99,14 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
   const nextEta = atSea.map((x) => x.eta).filter((x): x is string => !!x).sort()[0];
 
   const chips = [
-    { key: "open", label: "Open", icon: ListIcon, n: c.open, href: href({ status: undefined, stage: undefined }), active: status === "open" && !stage },
-    { key: "confirmed", label: "Confirmed", icon: Check, n: c.confirmed, href: href({ status: undefined, stage: "confirmed" }), active: stage === "confirmed" },
-    { key: "in_production", label: "In production", icon: Factory, n: c.in_production, href: href({ status: undefined, stage: "in_production" }), active: stage === "in_production" },
-    { key: "shipped", label: "Shipped", icon: Ship, n: c.shipped, href: href({ status: undefined, stage: "shipped" }), active: stage === "shipped" },
-    { key: "done", label: "Done", icon: Package, n: c.done ?? 0, href: href({ status: undefined, stage: "done" }), active: stage === "done" },
-    { key: "late", label: "Late", icon: AlertTriangle, n: c.late, href: href({ status: "late", stage: undefined }), active: status === "late" },
-    { key: "closed", label: "Closed", icon: Lock, n: c.closed ?? 0, href: href({ status: "closed", stage: undefined }), active: status === "closed" },
-    { key: "cancelled", label: "Cancelled", icon: X, n: c.cancelled ?? 0, href: href({ status: "cancelled", stage: undefined }), active: status === "cancelled" },
+    { key: "open", label: "Open", n: c.open, href: href({ status: undefined, stage: undefined }), active: status === "open" && !stage },
+    { key: "confirmed", label: "Confirmed", n: c.confirmed, href: href({ status: undefined, stage: "confirmed" }), active: stage === "confirmed" },
+    { key: "in_production", label: "In production", n: c.in_production, href: href({ status: undefined, stage: "in_production" }), active: stage === "in_production" },
+    { key: "shipped", label: "Shipped", n: c.shipped, href: href({ status: undefined, stage: "shipped" }), active: stage === "shipped" },
+    { key: "done", label: "Done", n: c.done ?? 0, href: href({ status: undefined, stage: "done" }), active: stage === "done" },
+    { key: "late", label: "Late", n: c.late, href: href({ status: "late", stage: undefined }), active: status === "late" },
+    { key: "closed", label: "Closed", n: c.closed ?? 0, href: href({ status: "closed", stage: undefined }), active: status === "closed" },
+    { key: "cancelled", label: "Cancelled", n: c.cancelled ?? 0, href: href({ status: "cancelled", stage: undefined }), active: status === "cancelled" },
   ].filter((x) => x.key !== "late" || c.late > 0 || status === "late");
 
   const rowMenu = (o: OrderRow): MenuEntry[] => [
@@ -121,19 +122,14 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/orders")}
-        icon={Package}
         title="Sales orders"
-        description="An order is made when a customer accepts a quotation"
-        actions={
-          <>
-            <ViewSwitch view="list" mine={mine} />
-            <ExportCsv what="orders" query={{ status, mine: keep.mine, q: sp.q }} />
-          </>
-        }
+        views={<ViewSwitch view="list" mine={mine} />}
+        more={<ExportCsv what="orders" query={{ status, mine: keep.mine, q: sp.q }} />}
       />
 
-      <StatRow className="mb-4" phone="line">
+      <StatRow facts>
         <StatTile icon={Package} iconColor={1} label="Open orders" value={c.open} href={href({ status: undefined, stage: undefined })} />
         <StatTile
           icon={FileText}
@@ -169,18 +165,12 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         label="Which orders"
         className="mb-4"
         tabs={chips.map((x) => {
-          const Icon = x.icon;
           return {
             href: x.href,
             active: x.active,
             count: x.n ?? 0,
             alert: x.key === "late" && x.n > 0,
-            label: (
-              <>
-                <Icon aria-hidden />
-                {x.label}
-              </>
-            ),
+            label: x.label,
           };
         })}
       />
@@ -347,35 +337,10 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/orders")}
-        icon={Package}
         title="Sales orders"
-        description="Orders by stage. A card moves when its step is done."
-        actions={<ViewSwitch view="board" mine={mine} />}
-      />
-      <LinkTabs
-        label="Boards"
-        className="mb-4"
-        tabs={[
-          {
-            href: "/inquiries/board",
-            active: false,
-            label: (
-              <>
-                <MessageSquare aria-hidden /> Inquiries
-              </>
-            ),
-          },
-          {
-            href: "/orders/board",
-            active: true,
-            label: (
-              <>
-                <Package aria-hidden /> Orders
-              </>
-            ),
-          },
-        ]}
+        views={<ViewSwitch view="board" mine={mine} />}
       />
       <FilterCard
         search="Search…"
@@ -384,40 +349,36 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
         clearHref={mine ? "/orders/board?mine=1" : "/orders/board"}
         selects={[{ name: "customer", label: "Customer", value: sp.customer, options: (customers?.rows ?? []).map((c) => ({ value: c.id, label: c.name })) }]}
       />
-      <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
-        {cols.map((c) => {
-          const v = valueOf(c.rows);
+      <BoardColumns
+        columns={cols.map((c) => ({
+          key: c.stage,
+          label: c.stage === "done" ? "Done" : ORDER_STAGE_LABEL[c.stage],
+          tone: ORDER_STAGE_TONE[c.stage],
+          total: c.rows.length,
+          rows: c.rows.slice(0, 40),
+          value: valueOf(c.rows),
+          empty: c.stage === "done" ? "Nothing done lately." : `No orders ${ORDER_STAGE_LABEL[c.stage].toLowerCase()}.`,
+          moreHref: buildHref("/orders", {}, { stage: c.stage === "done" ? undefined : c.stage, status: c.stage === "done" ? "closed" : undefined }),
+        }))}
+        rowKey={(o) => o.id}
+        phoneKey={cols.some((c) => c.stage === sp.stage) ? String(sp.stage) : cols[0]!.stage}
+        phoneHref={(key) => buildHref("/orders/board", { mine: mine ? "1" : undefined, q: sp.q, customer: sp.customer }, { stage: key })}
+        card={(o) => {
+          const [word, meaning] = pill(o);
           return (
-            <section key={c.stage} aria-label={ORDER_STAGE_LABEL[c.stage]} className="flex w-[296px] min-w-[260px] flex-none flex-col gap-2.5 rounded-2xl bg-surface-3/60 p-3 lg:w-auto lg:flex-1">
-              <h2 className="flex items-baseline justify-between gap-2 px-1 text-sm">
-                <span className="font-bold">
-                  {c.stage === "done" ? "Done" : ORDER_STAGE_LABEL[c.stage]} <span className="font-normal text-muted">{c.rows.length}</span>
+            <li>
+              <Link href={`/orders/${o.id}`} className="block rounded-[10px] border border-line bg-surface px-3 py-2.5 text-md leading-[18px] transition-colors hover:border-primary-line">
+                <span className="flex items-center justify-between gap-2">
+                  <RefCode>{o.refNo}</RefCode>
+                  <StatusBadge meaning={meaning}>{word}</StatusBadge>
                 </span>
-                {v && <span className="text-xs text-muted">{v}</span>}
-              </h2>
-              {c.rows.slice(0, 40).map((o) => {
-                const [word, meaning] = pill(o);
-                return (
-                  <Link key={o.id} href={`/orders/${o.id}`} className="block rounded-xl border border-line bg-surface px-3 py-2.5 transition-shadow hover:shadow-card">
-                    <span className="flex items-center justify-between gap-2">
-                      <RefCode>{o.refNo}</RefCode>
-                      <StatusBadge meaning={meaning}>{word}</StatusBadge>
-                    </span>
-                    <strong className="mt-1.5 block truncate text-sm">{o.inquiry.title}</strong>
-                    <span className="block truncate text-xs text-muted">{line(o)}</span>
-                  </Link>
-                );
-              })}
-              {c.rows.length > 40 && (
-                <Link href={buildHref("/orders", {}, { stage: c.stage === "done" ? undefined : c.stage, status: c.stage === "done" ? "closed" : undefined })} className="px-1 text-xs font-semibold text-primary hover:underline">
-                  {c.rows.length - 40} more in the list →
-                </Link>
-              )}
-              {c.rows.length === 0 && <p className="rounded-xl border-2 border-dashed border-line-strong px-3 py-6 text-center text-xs text-muted">Nothing here</p>}
-            </section>
+                <span className="mt-1.5 block truncate text-md font-semibold text-text">{o.inquiry.title}</span>
+                <span className="block truncate text-xs text-text-2">{line(o)}</span>
+              </Link>
+            </li>
           );
-        })}
-      </div>
+        }}
+      />
     </div>
   );
 }

@@ -171,7 +171,7 @@ function AgreedFields({
           </PanelSection>
 
           <PanelSection title="Payment" sub="changed in one place: its plan" className="sm:grid-cols-1">
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2/40 px-3 py-2 text-[13px]">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2/40 px-3 py-2 text-md">
               <span className="min-w-0">{payment}</span>
               <ButtonLink href={paymentHref} size="sm" variant="secondary">
                 Open the payment plan

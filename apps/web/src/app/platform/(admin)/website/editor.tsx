@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { SITE_ICONS, siteContent, type SiteContent, type SiteIcon } from "@kebo/shared";
-import { Button, Card, CardBody, CardHeader, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, Checkbox, cn, Field, Input, Select, Textarea, EmptyLine } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { SITE_ICON } from "@/components/site/icons";
@@ -216,7 +216,7 @@ export function SiteEditor({ initial, plans }: { initial: SiteContent; plans: Si
         <fieldset>
           <legend className="mb-2 text-sm font-medium">Which plans show</legend>
           {plans.length === 0 ? (
-            <p className="text-sm text-muted">No active plans yet. Make them under Plans.</p>
+            <EmptyLine>No active plans yet. Make them under Plans.</EmptyLine>
           ) : (
             <ul className="flex flex-wrap gap-x-6 gap-y-2">
               {plans.map((p) => (

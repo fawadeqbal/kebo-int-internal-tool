@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Mail, MessageCircle, RefreshCw, X } from "lucide-react";
 import { FLOW_STEP_LABEL, inSentence, type PaperCheck } from "@kebo/shared";
-import { Alert, Badge, Button, buttonClass, Card, Checkbox, cn, Input } from "@kebo/ui";
+import { Badge, Button, buttonClass, Card, Checkbox, cn, Input, controlClass, controlSizes, Notice, chipClass } from "@kebo/ui";
 import { FileActions } from "@/components/common/file-actions";
 import type { ActionState } from "@/lib/actions";
 import type { PaperChecks } from "@/lib/types-papers";
@@ -36,7 +36,7 @@ function Preview({ src, title }: { src: string; title: string }) {
   return (
     <div
       ref={box}
-      className="relative w-full overflow-hidden rounded-lg border border-line bg-[#e7ebf0]"
+      className="relative w-full overflow-hidden rounded-lg border border-line bg-surface-3"
       style={{ height: SHEET_HEIGHT * scale }}
     >
       <iframe
@@ -102,7 +102,7 @@ function CheckRow({
               type={fix.type}
               value={v}
               onChange={(e) => setV(e.target.value)}
-              className="h-8 w-36 min-w-0 rounded-md border-[1.5px] border-primary/60 bg-surface px-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+              className={cn(controlClass, controlSizes.sm, "w-36 min-w-0 border-primary/60")}
             />
             {v.trim() && (
               <Button type="submit" size="xs" variant="secondary" disabled={pending}>
@@ -147,7 +147,7 @@ function CheckRow({
                   value={hs[l.id] ?? ""}
                   onChange={(e) => setHs((x) => ({ ...x, [l.id]: e.target.value }))}
                   inputMode="decimal"
-                  className="h-7 w-28 rounded-md border border-line-strong bg-surface px-2 text-xs focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                  className={cn(controlClass, controlSizes.sm, "w-28 tabular")}
                 />
                 {hs[l.id]?.trim() && (
                   <Button type="submit" size="xs" variant="secondary" disabled={pending}>
@@ -258,7 +258,7 @@ function BuyerBox({
   return (
     <section aria-labelledby="buyer" className="rounded-lg border border-line p-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 id="buyer" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+        <h3 id="buyer" className="text-2xs font-semibold tracking-wide text-muted uppercase">
           Buyer as on the order
         </h3>
         {editing && p.canRefreshBuyer && (
@@ -301,7 +301,7 @@ function TermsBox({ p }: { p: PaperChecks }) {
   if (!t) return null;
   return (
     <section aria-labelledby="terms" className="rounded-lg border border-warn/40 bg-warn-soft p-3">
-      <h3 id="terms" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+      <h3 id="terms" className="text-2xs font-semibold tracking-wide text-muted uppercase">
         Payment terms
       </h3>
       <p className="mt-1 text-sm">
@@ -424,10 +424,7 @@ export function MakePaper({
                 key={f.id}
                 href={`${base}/papers/${p.kind}?ref=${f.id}`}
                 aria-current={p.ref === f.id ? "page" : undefined}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-xs",
-                  p.ref === f.id ? "border-primary bg-primary-soft text-primary" : "border-line text-text-2",
-                )}
+                className={chipClass(p.ref === f.id)}
               >
                 {f.name}
               </Link>
@@ -435,11 +432,11 @@ export function MakePaper({
           </nav>
         )}
 
-        {error && <Alert tone="error">{error}</Alert>}
-        {notice && <Alert tone="success">{notice}</Alert>}
+        {error && <Notice tone="bad">{error}</Notice>}
+        {notice && <Notice tone="ok">{notice}</Notice>}
 
         <section aria-labelledby="filled">
-          <h3 id="filled" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+          <h3 id="filled" className="text-2xs font-semibold tracking-wide text-muted uppercase">
             Filled from the order
           </h3>
           <ul className="mt-1 flex flex-col divide-y divide-line">
@@ -468,7 +465,7 @@ export function MakePaper({
 
         {editing && p.options.length > 0 && (
           <fieldset>
-            <legend className="text-[11px] font-semibold tracking-wide text-muted uppercase">Options</legend>
+            <legend className="text-2xs font-semibold tracking-wide text-muted uppercase">Options</legend>
             <div className="mt-1.5 flex flex-col gap-2">
               {p.options.map((o) => (
                 <label key={o.key} className="flex items-center gap-2.5 text-sm">
@@ -539,7 +536,7 @@ export function MakePaper({
 
         {p.versions.length > 1 && (
           <section aria-labelledby="versions">
-            <h3 id="versions" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+            <h3 id="versions" className="text-2xs font-semibold tracking-wide text-muted uppercase">
               Versions
             </h3>
             <ul className="mt-1 flex flex-col gap-1 text-xs">

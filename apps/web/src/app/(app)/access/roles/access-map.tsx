@@ -15,7 +15,7 @@ function Calls({ routes, note }: { routes: AccessRoute[]; note?: (r: AccessRoute
     <ul className="mt-2 flex flex-col gap-1 pb-1">
       {routes.map((r) => (
         <li key={`${r.method} ${r.path}`} className="text-xs text-text-2">
-          <code className="font-mono text-[11.5px] text-text">{call(r)}</code>
+          <code className="font-mono text-2xs text-text">{call(r)}</code>
           {note?.(r) && <span className="ml-2 text-muted">{note(r)}</span>}
         </li>
       ))}
@@ -56,7 +56,7 @@ export function AccessMapCard({ routes }: { routes: AccessRoute[] }) {
                 return (
                   <li key={it.permission}>
                     <details className="group py-1">
-                      <summary className="tap cursor-pointer text-[13px] text-text-2 marker:text-muted">
+                      <summary className="tap cursor-pointer text-md text-text-2 marker:text-muted">
                         <span className="font-medium text-text">{it.label}</span>
                         <span className="ml-2 text-xs text-muted">
                           {need.length} {need.length === 1 ? "call" : "calls"}

@@ -108,7 +108,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
             place: "primary",
             when: d.allowed.quote && x.lines.length > 0,
             node: (
-              <ButtonLink href={`${base}/quotation?start=1&offer=${x.id}`} variant="primary" size="sm">
+              <ButtonLink href={`${base}/quotation?start=1&offer=${x.id}`} variant="primary">
                 <Plus aria-hidden /> Quote this offer
               </ButtonLink>
             ),
@@ -134,7 +134,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
             title: "Quoted in",
             children: quotedIn.length ? (
               quotedIn.map((y) => (
-                <Link key={y.id} href={`${base}/quotations/${y.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-[13px] hover:bg-surface-2">
+                <Link key={y.id} href={`${base}/quotations/${y.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-md hover:bg-surface-2">
                   <span className="font-semibold">
                     {y.refNo} <span className="font-normal text-text-2">R{y.number}</span>
                   </span>
@@ -142,7 +142,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
                 </Link>
               ))
             ) : (
-              <p className="text-[13px] text-text-2">Not quoted yet.</p>
+              <p className="text-md text-text-2">Not quoted yet.</p>
             ),
           },
           ...(asked
@@ -150,7 +150,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
                 {
                   id: "o-asked",
                   title: "Asked",
-                  children: <p className="text-[13px] text-text-2">{`${date(asked.sentOn)}${asked.channel ? ` by ${REQUEST_CHANNEL_LABEL[asked.channel].toLowerCase()}` : ""}`}</p>,
+                  children: <p className="text-md text-text-2">{`${date(asked.sentOn)}${asked.channel ? ` by ${REQUEST_CHANNEL_LABEL[asked.channel].toLowerCase()}` : ""}`}</p>,
                 },
               ]
             : []),

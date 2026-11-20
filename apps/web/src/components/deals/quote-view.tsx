@@ -163,7 +163,7 @@ export function quotePrices(o: OptionView, currency: string, phone: { edit?: boo
                 </OpenPanelButton>
               </div>
             ) : phone.locked ? (
-              <p className="flex items-center gap-1.5 px-4 pt-1 pb-2 text-[13px] text-text-2">
+              <p className="flex items-center gap-1.5 px-4 pt-1 pb-2 text-md text-text-2">
                 <Lock className="size-3.5" aria-hidden /> Sent: a change needs a new revision.
               </p>
             ) : null}

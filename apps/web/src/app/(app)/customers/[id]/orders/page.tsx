@@ -1,16 +1,17 @@
 import { X } from "lucide-react";
 import { ORDER_WORD_TONE } from "@kebo/shared";
-import { ButtonLink, Card, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead, toPage, type StatusMeaning } from "@kebo/ui";
+import { ButtonLink, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead, toPage, type StatusMeaning } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { customerOf, customerPaymentsOf } from "@/lib/party-data";
-import { date, whole, companyToday } from "@/lib/format";
+import { date, whole, companyToday, countOf } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
 import type { CustomerPayments } from "@/lib/types-money";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { late } from "../shared";
 import { customerTitle } from "@/lib/titles";
+import { TabList } from "@/components/lists/tab-list";
 
 export const generateMetadata = customerTitle("Orders");
 
@@ -95,7 +96,7 @@ export default async function CustomerOrders({
           { name: "year", label: "Year", value: sp.year, options: years.map((y) => ({ value: y, label: y })) },
         ]}
       />
-      <Card className="overflow-clip p-0">
+      <TabList title="Orders" summary={countOf(rows.length, "order", "orders")}>
         {rows.length === 0 ? (
           <EmptyState
             title={filtered ? "No orders match" : "No orders yet"}
@@ -125,7 +126,7 @@ export default async function CustomerOrders({
                 );
               })}
             </PhoneList>
-            <DataTable label="Orders" className="max-sm:hidden" tableClassName="min-w-[1000px] text-[13px]">
+            <DataTable label="Orders" className="max-sm:hidden">
                 <THead>
                   <tr>
                     <Th>Order</Th>
@@ -177,7 +178,7 @@ export default async function CustomerOrders({
             </DataTable>
           </>
         )}
-      </Card>
+      </TabList>
       <Pager base={base} params={{ q: sp.q, status: sp.status, year: sp.year }} page={page} total={rows.length} bare />
     </>
   );

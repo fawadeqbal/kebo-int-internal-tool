@@ -1,7 +1,7 @@
 "use client";
 
 import { Children, useEffect, useRef, useState, type ReactNode } from "react";
-import { cn } from "@kebo/ui";
+import { boxTitleClass, cn, EmptyLine } from "@kebo/ui";
 
 /** How many rows a section shows before it folds behind "Show all n" (phone); on a wide screen it scrolls after about six. */
 const ROWS = 5;
@@ -39,7 +39,7 @@ export function SidePanelCard({ children, label }: { children: ReactNode; /** It
 }
 
 /**
- * One section of the panel: "Title n" and its button, then two-line rows —
+ * One section of every side panel (records and steps alike): "Title n" and its button, then two-line rows —
  * about six, then the list scrolls inside (desktop), or five and "Show all n"
  * (phone) — then an optional footer (the costs' total).
  */
@@ -48,6 +48,7 @@ export function SideSection({
   title,
   count,
   action,
+  lead,
   empty,
   footer,
   dense,
@@ -58,6 +59,8 @@ export function SideSection({
   title: string;
   count?: number;
   action?: ReactNode;
+  /** Above its rows (a picker). */
+  lead?: ReactNode;
   empty?: ReactNode;
   footer?: ReactNode;
   /** Changes: scrolls after 300px (the rest 330px). */
@@ -81,12 +84,13 @@ export function SideSection({
   return (
     <section aria-label={title} data-target={target} data-target-card={target ? "" : undefined} className="border-b border-line px-[18px] pt-3.5 pb-3 last:border-b-0">
       <div className="mb-1 flex min-h-8 items-center justify-between gap-2">
-        <h3 className="text-[15px] font-semibold">
+        <h3 className={boxTitleClass}>
           {title}
-          {count !== undefined && <span className="ml-1.5 text-[13px] font-normal text-muted tabular">{count}</span>}
+          {count !== undefined && <span className="ml-1.5 text-md font-normal text-muted tabular">{count}</span>}
         </h3>
         {action && <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">{action}</span>}
       </div>
+      {lead}
       {rows.length ? (
         <ul
           ref={list}
@@ -101,7 +105,7 @@ export function SideSection({
           {rows}
         </ul>
       ) : (
-        empty && <p className="my-1.5 text-sm text-muted">{empty}</p>
+        empty && <EmptyLine className="my-1.5">{empty}</EmptyLine>
       )}
       {rows.length > ROWS && !all && (
         <button type="button" className="mt-1 text-sm font-medium text-primary hover:underline lg:hidden" onClick={() => setAll(true)}>

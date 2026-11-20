@@ -58,8 +58,12 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await offer.getByLabel("Months").fill("12");
   expect(await accessibilityProblems(page), "the offer's form meets WCAG 2.2 AA").toEqual([]);
   await offer.getByRole("button", { name: /^Next/ }).click();
-  await offer.getByRole("button", { name: /^Save \d+ changes/ }).click();
-  await answerWhy(page, "Supplier changed its terms");
+  // Lead time and warranty were empty, so they are only Added (canvas group 9); the payment replaces the split the offer
+  // was saved with, if it had one — then that one change asks why before it saves.
+  await offer.getByRole("button", { name: /^Save( 1 change)?$/ }).click();
+  const why = page.getByRole("dialog", { name: /^Why (the change|these changes)\?$/ });
+  if (await Promise.race([why.waitFor({ timeout: 10_000 }).then(() => true), offer.waitFor({ state: "hidden", timeout: 10_000 }).then(() => false)]))
+    await answerWhy(page, "Supplier changed its terms");
   await expect(offer).toBeHidden();
   // The offer's page: a box per part, the same as its steps.
   await expect(page.getByRole("region", { name: "Delivery & payment", exact: true })).toContainText("30 days after the deposit");
@@ -190,8 +194,9 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(form.getByRole("link", { name: "Open the payment plan" })).toBeVisible();
   expect(await accessibilityProblems(page), "the Edit window meets WCAG 2.2 AA").toEqual([]);
   await form.locator("#agr-pod").fill("Karachi");
-  await form.getByRole("button", { name: /^Save \d+ changes?$/ }).click();
-  await form.getByRole("button", { name: "Agreed a new port" }).click();
+  // An empty port filled is Added (the button says Save); the order still asks why, as it differs from the quotation.
+  await form.getByRole("button", { name: /^Save( \d+ changes?)?$/ }).click();
+  await form.getByRole("radio", { name: "Agreed a new port" }).click();
   await form.getByRole("button", { name: "Save with this reason" }).click();
   await expect(form).toBeHidden();
   await expect(agreed.getByText("Karachi")).toBeVisible();
@@ -227,7 +232,7 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(factory.getByText("30 days after the deposit")).toBeVisible();
   await expect(factory.getByText("12 months", { exact: true })).toBeVisible();
   expect(await accessibilityProblems(page), "the purchase order meets WCAG 2.2 AA").toEqual([]);
-  await factory.getByRole("button", { name: "Change", exact: true }).click();
+  await factory.getByRole("button", { name: "Edit what we agreed with the supplier" }).click();
   const terms = page.getByRole("dialog", { name: /What we agreed with Jinan Terms/ });
   await expect(terms.getByText(/Not sent yet/)).toBeVisible();
   expect(await accessibilityProblems(page), "the supplier's Change window meets WCAG 2.2 AA").toEqual([]);

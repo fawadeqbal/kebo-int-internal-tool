@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
-import { Alert, buttonClass } from "@kebo/ui";
+import { buttonClass, Notice } from "@kebo/ui";
 import { companyOrigin } from "@kebo/shared";
 import { apiFetch } from "@/lib/api";
 import { AuthShell } from "@/app/login/auth-shell";
@@ -21,7 +21,7 @@ export default async function ConfirmSignUpPage({ searchParams }: { searchParams
       {res?.ok ? (
         <div className="flex flex-col items-center gap-3 text-center">
           <CheckCircle2 className="size-10 text-ok" aria-hidden />
-          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">Your workspace is ready</h1>
+          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-2xl sm:leading-9">Your workspace is ready</h1>
           <p className="text-sm text-muted">Sign in with {body.email} and the password you chose.</p>
           <a href={login} className={buttonClass("primary", "lg", "w-full")}>
             Sign in
@@ -29,10 +29,10 @@ export default async function ConfirmSignUpPage({ searchParams }: { searchParams
         </div>
       ) : (
         <>
-          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">This link does not work</h1>
-          <Alert tone="warning" className="mt-3">
+          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-2xl sm:leading-9">This link does not work</h1>
+          <Notice tone="todo" className="mt-3">
             {body.error ?? "It has expired. Sign up again."}
-          </Alert>
+          </Notice>
           <Link href="/sign-up" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
             Sign up again
           </Link>

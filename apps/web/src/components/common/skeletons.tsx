@@ -1,4 +1,4 @@
-import { cn } from "@kebo/ui";
+import { cn, RULES } from "@kebo/ui";
 
 /*
  * Board "Loading": while a page's data comes, the page's own frame is drawn with grey bars where the words
@@ -255,7 +255,7 @@ export function TabSkeleton({ side = true, tiles = 0, table = false }: { side?: 
   return (
     <Loading className="flex flex-col gap-4">
       {tiles > 0 && <TilesSkeleton count={tiles} />}
-      <div className={cn("grid items-start gap-4", side && "lg:grid-cols-[minmax(0,1fr)_320px]")}>
+      <div className={cn("grid items-start gap-4", side && RULES.page.withPanel)}>
         <div className="flex min-w-0 flex-col gap-4">
           {table ? (
             <TableSkeleton rows={6} cols={5} />

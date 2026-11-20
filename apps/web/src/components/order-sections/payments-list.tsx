@@ -80,7 +80,7 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
                 <Td>{x.how}</Td>
                 <Td>{x.account ?? <span className="text-muted">—</span>}</Td>
                 <Td>{x.reference ? <RefCode>{x.reference}</RefCode> : <span className="text-muted">—</span>}</Td>
-                <Td className="text-[12.5px] text-text-2" title={dateTime(x.recordedAt)}>
+                <Td className="text-xs text-text-2" title={dateTime(x.recordedAt)}>
                   {x.recordedBy ?? "—"}
                   <span className="block whitespace-nowrap text-muted">{dayMonth(x.recordedAt)}</span>
                 </Td>

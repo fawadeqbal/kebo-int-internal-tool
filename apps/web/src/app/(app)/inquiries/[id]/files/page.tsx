@@ -1,6 +1,6 @@
 import { Download, Eye, File as FileIcon } from "lucide-react";
 import { can } from "@kebo/shared";
-import { buttonClass, Card, CardBody, CardHeader, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { buttonClass, Card, CardBody, CardHeader, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { date, fileSize } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
@@ -63,7 +63,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
         {files.length ? (
           <FilesTable files={files} />
         ) : (
-          <EmptyState title="No files yet" description="The customer's URS, drawings and photos go here." />
+          <EmptyLine inset>No files yet. The customer's URS, drawings and photos go here.</EmptyLine>
         )}
       </Card>
 
@@ -76,7 +76,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
               </>
             }
           />
-          <Table className="min-w-[720px]">
+          <Table>
             <THead>
               <tr>
                 <Th>File</Th>

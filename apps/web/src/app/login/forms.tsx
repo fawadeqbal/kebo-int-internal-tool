@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { Alert, Field, Input } from "@kebo/ui";
+import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { loginAction, twoStepAction } from "./actions";
 
@@ -41,7 +41,7 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
           <p className="pt-1 text-center text-xs text-muted">or sign in with an email</p>
         </div>
       )}
-      {state.message && state.code === "choose_company" && <Alert tone="info">{state.message}</Alert>}
+      {state.message && state.code === "choose_company" && <Notice tone="info">{state.message}</Notice>}
       <input type="hidden" name="next" value={next ?? ""} />
       {state.code === "choose_company" && Array.isArray(state.data) && (
         <fieldset className="flex flex-col gap-2">
@@ -77,7 +77,7 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
             onClick={() => setShowPassword((v) => !v)}
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
-            className="absolute inset-y-1 right-1 rounded-md px-2.5 text-[13px] font-semibold text-text-2 hover:bg-surface-2"
+            className="absolute inset-y-1 right-1 rounded-md px-2.5 text-md font-semibold text-text-2 hover:bg-surface-2"
           >
             {showPassword ? "Hide" : "Show"}
           </button>
@@ -88,10 +88,10 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
         <input type="checkbox" name="keep" defaultChecked className="size-[18px] accent-primary-solid" />
         Keep me signed in
       </label>
-      <SubmitButton pendingText="Signing in…" className="h-11 w-full text-[15px]">
+      <SubmitButton pendingText="Signing in…" className="w-full">
         Sign in
       </SubmitButton>
-      {state.message && state.code !== "choose_company" && <Alert tone="error">{state.message}</Alert>}
+      {state.message && state.code !== "choose_company" && <Notice tone="bad">{state.message}</Notice>}
     </form>
   );
 }
@@ -143,18 +143,18 @@ export function TwoStepForm({ next }: { next?: string }) {
                   e.preventDefault();
                   put(i, e.clipboardData.getData("text"));
                 }}
-                className="h-14 w-11 rounded-[10px] border border-line-strong bg-surface text-center text-[22px] font-bold text-text outline-none focus:border-2 focus:border-primary-solid sm:w-12"
+                className="h-14 w-11 rounded-[10px] border border-line-strong bg-surface text-center text-xl font-bold text-text outline-none focus:border-2 focus:border-primary-solid sm:w-12"
               />
             ))}
           </div>
           {state.errors?.code && <p className="mt-2 text-xs text-bad">{state.errors.code[0]}</p>}
         </fieldset>
       )}
-      {state.message && <Alert tone="error">{state.message}</Alert>}
+      {state.message && <Notice tone="bad">{state.message}</Notice>}
       <SubmitButton pendingText="Checking…" className="w-full">
         Verify
       </SubmitButton>
-      <p className="text-[13px] text-muted">
+      <p className="text-md text-muted">
         {recovery ? "Have your phone? " : "Lost your phone? "}
         <button type="button" onClick={() => setRecovery((r) => !r)} className="font-semibold text-primary hover:underline">
           {recovery ? "Use the 6-digit code" : "Use a recovery code"}

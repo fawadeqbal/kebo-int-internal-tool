@@ -1,8 +1,10 @@
 "use client";
 
+import { ChoiceChips } from "@/components/common/choice-chips";
 import { useState, type ReactNode } from "react";
 import { REASON_CHOICES } from "@kebo/shared";
-import { Button, cn, Field, Textarea } from "@kebo/ui";
+import { Button, Field, Textarea, Badge, Notice } from "@kebo/ui";
+import { ChangeText } from "@/components/common/change-words";
 import { Modal } from "@/components/common/dialog";
 import type { EditCard } from "@/lib/types-edits";
 import { formatDayMonth, formatTime, todayIn, type TimeStyle } from "@kebo/utils";
@@ -33,12 +35,12 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
         Edited {card.count}×{last?.by && <span className="max-sm:hidden"> · last by {last.by.split(" ")[0]}, {whenText(last.at, style)}</span>}
       </button>
       {open && (
-        <Modal title={`${title} · edited ${card.count}× since first saved`} onClose={() => setOpen(false)}>
+        <Modal title={`${title} · edited ${card.count}× since it was made`} onClose={() => setOpen(false)}>
           <ol className="flex flex-col divide-y divide-line">
             {card.edits.map((e) => (
               <li key={`${e.n}-${e.at}`} className="flex flex-col gap-1 py-3">
                 <span className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-bold text-warn">Edit {e.n}</span>
+                  <Badge size="sm" tone="warn">Edit {e.n}</Badge>
                   <b>{e.by ?? "Someone"}</b>
                   <span className="text-xs text-muted">{whenText(e.at, style)}</span>
                 </span>
@@ -48,9 +50,11 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
                   </span>
                 )}
                 {e.changes.length > 0 && (
-                  <ul className="text-[13px] leading-relaxed text-text-2">
+                  <ul className="text-md leading-relaxed text-text-2">
                     {e.changes.slice(0, 12).map((c, i) => (
-                      <li key={i}>{c}</li>
+                      <li key={i}>
+                        <ChangeText text={c} />
+                      </li>
                     ))}
                     {e.changes.length > 12 && <li>and {e.changes.length - 12} more</li>}
                   </ul>
@@ -59,7 +63,7 @@ export function EditsChip({ card, title = "This card" }: { card: EditCard | null
             ))}
             {card.first && (
               <li className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <span className="rounded-full bg-ok-soft px-2 py-0.5 text-xs font-bold text-ok">First saved</span>
+                <Badge size="sm" tone="ok">Made</Badge>
                 <b>{card.first.by ?? "Someone"}</b>
                 <span className="text-xs text-muted">{whenText(card.first.at, style)}</span>
               </li>
@@ -76,7 +80,7 @@ export function editedMark(card: EditCard | null | undefined, key: string): Reac
   const n = card?.keys[key] ?? 0;
   if (!n) return null;
   return (
-    <span className="ml-1.5 align-middle text-[11px] font-semibold text-warn" title={`Changed in ${n} edit${n === 1 ? "" : "s"} since it was first saved`}>
+    <span className="ml-1.5 align-middle text-2xs font-semibold text-warn" title={`Changed in ${n} edit${n === 1 ? "" : "s"} since it was first saved`}>
       edited{n > 1 ? ` ${n}×` : ""}
     </span>
   );
@@ -120,7 +124,7 @@ export function ReasonDialog({
       title={
         <span className="flex flex-wrap items-center gap-2">
           {title}
-          {n ? <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-bold text-warn">Edit {n}</span> : null}
+          {n ? <Badge size="sm" tone="warn">Edit {n}</Badge> : null}
         </span>
       }
       sub={sub}
@@ -139,9 +143,9 @@ export function ReasonDialog({
       }
     >
       <div className="flex flex-col gap-4">
-        {note && <p className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm leading-relaxed">{note}</p>}
+        {note && <Notice tone="todo">{note}</Notice>}
         {changes.length > 0 && (
-          <ul className="flex max-h-56 flex-col divide-y divide-line overflow-y-auto rounded-lg border border-line text-[13px]">
+          <ul className="flex max-h-56 flex-col divide-y divide-line overflow-y-auto rounded-lg border border-line text-md">
             {changes.map((c, i) => (
               <li key={i} className="px-3 py-2">
                 {c}
@@ -153,23 +157,7 @@ export function ReasonDialog({
           <span className="text-sm font-semibold">
             Reason <span className="text-bad">*</span>
           </span>
-          <div role="radiogroup" aria-label="Reason" className="flex flex-wrap gap-2">
-            {choices.map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={pick === c}
-                onClick={() => setPick(pick === c ? null : c)}
-                className={cn(
-                  "h-9 rounded-full border px-3 text-[13px]",
-                  pick === c ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line-strong bg-surface hover:border-primary",
-                )}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+          <ChoiceChips label="Reason" value={pick ?? ""} options={choices} onChange={setPick} />
           <Field label="Or write it" htmlFor="edit-reason">
             <Textarea id="edit-reason" rows={2} className="min-h-0" maxLength={500} value={text} onChange={(e) => setText(e.target.value)} />
           </Field>

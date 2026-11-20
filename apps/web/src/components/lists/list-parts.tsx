@@ -8,38 +8,14 @@ import { Avatar, Badge, cn } from "@kebo/ui";
  * row of three lines. Drawn on the inquiries list; orders, customers, suppliers and quotations use the same.
  */
 
-export interface Fact {
-  label: string;
-  value: ReactNode;
-  /** After the value, in grey ("9 quotations", "this year"). */
-  sub?: string;
-  tone?: "bad";
-}
-
-/**
- * One slim line of facts, only what the tabs do not already say (never a big card per number). Not on a phone:
- * there the tabs and the rows are the page.
- */
-export function FactLine({ facts, className }: { facts: Fact[]; className?: string }) {
-  if (!facts.length) return null;
-  return (
-    <dl aria-label="Facts" className={cn("mb-4 flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>
-      {facts.map((f, i) => (
-        <div key={f.label} className={cn("flex items-baseline gap-1.5 px-3.5 text-[13px] whitespace-nowrap text-muted", i > 0 && "border-l border-line")}>
-          <dt>{f.label}</dt>
-          <dd className={cn("text-sm font-bold text-text tabular", f.tone === "bad" && "text-bad")}>{f.value}</dd>
-          {f.sub && <dd>{f.sub}</dd>}
-        </div>
-      ))}
-    </dl>
-  );
-}
+/** The facts line is the one in @kebo/ui (FactsLine), the same on every list. */
+export { FactsLine as FactLine, type Fact } from "@kebo/ui";
 
 /** Who is responsible: initials and name, or "Nobody yet" in orange. `short`: the phone's smaller one. */
 export function Responsible({ name, short }: { name: string | null | undefined; short?: boolean }) {
-  if (!name) return <span className={cn("font-semibold whitespace-nowrap text-action", short ? "text-[12.5px]" : "text-[13.5px]")}>Nobody yet</span>;
+  if (!name) return <span className={cn("font-semibold whitespace-nowrap text-action", short ? "text-xs" : "text-md")}>Nobody yet</span>;
   return (
-    <span className={cn("inline-flex min-w-0 items-center whitespace-nowrap text-text", short ? "gap-1.5 text-[12.5px] text-text-2" : "gap-2 text-[13.5px]")}>
+    <span className={cn("inline-flex min-w-0 items-center whitespace-nowrap text-text", short ? "gap-1.5 text-xs text-text-2" : "gap-2 text-md")}>
       <Avatar name={name} size={short ? 20 : 24} />
       <span className="truncate">{name}</span>
     </span>
@@ -75,7 +51,7 @@ export function Stands({ pill, fact }: { pill: ReactNode; fact?: ReactNode }) {
   return (
     <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
       {pill}
-      {fact && <span className="truncate text-[13px] text-text-2">{fact}</span>}
+      {fact && <span className="truncate text-md text-text-2">{fact}</span>}
     </span>
   );
 }
@@ -87,11 +63,11 @@ export function Stands({ pill, fact }: { pill: ReactNode; fact?: ReactNode }) {
 export function ListRow({ href, title, tag, end, line, stands, who }: { href: string; title: ReactNode; tag?: ReactNode; end?: ReactNode; line: ReactNode; stands: ReactNode; who?: ReactNode }) {
   return (
     <li>
-      <Link href={href} className="block px-4 py-3 text-[13px] leading-[18px] active:bg-surface-2">
+      <Link href={href} className="block px-4 py-3 text-md leading-[18px] active:bg-surface-2">
         <span className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate text-[14.5px] leading-5 font-semibold text-text">{title}</span>
+          <span className="min-w-0 flex-1 truncate text-sm leading-5 font-semibold text-text">{title}</span>
           {tag}
-          {end && <span className="shrink-0 text-[13px]">{end}</span>}
+          {end && <span className="shrink-0 text-md">{end}</span>}
         </span>
         <span className="mt-px block truncate text-text-2">{line}</span>
         <span className="mt-1.5 flex items-center gap-2">

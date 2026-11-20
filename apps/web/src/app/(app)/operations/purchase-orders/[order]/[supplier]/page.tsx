@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, Printer, ShoppingCart } from "lucide-react";
+import { ExternalLink, Printer } from "lucide-react";
 import { PAYMENT_METHOD_LABEL, RECORD_KIND, RECORD_TITLE } from "@kebo/shared";
-import { ButtonLink, PageHeader, StatusBadge } from "@kebo/ui";
+import { ButtonLink, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderFilesOf, orderMoneyOf, orderOf } from "@/lib/order-data";
@@ -24,6 +24,8 @@ import { FileToolsProvider } from "@/components/files/file-tools";
 import { factoryPaymentAction } from "../../../../money/actions";
 import { stageData } from "../../../../orders/[id]/stage-data";
 import { cache } from "react";
+import { RecordShell } from "@/components/records/record-frame";
+import { RecordTop } from "@/components/records/record-page";
 
 /** The order's purchase orders, read once per request (the page and its tab title). */
 const purchaseOrdersOf = cache((order: string) => optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${order}/purchase-orders`)));
@@ -119,15 +121,16 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
 
   return (
     <FileToolsProvider orderId={o.id} files={files?.files ?? []} targets={files?.targets ?? []} share={{ refNo: o.refNo, greeting: `Dear ${o.customer.name}`, vessel: null, eta: null }}>
-      <PageHeader
-        crumbs={[{ label: "Purchasing" }, { label: "Purchase orders", href: PURCHASE_ORDERS }, { label: po.number }]}
-        icon={ShoppingCart}
-        title={RECORD_TITLE.purchaseOrder({ items: lines, supplier: po.supplier.name })}
-        record={{ kind: RECORD_KIND.purchaseOrder, number: po.number }}
-        phoneStack
-        badge={status ? <StatusBadge meaning={status.meaning}>{status.label}</StatusBadge> : undefined}
-        summary={
-          <p className="min-w-0">
+      <RecordShell
+        top={
+          <RecordTop
+            header={{
+              crumbs: [{ label: "Purchasing" }, { label: "Purchase orders", href: PURCHASE_ORDERS }, { label: po.number }],
+              title: RECORD_TITLE.purchaseOrder({ items: lines, supplier: po.supplier.name }),
+              record: { kind: RECORD_KIND.purchaseOrder, number: po.number },
+              badge: status ? <StatusBadge meaning={status.meaning}>{status.label}</StatusBadge> : undefined,
+              summary: (
+                <p className="min-w-0">
             {meta.map((x, i) => (
               <span key={i}>
                 {i > 0 && (
@@ -139,9 +142,9 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               </span>
             ))}
           </p>
-        }
-        actions={
-          <>
+              ),
+              actions: (
+                <>
             <ButtonLink href={`/orders/${o.id}/papers/purchase-order?ref=${po.supplier.id}`}>
               <Printer aria-hidden /> View / print
             </ButtonLink>
@@ -149,10 +152,69 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               <ExternalLink aria-hidden /> Open the order
             </ButtonLink>
           </>
+              ),
+            }}
+          />
         }
-      />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex min-w-0 flex-col gap-4">
+        panelLabel="Beside the purchase order"
+        panel={
+          <>
+          <SidePanelCard>
+            <SideSection title="Key dates">
+              {(
+                [
+                  ["Order made", date(o.orderedOn)],
+                  ["Sent to the supplier", po.sentOn ? date(po.sentOn) : "—"],
+                  ["Goods ready", po.readyOn ? date(po.readyOn) : "—"],
+                ] as [string, string][]
+              ).map(([k, v]) => (
+                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-md">
+                  <span className="text-text-2">{k}</span>
+                  <span className="text-right font-semibold tabular">{v}</span>
+                </li>
+              ))}
+            </SideSection>
+            <SideSection title="Money">
+              {owed.flatMap((r) =>
+                (
+                  [
+                    ["Total", whole(r.owed, r.currency)],
+                    ["Paid", whole(r.paid, r.currency)],
+                    ["Still to pay", whole(r.toPay, r.currency)],
+                  ] as [string, string][]
+                ).map(([k, v]) => (
+                  <li key={`${r.currency}:${k}`} className="flex items-baseline justify-between gap-3 py-1 text-md">
+                    <span className="text-text-2">{k}</span>
+                    <span className="text-right font-semibold tabular">{v}</span>
+                  </li>
+                )),
+              )}
+            </SideSection>
+            <SideSection title="People">
+              {(
+                [
+                  ["Supplier", po.supplier.name],
+                  ["Customer", o.customer.name],
+                  ["Responsible person", o.inquiry.assignee?.name ?? "—"],
+                ] as [string, string][]
+              ).map(([k, v]) => (
+                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-md">
+                  <span className="text-text-2">{k}</span>
+                  <span className="text-right font-semibold">{v}</span>
+                </li>
+              ))}
+            </SideSection>
+            <SideSection title="Changed on the order">
+              <li className="py-1 text-md">
+                <Link href={orderHref} className="font-semibold text-primary hover:underline">
+                  Open {o.refNo} › Purchase order
+                </Link>
+              </li>
+            </SideSection>
+          </SidePanelCard>
+        </>
+        }
+      >
           <Section
             title="Terms"
             state={sent}
@@ -275,64 +337,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           )}
 
           <Section title="Files" files={<SectionFiles orderId={o.id} section="purchase_order" canAdd={false} />} />
-        </div>
-
-        <aside aria-label="Beside the purchase order" className="flex min-w-0 flex-col gap-4">
-          <SidePanelCard>
-            <SideSection title="Key dates">
-              {(
-                [
-                  ["Order made", date(o.orderedOn)],
-                  ["Sent to the supplier", po.sentOn ? date(po.sentOn) : "—"],
-                  ["Goods ready", po.readyOn ? date(po.readyOn) : "—"],
-                ] as [string, string][]
-              ).map(([k, v]) => (
-                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
-                  <span className="text-text-2">{k}</span>
-                  <span className="text-right font-semibold tabular">{v}</span>
-                </li>
-              ))}
-            </SideSection>
-            <SideSection title="Money">
-              {owed.flatMap((r) =>
-                (
-                  [
-                    ["Total", whole(r.owed, r.currency)],
-                    ["Paid", whole(r.paid, r.currency)],
-                    ["Still to pay", whole(r.toPay, r.currency)],
-                  ] as [string, string][]
-                ).map(([k, v]) => (
-                  <li key={`${r.currency}:${k}`} className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
-                    <span className="text-text-2">{k}</span>
-                    <span className="text-right font-semibold tabular">{v}</span>
-                  </li>
-                )),
-              )}
-            </SideSection>
-            <SideSection title="People">
-              {(
-                [
-                  ["Supplier", po.supplier.name],
-                  ["Customer", o.customer.name],
-                  ["Responsible person", o.inquiry.assignee?.name ?? "—"],
-                ] as [string, string][]
-              ).map(([k, v]) => (
-                <li key={k} className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
-                  <span className="text-text-2">{k}</span>
-                  <span className="text-right font-semibold">{v}</span>
-                </li>
-              ))}
-            </SideSection>
-            <SideSection title="Changed on the order">
-              <li className="py-1 text-[13px]">
-                <Link href={orderHref} className="font-semibold text-primary hover:underline">
-                  Open {o.refNo} › Purchase order
-                </Link>
-              </li>
-            </SideSection>
-          </SidePanelCard>
-        </aside>
-      </div>
+      </RecordShell>
     </FileToolsProvider>
   );
 }

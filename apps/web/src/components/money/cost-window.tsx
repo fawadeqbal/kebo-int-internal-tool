@@ -1,8 +1,10 @@
 "use client";
 
+import { FileZone } from "@/components/common/file-zone";
+import { ChoiceChips } from "@/components/common/choice-chips";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Copy, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Copy, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   EXPENSE_BEARER_HINT,
   EXPENSE_BEARER_LABEL,
@@ -15,13 +17,13 @@ import {
   type ExpenseCategory,
   type InquiryStage,
 } from "@kebo/shared";
-import { Alert, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Notice, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { MoneyInput } from "@/components/common/money-input";
-import { PANEL_FORM, PanelActions, PanelBody, SidePanel, WhatHappens, WindowCancelIn } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, SidePanel, WhatHappens, WindowCancelIn, WindowFooter } from "@/components/common/panel";
 import { useWindowDone } from "@/components/common/route-window";
 import { costChoicesAction, expenseAction, submitCostAction, voidExpenseAction } from "@/app/(app)/money/actions";
 import type { ActionState } from "@/lib/actions";
@@ -128,32 +130,10 @@ const rateText = (r: number) => String(Number(r.toFixed(4)));
 
 const chip = (on: boolean) =>
   cn(
-    "h-8 rounded-full border px-3 text-[13px] font-medium transition-colors",
+    "h-8 rounded-full border px-3 text-md font-medium transition-colors",
     on ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
   );
 
-/** A row of choices of which one is on (For, Paid, Who bears it). */
-function Seg<T extends string>({ labelledBy, value, options, onChange }: { labelledBy: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
-  return (
-    <div role="radiogroup" aria-labelledby={labelledBy} className="inline-flex w-fit max-w-full flex-wrap gap-0.5 rounded-[10px] border border-line bg-surface-2 p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "inline-flex h-[34px] items-center rounded-lg px-3.5 text-[13px] font-medium whitespace-nowrap text-text-2 transition-colors hover:text-text",
-            value === o.value && "bg-surface font-semibold text-text shadow-card",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function GroupLabel({ id, children, optional }: { id: string; children: ReactNode; optional?: boolean }) {
   return (
@@ -327,11 +307,11 @@ export function CostForm({
   const personName = s0.people.find((p) => p.id === paidBy)?.name ?? (paidBy === me.id ? me.name : null);
 
   const footerStart = expense && onRemove ? (
-    <button type="button" onClick={onRemove} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-bad hover:underline">
+    <button type="button" onClick={onRemove} className="inline-flex items-center gap-1.5 text-md font-semibold text-bad hover:underline">
       <Trash2 className="size-4" aria-hidden /> Remove this cost…
     </button>
   ) : expense ? undefined : (
-    <RecordedBy verify={!!send} className="text-[12.5px] text-text-2" />
+    <RecordedBy verify={!!send} className="text-xs text-text-2" />
   );
   const buttons = (
     <>
@@ -382,14 +362,14 @@ export function CostForm({
                   {forLabel}
                 </span>
                 {!send && !month && (
-                  <button type="button" onClick={() => setChoosing(true)} className="shrink-0 text-[13px] font-semibold text-primary hover:underline">
+                  <button type="button" onClick={() => setChoosing(true)} className="shrink-0 text-md font-semibold text-primary hover:underline">
                     Change
                   </button>
                 )}
               </div>
             ) : (
               <>
-                <Seg labelledBy="cost-for-label" value={place} options={forOptions} onChange={setPlace} />
+                <ChoiceChips labelledBy="cost-for-label" value={place} items={forOptions} onChange={setPlace} />
                 {loading && !choices && <p className="text-xs text-muted">Loading the customers, inquiries and orders…</p>}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {!send && place !== "company" && !fixedCustomer && (
@@ -479,7 +459,7 @@ export function CostForm({
                 </button>
               ))}
               {!allKinds && (
-                <button type="button" onClick={() => setAllKinds(true)} className="h-8 px-2 text-[13px] font-medium text-primary hover:underline">
+                <button type="button" onClick={() => setAllKinds(true)} className="h-8 px-2 text-md font-medium text-primary hover:underline">
                   More kinds
                 </button>
               )}
@@ -549,7 +529,7 @@ export function CostForm({
                 {settled.account ? ` from ${settled.account.name}` : ""}
               </p>
             ) : (
-              <Seg labelledBy="cost-paid-label" value={paid} options={paidOptions} onChange={setPaid} />
+              <ChoiceChips labelledBy="cost-paid-label" value={paid} items={paidOptions} onChange={setPaid} />
             )}
             {!settled && paid === "later" && <p className="text-xs text-text-2">It shows under Still to pay until it is paid. Pay it from its row, or from Money › To receive and to pay.</p>}
             {!settled && paid === "now" && (
@@ -624,10 +604,10 @@ export function CostForm({
               {place === "order" && (
                 <div className="flex flex-col gap-2">
                   <GroupLabel id="cost-bearer-label">Who bears it</GroupLabel>
-                  <Seg
+                  <ChoiceChips
                     labelledBy="cost-bearer-label"
                     value={bearer}
-                    options={EXPENSE_BEARERS.filter((b) => b !== "factory" || (onSetupOrder && s0.order!.factories.length > 0) || bearer === "factory").map((b) => ({ value: b, label: EXPENSE_BEARER_LABEL[b] }))}
+                    items={EXPENSE_BEARERS.filter((b) => b !== "factory" || (onSetupOrder && s0.order!.factories.length > 0) || bearer === "factory").map((b) => ({ value: b, label: EXPENSE_BEARER_LABEL[b] }))}
                     onChange={(b) => {
                       setBearer(b);
                       if (b === "factory" && onSetupOrder && s0.order!.factories.length === 1) setFactoryId(s0.order!.factories[0]!.id);
@@ -666,10 +646,10 @@ export function CostForm({
             </Field>
           )}
 
-          <PanelActions className={cn("justify-end gap-x-3 gap-y-2", !(inPanel || inWindow) && "static mx-0 mb-0 border-t-0 px-0 sm:mx-0 sm:px-0")} cancel={false}>
-            {footerStart && <span className={cn("mr-auto min-w-0 flex-[1_1_9rem] text-[12.5px] text-text-2", !expense && "max-sm:hidden")}>{footerStart}</span>}
+          <WindowFooter className={cn("justify-end gap-x-3 gap-y-2", !(inPanel || inWindow) && "static mx-0 mb-0 border-t-0 px-0 sm:mx-0 sm:px-0")} cancel={false}>
+            {footerStart && <span className={cn("mr-auto min-w-0 flex-[1_1_9rem] text-xs text-text-2", !expense && "max-sm:hidden")}>{footerStart}</span>}
             {buttons}
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>
@@ -678,35 +658,30 @@ export function CostForm({
 
 /** "Their bill or a photo": chosen here, sent once the cost is saved; a new one replaces the one kept. */
 function Receipt({ file, onChange, kept, label }: { file: File | null; onChange: (f: File | null) => void; kept: { id: string; name: string } | null; label: string }) {
+  if (!file)
+    return (
+      <FileZone
+        label={label}
+        inputId="cost-receipt"
+        compact
+        one
+        accept="image/*,application/pdf"
+        hint={kept ? <a href={`/files/${kept.id}?view=1`} target="_blank" rel="noreferrer" className="text-primary hover:underline">Kept: {kept.name} · a new one replaces it</a> : "Their bill or a photo"}
+        onFiles={(fs) => onChange(fs[0] ?? null)}
+      />
+    );
   return (
     <div className="grid content-start gap-1.5">
       <span className="flex items-baseline gap-1.5 text-sm font-medium text-text">
         {label} <span className="text-xs font-normal text-muted">optional</span>
       </span>
-      {file ? (
-        <span className="flex h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-2.5 text-sm">
-          <Paperclip className="size-4 shrink-0 text-muted" aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{file.name}</span>
-          <Button type="button" size="icon-xs" variant="ghost" onClick={() => onChange(null)} aria-label="Do not attach this file">
-            <X aria-hidden />
-          </Button>
-        </span>
-      ) : (
-        <>
-          <input id="cost-receipt" type="file" accept="image/*,application/pdf" className="peer sr-only" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
-          <label
-            htmlFor="cost-receipt"
-            className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-dashed border-primary/40 px-3 text-sm font-medium text-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary hover:bg-primary-soft"
-          >
-            <Camera className="size-4" aria-hidden /> {kept ? "Replace the file" : "Their bill or a photo"}
-          </label>
-        </>
-      )}
-      {kept && !file && (
-        <a href={`/files/${kept.id}?view=1`} target="_blank" rel="noreferrer" className="w-fit text-xs text-primary hover:underline">
-          Kept: {kept.name}
-        </a>
-      )}
+      <span className="flex h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-2.5 text-sm">
+        <Paperclip className="size-4 shrink-0 text-muted" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{file.name}</span>
+        <Button type="button" size="icon-sm" variant="ghost" onClick={() => onChange(null)} aria-label="Do not attach this file">
+          <X aria-hidden />
+        </Button>
+      </span>
     </div>
   );
 }
@@ -731,7 +706,7 @@ function CostPanel({
   onRemove?: () => void;
 }) {
   return (
-    <SidePanel title={title} description={sub} onClose={onClose} className="md:w-[640px]">
+    <SidePanel title={title} description={sub} onClose={onClose} className={RULES.window.part}>
       <PanelBody className="gap-4">
         <CostForm setup={setup} mode={mode} inPanel onSaved={onClose} onFileError={onFileError} onRemove={onRemove} />
       </PanelBody>
@@ -745,7 +720,8 @@ const subOf = (f: CostFor | null) => (!f ? "Choose what it is for" : f.place ===
 export function AddCost({
   setup,
   label = "Add a cost",
-  variant = "primary",
+  // A box head's add is the outline small button (one look for "+ New …" in a box); "strong" md: a list's top.
+  variant = "secondary",
   size = "sm",
   icon = "plus",
   template,
@@ -753,8 +729,8 @@ export function AddCost({
 }: {
   setup: CostSetup;
   label?: string;
-  variant?: "primary" | "secondary" | "ghost";
-  size?: "xs" | "sm";
+  variant?: "strong" | "secondary" | "ghost";
+  size?: "xs" | "sm" | "md";
   icon?: "plus" | "copy" | null;
   template?: CostToChange & { for?: CostFor };
   className?: string;
@@ -768,9 +744,9 @@ export function AddCost({
         {icon === "plus" ? <Plus aria-hidden /> : icon === "copy" ? <Copy aria-hidden /> : null} {label}
       </Button>
       {notice && (
-        <Alert tone="warning" className="basis-full">
+        <Notice tone="todo" className="basis-full">
           {notice}
-        </Alert>
+        </Notice>
       )}
       {open && (
         <CostPanel
@@ -792,10 +768,10 @@ export function ConfirmCost({ setup, month, sub }: { setup: CostSetup; month: Co
   const [notice, setNotice] = useState<string | null>(null);
   return (
     <>
-      <Button type="button" size="sm" variant="secondary" className="h-8 px-2.5 text-[13px]" onClick={() => setOpen(true)}>
+      <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
         Confirm
       </Button>
-      {notice && <Alert tone="warning">{notice}</Alert>}
+      {notice && <Notice tone="todo">{notice}</Notice>}
       {open && <CostPanel title="Confirm" sub={sub} setup={setup} mode={{ kind: "confirm", month }} onClose={() => setOpen(false)} onFileError={setNotice} />}
     </>
   );
@@ -810,7 +786,7 @@ export function SendCost({ setup, orders }: { setup: CostSetup; orders: { id: st
       <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
         Add a cost
       </Button>
-      {notice && <Alert tone="error">{notice}</Alert>}
+      {notice && <Notice tone="bad">{notice}</Notice>}
       {open && <CostPanel title="New cost" sub="A manager approves it before it counts" setup={setup} mode={{ kind: "send", orders }} onClose={() => setOpen(false)} onFileError={setNotice} />}
     </>
   );
@@ -860,7 +836,7 @@ export function ChangeCost({
           <Pencil aria-hidden /> Change
         </Button>
       )}
-      {notice && <Alert tone="warning">{notice}</Alert>}
+      {notice && <Notice tone="todo">{notice}</Notice>}
       {open && (
         <CostPanel
           title="Change the cost"

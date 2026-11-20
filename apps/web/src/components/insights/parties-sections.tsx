@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CHANNEL_LABEL, type InquiryChannel } from "@kebo/shared";
-import { Card, CardHeader, DataRow, FilterChip, Meter, Pager, Table, Td, Th, THead, Tr, cn, StatTile } from "@kebo/ui";
+import { Card, CardHeader, DataRow, FilterChip, Meter, Pager, Table, Td, Th, THead, Tr, cn, StatTile, EmptyLine } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { countryName } from "@/lib/countries";
 import { companyToday, money, plural, daysText } from "@/lib/format";
@@ -198,7 +198,7 @@ export function FactoriesSection({
           description={`click a supplier for its page${d.shipped?.withDate ? ` · orders shipped on time: ${percent(d.shipped.percent)} (${d.shipped.onTime} of ${d.shipped.withDate})` : ""}`}
         />
         {d.rows.length === 0 ? (
-          <p className="p-4 text-sm text-muted">No supplier ordered from or asked for prices {p.name}.</p>
+          <EmptyLine inset>No supplier ordered from or asked for prices {p.name}.</EmptyLine>
         ) : (
           <DataTable label="Suppliers">
             <THead>
@@ -424,7 +424,7 @@ export function FunnelSection({ d, p }: { d: Awaited<ReturnType<typeof loadFunne
           <CardHeader title="Why we lose" description={`${f.lost} lost ${p.name}`} />
           <div className="p-4">
             {f.lostReasons.length === 0 ? (
-              <p className="text-sm text-muted">No inquiry lost {p.name}.</p>
+              <EmptyLine>No inquiry lost {p.name}.</EmptyLine>
             ) : (
               <BarList
                 label="Why we lose"
@@ -494,7 +494,7 @@ function GroupTable({
     <Card>
       <CardHeader title={title} />
       {rows.length === 0 ? (
-        <p className="p-4 text-sm text-muted">No inquiry in this period.</p>
+        <EmptyLine inset>No inquiry in this period.</EmptyLine>
       ) : (
         <Table>
           <THead>

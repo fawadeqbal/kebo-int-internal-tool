@@ -47,7 +47,8 @@ function pageList(page: number, pages: number): (number | null)[] {
   return sorted.flatMap((p, i) => (i > 0 && p - sorted[i - 1]! > 1 ? [null, p] : [p]));
 }
 
-export function Pagination({
+/** The pager's row (Pager draws it; not used on its own). */
+function Pagination({
   base,
   params,
   page,
@@ -65,7 +66,7 @@ export function Pagination({
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
-  const box = "inline-grid h-9 min-w-9 place-items-center rounded-[10px] border px-2 text-[13px] font-medium tabular transition-colors";
+  const box = "inline-grid h-9 min-w-9 place-items-center rounded-[10px] border px-2 text-md font-medium tabular transition-colors";
   const link = (p: number, label: string, aria: string, disabled: boolean, extra?: string) => (
     <Link
       key={aria}
@@ -84,7 +85,7 @@ export function Pagination({
   return (
     <nav
       aria-label="Pagination"
-      className={cn("flex items-center justify-between gap-3 text-[13px] text-muted", bare ? "mt-4" : "border-t border-line px-4 py-2.5")}
+      className={cn("flex items-center justify-between gap-3 text-md text-muted", bare ? "mt-4" : "border-t border-line px-4 py-2.5")}
     >
       <span className="tabular">
         {from}–{to} of {total}

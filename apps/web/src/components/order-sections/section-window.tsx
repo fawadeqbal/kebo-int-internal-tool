@@ -4,11 +4,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { OrderSection } from "@kebo/shared";
 import { Pencil } from "lucide-react";
-import { Button, cn } from "@kebo/ui";
+import { Button, cn, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useChangeCount } from "@/components/common/changes";
-import { PANEL_FORM, PanelBody, PanelFooter, SidePanel, WhatHappens } from "@/components/common/panel";
+import { changeWords } from "@/components/common/change-words";
+import { PANEL_FORM, PanelBody, SidePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { WindowFiles } from "./section-files";
 
@@ -50,9 +51,8 @@ export function useOpenFromLink(name: string | undefined, open: () => void) {
 }
 
 /** The quiet words that open a window from a table row. */
-export const ROW_LINK = "text-[13px] font-medium whitespace-nowrap text-primary hover:underline";
+export const ROW_LINK = "text-md font-medium whitespace-nowrap text-primary hover:underline";
 
-const SMALL = "h-8 px-2.5 text-[13px]";
 
 /** The button that opens a window, in its look (WindowButton); the same for every kind of window. */
 export function WindowOpener({ button, disabled, onClick }: { button: WindowButton; disabled?: boolean; onClick: () => void }) {
@@ -82,7 +82,7 @@ export function WindowOpener({ button, disabled, onClick }: { button: WindowButt
   // "main" is a box's own act (Record payment, Add): plain like the others — the page's one orange button is the
   // header's next step (canvas row "The order on the same pieces": no orange buttons in boxes).
   return (
-    <Button size="sm" disabled={disabled} variant={kind === "danger" ? "danger" : "secondary"} className={SMALL} onClick={onClick}>
+    <Button size="sm" disabled={disabled} variant={kind === "danger" ? "danger" : "secondary"} onClick={onClick}>
       {button.label}
     </Button>
   );
@@ -90,25 +90,25 @@ export function WindowOpener({ button, disabled, onClick }: { button: WindowButt
 
 function Foot({ submit, danger, note, disabled }: { submit: string; danger?: boolean; note?: ReactNode; disabled?: boolean }) {
   return (
-    <PanelFooter start={note}>
+    <WindowFooter note={note}>
       <SubmitButton variant={danger ? "danger" : "primary"} disabled={disabled}>
         {submit}
       </SubmitButton>
-    </PanelFooter>
+    </WindowFooter>
   );
 }
 
 /**
  * The inside of an Edit window: its fields, counted as they are typed — the button says "No changes" (nothing to
- * save) or "Save 2 changes" (useChangeCount; the same rule as every edit window).
+ * save), "Save" (only added) or "Save 2 changes" (useChangeCount and changeWords, the rule of every edit window).
  */
 function Counted({ children, foot }: { children: ReactNode; foot: (words: string, none: boolean) => ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
-  const { count, recount } = useChangeCount(box);
+  const { changed, added, recount } = useChangeCount(box);
   return (
     <div ref={box} className="contents" onInput={recount} onChange={recount}>
       {children}
-      {foot(count === 0 ? "No changes" : count === 1 ? "Save 1 change" : `Save ${count} changes`, count === 0)}
+      {foot(changeWords({ changed, added }), changed + added === 0)}
     </div>
   );
 }
@@ -158,7 +158,7 @@ export function SectionWindow({
     <>
       <WindowOpener button={button} onClick={() => setOpen(true)} />
       {open && (
-        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && "md:w-[460px]", size === "md" && "md:w-[600px]")}>
+        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={cn(size === "sm" && RULES.window.part, size === "md" && RULES.window.part)}>
           <PanelBody>
             <ActionForm action={action} onDone={() => setOpen(false)} showSuccess={false} className={PANEL_FORM}>
               {(s) => {

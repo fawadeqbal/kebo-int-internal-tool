@@ -6,7 +6,7 @@ import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
 import { useFeature } from "@/components/common/features";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import { SwitchList } from "@/components/common/switch-list";
 import type { ActionState } from "@/lib/actions";
 import { ColoursCard } from "./colours";
@@ -27,7 +27,7 @@ function ValueText({ f, value }: { f: SettingField; value: unknown }) {
     return (
       <span className="flex flex-wrap gap-1.5">
         {(value as string[]).map((x) => (
-          <span key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-[13px]">
+          <span key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-md">
             {x}
           </span>
         ))}
@@ -54,7 +54,7 @@ function CurrenciesText({ values }: { values: Record<string, unknown> }) {
       <span>
         <span className="font-medium">{main}</span> · {CURRENCY_LABEL[main as keyof typeof CURRENCY_LABEL] ?? main} <span className="text-muted">(main)</span>
       </span>
-      <ul className="flex flex-col gap-0.5 text-[13px]">
+      <ul className="flex flex-col gap-0.5 text-md">
         {CURRENCIES.filter((c) => c !== main).map((c) => (
           <li key={c} className="tabular">
             {rates[c] ? (
@@ -238,10 +238,10 @@ function CardForm({
               ),
             )}
           </PanelSection>
-          <PanelActions>
+          <WindowFooter>
             <SubmitButton pendingText="Saving…">Save</SubmitButton>
             <PanelKeys />
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>

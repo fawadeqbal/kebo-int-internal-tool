@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { FilterCard } from "@/components/common/filter-card";
 import { Plus } from "lucide-react";
 import { COMPANY_KIND_LABEL } from "@kebo/shared";
-import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, LinkTabs, FactsLine } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { date, dateTime, timeAgo } from "@/lib/format";
 import type { CompanyRow } from "@/lib/types-platform";
@@ -58,26 +59,18 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader
+        kind="list"
         title="Companies & demos"
-        summary={
-          <>
-            {live.length} {live.length === 1 ? "company" : "companies"}
-            <span className="max-sm:hidden"> · each works in its own space; nothing is shared between them</span>
-          </>
-        }
         primary={
-          <ButtonLink href="/platform/companies/new" variant="primary">
+          <ButtonLink href="/platform/companies/new" variant="strong">
             <Plus aria-hidden /> <span className="sm:hidden">Add</span>
             <span className="max-sm:hidden">Add company or demo</span>
           </ButtonLink>
         }
       />
-      <ListToolbar
-        search={{ placeholder: "Name, short name or email", value: sp.q, clearHref: href({ q: undefined }) }}
-        keep={keep}
-        chips={chips}
-        label="Filter companies"
-      />
+      <FactsLine facts={[{ label: "Companies", value: live.length }]} />
+      <LinkTabs look="tabs" label="Kinds of company" tabs={chips} />
+      <FilterCard search="Name, short name or email" value={sp.q} keep={keep} />
       <Card className="overflow-clip p-0">
         {shown.length === 0 ? (
           live.length + gone.length === 0 && !sp.q ? (

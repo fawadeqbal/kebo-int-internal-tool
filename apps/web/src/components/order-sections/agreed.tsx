@@ -33,9 +33,9 @@ type Agreed = NonNullable<OrderView["agreed"]>;
 /** One of the four groups: its name, its main fact in bold, the rest under it. */
 export function Group({ title, big, children }: { title: string; big: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-lg border border-line bg-surface-2/40 px-3.5 py-3 text-[13px] [overflow-wrap:anywhere]">
+    <div className="flex min-w-0 flex-col gap-1 rounded-lg border border-line bg-surface-2/40 px-3.5 py-3 text-md [overflow-wrap:anywhere]">
       <h3 className="text-xs font-semibold text-text-2">{title}</h3>
-      <p className="text-[15px] font-bold">{big}</p>
+      <p className="text-lead font-bold">{big}</p>
       {children}
     </div>
   );
@@ -203,7 +203,7 @@ export function SideBySideTable({ table, customer, many }: { table: SideTable; c
         </p>
       )}
       {/* Made to fit a phone (each row a short card there): no phone-width minimum. */}
-      <table data-fit="" className="w-full table-fixed text-[13px] max-sm:block">
+      <table data-fit="" className="w-full table-fixed text-md max-sm:block">
         <caption className="sr-only">
           What we promised {customer}, beside what {table.factory} gives us ({table.offer})
         </caption>

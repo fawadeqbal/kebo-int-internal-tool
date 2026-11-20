@@ -3,16 +3,16 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { lockScroll } from "@/lib/scroll-lock";
-import { ButtonLink, cn } from "@kebo/ui";
+import { ButtonLink, cn, RULES } from "@kebo/ui";
 import { useChanges, watchChanges } from "./changes";
 import { focusables, ThrowAwayConfirm, useBackGuard, useFocusTrap, useMounted, WINDOW_BOX, WINDOW_LAYER, WindowHead } from "./dialog";
-import { PanelCloseProvider, PanelFooter } from "./panel";
+import { PanelCloseProvider, WindowFooter } from "./panel";
 
 /** Inside a RouteWindow: called by a form once it saved, to close the window (back to the page under it). */
 const WindowDone = createContext<(() => void) | null>(null);
 export const useWindowDone = () => useContext(WindowDone);
 
-const WIDTH = { md: "md:w-[600px]", lg: "md:w-[760px]", xl: "md:w-[900px]" } as const;
+const WIDTH = { md: RULES.window.part, lg: RULES.window.wideRows, xl: RULES.window.wideRows } as const;
 
 /**
  * A whole page shown as a window over the page you were on (Record payment, New company): the same frame
@@ -111,7 +111,7 @@ export function RouteWindow({
 export function FormButtons({ children, cancelHref }: { children: ReactNode; cancelHref?: string }) {
   const inWindow = useWindowDone() !== null;
   if (inWindow)
-    return <PanelFooter>{children}</PanelFooter>;
+    return <WindowFooter>{children}</WindowFooter>;
   return (
     <div className="flex flex-wrap justify-end gap-3">
       {cancelHref && (

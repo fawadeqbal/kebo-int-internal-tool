@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 // The note after an action (design "knowing what happened"): one sentence naming the thing, the facts under
 // it, the next step, Undo where safe; its kind said in words; it waits while held. And a form's mistake: what to
@@ -113,11 +113,12 @@ describe("a form's mistake", () => {
     await save();
     const box = screen.getByRole("alert");
     expect(box.textContent).toContain("Two things to fix before saving");
-    expect(screen.getByLabelText("Name").getAttribute("aria-invalid")).toBe("true");
+    // Marked a tick later (a steps window first goes to the step that holds the field).
+    await waitFor(() => expect(screen.getByLabelText("Name").getAttribute("aria-invalid")).toBe("true"));
     expect(screen.getByLabelText("Country").getAttribute("aria-invalid")).toBe("true");
     expect(document.activeElement).toBe(screen.getByLabelText("Name"));
     fireEvent.click(screen.getByRole("button", { name: "Choose a country" }));
-    expect(document.activeElement).toBe(screen.getByLabelText("Country"));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Country")));
   });
 
   it("no connection: says so with Try again, and keeps what was typed", async () => {

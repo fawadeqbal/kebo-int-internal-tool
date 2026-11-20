@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { Banknote, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 import { can } from "@kebo/shared";
-import { ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
+import { PhoneList, PhoneRow, ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission, hasFeature } from "@/lib/session";
 import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
@@ -12,7 +12,7 @@ import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
 import { supplierTitle } from "@/lib/titles";
 
-export const generateMetadata = supplierTitle("Costs");
+export const generateMetadata = supplierTitle("Money");
 
 interface Line {
   key: string;
@@ -32,7 +32,7 @@ const amount = (v: number) => (Math.abs(v) < 0.005 ? "" : two(v));
 /**
  * The supplier's Costs tab (board "Supplier — Costs tab (statement)", managers): Bought, Paid, We owe and the
  * other costs on it; then the statement — every purchase and every payment to the factory, with what we owe
- * after each — from the ledger for those who see it, else order by order. Print and Pay supplier above it.
+ * after each — from the ledger for those who see it, else order by order. Print statement above it (Pay supplier is the record's one button, at its top).
  */
 export default async function FactoryCosts({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -50,9 +50,6 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
   ]);
   const orders = (pos?.rows ?? []).filter((o) => o.status !== "cancelled");
   const cur = orders[0]?.currency ?? payables[0]?.currency ?? ledger?.currencies[0]?.currency ?? "CNY";
-  const sum = (k: "owed" | "paid" | "toPay") => orders.filter((o) => o.currency === cur).reduce((t, o) => t + Number(o[k]), 0);
-  const owing = pos ? sum("toPay") : payables.filter((p) => p.currency === cur).reduce((t, p) => t + Number(p.toPay), 0);
-  const firstOpen = orders.find((o) => Number(o.toPay) > 0.005);
 
   let lines: Line[];
   if (ledger) {
@@ -96,15 +93,8 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
 
   return (
     <div className="flex flex-col gap-4">
-      <StatRow>
-        <StatTile label="Bought" value={pos ? whole(sum("owed"), cur) : "—"} />
-        <StatTile label="Paid" value={pos ? whole(sum("paid"), cur) : "—"} />
-        <StatTile
-          label="We owe"
-          value={whole(owing, cur)}
-          tone={owing > 0.005 ? "warn" : undefined}
-          sub={owing > 0.005 && firstOpen ? `${firstOpen.refNo} first` : undefined}
-        />
+      {/* Bought, Paid and We owe are the side panel's Money box; only what it does not say is here, in the facts line. */}
+      <StatRow facts>
         <StatTile label="Other costs" value={costs ? whole(costs.total, costs.currency) : "—"} sub="visits, inspections" />
       </StatRow>
 
@@ -120,12 +110,7 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
                   target="_blank"
                   prefetch={false}
                 >
-                  <Printer aria-hidden /> Print
-                </ButtonLink>
-              )}
-              {(can(me, "payments.record") || can(me, "expenses.manage")) && (
-                <ButtonLink href={`/payments/new?kind=out&factory=${f.id}&back=/suppliers/${f.id}/costs`} variant="primary" size="sm">
-                  <Banknote aria-hidden /> Pay supplier
+                  <Printer aria-hidden /> Print statement
                 </ButtonLink>
               )}
             </span>
@@ -137,7 +122,21 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
             description="What we buy from this supplier and what we pay it show here, with what we owe after each."
           />
         ) : (
-          <DataTable label="Statement" tableClassName="min-w-[1000px] text-[13px]">
+          <>
+          {/* A phone: a row per line — what, its day and order, what it moved; the balance after it on the right. */}
+          <PhoneList label="Statement">
+            {lines.map((l) => (
+              <PhoneRow
+                key={l.key}
+                href={l.order ? `/orders/${l.order.id}` : undefined}
+                title={l.what}
+                line={[(l.date ? date(l.date) : "—"), l.order?.refNo, Math.abs(l.owed) >= 0.005 ? `${"owed"} ${amount(l.owed)}` : null, l.paid ? `paid ${amount(l.paid)}` : null].filter(Boolean).join(" · ")}
+                figure={two(l.balance)}
+              />
+            ))}
+          </PhoneList>
+          <div className="max-sm:hidden">
+          <DataTable label="Statement">
               <THead>
                 <tr>
                   <Th>Date</Th>
@@ -175,6 +174,8 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
                 </tr>
               </tfoot>
           </DataTable>
+          </div>
+          </>
         )}
       </Card>
     </div>

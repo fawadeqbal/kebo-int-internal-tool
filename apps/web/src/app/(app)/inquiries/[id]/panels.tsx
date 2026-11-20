@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+import { useConfirmSubmit } from "@/components/common/dialog";
 import { Clock } from "lucide-react";
 import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from "@kebo/shared";
-import { Field, Select, Textarea } from "@kebo/ui";
+import { Field, Select, Textarea, RULES } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelButton } from "@/components/orders/step-view";
-import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, SidePanel, useClosePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -15,11 +16,11 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 /** A panel form's Save / Cancel. */
 function Buttons({ save, danger }: { save: string; danger?: boolean }) {
   return (
-    <PanelActions>
+    <WindowFooter>
       <SubmitButton size="sm" variant={danger ? "danger" : "primary"} pendingText="Saving…">
         {save}
       </SubmitButton>
-    </PanelActions>
+    </WindowFooter>
   );
 }
 
@@ -35,7 +36,7 @@ function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
             <input type="hidden" name="to" value={to} />
             {lost && (
               <fieldset className="flex flex-col gap-2.5">
-                <legend className="mb-2 text-[13px] font-semibold">
+                <legend className="mb-2 text-md font-semibold">
                   Why was it lost? <span className="text-bad">*</span>
                 </legend>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -55,7 +56,7 @@ function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
             <Field label="Note" htmlFor="note">
               <Textarea id="note" name="note" rows={3} className="min-h-0" defaultValue={s.values?.note} />
             </Field>
-            {lost && <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">A quotation sent and not answered is marked “rejected”. You can reopen the inquiry later.</p>}
+            {lost && <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-md text-text-2">A quotation sent and not answered is marked “rejected”. You can reopen the inquiry later.</p>}
             <Buttons save={lost ? "Mark lost" : "Confirm"} danger={lost} />
           </>
         )}
@@ -118,7 +119,7 @@ export function DecisionWindows({
           title={onHold ? "Resume the inquiry" : "Put the inquiry on hold"}
           description={onHold ? "It goes back to the lists as active." : "It stays where it is, marked on hold, until resumed."}
           onClose={() => hold.close({})}
-          className="md:w-[560px]"
+          className={RULES.window.part}
         >
           <HoldForm onHold={onHold} action={holdAction} />
         </SidePanel>
@@ -128,7 +129,7 @@ export function DecisionWindows({
           title={m.to === "lost" ? `Mark ${refNo} as lost` : m.label}
           description={m.to === "lost" ? "The reason shows on reports. A manager can reopen it." : undefined}
           onClose={() => move.close({})}
-          className="md:w-[560px]"
+          className={RULES.window.part}
         >
           <StageForm to={m.to} action={stageAction} />
         </SidePanel>
@@ -259,7 +260,7 @@ export function NoteForm({ action }: { action: Action }) {
     <ActionForm action={action} resetOnSuccess showSuccess={false} className="flex flex-col gap-2">
       {(s) => (
         <>
-          <label htmlFor="inquiry-note" className="text-[13px] font-medium text-text-2">
+          <label htmlFor="inquiry-note" className="text-md font-medium text-text-2">
             Add a note
           </label>
           <Textarea id="inquiry-note" name="body" rows={2} placeholder="Write a note or @mention someone" className="min-h-0" />
@@ -276,16 +277,18 @@ export function NoteForm({ action }: { action: Action }) {
 }
 
 export function RemoveFile({ action, name }: { action: Action; name: string }) {
+  const { onClick: confirmSubmit, dialog } = useConfirmSubmit();
   return (
     <ActionForm action={action} showSuccess={false} className="inline">
       <button
         type="submit"
         className="text-xs text-muted hover:text-bad"
         aria-label={`Remove ${name}`}
-        onClick={(e) => !confirm(`Remove ${name}?`) && e.preventDefault()}
+        onClick={confirmSubmit({ question: `Remove ${name}?`, confirmLabel: "Remove", danger: true })}
       >
         Remove
       </button>
+      {dialog}
     </ActionForm>
   );
 }

@@ -3,10 +3,10 @@
 import { useState, type ReactNode } from "react";
 import { Check, Pencil } from "lucide-react";
 import { PAYMENT_ROUTES, type PaymentRoute } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, PanelFooter, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, SidePanel, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { money } from "@/lib/format";
 import type { OptionView, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
@@ -158,7 +158,7 @@ export function QuoteEdit({
 }) {
   const [open, setOpen] = useState(false);
   const [one, setOne] = useState(only);
-  const width = !one || step === "lines" ? "md:w-[1180px]" : step === "warranty" ? "md:w-[680px]" : "md:w-[820px]";
+  const width = !one || step === "lines" ? RULES.window.items : step === "warranty" ? RULES.window.part : RULES.window.wideRows;
   const at: QuoteStep = step === "terms" ? "delivery" : step;
   return (
     <>
@@ -223,7 +223,7 @@ export function AcceptForm({
           <input type="hidden" name="optionId" value={optionId} />
           <PanelBody className="flex flex-col gap-4">
             <fieldset className="flex flex-col gap-3">
-              <legend className="mb-3 text-[13px] font-semibold">
+              <legend className="mb-3 text-md font-semibold">
                 Which option did they accept?<span className="text-bad"> *</span>
               </legend>
               {options.map((o) => (
@@ -266,7 +266,7 @@ export function AcceptForm({
               </Field>
             </div>
             {chosen && (
-              <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">
+              <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-md text-text-2">
                 <strong className="block text-text">What happens</strong>
                 <span className="block">
                   · Sales order <strong className="text-text">SO-{today.slice(0, 4)}-…</strong> is made with Option {chosen.letter}&apos;s items, prices and terms.
@@ -288,11 +288,11 @@ export function AcceptForm({
               </div>
             )}
           </PanelBody>
-          <PanelActions className="static mx-0 mb-0 justify-end">
+          <WindowFooter className="static mx-0 mb-0">
             <SubmitButton pendingText="Saving…" disabled={!optionId}>
               <Check aria-hidden /> Accept and make the order
             </SubmitButton>
-          </PanelActions>
+          </WindowFooter>
         </>
       )}
     </ActionForm>
@@ -318,11 +318,11 @@ export function ExpiredForm({ action, today, number }: { action: Action; today: 
               <Input id="exp-on" name="on" type="date" max={today} className="w-44" defaultValue={s.values?.on} />
             </Field>
             <WhatHappens lines={[<>R{number} is marked <strong>Expired</strong>.</>, "The inquiry stays open.", `“Do next” becomes “Start R${number + 1} from R${number}”.`]} />
-            <PanelFooter>
+            <WindowFooter>
               <SubmitButton pendingText="Saving…">
                 Mark R{number} expired
               </SubmitButton>
-            </PanelFooter>
+            </WindowFooter>
           </>
         )}
       </ActionForm>

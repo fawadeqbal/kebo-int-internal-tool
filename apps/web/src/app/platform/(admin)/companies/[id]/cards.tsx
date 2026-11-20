@@ -1,47 +1,15 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition } from "react";
 export { GroupCard, type GroupValue } from "@/components/platform/group-card";
 import { useRouter } from "next/navigation";
 import { MODULE_PRESETS, ORDER_FLOW_FEATURES, PLAN_FEATURE_KEYS, PLAN_FEATURES, planFeatureName, withPreset } from "@kebo/shared";
 import { Badge, Button, cn } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
-import { useSidePanel } from "@/components/common/panel";
 import { Switch } from "@/components/common/switch-list";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
-
-/** A secondary button that opens one of the page's side panels (Change plan, + Record payment, Extend…). */
-export function PanelButton({
-  panel,
-  id,
-  children,
-  label,
-  variant = "secondary",
-  className,
-}: {
-  panel: string;
-  id?: string;
-  children: ReactNode;
-  label?: string;
-  variant?: "secondary" | "ghost" | "link";
-  className?: string;
-}) {
-  const p = useSidePanel(panel);
-  return (
-    <Button
-      size="sm"
-      variant={variant}
-      aria-label={label}
-      aria-haspopup="dialog"
-      className={cn(variant !== "link" && "h-8 px-2.5 text-[13px] [&_svg]:size-3.5", variant === "link" && "h-auto p-0 text-xs", className)}
-      onClick={() => p.openPanel(id)}
-    >
-      {children}
-    </Button>
-  );
-}
 
 /**
  * The modules this company uses (design system: switch list): every module,

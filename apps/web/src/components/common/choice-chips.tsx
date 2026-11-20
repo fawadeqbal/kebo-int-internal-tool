@@ -11,24 +11,36 @@ import { cn } from "@kebo/ui";
 export function ChoiceChips<T extends string>({
   id,
   label,
+  labelledBy,
   value,
-  options,
-  labels,
+  options: givenOptions,
+  labels: givenLabels,
+  items,
   onChange,
   invalid,
+  tones,
+  disabled,
   className,
 }: {
   id?: string;
-  /** What the group is (read out): "Came by". */
-  label: string;
+  /** What the group is (read out): "Came by". Or labelledBy: the id of a label already on the page. */
+  label?: string;
+  labelledBy?: string;
   value: T | "";
-  options: readonly T[];
+  options?: readonly T[];
   labels?: Partial<Record<T, string>>;
+  /** Instead of options and labels: { value, label } pairs. */
+  items?: readonly { value: T; label: string }[];
   onChange: (v: T) => void;
   invalid?: boolean;
+  /** A chosen result in its own colour (Pass green, Fail red). */
+  tones?: Partial<Record<T, "ok" | "bad">>;
+  disabled?: boolean;
   className?: string;
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const options = items ? items.map((i) => i.value) : (givenOptions ?? []);
+  const labels: Partial<Record<T, string>> = items ? (Object.fromEntries(items.map((i) => [i.value, i.label])) as Partial<Record<T, string>>) : (givenLabels ?? {});
   const at = Math.max(0, options.indexOf(value as T));
   const move = (e: KeyboardEvent, i: number) => {
     const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
@@ -39,7 +51,7 @@ export function ChoiceChips<T extends string>({
     refs.current[n]?.focus();
   };
   return (
-    <div id={id} role="radiogroup" aria-label={label} aria-invalid={invalid || undefined} className={cn("flex flex-wrap gap-2", className)}>
+    <div id={id} role="radiogroup" aria-label={labelledBy ? undefined : label} aria-labelledby={labelledBy} aria-invalid={invalid || undefined} className={cn("flex flex-wrap gap-2", className)}>
       {options.map((o, i) => {
         const on = o === value;
         return (
@@ -52,11 +64,19 @@ export function ChoiceChips<T extends string>({
             role="radio"
             aria-checked={on}
             tabIndex={i === at ? 0 : -1}
+            disabled={disabled}
             onClick={() => onChange(o)}
             onKeyDown={(e) => move(e, i)}
             className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text max-sm:h-10",
-              on ? "border-primary bg-primary-soft font-semibold text-primary" : "border-line-strong bg-surface text-text hover:bg-surface-2",
+              "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-md font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text max-sm:h-10",
+              on
+                ? tones?.[o] === "bad"
+                  ? "border-bad bg-bad-soft font-semibold text-bad"
+                  : tones?.[o] === "ok"
+                    ? "border-ok bg-ok-soft font-semibold text-ok"
+                    : "border-primary bg-primary-soft font-semibold text-primary"
+                : "border-line-strong bg-surface text-text hover:bg-surface-2",
+              "disabled:cursor-not-allowed disabled:opacity-60",
             )}
           >
             {on && <Check aria-hidden className="size-3.5" strokeWidth={3} />}
@@ -66,4 +86,10 @@ export function ChoiceChips<T extends string>({
       })}
     </div>
   );
+}
+
+/** Quick reasons ("Why the change?"): the record's choices as choice buttons. A typed reason leaves none chosen. */
+export function QuickReasons({ choices, value, onChange, label = "Quick reasons" }: { choices: readonly string[]; value: string; onChange: (v: string) => void; label?: string }) {
+  if (!choices.length) return null;
+  return <ChoiceChips label={label} value={choices.includes(value) ? value : ""} options={choices} onChange={onChange} />;
 }

@@ -1,14 +1,15 @@
 "use client";
 
+import { ChoiceChips } from "@/components/common/choice-chips";
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, Plus } from "lucide-react";
 import { fromMinor, priceForMargin, toMinor } from "@kebo/money";
 import { CURRENCIES, LOST_REASON_LABEL, LOST_REASONS, quotationLetter, type PaymentRoute } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { THead, Th, Button, cn, Field, Input, Select, Textarea, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelBody, PanelFooter, SidePanel, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, SidePanel, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { date, money } from "@/lib/format";
 import type { OptionView, QuoteOffers } from "@/lib/types-deals";
@@ -67,7 +68,7 @@ export function NewQuotationsButton({
         <Plus aria-hidden /> {label}
       </Button>
       {open && (
-        <SidePanel title="New quotations" description="Each offer ticked becomes its own draft." onClose={close} className="md:w-[860px]">
+        <SidePanel title="New quotations" description="Each offer ticked becomes its own draft." onClose={close} className={RULES.window.wideRows}>
           <NewQuotationsForm action={action} first={first} loadOffers={loadOffers} defaults={defaults} usedIn={usedIn} letters={letters} base={base} only={only} />
         </SidePanel>
       )}
@@ -145,26 +146,26 @@ function NewQuotationsForm({
               <input key={id} type="hidden" name="offer" value={id} />
             ))}
             <fieldset className="flex flex-col gap-2">
-              <legend className="mb-2 text-[13px] font-semibold">Offers</legend>
+              <legend className="mb-2 text-md font-semibold">Offers</legend>
               {/* Made to fit a phone (data-fit): the tick, the offer and its cost; where it is quoted goes under its name. */}
               <div className="relative overflow-x-auto rounded-xl border border-line">
-                <table data-fit className="w-full border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-surface-2 text-left text-xs text-text-2">
-                      <th scope="col" className="w-10 border-b border-line px-3 py-2 max-sm:w-9 max-sm:px-2.5">
+                <table data-fit className="w-full border-collapse text-md">
+                  <THead>
+                    <tr>
+                      <Th scope="col" className="w-10 max-sm:w-9">
                         <span className="sr-only">Quote it</span>
-                      </th>
-                      <th scope="col" className="border-b border-line px-3 py-2 font-medium">
+                      </Th>
+                      <Th scope="col">
                         Offer
-                      </th>
-                      <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium">
+                      </Th>
+                      <Th scope="col" className="text-right">
                         Cost
-                      </th>
-                      <th scope="col" className="border-b border-line px-3 py-2 font-medium max-sm:hidden">
+                      </Th>
+                      <Th scope="col" className="max-sm:hidden">
                         <span className="sr-only">Quoted in</span>
-                      </th>
+                      </Th>
                     </tr>
-                  </thead>
+                  </THead>
                   <tbody>
                     {(offers?.offers ?? []).map((o) => {
                       const on = ticked.includes(o.factoryQuoteId);
@@ -212,7 +213,7 @@ function NewQuotationsForm({
             </fieldset>
 
             <fieldset className="flex flex-col gap-3">
-              <legend className="mb-2 text-[13px] font-semibold">Drafts</legend>
+              <legend className="mb-2 text-md font-semibold">Drafts</legend>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Field label="Currency" htmlFor="nq-currency" error={s.errors?.currency}>
                   <Select id="nq-currency" name="currency" value={currency} onChange={(e) => void changeCurrency(e.target.value)}>
@@ -227,25 +228,25 @@ function NewQuotationsForm({
                   <Input id="nq-valid" name="validUntil" type="date" defaultValue={s.values?.validUntil ?? defaults.validUntil} />
                 </Field>
                 <Field label="Margin" htmlFor="nq-margin" error={s.errors?.margin ?? (marginOk ? undefined : "From 0 up to 99.9%")}>
-                  <Input id="nq-margin" name="margin" inputMode="decimal" value={margin} onChange={(e) => setMargin(e.target.value)} />
+                  <Input id="nq-margin" name="margin" inputMode="decimal" unit="%" value={margin} onChange={(e) => setMargin(e.target.value)} />
                 </Field>
               </div>
               {rows.length > 0 && (
                 <div className="relative overflow-x-auto rounded-xl border border-line">
-                  <table data-fit className="w-full border-collapse text-[13px]">
-                    <thead>
-                      <tr className="bg-surface-2 text-left text-xs text-text-2">
-                        <th scope="col" className="border-b border-line px-3 py-2 font-medium">
+                  <table data-fit className="w-full border-collapse text-md">
+                    <THead>
+                      <tr>
+                        <Th scope="col">
                           Quotation
-                        </th>
-                        <th scope="col" className="border-b border-line px-3 py-2 font-medium">
+                        </Th>
+                        <Th scope="col">
                           From
-                        </th>
-                        <th scope="col" className="border-b border-line px-3 py-2 text-right font-medium">
+                        </Th>
+                        <Th scope="col" className="text-right">
                           Total
-                        </th>
+                        </Th>
                       </tr>
-                    </thead>
+                    </THead>
                     <tbody>
                       {rows.map((id, i) => {
                         const o = offers?.offers.find((x) => x.factoryQuoteId === id);
@@ -266,11 +267,11 @@ function NewQuotationsForm({
               )}
             </fieldset>
 
-            <PanelFooter>
+            <WindowFooter>
               <SubmitButton pendingText="Making…" disabled={!ticked.length || !marginOk}>
                 <Check aria-hidden /> {ticked.length === 1 ? "Make the draft" : `Make ${ticked.length || ""} drafts`}
               </SubmitButton>
-            </PanelFooter>
+            </WindowFooter>
           </>
         )}
       </ActionForm>
@@ -330,25 +331,14 @@ export function AnswerButton({
         Customer answered
       </Button>
       {open && (
-        <SidePanel title={`Customer answered · ${refNo} R${number}`} description={customer} onClose={() => setOpen(false)} className="md:w-[760px]">
-          <div role="radiogroup" aria-label="Their answer" className="flex flex-wrap gap-2 px-6 pt-4 max-md:px-4">
-            {choices.map((c) => (
-              <button
-                key={c.key}
-                type="button"
-                role="radio"
-                aria-checked={answer === c.key}
-                onClick={() => setAnswer(c.key)}
-                className={cn(
-                  "h-9 rounded-full border px-4 text-[13px] font-semibold",
-                  answer === c.key ? "border-primary bg-primary-soft text-primary" : "border-line-strong bg-surface text-text hover:bg-surface-2",
-                )}
-              >
-                {c.label}
-                {c.key === "expired" && overdue ? " · ran out" : ""}
-              </button>
-            ))}
-          </div>
+        <SidePanel title={`Customer answered · ${refNo} R${number}`} description={customer} onClose={() => setOpen(false)} className={RULES.window.wideRows}>
+          <ChoiceChips
+            label="Their answer"
+            className="px-6 pt-4 max-md:px-4"
+            value={answer ?? ""}
+            items={choices.map((c) => ({ value: c.key, label: c.key === "expired" && overdue ? `${c.label} · ran out` : c.label }))}
+            onChange={setAnswer}
+          />
           {answer === "accepted" && (
             <AcceptForm options={options} currency={currency} action={answerAction} today={today} route={route} others={others} onOrder={(o) => router.push(`/orders/${o.orderId}`)} />
           )}
@@ -405,11 +395,11 @@ function SaidNoForm({ action, today, number, othersWaiting }: { action: Action; 
                 ),
               ]}
             />
-            <PanelFooter>
+            <WindowFooter>
               <SubmitButton variant={closeDeal ? "danger" : "primary"} pendingText="Saving…">
                 {closeDeal ? "Mark as lost" : `Mark R${number} rejected`}
               </SubmitButton>
-            </PanelFooter>
+            </WindowFooter>
           </>
         )}
       </ActionForm>

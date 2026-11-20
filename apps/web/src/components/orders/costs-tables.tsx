@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
 import { expenseShort, lineNumbers } from "@kebo/shared";
-import { Alert, Button } from "@kebo/ui";
+import { Button, Notice } from "@kebo/ui";
 import { useExcelAllowed } from "@/components/common/features";
 import type { LineColumn, LineRow } from "@/components/lines/line-table";
 import { lineExport } from "@/components/sheets/line-sheets";
@@ -26,7 +26,6 @@ export function CostsExcel({ costs }: { costs: OrderCosts }) {
         type="button"
         variant="secondary"
         size="sm"
-        className="h-8 px-2.5 text-[13px]"
         disabled={busy || !costs.sheet.rows.length}
         onClick={async () => {
           setBusy(true);
@@ -53,7 +52,7 @@ export function CostsExcel({ costs }: { costs: OrderCosts }) {
       >
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : <FileSpreadsheet aria-hidden />} Excel
       </Button>
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && <Notice tone="bad">{error}</Notice>}
     </>
   );
 }

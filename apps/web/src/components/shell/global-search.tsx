@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { createPortal } from "react-dom";
 import { ArrowLeft, Clock, Loader2, Search, X } from "lucide-react";
 import { SEARCH_KIND_LABEL, type SearchKind, type SearchResult } from "@kebo/shared";
-import { Badge, cn, Kbd } from "@kebo/ui";
+import { Badge, cn, Kbd, controlClass, controlSizes, EmptyLine } from "@kebo/ui";
 import { useBackGuard } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
 import { kindCount, kindOne, Marked, SEARCH_ICON as ICON, searchHref } from "./search-bits";
@@ -185,7 +185,7 @@ export function TopSearch() {
             } else box.current?.blur();
           }
         }}
-        className="h-9 w-full rounded-[10px] border border-line-strong bg-faint pr-10 pl-9 text-[13px] text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
+        className="h-9 w-full rounded-[10px] border border-line-strong bg-faint pr-10 pl-9 text-md text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
       />
       <span className="pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 lg:inline-flex">
         <Kbd>/</Kbd>
@@ -195,7 +195,7 @@ export function TopSearch() {
           <div id={`${base}-list`} role="listbox" aria-label={q.length >= 2 ? `Results for ${q}` : "Recent searches"} className="max-h-[min(70vh,560px)] overflow-y-auto py-1.5">
             {q.length < 2 ? (
               <div role="group" aria-label="Recent searches">
-                <p aria-hidden className="px-4 pt-2 pb-1 text-[11.5px] font-semibold tracking-wide text-text-2 uppercase">
+                <p aria-hidden className="px-4 pt-2 pb-1 text-2xs font-semibold tracking-wide text-text-2 uppercase">
                   Recent searches
                 </p>
                 {recentOptions.map((o, i) => (
@@ -204,13 +204,13 @@ export function TopSearch() {
               </div>
             ) : !result || flat.length === 0 ? (
               // Not a result: said in the list's place, and not picked by Enter.
-              <div role="option" aria-selected={false} aria-disabled="true" className="px-4 py-3 text-[13px] text-text-2">
+              <div role="option" aria-selected={false} aria-disabled="true" className="px-4 py-3 text-md text-text-2">
                 {!result ? (failed ? "Search did not answer. Try again in a moment." : "Searching…") : `Nothing found for “${q}”. Try a part of a name, a number or a phone.`}
               </div>
             ) : (
               groups.map((g) => (
                 <div key={g.kind} role="group" aria-label={g.title} className="border-t border-line first:border-t-0">
-                  <p aria-hidden className="px-4 pt-2.5 pb-1 text-[11.5px] font-semibold tracking-wide text-text-2 uppercase">
+                  <p aria-hidden className="px-4 pt-2.5 pb-1 text-2xs font-semibold tracking-wide text-text-2 uppercase">
                     {g.title}
                   </p>
                   {g.options.map((o) => {
@@ -254,7 +254,7 @@ function Row({ o, on, onPick, onHover, icon }: { o: Option; on: boolean; onPick:
         {icon ?? (Icon ? <Icon className="size-4" /> : <Search className="size-4" />)}
       </span>
       <span className="min-w-0 flex-1">
-        <span className={cn("block truncate text-[13.5px]", o.quiet ? "font-medium text-primary" : "font-semibold text-text")}>{o.label}</span>
+        <span className={cn("block truncate text-md", o.quiet ? "font-medium text-primary" : "font-semibold text-text")}>{o.label}</span>
         {o.sub && <span className="block truncate text-xs text-text-2">{o.sub}</span>}
       </span>
       {o.badge}
@@ -324,7 +324,7 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Names, numbers, phones…"
-            className="h-11 w-full rounded-xl border-2 border-primary-solid bg-surface pr-10 pl-9 text-base text-text focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className={cn(controlClass, controlSizes.md, "pr-10 pl-9 [&::-webkit-search-cancel-button]:hidden")}
           />
           {text && (
             <button type="button" onClick={() => setText("")} aria-label="Clear the words" className="absolute top-1/2 right-1 grid size-9 -translate-y-1/2 place-items-center text-muted">
@@ -338,7 +338,7 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
           recent.length > 0 && (
             <div className="flex flex-wrap gap-2 px-4 py-3" aria-label="Recent searches" role="group">
               {recent.map((r) => (
-                <button key={r} type="button" onClick={() => setText(r)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-[13px] text-text">
+                <button key={r} type="button" onClick={() => setText(r)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-md text-text">
                   <Clock className="size-3.5 text-muted" aria-hidden />
                   {r}
                 </button>
@@ -348,7 +348,7 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
         ) : !result ? (
           <p className="px-4 py-4 text-sm text-text-2">{failed ? "Search did not answer. Try again in a moment." : "Searching…"}</p>
         ) : result.groups.length === 0 && !result.exact ? (
-          <p className="px-4 py-4 text-sm text-text-2">Nothing found for “{q}”. Try a part of a name, a number or a phone.</p>
+          <EmptyLine inset>Nothing found for “{q}”. Try a part of a name, a number or a phone.</EmptyLine>
         ) : (
           <>
             {result.exact && (
@@ -386,7 +386,7 @@ function PhoneGroup({ title, all, children }: { title: string; all?: { href: str
   return (
     <section aria-label={title} className="border-b border-line">
       <div className="flex items-center justify-between bg-surface-2/60 px-4 py-1.5">
-        <h2 className="text-[11.5px] font-semibold tracking-wide text-text-2 uppercase">{title}</h2>
+        <h2 className="text-2xs font-semibold tracking-wide text-text-2 uppercase">{title}</h2>
         {all && (
           <Link
             href={all.href}
@@ -394,7 +394,7 @@ function PhoneGroup({ title, all, children }: { title: string; all?: { href: str
               e.preventDefault();
               all.onGo();
             }}
-            className="inline-flex min-h-8 items-center text-[13px] font-medium text-primary"
+            className="inline-flex min-h-8 items-center text-md font-medium text-primary"
           >
             {all.label}
           </Link>
@@ -421,10 +421,10 @@ function PhoneRow({ href, kind, title, sub, badge, q, onGo }: { href: string; ki
           <Icon className="size-[18px]" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-semibold text-text">
+          <span className="block truncate text-lead font-semibold text-text">
             <Marked text={title} q={q} />
           </span>
-          <span className="block truncate text-[13px] text-text-2">
+          <span className="block truncate text-md text-text-2">
             <Marked text={sub} q={q} />
           </span>
         </span>

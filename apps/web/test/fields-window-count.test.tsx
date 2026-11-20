@@ -33,10 +33,13 @@ describe("a window of saved values", () => {
     fireEvent.change(screen.getByLabelText(/Supplier says ready on/), { target: { value: "2026-12-05" } });
     expect(screen.getByRole("button", { name: "Save 1 change" })).toHaveProperty("disabled", false);
     expect(screen.getByText(/Changed · was/)).toBeTruthy();
+    // An empty field filled is Added, not a change: the count stays, and the field says Added.
     fireEvent.change(screen.getByLabelText("Note"), { target: { value: "By WeChat" } });
-    expect(screen.getByRole("button", { name: "Save 2 changes" })).toHaveProperty("disabled", false);
+    expect(screen.getByRole("button", { name: "Save 1 change" })).toHaveProperty("disabled", false);
+    expect(screen.getByText("Added")).toBeTruthy();
     // Typed back as it was: nothing to save again.
     fireEvent.change(screen.getByLabelText(/Supplier says ready on/), { target: { value: "2026-11-14" } });
+    expect(screen.getByRole("button", { name: "Save" })).toHaveProperty("disabled", false);
     fireEvent.change(screen.getByLabelText("Note"), { target: { value: "" } });
     expect(screen.getByRole("button", { name: "No changes" })).toHaveProperty("disabled", true);
   });

@@ -68,7 +68,7 @@ export function CostSheetTable({
   const c = currency;
   const toPay = Number(totals?.toPay ?? 0);
   return (
-    <Table className="min-w-[640px]">
+    <Table>
       <THead>
         <tr>
           <Th>What for</Th>
@@ -179,7 +179,7 @@ export function OwedBack({ owed, where, orderId, today, canPay, canFiles = false
           const amount = money(o.amount, o.currency);
           return (
             <li key={`${o.person.id}:${o.currency}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-[18px] py-3">
-              <span className="min-w-0 text-[13px]">
+              <span className="min-w-0 text-md">
                 <span className="block font-semibold">{o.person.name}</span>
                 <span className="block text-text-2">
                   Paid {o.ids.length === 1 ? "1 cost" : `${o.ids.length} costs`} {where} with their own money · since {date(o.since)}

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { can } from "@kebo/shared";
-import { PageHeader, StageBadge, StatusBadge } from "@kebo/ui";
+import { StageBadge, StatusBadge, EmptyState } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { date, dateTime, timeAgo, companyToday } from "@/lib/format";
@@ -9,8 +9,10 @@ import type { DealRow, HistoryEntry, Paged } from "@/lib/types";
 import type { AuditRow, RoleRow, UserRow } from "@/lib/types-people";
 import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { OpenPanelButton } from "@/components/common/panel";
-import { AllLink, DetailsCard, RecordEmpty, RecordFrame, RecordListCard, RecordRow, RecordSection } from "@/components/common/record";
-import { RecordLanding, RecordNav } from "@/components/common/record-nav";
+import { AllLink, DetailsCard, RecordListCard, RecordRow, RecordSection } from "@/components/common/record";
+import { RecordShell } from "@/components/records/record-frame";
+import { RecordTop } from "@/components/records/record-page";
+import { RecordLanding } from "@/components/common/record-nav";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { changeRows, compactChanges } from "@/components/common/change-lines";
 import { RoleBadge } from "@/components/people/role-badge";
@@ -132,47 +134,51 @@ export default async function UserPage({ params, searchParams }: { params: Promi
 
   return (
     <div>
-      <PageHeader
-        crumbs={[{ label: "Admin settings" }, { label: "People", href: "/users" }, { label: u.name }]}
-        phoneStack
-        title={u.name}
-        badge={
-          <>
-            {u.isActive ? <StatusBadge meaning="ok">Active</StatusBadge> : <StatusBadge meaning="neutral">Switched off</StatusBadge>}
-            <RoleBadge name={u.access.name} superAdmin={u.access.superAdmin} />
-          </>
-        }
-        summary={
-          <>
-            <span className="break-all">{u.email}</span> · {u.lastLoginAt ? `last signed in ${timeAgo(u.lastLoginAt)}` : "never signed in"}
-            {isMe && <span className="block text-muted">This is you: change your own password and two-step sign-in under My account.</span>}
-          </>
-        }
-        papers={
-          !isMe && (
-            <OpenPanelButton panel="user-password" size="md">
-              <KeyRound aria-hidden /> Set a new password
-            </OpenPanelButton>
-          )
-        }
-        more={<MoreMenu items={more} phoneItems={isMe ? [] : [{ label: "Set a new password", panel: "user-password" }]} label={`More for ${u.name}`} />}
-      />
       <RecordLanding />
-
-      <RecordFrame
-        sideLabel="Changes"
-        nav={
-          <RecordNav
-            label="Person sections"
-            items={[
-              { id: "overview", label: "Overview" },
-              ...(spending ? [{ id: "spending", label: "Spending", count: spending.count }] : []),
-              ...(inquiries ? [{ id: "inquiries", label: "Inquiries", count: inquiries.total }] : []),
-              ...(changes ? [{ id: "changes", label: "Changes", count: changes.length }] : []),
-            ]}
-          />
-        }
-        main={
+        <RecordShell
+          top={
+            <RecordTop
+              header={{
+                crumbs: [{ label: "Admin settings" }, { label: "People", href: "/users" }, { label: u.name }],
+                title: u.name,
+                badge: (<>
+                {u.isActive ? <StatusBadge meaning="ok">Active</StatusBadge> : <StatusBadge meaning="neutral">Switched off</StatusBadge>}
+                <RoleBadge name={u.access.name} superAdmin={u.access.superAdmin} />
+              </>),
+                summary: (<>
+                <span className="break-all">{u.email}</span> · {u.lastLoginAt ? `last signed in ${timeAgo(u.lastLoginAt)}` : "never signed in"}
+                {isMe && <span className="block text-muted">This is you: change your own password and two-step sign-in under My account.</span>}
+              </>),
+                papers: (!isMe && (
+                <OpenPanelButton panel="user-password" size="md">
+                  <KeyRound aria-hidden /> Set a new password
+                </OpenPanelButton>
+              )),
+                more: <MoreMenu items={more} phoneItems={isMe ? [] : [{ label: "Set a new password", panel: "user-password" }]} label={`More for ${u.name}`} />,
+              }}
+            />
+          }
+          panelLabel="Changes"
+          panel={
+          changes && (
+            <SidePanelCard>
+              <div id="changes" className="scroll-mt-32">
+                <SideSection
+                  title="Changes"
+                  count={changes.length}
+                  dense
+                  action={
+<AllLink href={`/audit?person=${u.id}`}>What they did</AllLink>
+                  }
+                  empty="Nothing changed on their account yet."
+                >
+                  {changeRows(changes)}
+                </SideSection>
+              </div>
+            </SidePanelCard>
+          )
+          }
+        >
           <>
             <RecordSection id="overview" className="flex flex-col gap-5">
               <PerformanceCard kind="user" id={u.id} me={me} />
@@ -206,9 +212,10 @@ export default async function UserPage({ params, searchParams }: { params: Promi
                   description={inquiries.total ? "New, sourcing and quoted, newest first" : undefined}
                   action={inquiries.total > ROWS && <AllLink href={`/inquiries?assignee=${u.id}`}>All {inquiries.total}</AllLink>}
                   empty={
-                    <RecordEmpty title="No open inquiries">
-                      Inquiries they handle show here while they are open. Choose them under &ldquo;Responsible person&rdquo; on an inquiry.
-                    </RecordEmpty>
+                    <EmptyState
+                      title="No open inquiries"
+                      description="Inquiries they handle show here while they are open. Choose them under “Responsible person” on an inquiry."
+                    />
                   }
                 >
                   {inquiries.rows.map((d) => (
@@ -234,27 +241,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
               </RecordSection>
             )}
           </>
-        }
-        side={
-          changes && (
-            <SidePanelCard>
-              <div id="changes" className="scroll-mt-32">
-                <SideSection
-                  title="Changes"
-                  count={changes.length}
-                  dense
-                  action={
-<AllLink href={`/audit?person=${u.id}`}>What they did</AllLink>
-                  }
-                  empty="Nothing changed on their account yet."
-                >
-                  {changeRows(changes)}
-                </SideSection>
-              </div>
-            </SidePanelCard>
-          )
-        }
-      />
+        </RecordShell>
 
       {sp.panel === "edit-user" && <EditUserPanel action={updateUserAction.bind(null, u.id)} user={u} roles={roles} isMe={isMe} />}
       {sp.panel === "user-password" && !isMe && <PasswordPanel action={setPasswordAction.bind(null, u.id)} name={u.name} />}

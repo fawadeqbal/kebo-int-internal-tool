@@ -2,25 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Check, Clock, FileText } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, type ExpenseCategory } from "@kebo/shared";
-import {
-  Alert,
-  Badge,
-  Card,
-  EmptyState,
-  LinkTabs,
-  PageHeader,
-  Pager,
-  StatRow,
-  StatTile,
-  StatusBadge,
-  Table,
-  Td,
-  Th,
-  THead,
-  toPage,
-  Tr,
-  type StatusMeaning,
-} from "@kebo/ui";
+import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
@@ -95,18 +77,24 @@ export default async function ApprovalsPage({
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={[{ label: "Money" }, { label: "Payments", href: "/payments" }, { label: "To verify" }]}
-        icon={Check}
         title="To verify"
-        summary={
-          mine
-            ? "Sent for approval: money received and expenses you added. Each counts once a manager approves it."
-            : "Payments recorded by the team, waiting for a manager to check the bank"
-        }
         primary={!mine && status === "pending" && list.rows.some((r) => r.can.approve) ? <VerifyChosen action={approveManyAction} /> : undefined}
+        views={
+          approver && submitter ? (
+            <Segmented
+              label="Whose"
+              options={[
+                { href: base({ q: sp.q }), label: "To approve", active: !mine },
+                { href: base({ mine: "true", q: sp.q }), label: "Mine", active: mine },
+              ]}
+            />
+          ) : undefined
+        }
       />
       {!mine && (
-        <StatRow className="mb-4" phone="line">
+        <StatRow facts>
           <StatTile
             icon={Clock}
             iconColor={2}
@@ -118,16 +106,6 @@ export default async function ApprovalsPage({
           <StatTile label="Oldest" value={oldest === null ? "—" : oldest === 0 ? "today" : `${oldest} day${oldest === 1 ? "" : "s"}`} />
           <StatTile icon={Check} iconColor={1} label="Approved" value={all.counts.approved} sub={all.counts.sent_back ? `${all.counts.sent_back} sent back` : undefined} />
         </StatRow>
-      )}
-      {approver && submitter && (
-        <LinkTabs
-          label="Whose"
-          className="mb-4"
-          tabs={[
-            { href: base({ q: sp.q }), label: "To approve", active: !mine },
-            { href: base({ mine: "true", q: sp.q }), label: "Mine", active: mine },
-          ]}
-        />
       )}
       <LinkTabs
         label="Which ones"
@@ -141,9 +119,9 @@ export default async function ApprovalsPage({
       />
       <FilterCard search="Search order, customer, who sent it…" value={sp.q} keep={{ mine: keep.mine, status: keep.status }} clearHref={base({ mine: keep.mine, status: keep.status })} />
       {!mine && status === "pending" && list.counts.pending > 0 && (
-        <Alert tone="info" className="mb-3">
+        <Notice tone="info" className="mb-3">
           They added it; you approve it. Nothing counts until you do.
-        </Alert>
+        </Notice>
       )}
       <Card className="overflow-clip p-0">
         {list.rows.length === 0 ? (
@@ -167,7 +145,7 @@ export default async function ApprovalsPage({
                 <Row key={s.id} s={s} />
               ))}
             </ul>
-            <div className="hidden overflow-x-auto md:block">
+            <div className="hidden md:block">
               <Table>
                 <THead>
                   <tr>

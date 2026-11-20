@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, List, Plus, TriangleAlert } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Banknote, Plus } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
@@ -21,7 +21,6 @@ export const metadata = { title: "Payments" };
 type Search = { tab?: string; mine?: string; p?: string; dir?: string; status?: string; kind?: string; q?: string; order?: string; party?: string; account?: string; method?: string; page?: string };
 const STATUS_MEANING = { to_verify: "warn", sent_back: "bad", recorded: "ok", void: "neutral" } as const;
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-
 
 /** The row's status: money in reads "Received", a supplier payment "Paid", an expense "Expense", a transfer "Transfer". */
 function statusOf(r: PaymentRow) {
@@ -99,6 +98,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/payments")}
         title="Payments"
         phoneStack
@@ -110,33 +110,34 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                 All payments
               </Link>
             </>
-          ) : (
-            "Every amount that came in or went out"
-          )
+          ) : undefined
         }
-        actions={
+        more={
           <ExportCsv what="cash-book" query={{ from: allDates ? undefined : pr.from, to: allDates ? undefined : pr.to, account }} />
         }
         primary={
           canRecord ? (
-            <ButtonLink href={recordHref} variant="primary">
+            <ButtonLink href={recordHref} variant="strong">
               <Plus aria-hidden /> Record payment
             </ButtonLink>
           ) : undefined
         }
       />
       {waiting > 0 && (
-        <p className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm">
-          <span>
-            <strong className="font-semibold">{approver ? `${waiting} waiting to be verified` : `${waiting} sent back to you`}</strong>
-            <span className="text-text-2"> · {approver ? "added by the team, not counted yet" : "to correct and send again"}</span>
-          </span>
-          <ButtonLink href={approver ? "/approvals" : "/approvals?status=sent_back"} variant="secondary" size="sm">
-            {approver ? "Verify" : "Open"}
-          </ButtonLink>
-        </p>
+        <Notice
+          tone="todo"
+          className="mb-4"
+          title={approver ? `${waiting} waiting to be verified` : `${waiting} sent back to you`}
+          action={
+            <ButtonLink href={approver ? "/approvals" : "/approvals?status=sent_back"} variant="secondary" size="sm">
+              {approver ? "Verify" : "Open"}
+            </ButtonLink>
+          }
+        >
+          {approver ? "Added by the team, not counted yet." : "To correct and send again."}
+        </Notice>
       )}
-      <StatRow className="mb-4" phone="line">
+      <StatRow facts>
         <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} {...moneyTile(t.in)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />
         <StatTile icon={ArrowUpFromLine} iconColor={2} label={`Out${when}`} {...moneyTile(t.out)} sub={`${t.outCount} payment${t.outCount === 1 ? "" : "s"} out`} />
         <StatTile icon={Banknote} iconColor={4} label="Expenses" {...moneyTile(t.expenses)} sub={`${list.counts.expense} entr${list.counts.expense === 1 ? "y" : "ies"}`} />
@@ -145,12 +146,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         label="Which payments"
         className="mb-4"
         tabs={[
-          { href: chip({}), label: <><List aria-hidden /> All</>, count: list.counts.all, active: !dir && !status && !kind },
-          { href: chip({ dir: "in" }), label: <><ArrowDownToLine aria-hidden /> Money in</>, count: list.counts.in, active: dir === "in" && !status },
-          { href: chip({ dir: "out" }), label: <><ArrowUpFromLine aria-hidden /> Money out</>, count: list.counts.out, active: dir === "out" && !status && !kind },
-          { href: chip({ kind: "expense" }), label: <><Banknote aria-hidden /> Expenses</>, count: list.counts.expense, active: kind === "expense" },
-          { href: chip({ dir: "move" }), label: <><ArrowLeftRight aria-hidden /> Transfers</>, count: list.counts.move, active: dir === "move" },
-          ...(list.counts.to_verify ? [{ href: chip({ status: "to_verify" }), label: <><TriangleAlert aria-hidden /> To verify</>, count: list.counts.to_verify, alert: true, active: status === "to_verify" }] : []),
+          { href: chip({}), label: "All", count: list.counts.all, active: !dir && !status && !kind },
+          { href: chip({ dir: "in" }), label: "Money in", count: list.counts.in, active: dir === "in" && !status },
+          { href: chip({ dir: "out" }), label: "Money out", count: list.counts.out, active: dir === "out" && !status && !kind },
+          { href: chip({ kind: "expense" }), label: "Expenses", count: list.counts.expense, active: kind === "expense" },
+          { href: chip({ dir: "move" }), label: "Transfers", count: list.counts.move, active: dir === "move" },
+          ...(list.counts.to_verify ? [{ href: chip({ status: "to_verify" }), label: "To verify", count: list.counts.to_verify, alert: true, active: status === "to_verify" }] : []),
           { href: chip({ status: "void" }), label: "Removed", count: list.counts.void, active: status === "void" },
         ]}
       />
@@ -196,7 +197,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                 />
               ))}
             </PhoneList>
-            <div className="hidden overflow-x-auto sm:block">
+            <div className="hidden sm:block">
               <Table>
                 <THead>
                   <tr>

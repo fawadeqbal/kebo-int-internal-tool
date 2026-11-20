@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { FilterCard } from "@/components/common/filter-card";
 import { Plus } from "lucide-react";
 import { LEAD_SOURCE_LABEL, LEAD_STATUS_LABEL, LEAD_STATUSES } from "@kebo/shared";
-import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, LinkTabs, FactsLine } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { date, timeAgo } from "@/lib/format";
 import type { LeadRow } from "@/lib/types-platform";
@@ -45,21 +46,17 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader
+        kind="list"
         title="Client inquiries"
-        summary={
-          <>
-            {all.length} {all.length === 1 ? "inquiry" : "inquiries"}
-            {followUp > 0 && <span className="text-warn"> · {followUp} to follow up</span>}
-            <span className="max-sm:hidden"> · new → contacted → demo given → client, or lost</span>
-          </>
-        }
         primary={
-          <ButtonLink href="/platform/leads/new" variant="primary">
+          <ButtonLink href="/platform/leads/new" variant="strong">
             <Plus aria-hidden /> Add client inquiry
           </ButtonLink>
         }
       />
-      <ListToolbar search={{ placeholder: "Company, name or email", value: sp.q, clearHref: href({ q: undefined }) }} keep={keep} chips={chips} label="Filter client inquiries" />
+      <FactsLine facts={[{ label: "Client inquiries", value: all.length }, ...(followUp > 0 ? [{ label: "To follow up", value: followUp, tone: "warn" as const }] : [])]} />
+      <LinkTabs look="tabs" label="Stages of client inquiries" tabs={chips} />
+      <FilterCard search="Company, name or email" value={sp.q} keep={keep} />
       <Card className="overflow-clip p-0">
         {shown.length === 0 ? (
           all.length === 0 && !sp.q ? (

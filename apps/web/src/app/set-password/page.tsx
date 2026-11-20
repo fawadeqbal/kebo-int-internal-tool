@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import { apiFetch } from "@/lib/api";
 import { AuthShell } from "@/app/login/auth-shell";
 import { SetPasswordForm } from "./form";
@@ -15,7 +15,7 @@ export default async function SetPasswordPage({ searchParams }: { searchParams: 
     <AuthShell subtitle="Set your password">
       {info ? (
         <>
-          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">Hello {info.name}</h1>
+          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-2xl sm:leading-9">Hello {info.name}</h1>
           <p className="mt-1 text-sm text-muted">
             Choose a password for <span className="font-medium text-text">{info.email}</span> at {info.company}.
           </p>
@@ -23,10 +23,10 @@ export default async function SetPasswordPage({ searchParams }: { searchParams: 
         </>
       ) : (
         <>
-          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">This link does not work</h1>
-          <Alert tone="warning" className="mt-3">
+          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-2xl sm:leading-9">This link does not work</h1>
+          <Notice tone="todo" className="mt-3">
             It has expired or was already used. Ask your admin (or the person who sent it) for a new one.
-          </Alert>
+          </Notice>
           <Link href="/login" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
             Go to sign in
           </Link>

@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { INCOTERMS, isLeadFrom, isWarrantyFrom, type LeadFrom, type WarrantyFrom } from "@kebo/shared";
-import { Alert, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { PanelSection } from "@/components/common/panel";
 import { LeadField, WarrantyFields } from "@/components/deals/terms-fields";
 import type { ActionState } from "@/lib/actions";
@@ -78,7 +78,7 @@ export function PayFactoryWindow({
       <FormWindow button={{ label, kind: main ? "main" : "plain" }} title="Pay the supplier" sub={sub} size="lg" disabled={!p.factories.length} startOpen={startOpen} onClosed={onClosed}>
         {(close) => <FactoryPaymentForm {...fields} bare onClose={close} onFileError={setFileError} />}
       </FormWindow>
-      {fileError && <Alert tone="error">{fileError}</Alert>}
+      {fileError && <Notice tone="bad">{fileError}</Notice>}
     </>
   );
 }
@@ -109,7 +109,7 @@ export function ChangeFactoryPaymentWindow({
         <>
           <FactoryPaymentForm {...p} action={save} payment={payment} bare onClose={close} />
           <div className="flex flex-col gap-2 border-t border-line pt-4">
-            <p className="text-[13px] font-semibold">Bank slip</p>
+            <p className="text-md font-semibold">Bank slip</p>
             <AttachedFile src={`/files/factory-payments/${payment.id}`} file={payment.file} what="Bank slip" canChange remove={removeFile} empty="No bank slip" />
           </div>
           <div className="border-t border-line pt-4">
@@ -184,7 +184,7 @@ function FactoryAgreedFields({ state, values, payment, sent }: { state: ActionSt
       </PanelSection>
 
       <PanelSection title="Payment" sub="its parts are its plan's" className="sm:grid-cols-1">
-        <div className="rounded-md border border-line bg-surface-2/40 px-3 py-2 text-[13px]">{payment}</div>
+        <div className="rounded-md border border-line bg-surface-2/40 px-3 py-2 text-md">{payment}</div>
         <Field label="Payment note" htmlFor="fac-note" optional error={e.paymentNote}>
           <Textarea id="fac-note" name="paymentNote" rows={2} className="min-h-0" maxLength={2000} defaultValue={v("paymentNote")} />
         </Field>
@@ -238,7 +238,7 @@ export function FactoryAgreedWindow({
   sent: boolean;
 }) {
   return (
-    <SectionWindow button={{ label: "Change" }} title={title} sub={sub} action={action} size="md">
+    <SectionWindow button={{ label: "Edit", kind: "edit", what: "what we agreed with the supplier" }} title={title} sub={sub} action={action} size="md">
       {(s) => <FactoryAgreedFields state={s} values={values} payment={payment} sent={sent} />}
     </SectionWindow>
   );

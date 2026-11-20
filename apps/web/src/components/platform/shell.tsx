@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { Activity, Building2, ClipboardList, Gauge, Inbox, LogOut, Package, ScrollText, Settings } from "lucide-react";
-import { Avatar, cn } from "@kebo/ui";
+import { Avatar, cn, RULES, Badge } from "@kebo/ui";
 import { NavMemoryKeeper } from "@kebo/ui/client";
 import { platformLogoutAction } from "@/app/platform/actions";
 
@@ -132,7 +132,7 @@ export function PlatformShell({
             </span>
             <span className="leading-tight">
               <span className="block text-sm font-semibold">RFQ Desk</span>
-              <span className="block text-[11px] text-muted">Platform admin</span>
+              <span className="block text-2xs text-muted">Platform admin</span>
             </span>
           </Link>
           <div className="ml-auto flex items-center gap-1">
@@ -174,17 +174,17 @@ export function PlatformShell({
                 <n.icon className="size-4" aria-hidden />
                 {n.label}
                 {!!c && "countLabel" in n && (
-                  <span className="rounded-full bg-warn-soft px-1.5 text-[11px] font-semibold text-warn tabular">
+                  <Badge size="sm" tone="warn" className="min-w-5 justify-center px-1.5 tabular">
                     {c}
                     <span className="sr-only"> {n.countLabel}</span>
-                  </span>
+                  </Badge>
                 )}
               </Link>
             );
           })}
         </nav>
       </header>
-      <main id="main" className="mx-auto w-full max-w-[1400px] px-4 pt-6 pb-16 sm:px-6 lg:px-8">
+      <main id="main" className={cn(RULES.page.frame, "pb-16")}>
         {children}
       </main>
     </div>

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { PAYMENT_METHOD_LABEL, type CustomerMoneyState, type FactoryDueRule, type PaymentRoute, type Tone } from "@kebo/shared";
-import { Badge, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, cn, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { date, dayMonth, dueText, money } from "@/lib/format";
 import type { FactoryPaymentView, FactoryPlanView } from "@/lib/types-money";
 import { ROW_LINK } from "./section-window";
@@ -95,7 +95,7 @@ export function SupplierPlanTable({
   after?: ReactNode;
 }) {
   const c = plan.currency;
-  if (!plan.rows.length) return <p className="px-[18px] text-sm text-muted">No plan yet.</p>;
+  if (!plan.rows.length) return <EmptyLine className="px-[18px]">No plan yet.</EmptyLine>;
   const next = plan.rows.find((r) => r.status !== "paid");
   const paidBy = (r: Row) => r.payments.map((x) => payments.get(x.id)).filter((x): x is FactoryPaymentView => !!x);
   /** Under a part's name: their invoice for it, and how it was paid. */
@@ -148,7 +148,7 @@ export function SupplierPlanTable({
           </li>
         ))}
       </ul>
-      <div className="hidden overflow-x-auto sm:block">
+      <div className="hidden sm:block">
         <Table>
           <THead>
             <tr>
@@ -261,7 +261,7 @@ export function CustomerMoneyLine({
       </>
     );
   return (
-    <p data-target="factory.customer" className={cn("mx-[18px] flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-md bg-surface-2 px-3 py-2 text-[13px]", warn && "text-warn")}>
+    <p data-target="factory.customer" className={cn("mx-[18px] flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-md bg-surface-2 px-3 py-2 text-md", warn && "text-warn")}>
       <span className={warn ? "font-medium" : "text-text-2"}>{text}</span>
       <Link href={`/orders/${orderId}/payment`} className={ROW_LINK}>
         Payment tab

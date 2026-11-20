@@ -1,50 +1,59 @@
-import Form from "next/form";
+
 import Link from "next/link";
 import { BackArrow, ListLink } from "./back";
 import { Pending } from "./pending";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
-import { Filter, House, Info, Package, Settings, ShieldCheck, ShoppingCart, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
+import { Info, Package, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 
 /* ---------------------------------------------------------------- Button */
-export type ButtonVariant = "primary" | "strong" | "soft" | "brand" | "secondary" | "ghost" | "danger" | "danger-ghost" | "danger-line" | "trust" | "link";
+/**
+ * The one button (canvas "RFQ Desk — the pieces", board "The one button: seven kinds, three sizes, every state").
+ * Kinds, each one job:
+ *   strong    the page's one next step (orange, bold, a glow) — one per screen; on a phone pinned at the bottom
+ *   primary   Main: the one way to finish a window — Save, Send, Record (green)
+ *   soft      a step forward that is not the finish: Next in a steps window
+ *   secondary Plain: every other act — + Add, Send request, View, Cancel
+ *   ghost     Quiet: a box's own ✎ Edit and the clock, a row's tools
+ *   danger-line Danger: Remove, Cancel the order — always asks first; danger (solid red) only on that confirm
+ *   link      words in a sentence or a table cell
+ * "brand" and "danger-ghost" are kept as names of primary and danger-line.
+ */
+export type ButtonVariant = "primary" | "strong" | "soft" | "brand" | "secondary" | "ghost" | "danger" | "danger-ghost" | "danger-line" | "link";
+/**
+ * Three sizes, never smaller on a phone: sm 32 (phone 40) in boxes and rows · md 40 (44) in windows and forms ·
+ * lg 44 (48) for the strong one. "xs" and "icon-xs" are kept as names of sm and icon-sm. No page sets a height.
+ */
 export type ButtonSize = "xs" | "sm" | "md" | "lg" | "icon" | "icon-sm" | "icon-xs";
 
 const buttonBase =
-  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold whitespace-nowrap transition-colors select-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0";
+  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold whitespace-nowrap transition-colors select-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0";
+const main = "bg-primary-solid text-primary-fg shadow-card hover:bg-primary-solid-hover";
+const dangerLine = "border border-bad/30 bg-surface text-bad hover:bg-bad-soft";
 const buttonVariants: Record<ButtonVariant, string> = {
-  /* The page's one main action: orange. */
-  primary: "bg-action-solid text-white shadow-card hover:bg-action-solid-hover",
-  /* The one button that finishes the job (design rules 18 Nov): orange, bold, a light glow. One per screen. */
-  strong: "bg-action-solid font-bold text-white shadow-[0_6px_16px_rgba(194,81,10,0.28)] hover:bg-action-solid-hover",
-  /* A step forward that is not the finish (Next): light orange, so the strong button stays the one that stands out. */
+  strong: "bg-action-solid font-bold text-white shadow-[0_6px_16px_color-mix(in_srgb,var(--action-solid)_28%,transparent)] hover:bg-action-solid-hover",
+  primary: main,
+  brand: main,
   soft: "border border-action/20 bg-action-soft text-action hover:border-action/45",
-  /* Green: the brand, for a second positive action beside the orange one (Save draft). */
-  brand: "bg-primary-solid text-primary-fg shadow-card hover:bg-primary-solid-hover",
   secondary: "border border-line-strong bg-surface text-text shadow-card hover:bg-surface-2",
   ghost: "text-text-2 hover:bg-surface-2 hover:text-text",
+  "danger-line": dangerLine,
+  "danger-ghost": dangerLine,
   danger: "bg-bad-solid text-white shadow-card hover:opacity-90",
-  "danger-ghost": "text-bad hover:bg-bad-soft",
-  /* Discard, Delete beside a strong button: red words in a white box. */
-  "danger-line": "border border-bad/30 bg-surface text-bad hover:bg-bad-soft",
-  trust: "bg-trust text-white shadow-card hover:opacity-90 dark:text-bg",
   link: "h-auto px-0 text-primary underline-offset-4 hover:underline",
 };
-/**
- * Compact everywhere (asked 17 Nov: buttons took too much room on a phone): on a phone a size steps down one
- * notch, and on a touch screen nothing is under 32 px each way, above WCAG 2.2's 24 px (2.5.8).
- */
+/** sm: 32px high on a laptop, 40 on a phone, with room either side of its words (never tighter than this). */
+const small = "h-8 px-2.5 text-md [&_svg]:size-3.5 max-sm:h-10 max-sm:px-3.5";
+const iconSmall = "size-8 [&_svg]:size-3.5 max-sm:size-10";
 const buttonSizes: Record<ButtonSize, string> = {
-  xs: "h-7 rounded-lg px-2 text-xs [&_svg]:size-3.5 pointer-coarse:h-8 pointer-coarse:min-w-8 pointer-coarse:px-2.5",
-  // Design rule 10 (sizes): buttons 32–40 on a laptop, 40–44 on a phone (a thumb, not a pointer); the strong
-  // one 44, 48 on a phone. A button never gets smaller on a phone.
-  sm: "h-9 px-3 text-[13px] max-sm:h-10 max-sm:px-3.5",
+  xs: small,
+  sm: small,
   md: "h-10 px-3.5 max-sm:h-11 max-sm:px-4",
-  lg: "h-11 px-5 max-sm:h-12",
-  icon: "size-10",
-  "icon-sm": "size-9",
-  "icon-xs": "size-7 rounded-md [&_svg]:size-3.5 pointer-coarse:size-8",
+  lg: "h-11 px-5 text-lead max-sm:h-12",
+  icon: "size-10 max-sm:size-11",
+  "icon-sm": iconSmall,
+  "icon-xs": iconSmall,
 };
 
 export function buttonClass(variant: ButtonVariant = "secondary", size: ButtonSize = "md", className?: string) {
@@ -74,15 +83,37 @@ export function ButtonLink({
 }
 
 /* ---------------------------------------------------------------- Form controls */
+/**
+ * The one field (canvas board "The one field"): a label on top, the box, then one line (the hint, or the error in its
+ * place). One height: md 40 on a laptop, 44 on a phone, with 16 px text there so the phone does not zoom; a table
+ * cell has the small box, sm 32 (40 on a phone). No page sets a field's height of its own.
+ */
+export type ControlSize = "md" | "sm";
+export const controlSizes: Record<ControlSize, string> = { md: "h-10 max-sm:h-11", sm: "h-8 px-2.5 max-sm:h-10" };
 export const controlClass =
-  "w-full rounded-[10px] border border-line-strong bg-surface px-3 text-sm text-text shadow-card transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-bad aria-invalid:focus-visible:ring-bad/25";
+  "w-full rounded-[10px] border border-line-strong bg-surface px-3 text-sm text-text shadow-card max-sm:text-base transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-bad aria-invalid:focus-visible:ring-bad/25";
+/** The search box's frame (a label around an icon and the input): the field's border, corner and focus ring. */
+export const searchFrameClass =
+  "rounded-[10px] border border-line-strong bg-surface shadow-card transition-colors focus-within:border-primary-solid focus-within:ring-3 focus-within:ring-ring";
 
-export function Input({ className, leading, ...props }: ComponentProps<"input"> & { leading?: ReactNode }) {
-  if (!leading) return <input className={cn(controlClass, "h-10", className)} {...props} />;
+export function Input({
+  className,
+  leading,
+  unit,
+  size = "md",
+  ...props
+}: Omit<ComponentProps<"input">, "size"> & {
+  leading?: ReactNode;
+  /** The unit, inside the box on the right: %, days, pcs, GB (board "The one field", rule 3). */
+  unit?: ReactNode;
+  size?: ControlSize;
+}) {
+  if (!leading && !unit) return <input className={cn(controlClass, controlSizes[size], className)} {...props} />;
   return (
-    <div className="relative">
-      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted [&_svg]:size-4">{leading}</span>
-      <input className={cn(controlClass, "h-10 pl-9", className)} {...props} />
+    <div className={cn("relative", unit && className?.match(/(?:^|\s)(w-\S+)/)?.[1])}>
+      {leading && <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted [&_svg]:size-4">{leading}</span>}
+      {unit && <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted">{unit}</span>}
+      <input className={cn(controlClass, controlSizes[size], leading && "pl-9", unit && "pr-10", className, unit && "w-full")} {...props} />
     </div>
   );
 }
@@ -92,11 +123,17 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
 }
 
 /** Native select, styled: accessible, fast, works with forms and keyboard out of the box. */
-export function Select({ className, children, compact, ...props }: ComponentProps<"select"> & { compact?: boolean }) {
+export function Select({
+  className,
+  children,
+  compact,
+  size,
+  ...props
+}: Omit<ComponentProps<"select">, "size"> & { /** The same as size="sm". */ compact?: boolean; size?: ControlSize }) {
   // Width classes go on the wrapper so the chevron stays at the control's edge.
   return (
     <div className={cn("relative", className)}>
-      <select className={cn(controlClass, compact ? "h-8" : "h-10", "appearance-none pr-8")} {...props}>
+      <select className={cn(controlClass, controlSizes[size ?? (compact ? "sm" : "md")], "appearance-none pr-8")} {...props}>
         {children}
       </select>
       <svg aria-hidden className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted" viewBox="0 0 16 16" fill="none">
@@ -218,6 +255,13 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
   );
 }
 
+/**
+ * The one box head (canvas group 7): a 48px row under a line — the title (15px bold), what stands beside it, and its
+ * buttons at the right. CardHeader and the record's boxes (RecordBox) both draw it from these.
+ */
+export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-5 max-sm:pl-4";
+export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
+
 export function Card({ className, ...props }: ComponentProps<"section">) {
   return <section className={cn("rounded-2xl border border-line bg-surface", className)} {...props} />;
 }
@@ -229,6 +273,7 @@ export function CardHeader({
   className,
   how,
   howTitle,
+  titleId,
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -238,13 +283,20 @@ export function CardHeader({
   how?: string;
   /** The ⓘ note's heading when the title is not plain text. */
   howTitle?: string;
+  /** The title's id, for a box labelled by it (aria-labelledby). */
+  titleId?: string;
 }) {
-  const heading = <h2 className="text-base font-bold text-text">{title}</h2>;
+  const heading = (
+    <h2 id={titleId} className={boxTitleClass}>
+      {title}
+    </h2>
+  );
   return (
     // With a description and actions, a phone puts the actions under the text instead of squeezing it; actions
     // that do not fit beside the title (a narrow screen) go under it rather than past the edge.
-    <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
-      <div className="min-w-0">
+    <div className={cn(boxHeadClass, "justify-between gap-x-3", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
+      {/* The words shrink (a long description wraps) so the buttons stay at the right on a laptop. */}
+      <div className="min-w-0 flex-[1_1_12rem]">
         {how ? (
           <div className="flex items-center gap-1">
             {heading}
@@ -265,9 +317,6 @@ export function CardBody({ className, ...props }: ComponentProps<"div">) {
   return <div className={cn("p-4 sm:p-5", className)} {...props} />;
 }
 
-export function CardFooter({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("flex items-center justify-end gap-2 border-t border-line px-4 py-3 sm:px-5", className)} {...props} />;
-}
 
 /* ---------------------------------------------------------------- Page structure */
 
@@ -280,20 +329,9 @@ export function CardFooter({ className, ...props }: ComponentProps<"div">) {
  * On a phone the paper buttons hide and the page passes them to ⋯ instead
  * (MoreMenu's `phoneItems`), so the row is the primary and ⋯.
  *
- * `actions` and `description` are the older form (a free row of buttons, a
- * line of text), kept for the pages not yet moved to the frame.
+ * `actions` is the older form (a free row of buttons), kept for the pages not yet moved to the frame. There is no
+ * help line under a title (rule 15): what a page is for shows in what it holds.
  */
-/** The icon of each group of the menu, shown in the title's tile when the page names no icon of its own. */
-export const MODULE_ICONS: Record<string, LucideIcon> = {
-  Home: House,
-  Sales: Package,
-  Purchasing: ShoppingCart,
-  Money: Wallet,
-  Reports: TrendingUp,
-  Settings: Settings,
-  "Company settings": Settings,
-  "Admin settings": ShieldCheck,
-};
 
 /**
  * A record's one strong button on a phone (canvas row "Every page's top on a phone", option A): pinned at the
@@ -301,18 +339,16 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
  * aside while it is there (globals.css). With nothing in it (no next step) it is not there and the bar stays.
  */
 const DOCK =
-  "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:flex max-md:gap-2 max-md:border-t max-md:border-line max-md:bg-surface max-md:px-3 max-md:pt-2 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-md:shadow-[0_-4px_12px_rgb(0_0_0/0.06)] max-md:[&:not(:has(a,button))]:hidden max-md:[&>*]:min-w-0 max-md:[&>*]:flex-1 max-md:[&_:is(a,button)]:h-12 max-md:[&_:is(a,button)]:w-full max-md:[&_:is(a,button)]:justify-center max-md:[&_:is(a,button)]:text-[15px]";
+  "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:flex max-md:gap-2 max-md:border-t max-md:border-line max-md:bg-surface max-md:px-3 max-md:pt-2 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-md:shadow-[0_-4px_12px_rgb(0_0_0/0.06)] max-md:[&:not(:has(a,button))]:hidden max-md:[&>*]:min-w-0 max-md:[&>*]:flex-1 max-md:[&_:is(a,button)]:h-12 max-md:[&_:is(a,button)]:w-full max-md:[&_:is(a,button)]:justify-center max-md:[&_:is(a,button)]:text-lead";
 
 export function PageHeader({
   title,
-  icon,
   badge,
   summary,
   papers,
   views,
   primary,
   more,
-  description,
   actions,
   backHref,
   backLabel,
@@ -329,8 +365,6 @@ export function PageHeader({
    * path ("Inquiries" for an inquiry); false: none. A list and Home have none: they are the top.
    */
   back?: { href: string; label: string; root?: string } | false;
-  /** The icon in the green tile before the title (default: the module's, from the crumbs; none without crumbs). */
-  icon?: LucideIcon | null;
   /** Where the page is in the menu, above the title: "Money / Cash & bank" (the last is this page). */
   crumbs?: { label: string; href?: string }[];
   /** On a phone, the buttons go under the title (record pages, whose names are long). */
@@ -352,15 +386,15 @@ export function PageHeader({
   primary?: ReactNode;
   /** The ⋯ menu (MoreMenu): everything else; delete last, in red. */
   more?: ReactNode;
-  description?: ReactNode;
   actions?: ReactNode;
+  /** A list page (canvas board "One list page for all 25 lists"): its name from the menu. */
+  kind?: "list";
   backHref?: string;
   backLabel?: string;
   children?: ReactNode;
 }) {
   const framed = badge !== undefined || summary !== undefined || primary !== undefined || papers !== undefined || more !== undefined || views !== undefined;
   const right = actions || papers || views || primary || more;
-  const Icon = icon === null ? null : (icon ?? (crumbs?.[0] ? MODULE_ICONS[crumbs[0].label] : undefined));
   // The path is the menu's two levels (and the record, on a record's page): "Sales / Inquiries / RFQ-2026-0001".
   const trail = crumbs && crumbs.length > 0 ? crumbs : null;
   // A deeper page goes up to the last link in its path (or where it says), with ← beside its title.
@@ -383,8 +417,8 @@ export function PageHeader({
           <div data-record-bar="" className="no-print fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-1 border-b border-line bg-surface pr-1.5 pl-1 md:hidden">
             <BackArrow up={up.href} label={up.label} root={up.root} bar />
             <div className="min-w-0 flex-1 pl-0.5">
-              <p className="truncate text-[16.5px] leading-5 font-bold text-text">{name ?? title}</p>
-              <p className="truncate text-[12px] leading-4 font-medium text-muted">{under}</p>
+              <p className="truncate text-base leading-5 font-bold text-text">{name ?? title}</p>
+              <p className="truncate text-xs leading-4 font-medium text-muted">{under}</p>
             </div>
             {/* ⋯ as a plain icon here, the size of ← (it is a bordered button in the header). */}
             {more && <div className="shrink-0 [&>button]:size-11 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
@@ -396,7 +430,7 @@ export function PageHeader({
         // (globals.css hides that while this is on the page), and its ⋯ at the bar's end; the menu, search and
         // alerts stay around them.
         <div data-page-title="" className="no-print pointer-events-none fixed top-0 right-36 left-14 z-30 flex h-14 items-center gap-1 md:hidden">
-          <span aria-hidden className="min-w-0 flex-1 truncate text-[17px] leading-5 font-bold text-text">
+          <span aria-hidden className="min-w-0 flex-1 truncate text-lg leading-5 font-bold text-text">
             {named}
           </span>
           {more && <div className="pointer-events-auto shrink-0 [&>button]:size-10 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
@@ -408,25 +442,17 @@ export function PageHeader({
             browsers then size the title to its text, so a long line runs past the screen and the page zooms out.) */}
         <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap", phoneStack && "max-sm:flex-col max-sm:flex-nowrap max-sm:items-stretch")}>
           <div className={cn("flex min-w-0 items-start gap-3", framed ? "flex-1 sm:flex-[1_1_18rem]" : "flex-[1_1_18rem]", phoneStack && "max-sm:w-full max-sm:flex-none")}>
-            {up ? (
-              <BackArrow up={up.href} label={up.label} root={up.root} className="max-md:hidden" />
-            ) : (
-              Icon && (
-                <span data-slot="page-icon" className="mt-0.5 hidden size-11 shrink-0 place-items-center rounded-xl bg-primary-solid text-white sm:grid" aria-hidden>
-                  <Icon className="size-[22px]" strokeWidth={2} />
-                </span>
-              )
-            )}
+            {/* No icon tile before a title (live audit 20 Nov): a deeper page has ← here, a top page nothing. */}
+            {up && <BackArrow up={up.href} label={up.label} root={up.root} className="max-md:hidden" />}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <h1 className={cn("font-bold text-text", framed ? "text-[22px] leading-7 sm:text-[26px] sm:leading-8" : "text-2xl leading-8 sm:text-[26px] sm:leading-8", titleInBar && "max-md:sr-only")}>
+                <h1 className={cn("font-bold text-text", framed ? "text-xl leading-7 sm:text-2xl sm:leading-8" : "text-2xl leading-8 sm:text-2xl sm:leading-8", titleInBar && "max-md:sr-only")}>
                   {title}
                 </h1>
                 {badge}
               </div>
               {/* A top page's plain sentence under its name is a help line: not on a phone (design rule 15). */}
-              {summary && <div data-page-summary="" className={cn("mt-0.5 text-[13px] text-muted", !up && titleInBar && typeof summary === "string" && "max-md:hidden")}>{summary}</div>}
-              {description && <div data-page-desc="" className={cn("mt-0.5 max-w-2xl text-[13px] text-muted", titleInBar && "max-md:hidden")}>{description}</div>}
+              {summary && <div data-page-summary="" className={cn("mt-0.5 text-md text-muted", !up && titleInBar && typeof summary === "string" && "max-md:hidden")}>{summary}</div>}
             </div>
           </div>
           {/* Papers first, then the one primary, then ⋯: always top right. */}
@@ -522,33 +548,12 @@ export function EmptyState({
   );
 }
 
-const ALERT_TONES = {
-  info: "bg-info-soft text-info",
-  error: "bg-bad-soft text-bad",
-  success: "bg-ok-soft text-ok",
-  warning: "bg-warn-soft text-warn",
-  neutral: "bg-surface-2 text-text-2 [&_strong]:text-text",
-};
-
-export function Alert({ tone = "info", children, className }: { tone?: keyof typeof ALERT_TONES; children: ReactNode; className?: string }) {
-  return (
-    <div role={tone === "error" ? "alert" : "status"} className={cn("rounded-xl px-3.5 py-3 text-[13px] [&_strong]:font-bold", ALERT_TONES[tone], className)}>
-      {children}
-    </div>
-  );
-}
-
 /**
- * A problem or a note on the page, shown in the card it concerns (not at the
- * top of the page): the Alert in the design system's meanings.
+ * The one empty line (canvas group 7): what is not there yet, in quiet words, inside the box it concerns — "No
+ * payments yet." A whole empty list with its one way to add is EmptyState. `inset`: with the box's own padding.
  */
-export function Banner({ meaning = "info", children, className }: { meaning?: "info" | "ok" | "warn" | "bad"; children: ReactNode; className?: string }) {
-  const tone = meaning === "ok" ? "success" : meaning === "warn" ? "warning" : meaning === "bad" ? "error" : "info";
-  return (
-    <Alert tone={tone} className={className}>
-      {children}
-    </Alert>
-  );
+export function EmptyLine({ inset, className, ...props }: ComponentProps<"p"> & { inset?: boolean }) {
+  return <p className={cn("text-sm text-muted", inset && "p-4 sm:px-5", className)} {...props} />;
 }
 
 /* ---------------------------------------------------------------- Table */
@@ -556,7 +561,7 @@ export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
     <ScrollFade className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
-      <table className={cn("w-full border-collapse text-[13px]", className)} {...props} />
+      <table className={cn("w-full border-collapse text-md", className)} {...props} />
     </ScrollFade>
   );
 }
@@ -566,7 +571,7 @@ export function THead({ className, ...props }: ComponentProps<"thead">) {
 export function Th({ className, ...props }: ComponentProps<"th">) {
   // relative: a hidden (sr-only) name inside is placed in its cell, so a table that scrolls
   // sideways keeps it in its box instead of widening the page.
-  return <th scope="col" className={cn("relative h-[42px] border-b border-line px-3.5 text-left text-[13px] font-semibold whitespace-nowrap text-muted", className)} {...props} />;
+  return <th scope="col" className={cn("relative h-[42px] border-b border-line px-3.5 text-left text-md font-semibold whitespace-nowrap text-muted", className)} {...props} />;
 }
 export function Td({ className, ...props }: ComponentProps<"td">) {
   return <td className={cn("h-[52px] border-b border-line px-3.5 py-3 align-middle text-text", className)} {...props} />;
@@ -664,16 +669,25 @@ export function PhoneRow({
 
 /* ---------------------------------------------------------------- Detail list */
 
-/** Label/value grid for detail panels. */
+/**
+ * Label/value rows for detail panels: the record box's rows (label at the left, the value beside it), the same as
+ * DetailsCard and BoxFacts; `columns` 2 or 3: two pairs a row on a wide screen.
+ */
 export function DetailList({ items, columns = 2, className }: { items: { label: ReactNode; value: ReactNode; hidden?: boolean }[]; columns?: 1 | 2 | 3; className?: string }) {
   return (
-    <dl className={cn("grid gap-x-6 gap-y-3", columns === 1 ? "grid-cols-1" : columns === 3 ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-1 sm:grid-cols-2", className)}>
+    <dl
+      className={cn(
+        "grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm",
+        columns > 1 && "lg:grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1fr)] lg:gap-x-6",
+        className,
+      )}
+    >
       {items
         .filter((i) => !i.hidden)
         .map((i, idx) => (
-          <div key={idx} className="min-w-0">
-            <dt className="text-xs text-muted">{i.label}</dt>
-            <dd className="mt-0.5 text-sm break-words text-text">{i.value ?? "—"}</dd>
+          <div key={idx} className="contents">
+            <dt className="text-text-2">{i.label}</dt>
+            <dd className="min-w-0 font-medium break-words text-text">{i.value ?? "—"}</dd>
           </div>
         ))}
     </dl>
@@ -715,7 +729,80 @@ export function RefCode({ children, href, className }: { children: ReactNode; hr
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="inline-flex h-5 items-center rounded border border-line bg-surface-2 px-1.5 font-mono text-[11px] text-muted">{children}</kbd>;
+  return <kbd className="inline-flex h-5 items-center rounded border border-line bg-surface-2 px-1.5 font-mono text-2xs text-muted">{children}</kbd>;
+}
+
+/**
+ * The one tab row (board "The one filter row and the one tab row"): underlined tabs, 42 tall, the open one bold
+ * with a green line, a short fact beside a name ("3", "R1 draft"). Each tab is its own address; by default a tab
+ * replaces the one before in the browser's history. phone "tabs" (a record's tabs): the row scrolls sideways;
+ * phone "chips" (a list's stages, rule 15): round chips on a phone, underlined from 640 px.
+ */
+export interface TabRowItem {
+  href: string;
+  label: ReactNode;
+  /** The short fact beside the name: a count, "R1 draft", "sailed". */
+  tag?: ReactNode;
+  /** The fact is bad news (late): drawn in red. */
+  alert?: boolean;
+  active: boolean;
+}
+
+export function TabRow({
+  label,
+  items,
+  end,
+  className = "mt-4",
+  replace = true,
+  phone = "tabs",
+}: {
+  label: string;
+  items: TabRowItem[];
+  end?: ReactNode;
+  className?: string;
+  replace?: boolean;
+  phone?: "tabs" | "chips";
+}) {
+  const chips = phone === "chips";
+  return (
+    <ScrollFade
+      as="nav"
+      aria-label={label}
+      className={cn(
+        "no-print flex overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        chips ? "-mx-4 items-center gap-2 px-4 py-0.5 sm:mx-0 sm:items-stretch sm:gap-x-[22px] sm:border-b sm:border-line sm:px-0 sm:py-0" : "items-stretch gap-x-[22px] border-b border-line",
+        className,
+      )}
+    >
+      {items.map((t) => (
+        <Link
+          key={t.href}
+          href={t.href}
+          replace={replace}
+          scroll={replace ? false : undefined}
+          aria-current={t.active ? "page" : undefined}
+          className={cn(
+            "shrink-0 items-center whitespace-nowrap text-md",
+            chips
+              ? cn(
+                  "inline-flex h-9 gap-1.5 rounded-full border px-3 font-semibold transition-colors max-sm:h-10 [&_svg]:size-4",
+                  t.active ? "border-primary-line bg-primary-soft text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
+                  "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:bg-transparent sm:px-0",
+                  t.active ? "sm:border-primary-solid sm:font-bold sm:text-text" : "sm:border-transparent sm:font-medium sm:text-text-2 sm:hover:text-text",
+                )
+              : "-mb-px flex h-[42px] gap-[7px] border-b-2 border-transparent font-medium text-text-2 hover:text-text aria-[current]:border-primary-solid aria-[current]:font-bold aria-[current]:text-text",
+          )}
+        >
+          {t.label}
+          {t.tag !== undefined && t.tag !== null && t.tag !== "" && (
+            <span className={cn("text-xs font-semibold tabular", t.alert ? "rounded-md bg-bad-soft px-1.5 text-bad" : "text-text-2 max-md:rounded-full max-md:bg-surface-2 max-md:px-1.5 max-md:leading-[17px]")}>{t.tag}</span>
+          )}
+          <Pending />
+        </Link>
+      ))}
+      {end}
+    </ScrollFade>
+  );
 }
 
 /** Sub-tabs as chips (the page's sections), as links: URL-driven, so they work without JavaScript. The current one is soft green. */
@@ -724,7 +811,7 @@ export function LinkTabs({
   className,
   label,
   replace,
-  look = "chips",
+  look = "tabs",
 }: {
   tabs: { href: string; label: ReactNode; count?: number; active: boolean; alert?: boolean }[];
   className?: string;
@@ -732,19 +819,28 @@ export function LinkTabs({
   /** Switch in place (no new history step): tabs inside a window. */
   replace?: boolean;
   /**
-   * "tabs" (design "list pages" 18 Nov: a list's stages): on a laptop underlined tabs like a record's, with their
-   * counts; on a phone round chips that slide sideways. "chips": chips everywhere.
+   * "tabs" (the default; design "list pages" 18 Nov: a page's stages or views): on a laptop underlined tabs like a
+   * record's, with their counts; on a phone round chips that slide sideways. "chips": chips everywhere — only for a
+   * filter inside a box.
    */
   look?: "chips" | "tabs";
 }) {
-  const tabsLook = look === "tabs";
+  if (look === "tabs")
+    return (
+      <TabRow
+        label={label}
+        phone="chips"
+        replace={!!replace}
+        className={className ?? ""}
+        items={tabs.map((x) => ({ href: x.href, label: x.label, tag: x.count, alert: x.alert, active: x.active }))}
+      />
+    );
   return (
     <ScrollFade
       as="nav"
       aria-label={label}
       className={cn(
         "-mx-4 flex items-center gap-2 overflow-x-auto overflow-y-hidden px-4 py-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0.5 [&::-webkit-scrollbar]:hidden",
-        tabsLook && "sm:items-stretch sm:gap-x-[22px] sm:border-b sm:border-line sm:px-0 sm:py-0",
         className,
       )}
     >
@@ -755,19 +851,11 @@ export function LinkTabs({
           replace={replace}
           scroll={replace ? false : undefined}
           aria-current={t.active ? "page" : undefined}
-          className={cn(
-            "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap transition-colors [&_svg]:size-4",
-            t.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
-            tabsLook && "max-sm:rounded-full max-sm:text-[13.5px] max-sm:font-semibold",
-            tabsLook &&
-              (t.active
-                ? "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-primary-solid sm:bg-transparent sm:px-0 sm:text-[13.5px] sm:font-bold sm:text-text"
-                : "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:border-transparent sm:bg-transparent sm:px-0 sm:text-[13.5px] sm:font-medium sm:text-text-2 sm:hover:text-text"),
-          )}
+          className={chipClass(t.active)}
         >
           {t.label}
           {t.count !== undefined && (
-            <span className={cn("tabular", tabsLook && "text-xs font-semibold", t.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{t.count}</span>
+            <span className={cn("tabular", t.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{t.count}</span>
           )}
           <Pending />
         </Link>
@@ -776,111 +864,35 @@ export function LinkTabs({
   );
 }
 
-/** The strip above a table: search on the left, filter chips, extras on the right. */
-export function FilterBar({ children, end, className }: { children: ReactNode; end?: ReactNode; className?: string }) {
-  return (
-    <div className={cn("flex flex-wrap items-center gap-2 border-b border-line px-4 py-3", className)}>
-      {children}
-      {end && <div className="ml-auto flex items-center gap-2">{end}</div>}
-    </div>
-  );
-}
-
 /**
- * A filter chip that is a link: dashed when off, tinted when on. `pill`: the
- * list toolbar's round chip with its count ("Overdue 2"), ringed when on.
+ * A filter chip that is a link: the one chip (the same as LinkTabs' chips), tinted when on, with its count
+ * ("Overdue 2"). `pill` is kept as a name; every chip looks the same.
  */
-export function FilterChip({ href, active, count, pill, children }: { href: string; active: boolean; count?: number; pill?: boolean; children: ReactNode }) {
+export const chipClass = (active: boolean) =>
+  cn(
+    "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-md font-medium whitespace-nowrap transition-colors max-sm:h-10 [&_svg]:size-4",
+    active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
+  );
+
+export function FilterChip({ href, active, count, children }: { href: string; active: boolean; count?: number; pill?: boolean; children: ReactNode }) {
   return (
-    <Link
-      href={href}
-      aria-current={active ? "true" : undefined}
-      className={cn(
-        pill
-          ? "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-[13px] font-medium whitespace-nowrap text-text transition-colors hover:bg-surface-2"
-          : buttonClass("secondary", "sm"),
-        !pill && "h-8 gap-1 border-dashed px-2.5 text-xs",
-        active &&
-          (pill
-            ? "border-primary-line bg-primary-soft font-semibold text-primary hover:bg-primary-soft"
-            : "border-solid border-primary/40 bg-primary-soft text-primary hover:bg-primary-soft"),
-      )}
-    >
+    <Link href={href} aria-current={active ? "true" : undefined} className={chipClass(active)}>
       {children}
-      {count !== undefined && <span className={cn("tabular", active ? "font-semibold" : "text-text-2")}>{count}</span>}
+      {count !== undefined && <span className="tabular">{count}</span>}
     </Link>
   );
 }
 
-export interface ListChip {
-  key: string;
-  label: ReactNode;
-  count?: number;
-  href: string;
-  active: boolean;
-}
-
 /**
- * The filters above a list (design system: List frame), drawn the same as every list's: the chips (tabs with
- * their counts) on their own row, then the white filter strip with the search taking the width, the list's
- * other filters and Filter, and on the right the list's Excel. The search is a GET form that keeps the other
- * filters (`keep`), so the URL holds them all. Inside a card (`inCard`) the chips sit in a row with a rule under it.
+ * The one switch between a few views (List | Board, Month | Quarter, For the bank | All): its track and its
+ * segments. Segmented (links), SegmentedChoice (buttons) and the app's ViewSwitch all draw these two.
  */
-export function ListToolbar({
-  search,
-  keep = {},
-  chips = [],
-  filters,
-  end,
-  label = "Filters",
-  className,
-  inCard,
-}: {
-  search?: { placeholder: string; value?: string; clearHref?: string; label?: string; name?: string };
-  /** The list's other filters, carried by the search form (page is dropped: a new search starts at page 1). */
-  keep?: Record<string, string | undefined>;
-  chips?: ListChip[];
-  /** After the search: the list's other filters (selects). */
-  filters?: ReactNode;
-  /** The list's Excel (export what the filters show). */
-  end?: ReactNode;
-  label?: string;
-  className?: string;
-  /** Inside a card: the chips and the end in one row with a rule under it, no strip. */
-  inCard?: boolean;
-}) {
-  const name = search?.name ?? "q";
-  const tabs = chips.map((c) => ({ href: c.href, label: c.label, count: c.count, active: c.active }));
-  if (inCard) {
-    return (
-      <div data-slot="list-toolbar" className={cn("flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5", className)}>
-        {tabs.length > 0 && <LinkTabs label={label} tabs={tabs} className="min-w-0 flex-1" />}
-        {end && <div className="ml-auto flex shrink-0 items-center gap-2">{end}</div>}
-      </div>
-    );
-  }
-  return (
-    <div data-slot="list-toolbar" className={className}>
-      {tabs.length > 0 && <LinkTabs label={label} tabs={tabs} className="mb-4" />}
-      {(search || filters || end) && (
-        <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3">
-          {search && (
-            <Form action="" scroll={false} role="search" aria-label={search.label ?? "Search this list"} className="flex min-w-0 flex-[1_1_260px] items-center gap-2.5">
-              {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
-              <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="min-w-0 flex-1" />
-              <button type="submit" className={buttonClass("secondary", "md", "shrink-0")}>
-                <Filter aria-hidden />
-                Filter
-              </button>
-            </Form>
-          )}
-          {filters && <div className="flex flex-wrap items-center gap-2.5">{filters}</div>}
-          {end && <div className="ml-auto flex shrink-0 items-center gap-2">{end}</div>}
-        </div>
-      )}
-    </div>
+export const segmentsClass = "inline-flex max-w-full overflow-x-auto rounded-[10px] border border-line bg-surface-2 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+export const segmentClass = (active: boolean) =>
+  cn(
+    "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-md font-medium whitespace-nowrap text-muted transition-colors hover:text-text max-sm:h-10 [&_svg]:size-4",
+    active && "bg-surface font-semibold text-primary shadow-card",
   );
-}
 
 /** Pill links for a small set of options (e.g. This month / Last month). */
 export function Segmented({ options, className, label }: { options: { href: string; label: ReactNode; active: boolean }[]; className?: string; label: string }) {
@@ -888,42 +900,14 @@ export function Segmented({ options, className, label }: { options: { href: stri
     <ScrollFade
       as="nav"
       aria-label={label}
-      className={cn("inline-flex max-w-full overflow-x-auto rounded-[10px] border border-line bg-surface-2 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+      className={cn(segmentsClass, className)}
     >
       {options.map((o) => (
-        <Link
-          key={o.href}
-          href={o.href}
-          aria-current={o.active ? "page" : undefined}
-          className={cn("inline-flex h-8 items-center rounded-lg px-3 text-[13px] font-medium whitespace-nowrap text-muted transition-colors hover:text-text", o.active && "bg-surface font-semibold text-primary shadow-card")}
-        >
+        <Link key={o.href} href={o.href} scroll={false} aria-current={o.active ? "page" : undefined} className={segmentClass(o.active)}>
           {o.label}
         </Link>
       ))}
     </ScrollFade>
-  );
-}
-
-/** Search box for a FilterBar (GET form field; Enter submits). */
-export function SearchField({ defaultValue, placeholder, clearHref, label = "Search", className }: { defaultValue?: string; placeholder: string; clearHref?: string; label?: string; className?: string }) {
-  return (
-    <div className={cn("relative w-full sm:w-72", className)}>
-      <label htmlFor="search" className="sr-only">
-        {label}
-      </label>
-      <svg aria-hidden viewBox="0 0 24 24" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-3.5-3.5" />
-      </svg>
-      <input id="search" name="q" type="search" defaultValue={defaultValue} placeholder={placeholder} className={cn(controlClass, "h-10 pr-8 pl-9 [&::-webkit-search-cancel-button]:appearance-none")} />
-      {defaultValue && clearHref && (
-        <Link href={clearHref} className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-muted hover:text-text" aria-label="Clear search">
-          <svg aria-hidden viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </Link>
-      )}
-    </div>
   );
 }
 

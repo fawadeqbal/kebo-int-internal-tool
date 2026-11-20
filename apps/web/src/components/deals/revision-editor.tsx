@@ -37,7 +37,7 @@ import {
   type TheirTerms,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -45,8 +45,8 @@ import type { OfferLine, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
-import { PANEL_FORM, PanelFooter, PanelSection, useReportDirty } from "@/components/common/panel";
-import { OnePartFooter, StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
+import { PANEL_FORM, PanelSection, useReportDirty, WindowFooter } from "@/components/common/panel";
+import { StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
 import { PriceSheet, PriceTotals } from "./price-editor";
 import { shortName } from "./offer-facts";
 import {
@@ -83,7 +83,7 @@ const ROUTE_SHORT: Record<PaymentRoute, string> = { informal: "informal", bank_c
 /** A step's check on the right of its heading: a few words (the whole sentence is in the step, and on hover). */
 function StepChip({ ok, title, children }: { ok: boolean; title?: string; children: ReactNode }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 text-[13px] font-semibold", ok ? "text-ok" : "text-warn")} title={title}>
+    <span className={cn("inline-flex items-center gap-1.5 text-md font-semibold", ok ? "text-ok" : "text-warn")} title={title}>
       {ok ? <CheckCircle2 className="size-4 shrink-0" aria-hidden /> : <AlertTriangle className="size-4 shrink-0" aria-hidden />}
       {children}
     </span>
@@ -767,13 +767,13 @@ export function RevisionEditor({
                 )}
               </ul>
               {showCosts && (
-                <div className="flex flex-col gap-1 text-[13px] text-text-2">
+                <div className="flex flex-col gap-1 text-md text-text-2">
                   <p className="flex flex-wrap items-center gap-2">
                     <label htmlFor={`margin-${number}`}>Price every ticked offer at</label>
-                    <Input
+                    <Input size="sm"
                       id={`margin-${number}`}
                       inputMode="decimal"
-                      className="h-9 w-16 text-right tabular"
+                      className="w-16 text-right tabular"
                       value={margin}
                       onChange={(e) => priceEveryOffer(e.target.value)}
                     />
@@ -792,13 +792,13 @@ export function RevisionEditor({
                 .map((o, i) => ({ o, i }))
                 .filter(({ o }) => requireChanges && !s.options.some((x) => x.factoryQuoteId === o.factoryQuoteId))
                 .map(({ o, i }) => (
-                  <p key={o.factoryQuoteId ?? "items"} className="rounded-lg bg-warn-soft/60 px-3 py-2 text-[13px]">
+                  <Notice key={o.factoryQuoteId ?? "items"} tone="todo">
                     Option {optionLetter(i)}
                     {o.factoryQuoteId
                       ? ` (${offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.factory.name ?? "its offer"})`
                       : ""}{" "}
                     and the prices you set for it will be removed when you save.
-                  </p>
+                  </Notice>
                 ))}
               <ErrorText error={st.errors?.options} />
             </PanelSection>
@@ -1038,17 +1038,14 @@ export function RevisionEditor({
                 heading={stepCheck(step)}
                 single={only}
                 footer={
-                  only ? (
-                    <OnePartFooter onCancel={onCancel} canSave={!requireChanges || dirty} />
-                  ) : (
                   <StepsFooter
-                    first={stepAt === 0}
-                    last={stepAt === QUOTE_STEPS.length - 1}
-                    onBack={() => setStep(QUOTE_STEPS[Math.max(0, stepAt - 1)]!.key)}
-                    onNext={() => setStep(QUOTE_STEPS[Math.min(QUOTE_STEPS.length - 1, stepAt + 1)]!.key)}
-                    canSave={!requireChanges || dirty}
+                    onCancel={onCancel}
+                    onBack={only || stepAt === 0 ? null : () => setStep(QUOTE_STEPS[stepAt - 1]!.key)}
+                    // Save is the one strong button on the last step; before it, a quiet Save once something changed.
+                    jump={!only && (!requireChanges || dirty) ? { label: "Save now" } : null}
+                    onNext={only || stepAt === QUOTE_STEPS.length - 1 ? null : () => setStep(QUOTE_STEPS[stepAt + 1]!.key)}
+                    save={{ label: "Save", disabled: requireChanges && !dirty }}
                   />
-                  )
                 }
               >
                 {sections}
@@ -1056,11 +1053,11 @@ export function RevisionEditor({
             ) : (
               <>
                 {sections}
-              <PanelFooter start={footNote} onCancel={onCancel}>
+              <WindowFooter note={footNote} onCancel={onCancel}>
                 <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
                   <Check aria-hidden /> {submitLabel}
                 </SubmitButton>
-              </PanelFooter>
+              </WindowFooter>
               </>
             )}
           </>
@@ -1179,10 +1176,10 @@ export function BasisCosts({
                       <span className="block text-sm">{BASIS_STEP_LABEL[step]}</span>
                       <span className="block text-xs text-muted">{BASIS_STEP_HINT[step]}</span>
                     </span>
-                    <Input
+                    <Input size="sm"
                       aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} cost`}
                       inputMode="decimal"
-                      className="h-8 text-right tabular"
+                      className="text-right tabular"
                       placeholder={asLine(step) ? "as a charge" : "0.00"}
                       value={c.amount}
                       onChange={(e) => onChange(step, { amount: e.target.value })}
@@ -1200,9 +1197,9 @@ export function BasisCosts({
                         onChange(step, { currency: to, ...(amount !== null ? { amount } : {}) });
                       }}
                     />
-                    <Input
+                    <Input size="sm"
                       aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} note`}
-                      className="h-8"
+                     
                       maxLength={200}
                       value={c.note}
                       onChange={(e) => onChange(step, { note: e.target.value })}

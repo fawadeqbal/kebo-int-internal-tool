@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { cn, PageHeader } from "@kebo/ui";
+import { boxTitleClass, cn, PageHeader } from "@kebo/ui";
 import { OwnPagerTop, OwnPagerUnder } from "@/components/deals/own-pager";
 import { SideSheet } from "@/components/common/side-sheet";
 import { RecordShell } from "./record-frame";
@@ -45,6 +45,7 @@ export function RecordPage({
       top={<RecordTop pager={pager} header={header} />}
       panelLabel={panel?.label}
       panel={panel ? ("sheet" in panel ? panel.sheet : <RecordPanel sections={panel.sections} summary={panel.summary} />) : null}
+      folds
     >
       {children}
     </RecordShell>
@@ -90,7 +91,7 @@ export function RecordPanel({ sections, summary }: { sections: PanelSection[]; s
       <section className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
         {sections.map((s, i) => (
           <section key={s.id} aria-labelledby={s.id} className={cn("flex flex-col gap-1 px-4 py-3", i < sections.length - 1 && "border-b border-line")}>
-            <h2 id={s.id} className="mb-1 text-[15px] font-semibold">
+            <h2 id={s.id} className={cn(boxTitleClass, "mb-1")}>
               {s.title}
             </h2>
             {s.children}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { can, REVISION_STATUS_LABEL } from "@kebo/shared";
-import { ButtonLink, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
+import { RefCode, ButtonLink, cn, RevisionBadge, StatusBadge } from "@kebo/ui";
 import { Notice } from "@/components/records/notice";
 import { TabList } from "@/components/lists/tab-list";
 import { requireUser } from "@/lib/session";
@@ -147,12 +147,12 @@ export default async function QuotationPage({
                   <Link
                     href={`${base}/quotations/${x.id}`}
                     className={cn(
-                      "grid grid-cols-[minmax(0,1fr)_auto_20px] items-start gap-x-4 gap-y-1 px-5 py-3 text-[13px] hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-text",
+                      "grid grid-cols-[minmax(0,1fr)_auto_20px] items-start gap-x-4 gap-y-1 px-5 py-3 text-md hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-text",
                       COLS,
                     )}
                   >
                     <span className="min-w-0">
-                      <span className="block font-semibold text-text">{x.refNo}</span>
+                      <RefCode>{x.refNo}</RefCode>
                       <span className="block truncate text-xs text-text-2">{[from, `R${c.number}`].filter(Boolean).join(" · ")}</span>
                       <span className="block text-xs font-semibold tabular md:hidden">{totalText(c)}</span>
                     </span>

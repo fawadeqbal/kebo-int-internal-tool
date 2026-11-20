@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Banner, Badge, Card, CardHeader, PageHeader, StatusBadge, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
+import { Badge, Card, CardHeader, PageHeader, PhoneList, PhoneRow, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
@@ -29,9 +29,9 @@ export default async function RolesPage() {
   const frozen = roles.filter((r) => r.frozen);
   return (
     <div>
-      <PageHeader crumbs={crumbsFor("/access/roles")} title="Roles" description="Who may do what, who must use two-step sign-in, and how people stand." />
+      <PageHeader kind="list" crumbs={crumbsFor("/access/roles")} title="Roles" />
       <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatRow facts>
         <StatTile label="Signed in now" value={o.liveSessions} sub="Browsers and phones" href="/access/sessions" />
         <StatTile
           label="Two-step sign-in"
@@ -41,10 +41,10 @@ export default async function RolesPage() {
         />
         <StatTile label="Failed sign-ins" value={o.failedLastDay} sub="In the last 24 hours" tone={o.failedLastDay >= 10 ? "bad" : o.failedLastDay ? "warn" : undefined} href="/access/sign-ins?failed=1" />
         <StatTile label="Blocked addresses" value={o.blockedIpsLastDay} sub="Too many attempts, last 24 hours" tone={o.blockedIpsLastDay ? "bad" : undefined} href="/access/sign-ins?failed=1" />
-      </div>
+      </StatRow>
 
       {o.mustSetUp.length > 0 && (
-        <Banner meaning="warn">
+        <Notice tone="todo">
           <p className="font-medium">
             {o.mustSetUp.length === 1 ? "1 person has" : `${o.mustSetUp.length} people have`} not set up two-step sign-in yet, though their role needs it.
           </p>
@@ -61,11 +61,11 @@ export default async function RolesPage() {
             ))}
             .
           </p>
-        </Banner>
+        </Notice>
       )}
 
       {frozen.length > 0 && (
-        <Banner meaning="info">
+        <Notice tone="info">
           <p className="font-medium">
             {frozen.length === 1 ? `The role ${frozen[0]!.name} is` : `${frozen.length} roles your company made are`} frozen: your plan
             {company?.plan ? ` (${company.plan.name})` : ""} does not include custom roles.
@@ -74,7 +74,7 @@ export default async function RolesPage() {
             Their people keep working with what the plan includes. They cannot be changed or given to anyone else; move people to Super Admin, Manager or Staff, or ask for a
             plan with custom roles.
           </p>
-        </Banner>
+        </Notice>
       )}
 
       <Card className="overflow-hidden p-0">
@@ -84,12 +84,25 @@ export default async function RolesPage() {
           actions={
             // Roles beyond the three built in are a plan feature.
             custom && (
-              <OpenPanelButton panel="new-role" variant="ghost" size="sm" className="h-8 px-2.5 text-[13px] [&_svg]:size-3.5">
+              <OpenPanelButton panel="new-role" variant="ghost" size="sm">
                 <Plus aria-hidden /> Add role
               </OpenPanelButton>
             )
           }
         />
+        {/* A phone: a row per role — its name, how many people, its two-step rule. */}
+        <PhoneList label="Roles">
+          {roles.map((r) => (
+            <PhoneRow
+              key={r.key}
+              href={`/access/roles/${r.key}`}
+              title={r.name}
+              line={`${r.people} ${r.people === 1 ? "person" : "people"} · ${r.superAdmin ? "every permission" : `${r.permissions.length - r.notInPlan.length} of ${available} permissions`}`}
+              status={<StatusBadge meaning={r.requireTwoStep ? (r.withoutTwoStep > 0 ? "warn" : "ok") : "neutral"}>{r.requireTwoStep ? "Two-step required" : "Two-step their choice"}</StatusBadge>}
+            />
+          ))}
+        </PhoneList>
+        <div className="max-sm:hidden">
         <Table>
           <THead>
             <tr>
@@ -134,6 +147,7 @@ export default async function RolesPage() {
             ))}
           </tbody>
         </Table>
+        </div>
       </Card>
       {access && <AccessMapCard routes={access} />}
       {custom && (

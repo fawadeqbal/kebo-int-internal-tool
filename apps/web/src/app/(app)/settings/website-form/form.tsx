@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Copy } from "lucide-react";
 import { Button, Input, Textarea } from "@kebo/ui";
-import { ConfirmSubmit } from "@kebo/ui/client";
+import { ConfirmSubmit } from "@/components/common/dialog";
 import { ActionForm } from "@/components/common/action-form";
 import { newFormKeyAction } from "./actions";
 
@@ -31,6 +31,7 @@ export function NewKeyButton() {
         variant="secondary"
         size="sm"
         pendingText="Making…"
+        confirmLabel="Make a new key"
         message="Make a new key? The form on your website stops working until you paste the new snippet."
       >
         Make a new key

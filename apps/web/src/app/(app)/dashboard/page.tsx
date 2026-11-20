@@ -54,7 +54,7 @@ export default async function DashboardPage() {
       {/* data-page-label: Back from a page opened here says "Back to Home". */}
       <header data-page-label="Home" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className="text-[22px] leading-7 font-bold text-text">
+          <h1 className="text-xl leading-7 font-bold text-text">
             {hello}, {me.name.split(" ")[0]}
           </h1>
           <p className="mt-0.5 text-sm text-text-2">
@@ -81,7 +81,7 @@ export default async function DashboardPage() {
             </Suspense>
           )}
           {can(me, "inquiries.create") && (
-            <ButtonLink href="/inquiries?panel=new-inquiry" variant="primary">
+            <ButtonLink href="/inquiries?panel=new-inquiry" variant="strong">
               <Plus aria-hidden /> Add inquiry
             </ButtonLink>
           )}
@@ -231,7 +231,7 @@ function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
       <CardHeader
         title="Inquiries now"
         actions={
-          <Link href="/inquiries/board" className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline">
+          <Link href="/inquiries/board" className="inline-flex items-center gap-1 text-md font-semibold text-primary hover:underline">
             <ArrowRight className="size-4" aria-hidden /> Board
           </Link>
         }
@@ -241,7 +241,7 @@ function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
           {rows.map((r) => (
             <li key={r.label}>
               <Link href={r.href} className="flex flex-col gap-1.5 rounded-lg hover:text-primary">
-                <span className="flex justify-between gap-3 text-[13px]">
+                <span className="flex justify-between gap-3 text-md">
                   <span>
                     {r.label} <span className="text-muted">· {r.n}</span>
                   </span>

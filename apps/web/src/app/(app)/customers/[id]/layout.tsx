@@ -1,11 +1,16 @@
 import { Pencil, Plus } from "lucide-react";
 import { can, PARTY_TYPE_LABEL, RECORD_KIND, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { ButtonLink, PageHeader, RefCode } from "@kebo/ui";
+import { ButtonLink, RefCode } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { customerOf, customerPaymentsOf } from "@/lib/party-data";
 import { companyToday, currentZone } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import { RecordTabs } from "@/components/common/record-tabs";
+import { RecordFrame } from "@/components/records/record-frame";
+import { RecordTop } from "@/components/records/record-page";
+import { CustomerSide } from "./side";
+import { MoreMenu } from "@/components/common/more-menu";
+import { removeCustomerAction } from "../actions";
 import { late } from "./shared";
 
 /** "Mar 2025" */
@@ -29,57 +34,82 @@ export default async function CustomerLayout({ children, params }: { children: R
   const lateOrders = (pay?.orders ?? []).filter((o) => late(o, today)).length;
 
   return (
-    <div>
-      <PageHeader
-        crumbs={[{ label: "Sales" }, { label: "Customers", href: "/customers" }, { label: c.name }]}
-        phoneStack
-        title={c.name}
-        record={{ kind: RECORD_KIND.customer, number: c.customerCode }}
-        summary={
-          <>
-            {c.customerCode && (
-              // On a phone the number is in the top bar, under the name.
-              <span className="max-md:hidden">
-                <RefCode>{c.customerCode}</RefCode>
+    <RecordFrame
+      top={
+        <RecordTop
+          header={{
+            crumbs: [{ label: "Sales" }, { label: "Customers", href: "/customers" }, { label: c.name }],
+            title: c.name,
+            record: { kind: RECORD_KIND.customer, number: c.customerCode },
+            summary: (
+              <>
+                {c.customerCode && (
+                  // On a phone the number is in the top bar, under the name.
+                  <span className="max-md:hidden">
+                    <RefCode>{c.customerCode}</RefCode>
+                    {" · "}
+                  </span>
+                )}
+                {c.type === "individual" ? PARTY_TYPE_LABEL.individual : "Company"}
                 {" · "}
-              </span>
-            )}
-            {c.type === "individual" ? PARTY_TYPE_LABEL.individual : "Company"}
-            {" · "}
-            {countryKnown ? countryName(c.country) : <span className="text-warn">Country not set</span>}
-            {c.defaultCurrency && ` · ${c.defaultCurrency}`}
-            {` · since ${monthOf(c.createdAt)}`}
-          </>
-        }
-        papers={
-          can(me, "customers.manage") && (
-            <ButtonLink href={`${base}?panel=edit-customer&id=${c.id}`} variant="secondary" scroll={false}>
-              <Pencil aria-hidden /> Edit
-            </ButtonLink>
-          )
-        }
-        primary={
-          canAsk && (
-            <ButtonLink href={`/inquiries?panel=new-inquiry&for=${c.id}`} variant="primary">
-              <Plus aria-hidden /> Add inquiry
-            </ButtonLink>
-          )
-        }
-      />
-
-      <RecordTabs
-        base={base}
-        label="The customer"
-        tabs={[
-          { path: "", label: "Overview" },
-          { path: "orders", label: "Orders", count: c.orders.length, alert: lateOrders > 0 },
-          { path: "inquiries", label: "Inquiries", count: c.inquiries.length },
-          { path: "money", label: "Money" },
-          { path: "contacts", label: "Contacts", count: c.contacts.length },
-          { path: "notes", label: "Notes" },
-        ]}
-      />
-      <div className="mt-5">{children}</div>
-    </div>
+                {countryKnown ? countryName(c.country) : <span className="text-warn">Country not set</span>}
+                {c.defaultCurrency && ` · ${c.defaultCurrency}`}
+                {` · since ${monthOf(c.createdAt)}`}
+              </>
+            ),
+            papers: (
+              can(me, "customers.manage") && (
+                <ButtonLink href={`${base}?panel=edit-customer&id=${c.id}`} variant="secondary" scroll={false}>
+                  <Pencil aria-hidden /> Edit
+                </ButtonLink>
+              )
+            ),
+            // Remove lives in ⋯, last and in red (not under the Overview's boxes).
+            more: can(me, "customers.delete") ? (
+              <MoreMenu
+                label={`More for ${c.name}`}
+                items={[
+                  {
+                    label: "Remove this customer",
+                    danger: true,
+                    confirm: {
+                      title: `Remove ${c.name}?`,
+                      body: "They stay on past inquiries and orders, and can be brought back from Customers › Archived. Not possible while an order is open.",
+                      confirmLabel: "Remove",
+                    },
+                    action: removeCustomerAction.bind(null, c.id),
+                  },
+                ]}
+              />
+            ) : undefined,
+            primary: (
+              canAsk && (
+                <ButtonLink href={`/inquiries?panel=new-inquiry&for=${c.id}`} variant="primary">
+                  <Plus aria-hidden /> Add inquiry
+                </ButtonLink>
+              )
+            ),
+          }}
+          tabs={
+            <RecordTabs
+              base={base}
+              label="The customer"
+              tabs={[
+                { path: "", label: "Overview" },
+                { path: "orders", label: "Orders", count: c.orders.length, alert: lateOrders > 0 },
+                { path: "inquiries", label: "Inquiries", count: c.inquiries.length },
+                { path: "money", label: "Money" },
+                { path: "contacts", label: "Contacts", count: c.contacts.length },
+                { path: "notes", label: "Notes" },
+              ]}
+            />
+          }
+        />
+      }
+      panel={<CustomerSide id={c.id} />}
+      panelLabel="At a glance"
+    >
+      {children}
+    </RecordFrame>
   );
 }

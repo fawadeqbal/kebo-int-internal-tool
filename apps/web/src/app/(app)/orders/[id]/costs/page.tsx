@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ORDER_TAB_LABEL } from "@kebo/shared";
-import { Alert, Badge, buttonClass, cn } from "@kebo/ui";
+import { Badge, buttonClass, cn, Notice, EmptyLine } from "@kebo/ui";
 import { money, whole, dayMonth } from "@/lib/format";
 import type { CostSheetRow } from "@/lib/types-money";
 import { OrderPage } from "@/components/order-sections/order-side";
@@ -168,7 +168,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
       </RecordBox>
 
       {costs.missingRate && (
-        <Alert tone="warning">There is no exchange rate for {costs.missingRate} in Settings, so the costs cannot be added up in it.</Alert>
+        <Notice tone="todo">There is no exchange rate for {costs.missingRate} in Settings, so the costs cannot be added up in it.</Notice>
       )}
 
       <Section
@@ -185,7 +185,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
         files={<SectionFiles orderId={o.id} section="expenses" canAdd={d.canFiles} />}
       >
         {sheet.rows.length === 0 ? (
-          <p className="border-t border-line px-[18px] py-3.5 text-[13px] text-text-2">No cost known yet.</p>
+          <EmptyLine className="border-t border-line px-[18px] py-3.5">No cost known yet.</EmptyLine>
         ) : (
           <CostSheetTable
             rows={sheet.rows}
@@ -225,7 +225,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
             {dealSpent.map((e) => {
               const how = [e.paidBy?.name, paidHow(e)].filter(Boolean).join(" · ");
               return (
-                <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-[13px]">
+                <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-md">
                   <span className="w-14 shrink-0 text-text-2 tabular">{dayMonth(e.spentOn)}</span>
                   <span className="min-w-0 flex-1">
                     {e.description} <Badge tone="neutral">{costKind(e.category)}</Badge>

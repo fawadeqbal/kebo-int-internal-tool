@@ -28,9 +28,9 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/access/sessions")}
         title="Sessions"
-        description="Every browser and phone signed in now. Sign one out, or someone everywhere."
         actions={
           who && list.total ? (
             <ConfirmAction action={signOutEverywhereAction.bind(null, who.id)} confirm={`Sign ${who.name} out on every device?`} label="Sign out everywhere" pendingText="Signing out…" variant="secondary" size="md" />

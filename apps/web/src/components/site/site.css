@@ -1,57 +1,61 @@
 /*
- * The marketing site (<BASE_DOMAIN>). Its own small palette, always light:
- * paper and violet ink like the app, and one red, kept for the company seal.
- * One typeface, Archivo, whose width is the voice: expanded for headlines,
- * normal for reading.
+ * The marketing site (<BASE_DOMAIN>), in the app's own look (design "RFQ Desk — marketing page", 20 Nov 2026):
+ * the app's Green colours, always light (the page carries data-colours="green" data-mode="light", so the app's
+ * tokens inside it are the light green set whatever the visitor's app looks like), Inter for reading and Plus
+ * Jakarta Sans for headlines. The page's own few colours below; the app screens use the app's tokens.
  */
-@font-face {
-  font-family: "Site Archivo";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  font-stretch: 62% 125%;
-  src: url("/fonts/archivo-latin-wdth.woff2") format("woff2-variations");
-}
-
 .site {
-  --s-ink: #1b1530;
-  --s-steel: #5d5872;
-  --s-line: #e4e0ee;
-  --s-mist: #f6f4fb;
-  --s-paper: #ffffff;
-  --s-violet: #6d28d9;
-  --s-violet-deep: #4c1d95;
-  --s-violet-soft: #ede7fb;
-  --s-seal: #c8102e;
+  --s-ink: var(--text);
+  --s-steel: var(--text-2);
+  --s-muted: var(--muted);
+  --s-line: var(--line);
+  --s-mist: var(--bg);
+  --s-paper: var(--surface);
+  --s-green: var(--primary);
+  --s-green-solid: var(--primary-solid);
+  --s-green-deep: #124d26;
+  --s-green-soft: var(--primary-soft);
+  --s-green-line: var(--primary-line);
+  --s-action: var(--action-solid);
+  --s-action-hover: var(--action-solid-hover);
+  --s-night: #15211a;
+  --s-bad: var(--bad);
   color-scheme: light;
-  background: var(--s-paper);
+  background: var(--bg);
   color: var(--s-ink);
-  font-family: "Site Archivo", ui-sans-serif, system-ui, sans-serif;
-  font-stretch: 100%;
-  font-size: 1.0625rem;
-  line-height: 1.6;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Headlines: wide and heavy, like the lettering on a container. */
-.site .s-display {
-  font-stretch: 125%;
+/* Headlines: Plus Jakarta Sans, tight. */
+.site .s-display,
+.site .s-heading {
+  font-family: "Kebo Jakarta", var(--font-sans);
   font-weight: 800;
-  line-height: 1.02;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.022em;
   text-wrap: balance;
+}
+.site .s-display {
+  line-height: 1.08;
 }
 .site .s-heading {
-  font-stretch: 118%;
-  font-weight: 750;
-  line-height: 1.1;
-  text-wrap: balance;
-}
-.site .s-narrow {
-  font-stretch: 82%;
+  line-height: 1.18;
 }
 .site .s-lead {
   text-wrap: pretty;
+}
+
+/* The one strong button, as in the app: orange, bold, with its shadow. */
+.site .s-strong {
+  background: var(--s-action);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(194, 81, 10, 0.28);
+}
+.site .s-strong:hover {
+  background: var(--s-action-hover);
 }
 
 .site a:focus-visible,
@@ -59,33 +63,52 @@
 .site summary:focus-visible,
 .site input:focus-visible,
 .site textarea:focus-visible {
-  outline: 3px solid color-mix(in oklab, var(--s-violet) 60%, white);
+  outline: 3px solid color-mix(in oklab, var(--s-green-solid) 55%, white);
   outline-offset: 2px;
 }
 
-/* The seal comes down once, the moment the page opens. */
-.site .s-seal {
-  animation: s-stamp 520ms cubic-bezier(0.2, 0.9, 0.25, 1.15) 700ms both;
-}
-@keyframes s-stamp {
-  from {
-    opacity: 0;
-    transform: scale(1.9) rotate(-28deg);
-  }
-  70% {
-    opacity: 1;
-  }
-  to {
-    opacity: 0.92;
-    transform: scale(1) rotate(-12deg);
+/* A phone holding one of the app's screens: the screen keeps its real 390 × 844 layout and is scaled to fit.
+   (In the components layer, so a utility like hidden on it still wins.) */
+@layer components {
+  .site .s-phone {
+    display: flex;
+    justify-content: center;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .site .s-seal {
-    animation: none;
-    opacity: 0.92;
-    transform: rotate(-12deg);
+.site .s-phone {
+  --s-scale: 0.72;
+}
+@media (min-width: 64rem) {
+  .site .s-phone {
+    --s-scale: 0.8;
   }
+  .site .s-phone.s-small {
+    --s-scale: 0.6;
+  }
+}
+.site .s-phone-frame {
+  padding: 8px;
+  border-radius: 46px;
+  background: #0f1712;
+  box-shadow:
+    0 30px 60px -24px rgb(21 33 26 / 0.45),
+    0 0 0 1px rgb(21 33 26 / 0.08);
+}
+.site .s-phone-glass {
+  position: relative;
+  width: calc(390px * var(--s-scale));
+  height: calc(844px * var(--s-scale));
+  overflow: hidden;
+  border-radius: 38px;
+  background: var(--bg);
+}
+.site .s-phone-screen {
+  width: 390px;
+  height: 844px;
+  transform: scale(var(--s-scale));
+  transform-origin: 0 0;
+  pointer-events: none;
+  user-select: none;
 }
 
 .site details > summary {
@@ -100,4 +123,16 @@
 }
 .site .s-plus {
   transition: transform 160ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site .s-plus {
+    transition: none;
+  }
+}
+
+/* The top of the page on a wide screen: two phones side by side, a little smaller. */
+@media (min-width: 80rem) {
+  .site .s-phone.s-hero-phone {
+    --s-scale: 0.64;
+  }
 }

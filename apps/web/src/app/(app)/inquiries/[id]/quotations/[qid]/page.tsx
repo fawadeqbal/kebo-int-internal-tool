@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Fragment, type ReactNode } from "react";
 import { ChevronRight, Download, Eye, Lock, Send } from "lucide-react";
 import { BASIS_STEP_LABEL, can, PAPER, RECORD_KIND, RECORD_TITLE, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, unpricedItems, type BasisStep, type TermsCheck } from "@kebo/shared";
-import { cn } from "@kebo/ui";
+import { cn, RULES } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
 import { recordActions } from "@/components/records/actions";
@@ -20,7 +20,8 @@ import type { QuotationOfDeal, QuoteOffers, RevisionDraft, RevisionView } from "
 import { QuoteEdit, type QuoteBox } from "@/components/deals/quotation-step";
 import { AnswerButton } from "@/components/deals/quotation-tab";
 import { CheckChip, checksOf, optionOf, optionTitle, PaymentParts, quoteCount, quotePrices } from "@/components/deals/quote-view";
-import { EditAllWindow, NewRevisionWindow, UrlWindow } from "@/components/deals/quote-windows";
+import { UrlWindow } from "@/components/common/panel";
+import { EditAllWindow, NewRevisionWindow } from "@/components/deals/quote-windows";
 import { SendWindow, type SendItem } from "@/components/deals/send-quote";
 import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offerPricesAction, offersAction, reviseAction, saidNoAction, updateRevisionAction } from "../../quotation/actions";
 import { ActionForm } from "@/components/common/action-form";
@@ -144,7 +145,7 @@ export default async function QuotationOwnPage({
       place: "primary",
       when: isDraft && !!send,
       node: (
-        <PanelButton variant="primary" size="sm" icon={<Send aria-hidden />} label={`Send R${r.number}`} title={`Send ${quoteRef} to ${d.customer.name}`} description={`Valid until ${date(r.validUntil)}`} panelClassName="md:w-[620px]" body={send} />
+        <PanelButton variant="primary" icon={<Send aria-hidden />} label={`Send R${r.number}`} title={`Send ${quoteRef} to ${d.customer.name}`} description={`Valid until ${date(r.validUntil)}`} panelClassName={RULES.window.part} body={send} />
       ),
     },
     {
@@ -233,7 +234,7 @@ export default async function QuotationOwnPage({
         back: { href: `${base}/quotation`, label: `${d.refNo} · Quotations` },
         title: RECORD_TITLE.quotation({ customer: d.customer.name, option: q.quotations.length > 1 ? x.letter : null }),
         record: { kind: RECORD_KIND.quotation, number: x.refNo },
-        badge: <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[13px] font-semibold text-text-2 tabular">R{r.number}</span>,
+        badge: <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-md font-semibold text-text-2 tabular">R{r.number}</span>,
         summary: (
           <p className="min-w-0">
             <span className={cn("font-semibold", TONE[state.tone])}>{state.text}</span>
@@ -364,7 +365,7 @@ export default async function QuotationOwnPage({
       {/* The windows ⋯ opens (kept in the address: Back closes them). */}
       {editor && sp.panel === "edit-quote" && <EditAllWindow {...editor} />}
       {send && r.status === "sent" && sp.panel === "send-again" && (
-        <UrlWindow name="send-again" title={`Send ${quoteRef} again`} description="The same PDF, by email" className="md:w-[620px]">
+        <UrlWindow name="send-again" title={`Send ${quoteRef} again`} description="The same PDF, by email" className={RULES.window.part}>
           {send}
         </UrlWindow>
       )}
@@ -378,7 +379,7 @@ export default async function QuotationOwnPage({
 /** The panel beside the quotation: its revisions, and the offer it came from (who it goes to is in Customer). */
 function quoteSide({ x, r, here, base, offers }: { x: QuotationOfDeal; r: RevisionView; here: string; base: string; offers: QuoteOffers | null }): PanelSection[] {
   const row = (label: string, value: ReactNode) => (
-    <div className="flex justify-between gap-3 text-[13px]">
+    <div className="flex justify-between gap-3 text-md">
       <dt className="text-text-2">{label}</dt>
       <dd className="min-w-0 text-right font-medium break-words text-text">{value}</dd>
     </div>
@@ -392,7 +393,7 @@ function quoteSide({ x, r, here, base, offers }: { x: QuotationOfDeal; r: Revisi
           key={v.id}
           href={`${here}?rev=${v.id}`}
           aria-current={v.id === r.id ? "page" : undefined}
-          className={cn("-mx-2 flex items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-[13px] hover:bg-surface-2", v.id === r.id && "bg-surface-2")}
+          className={cn("-mx-2 flex items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-md hover:bg-surface-2", v.id === r.id && "bg-surface-2")}
         >
           <span className="font-semibold">R{v.number}</span>
           <span className="text-right text-xs text-text-2">
@@ -424,7 +425,7 @@ function quoteSide({ x, r, here, base, offers }: { x: QuotationOfDeal; r: Revisi
           {r.options
             .filter((o) => o.factoryQuoteId && offers)
             .map((o) => (
-              <Link key={o.id} href={`${base}/offers/${o.factoryQuoteId}`} className="mt-1 inline-flex items-center gap-1 text-[13px] font-semibold text-primary underline underline-offset-2">
+              <Link key={o.id} href={`${base}/offers/${o.factoryQuoteId}`} className="mt-1 inline-flex items-center gap-1 text-md font-semibold text-primary underline underline-offset-2">
                 Open {r.options.length > 1 ? `Option ${o.letter}’s offer` : "the offer"} <ChevronRight className="size-3.5" aria-hidden />
               </Link>
             ))}

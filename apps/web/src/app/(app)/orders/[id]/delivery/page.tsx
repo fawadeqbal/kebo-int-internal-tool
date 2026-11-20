@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Badge, RULES } from "@kebo/ui";
 import { getPeople } from "@/lib/loaders";
 import { date } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
@@ -21,7 +21,6 @@ import { orderTitle } from "@/lib/titles";
 
 export const generateMetadata = orderTitle("Delivery and SAT");
 
-const SMALL = "h-8 px-2.5 text-[13px]";
 const RESULT_TONE = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" } as const;
 
 /** A day some months later (YYYY-MM-DD), kept inside the month it lands in. */
@@ -79,12 +78,11 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
     );
   const linesButton = canEdit && goodsLines.length > 0 && (
     <PanelButton
-      size="sm"
-      className={SMALL}
+      edit
       label="Edit items"
       title="Delivery"
       description="How many of each item reached the customer, and in what condition. Nothing is saved until Save changes."
-      panelClassName="md:w-[1180px]"
+      panelClassName={RULES.window.items}
       body={<OrderLinesEditor set="delivered" orderId={o.id} lines={goodsLines} today={now} edit={{ type: "order", id: o.id, card: "lines.delivered" }} card={edits.cards["lines.delivered"]} />}
     />
   );
@@ -170,7 +168,6 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
                 {canEdit && (
                   <PanelButton
                     size="sm"
-                    className={SMALL}
                     label="Points"
                     title="The SAT points"
                     description="Each point: Pass, Fail or N/A, and a note."
@@ -186,7 +183,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
               <ul className="flex flex-col divide-y divide-line border-t border-line px-[18px]">
                 {dv.sat.map((c) => (
                   <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 py-2">
-                    <span className="min-w-0 text-[13px]">
+                    <span className="min-w-0 text-md">
                       <span className="block font-semibold">{c.item}</span>
                       {c.note && <span className="block text-xs text-text-2">{c.note}</span>}
                     </span>
@@ -213,7 +210,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
               { label: "Ends on", value: until ? date(until) : null },
             ]}
             actions={
-              <Link href={`/orders/${o.id}#agreed`} className="text-[13px] font-medium whitespace-nowrap text-primary hover:underline">
+              <Link href={`/orders/${o.id}#agreed`} className="text-md font-medium whitespace-nowrap text-primary hover:underline">
                 As agreed with the customer
               </Link>
             }

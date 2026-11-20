@@ -6,7 +6,7 @@ import { SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type SentVia } from "@kebo/sha
 import { cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelBody, PanelFooter, useClosePanel, WhatHappens } from "@/components/common/panel";
+import { PANEL_FORM, PanelBody, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -132,7 +132,7 @@ export function SendWindow({
     </label>
   );
   const file = (name: string, print: string, download: string) => (
-    <div key={name} className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-[13px]">
+    <div key={name} className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-md">
       <span className="font-semibold">{name}</span>
       <span className="flex gap-4">
         <a href={print} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline" aria-label={many ? `See how ${name} prints` : undefined}>
@@ -193,11 +193,11 @@ export function SendWindow({
                       : ["The email goes out with the PDF.", `R${number} becomes Sent: by email, today. It is then kept exactly as sent.`, ...after]
                 }
               />
-              <PanelFooter>
+              <WindowFooter>
                 <SubmitButton pendingText="Sending…">
                   <Mail aria-hidden /> {many ? `Send ${chosen.length}` : "Send email"}
                 </SubmitButton>
-              </PanelFooter>
+              </WindowFooter>
             </>
           )}
         </ActionForm>
@@ -231,11 +231,11 @@ export function SendWindow({
                   ...after,
                 ]}
               />
-              <PanelFooter>
+              <WindowFooter>
                 <SubmitButton pendingText="Saving…">
                   <Check aria-hidden /> {many ? `Mark ${chosen.length} as sent` : `Mark R${number} as sent`}
                 </SubmitButton>
-              </PanelFooter>
+              </WindowFooter>
             </>
           )}
         </ActionForm>

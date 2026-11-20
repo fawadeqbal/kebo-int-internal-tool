@@ -40,7 +40,6 @@ export const generateMetadata = orderTitle("Shipping");
 /** What saving the freight and the insurance does to the order's costs. */
 const COST_WHATS = ["Freight we pay (not “collect”) and the premium become costs of this order by themselves."];
 
-const SMALL = "h-8 px-2.5 text-[13px]";
 const has = (...v: (string | null | undefined)[]) => v.some((x) => x !== null && x !== undefined && x !== "");
 
 /**
@@ -163,7 +162,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           { label: "Version", value: advice.version ? String(advice.version) : null },
         ]}
         actions={
-          <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary" className={SMALL}>
+          <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary">
             Open
           </ButtonLink>
         }
@@ -175,7 +174,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         text="Not sent yet."
         action={
           advice.makeable && papers?.canMake ? (
-            <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary" className={SMALL}>
+            <ButtonLink href={`/orders/${o.id}/papers/shipping-advice`} size="sm" variant="secondary">
               Make and send
             </ButtonLink>
           ) : undefined
@@ -349,7 +348,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             action: (
               <>
                 {track && (
-                  <a href={track.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm", SMALL)} title={`${track.carrier} · ${track.number}`}>
+                  <a href={track.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm")} title={`${track.carrier} · ${track.number}`}>
                     <Globe aria-hidden /> Track
                   </a>
                 )}

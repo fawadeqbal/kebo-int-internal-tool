@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Trash2, X } from "lucide-react";
-import { Button, cn } from "@kebo/ui";
+import { Button, cn, RULES } from "@kebo/ui";
+import { SubmitButton } from "@kebo/ui/client";
 import { lockScroll } from "@/lib/scroll-lock";
 import { useChanges, watchChanges } from "./changes";
 
@@ -154,6 +155,77 @@ export function ConfirmDialog({
   );
 }
 
+/** What useConfirm asks: the question (its first sentence is the title, the rest the line under it) and the button. */
+export interface ConfirmAsk {
+  question: string;
+  confirmLabel: string;
+  danger?: boolean;
+}
+
+/**
+ * The browser's own confirm(), in the app's look (canvas group 8: "confirm() → ConfirmDialog"): `ask(q, then)`
+ * shows the ConfirmDialog and runs `then` only on its button; render `dialog` once in the component.
+ */
+export function useConfirm() {
+  const [open, setOpen] = useState<(ConfirmAsk & { then: () => void }) | null>(null);
+  const ask = useCallback((q: ConfirmAsk, then: () => void) => setOpen({ ...q, then }), []);
+  let dialog: ReactNode = null;
+  if (open) {
+    const [title, ...rest] = open.question.split(/(?<=\?)\s+/);
+    dialog = (
+      <ConfirmDialog
+        title={title ?? open.question}
+        confirmLabel={open.confirmLabel}
+        danger={open.danger}
+        onCancel={() => setOpen(null)}
+        onConfirm={() => {
+          setOpen(null);
+          open.then();
+        }}
+      >
+        {rest.length ? rest.join(" ") : undefined}
+      </ConfirmDialog>
+    );
+  }
+  return { ask, dialog };
+}
+
+/**
+ * A submit button that asks first: on its click the form waits, and is sent (by this button) only on Yes.
+ * For a plain <form> or ActionForm whose button removes something.
+ */
+export function useConfirmSubmit() {
+  const { ask, dialog } = useConfirm();
+  const onClick = useCallback(
+    (q: ConfirmAsk) => (e: { preventDefault: () => void; currentTarget: HTMLButtonElement }) => {
+      e.preventDefault();
+      const button = e.currentTarget;
+      ask(q, () => button.form?.requestSubmit(button));
+    },
+    [ask],
+  );
+  return { onClick, dialog };
+}
+
+/** A form's submit button that asks first, in the app's ConfirmDialog (red when its button is). */
+export function ConfirmSubmit({
+  message,
+  confirmLabel,
+  danger,
+  children,
+  ...props
+}: ComponentProps<typeof SubmitButton> & { message: string; confirmLabel: string; danger?: boolean }) {
+  const { onClick, dialog } = useConfirmSubmit();
+  return (
+    <>
+      <SubmitButton {...props} onClick={onClick({ question: message, confirmLabel, danger: danger ?? String(props.variant ?? "").startsWith("danger") })}>
+        {children}
+      </SubmitButton>
+      {dialog}
+    </>
+  );
+}
+
 /** What would be lost by closing a window now: its own question and the changes in a few words (design rules 18 Nov). */
 export interface LostInfo {
   /** "Close without saving?" for a new record; "Discard your change?" by default. */
@@ -199,13 +271,13 @@ export function ThrowAwayConfirm({ what, lost, onKeep, onThrow }: { what?: React
         className="relative w-full max-w-[440px] animate-in rounded-2xl border border-line bg-surface p-5 shadow-pop max-sm:max-w-none max-sm:rounded-b-none max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))]"
       >
         <span aria-hidden className="mx-auto -mt-2 mb-3 block h-1 w-10 rounded-full bg-line sm:hidden" />
-        <h2 id={`${id}-t`} className="text-[17px] font-bold">
+        <h2 id={`${id}-t`} className="text-lg font-bold">
           {title}
         </h2>
         <div id={`${id}-d`} className="mt-1 text-sm text-text-2">
           <p>{text}</p>
           {lines.length > 0 && (
-            <ul className="mt-3 overflow-hidden rounded-xl border border-line text-[13.5px] text-text">
+            <ul className="mt-3 overflow-hidden rounded-xl border border-line text-md text-text">
               {lines.slice(0, 6).map((l) => (
                 <li key={l} className="border-t border-line px-3 py-2 first:border-t-0">
                   {l}
@@ -216,10 +288,10 @@ export function ThrowAwayConfirm({ what, lost, onKeep, onThrow }: { what?: React
           )}
         </div>
         <div className="mt-5 flex justify-end gap-2 max-sm:flex-col-reverse">
-          <Button variant="danger-line" onClick={onThrow} className="max-sm:h-11 max-sm:w-full">
+          <Button variant="danger-line" onClick={onThrow} className="max-sm:w-full">
             <Trash2 aria-hidden /> Discard
           </Button>
-          <Button ref={keep} variant="strong" onClick={onKeep} className="max-sm:h-12 max-sm:w-full">
+          <Button size="lg" ref={keep} variant="strong" onClick={onKeep} className="max-sm:w-full">
             Keep editing
           </Button>
         </div>
@@ -318,12 +390,12 @@ export function WindowHead({
           {title}
         </h2>
         {description && (
-          <p id={`${id}-desc`} className="mt-0.5 text-[13px] text-text-2 max-md:line-clamp-2">
+          <p id={`${id}-desc`} className="mt-0.5 text-md text-text-2 max-md:line-clamp-2">
             {description}
           </p>
         )}
       </div>
-      <Button data-window-x="" size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled} className="max-md:order-1 max-md:size-11 max-md:rounded-full max-md:[&_svg]:size-[22px]">
+      <Button data-window-x="" size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose} disabled={disabled} className="max-md:order-1 max-md:rounded-full max-md:[&_svg]:size-[22px]">
         <X aria-hidden />
       </Button>
     </div>
@@ -334,7 +406,7 @@ export function WindowHead({
 export const WINDOW_FOOTER =
   "flex flex-wrap items-center justify-end gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-6";
 
-const MODAL_WIDTH = { md: "md:w-[600px]", lg: "md:w-[760px]" } as const;
+const MODAL_WIDTH = { md: RULES.window.part, lg: RULES.window.wideRows } as const;
 
 /**
  * A window over the page (cancel an order, a file, a request): the same frame as every other window.

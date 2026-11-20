@@ -1,5 +1,7 @@
-import { Bell, Check } from "lucide-react";
-import { Badge, buildHref, ButtonLink, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, toPage } from "@kebo/ui";
+import Link from "next/link";
+import { Check } from "lucide-react";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage } from "@kebo/ui";
+import { DataTable } from "@/components/common/data-table";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { dateTime, timeAgo, countOf } from "@/lib/format";
@@ -12,7 +14,6 @@ import { readableDates } from "@/components/insights/readable-dates";
 
 export const metadata = { title: "Alerts" };
 
-
 /** Where a row goes: through /notifications/open (marks it read) when new, else straight to its link. */
 const openHref = (n: NotificationItem) =>
   n.readAt ? (n.link ?? "/notifications") : buildHref("/notifications/open", {}, { id: n.id, to: n.link ?? undefined });
@@ -20,7 +21,8 @@ const openHref = (n: NotificationItem) =>
 /**
  * Alerts (board "Alerts"): "N new" and Mark all read; chips All / Unread N /
  * Payments / Inquiries / Orders / Follow-ups; each alert a row with a dot when
- * new, its kind as a label, what happened, when, and Open. 25 a page.
+ * new, its kind as a label, what happened and when, in the one list table (a click opens it); phone rows on a phone.
+ * 25 a page.
  */
 export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ show?: string; page?: string; q?: string }> }) {
   await requireUser();
@@ -45,10 +47,9 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   return (
     <>
       <PageHeader
+        kind="list"
         crumbs={[{ label: "Alerts" }]}
-        icon={Bell}
         title="Alerts"
-        summary={unread ? `${unread} new` : "You are all caught up"}
         primary={
           unread > 0 && (
             <ConfirmAction
@@ -94,45 +95,60 @@ export default async function NotificationsPage({ searchParams }: { searchParams
             }
           />
         ) : (
-          <ul aria-label="Alerts">
-            {items.map((n, i) => {
-              const fresh = !n.readAt;
-              const kind = alertKind(n.type, n.message);
-              return (
-                <li
-                  key={n.id}
-                  className={cn("flex gap-3 px-4 py-3.5 sm:px-5", i > 0 && "border-t border-surface-2", fresh && "bg-primary-soft/40")}
-                >
-                  <span className="w-2.5 flex-none pt-2">
-                    {fresh && (
-                      <span className="block size-2 rounded-full bg-primary-solid">
-                        <span className="sr-only">New</span>
-                      </span>
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <Badge tone={kind.tone}>{kind.label}</Badge>
-                    <span className="mt-1.5 block text-sm text-text">
-                      {readableDates(n.title)}
-                      {n.body && <span className="text-text-2"> · {readableDates(n.body)}</span>}
-                    </span>
-                    <time dateTime={n.createdAt} title={dateTime(n.createdAt)} className="text-xs text-muted">
-                      {timeAgo(n.createdAt)}
-                    </time>
-                  </span>
-                  <ButtonLink
+          <>
+            <DataTable label="Alerts" className="max-sm:hidden">
+              <THead>
+                <tr>
+                  <Th>
+                    <span className="sr-only">New</span>
+                  </Th>
+                  <Th>Kind</Th>
+                  <Th>What happened</Th>
+                  <Th className="text-right">When</Th>
+                </tr>
+              </THead>
+              <tbody>
+                {items.map((n) => {
+                  const kind = alertKind(n.type, n.message);
+                  return (
+                    <DataRow key={n.id} href={openHref(n)} className={cn(!n.readAt && "bg-primary-soft/40")}>
+                      <Td className="w-6 pr-0">{!n.readAt && <span className="block size-2 rounded-full bg-primary-solid" role="img" aria-label="New" />}</Td>
+                      <Td>
+                        <Badge tone={kind.tone}>{kind.label}</Badge>
+                      </Td>
+                      <Td>
+                        <Link href={openHref(n)} prefetch={false} className="font-medium text-text hover:underline">
+                          {readableDates(n.title)}
+                        </Link>
+                        {n.body && <span className="text-text-2"> · {readableDates(n.body)}</span>}
+                      </Td>
+                      <Td className="text-right whitespace-nowrap text-text-2">
+                        <time dateTime={n.createdAt} title={dateTime(n.createdAt)}>
+                          {timeAgo(n.createdAt)}
+                        </time>
+                      </Td>
+                    </DataRow>
+                  );
+                })}
+              </tbody>
+            </DataTable>
+            <PhoneList label="Alerts">
+              {items.map((n) => {
+                const kind = alertKind(n.type, n.message);
+                return (
+                  <PhoneRow
+                    key={n.id}
                     href={openHref(n)}
                     prefetch={false}
-                    size="sm"
-                    className="flex-none self-start"
-                    aria-label={`Open: ${n.title}`}
-                  >
-                    Open
-                  </ButtonLink>
-                </li>
-              );
-            })}
-          </ul>
+                    title={readableDates(n.title)}
+                    line={n.body ? readableDates(n.body) : timeAgo(n.createdAt)}
+                    status={<Badge tone={kind.tone}>{!n.readAt ? `New · ${kind.label}` : kind.label}</Badge>}
+                    figure={n.body ? timeAgo(n.createdAt) : undefined}
+                  />
+                );
+              })}
+            </PhoneList>
+          </>
         )}
       </Card>
       <Pager base="/notifications" params={keep} page={page} pageSize={PAGE_SIZE} total={total} bare />

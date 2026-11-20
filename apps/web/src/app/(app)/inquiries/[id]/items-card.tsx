@@ -1,6 +1,6 @@
 import { ChevronRight, Pencil } from "lucide-react";
 import { can } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Badge, EmptyLine } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { dateTime, money, qty } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
@@ -136,7 +136,7 @@ export async function ItemsCard({ id }: { id: string }) {
                                 <span className="min-w-0 flex-1">
                                   <span className="block truncate font-semibold">{t.q.factory.name}</span>
                                   <span className="flex items-center gap-1.5 text-xs text-text-2">
-                                    {low !== null && t.price === low && <span className="rounded bg-ok-soft px-1 text-[10.5px] font-bold text-ok">Lowest</span>}
+                                    {low !== null && t.price === low && <span className="rounded bg-ok-soft px-1 text-2xs font-bold text-ok">Lowest</span>}
                                     {t.q.leadTime ?? "lead time not said"}
                                   </span>
                                 </span>
@@ -147,14 +147,14 @@ export async function ItemsCard({ id }: { id: string }) {
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-text-2">No supplier offer has it yet.</p>
+                        <EmptyLine>No supplier offer has it yet.</EmptyLine>
                       )}
                     </SheetPart>
                   )}
                   {mine.length > 0 && (
                     <SheetPart title="Its changes">
                       {mine.map((e, k) => (
-                        <p key={k} className="py-1 text-[13px]">
+                        <p key={k} className="py-1 text-md">
                           {e.lines![i.id]!.join(" · ")}
                           <span className="block text-xs text-text-2">{[e.reason, e.by, dateTime(e.at)].filter(Boolean).join(" · ")}</span>
                         </p>

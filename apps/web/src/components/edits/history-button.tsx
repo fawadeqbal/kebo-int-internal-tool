@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Clock, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Button, cn } from "@kebo/ui";
+import { ChangeText } from "@/components/common/change-words";
 
 /** One change in a box's or a line's history: what changed (a line each), why, who and when. */
 export interface HistoryEntry {
@@ -16,28 +17,6 @@ export interface HistoryEntry {
   at: string;
   /** "Added with the inquiry": the start, no reason. */
   start?: boolean;
-}
-
-/** "Came by: Email → WhatsApp": the old value struck through, the new one bold. */
-function ChangeLine({ text }: { text: string }) {
-  const arrow = text.lastIndexOf(" → ");
-  if (arrow < 0) return <span>{text}</span>;
-  const left = text.slice(0, arrow);
-  const right = text.slice(arrow + 3);
-  const colon = left.indexOf(": ");
-  return (
-    <span>
-      {colon >= 0 ? (
-        <>
-          {left.slice(0, colon + 2)}
-          <s className="text-muted">{left.slice(colon + 2)}</s>
-        </>
-      ) : (
-        left
-      )}{" "}
-      → <b className="font-semibold">{right}</b>
-    </span>
-  );
 }
 
 /**
@@ -102,15 +81,15 @@ export function HistoryButton({ title, entries, allHref }: { title: string; entr
                 {entries.map((e, n) => (
                   <li
                     key={n}
-                    className="grid grid-cols-[10px_minmax(0,1fr)] gap-2.5 border-t border-line px-4 py-2.5 text-[13.5px] first:border-t-0"
+                    className="grid grid-cols-[10px_minmax(0,1fr)] gap-2.5 border-t border-line px-4 py-2.5 text-md first:border-t-0"
                   >
                     <span aria-hidden className={cn("mt-1.5 size-2 rounded-full", e.start ? "bg-line-strong" : "bg-primary-solid")} />
                     <span className="flex min-w-0 flex-col gap-1">
                       {e.lines.map((l) => (
-                        <ChangeLine key={l} text={l} />
+                        <ChangeText key={l} text={l} />
                       ))}
                       {e.reason && (
-                        <span className="self-start rounded-md bg-action-soft px-2 py-0.5 text-[12.5px] font-semibold text-action">
+                        <span className="self-start rounded-md bg-action-soft px-2 py-0.5 text-xs font-semibold text-action">
                           Why: {e.reason}
                         </span>
                       )}

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SEARCH_KIND_LABEL, SEARCH_KINDS, type SearchItem, type SearchKind, type SearchResult } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, EmptyState, LinkTabs, PageHeader } from "@kebo/ui";
+import { boxHeadClass, boxTitleClass, cn, Badge, buildHref, ButtonLink, Card, EmptyState, LinkTabs, PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { countOf } from "@/lib/format";
@@ -36,8 +36,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader
+        kind="list"
         crumbs={[{ label: "Search" }]}
-        icon={Search}
         title="Search"
         summary={asked ? `${countOf(total, "result")} for “${q}” · everything you may see` : "Customers, suppliers, inquiries, quotations, orders, purchase orders and payments"}
       />
@@ -57,7 +57,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           <span className="min-w-0 flex-1 text-sm">
             <span className="font-semibold">{counts.exact.label}</span> <span className="text-text-2">· {kindOne(counts.exact.kind)}</span>
           </span>
-          <ButtonLink href={counts.exact.href} size="sm" variant="primary">
+          <ButtonLink href={counts.exact.href} size="sm" variant="strong">
             Open it <ArrowRight aria-hidden />
           </ButtonLink>
         </Card>
@@ -90,12 +90,12 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           {found.groups.map((g) => (
             <Card key={g.kind} className="overflow-clip p-0">
               <section aria-label={SEARCH_KIND_LABEL[g.kind]}>
-                <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5 sm:px-5">
-                  <h2 className="text-[13px] font-semibold tracking-wide text-text-2 uppercase">
-                    {SEARCH_KIND_LABEL[g.kind]} · {g.total}
+                <div className={cn(boxHeadClass, "justify-between gap-3")}>
+                  <h2 className={boxTitleClass}>
+                    {SEARCH_KIND_LABEL[g.kind]} <span className="font-normal text-muted">· {g.total}</span>
                   </h2>
                   {!kind && (
-                    <Link href={tab(g.kind)} className="inline-flex min-h-8 items-center text-[13px] font-medium text-primary hover:underline">
+                    <Link href={tab(g.kind)} className="inline-flex min-h-8 items-center text-md font-medium text-primary hover:underline">
                       {g.total > g.items.length ? `See all ${kindCount(g.kind, g.total)}` : `Only ${SEARCH_KIND_LABEL[g.kind].toLowerCase()}`}
                     </Link>
                   )}
@@ -106,7 +106,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                   ))}
                 </ul>
                 {kind && g.total > g.items.length && (
-                  <p className="border-t border-line px-4 py-2.5 text-[13px] text-text-2 sm:px-5">
+                  <p className="border-t border-line px-4 py-2.5 text-md text-text-2 sm:px-5">
                     The first {g.items.length} of {g.total}: add words to narrow it.
                   </p>
                 )}
@@ -131,7 +131,7 @@ function ResultRow({ x, q }: { x: SearchItem; q: string }) {
           <span className="block truncate text-sm font-semibold text-text">
             <Marked text={x.title} q={q} />
           </span>
-          <span className="block truncate text-[13px] text-text-2">
+          <span className="block truncate text-md text-text-2">
             <Marked text={x.sub} q={q} />
           </span>
         </span>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, CircleCheck, Download, Eye, FileText, History, List, Paperclip, Pencil, Sparkles, Trash2, UserRound } from "lucide-react";
+import { ChevronRight, CircleCheck, Download, Eye, FileText, History, List, Paperclip, Pencil, Sparkles, Trash2, UserRound } from "lucide-react";
 import {
   ATTACHMENT_KIND_LABEL,
   CHANNEL_LABEL,
@@ -16,12 +16,13 @@ import {
   UNKNOWN_COUNTRY,
   type AttachmentKind,
 } from "@kebo/shared";
-import { Alert, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton, toast } from "@kebo/ui/client";
+import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice, Badge, EmptyLine } from "@kebo/ui";
+import { toast } from "@kebo/ui/client";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens, WindowCancel } from "@/components/common/panel";
+import { ChangeHint, changeCount, changedClassOf, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
+import { PANEL_FORM, PanelBody, PanelSection, useReportDirty, useReportLost, WhatHappens } from "@/components/common/panel";
 import { ActionForm } from "@/components/common/action-form";
-import { StepsFrame } from "@/components/common/steps-frame";
+import { JumpToStep, StepsFooter, StepsFrame } from "@/components/common/steps-frame";
 import { CountrySelect } from "@/components/people/country-select";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { countryName } from "@/lib/countries";
@@ -31,7 +32,7 @@ import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole } fr
 import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/inquiries/actions";
 import { CustomerPicker } from "./customer-picker";
 import { ChoiceChips } from "@/components/common/choice-chips";
-import { send, type Staged } from "./documents-panel";
+import { send, type Staged } from "@/components/files/upload";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
 import { LineTable } from "@/components/lines/line-table";
 import { ReasonSheet } from "@/components/edits/reason-chips";
@@ -215,7 +216,7 @@ export function DealForm({
           card,
           kind: "edit",
           reason: why.trim(),
-          changes: list.map((c) => `${c.label}: ${c.from} → ${c.to}`),
+          changes: list.map((c) => changeLine(c.label, c.from, c.to)),
           keys: list.map((c) => c.key),
         }).catch(() => undefined);
       }
@@ -280,8 +281,13 @@ export function DealForm({
   );
   const changedOf = (k: keyof DealFormValues) => fieldChanges.find((c) => c.key === k);
   const itemChanges = !create && sheet.dirty ? sheet.diff.changes : [];
-  const total = fieldChanges.length + itemChanges.length + staged.length;
-  const saveLabel = total ? `Save ${total} change${total === 1 ? "" : "s"}` : "No changes";
+  // Added is not a change (canvas group 9): an empty field filled, a new item, a file to add are counted apart,
+  // and only what replaced or cleared a saved value asks Why?.
+  const fieldCounts = countChanges(fieldChanges);
+  const itemsAdded = itemChanges.filter((x) => x.startsWith("Added ")).length;
+  const counts = { changed: fieldCounts.changed + itemChanges.length - itemsAdded, added: fieldCounts.added + itemsAdded + staged.length };
+  const total = counts.changed + counts.added;
+  const saveLabel = changeWords(counts);
   const reasonChoices = REASONS(
     fieldChanges.some((c) => c.key === "customer"),
     itemChanges.length > 0,
@@ -297,7 +303,7 @@ export function DealForm({
           : k === "changes"
             ? total
             : 0;
-  const needWhy = !create && total > 0;
+  const needWhy = !create && counts.changed > 0;
   // Something changed: Save asks why, once, in a sheet (canvas board "Why the change? at Save").
   const canSave = create || total > 0;
   const [askWhy, setAskWhy] = useState(false);
@@ -311,15 +317,12 @@ export function DealForm({
   };
   const changedNote = (k: keyof DealFormValues) => {
     const c = changedOf(k);
-    return c ? (
-      <span className="flex items-center gap-1.5 text-xs font-semibold text-action">
-        <span aria-hidden className="size-1.5 rounded-full bg-action-solid" />
-        Changed · was {c.from}
-      </span>
-    ) : null;
+    return c ? <ChangeHint was={c.from} now={c.to} onUndo={() => undo(k)} /> : null;
   };
-  const changedField = (k: keyof DealFormValues) =>
-    changedOf(k) ? "[&_:is(input,select,textarea)]:border-action/70 [&_[aria-checked=true]]:border-action" : undefined;
+  const changedField = (k: keyof DealFormValues) => {
+    const c = changedOf(k);
+    return c ? changedClassOf(c.from, c.to) : undefined;
+  };
   const whySheet = (
     <ReasonSheet
       open={askWhy && needWhy}
@@ -328,8 +331,8 @@ export function DealForm({
       value={why ?? ""}
       onChange={(r) => setWhy(r)}
       formId={formId}
-      title={total === 1 ? "Why the change?" : "Why these changes?"}
-      what={`${total} change${total === 1 ? "" : "s"}: ${lost.slice(0, 2).join(" · ")}`}
+      title={counts.changed === 1 ? "Why the change?" : "Why these changes?"}
+      what={`${changeCount(counts)}: ${lost.slice(0, 2).join(" · ")}`}
       saveLabel={saveLabel}
     />
   );
@@ -351,7 +354,7 @@ export function DealForm({
   if (created)
     return (
       <PanelBody>
-        <Alert tone="warning">
+        <Notice tone="todo">
           <p className="font-medium">The inquiry was saved, but some files did not upload:</p>
           <ul className="mt-1 list-disc pl-5 text-sm">
             {created.failed.map((f) => (
@@ -361,7 +364,7 @@ export function DealForm({
           <Link href={`/inquiries/${created.id}/files`} className={buttonClass("primary", "sm", "mt-3")}>
             Open the inquiry’s files and try them again
           </Link>
-        </Alert>
+        </Notice>
       </PanelBody>
     );
 
@@ -389,9 +392,9 @@ export function DealForm({
         }}
         banner={(st) =>
           st.message && st.ok === false ? (
-            <Alert tone="error">
+            <Notice tone="bad">
               <strong>Not saved.</strong> {notSaved(st)}
-            </Alert>
+            </Notice>
           ) : null
         }
       >
@@ -414,7 +417,7 @@ export function DealForm({
                         ? [v.category, PRIORITY_LABEL[v.priority as keyof typeof PRIORITY_LABEL]].filter(Boolean).join(" · ") || undefined
                         : x.key === "review" || x.key === "changes"
                           ? x.key === "changes" && total
-                            ? `${total} change${total === 1 ? "" : "s"}`
+                            ? changeCount(counts)
                             : undefined
                           : files.length + staged.length
                             ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
@@ -430,111 +433,38 @@ export function DealForm({
               fill={step === "items"}
               footer={
                 step === "customer" && adding !== null ? (
-                  <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
-                    <Button type="button" variant="ghost" onClick={() => setAdding(null)}>
-                      <ChevronLeft aria-hidden /> Back to search
-                    </Button>
-                    <span className="flex-1" />
-                    <Button
-                      type="button"
-                      variant="strong"
-                      size="lg"
-                      disabled={addingBusy}
-                      onClick={() => newCustomer.current?.save()}
-                      className="max-md:h-11"
-                    >
-                      <Check aria-hidden /> {addingBusy ? "Adding…" : "Add and use"}
-                    </Button>
-                  </div>
+                  <StepsFooter
+                    cancel={false}
+                    onBack={() => setAdding(null)}
+                    backLabel="Back to search"
+                    save={{ label: addingBusy ? "Adding…" : "Add and use", busy: addingBusy, onClick: () => newCustomer.current?.save() }}
+                  />
                 ) : !create ? (
                   <>
-                  {whySheet}
-                  <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
-                    {!only && at > 0 ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => go(at - 1)}
-                        aria-label="Back"
-                        className="max-md:size-11 max-md:px-0"
-                      >
-                        <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
-                      </Button>
-                    ) : (
-                      lastChanged && <span className="text-xs text-text-2 max-md:hidden">Last changed {lastChanged}</span>
-                    )}
-                    <span className="flex-1 max-md:hidden" />
-                    <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
-                    {only || step === "changes" ? (
-                      <SubmitButton
-                        variant="strong"
-                        size="lg"
-                        disabled={!canSave}
-                        pendingText={uploading ? "Uploading files…" : "Saving…"}
-                        className="max-md:flex-1"
-                      >
-                        <Check aria-hidden /> {saveLabel}
-                      </SubmitButton>
-                    ) : (
-                      <>
-                        {at < STEPS.length - 2 && (
-                          <Button type="button" variant="ghost" onClick={() => setStep("changes")} className="max-md:hidden">
-                            Changes{total ? ` · ${total}` : ""}
-                          </Button>
-                        )}
-                        <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
-                          Next <ChevronRight aria-hidden />
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                    {whySheet}
+                    <StepsFooter
+                      onBack={!only && at > 0 ? () => go(at - 1) : null}
+                      start={lastChanged ? `Last changed ${lastChanged}` : undefined}
+                      jump={at < STEPS.length - 2 ? { label: `Changes${total ? ` · ${total}` : ""}`, onClick: () => setStep("changes") } : null}
+                      onNext={only || step === "changes" ? null : () => go(at + 1)}
+                      save={{ label: saveLabel, disabled: !canSave, pendingText: uploading ? "Uploading files…" : "Saving…" }}
+                    />
                   </>
                 ) : (
-                  <div data-window-footer="" className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4">
-                    {/* One strong button (design rules 18 Nov): Next is soft, Back and Review are words; Cancel beside them (canvas row "Cancel, not ✕"). */}
-                    {at > 0 ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => go(at - 1)}
-                        aria-label="Back"
-                        className="max-md:size-11 max-md:px-0"
-                      >
-                        <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
-                      </Button>
-                    ) : null}
-                    <span className="flex-1 max-md:hidden" />
-                    <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
-                    {create && step === "review" ? (
-                      <SubmitButton
-                        variant="strong"
-                        size="lg"
-                        pendingText={uploading ? "Uploading files…" : "Saving…"}
-                        className="max-md:flex-1"
-                      >
-                        <Check aria-hidden /> Confirm and save
-                      </SubmitButton>
-                    ) : (
-                      <>
-                        {create && at < STEPS.length - 2 && (
-                          <Button type="button" variant="ghost" onClick={() => setStep("review")} className="max-md:hidden">
-                            Review
-                          </Button>
-                        )}
-                        {!last && (
-                          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
-                            Next <ChevronRight aria-hidden />
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  // One strong button (design rules 18 Nov): Next is soft, Back and Review are words.
+                  <StepsFooter
+                    onBack={at > 0 ? () => go(at - 1) : null}
+                    jump={at < STEPS.length - 2 ? { label: "Review", onClick: () => setStep("review") } : null}
+                    onNext={step === "review" || last ? null : () => go(at + 1)}
+                    save={{ label: "Confirm and save", pendingText: uploading ? "Uploading files…" : "Saving…" }}
+                  />
                 )
               }
             >
               {/* A refused field on another part: every step, at that one. */}
               <JumpToStep
-                st={s}
+                errors={s.errors}
+                stepOf={(f): RequestStep => (f === "items" || f.startsWith("items.") ? "items" : DETAIL_FIELDS.has(f) ? "details" : "customer")}
                 onJump={(k) => {
                   setStep(k);
                   if (only && k !== step) onAllSteps?.();
@@ -582,14 +512,9 @@ export function DealForm({
                           Contact
                           {/* The main contact is chosen for you, and says so. */}
                           {mainContact && (
-                            <span
-                              className={cn(
-                                "rounded-full bg-primary-soft px-2 py-px text-[11.5px] font-semibold text-primary",
-                                changedField("contactId"),
-                              )}
-                            >
+                            <Badge size="sm" tone="primary" className={changedField("contactId")}>
                               Main contact
-                            </span>
+                            </Badge>
                           )}
                         </>
                       }
@@ -671,17 +596,13 @@ export function DealForm({
                     {...sheet.handlers}
                   />
                   {itemErrors(s.errors).length > 0 && (
-                    <div
-                      role="alert"
-                      className="flex flex-col gap-0.5 rounded-xl border border-bad/30 bg-bad-soft px-3 py-2.5 text-sm text-bad"
-                    >
-                      <span className="font-semibold">
-                        Fix {itemErrors(s.errors).length === 1 ? "this item" : "these items"}, then save again:
-                      </span>
+                    <Notice tone="bad" title={`Fix ${itemErrors(s.errors).length === 1 ? "this item" : "these items"}, then save again:`}>
                       {itemErrors(s.errors).map((e) => (
-                        <span key={e}>{e}</span>
+                        <span key={e} className="block">
+                          {e}
+                        </span>
                       ))}
-                    </div>
+                    </Notice>
                   )}
                 </PanelSection>
               )}
@@ -700,7 +621,7 @@ export function DealForm({
                       <button
                         type="button"
                         onClick={() => set("title", suggestedTitle)}
-                        className="inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-full border border-dashed border-primary bg-primary-soft/50 px-2.5 py-1 text-[12.5px] font-semibold text-primary hover:bg-primary-soft"
+                        className="inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-full border border-dashed border-primary bg-primary-soft/50 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary-soft"
                       >
                         <Sparkles aria-hidden className="size-3.5 shrink-0" />
                         <span className="truncate">Use “{suggestedTitle}”</span>
@@ -795,11 +716,11 @@ export function DealForm({
                       ])
                     }
                     kind={
-                      <Select
+                      <Select size="sm"
                         aria-label="What kind of file"
                         value={kindNext}
                         onChange={(e) => setKindNext(e.target.value as AttachmentKind)}
-                        className="h-[34px] w-auto text-[13px]"
+                        className="w-auto text-md"
                       >
                         {NEW_KINDS.map((k) => (
                           <option key={k} value={k}>
@@ -918,7 +839,7 @@ export function DealForm({
                     <div
                       role="table"
                       aria-label="What changed"
-                      className="overflow-hidden rounded-xl border border-line text-[13.5px] max-sm:[&>[role=row]:nth-child(2)]:border-t-0"
+                      className="overflow-hidden rounded-xl border border-line text-md max-sm:[&>[role=row]:nth-child(2)]:border-t-0"
                     >
                       <div role="row" className={cn(CHANGE_ROW, "h-9 border-t-0 bg-surface-2 py-0 text-xs font-semibold text-text-2 max-sm:hidden")}>
                         <span role="columnheader">Part</span>
@@ -941,14 +862,14 @@ export function DealForm({
                             </span>
                             {/* A phone has no room for two more columns: old → new under the name. */}
                             <span className="block sm:hidden">
-                              <s className="text-muted">{c.from}</s> → <b className="font-semibold">{c.to}</b>
+                              <Was was={c.from} /> → <Now now={c.to} />
                             </span>
                           </span>
                           <span role="cell" title={c.from} className="min-w-0 truncate max-sm:hidden">
-                            <s className="text-muted">{c.from}</s>
+                            <Was was={c.from} />
                           </span>
-                          <span role="cell" title={c.to} className="min-w-0 truncate font-semibold max-sm:hidden">
-                            {c.to}
+                          <span role="cell" title={c.to} className="min-w-0 truncate max-sm:hidden">
+                            <Now now={c.to} />
                           </span>
                           <span role="cell" className="text-right">
                             <Button
@@ -1015,7 +936,7 @@ export function DealForm({
                       )}
                     </div>
                   ) : (
-                    <p className="text-sm text-text-2">Nothing changed.</p>
+                    <EmptyLine>Nothing changed.</EmptyLine>
                   )}
                 </div>
               )}
@@ -1084,12 +1005,12 @@ function KindSelect({
   className?: string;
 }) {
   return (
-    <Select
+    <Select size="sm"
       aria-label={`What kind of file is ${f.file.name}`}
       value={f.kind}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as AttachmentKind)}
-      className={cn("h-8 w-auto text-[13px]", className)}
+      className={cn("w-auto text-md", className)}
     >
       {NEW_KINDS.map((k) => (
         <option key={k} value={k}>
@@ -1227,7 +1148,8 @@ function NewCustomerForm({
         <h4 className="text-base font-bold">New customer</h4>
       </div>
       {matches.length > 0 && (
-        <div role="status" className="flex flex-col gap-2 rounded-xl border border-warn/30 bg-warn-soft px-3 py-2.5 text-[13.5px]">
+        <Notice tone="todo">
+          <div className="flex flex-col gap-2">
           {matches.map((m) => (
             <div key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="min-w-0 flex-1">
@@ -1244,7 +1166,8 @@ function NewCustomerForm({
               It’s a different customer: add it anyway
             </Button>
           ) : null}
-        </div>
+          </div>
+        </Notice>
       )}
       {result && !result.matches?.length && !Object.keys(result.errors ?? {}).length && (
         <p className="text-sm text-bad">{result.message}</p>
@@ -1405,18 +1328,18 @@ function changeList(
   b: DealFormValues,
   o: { contacts: ContactOption[]; people: PersonWithRole[]; meId: string },
 ): Change[] {
-  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "none");
+  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "");
   const pr = (p: string) => PRIORITY_LABEL[p as keyof typeof PRIORITY_LABEL] ?? p;
-  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "none");
+  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "");
   const all: Change[] = [
-    { key: "customer", label: "Customer", from: a.customer?.name ?? "none", to: b.customer?.name ?? "none" },
+    { key: "customer", label: "Customer", from: a.customer?.name ?? "", to: b.customer?.name ?? "" },
     { key: "contactId", label: "Contact", from: a.customer?.id === b.customer?.id ? contact(a.contactId) : "", to: contact(b.contactId) },
     { key: "channel", label: "Came by", from: CHANNEL_LABEL[a.channel], to: CHANNEL_LABEL[b.channel] },
     {
       key: "requiredBy",
       label: "Needed by",
-      from: a.requiredBy ? date(a.requiredBy) : "none",
-      to: b.requiredBy ? date(b.requiredBy) : "none",
+      from: a.requiredBy ? date(a.requiredBy) : "",
+      to: b.requiredBy ? date(b.requiredBy) : "",
     },
     {
       key: "assigneeId",
@@ -1425,7 +1348,7 @@ function changeList(
       to: personName(o.people, b.assigneeId, o.meId),
     },
     { key: "title", label: "Inquiry title", from: short(a.title), to: short(b.title) },
-    { key: "category", label: "Category", from: a.category.trim() || "none", to: b.category.trim() || "none" },
+    { key: "category", label: "Category", from: a.category.trim(), to: b.category.trim() },
     { key: "priority", label: "Priority", from: pr(a.priority), to: pr(b.priority) },
     { key: "requirements", label: "What they need", from: short(a.requirements), to: short(b.requirements) },
   ];
@@ -1458,15 +1381,15 @@ function lostLines(
     create: boolean;
   },
 ): string[] {
-  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "none");
+  const contact = (id: string) => (id ? (o.contacts.find((c) => c.id === id)?.name ?? "another contact") : "");
   const fields: [string, string, string][] = [
-    ["Customer", a.customer?.name ?? "none", b.customer?.name ?? "none"],
+    ["Customer", a.customer?.name ?? "", b.customer?.name ?? ""],
     ["Contact", contact(a.contactId), contact(b.contactId)],
     ["Came by", CHANNEL_LABEL[a.channel], CHANNEL_LABEL[b.channel]],
-    ["Needed by", a.requiredBy ? date(a.requiredBy) : "none", b.requiredBy ? date(b.requiredBy) : "none"],
+    ["Needed by", a.requiredBy ? date(a.requiredBy) : "", b.requiredBy ? date(b.requiredBy) : ""],
     ["Responsible person", personName(o.people, a.assigneeId, o.meId), personName(o.people, b.assigneeId, o.meId)],
-    ["Inquiry title", a.title.trim() || "none", b.title.trim() || "none"],
-    ["Category", a.category.trim() || "none", b.category.trim() || "none"],
+    ["Inquiry title", a.title.trim(), b.title.trim()],
+    ["Category", a.category.trim(), b.category.trim()],
     [
       "Priority",
       PRIORITY_LABEL[a.priority as keyof typeof PRIORITY_LABEL] ?? a.priority,
@@ -1474,8 +1397,8 @@ function lostLines(
     ],
     [
       "What they need",
-      a.requirements.trim() ? "written" : "none",
-      b.requirements.trim() ? (a.requirements.trim() ? "changed" : "written") : "none",
+      a.requirements.trim() ? "written" : "",
+      b.requirements.trim() ? (a.requirements.trim() ? "changed" : "written") : "",
     ],
   ];
   const out = fields
@@ -1486,9 +1409,9 @@ function lostLines(
           ? a.requirements.trim() !== b.requirements.trim()
           : x !== y,
     )
-    .map(([label, x, y]) => (o.create ? `${label}: ${y}` : `${label}: ${x} → ${y}`));
+    .map(([label, x, y]) => (o.create ? `${label}: ${y}` : changeLine(label, x, y)));
   if (o.create ? o.items.length > 0 : o.itemsDirty)
-    out.push(o.create ? `Items: ${itemsCount(o.items)}` : `Items: ${o.itemChanges} change${o.itemChanges === 1 ? "" : "s"}`);
+    out.push(o.create ? `Items: ${itemsCount(o.items)}` : `Items: ${changeCount({ changed: o.itemChanges })}`);
   if (o.staged) out.push(`Files: ${o.staged} to add`);
   return out;
 }
@@ -1550,7 +1473,7 @@ function ReviewBoxes({
       </div>
       <ReviewBox title="Items" count={rows.length ? itemsCount(rows) : undefined} onEdit={() => onEdit("items")}>
         {lines.length ? (
-          <ul className="text-[13.5px]">
+          <ul className="text-md">
             {lines.map((r) => (
               <li
                 key={r.key}
@@ -1575,7 +1498,7 @@ function ReviewBoxes({
             {files.map((f) => (
               <span
                 key={f.key}
-                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-[13px]"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-md"
               >
                 <FileText aria-hidden className="size-3.5 shrink-0 text-text-2" />
                 <span className="truncate">{f.name}</span>
@@ -1611,7 +1534,7 @@ export function ReviewBox({ title, count, onEdit, children }: { title: string; c
 /** Label · value rows, the label quiet. */
 export function Facts({ rows }: { rows: [string, ReactNode][] }) {
   return (
-    <dl className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-4 py-3 text-[13.5px]">
+    <dl className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-4 py-3 text-md">
       {rows.map(([k, val]) => (
         <div key={k} className="contents">
           <dt className="text-text-2">{k}</dt>
@@ -1623,16 +1546,3 @@ export function Facts({ rows }: { rows: [string, ReactNode][] }) {
 }
 const DETAIL_FIELDS = new Set(["title", "category", "priority", "requirements"]);
 
-/** A save refused for a field on another step opens that step, so the field and its message are in view. */
-function JumpToStep({ st, onJump }: { st: ActionState; onJump: (step: RequestStep) => void }) {
-  // Once per answer: a later step change by hand is not undone.
-  const jump = useRef(onJump);
-  useEffect(() => {
-    jump.current = onJump;
-  });
-  useEffect(() => {
-    const first = Object.keys(st.errors ?? {}).find((k) => st.errors?.[k]?.length);
-    if (first) jump.current(first === "items" || first.startsWith("items.") ? "items" : DETAIL_FIELDS.has(first) ? "details" : "customer");
-  }, [st]);
-  return null;
-}

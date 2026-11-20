@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import { AuthShell } from "./auth-shell";
 import { BrandMark } from "./brand-mark";
 import { LoginForm } from "./forms";
@@ -53,15 +53,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </Splash>
       )}
       {moved && (
-        <Alert tone="info" className="mb-5">
+        <Notice tone="info" className="mb-5">
           This is your company&apos;s new address. Sign in once more here, and bookmark it.
-        </Alert>
+        </Notice>
       )}
       {/* Who you are signing in to: the company's logo, or its initials (board "Trusted sign in", White label). */}
       <div className="flex flex-col items-center gap-4 text-center">
         <BrandMark name={name} logoSrc={look?.logoSrc ?? null} size="card" />
         <div>
-          <h1 className="text-[22px] leading-7 font-semibold tracking-tight text-text">Sign in</h1>
+          <h1 className="text-xl leading-7 font-semibold tracking-tight text-text">Sign in</h1>
           <p className="mt-1 text-sm text-muted">
             {demoMode() ? (
               "This is a demo with sample data. Pick a person below to look around."

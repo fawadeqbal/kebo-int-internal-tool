@@ -1,5 +1,6 @@
 "use client";
 
+import { ChoiceChips } from "@/components/common/choice-chips";
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
@@ -19,7 +20,8 @@ import {
   type SatResult,
 } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, SelectCard, SelectCardList, Textarea } from "@kebo/ui";
-import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
+import { SubmitButton } from "@kebo/ui/client";
+import { ConfirmSubmit } from "@/components/common/dialog";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
@@ -59,25 +61,6 @@ export interface RouteTermsValue {
   lcDays: number | null;
 }
 
-/** Two or three choices side by side (a small segmented control inside a form). */
-function Pills<T extends string>({ label, options, value, onChange }: { label: string; options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
-  return (
-    <div role="radiogroup" aria-label={label} className="inline-flex w-fit rounded-lg border border-line bg-surface-2 p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={cn("rounded-md px-3 py-1 text-sm", value === o.value ? "bg-surface font-medium shadow-xs" : "text-text-2 hover:text-text")}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /**
  * How the customer pays: three cards, one choice (bank routes only when the
@@ -127,29 +110,13 @@ export function RouteForm({
       {pick === "informal" && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-text-2">The balance</span>
-          <Pills
-            label="When the balance is paid"
-            value={when}
-            onChange={setWhen}
-            options={[
-              { value: "before_shipment", label: "Before shipment" },
-              { value: "against_bl_copy", label: "Against the B/L copy" },
-            ]}
-          />
+          <ChoiceChips label="When the balance is paid" value={when} onChange={setWhen} options={["before_shipment", "against_bl_copy"] as const} labels={{ before_shipment: "Before shipment", against_bl_copy: "Against the B/L copy" }} />
         </div>
       )}
       {pick === "letter_of_credit" && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-text-2">The LC pays</span>
-          <Pills
-            label="LC terms"
-            value={lcTerms}
-            onChange={setLcTerms}
-            options={[
-              { value: "at_sight", label: "At sight" },
-              { value: "deferred", label: "Deferred" },
-            ]}
-          />
+          <ChoiceChips label="LC terms" value={lcTerms} onChange={setLcTerms} options={["at_sight", "deferred"] as const} labels={{ at_sight: "At sight", deferred: "Deferred" }} />
           {lcTerms === "deferred" && (
             <span className="flex items-center gap-2 text-text-2">
               <Input aria-label="Days after the documents reach their bank" inputMode="numeric" className="w-20 tabular" value={lcDays} onChange={(e) => setLcDays(e.target.value.replace(/\D/g, ""))} />
@@ -246,7 +213,7 @@ const nextKey = () => `n${++seq}`;
 export function RemoveButton({ action, what }: { action: Action; what: string }) {
   return (
     <ActionForm action={action} showSuccess={false} className="inline-flex">
-      <ConfirmSubmit size="xs" variant="danger-ghost" pendingText="Removing…" message={`Remove ${what}?`}>
+      <ConfirmSubmit confirmLabel="Remove" size="xs" variant="danger-ghost" pendingText="Removing…" message={`Remove ${what}?`}>
         <Trash2 aria-hidden /> Remove
       </ConfirmSubmit>
     </ActionForm>
@@ -305,23 +272,11 @@ export function SatEditor({ action, checks, suggested, locked }: { action: Actio
         {rows.map((r, i) => (
           <li key={r.key} className="grid gap-2 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
             <div className="flex min-w-0 flex-col gap-1">
-              <Input aria-label={`Point ${i + 1}`} value={r.item} disabled={locked} maxLength={200} onChange={(e) => set(i, { item: e.target.value })} className="h-8" />
-              <Input aria-label={`Note on point ${i + 1}`} value={r.note} disabled={locked} maxLength={500} onChange={(e) => set(i, { note: e.target.value })} placeholder="Note" className="h-8 text-xs" />
+              <Input size="sm" aria-label={`Point ${i + 1}`} value={r.item} disabled={locked} maxLength={200} onChange={(e) => set(i, { item: e.target.value })} />
+              <Input size="sm" aria-label={`Note on point ${i + 1}`} value={r.note} disabled={locked} maxLength={500} onChange={(e) => set(i, { note: e.target.value })} placeholder="Note" className="text-xs" />
             </div>
-            <div role="radiogroup" aria-label={`Result of point ${i + 1}`} className="flex flex-wrap items-center gap-1">
-              {SAT_RESULTS.map((x) => (
-                <button
-                  key={x}
-                  type="button"
-                  role="radio"
-                  aria-checked={r.result === x}
-                  disabled={locked}
-                  onClick={() => set(i, { result: x })}
-                  className={cn("h-7 rounded-md border px-2 text-xs font-medium", r.result === x ? RESULT_STYLE[x] : "border-line bg-surface text-muted hover:border-line-strong")}
-                >
-                  {SAT_RESULT_LABEL[x]}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-1">
+              <ChoiceChips label={`Result of point ${i + 1}`} value={r.result} options={SAT_RESULTS} labels={SAT_RESULT_LABEL} tones={{ pass: "ok", fail: "bad" }} disabled={locked} onChange={(x) => set(i, { result: x })} />
               {!locked && (
                 <Button type="button" size="icon-xs" variant="danger-ghost" aria-label={`Remove point ${i + 1}`} onClick={() => (setDirty(true), setRows((x) => x.filter((_, j) => j !== i)))}>
                   <Trash2 aria-hidden />

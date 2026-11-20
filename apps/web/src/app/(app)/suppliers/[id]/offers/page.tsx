@@ -1,13 +1,14 @@
 import { Search, X } from "lucide-react";
 import { LOST_REASON_LABEL } from "@kebo/shared";
-import { ButtonLink, Card, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { ButtonLink, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { factoryOf } from "@/lib/party-data";
-import { date, whole } from "@/lib/format";
+import { date, whole, countOf } from "@/lib/format";
 import type { FactoryDetail } from "@/lib/types-people";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { supplierTitle } from "@/lib/titles";
+import { TabList } from "@/components/lists/tab-list";
 
 export const generateMetadata = supplierTitle("Offers");
 
@@ -74,7 +75,7 @@ export default async function FactoryOffers({
           { name: "result", label: "Result", value: sp.result, options: RESULTS },
         ]}
       />
-      <Card className="overflow-clip p-0">
+      <TabList title="Supplier offers" summary={countOf(rows.length, "offer", "offers")}>
         {rows.length === 0 ? (
           <EmptyState
             title={filtered ? "No offers match" : "No offers yet"}
@@ -112,7 +113,7 @@ export default async function FactoryOffers({
                 );
               })}
             </PhoneList>
-            <DataTable label="Offers" className="max-sm:hidden" tableClassName="min-w-[1100px] text-[13px]">
+            <DataTable label="Offers" className="max-sm:hidden">
                 <THead>
                   <tr>
                     <Th>Inquiry</Th>
@@ -151,7 +152,7 @@ export default async function FactoryOffers({
             </DataTable>
           </>
         )}
-      </Card>
+      </TabList>
       <Pager base={base} params={{ q: sp.q, inquiry: sp.inquiry, result: sp.result }} page={page} total={rows.length} bare />
     </>
   );

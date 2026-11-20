@@ -1,5 +1,6 @@
 "use client";
 
+import { QuickReasons } from "@/components/common/choice-chips";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ClipboardEvent, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -30,7 +31,7 @@ import {
 } from "lucide-react";
 import { lineNumbers } from "@kebo/shared";
 import { ConfirmDialog } from "@/components/common/dialog";
-import { Button, cn, Input, Textarea } from "@kebo/ui";
+import { Button, cn, Input, Textarea, Badge } from "@kebo/ui";
 import { parseList, type PastedItem } from "@/components/deals/paste-list";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
 import { downloadSheet, ExcelMenu, useSheetPicker } from "@/components/sheets/excel-menu";
@@ -1094,7 +1095,7 @@ export function LineTable({
         <p className="line-clamp-2 text-base leading-snug font-semibold">
           {numbers[i]} · {firstLine(r) || "No description yet"}
         </p>
-        <p className="text-[13px] text-text-2 tabular">
+        <p className="text-md text-text-2 tabular">
           {bits.line[0]}
           {bits.amount ? <> = {bits.amount}</> : null}
           {parts ? ` · ${parts} part${parts === 1 ? "" : "s"}` : r.parentKey ? ` · part of ${parentLabel(r.parentKey)}` : null}
@@ -1188,11 +1189,11 @@ export function LineTable({
               aria-keyshortcuts="Enter"
               disabled={isBlank(entry, columns, entryAt.parentKey)}
               // Grey until something is typed (design 18 Nov), then the brand colour.
-              className="h-7 gap-1.5 pr-2 pl-2.5 disabled:bg-surface-3 disabled:text-muted disabled:opacity-100 disabled:shadow-none max-sm:h-7"
+              className="gap-1.5 pr-2 pl-2.5 disabled:bg-surface-3 disabled:text-muted disabled:opacity-100 disabled:shadow-none"
             >
               <Check aria-hidden /> Add
               {/* The key, drawn (not text): the button's name stays "Add the item". */}
-              {!inline && !flat && partButton && <kbd aria-hidden className="rounded bg-white/20 px-1.5 font-sans text-[11px] leading-5 font-semibold before:content-['Enter']" />}
+              {!inline && !flat && partButton && <kbd aria-hidden className="rounded bg-white/20 px-1.5 font-sans text-2xs leading-5 font-semibold before:content-['Enter']" />}
             </Button>
             {inline && (
               <Button size="icon-xs" variant="ghost" onClick={() => setEntryAt({ afterKey: null, parentKey: null })} aria-label="Stop adding here" title="Esc">
@@ -1253,14 +1254,14 @@ export function LineTable({
           variant="ghost"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => findRef.current?.blur()}
-          className="h-10 shrink-0 px-2 text-[15px] font-bold text-primary hover:text-primary"
+          className="shrink-0 px-2 font-bold text-primary hover:text-primary"
         >
           Done
         </Button>
       ) : (
         rows.length > 0 && (
           <>
-            <Button type="button" variant="primary" onClick={() => openNew()} aria-label={`Add ${noun}`} className="h-10 w-11 shrink-0 px-0 max-sm:h-10 [&_svg]:size-[22px]">
+            <Button type="button" variant="strong" onClick={() => openNew()} aria-label={`Add ${noun}`} className="w-11 shrink-0 px-0 [&_svg]:size-[22px]">
               <Plus aria-hidden strokeWidth={2.6} />
             </Button>
             <Button
@@ -1273,7 +1274,7 @@ export function LineTable({
               aria-haspopup="menu"
               aria-expanded={moreOpen}
               disabled={phonePicker.busy}
-              className="size-10 shrink-0 max-sm:size-10"
+              className="shrink-0"
             >
               {phonePicker.busy ? <Loader2 className="animate-spin" aria-hidden /> : <MoreHorizontal aria-hidden />}
             </Button>
@@ -1287,8 +1288,8 @@ export function LineTable({
   // Select on a phone: the top says how many, Done ends it; the bar of what to do takes the footer's place.
   const phoneSelectTop = (
     <div className="flex min-h-11 items-center justify-between gap-2 rounded-[10px] bg-primary-soft px-3 text-primary">
-      <span className="text-[15px] font-bold">{pickedRows.length ? pickedLabel : `Tap the ${noun}s to select them`}</span>
-      <Button type="button" variant="ghost" onClick={stopSelecting} className="h-10 px-2 text-[15px] font-bold text-primary hover:text-primary">
+      <span className="text-lead font-bold">{pickedRows.length ? pickedLabel : `Tap the ${noun}s to select them`}</span>
+      <Button type="button" variant="ghost" onClick={stopSelecting} className="px-2 font-bold text-primary hover:text-primary">
         Done
       </Button>
     </div>
@@ -1326,7 +1327,7 @@ export function LineTable({
       <span className="flex items-center gap-1 text-xs text-text-2">
         {total.label} <ChevronUp className="size-3.5" aria-hidden />
       </span>
-      <span className="max-w-full truncate text-[15px] font-bold tabular">{total.value}</span>
+      <span className="max-w-full truncate text-lead font-bold tabular">{total.value}</span>
     </button>
   );
   const totalsInFooter = phone && !!footerSlot && !!totalButton && !selecting;
@@ -1338,21 +1339,21 @@ export function LineTable({
       {empty ? <div className="text-sm text-text-2">{empty}</div> : <p className="text-sm text-text-2">Add them one by one, or bring them in at once.</p>}
       {!readOnly && (
         <>
-          <Button type="button" variant="primary" onClick={() => openNew()} className="h-12 text-[15px] max-sm:h-12">
+          <Button size="lg" type="button" variant="strong" onClick={() => openNew()}>
             <Plus aria-hidden /> Add {noun}
           </Button>
           {ways.map((w, n) => (
-            <Button key={w.key} type="button" variant={n === 0 ? "soft" : "secondary"} onClick={w.onSelect} className="h-12 text-[15px] max-sm:h-12">
+            <Button key={w.key} type="button" variant={n === 0 ? "soft" : "secondary"} onClick={w.onSelect}>
               {w.icon ?? <Copy aria-hidden />} {w.label}
               {w.note ? ` · ${w.note}` : ""}
             </Button>
           ))}
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant="secondary" onClick={() => setPasteOpen(true)} className="h-12 max-sm:h-12">
+            <Button type="button" variant="secondary" onClick={() => setPasteOpen(true)}>
               <ClipboardPaste aria-hidden /> Paste items
             </Button>
             {canUpload && excelAllowed && (
-              <Button type="button" variant="secondary" onClick={() => phonePicker.pick()} className="h-12 max-sm:h-12">
+              <Button type="button" variant="secondary" onClick={() => phonePicker.pick()}>
                 <FileSpreadsheet aria-hidden /> Import Excel
               </Button>
             )}
@@ -1365,7 +1366,7 @@ export function LineTable({
   const phoneList = (
     <div className="flex flex-col gap-2">
       {notice && rows.length > 0 && (
-        <div className="flex items-start gap-2 rounded-[10px] border border-info/20 bg-info-soft px-3 py-2 text-[13px] text-text">
+        <div className="flex items-start gap-2 rounded-[10px] border border-info/20 bg-info-soft px-3 py-2 text-md text-text">
           <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
           <span className={cn("min-w-0 flex-1", !noticeOpen && "truncate")}>{notice}</span>
           <button type="button" onClick={() => setNoticeOpen((o) => !o)} aria-expanded={noticeOpen} className="shrink-0 font-bold text-info underline underline-offset-2">
@@ -1384,7 +1385,7 @@ export function LineTable({
               type="button"
               aria-pressed={f.on}
               onClick={() => setNeedsOnly(f.set)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:font-semibold aria-pressed:text-primary"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-md aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:font-semibold aria-pressed:text-primary"
             >
               {f.label} <b className="tabular">{f.n}</b>
             </button>
@@ -1392,7 +1393,7 @@ export function LineTable({
         </div>
       )}
       {rows.length > 0 && (
-        <p className="truncate text-[12.5px] text-text-2">
+        <p className="truncate text-xs text-text-2">
           {q ? `${matching} of ${rows.length} match “${query.trim()}”` : selecting ? `Tap the ${noun}s to select them` : [countWords(rows, noun), caption].filter(Boolean).map((x, n) => (
             <span key={n}>
               {n > 0 && " · "}
@@ -1415,7 +1416,7 @@ export function LineTable({
                   variant="secondary"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => openNew({ afterKey: null, parentKey: null }, { [columns[0]!.key]: query.trim() })}
-                  className="h-12 text-[15px] max-sm:h-12"
+                 
                 >
                   <Plus aria-hidden /> Add “{query.trim()}” as {an(noun)}
                 </Button>
@@ -1426,7 +1427,7 @@ export function LineTable({
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        <div className={cn("overflow-hidden bg-surface", !readOnly && "rounded-lg border border-line")}>
           <ul aria-label={`${Noun}s`}>
             {phoneRows.map(({ r, i }, at) => {
               const bits = linePhoneParts(r, columns, valuesOf(r), !!inRowPrice);
@@ -1484,7 +1485,7 @@ export function LineTable({
         </div>
       )}
       {suggest && !q && !selecting && rows.length > 0 && (
-        <div className="flex items-center gap-2 rounded-xl border-[1.5px] border-dashed border-line-strong px-3 py-2.5 text-[13px] text-text-2">
+        <div className="flex items-center gap-2 rounded-xl border-[1.5px] border-dashed border-line-strong px-3 py-2.5 text-md text-text-2">
           <span className="min-w-0 flex-1">{suggest.text}</span>
           <button type="button" onClick={suggest.onSelect} className="shrink-0 font-bold text-primary">
             {suggest.label}
@@ -1563,38 +1564,38 @@ export function LineTable({
             (phone ? (
               // A phone (design 18 Nov): one big Add, and ⋯ beside it for the other ways in (paste, Excel).
               <div className="flex w-full gap-2">
-                <Button variant="primary" onClick={() => openNew()} className="h-12 flex-1 text-[15px] max-sm:h-12 max-sm:text-[15px]">
+                <Button size="lg" variant="strong" onClick={() => openNew()} className="flex-1">
                   <Plus aria-hidden /> Add {noun}
                 </Button>
                 <Button
                   id={`moreadd-${menuId}`}
-                  size="icon"
+                  size="lg"
                   variant="secondary"
                   onClick={() => setMoreOpen((o) => !o)}
                   aria-label="More ways to add"
                   aria-haspopup="menu"
                   aria-expanded={moreOpen}
                   disabled={phonePicker.busy}
-                  className="size-12 max-sm:size-12"
+                  className="aspect-square px-0"
                 >
                   {phonePicker.busy ? <Loader2 className="animate-spin" aria-hidden /> : <MoreHorizontal aria-hidden />}
                 </Button>
                 {phonePicker.input}
               </div>
             ) : (
-              <Button variant="primary" onClick={addLine}>
+              <Button variant="strong" onClick={addLine}>
                 <Plus aria-hidden /> Add {noun}
               </Button>
             ))}
           {rows.length > 8 && (
             <div className="relative min-w-0 flex-1 basis-36">
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
-              <Input
+              <Input size="sm"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={`Find in ${rows.length} ${noun}s…`}
                 aria-label={`Find ${an(noun)}`}
-                className="h-8 pl-8"
+                className="pl-8"
                 onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
               />
             </div>
@@ -1632,7 +1633,7 @@ export function LineTable({
             />
           )}
           {/* Tick boxes only when asked for (design 18 Nov): the table stays clean; Done turns them off. */}
-          {!readOnly && !phone && rows.length > 0 && <span className="ml-auto text-[13px] text-text-2">{countWords(rows, noun)}</span>}
+          {!readOnly && !phone && rows.length > 0 && <span className="ml-auto text-md text-text-2">{countWords(rows, noun)}</span>}
           {!readOnly && !phone && rows.length > 0 && (
             <Button
               size="sm"
@@ -1758,7 +1759,8 @@ export function LineTable({
       {phone ? (
         phoneList
       ) : (
-      <div className={cn("overflow-hidden rounded-lg border border-line bg-surface", fill && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
+      // Read-only lines sit in their record's box: no frame of their own (no box in a box). Editing, the grid is framed.
+      <div className={cn("overflow-hidden bg-surface", !readOnly && "rounded-lg border border-line", fill && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
         {/* Read-only lines have nothing to tab to inside, so the table itself takes the keyboard (arrow keys scroll
             it sideways); editable lines are reached through their cells. */}
         <div
@@ -1959,7 +1961,7 @@ export function LineTable({
                               <span className="line-clamp-3 whitespace-pre-line">{c.format ? c.format({ ...r.values, [c.key]: value }, r) : value}</span>
                               {r.badge}
                               {dupOf.has(r.key) && (
-                                <span className="ml-1.5 inline-flex rounded-full bg-warn-soft px-2 py-px align-middle text-xs font-semibold text-warn">Same as {dupOf.get(r.key)}?</span>
+                                <Badge size="sm" tone="warn" className="ml-1.5">Same as {dupOf.get(r.key)}?</Badge>
                               )}
                             </span>
                           ) : isChoice(c) && !readOnly ? (
@@ -2389,7 +2391,7 @@ function SelectBarButton({ icon, children, onClick, disabled, danger }: { icon: 
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[11.5px] font-semibold text-text active:bg-surface-2 disabled:opacity-40 [&_svg]:size-5",
+        "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-2xs font-semibold text-text active:bg-surface-2 disabled:opacity-40 [&_svg]:size-5",
         danger && "text-bad",
       )}
     >
@@ -2428,7 +2430,7 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40 max-sm:min-h-12 max-sm:gap-3 max-sm:text-[15px] [&_svg]:size-4 [&_svg]:text-muted max-sm:[&_svg]:size-5",
+        "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40 max-sm:min-h-12 max-sm:gap-3 max-sm:text-lead [&_svg]:size-4 [&_svg]:text-muted max-sm:[&_svg]:size-5",
         danger && "border-t border-line text-bad hover:bg-bad-soft [&_svg]:text-bad",
         strong && "font-bold text-primary [&_svg]:text-primary",
       )}
@@ -2436,7 +2438,7 @@ function MenuItem({
       {icon}
       <span className="flex-1 text-left">{children}</span>
       {note ? (
-        <span className="ml-3 shrink-0 text-[13px] text-muted">{note}</span>
+        <span className="ml-3 shrink-0 text-md text-muted">{note}</span>
       ) : (
         hint && <span className="ml-3 hidden text-xs text-muted sm:inline">{hint}</span>
       )}
@@ -2463,21 +2465,7 @@ function ReasonBox({ pending, onCancel }: { pending: Pending; onCancel: () => vo
           <span className="text-text-2">{pending.message} It is kept in the history.</span>
         </div>
       </div>
-      {pending.choices.length > 0 && (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick reasons">
-          {pending.choices.map((c) => (
-            <button
-              key={c}
-              type="button"
-              aria-pressed={value === c}
-              onClick={() => setValue(c)}
-              className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs hover:border-line-strong aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:text-primary"
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
+      <QuickReasons choices={pending.choices} value={value} onChange={setValue} />
       <div className="flex flex-wrap items-center gap-2">
         <Input
           ref={input}
@@ -2545,7 +2533,7 @@ function PastePanel({
         onChange={(e) => setText(e.target.value)}
       />
       {items.length > 0 && (
-        <p className="text-[13px] text-text-2">
+        <p className="text-md text-text-2">
           {items.length} row{items.length === 1 ? "" : "s"}
           {dupCount > 0 && `, ${dupCount} may be ${dupCount === 1 ? "a duplicate" : "duplicates"}`}
         </p>
@@ -2560,7 +2548,7 @@ function PastePanel({
                 <span className="mr-2 inline-block w-8 text-xs text-muted tabular">{no}</span>
                 {p.description}
                 {p.model && <span className="text-muted"> · {p.model}</span>}
-                {dups[n] && <span className="ml-1.5 rounded-full bg-warn-soft px-2 py-px text-xs font-semibold text-warn">{dups[n]}</span>}
+                {dups[n] && <Badge size="sm" tone="warn" className="ml-1.5">{dups[n]}</Badge>}
               </span>
               <span className="shrink-0 text-muted tabular">{p.quantity ? `${p.quantity} ${p.unit}`.trim() : "no quantity"}</span>
             </li>
@@ -2637,7 +2625,7 @@ function FilePanel({
                   <span className="mr-2 inline-block w-8 text-xs text-muted tabular">{l.problem ? "—" : l.no}</span>
                   <span className={cn(l.partOf !== null && "pl-3")}>{(l.values.description ?? "").split("\n")[0] || <span className="text-muted">(no description)</span>}</span>
                   {l.values.model && <span className="text-muted"> · {l.values.model}</span>}
-                  {dups[read.lines.indexOf(l)] && <span className="ml-1.5 rounded-full bg-warn-soft px-2 py-px text-xs font-semibold text-warn">{dups[read.lines.indexOf(l)]}</span>}
+                  {dups[read.lines.indexOf(l)] && <Badge size="sm" tone="warn" className="ml-1.5">{dups[read.lines.indexOf(l)]}</Badge>}
                   {l.problem && (
                     <span className="block text-xs text-bad">
                       Row {l.fileRow}: {l.problem}
@@ -2667,7 +2655,7 @@ function BarButton({ children, danger, className, ...props }: ComponentProps<"bu
     <button
       type="button"
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-semibold text-text hover:bg-surface/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-text-2",
+        "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-md font-semibold text-text hover:bg-surface/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-text-2",
         danger && "text-bad [&_svg]:text-bad",
         className,
       )}

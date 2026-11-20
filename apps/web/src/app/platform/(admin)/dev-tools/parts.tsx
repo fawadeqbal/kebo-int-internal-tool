@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { DEV_LANES, type DevCheck, type DevEvent, type DevLevel, type DevTab } from "@kebo/shared";
-import { Badge, cn } from "@kebo/ui";
+import { Badge, cn, Notice } from "@kebo/ui";
 
 export const TAB_HREF: Record<DevTab, string> = {
   picture: "/platform/dev-tools",
@@ -37,11 +37,9 @@ export function NeedsYou({ checks }: { checks: DevCheck[] }) {
   const needs = checks.filter((c) => c.level === "bad" || c.level === "warn").sort((a, b) => (a.level === b.level ? 0 : a.level === "bad" ? -1 : 1));
   if (!needs.length)
     return (
-      <div className="flex items-center gap-2.5 rounded-xl border border-ok/25 bg-ok-soft px-4 py-3 text-sm" role="status">
-        <Dot level="ok" />
-        <span className="font-semibold">All good.</span>
-        <span className="text-text-2">Nothing needs you. A problem shows here and is emailed to you.</span>
-      </div>
+      <Notice tone="ok" title="All good.">
+        Nothing needs you. A problem shows here and is emailed to you.
+      </Notice>
     );
   const now = needs.some((c) => c.level === "bad");
   return (
@@ -79,7 +77,7 @@ export function CheckMap({ checks }: { checks: DevCheck[] }) {
       {DEV_LANES.map((lane, n) => (
         <div key={lane.key} className={cn("flex flex-col gap-2 lg:px-2", n > 0 && "lg:border-l lg:border-dashed lg:border-line-strong")}>
           <h3 className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
-            <span className="grid size-[18px] place-items-center rounded-md bg-primary-soft text-[11px] text-primary">{n + 1}</span>
+            <span className="grid size-[18px] place-items-center rounded-md bg-primary-soft text-2xs text-primary">{n + 1}</span>
             {lane.label}
           </h3>
           {checks
@@ -89,7 +87,7 @@ export function CheckMap({ checks }: { checks: DevCheck[] }) {
                 <>
                   <Dot level={c.level} className="mt-1.5" />
                   <span className="min-w-0">
-                    <span className="block text-[13px] leading-[18px] font-medium">{c.name}</span>
+                    <span className="block text-md leading-[18px] font-medium">{c.name}</span>
                     <span className="block text-xs leading-4 text-text-2">{c.line}</span>
                   </span>
                 </>
@@ -186,7 +184,7 @@ export function LineChart({
           <path key={s.name} d={path(s.values)} fill="none" className={stroke[k]} strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         ))}
       </svg>
-      <div className="flex justify-between text-[11px] text-muted tabular">
+      <div className="flex justify-between text-2xs text-muted tabular">
         {labels.map((l, k) => (
           <span key={`${l}-${k}`}>{l}</span>
         ))}

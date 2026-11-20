@@ -1,9 +1,11 @@
 "use client";
 
+import { FileZone } from "@/components/common/file-zone";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Paperclip, Trash2, Upload, X } from "lucide-react";
-import { Alert, Button, buttonClass, cn, Field, Input } from "@kebo/ui";
+import { Button, buttonClass, cn, Field, Notice } from "@kebo/ui";
+import { toast } from "@kebo/ui/client";
 import { saveThenSend } from "@kebo/utils";
 import type { ActionState } from "@/lib/actions";
 import type { AttachedFileInfo } from "@/lib/types-money";
@@ -69,7 +71,7 @@ export function useSaveThenSend(
       if (r.fileError) {
         const message = `${what}, but its file was not: ${r.fileError} Open it to add the file again.`;
         if (mounted.current && hear.current) hear.current(message);
-        else window.alert(message);
+        else toast({ message, kind: "fail" });
       }
     }
     return r;
@@ -95,31 +97,29 @@ export function FilePicker({
   hint?: string;
   className?: string;
 }) {
-  return (
-    <Field
-      label={label}
-      htmlFor={id}
-      optional
-      hint={file ? undefined : current ? `Kept: ${current}. A new one replaces it.` : hint}
-      className={className}
-    >
-      {file ? (
-        <span className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm">
-          <Paperclip className="size-4 shrink-0 text-muted" aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{file.name}</span>
-          <Button type="button" size="xs" variant="ghost" onClick={() => onChange(null)} aria-label="Do not attach this file">
-            <X aria-hidden />
-          </Button>
-        </span>
-      ) : (
-        <Input
-          id={id}
-          type="file"
+  if (!file)
+    return (
+      <div className={className}>
+        <FileZone
+          label={label}
+          inputId={id}
+          compact
+          one
           accept="image/*,application/pdf"
-          className="file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-2.5 file:py-1 file:text-xs file:font-medium"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+          hint={current ? `Kept: ${current}. A new one replaces it.` : hint}
+          onFiles={(fs) => onChange(fs[0] ?? null)}
         />
-      )}
+      </div>
+    );
+  return (
+    <Field label={label} htmlFor={`${id}-chosen`} optional className={className}>
+      <span id={`${id}-chosen`} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm">
+        <Paperclip className="size-4 shrink-0 text-muted" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{file.name}</span>
+        <Button type="button" size="xs" variant="ghost" onClick={() => onChange(null)} aria-label="Do not attach this file">
+          <X aria-hidden />
+        </Button>
+      </span>
     </Field>
   );
 }
@@ -234,7 +234,7 @@ export function AttachedFile({
           )}
         </div>
       )}
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && <Notice tone="bad">{error}</Notice>}
     </div>
   );
 }

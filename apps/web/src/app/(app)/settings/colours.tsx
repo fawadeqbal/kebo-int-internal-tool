@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 import { COLOUR_SET_LABEL, COLOUR_SETS, type ColourSet } from "@kebo/shared";
-import { Card, CardBody, CardHeader, cn } from "@kebo/ui";
+import { Card, CardBody, CardHeader, cn, Badge } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import type { ActionState } from "@/lib/actions";
 
@@ -150,7 +150,7 @@ export function ColoursCard({
                   <Mini set={set} mode="light" />
                   <Mini set={set} mode="dark" />
                 </span>
-                <span aria-hidden className="grid grid-cols-2 gap-1.5 text-center text-[11.5px] text-muted">
+                <span aria-hidden className="grid grid-cols-2 gap-1.5 text-center text-2xs text-muted">
                   <span>Light</span>
                   <span>Dark</span>
                 </span>
@@ -170,19 +170,19 @@ export function ColoursCard({
                     {COLOUR_SET_LABEL[set]}
                   </span>
                   {set === "green" && (
-                    <span id={`colours-${set}-default`} className="ml-auto rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-bold text-text-2">
+                    <Badge size="sm" id={`colours-${set}-default`} className="ml-auto">
                       Default
-                    </span>
+                    </Badge>
                   )}
                 </span>
-                <span id={`colours-${set}`} className="px-1 text-[12.5px] leading-snug text-text-2">
+                <span id={`colours-${set}`} className="px-1 text-xs leading-snug text-text-2">
                   {SET_LINE[set]}
                 </span>
               </label>
             ))}
           </div>
         </fieldset>
-        <p className="flex items-start gap-2.5 rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">
+        <p className="flex items-start gap-2.5 rounded-xl bg-surface-2 px-3.5 py-3 text-md text-text-2">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
             Each person still chooses <strong className="font-semibold text-text">Light</strong>, <strong className="font-semibold text-text">Dark</strong> or{" "}

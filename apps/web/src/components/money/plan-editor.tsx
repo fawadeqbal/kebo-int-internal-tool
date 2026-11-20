@@ -1,14 +1,15 @@
 "use client";
 
+import { EditButton } from "@/components/common/edit-button";
 import { useId, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
 import { formatMinor, fromMinor, toMinor } from "@kebo/money";
 import { addDays } from "@kebo/utils";
-import { Button, cn, Field, Input, Select } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
-import { PanelActions, PanelBody, SidePanel, WindowCancelIn } from "@/components/common/panel";
+import { PanelBody, SidePanel, WindowCancelIn, WindowFooter } from "@/components/common/panel";
 import { money } from "@/lib/format";
 import { useTime } from "@/lib/time-client";
 import type { ActionState } from "@/lib/actions";
@@ -217,7 +218,7 @@ export function PlanEditor({
         <p className="text-sm text-text-2">{intro}</p>
         {presets.length > 0 && (
           <div role="group" aria-label="Start from a usual plan" className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] text-text-2">Start from</span>
+            <span className="text-md text-text-2">Start from</span>
             {presets.map((p) => {
               const on = chosen(p);
               const can = fits(p);
@@ -230,7 +231,7 @@ export function PlanEditor({
                   title={can ? undefined : "A paid part would change: change the parts one by one"}
                   onClick={() => apply(p)}
                   className={cn(
-                    "inline-flex min-h-8 items-center rounded-full border px-3 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+                    "inline-flex min-h-8 items-center rounded-full border px-3 text-md font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
                     on ? "border-primary bg-primary-soft text-primary" : "border-line-strong bg-surface text-text hover:bg-surface-2",
                   )}
                 >
@@ -261,7 +262,7 @@ export function PlanEditor({
               <li key={p.key} className={cn("rounded-lg border border-line p-3", p.locked ? "bg-surface-2/60" : "bg-surface")}>
                 <div role="group" aria-label={`Part ${n + 1}`}>
                   <div className="mb-2 flex items-center justify-between md:hidden">
-                    <span className="text-[13px] font-semibold">Part {n + 1}</span>
+                    <span className="text-md font-semibold">Part {n + 1}</span>
                     {remove}
                   </div>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 md:grid-cols-[1.75rem_minmax(0,1.2fr)_5rem_8rem_minmax(0,1.4fr)_8rem_2rem] md:items-end">
@@ -370,7 +371,7 @@ export function PlanEditor({
                         />
                       </Field>
                     ) : (
-                      <span className="max-md:hidden md:mb-2.5 md:text-[13px] md:text-muted">Dated by the rule</span>
+                      <span className="max-md:hidden md:mb-2.5 md:text-md md:text-muted">Dated by the rule</span>
                     )}
                     <span className="max-md:hidden md:mb-0.5">{remove}</span>
                   </div>
@@ -404,9 +405,9 @@ export function PlanEditor({
         </Button>
       </PanelBody>
       {/* Under the parts, outside the scrolling: the sum stays in view above Save. */}
-      <PanelActions className="static mx-0 mb-0 justify-end sm:mx-0" cancel={false}>
+      <WindowFooter className="static mx-0 mb-0 sm:mx-0" cancel={false}>
         <div className={cn("flex basis-full items-center gap-3 rounded-lg px-3 py-2", ok ? "bg-ok-soft" : "bg-bad-soft")}>
-          <b role="status" className={cn("text-[13px] whitespace-nowrap tabular", ok ? "text-ok" : "text-bad")}>
+          <b role="status" className={cn("text-md whitespace-nowrap tabular", ok ? "text-ok" : "text-bad")}>
             {ok
               ? `Adds up: 100% · ${formatMinor(totalMinor, currency)}`
               : diff > 0
@@ -426,7 +427,7 @@ export function PlanEditor({
           </span>
         </div>
         {tried && (problems.some(Boolean) || !ok) && (
-          <p role="alert" className="basis-full text-[13px] font-medium text-bad">
+          <p role="alert" className="basis-full text-md font-medium text-bad">
             {!ok
               ? `The parts must add up to ${formatMinor(totalMinor, currency)}: ${diff > 0 ? `${formatMinor(diff, currency)} short` : `${formatMinor(-diff, currency)} over`}.`
               : "Fix the part marked in red."}
@@ -435,7 +436,7 @@ export function PlanEditor({
         <span className="mr-auto text-xs text-muted max-md:hidden">Ctrl+Enter saves · Esc closes</span>
         <WindowCancelIn />
         <SubmitButton pendingText="Saving…">Save the plan</SubmitButton>
-      </PanelActions>
+      </WindowFooter>
     </ActionForm>
   );
 }
@@ -455,11 +456,9 @@ function PlanEditWindow({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" variant="secondary" className="h-8 px-2.5 text-[13px]" onClick={() => setOpen(true)}>
-        {label}
-      </Button>
+      <EditButton label={label} onClick={() => setOpen(true)} />
       {open && (
-        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className="md:w-[920px]">
+        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={RULES.window.wideRows}>
           <PlanEditor {...editor} onDone={() => setOpen(false)} />
         </SidePanel>
       )}

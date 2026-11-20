@@ -1,34 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { buttonClass, Card, cn } from "@kebo/ui";
+import { boxTitleClass, buttonClass, Card, cn } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
+import { TabList } from "@/components/lists/tab-list";
 
-/**
- * Record pages (design system: Record frame) — customers, factories, users:
- * the same frame as orders. Under the page header, the main column of cards
- * (Performance, Details with ✎ Edit, then the record's lists) and, beside it,
- * the right panel (Files · Changes). No tabs: every section is on the page.
- * On a phone it stacks — the sections become a row of chips (RecordNav) and
- * the right panel moves under the page.
- */
-export function RecordFrame({ nav, main, side, sideLabel }: { nav?: ReactNode; main: ReactNode; side?: ReactNode; sideLabel: string }) {
-  return (
-    <>
-      {nav}
-      <div className={cn("grid items-start gap-5", side && "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_360px]")}>
-        <div className="flex min-w-0 flex-col gap-5">{main}</div>
-        {side && (
-          <aside aria-label={sideLabel} className="min-w-0">
-            {side}
-          </aside>
-        )}
-      </div>
-    </>
-  );
-}
-
-/** A section of a record page, where its chip (RecordNav) and old ?tab= links land. */
+/** A section of a record page, where its links (#section) and old ?tab= links land. */
 export function RecordSection({ id, children, className }: { id: string; children: ReactNode; className?: string }) {
   return (
     <div id={id} data-record-section="" className={cn("scroll-mt-32 md:scroll-mt-20", className)}>
@@ -55,7 +32,7 @@ const missing = (v: ReactNode) => v === null || v === undefined || v === "" || v
 
 /**
  * The record's Details card (board): "Details" with ✎ Edit in its header (opens the edit window), then the
- * values, label above value in up to three columns. A missing value shows "—". Without `edit` (no
+ * values, label at the left of each value (the record box's rows), two pairs a row on a wide box. A missing value shows "—". Without `edit` (no
  * permission) it is read-only.
  */
 export function DetailsCard({
@@ -82,13 +59,13 @@ export function DetailsCard({
     <Card className={cn(flash && "animate-flash")} aria-labelledby="details-title">
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
         <div className="min-w-0">
-          <h2 id="details-title" className="text-base font-bold text-text">
+          <h2 id="details-title" className={boxTitleClass}>
             {title}
           </h2>
           {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
         {editHref && (
-          <Link href={editHref} className="tap inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline">
+          <Link href={editHref} className="tap inline-flex items-center gap-1.5 text-md font-semibold text-primary hover:underline">
             <Pencil className="size-4" aria-hidden /> Edit
           </Link>
         )}
@@ -98,18 +75,19 @@ export function DetailsCard({
             id={edit.id}
             variant="link"
             size="sm"
-            className="tap h-auto text-[13px] font-semibold [&_svg]:size-4"
+            className="tap h-auto text-md font-semibold [&_svg]:size-4"
             label={edit.label}
           >
             <Pencil aria-hidden /> Edit
           </OpenPanelButton>
         )}
       </div>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-4 px-4 py-4 sm:grid-cols-2 sm:px-5 xl:grid-cols-3">
+      {/* The record box's rows (BoxFacts): label at the left, the value beside it; two pairs a row on a wide box. */}
+      <dl className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 px-5 py-4 text-sm max-sm:px-4 xl:grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1fr)] xl:gap-x-6">
         {shown.map((i) => (
-          <div key={i.label} className={cn("min-w-0", i.wide && "sm:col-span-2 xl:col-span-3")}>
-            <dt className="text-xs text-muted">{i.label}</dt>
-            <dd className="mt-[3px] text-sm break-words text-text">{missing(i.value) ? <span className="text-muted">—</span> : i.value}</dd>
+          <div key={i.label} className={cn("contents", i.wide && "xl:[&>dd]:col-span-3")}>
+            <dt className="text-text-2">{i.label}</dt>
+            <dd className="min-w-0 font-medium break-words text-text">{missing(i.value) ? <span className="font-normal text-muted">—</span> : i.value}</dd>
           </div>
         ))}
       </dl>
@@ -144,21 +122,12 @@ export function RecordListCard({
   footer?: ReactNode;
 }) {
   const rows = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : [];
+  // The one list inside a record (TabList): its name and count, a line under it, the card's action on the right.
   return (
-    <Card className="overflow-clip">
-      <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0">
-          <h2 className="text-[15px] font-semibold text-text">
-            {title}
-            {count !== undefined && <span className="font-semibold"> · {count}</span>}
-          </h2>
-          {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
-        </div>
-        {action && <div className="flex shrink-0 items-center gap-1">{action}</div>}
-      </div>
+    <TabList title={count !== undefined ? `${title} · ${count}` : title} summary={description} buttons={action}>
       {rows.length ? <ul className="divide-y divide-line">{children}</ul> : empty}
       {footer}
-    </Card>
+    </TabList>
   );
 }
 
@@ -225,19 +194,9 @@ export function RecordRow({
 /** "All 12 →" in a list card's header: the whole list elsewhere. */
 export function AllLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className={buttonClass("ghost", "sm", "h-8 px-2.5 text-[13px] text-text-2")}>
+    <Link href={href} className={buttonClass("ghost", "sm", "text-text-2")}>
       {children}
     </Link>
   );
 }
 
-/** A record's empty list: what goes here, and the one way to add it. */
-export function RecordEmpty({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
-  return (
-    <div className="m-4 rounded-lg border border-dashed border-line-strong px-4 py-5 text-center">
-      <p className="text-sm font-semibold">{title}</p>
-      <p className="mx-auto mt-1 max-w-sm text-xs text-text-2">{children}</p>
-      {action && <div className="mt-3 flex justify-center">{action}</div>}
-    </div>
-  );
-}

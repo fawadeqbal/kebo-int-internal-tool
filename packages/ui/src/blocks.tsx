@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Pending } from "./pending";
-import type { ReactNode } from "react";
-import { AlertTriangle, Check, CheckCircle2, Plus, type LucideIcon } from "lucide-react";
+
+import { Children, isValidElement, type ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 import { HowMade } from "./primitives";
 
@@ -11,45 +11,12 @@ import { HowMade } from "./primitives";
  * so every screen shows the same thing the same way.
  */
 
-/* ---------------------------------------------------------------- ChecksBox */
-
 export interface CheckItem {
   key: string;
   text: ReactNode;
   /** A button (xs, secondary) that goes to the fix. */
   action?: ReactNode;
 }
-
-/**
- * What is still missing before a record is ready ("2 things to finish this
- * offer", "Before you send R1"), or, with no items, a green line that it is.
- */
-export function ChecksBox({ title, items, ready, className }: { title: ReactNode; items: CheckItem[]; ready?: ReactNode; className?: string }) {
-  if (!items.length)
-    return ready ? (
-      <p role="status" className={cn("flex items-start gap-2 rounded-xl border border-ok/30 bg-ok-soft px-3 py-2.5 text-sm", className)}>
-        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" aria-hidden />
-        <span>{ready}</span>
-      </p>
-    ) : null;
-  return (
-    <div role="status" className={cn("flex flex-col gap-2 rounded-xl border border-warn/30 bg-warn-soft/60 p-3 sm:px-4", className)}>
-      <p className="flex items-center gap-2 text-sm font-semibold text-warn">
-        <AlertTriangle className="size-4 shrink-0" aria-hidden /> {title}
-      </p>
-      <ul className="flex flex-col gap-1.5">
-        {items.map((i) => (
-          <li key={i.key} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="min-w-0">{i.text}</span>
-            {i.action}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------- DetailGrid */
 
 export interface DetailItem {
   label: string;
@@ -58,43 +25,6 @@ export interface DetailItem {
   warn?: string;
   /** Hidden when empty (no "+ Add" box), e.g. for read-only viewers. */
   hideEmpty?: boolean;
-}
-
-/**
- * A record's facts at a glance: small boxes, label above value. With
- * `onEdit`, every box is a button that opens the record's details form and an
- * empty one says "+ Add"; without it they are plain and empty ones are hidden.
- */
-export function DetailGrid({ items, onEdit, className }: { items: DetailItem[]; onEdit?: () => void; className?: string }) {
-  return (
-    <div className={cn("grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6", className)}>
-      {items.map((f) => {
-        const empty = f.value === null || f.value === undefined || f.value === "";
-        if (empty && !f.warn && (!onEdit || f.hideEmpty)) return null;
-        const body = (
-          <>
-            <span className="block text-xs text-muted">{f.label}</span>
-            <span className={cn("line-clamp-2 block text-sm font-medium break-words", empty ? (f.warn ? "text-warn" : "text-primary") : "text-text")}>
-              {empty ? (f.warn ?? "+ Add") : f.value}
-            </span>
-          </>
-        );
-        const cls = cn(
-          "min-w-0 rounded-lg border px-3 py-2 text-left",
-          empty && f.warn ? "border-warn/30 bg-warn-soft/50" : empty ? "border-dashed border-line-strong bg-surface" : "border-line bg-surface-2/50",
-        );
-        return onEdit ? (
-          <button key={f.label} type="button" onClick={onEdit} className={cn(cls, "hover:border-primary/50")} title={`Change ${f.label.toLowerCase()}`}>
-            {body}
-          </button>
-        ) : (
-          <div key={f.label} className={cls}>
-            {body}
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 /* ---------------------------------------------------------------- SelectCard */
@@ -159,61 +89,65 @@ export function SelectCard({
   );
 }
 
-/**
- * The dashed "Add …" card that ends a SelectCard list, with an optional small
- * line under it ("2 more offers to add"). `expanded`: it opens a list (a
- * disclosure, announced as such) rather than toggling a state.
- */
-export function AddCard({
-  children,
-  hint,
-  onClick,
-  pressed,
-  expanded,
-  wide,
-}: {
-  children: ReactNode;
-  hint?: ReactNode;
-  onClick?: () => void;
-  pressed?: boolean;
-  expanded?: boolean;
-  wide?: boolean;
-}) {
-  const on = pressed ?? expanded;
-  return (
-    <li className={cn("w-48 shrink-0 snap-start", wide && "2xl:w-auto")}>
-      <button
-        type="button"
-        onClick={onClick}
-        aria-pressed={expanded === undefined ? pressed : undefined}
-        aria-expanded={expanded}
-        className={cn(
-          "flex h-full min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl border-[1.5px] border-dashed px-3 py-3 text-sm font-semibold text-primary",
-          on ? "border-primary bg-primary-soft" : "border-primary/40 bg-surface hover:border-primary",
-        )}
-      >
-        <span className="flex items-center gap-2">
-          <Plus className="size-4" aria-hidden /> {children}
-        </span>
-        {hint && <span className="text-xs font-normal text-text-2">{hint}</span>}
-      </button>
-    </li>
-  );
-}
-
 /* ---------------------------------------------------------------- StatTile, Meter, RankedBars */
 
 const ICON_BG = { 1: "bg-chart-1", 2: "bg-chart-2", 3: "bg-chart-3", 4: "bg-chart-4", 5: "bg-chart-5" } as const;
 
-/** Tiles in a row of 3–6. */
-export function StatRow({ children, className, phone = "tiles" }: { children: ReactNode; className?: string; phone?: "tiles" | "line" }) {
-  // phone "line" (a list's figures, design rule 15 and canvas board "List pages on a phone"): on a phone the tiles
-  // become one slim line of facts ("Customers owe USD 50.1K · USD 9,449 late"), so the list starts near the top.
+/** One fact of a list's facts line: its words, its figure, a grey word after it, red when it is bad, a link. */
+export interface Fact {
+  label: ReactNode;
+  value: ReactNode;
+  /** After the value, in grey ("9 quotations", "this year"). */
+  sub?: ReactNode;
+  tone?: "ok" | "warn" | "bad";
+  href?: string;
+}
+
+/**
+ * The one facts line of a list page (canvas board "One list page for all 25 lists": facts, not tiles): one slim line
+ * with only what the tabs do not already say, a figure each, never a big card per number. Not on a phone: there
+ * the tabs and the rows are the page.
+ */
+export function FactsLine({ facts, className }: { facts: Fact[]; className?: string }) {
+  if (!facts.length) return null;
   return (
-    <div data-stat-row={phone} className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]", className)}>
-      {children}
-    </div>
+    <dl aria-label="Facts" className={cn("mb-4 flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>
+      {facts.map((f, i) => {
+        return (
+          <div key={i} className={cn("flex items-baseline gap-1.5 px-3.5 text-md whitespace-nowrap text-muted", i > 0 && "border-l border-line")}>
+            <dt>{f.label}</dt>
+            <dd className={cn("text-sm font-bold text-text tabular", f.tone === "bad" && "text-bad", f.tone === "warn" && "text-warn")}>
+              {f.href ? (
+                <Link href={f.href} className="hover:underline">
+                  {f.value}
+                </Link>
+              ) : (
+                f.value
+              )}
+            </dd>
+            {f.sub && <dd>{f.sub}</dd>}
+          </div>
+        );
+      })}
+    </dl>
   );
+}
+
+/**
+ * Tiles in a row of 3–6 (Home, reports, a record's figures). `facts`: a list page's figures — drawn as the one
+ * FactsLine from the tiles' label, value, line and link, so every list says its figures the same way.
+ */
+export function StatRow({ children, className, facts }: { children: ReactNode; className?: string; facts?: boolean }) {
+  if (facts) {
+    const list = Children.toArray(children)
+      .filter(isValidElement)
+      .map((el) => {
+        const p = el.props as { label: ReactNode; value: ReactNode; sub?: ReactNode; also?: ReactNode; tone?: Fact["tone"]; href?: string };
+        return { label: p.label, value: p.value, sub: p.sub ?? p.also, tone: p.tone === "ok" ? undefined : p.tone, href: p.href };
+      });
+    return <FactsLine facts={list} className={className} />;
+  }
+  return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]", className)}>{children}</div>;
 }
 
 /**
@@ -275,7 +209,7 @@ export function StatTile({
         title={typeof value === "string" ? value : undefined}
         className={cn(
           "truncate font-bold tracking-tight tabular",
-          size === "sm" ? "text-lg sm:text-xl" : "text-xl leading-7 sm:text-[21px]",
+          size === "sm" ? "text-lg sm:text-xl" : "text-xl leading-7 sm:text-xl",
         )}
       >
         {value}
@@ -308,7 +242,7 @@ export function StatTile({
   );
   const cls = cn(
     "flex h-full min-w-0 flex-col rounded-[14px] border bg-surface",
-    tone === "bad" ? "border-[#f3c7c2] dark:border-bad/40" : "border-line",
+    tone === "bad" ? "border-bad/30" : "border-line",
     size === "sm" ? "gap-0.5 px-4 py-3" : "gap-0.5 px-4 py-3.5",
     className,
   );
@@ -372,117 +306,6 @@ export function RankedBars({ rows, label }: { rows: { key: string; label: ReactN
   );
 }
 
-/* ---------------------------------------------------------------- ProgressSteps, Tracker */
-
-export type StepState = "done" | "current" | "attention" | "todo";
-
-/**
- * A record's stage as one bar of segments (board: status bar): the stages before in green, the current one
- * in orange, the ones after in grey. The current segment is marked for screen readers.
- */
-export function StageBar({ stages, current, label = "Stage" }: { stages: string[]; current: number; label?: string }) {
-  return (
-    <ol aria-label={label} className="flex flex-wrap text-[13px] font-semibold">
-      {stages.map((st, i) => (
-        <li
-          key={st}
-          aria-current={i === current ? "step" : undefined}
-          className={cn(
-            "min-w-[110px] flex-[1_1_130px] px-3.5 py-2.5 first:rounded-l-[10px] last:rounded-r-[10px]",
-            i < current ? "bg-primary-solid text-white" : i === current ? "bg-action-solid text-white" : "bg-surface-3 text-text-2",
-          )}
-        >
-          {st}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-const STEP_WORD: Record<StepState, string> = { done: "Done", current: "Now", attention: "Late", todo: "Later" };
-
-/**
- * Where a record is in its flow (order steps, inquiry steps): one box per step, each linking to its
- * tab. Done: soft green with a tick. Now: an orange edge. Needs attention: a red edge. Later: plain.
- * The word ("Done", "Now"…) is always written; the colour only repeats it.
- */
-export function ProgressSteps({ steps, label = "Progress" }: { steps: { key: string; label: string; sub?: ReactNode; state: StepState; href?: string }[]; label?: string }) {
-  return (
-    <nav aria-label={label} className="-mx-4 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
-      <ol className="flex gap-2">
-        {steps.map((s, i) => {
-          const inner = (
-            <>
-              <span className="flex items-center gap-1.5 text-[13px] font-bold text-text">
-                {s.state === "done" ? (
-                  <Check className="size-3.5 shrink-0 text-ok" strokeWidth={3} aria-hidden />
-                ) : s.state === "attention" ? (
-                  <AlertTriangle className="size-3.5 shrink-0 text-bad" aria-hidden />
-                ) : s.state === "current" ? (
-                  <span className="size-2 shrink-0 rounded-full bg-action-solid" aria-hidden />
-                ) : (
-                  <span className="w-3.5 shrink-0 text-center text-xs font-semibold text-muted" aria-hidden>
-                    {i + 1}
-                  </span>
-                )}
-                <span className="truncate">{s.label}</span>
-                <span className={cn("ml-auto pl-1 text-[11px] font-semibold", s.state === "attention" ? "text-bad" : s.state === "current" ? "text-action" : "text-muted")}>{STEP_WORD[s.state]}</span>
-              </span>
-              {s.sub && <span className="block truncate text-xs text-text-2">{s.sub}</span>}
-            </>
-          );
-          const cls = cn(
-            "flex min-w-40 flex-1 flex-col gap-1 rounded-xl px-3 py-2.5 transition-colors",
-            s.state === "done" && "border border-primary-line bg-primary-soft",
-            s.state === "current" && "border-2 border-action-solid bg-action-soft",
-            s.state === "attention" && "border-2 border-bad bg-bad-soft",
-            s.state === "todo" && "border border-line bg-surface",
-          );
-          return (
-            <li key={s.key} className="flex min-w-40 flex-1">
-              {s.href ? (
-                <Link href={s.href} className={cn(cls, "hover:shadow-card")} aria-current={s.state === "current" ? "step" : undefined}>
-                  {inner}
-                </Link>
-              ) : (
-                <div className={cls} aria-current={s.state === "current" ? "step" : undefined}>
-                  {inner}
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
-
-/** Steps that happen outside the app, one after another (banks, delivery): a dot and a line each; only the current one has a button. */
-export function Tracker({ steps, label }: { steps: { key: string; title: ReactNode; sub?: ReactNode; state: StepState; side?: ReactNode }[]; label: string }) {
-  return (
-    <ol aria-label={label} className="flex flex-col">
-      {steps.map((s, i) => (
-        <li key={s.key} className="relative grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-x-3 pb-4 last:pb-0">
-          {i < steps.length - 1 && <span aria-hidden className={cn("absolute top-6.5 bottom-0.5 left-[11px] w-0.5", s.state === "done" ? "bg-ok" : "bg-line")} />}
-          <span
-            aria-hidden
-            className={cn(
-              "grid size-6 place-items-center rounded-full border-2 text-white",
-              s.state === "done" ? "border-ok bg-ok" : s.state === "current" ? "border-primary bg-primary-soft" : s.state === "attention" ? "border-warn bg-warn-soft" : "border-line-strong bg-surface",
-            )}
-          >
-            {s.state === "done" && <Check className="size-3.5" strokeWidth={3} />}
-          </span>
-          <span className="min-w-0">
-            <span className={cn("block text-sm", s.state === "current" ? "font-semibold" : s.state === "todo" ? "text-text-2" : "font-medium")}>{s.title}</span>
-            {s.sub && <span className="block text-xs text-muted">{s.sub}</span>}
-          </span>
-          <span className="flex items-start">{s.side}</span>
-        </li>
-      ))}
-    </ol>
-  );
-}
 
 /* ---------------------------------------------------------------- SectionNav */
 
@@ -498,75 +321,6 @@ export interface SectionNavItem {
   alert?: boolean;
   /** After the label: a short status in a small grey pill ("Written", "No offers", "R2 draft"). */
   tag?: string;
-}
-
-/**
- * Where you are in a record or a module, always visible (design system:
- * section navigation): numbered steps (orders, inquiries) or a list of
- * sections (Insights, Settings), with counts that show progress. From a
- * tablet up, a row of links on a line; on a phone, a row of chips that
- * scrolls sideways with the current one filled (`phone="chips"`), or nothing
- * when the page has its own phone picker (`phone="none"`).
- */
-export function SectionNav({
-  label,
-  items,
-  phone = "chips",
-  className,
-}: {
-  label: string;
-  items: SectionNavItem[];
-  phone?: "chips" | "none";
-  className?: string;
-}) {
-  return (
-    <>
-      <nav aria-label={label} className={cn("no-print hidden md:block", className)}>
-        <ul className="flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {items.map((l) => (
-            <li key={l.href} className="shrink-0">
-              <Link
-                href={l.href}
-                aria-current={l.active ? "page" : undefined}
-                className={cn(
-                  "flex h-9 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] whitespace-nowrap transition-colors [&_svg]:size-4",
-                  l.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface font-medium text-text-2 hover:border-line-strong hover:text-text",
-                )}
-              >
-                {l.mark}
-                <span>{l.label}</span>
-                {l.count !== undefined && l.count !== null && l.count !== "" && (
-                  <span className={cn("-ml-0.5 tabular", l.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{l.count}</span>
-                )}
-                {l.tag && (
-                  <span className={cn("rounded-lg px-[7px] py-px text-[11px] font-medium", l.alert ? "bg-bad-soft text-bad" : l.active ? "bg-surface text-primary" : "bg-bg text-muted")}>{l.tag}</span>
-                )}
-                <Pending />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      {phone === "chips" && (
-        <nav aria-label={label} className={cn("no-print -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden", className)}>
-          {items.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              aria-current={l.active ? "page" : undefined}
-              className={cn(
-                "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap",
-                l.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:text-text",
-              )}
-            >
-              {l.label}
-              {l.count !== undefined && l.count !== null && l.count !== "" && <span className={cn("tabular", l.alert && "text-bad")}>{l.count}</span>}
-            </Link>
-          ))}
-        </nav>
-      )}
-    </>
-  );
 }
 
 /* ---------------------------------------------------------------- SectionList (Settings frame) */
@@ -604,14 +358,14 @@ export function SectionList({
                 href={l.href}
                 aria-current={l.active ? "page" : undefined}
                 className={cn(
-                  "flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap lg:h-auto lg:rounded-md lg:px-2.5 lg:py-1.5 lg:text-sm",
+                  "flex h-8 items-center gap-1.5 rounded-full px-3 text-md font-medium whitespace-nowrap lg:h-auto lg:rounded-md lg:px-2.5 lg:py-1.5 lg:text-sm",
                   l.active ? "bg-primary-soft font-semibold text-primary" : "bg-surface-2 text-text-2 hover:text-text lg:bg-transparent lg:font-normal lg:hover:bg-surface-2",
                 )}
               >
                 {l.mark}
                 <span>{l.label}</span>
                 {l.count !== undefined && l.count !== null && l.count !== "" && (
-                  <span className={cn("ml-auto text-[11px] tabular", l.alert ? "text-bad" : "text-muted")}>{l.count}</span>
+                  <span className={cn("ml-auto text-2xs tabular", l.alert ? "text-bad" : "text-muted")}>{l.count}</span>
                 )}
               </Link>
             </li>
@@ -623,18 +377,3 @@ export function SectionList({
   );
 }
 
-/* ---------------------------------------------------------------- StickyBar */
-
-/** Save and Cancel of a long form, kept in view; above the phone's bottom bar. */
-export function StickyBar({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn(
-        "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface/95 px-3 py-2 shadow-pop backdrop-blur lg:bottom-3",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}

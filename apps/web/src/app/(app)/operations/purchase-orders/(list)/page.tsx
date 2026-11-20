@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Ban, Boxes, Factory, List, Mail, Package, Ship, ShoppingCart } from "lucide-react";
+import { AlertTriangle, Boxes, ShoppingCart } from "lucide-react";
 import { buildHref, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
@@ -15,12 +15,12 @@ export const metadata = { title: "Purchase orders" };
 const STATUS = PURCHASE_ORDER_STATUS;
 
 const CHIPS = [
-  { key: "all", label: "All", icon: List },
-  { key: "not_sent", label: "Not sent", icon: Mail },
-  { key: "in_production", label: "In production", icon: Factory },
-  { key: "ready", label: "Ready", icon: Package },
-  { key: "shipped", label: "Shipped", icon: Ship },
-  { key: "cancelled", label: "Cancelled", icon: Ban },
+  { key: "all", label: "All" },
+  { key: "not_sent", label: "Not sent" },
+  { key: "in_production", label: "In production" },
+  { key: "ready", label: "Ready" },
+  { key: "shipped", label: "Shipped" },
+  { key: "cancelled", label: "Cancelled" },
 ] as const;
 
 const PAGE = PAGE_SIZE;
@@ -54,15 +54,12 @@ export default async function PurchaseOrdersPage({
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={crumbsFor("/operations/purchase-orders")}
-        icon={ShoppingCart}
         title="Purchase orders"
-        description="One per supplier on each sales order"
-        actions={
-          <ExportCsv what="purchase-orders" />
-        }
+        more={<ExportCsv what="purchase-orders" />}
       />
-      <StatRow className="mb-4" phone="line">
+      <StatRow facts>
         <StatTile label="Open purchase orders" value={tiles.open} />
         <StatTile
           icon={ShoppingCart}
@@ -87,15 +84,9 @@ export default async function PurchaseOrdersPage({
         label="Which purchase orders"
         className="mb-4"
         tabs={CHIPS.map((c) => {
-          const Icon = c.icon;
           return {
             href: href({ status: c.key === "all" ? undefined : c.key }),
-            label: (
-              <>
-                <Icon aria-hidden />
-                {c.label}
-              </>
-            ),
+            label: c.label,
             count: data.counts[c.key],
             active: chip === c.key,
           };
@@ -130,7 +121,7 @@ export default async function PurchaseOrdersPage({
             description={data.suppliers.length ? "Clear the search or choose All." : "Each supplier on a sales order gets one, numbered PO-2026-0001, when the order is made."}
           />
         ) : (
-          <Table className="min-w-[900px]">
+          <Table>
             <THead>
               <tr>
                 <Th>Purchase order</Th>

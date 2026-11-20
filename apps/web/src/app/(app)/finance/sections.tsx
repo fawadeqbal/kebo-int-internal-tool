@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Banknote, Landmark, Wallet } from "lucide-react";
 import { can, CURRENCIES, MONEY_ACCOUNT_KIND_LABEL } from "@kebo/shared";
-import { Alert, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile } from "@kebo/ui";
+import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice } from "@kebo/ui";
 import { convertAmount } from "@kebo/money";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -75,7 +75,7 @@ export async function VaultOverview({ today }: { today: string }) {
   const latest = (book?.rows ?? []).slice(-6).reverse();
   return (
     <div className="flex flex-col gap-4">
-      <StatRow>
+      <StatRow facts>
         <StatTile icon={Landmark} iconColor={1} label="All money" value={`≈ ${whole(all, main)}`} sub={missing ? "some rates missing" : "at today's rates"} />
         {[...byCurrency.entries()].slice(0, 3).map(([c, v]) => {
           const n = open.filter((x) => x.currency === c).length;
@@ -101,7 +101,19 @@ export async function VaultOverview({ today }: { today: string }) {
               </>
             }
           />
-          <div className="overflow-x-auto">
+          {/* A phone: a row per account — its name and kind, its balance; the row opens its statement. */}
+          <PhoneList label="Bank accounts">
+            {open.map((a) => (
+              <PhoneRow
+                key={a.id}
+                href={`/finance/cash-book?acct=${a.id}`}
+                title={a.name}
+                line={MONEY_ACCOUNT_KIND_LABEL[a.kind]}
+                figure={<span className={cn(Number(a.balance) < 0 && "text-bad")}>{money(a.balance, a.currency)}</span>}
+              />
+            ))}
+          </PhoneList>
+          <div className="max-sm:hidden">
             <Table>
               <THead>
                 <tr>
@@ -128,7 +140,7 @@ export async function VaultOverview({ today }: { today: string }) {
                       <Td className={cn("text-right whitespace-nowrap tabular", Number(a.balance) < 0 && "font-semibold text-bad")}>{money(a.balance, a.currency)}</Td>
                       <Td className="text-right whitespace-nowrap tabular">{eq === null ? <span className="text-muted">no rate</span> : eq.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
                       <Td className="text-right">
-                        <Link href={`/finance/cash-book?acct=${a.id}`} className="text-[13px] font-medium whitespace-nowrap text-primary hover:underline">
+                        <Link href={`/finance/cash-book?acct=${a.id}`} className="text-md font-medium whitespace-nowrap text-primary hover:underline">
                           Statement
                         </Link>
                       </Td>
@@ -166,6 +178,25 @@ export async function VaultOverview({ today }: { today: string }) {
           {latest.length === 0 ? (
             <EmptyState title="Nothing in the last 90 days" description="Money recorded on orders and expenses shows here by its date." />
           ) : (
+            <>
+            {/* A phone: a row per move — what, its day and in or out; the balance after it on the right. */}
+            <PhoneList label="Latest moves">
+              {latest.map((r) => {
+                const n = Number(r.amount);
+                const two = (v: number) => Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2 });
+                return (
+                  <PhoneRow
+                    key={r.key}
+                    href={r.href ?? undefined}
+                    muted={!!r.voided}
+                    title={r.what}
+                    line={`${date(r.on)} · ${n > 0 ? `in ${two(n)}` : `out ${two(n)}`}`}
+                    figure={r.balance ? Number(r.balance).toLocaleString("en-US", { minimumFractionDigits: 2 }) : undefined}
+                  />
+                );
+              })}
+            </PhoneList>
+            <div className="max-sm:hidden">
             <Table>
               <THead>
                 <tr>
@@ -191,6 +222,8 @@ export async function VaultOverview({ today }: { today: string }) {
                 })}
               </tbody>
             </Table>
+            </div>
+            </>
           )}
         </Card>
       )}
@@ -292,13 +325,13 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
         </FilterChip>
       </div>
       {acct !== "none" && book.unassigned > 0 && (
-        <Alert tone="warning">
+        <Notice tone="todo">
           {book.unassigned} {one ? `${one.currency} ` : ""}amount{book.unassigned === 1 ? " is" : "s are"} not on an account in {pr.name}, so the balances leave{" "}
           {book.unassigned === 1 ? "it" : "them"} out.{" "}
           <Link href={href({ acct: "none", cur: undefined })} className="font-medium underline">
             Put {book.unassigned === 1 ? "it" : "them"} on an account
           </Link>
-        </Alert>
+        </Notice>
       )}
 
       {one ? (
@@ -374,7 +407,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
               );
             })}
           </ul>
-          <div className="hidden overflow-x-auto sm:block">
+          <div className="hidden sm:block">
             <Table>
               <THead>
                 <tr>

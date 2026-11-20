@@ -1,5 +1,5 @@
 import type { OwnDomainView } from "@kebo/shared";
-import { Card, CardBody, CardHeader, ScrollFade, StatusBadge } from "@kebo/ui";
+import { THead, Th, Card, CardBody, CardHeader, ScrollFade, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { CheckDomain, ConnectDomain, CopyValue, RemoveDomain } from "./domain-forms";
 import { date } from "@/lib/format";
@@ -24,19 +24,19 @@ function Record({ view }: { view: DomainView }) {
   const r = view.record!;
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[13px] font-semibold">Add this record where {r.zone} is managed</p>
+      <p className="text-md font-semibold">Add this record where {r.zone} is managed</p>
       <ScrollFade scrollLabel="The record to add" className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full min-w-[420px] text-left text-[13px]">
-          <thead className="bg-surface-2 text-xs text-text-2">
+        <table className="w-full min-w-[420px] text-left text-md">
+          <THead>
             <tr>
-              <th className="px-3.5 py-2 font-semibold">Type</th>
-              <th className="px-3.5 py-2 font-semibold">Name</th>
-              <th className="px-3.5 py-2 font-semibold">Value</th>
-              <th className="px-3.5 py-2">
+              <Th>Type</Th>
+              <Th>Name</Th>
+              <Th>Value</Th>
+              <Th>
                 <span className="sr-only">Copy</span>
-              </th>
+              </Th>
             </tr>
-          </thead>
+          </THead>
           <tbody>
             <tr>
               <td className="px-3.5 py-2.5 font-semibold">{r.type}</td>

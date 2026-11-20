@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { Alert, Button, Card, cn, Field, Input, Select, Textarea } from "@kebo/ui";
-import { OpenPanelButton, PanelActions, PanelBody, PanelSection, SidePanel, useClosePanel } from "@/components/common/panel";
+import { Button, Card, cn, Field, Input, Select, Textarea, type ButtonSize, type ButtonVariant, Notice, RULES } from "@kebo/ui";
+import { ChangeHint, changeKind, changeLine, changeWords, countChanges } from "@/components/common/change-words";
+import { OpenPanelButton, PanelBody, PanelSection, SidePanel, useClosePanel, WindowFooter } from "@/components/common/panel";
 import { EditButton } from "@/components/common/edit-button";
 import { EditsChip, editedMark } from "@/components/edits/edits";
 import { useEditSave } from "@/components/edits/use-edit-save";
@@ -23,17 +24,6 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 export const dayLabel = (iso: string | null | undefined, style: TimeStyle = timeStyle()) => (iso ? formatDate(iso, style) : "");
 
 /* ---------------------------------------------------------------- the side panel (common/panel) */
-
-function PanelFooter({ save = "Save", busy, note, disabled }: { save?: string; busy?: boolean; note?: ReactNode; disabled?: boolean }) {
-  return (
-    <PanelActions>
-      <Button type="submit" size="sm" disabled={busy || disabled} aria-busy={busy}>
-        {busy ? "Saving…" : save}
-      </Button>
-      <span className="text-xs text-muted">{note ?? "Changes show in the step’s Changes."}</span>
-    </PanelActions>
-  );
-}
 
 /* ---------------------------------------------------------------- fields */
 
@@ -109,9 +99,9 @@ function Control({ f, id, value, onChange, autoFocus, onKeyDown }: { f: DetailFi
   );
 }
 
-/** How a value reads in "what changed": a choice's label, a date as "14 Jan 2027", or "empty". */
+/** How a value reads in "what changed": a choice's label, a date as "14 Jan 2027"; empty is "" (then it is Added). */
 const changeText = (f: DetailField, v: string) =>
-  (f.options?.find((o) => o.value === v)?.label ?? (f.type === "date" && ISO.test(v) ? dayLabel(v) : v.length > 40 ? `${v.slice(0, 39)}…` : v)) || "empty";
+  (f.options?.find((o) => o.value === v)?.label ?? (f.type === "date" && ISO.test(v) ? dayLabel(v) : v.length > 40 ? `${v.slice(0, 39)}…` : v)) || "";
 
 /**
  * The full form of a card in the panel: its fields grouped, Save / Cancel.
@@ -147,19 +137,26 @@ export function FieldsForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const saver = useEditSave({ edit, card, what: "values" });
   // What differs from what is saved, as it is typed (canvas board "One edit window"): the button counts it
-  // ("Save 2 changes", or "No changes"), and each changed field says what it was.
+  // (changeWords: "No changes", "Save", "Save 2 changes"), and each differing field says Added, or what it was.
   const formRef = useRef<HTMLFormElement>(null);
-  const [changed, setChanged] = useState<string[]>([]);
+  // Each differing field's value now (name → value): Added when it was empty, else Changed or Removed.
+  const [nowOf, setNowOf] = useState<Record<string, string>>({});
   const recount = () => {
     if (!formRef.current) return;
     const data = new FormData(formRef.current);
-    const now = editable.filter((f) => data.has(f.name!) && String(data.get(f.name!) ?? "").trim() !== (f.value ?? "").trim()).map((f) => f.name!);
-    setChanged((was) => (was.join() === now.join() ? was : now));
+    const now: Record<string, string> = {};
+    for (const f of editable) {
+      if (!data.has(f.name!)) continue;
+      const v = String(data.get(f.name!) ?? "").trim();
+      if (changeKind(f.value, v)) now[f.name!] = v;
+    }
+    setNowOf((was) => (JSON.stringify(was) === JSON.stringify(now) ? was : now));
   };
+  const counts = countChanges(editable.filter((f) => f.name! in nowOf).map((f) => ({ from: f.value ?? "", to: nowOf[f.name!]! })));
   // A window that names its own button (Add the shipment) keeps it, and so does one for something new (plain);
   // the Save of saved values counts.
   const counting = !save && !plain;
-  const saveWords = counting ? (changed.length === 0 ? "No changes" : changed.length === 1 ? "Save 1 change" : `Save ${changed.length} changes`) : save;
+  const saveWords = counting ? changeWords(counts) : save;
 
   const submit = (form: HTMLFormElement) => {
     const data = new FormData(form);
@@ -173,7 +170,7 @@ export function FieldsForm({
       if (now === was) continue;
       if (was) filledChanged = true;
       keys.push(f.name!);
-      changes.push(`${f.panelLabel ?? f.label}: ${changeText(f, was)} → ${changeText(f, now)}`);
+      changes.push(changeLine(f.panelLabel ?? f.label, changeText(f, was), changeText(f, now)));
     }
     if (!changes.length) return close({ ok: true });
     setErrors({});
@@ -217,7 +214,7 @@ export function FieldsForm({
       }}
     >
       <PanelBody className="gap-5">
-        {saver.error && <Alert tone="error">{saver.error}</Alert>}
+        {saver.error && <Notice tone="bad">{saver.error}</Notice>}
         {groups.map((g, i) => (
           <PanelSection key={g} title={g || undefined} first={i === 0}>
             {editable
@@ -227,7 +224,16 @@ export function FieldsForm({
                   key={f.name}
                   label={f.panelLabel ?? f.label}
                   htmlFor={`${id}-${f.name}`}
-                  hint={changed.includes(f.name!) ? <WasHint f={f} hint={f.hint} /> : f.hint}
+                  hint={
+                    f.name! in nowOf ? (
+                      <>
+                        <ChangeHint was={changeText(f, (f.value ?? "").trim())} now={changeText(f, nowOf[f.name!]!)} />
+                        {f.hint}
+                      </>
+                    ) : (
+                      f.hint
+                    )
+                  }
                   error={errors[f.name!]}
                   className={cn(f.wide && "sm:col-span-2")}
                 >
@@ -237,23 +243,14 @@ export function FieldsForm({
           </PanelSection>
         ))}
         {extra}
-        <PanelFooter save={saveWords} busy={saver.busy} disabled={counting && changed.length === 0} note={note ?? (card?.first ? "Changing a saved value asks why." : undefined)} />
+        <WindowFooter note={note ?? (card?.first ? "Changing a saved value asks why." : "Changes show in the step’s Changes.")}>
+          <Button type="submit" variant="strong" disabled={saver.busy || (counting && counts.changed + counts.added === 0)} aria-busy={saver.busy}>
+            {saver.busy ? "Saving…" : (saveWords ?? "Save")}
+          </Button>
+        </WindowFooter>
       </PanelBody>
       {saver.dialog}
     </form>
-  );
-}
-
-/** Under a changed field: what it was ("Changed · was 14 Nov 2026"), then its own hint. */
-function WasHint({ f, hint }: { f: DetailField; hint?: ReactNode }) {
-  const was = changeText(f, (f.value ?? "").trim());
-  return (
-    <>
-      <span data-was="" className="block font-medium text-action">
-        Changed · was {was || "empty"}
-      </span>
-      {hint}
-    </>
   );
 }
 
@@ -511,7 +508,7 @@ export function LinesCard({
             {actions}
             {editable && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
             {canEdit && editPanel && (
-              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="secondary" size="sm" className="h-8 px-2.5 text-[13px] [&_svg]:size-3.5">
+              <OpenPanelButton panel={editPanel.panel} id={editPanel.id} variant="ghost" size="xs" className="text-primary hover:text-primary">
                 <Pencil aria-hidden /> {editLabel}
               </OpenPanelButton>
             )}
@@ -535,7 +532,7 @@ export function LinesCard({
           title={panelTitle ?? `Edit ${name.toLowerCase().startsWith("lines") ? name.toLowerCase() : name}`}
           description={panelDescription}
           onClose={close}
-          className="md:w-[1180px]"
+          className={RULES.window.items}
         >
           {edit}
         </SidePanel>
@@ -556,17 +553,20 @@ export function PanelButton({
   className,
   panelClassName,
   name,
+  edit,
 }: {
   /** A link opens it: ?do=<name> (the order's next step). */
   name?: string;
+  /** It changes the box it sits in: drawn as the one quiet ✎ Edit (EditButton), its label its words. */
+  edit?: boolean;
   label: ReactNode;
   title: string;
   description?: string;
   body: ReactNode;
-  /** The window's own width and such (md:w-[820px]). */
+  /** The window's width: one of RULES.window (part 640, wideRows 720, items 1180). */
   panelClassName?: string;
-  variant?: "primary" | "secondary" | "ghost";
-  size?: "xs" | "sm" | "md";
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   icon?: ReactNode;
   className?: string;
 }) {
@@ -574,9 +574,13 @@ export function PanelButton({
   useOpenFromLink(name, () => setOpen(true));
   return (
     <>
-      <Button size={size} variant={variant} onClick={() => setOpen(true)} className={className}>
-        {icon} {label}
-      </Button>
+      {edit ? (
+        <EditButton label={label} onClick={() => setOpen(true)} className={className} />
+      ) : (
+        <Button size={size} variant={variant} onClick={() => setOpen(true)} className={className}>
+          {icon} {label}
+        </Button>
+      )}
       {open && (
         <SidePanel title={title} description={description} onClose={() => setOpen(false)} className={panelClassName}>
           {body}

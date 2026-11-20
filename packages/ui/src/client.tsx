@@ -5,7 +5,8 @@ import { useFormStatus } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Check, Clock, Loader2, X } from "lucide-react";
-import { buttonClass, Select, type ButtonSize, type ButtonVariant } from "./primitives";
+import { buttonClass, segmentClass, segmentsClass, Select, type ButtonSize, type ButtonVariant } from "./primitives";
+import { cn } from "./cn";
 
 export { BackArrow, ListLink, NavMemoryKeeper, placeOf, readNav, writeNav, type NavMemory, type Place } from "./back";
 
@@ -24,24 +25,6 @@ export function SubmitButton({
       {pending && <Loader2 className="animate-spin" aria-hidden />}
       {pending ? pendingText : children}
     </button>
-  );
-}
-
-/** Submit button that asks for confirmation first (for destructive or irreversible actions). */
-export function ConfirmSubmit({
-  message,
-  children,
-  ...props
-}: ComponentProps<typeof SubmitButton> & { message: string }) {
-  return (
-    <SubmitButton
-      {...props}
-      onClick={(e) => {
-        if (!window.confirm(message)) e.preventDefault();
-      }}
-    >
-      {children}
-    </SubmitButton>
   );
 }
 
@@ -103,10 +86,10 @@ const subscribeToast = (l: () => void) => {
 export const NOTE_MS = { plain: 5000, undo: 5000, fail: 5000 } as const;
 
 const KINDS: Record<NoteKind, { icon: ReactNode; className: string; said: string }> = {
-  done: { icon: <Check className="size-3.5" strokeWidth={3} aria-hidden />, className: "bg-[#2e8b57]", said: "Done" },
-  wait: { icon: <Clock className="size-3.5" strokeWidth={2.75} aria-hidden />, className: "bg-[#2f6fd6]", said: "Waiting" },
-  part: { icon: <span aria-hidden className="text-[13px] leading-none font-black">!</span>, className: "bg-[#b86e00]", said: "Partly done" },
-  fail: { icon: <X className="size-3.5" strokeWidth={3} aria-hidden />, className: "bg-[#c2382b]", said: "Not done" },
+  done: { icon: <Check className="size-3.5" strokeWidth={3} aria-hidden />, className: "bg-primary-solid", said: "Done" },
+  wait: { icon: <Clock className="size-3.5" strokeWidth={2.75} aria-hidden />, className: "bg-info-solid", said: "Waiting" },
+  part: { icon: <span aria-hidden className="text-md leading-none font-black">!</span>, className: "bg-warn-solid", said: "Partly done" },
+  fail: { icon: <X className="size-3.5" strokeWidth={3} aria-hidden />, className: "bg-bad-solid", said: "Not done" },
 };
 
 /**
@@ -167,9 +150,9 @@ export function Toaster() {
       </span>
       <div className="min-w-0 flex-1">
         <p className="leading-snug font-semibold">{t.message}</p>
-        {t.detail && <p className="mt-0.5 text-[12.5px] leading-snug text-note-sub">{t.detail}</p>}
+        {t.detail && <p className="mt-0.5 text-xs leading-snug text-note-sub">{t.detail}</p>}
         {(t.undo || steps.length > 0) && (
-          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-md">
             {t.undo && (
               <button type="button" onClick={() => void undo()} disabled={busy} className={link}>
                 {busy ? "Undoing…" : "Undo"}
@@ -231,6 +214,52 @@ export function Toast() {
 }
 
 /** A filter select that applies itself as soon as it changes. */
+/** A select that sends its form as soon as a choice is made: no Continue button. The one AutoSelect (size like Select). */
 export function AutoSelect(props: ComponentProps<typeof Select>) {
-  return <Select compact {...props} onChange={(e) => e.currentTarget.form?.requestSubmit()} />;
+  return <Select {...props} onChange={(e) => e.currentTarget.form?.requestSubmit()} />;
+}
+
+/**
+ * The view switch made of buttons (board "The one choice": the same data shown another way — Chart | Table, Year | All
+ * time). The link one is Segmented; this one keeps its value in the page. A radio group: one stop for Tab, ← → move.
+ */
+export function SegmentedChoice<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+}: {
+  label: string;
+  value: T;
+  options: readonly { value: T; label: ReactNode }[];
+  onChange: (v: T) => void;
+  className?: string;
+}) {
+  const at = Math.max(0, options.findIndex((o) => o.value === value));
+  return (
+    <div role="radiogroup" aria-label={label} className={cn(segmentsClass, className)}>
+      {options.map((o, i) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={o.value === value}
+          tabIndex={i === at ? 0 : -1}
+          onClick={() => onChange(o.value)}
+          onKeyDown={(e) => {
+            const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+            if (!step) return;
+            e.preventDefault();
+            const n = (i + step + options.length) % options.length;
+            onChange(options[n]!.value);
+            (e.currentTarget.parentElement?.children[n] as HTMLElement | undefined)?.focus();
+          }}
+          className={cn(segmentClass(o.value === value), "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text")}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { PaymentRoute } from "@kebo/shared";
-import { Alert } from "@kebo/ui";
+import { Notice } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { BankContract } from "@/lib/types-flow";
 import { BankContractForm, RouteForm, type RouteTermsValue } from "@/components/orders/flow-forms";
@@ -79,7 +79,7 @@ export function RecordPaymentWindow({
       >
         {(close) => <ReceivedFields {...fields} bare onClose={close} onFileError={setFileError} />}
       </FormWindow>
-      {fileError && <Alert tone="error">{fileError}</Alert>}
+      {fileError && <Notice tone="bad">{fileError}</Notice>}
     </>
   );
 }
@@ -133,7 +133,7 @@ export function ChangePaymentWindow({
           )}
           {!fromCredit && (
             <div className="flex flex-col gap-2 border-t border-line pt-4">
-              <p className="text-[13px] font-semibold">Bank slip</p>
+              <p className="text-md font-semibold">Bank slip</p>
               <AttachedFile src={`/files/payments/${payment.id}`} file={payment.file} what="Bank slip" canChange={!!save} remove={removeFile} empty="No bank slip" />
             </div>
           )}

@@ -2,13 +2,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { FileSpreadsheet, Plus } from "lucide-react";
 import { COMPANY_KIND_LABEL, COMPANY_LOG_KINDS, LIFECYCLE, planFeatureName, type CompanyLogKind } from "@kebo/shared";
-import { Badge, buildHref, buttonClass, Card, cn, EmptyState, ListToolbar, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
+import { Badge, buildHref, buttonClass, Card, cn, EmptyState, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile, LinkTabs, EmptyLine, CardHeader } from "@kebo/ui";
 import type { ISODate } from "@kebo/utils";
 import { RowMenu } from "@/components/common/more-menu";
 import { date, dateTime, money, timeAgo } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
 import type { CompanyDetail, CompanyHistory, LogEntry } from "@/lib/types-platform";
-import { GroupCard, ModulesList, PanelButton } from "./cards";
+import { GroupCard, ModulesList } from "./cards";
+import { OpenPanelButton } from "@/components/common/panel";
 import { attention, daysTo, inDays, modulesOn, paidShare, paidState, sectionHref, storage, type Meaning } from "./model";
 import type { SavedCard } from "./panels";
 
@@ -36,20 +37,7 @@ function Box({
 }) {
   return (
     <Card id={id} className={cn("overflow-clip", className)} aria-labelledby={id ? `${id}-title` : undefined}>
-      <div
-        className={cn(
-          "flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3",
-          description && action && "max-sm:flex-col max-sm:gap-2",
-        )}
-      >
-        <div className="min-w-0">
-          <h2 id={id ? `${id}-title` : undefined} className="text-sm font-semibold text-text">
-            {title}
-          </h2>
-          {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
-        </div>
-        {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
-      </div>
+      <CardHeader titleId={id ? `${id}-title` : undefined} title={title} description={description} actions={action} />
       {children}
     </Card>
   );
@@ -183,7 +171,7 @@ export function OverviewSection({ c, today }: { c: CompanyDetail; today: ISODate
               ))}
             </ul>
           ) : (
-            <p className="px-4 py-4 text-sm text-text-2">Nothing needs you: they are paid up, within their limits and signing in safely.</p>
+            <EmptyLine inset>Nothing needs you: they are paid up, within their limits and signing in safely.</EmptyLine>
           )}
         </Box>
         <Box title="What they do" description="your own visits don't count">
@@ -206,7 +194,7 @@ export function OverviewSection({ c, today }: { c: CompanyDetail; today: ISODate
         title="Recent history"
         description="everything done to this company from the platform"
         action={
-          <Link href={sectionHref(c.id, "history")} className={buttonClass("ghost", "sm", "h-8 px-2.5 text-[13px] text-text-2")}>
+          <Link href={sectionHref(c.id, "history")} className={buttonClass("ghost", "sm", "text-text-2")}>
             All history
           </Link>
         }
@@ -319,15 +307,12 @@ export function PlanSection({ c, modules, saved }: { c: CompanyDetail; modules: 
   return (
     <>
       <Card id="plan" aria-labelledby="plan-title" className={cn("overflow-clip", saved === "plan" && "animate-flash")}>
-        <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-          <div className="min-w-0">
-            <h2 id="plan-title" className="text-sm font-semibold">
-              Plan
-            </h2>
-            <p className="mt-0.5 text-xs text-muted">what they pay for, and their limits</p>
-          </div>
-          {live && <PanelButton panel="change-plan">Change plan</PanelButton>}
-        </div>
+        <CardHeader
+          titleId="plan-title"
+          title="Plan"
+          description="what they pay for, and their limits"
+          actions={live && <OpenPanelButton size="sm" panel="change-plan">Change plan</OpenPanelButton>}
+        />
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-3.5 xl:grid-cols-4">
           {[
             { label: "Plan", value: p?.name ?? "No plan" },
@@ -350,8 +335,8 @@ export function PlanSection({ c, modules, saved }: { c: CompanyDetail; modules: 
           description={ends ? `${ends <= new Date() ? "ended" : "ends"} ${dateTime(c.endsAt)}` : "no end date"}
           action={
             <>
-              <PanelButton panel="extend">Extend…</PanelButton>
-              <PanelButton panel="make-real">Make it a client</PanelButton>
+              <OpenPanelButton size="sm" panel="extend">Extend…</OpenPanelButton>
+              <OpenPanelButton size="sm" panel="make-real">Make it a client</OpenPanelButton>
             </>
           }
         >
@@ -396,21 +381,19 @@ export function BillingSection({
   const share = paidShare(c, today);
   return (
     <Card id="billing" aria-labelledby="billing-title" className={cn("overflow-clip", saved === "billing" && "animate-flash")}>
-      <div className="flex min-h-14 items-start justify-between gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0">
-          <h2 id="billing-title" className="text-sm font-semibold">
-            Billing
-          </h2>
-          <p className="mt-0.5 text-xs text-muted">
-            {client ? "each payment sets the paid-until date" : `a ${c.kind} pays nothing; make it a client first`}
-          </p>
-        </div>
-        {client && live && (
-          <PanelButton panel="record-payment">
-            <Plus aria-hidden /> Record payment
-          </PanelButton>
-        )}
-      </div>
+      <CardHeader
+        titleId="billing-title"
+        title="Billing"
+        description={client ? "each payment sets the paid-until date" : `a ${c.kind} pays nothing; make it a client first`}
+        actions={
+          client &&
+          live && (
+            <OpenPanelButton size="sm" panel="record-payment">
+              <Plus aria-hidden /> Record payment
+            </OpenPanelButton>
+          )
+        }
+      />
       {client ? (
         <>
           <div className="flex flex-col gap-2 px-4 py-3">
@@ -422,9 +405,9 @@ export function BillingSection({
                   <>
                     {" "}
                     ·{" "}
-                    <PanelButton panel="paid-until" variant="link" label="Change the paid-until date">
+                    <OpenPanelButton panel="paid-until" variant="link" className="text-xs" label="Change the paid-until date">
                       change
-                    </PanelButton>
+                    </OpenPanelButton>
                   </>
                 )}
               </span>
@@ -618,20 +601,22 @@ export function HistorySection({ c, history, page }: { c: CompanyDetail; history
       title={`History · ${history.counts.all ?? 0}`}
       description="everything done to this company from the platform, newest first"
     >
-      <ListToolbar
-        inCard
-        label="Kinds of history"
-        chips={[
-          { key: "all", label: "All", count: history.counts.all ?? 0, href: buildHref(base, { section: "history" }, {}), active: !kind },
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
+        <LinkTabs
+          look="chips"
+          className="min-w-0 flex-1"
+          label="Kinds of history"
+          tabs={[
+          { label: "All", count: history.counts.all ?? 0, href: buildHref(base, { section: "history" }, {}), active: !kind },
           ...kinds.map((k) => ({
-            key: k.key,
             label: k.label,
             count: history.counts[k.key] ?? 0,
             href: buildHref(base, { section: "history", kind: k.key }, {}),
             active: kind === k.key,
           })),
         ]}
-        end={
+        />
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <a
             href={buildHref(`${base}/history-excel`, {}, { kind })}
             download
@@ -640,8 +625,8 @@ export function HistorySection({ c, history, page }: { c: CompanyDetail; history
           >
             <FileSpreadsheet aria-hidden /> Excel
           </a>
-        }
-      />
+        </div>
+      </div>
       <LogList entries={rows} empty={kind ? "Nothing of this kind yet." : "Nothing yet."} />
       <Pager base={base} params={{ section: "history", kind }} page={page} total={history.rows.length} />
     </Box>

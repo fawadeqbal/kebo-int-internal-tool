@@ -3,8 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { OrderSection } from "@kebo/shared";
-import { cn } from "@kebo/ui";
 import { FileChip, guessKind, uploadToOrder, useFileTools } from "@/components/files/file-tools";
+import { FileZone } from "@/components/common/file-zone";
 
 /** The files of one section, from the order's one list (the layout loads it once). */
 export function useSectionFiles(section: OrderSection) {
@@ -48,7 +48,7 @@ export function SectionFiles({ orderId, section, canAdd, quiet }: { orderId: str
       {canAdd && (
         <>
           <input ref={input} type="file" multiple hidden onChange={(e) => (send(e.target.files), (e.target.value = ""))} />
-          <button type="button" disabled={busy} className="tap text-[12.5px] font-medium text-text-2 hover:text-primary hover:underline disabled:opacity-60" onClick={() => input.current?.click()}>
+          <button type="button" disabled={busy} className="tap text-xs font-medium text-text-2 hover:text-primary hover:underline disabled:opacity-60" onClick={() => input.current?.click()}>
             {busy ? "Sending…" : "+ Add a file"}
           </button>
         </>
@@ -69,8 +69,6 @@ export function SectionFiles({ orderId, section, canAdd, quiet }: { orderId: str
  */
 export function WindowFiles({ orderId, section }: { orderId: string; section: OrderSection; /** (Unused: the drop zone says "a file", nothing more; white label, 17 Nov.) */ hint?: string }) {
   const files = useSectionFiles(section);
-  const input = useRef<HTMLInputElement>(null);
-  const [over, setOver] = useState(false);
   const { busy, error, send } = useSectionUpload(orderId, section);
   return (
     <div className="flex flex-col gap-2 border-t border-line pt-4">
@@ -82,26 +80,7 @@ export function WindowFiles({ orderId, section }: { orderId: string; section: Or
           ))}
         </span>
       )}
-      <input ref={input} type="file" multiple hidden onChange={(e) => (send(e.target.files), (e.target.value = ""))} />
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => input.current?.click()}
-        onDragOver={(e) => (e.preventDefault(), setOver(true))}
-        onDragLeave={() => setOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setOver(false);
-          send(e.dataTransfer.files);
-        }}
-        className={cn(
-          "flex min-h-11 items-center justify-center rounded-lg border border-dashed border-line-strong px-3 py-2 text-center text-[12.5px] text-text-2 hover:border-primary/60 hover:text-text",
-          over && "border-primary bg-primary-soft text-text",
-        )}
-      >
-        {busy ? "Sending…" : "Drop or choose a file"}
-      </button>
+      <FileZone label="Add files" optional={false} compact disabled={busy} hint={busy ? "Sending…" : undefined} onFiles={send} />
       {error && (
         <span role="alert" className="text-xs text-bad">
           {error}

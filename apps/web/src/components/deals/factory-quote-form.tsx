@@ -1,7 +1,8 @@
 "use client";
 
+import { Picker } from "@/components/common/picker";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Factory, History, Loader2, Plus, Search, ShieldCheck, Tag, Truck } from "lucide-react";
+import { ChevronDown, CircleCheck, Factory, History, ShieldCheck, Tag, Truck } from "lucide-react";
 import { fxRate } from "@kebo/money";
 import {
   basisText,
@@ -16,7 +17,7 @@ import {
   type LeadFrom,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea, controlSizes, EmptyLine } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -24,8 +25,9 @@ import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
-import { FooterTotal, PANEL_FORM, PanelSection, useReportDirty, useReportLost, WindowCancel } from "@/components/common/panel";
-import { StepsFrame } from "@/components/common/steps-frame";
+import { ChangeHint, changeCount, changedClassOf, changeKind, changeLine, changeWords, countChanges, Now, Was } from "@/components/common/change-words";
+import { PANEL_FORM, PanelSection, useReportDirty, useReportLost } from "@/components/common/panel";
+import { StepsFooter, StepsFrame } from "@/components/common/steps-frame";
 import { ChoiceChips } from "@/components/common/choice-chips";
 import { ReasonSheet } from "@/components/edits/reason-chips";
 import { date, money } from "@/lib/format";
@@ -66,8 +68,7 @@ export function PortPicker({ id, value, onChange, exw }: { id: string; value: st
         autoComplete="off"
         value={value}
         maxLength={60}
-        
-        className={cn(controlClass, "h-9 pr-9")}
+        className={cn(controlClass, controlSizes.md, "pr-9")}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
           onChange(e.target.value);
@@ -178,12 +179,12 @@ export function TaxBox({
           <Input
             id={`${idPrefix}-tax-rate`}
             inputMode="decimal"
-            className="w-24 text-right tabular"
+            unit="%"
+            className="w-28 text-right tabular"
             value={rate}
             onChange={(e) => onRate(e.target.value.replace(/[^\d.]/g, ""))}
             placeholder="0"
           />
-          <span className="text-sm text-muted">%</span>
         </span>
       </Field>
       <label htmlFor={`${idPrefix}-tax-included`} className="flex min-h-11 cursor-pointer items-start gap-2.5 text-sm sm:mt-[26px]">
@@ -348,17 +349,9 @@ const OFFER_PRESETS: PartsPreset[] = [
 /** A factory asked for this inquiry (offered first in the picker): how it stands ("asked 15 Nov · no offer yet"). */
 export type AskedFactory = FactoryOption & { note?: string };
 
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join("");
-
 /**
- * Choose a known factory, or type a new one's name (it is added to the factory list on save). The factories asked
- * for this inquiry come first (design 18 Nov); typing searches them all.
+ * Choose a known supplier, or type a new one's name (it is added to the supplier list on save). The suppliers asked
+ * for this inquiry come first (design 18 Nov); typing searches them all. Drawn by the one Picker.
  */
 export function FactoryPicker({
   value,
@@ -373,140 +366,26 @@ export function FactoryPicker({
   asked?: AskedFactory[];
   error?: string[];
 }) {
-  const id = useId();
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState<FactoryOption[]>([]);
-  const [loading, setLoading] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const call = useRef(0);
-
-  useEffect(() => {
-    if (!open) return;
-    const n = ++call.current;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      const found = await search(q);
-      if (n !== call.current) return;
-      setRows(found);
-      setLoading(false);
-    }, 200);
-    return () => clearTimeout(t);
-  }, [q, open, search]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  if (value) {
-    const known = asked.find((a) => a.id === value.id);
-    return (
-      <div className={cn("flex min-h-12 items-center gap-3 rounded-[10px] border border-line bg-surface-2/60 px-3 py-2", error && "border-bad")}>
-        <Factory className="size-4 shrink-0 text-muted" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{value.name}</p>
-          <p className="truncate text-xs text-text-2">{!value.id ? "New supplier — added when you save" : (known?.note ?? known?.contactPerson ?? "")}</p>
-        </div>
-        <Button size="xs" variant="ghost" onClick={() => onChange(null)}>
-          Change
-        </Button>
-      </div>
-    );
-  }
-
-  const typed = q.trim();
-  const low = typed.toLowerCase();
-  const askedShown = asked.filter((a) => !low || a.name.toLowerCase().includes(low));
-  const others = rows.filter((r) => !asked.some((a) => a.id === r.id));
-  const exact = [...asked, ...rows].some((r) => r.name.toLowerCase() === low);
-  const pick = (f: FactoryOption) => onChange({ id: f.id, name: f.name }, f);
-  const option = (f: AskedFactory, note?: string) => (
-    <li
-      key={f.id}
-      role="option"
-      aria-selected={false}
-      onMouseDown={(e) => {
-        e.preventDefault();
-        pick(f);
-      }}
-      className="grid cursor-pointer grid-cols-[2rem_minmax(0,1fr)] items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-surface-2"
-    >
-      <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-surface-3 text-xs font-bold text-text-2">
-        {initialsOf(f.name)}
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-semibold">{f.name}</span>
-        {(note ?? f.contactPerson) && <span className="block truncate text-xs text-text-2">{note ?? f.contactPerson}</span>}
-      </span>
-    </li>
-  );
-  const group = (title: string) => (
-    <li role="presentation" className="px-2.5 pt-1.5 pb-1 text-[11.5px] font-semibold tracking-wide text-text-2 uppercase">
-      {title}
-    </li>
-  );
+  const known = value ? asked.find((a) => a.id === value.id) : undefined;
   return (
-    <div ref={box} className="relative">
-      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
-      <input
-        id="factory"
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={`${id}-list`}
-        aria-invalid={!!error || undefined}
-        autoComplete="off"
-        value={q}
-        placeholder="Search suppliers"
-        className={cn(controlClass, "h-10 pr-9 pl-9 max-sm:h-11 max-sm:text-base")}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setOpen(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            const hit = [...askedShown, ...others].find((r) => r.name.toLowerCase() === low);
-            if (hit) pick(hit);
-            else if (typed) onChange({ id: null, name: typed });
-          } else if (e.key === "Escape") setOpen(false);
-        }}
-      />
-      {loading && <Loader2 className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted" aria-hidden />}
-      {open && (
-        <ul
-          id={`${id}-list`}
-          role="listbox"
-          aria-label="Suppliers"
-          className="absolute top-full right-0 left-0 z-30 mt-1 max-h-80 overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-pop"
-        >
-          {askedShown.length > 0 && group("Asked for this inquiry")}
-          {askedShown.map((f) => option(f, f.note))}
-          {others.length > 0 && group(typed ? `Results for “${typed}”` : "Other suppliers")}
-          {others.map((f) => option(f))}
-          {typed && !exact && (
-            <li
-              role="option"
-              aria-selected={false}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onChange({ id: null, name: typed });
-              }}
-              className="mt-1 grid cursor-pointer grid-cols-[2rem_minmax(0,1fr)] items-center gap-2.5 rounded-lg border-t border-line px-2.5 py-2 font-semibold text-primary hover:bg-surface-2"
-            >
-              <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-primary-soft">
-                <Plus className="size-4" />
-              </span>
-              <span className="truncate text-sm">New supplier “{typed}”</span>
-            </li>
-          )}
-          {!loading && !askedShown.length && !others.length && !typed && <li className="px-2.5 py-3 text-sm text-muted">No suppliers yet: type the name of the first one.</li>}
-        </ul>
-      )}
-    </div>
+    <Picker<AskedFactory>
+      inputId="factory"
+      placeholder="Search suppliers"
+      listLabel="Suppliers"
+      icon={<Factory />}
+      chosen={value && { name: value.name, sub: !value.id ? "New supplier — added when you save" : (known?.note ?? known?.contactPerson ?? "") }}
+      onClear={() => onChange(null)}
+      onPick={(f) => onChange({ id: f.id, name: f.name }, f)}
+      search={search}
+      first={{ title: "Asked for this inquiry", rows: asked, line: (f) => ({ sub: f.note ?? f.contactPerson }) }}
+      othersTitle="Other suppliers"
+      line={(f) => ({ sub: f.contactPerson })}
+      newLabel="New supplier"
+      onNew={(typed) => onChange({ id: null, name: typed })}
+      newOnlyWhenTyped
+      empty={(typed) => (typed ? `No supplier matches “${typed}”` : "No suppliers yet: type the name of the first one.")}
+      error={error}
+    />
   );
 }
 
@@ -534,23 +413,23 @@ export type OfferChange = { key: string; label: string; from: string; to: string
 
 /** What changed between how the window opened and now, in words, part by part. */
 export function offerChanges(a: QuoteState, b: QuoteState): OfferChange[] {
-  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "none");
-  const day = (d: string) => (d ? date(d) : "none");
+  const short = (t: string) => (t.trim() ? (t.trim().length > 40 ? `${t.trim().slice(0, 40)}…` : t.trim()) : "");
+  const day = (d: string) => (d ? date(d) : "");
   const tax = (x: QuoteState) => {
     const r = Number(x.taxRate || 0);
     return r > 0 ? `${r}% ${x.taxIncluded ? "included" : "added"}` : "no tax";
   };
-  const lead = (x: QuoteState) => (x.leadDays.trim() ? leadWords(Number(x.leadDays) || 0, x.leadFrom, "factory") : x.leadTime.trim() || "none");
-  const plan = (x: QuoteState) => (x.parts.length ? x.parts.map((p) => `${p.share}%`).join(" / ") : "none");
-  const warranty = (x: QuoteState) => (x.warrantyMonths.trim() ? `${x.warrantyMonths.trim()} months from ${WARRANTY_FROM_LABEL[x.warrantyFrom]}` : "none");
+  const lead = (x: QuoteState) => (x.leadDays.trim() ? leadWords(Number(x.leadDays) || 0, x.leadFrom, "factory") : x.leadTime.trim() );
+  const plan = (x: QuoteState) => (x.parts.length ? x.parts.map((p) => `${p.share}%`).join(" / ") : "");
+  const warranty = (x: QuoteState) => (x.warrantyMonths.trim() ? `${x.warrantyMonths.trim()} months from ${WARRANTY_FROM_LABEL[x.warrantyFrom]}` : "");
   const all: (OfferChange & { same: boolean })[] = [
-    { key: "factory", label: "Supplier", from: a.factory?.name ?? "none", to: b.factory?.name ?? "none", part: "factory", same: (a.factory?.id ?? a.factory?.name) === (b.factory?.id ?? b.factory?.name) },
+    { key: "factory", label: "Supplier", from: a.factory?.name ?? "", to: b.factory?.name ?? "", part: "factory", same: (a.factory?.id ?? a.factory?.name) === (b.factory?.id ?? b.factory?.name) },
     { key: "receivedOn", label: "Received on", from: day(a.receivedOn), to: day(b.receivedOn), part: "factory", same: a.receivedOn === b.receivedOn },
     { key: "validUntil", label: "Valid until", from: day(a.validUntil), to: day(b.validUntil), part: "factory", same: a.validUntil === b.validUntil },
     { key: "reference", label: "Their reference", from: short(a.reference), to: short(b.reference), part: "factory", same: a.reference.trim() === b.reference.trim() },
     { key: "currency", label: "Currency", from: a.currency.toUpperCase(), to: b.currency.toUpperCase(), part: "prices", same: a.currency.trim().toUpperCase() === b.currency.trim().toUpperCase() },
     { key: "tax", label: "Tax", from: tax(a), to: tax(b), part: "prices", same: tax(a) === tax(b) },
-    { key: "basis", label: "Incoterm", from: a.basis || "none", to: b.basis || "none", part: "terms", same: a.basis === b.basis },
+    { key: "basis", label: "Incoterm", from: a.basis , to: b.basis , part: "terms", same: a.basis === b.basis },
     { key: "basisPlace", label: b.basis === "EXW" ? "Town" : "Port", from: short(a.basisPlace), to: short(b.basisPlace), part: "terms", same: a.basisPlace.trim() === b.basisPlace.trim() },
     { key: "lead", label: "Lead time", from: lead(a), to: lead(b), part: "terms", same: lead(a) === lead(b) },
     { key: "parts", label: "Payment", from: plan(a), to: plan(b), part: "terms", same: JSON.stringify(partsPayload(a.parts, "factory")) === JSON.stringify(partsPayload(b.parts, "factory")) },
@@ -682,29 +561,31 @@ export function OfferHeaderForm({
   // An edit (design rules 18 Nov): each change, the save that counts them, and why — asked only when something changed.
   const fieldChanges = useMemo(() => (create ? [] : offerChanges(start, s)), [create, start, s]);
   const changedOf = (k: string) => fieldChanges.find((c) => c.key === k);
-  const total = fieldChanges.length + linesChanges.length + filesAdded.length;
+  // Added is not a change (canvas group 9): an empty field filled, a new item, a file are counted apart,
+  // and only what replaced or cleared a saved value asks Why?.
+  const fieldCounts = countChanges(fieldChanges);
+  const linesAdded = linesChanges.filter((x) => x.startsWith("Added ")).length;
+  const counts = { changed: fieldCounts.changed + linesChanges.length - linesAdded, added: fieldCounts.added + linesAdded + filesAdded.length };
+  const total = counts.changed + counts.added;
   const changesIn = (k: OfferStep) =>
     k === "changes"
       ? total
       : fieldChanges.filter((c) => c.part === k).length + (k === "prices" ? linesChanges.length : 0) + (k === "factory" ? filesAdded.length : 0);
   const [why, setWhy] = useState("");
-  const needWhy = !create && total > 0;
+  const needWhy = !create && counts.changed > 0;
   // Something changed: Save asks why, once, in a sheet (canvas board "Why the change? at Save").
   const canSave = create || total > 0;
   const [askWhy, setAskWhy] = useState(false);
   const formId = useId();
-  const saveLabel = total ? `Save ${total} change${total === 1 ? "" : "s"}` : "No changes";
+  const saveLabel = changeWords(counts);
   const changedNote = (k: string) => {
     const c = changedOf(k);
-    return c ? (
-      <span className="flex items-center gap-1.5 text-xs font-semibold text-action">
-        <span aria-hidden className="size-1.5 rounded-full bg-action-solid" />
-        Changed · was {c.from}
-      </span>
-    ) : null;
+    return c ? <ChangeHint was={c.from} now={c.to} onUndo={() => undo(k)} /> : null;
   };
-  const changedField = (k: string) =>
-    changedOf(k) ? "[&_:is(input,select,textarea)]:border-action/70 [&_[aria-checked=true]]:border-action" : undefined;
+  const changedField = (k: string) => {
+    const c = changedOf(k);
+    return c ? changedClassOf(c.from, c.to) : undefined;
+  };
   const whySheet = (
     <ReasonSheet
       open={askWhy && needWhy}
@@ -713,8 +594,8 @@ export function OfferHeaderForm({
       value={why}
       onChange={setWhy}
       formId={formId}
-      title={total === 1 ? "Why the change?" : "Why these changes?"}
-      what={`${total} change${total === 1 ? "" : "s"}: ${[...fieldChanges.map((c) => `${c.label} ${c.from} → ${c.to}`), ...linesChanges].slice(0, 2).join(" · ")}`}
+      title={counts.changed === 1 ? "Why the change?" : "Why these changes?"}
+      what={`${changeCount(counts)}: ${[...fieldChanges.filter((c) => changeKind(c.from, c.to) !== "added").map((c) => changeLine(c.label, c.from, c.to)), ...linesChanges].slice(0, 2).join(" · ")}`}
       saveLabel={saveLabel}
     />
   );
@@ -739,7 +620,7 @@ export function OfferHeaderForm({
         linesCount && linesCount !== "no lines yet" ? `Items: ${linesCount}` : null,
         filesAdded.length ? `Files: ${filesAdded.join(", ")}` : null,
       ].filter((x): x is string => !!x)
-    : [...fieldChanges.map((c) => `${c.label}: ${c.from} → ${c.to}`), ...linesChanges.slice(0, 4), ...filesAdded.map((f) => `File to add: ${f}`)];
+    : [...fieldChanges.map((c) => changeLine(c.label, c.from, c.to)), ...linesChanges.slice(0, 4), ...filesAdded.map((f) => `File to add: ${f}`)];
   const lostKey = lost.join("\n");
   useEffect(() => {
     reportLost(
@@ -761,73 +642,32 @@ export function OfferHeaderForm({
   const leadWordsWere = quote && quote.leadDays === null && quote.leadTime && !s.leadTime ? quote.leadTime : null;
   const warrantyWordsWere = quote && quote.warrantyMonths === null && quote.warranty && parseWarranty(quote.warranty) ? quote.warranty : null;
 
-  const bar = "sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-surface px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:px-4";
-  const back =
-    !only && at > 0 ? (
-      <Button type="button" variant="ghost" onClick={() => go(at - 1)} aria-label="Back" className="max-md:size-11 max-md:px-0">
-        <ChevronLeft aria-hidden /> <span className="max-md:hidden">Back</span>
-      </Button>
-    ) : (
-      footerStart
-    );
+  // The one steps footer (StepsFooter): ‹ Back (or a note), Cancel, a quiet jump, Next — or the strong save.
   const footer = create ? (
-    // One strong button (design rules 18 Nov): Next is soft, Back and Review are words; Cancel beside them (canvas row "Cancel, not ✕").
-    // On a phone the items' total is a line of its own above them (design "Items on a small phone").
-    <div data-window-footer="" className={cn(bar, "max-sm:flex-wrap")}>
-      <FooterTotal line />
-      {back}
-      <span className="flex-1 max-md:hidden" />
-      <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
-      {step === "review" ? (
-        <>
-          {onAnother && (
-            <SubmitButton variant="ghost" pendingText="Saving…" onClick={() => onAnother()} className="max-md:hidden">
-              Save and add another
-            </SubmitButton>
-          )}
-          <SubmitButton variant="strong" size="lg" pendingText="Saving…" className="max-md:flex-1">
-            <Check aria-hidden /> Confirm and save
+    <StepsFooter
+      onBack={!only && at > 0 ? () => go(at - 1) : null}
+      start={footerStart}
+      jump={at < STEPS.length - 2 ? { label: "Review", onClick: () => setStep("review") } : null}
+      onNext={step === "review" ? null : () => go(at + 1)}
+      save={{
+        label: "Confirm and save",
+        also: onAnother && (
+          <SubmitButton variant="ghost" pendingText="Saving…" onClick={() => onAnother()} className="max-md:hidden">
+            Save and add another
           </SubmitButton>
-        </>
-      ) : (
-        <>
-          {at < STEPS.length - 2 && (
-            <Button type="button" variant="ghost" onClick={() => setStep("review")} className="max-md:hidden">
-              Review
-            </Button>
-          )}
-          <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
-            Next <ChevronRight aria-hidden />
-          </Button>
-        </>
-      )}
-    </div>
+        ),
+      }}
+    />
   ) : (
     <>
       {whySheet}
-      <div data-window-footer="" className={cn(bar, "max-sm:flex-wrap")}>
-        {/* On a phone the items' total on its own line above the buttons: Cancel · Save (canvas row "Cancel, not ✕"). */}
-        <FooterTotal line />
-        {back}
-        <span className="flex-1 max-md:hidden" />
-        <WindowCancel className="max-md:min-h-12 max-md:flex-1" />
-        {only || step === "changes" ? (
-          <SubmitButton variant="strong" size="lg" disabled={!canSave} pendingText="Saving…" className="max-md:flex-1">
-            <Check aria-hidden /> {saveLabel}
-          </SubmitButton>
-        ) : (
-          <>
-            {at < STEPS.length - 2 && (
-              <Button type="button" variant="ghost" onClick={() => setStep("changes")} className="max-md:hidden">
-                Changes{total ? ` · ${total}` : ""}
-              </Button>
-            )}
-            <Button type="button" variant="soft" onClick={() => go(at + 1)} className="max-md:min-h-12 max-md:flex-1">
-              Next <ChevronRight aria-hidden />
-            </Button>
-          </>
-        )}
-      </div>
+      <StepsFooter
+        onBack={!only && at > 0 ? () => go(at - 1) : null}
+        start={footerStart}
+        jump={at < STEPS.length - 2 ? { label: `Changes${total ? ` · ${total}` : ""}`, onClick: () => setStep("changes") } : null}
+        onNext={only || step === "changes" ? null : () => go(at + 1)}
+        save={{ label: saveLabel, disabled: !canSave }}
+      />
     </>
   );
 
@@ -1123,7 +963,7 @@ export function OfferHeaderForm({
             {step === "changes" && (
               <div className="flex flex-col gap-3.5">
                 {total ? (
-                  <div role="table" aria-label="What changed" className="overflow-hidden rounded-xl border border-line text-[13.5px] max-sm:[&>[role=row]:nth-child(2)]:border-t-0">
+                  <div role="table" aria-label="What changed" className="overflow-hidden rounded-xl border border-line text-md max-sm:[&>[role=row]:nth-child(2)]:border-t-0">
                     <div role="row" className={cn(CHANGE_ROW, "h-9 border-t-0 bg-surface-2 py-0 text-xs font-semibold text-text-2 max-sm:hidden")}>
                       <span role="columnheader">Part</span>
                       <span role="columnheader">What</span>
@@ -1144,14 +984,14 @@ export function OfferHeaderForm({
                             {c.label}
                           </span>
                           <span className="block sm:hidden">
-                            <s className="text-muted">{c.from}</s> → <b className="font-semibold">{c.to}</b>
+                            <Was was={c.from} /> → <Now now={c.to} />
                           </span>
                         </span>
                         <span role="cell" title={c.from} className="min-w-0 truncate max-sm:hidden">
-                          <s className="text-muted">{c.from}</s>
+                          <Was was={c.from} />
                         </span>
-                        <span role="cell" title={c.to} className="min-w-0 truncate font-semibold max-sm:hidden">
-                          {c.to}
+                        <span role="cell" title={c.to} className="min-w-0 truncate max-sm:hidden">
+                          <Now now={c.to} />
                         </span>
                         <span role="cell" className="text-right">
                           <Button type="button" size="xs" variant="ghost" onClick={() => undo(c.key)} className="text-primary hover:text-primary" aria-label={`Undo: ${c.label}`}>
@@ -1197,7 +1037,7 @@ export function OfferHeaderForm({
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-text-2">Nothing changed.</p>
+                  <EmptyLine>Nothing changed.</EmptyLine>
                 )}
               </div>
             )}
@@ -1234,11 +1074,11 @@ function TaxChoice({ id, included, rate, onChange }: { id: string; included: boo
           <Input
             aria-label="Tax %"
             inputMode="decimal"
-            className="w-20 text-right tabular"
+            unit="%"
+            className="w-24 text-right tabular"
             value={rate}
             onChange={(e) => onChange(included, e.target.value.replace(/[^\d.]/g, ""))}
           />
-          <span className="text-sm text-muted">%</span>
         </span>
       )}
     </span>

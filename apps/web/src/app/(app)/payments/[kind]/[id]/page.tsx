@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Banknote, Check, FileText } from "lucide-react";
+import { Check, FileText } from "lucide-react";
 import { can, PAYMENT_RECORD_KINDS, PAYMENT_RECORD_LABEL, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
-import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Avatar, ButtonLink, Card, CardBody, CardHeader, DetailList, RefCode, StatusBadge, Table, Td, Th, THead, Tr, EmptyLine, Notice } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { date, dateTime, companyToday, money } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
 import type { ReactNode } from "react";
-import { EditCustomerPayment, EditFactoryPayment, VoidForm } from "@/components/money/forms";
+import { EditCustomerPayment, EditFactoryPayment, VoidWindow } from "@/components/money/forms";
+import { MoreMenu } from "@/components/common/more-menu";
 import { AttachedFile } from "@/components/money/attachment";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
 import { getPeople, getSettings } from "@/lib/loaders";
@@ -18,6 +19,8 @@ import { editPaymentAction, factoryPaymentAction, removePaymentFileAction } from
 import { voidPaymentAction } from "../../actions";
 import { opensPayments } from "../../shared";
 import { cache } from "react";
+import { RecordShell } from "@/components/records/record-frame";
+import { RecordTop } from "@/components/records/record-page";
 
 /** One payment, read once per request (the page and its tab title). */
 const paymentOf = cache((kind: PaymentRecordKind, id: string) => api.get<PaymentView>(`/treasury/payments/${kind}/${id}`).catch(() => null));
@@ -85,42 +88,66 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        icon={Banknote}
-        crumbs={[...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }]}
-        title={title}
-        record={{ kind: kindOf(p), number: p.number }}
-        badge={<StatusBadge meaning={STATUS_MEANING[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</StatusBadge>}
-        summary={[money(p.amount, p.currency), p.party?.label, p.for.map((f) => f.label).join(", ") || null, date(p.on)].filter(Boolean).join(" · ")}
-        actions={
-          order?.href ? (
+      <RecordShell
+        top={
+          <RecordTop
+            header={{
+              crumbs: [...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }],
+              title: title,
+              record: { kind: kindOf(p), number: p.number },
+              badge: <StatusBadge meaning={STATUS_MEANING[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</StatusBadge>,
+              summary: [money(p.amount, p.currency), p.party?.label, p.for.map((f) => f.label).join(", ") || null, date(p.on)].filter(Boolean).join(" · "),
+              actions: (
+                order?.href ? (
             <ButtonLink href={order.href} variant="secondary">
               Open {order.label}
             </ButtonLink>
           ) : undefined
-        }
-      />
-      {p.status === "to_verify" && (
-        <section className="flex flex-col gap-3 rounded-2xl border border-warn/30 bg-warn-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            <strong className="block font-bold text-warn">Waiting for verification.</strong>
-            <span className="block text-sm text-text-2">
+              ),
+              more: p.voidPath ? (
+                <MoreMenu label={`More for ${p.number ?? "this payment"}`} items={[{ label: "Remove this payment", panel: "remove", danger: true }]} />
+              ) : undefined,
+            }}
+            notice={
+        <>
+          {p.status === "to_verify" && (
+            <Notice
+              tone="todo"
+              title="Waiting for verification."
+              action={
+                <ButtonLink href="/approvals" variant="primary">
+                  <Check aria-hidden /> Verify
+                </ButtonLink>
+              }
+            >
               Check that {p.currency} {Number(p.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} reached{p.account ? ` ${p.account}` : " the account"} on {date(p.on)}.
-            </span>
-          </p>
-          <ButtonLink href="/approvals" variant="primary">
-            <Check aria-hidden /> Verify
-          </ButtonLink>
-        </section>
-      )}
-      {p.voided && (
-        <p className="rounded-lg bg-surface-2 px-4 py-3 text-sm">
-          Removed {dateTime(p.voided.at)}
-          {p.voided.reason && <>: {p.voided.reason}</>}
-        </p>
-      )}
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex min-w-0 flex-col gap-4">
+            </Notice>
+          )}
+          {p.voided && (
+            <Notice tone="neutral" title={`Removed ${dateTime(p.voided.at)}`}>
+              {p.voided.reason}
+            </Notice>
+          )}
+        </>
+            }
+          />
+        }
+        panelLabel="Beside the payment"
+        panel={
+          <Card className="p-0">
+          <CardHeader title="History" />
+          <CardBody className="flex flex-col gap-3 text-sm">
+            <HistoryLine who={p.recordedBy} what={p.kind === "submission" ? "Sent for verification" : "Recorded"} at={p.recordedAt} />
+            {p.voided && <HistoryLine who={null} what={`Removed${p.voided.reason ? `: ${p.voided.reason}` : ""}`} at={p.voided.at} />}
+            {p.ledgerHref && (
+              <Link href={p.ledgerHref} className="font-medium text-primary hover:underline">
+                View in the general ledger
+              </Link>
+            )}
+          </CardBody>
+        </Card>
+        }
+      >
           <Card className="p-0">
             <CardHeader title="Payment" />
             <CardBody>
@@ -137,7 +164,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
                   <FileText className="size-4" aria-hidden /> {p.file.name}
                 </a>
               ) : (
-                <p className="text-sm text-muted">No file attached.</p>
+                <EmptyLine>No file attached.</EmptyLine>
               )}
             </CardBody>
           </Card>
@@ -173,26 +200,9 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
               </Table>
             </Card>
           )}
-          {(change || p.voidPath) && (
-            <div className="flex flex-wrap items-start gap-2">
-              {change}
-              {p.voidPath && <VoidForm action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
-            </div>
-          )}
-        </div>
-        <Card className="p-0">
-          <CardHeader title="History" />
-          <CardBody className="flex flex-col gap-3 text-sm">
-            <HistoryLine who={p.recordedBy} what={p.kind === "submission" ? "Sent for verification" : "Recorded"} at={p.recordedAt} />
-            {p.voided && <HistoryLine who={null} what={`Removed${p.voided.reason ? `: ${p.voided.reason}` : ""}`} at={p.voided.at} />}
-            {p.ledgerHref && (
-              <Link href={p.ledgerHref} className="font-medium text-primary hover:underline">
-                View in the general ledger
-              </Link>
-            )}
-          </CardBody>
-        </Card>
-      </div>
+          {change && <div className="flex flex-wrap items-start gap-2">{change}</div>}
+          {p.voidPath && <VoidWindow action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
+      </RecordShell>
     </div>
   );
 }

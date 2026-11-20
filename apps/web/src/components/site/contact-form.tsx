@@ -9,7 +9,7 @@ import { OriginFields } from "./origin-fields";
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 const field =
-  "mt-1 block w-full rounded-md border border-(--s-line) bg-white px-3 py-2 text-[0.95rem] text-(--s-ink) placeholder:text-(--s-steel)/70 focus:border-(--s-violet)";
+  "mt-1 block w-full h-11 rounded-[10px] border border-line-strong bg-white px-3 py-2 text-base text-(--s-ink) placeholder:text-(--s-steel)/70 focus:border-(--s-green-solid)";
 
 /** "Ask a question" on the marketing page: reaches the platform admin as a lead. */
 export function ContactForm({ action, origin, disabled = false }: { action: Action; origin: LeadOrigin | null; disabled?: boolean }) {
@@ -17,21 +17,21 @@ export function ContactForm({ action, origin, disabled = false }: { action: Acti
   if (state.ok)
     return (
       <div className="flex flex-col items-start gap-3 py-6" role="status">
-        <CheckCircle2 className="size-8 text-(--s-violet)" aria-hidden />
+        <CheckCircle2 className="size-8 text-(--s-green-solid)" aria-hidden />
         <p className="text-[0.95rem]">{state.message}</p>
       </div>
     );
   const v = state.values ?? {};
   const err = (k: string) =>
     state.errors?.[k]?.[0] ? (
-      <span className="mt-1 block text-sm text-(--s-seal)" id={`c-${k}-error`}>
+      <span className="mt-1 block text-sm text-(--s-bad)" id={`c-${k}-error`}>
         {state.errors[k]![0]}
       </span>
     ) : null;
   return (
     <form action={send} className="flex flex-col gap-4" noValidate>
       {state.message && (
-        <p role="alert" className="rounded-md bg-[#fdecef] px-3 py-2 text-sm text-(--s-seal)">
+        <p role="alert" className="rounded-md bg-bad-soft px-3 py-2 text-sm text-(--s-bad)">
           {state.message}
         </p>
       )}
@@ -79,7 +79,7 @@ export function ContactForm({ action, origin, disabled = false }: { action: Acti
           rows={4}
           required
           defaultValue={v.message}
-          className={field}
+          className={`${field} h-auto min-h-28`}
           aria-invalid={!!state.errors?.message}
           aria-describedby="c-message-error"
         />
@@ -92,7 +92,7 @@ export function ContactForm({ action, origin, disabled = false }: { action: Acti
         <button
           type="submit"
           disabled={disabled || pending}
-          className="rounded-md bg-(--s-violet) px-5 py-2.5 font-semibold text-white hover:bg-(--s-violet-deep) disabled:opacity-60"
+          className="s-strong inline-flex h-12 items-center justify-center rounded-[10px] px-6 text-base disabled:opacity-60 max-sm:w-full"
         >
           {pending ? "Sending…" : "Send the question"}
         </button>

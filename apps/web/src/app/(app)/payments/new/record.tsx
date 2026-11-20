@@ -1,11 +1,11 @@
+import { AutoSelect } from "@kebo/ui/client";
 import Form from "next/form";
 import { redirect } from "next/navigation";
 import { requestWords } from "@/lib/requests";
 import type { PaymentList } from "@kebo/shared";
 import type { ReactNode } from "react";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote } from "lucide-react";
-import { Alert, buildHref, Card, CardBody, CardHeader, LinkTabs, Table, Td, Th, THead, Tr } from "@kebo/ui";
-import { AutoSelect } from "@/components/common/auto-select";
+import { buildHref, Card, CardBody, CardHeader, LinkTabs, Table, Td, Th, THead, Tr, Notice, buttonClass } from "@kebo/ui";
 import { date, money, companyToday } from "@/lib/format";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -18,6 +18,7 @@ import type { CustomerPayments } from "@/lib/types-money";
 import { NewFactoryPayment } from "@/components/money/forms";
 import { CostForm, type ExpenseChoices } from "@/components/money/cost-window";
 import { MoveMoney, type AccountRow } from "@/components/money/cash-forms";
+import { RecordBody } from "@/components/records/record-frame";
 import { customerReceiptAction, paymentAction } from "../../orders/actions";
 import { factoryPaymentAction } from "../../money/actions";
 import { opensPayments } from "../shared";
@@ -94,10 +95,9 @@ export async function RecordPayment({ sp, inWindow = false }: { sp: Search; inWi
           {side}
         </div>
       ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="flex min-w-0 flex-col gap-4">{form}</div>
-          <div className="flex flex-col gap-4">{side}</div>
-        </div>
+        <RecordBody panelLabel="Beside the payment" panel={side}>
+          {form}
+        </RecordBody>
       )}
     </>
   );
@@ -225,7 +225,7 @@ async function OnOrder({
             ))}
           </AutoSelect>
           <noscript>
-            <button className="inline-flex h-9 items-center rounded-lg border border-line-strong px-3 text-sm font-medium hover:bg-surface-2">Continue</button>
+            <button className={buttonClass("secondary", "sm")}>Continue</button>
           </noscript>
         </Form>
       </CardBody>
@@ -255,7 +255,7 @@ async function OnOrder({
                 ))}
             </AutoSelect>
             <noscript>
-              <button className="inline-flex h-9 items-center rounded-lg border border-line-strong px-3 text-sm font-medium hover:bg-surface-2">Continue</button>
+              <button className={buttonClass("secondary", "sm")}>Continue</button>
             </noscript>
           </Form>
         </CardBody>
@@ -308,7 +308,7 @@ async function OnOrder({
           today={today}
         />
       ) : (
-        <Alert tone="info">Nothing is owed to a supplier on this order.</Alert>
+        <Notice tone="info">Nothing is owed to a supplier on this order.</Notice>
       )}
     </>
   );
@@ -325,7 +325,7 @@ async function Expense({ today }: { today: string }) {
 async function Transfer({ today }: { today: string }) {
   const accounts = await api.get<AccountRow[]>("/money/accounts");
   return accounts.filter((a) => !a.archived).length < 2 ? (
-    <Alert tone="info">A transfer needs two accounts. Add them in Money › Cash & bank.</Alert>
+    <Notice tone="info">A transfer needs two accounts. Add them in Money › Cash & bank.</Notice>
   ) : (
     <MoveMoney startOpen accounts={accounts} today={today} />
   );
@@ -340,7 +340,7 @@ async function FromCustomer({ customerId, today }: { customerId: string; today: 
   ]);
   const name = customers.find((c) => c.id === customerId)?.name ?? "the customer";
   const open = pay.orders.filter((o) => o.status !== "cancelled" && Number(o.due) > 0);
-  if (!pay.credit.canRecord) return <Alert tone="info">You cannot record money received.</Alert>;
+  if (!pay.credit.canRecord) return <Notice tone="info">You cannot record money received.</Notice>;
   return (
     <ReceiptForm
       startOpen

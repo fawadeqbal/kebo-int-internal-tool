@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Alert, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Segmented, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
-import { ArrowRight, Factory, Landmark, List, User, Users } from "lucide-react";
+import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
+import { ArrowRight } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
@@ -70,35 +70,30 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   return (
     <div>
       <PageHeader
+        kind="list"
         crumbs={[{ label: "Money" }, { label: "Ledger" }]}
         title="Ledger"
-        description={view === "balances" ? "Every customer, supplier, account and person with a balance" : `Every money record, posted from its document · ${main} at each entry's rate`}
-        actions={
-          <>
-            {view === "all" && (
-              <ExportCsv
-                what="ledger"
-                query={{
-                  from: period.from,
-                  to: period.to,
-                  type: sp.type,
-                  cur: sp.cur,
-                  removed: sp.removed,
-                  account: sp.account,
-                  order: sp.order,
-                }}
-              />
-            )}
-            <ButtonLink href={buildHref(PATH, {}, { view: "customers" })} variant="secondary" size="sm">
-              Statement…
-            </ButtonLink>
-          </>
+        more={
+          view === "all" ? (
+            <ExportCsv
+              what="ledger"
+              query={{
+                from: period.from,
+                to: period.to,
+                type: sp.type,
+                cur: sp.cur,
+                removed: sp.removed,
+                account: sp.account,
+                order: sp.order,
+              }}
+            />
+          ) : undefined
         }
       />
-      <Segmented
+      <LinkTabs
         label="Ledger views"
-        className="mb-3"
-        options={VIEWS.map((v) => ({
+        className="mb-4"
+        tabs={VIEWS.map((v) => ({
           href: buildHref(PATH, {}, { view: v.key === "balances" ? undefined : v.key, period: sp.period, from: sp.from, to: sp.to }),
           label: v.label,
           active: v.key === view,
@@ -162,13 +157,13 @@ async function Entries({
     <>
       <LedgerFilters path={PATH} sp={all} period={period} keep={keep} />
       {sp.account && (
-        <Alert tone="info" className="mb-3">
+        <Notice tone="info" className="mb-3">
           One account:{" "}
           <strong className="font-semibold">{data.rows[0]?.account === sp.account ? data.rows[0]?.accountLabel : sp.account}</strong>.{" "}
           <Link href={buildHref(PATH, all, { account: undefined, page: undefined })} className="font-medium underline">
             Show every account
           </Link>
-        </Alert>
+        </Notice>
       )}
       <Card className="overflow-clip p-0">
         {data.rows.length === 0 ? (
@@ -261,11 +256,11 @@ async function OrderPicker() {
 
 type BalanceRow = { account: string; kind: "customer" | "supplier" | "account" | "person"; id: string | null; label: string; currency: string; in: string; out: string; balance: string };
 const WHO = [
-  { key: "all", label: "All", icon: List },
-  { key: "customer", label: "Customers", icon: Users },
-  { key: "supplier", label: "Suppliers", icon: Factory },
-  { key: "account", label: "Bank accounts", icon: Landmark },
-  { key: "person", label: "People", icon: User },
+  { key: "all", label: "All" },
+  { key: "customer", label: "Customers" },
+  { key: "supplier", label: "Suppliers" },
+  { key: "account", label: "Bank accounts" },
+  { key: "person", label: "People" },
 ] as const;
 
 /** Balances (board General ledger): who, currency, charged / in, paid / out, balance, and their statement. */
@@ -286,25 +281,14 @@ async function Balances({ sp }: { sp: Search }) {
   const fmt = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
     <div className="flex flex-col gap-4">
-      <LinkTabs
-        label="Whose"
-        tabs={WHO.map((w) => ({
-          href: buildHref(PATH, { q: sp.q, cur: sp.cur, has: sp.has }, { who: w.key === "all" ? undefined : w.key }),
-          label: (
-            <>
-              <w.icon aria-hidden /> {w.label}
-            </>
-          ),
-          active: who === w.key,
-        }))}
-      />
       <div>
         <FilterCard
           search="Search…"
           value={sp.q}
-          keep={{ who: who === "all" ? undefined : who }}
-          clearHref={buildHref(PATH, { who: who === "all" ? undefined : who, cur: sp.cur, has: sp.has }, {})}
+          clearHref={buildHref(PATH, { cur: sp.cur, has: sp.has }, {})}
           selects={[
+            // Whose balances: a filter like the others (one row of tabs on the page: the ledger's views).
+            { name: "who", label: "Who", value: who === "all" ? undefined : who, options: WHO.filter((w) => w.key !== "all").map((w) => ({ value: w.key, label: w.label })) },
             { name: "cur", label: "Currency", value: sp.cur, options: currencies.map((c) => ({ value: c, label: c })) },
             { name: "has", label: "Has balance", value: sp.has, options: [{ value: "all", label: "Any" }], all: "Yes", showDefault: true },
           ]}
@@ -313,7 +297,21 @@ async function Balances({ sp }: { sp: Search }) {
           {shown.length === 0 ? (
             <EmptyState title="Nothing here" description="Balances appear when money is recorded: orders, payments, expenses, transfers." />
           ) : (
-            <Table className="min-w-[760px]">
+            <>
+            {/* A phone: one row each — who, what they are, the balance (the statement opens from the row). */}
+            <PhoneList label="Balances">
+              {shown.map((r) => (
+                <PhoneRow
+                  key={`${r.account}:${r.currency}`}
+                  href={statement(r) ?? undefined}
+                  title={r.label}
+                  line={`${r.kind === "person" ? "person · own money" : r.kind} · ${r.currency}`}
+                  figure={<span className={cn(Number(r.balance) < 0 && "text-bad")}>{fmt(r.balance)}</span>}
+                />
+              ))}
+            </PhoneList>
+            <div className="max-sm:hidden">
+            <Table>
               <THead>
                 <tr>
                   <Th>Who</Th>
@@ -351,6 +349,8 @@ async function Balances({ sp }: { sp: Search }) {
                 })}
               </tbody>
             </Table>
+            </div>
+            </>
           )}
         </Card>
       </div>
@@ -364,10 +364,10 @@ async function Accounts({ period }: { period: { to: string } }) {
   return (
     <div className="flex flex-col gap-4">
       {a.check && a.check.differences > 0 && (
-        <Alert tone="warning">
+        <Notice tone="todo">
           The last check found {a.check.differences} difference(s) between the ledger and today&rsquo;s figures. They are in the platform
           log.
-        </Alert>
+        </Notice>
       )}
       {a.groups.length === 0 ? (
         <Card>

@@ -1,7 +1,8 @@
-import { Children, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@kebo/ui";
 import { SideSheet } from "@/components/common/side-sheet";
+import { SideSection } from "@/components/orders/side-panel-parts";
 
 /**
  * The record panel's pieces (canvas board "One side panel for every record"): every record's panel is made of the
@@ -24,7 +25,7 @@ export function PanelRow({ label, children, href, tone, sub }: { label: ReactNod
     children
   );
   return (
-    <li className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
+    <li className="flex items-baseline justify-between gap-3 py-1 text-md">
       <span className="max-w-[55%] shrink-0 text-text-2 [overflow-wrap:anywhere]">{label}</span>
       <span className={cn("min-w-0 text-right tabular [overflow-wrap:anywhere]", tone ? TONE[tone] : "font-semibold", href && !tone && "text-primary")}>
         {value}
@@ -34,26 +35,13 @@ export function PanelRow({ label, children, href, tone, sub }: { label: ReactNod
   );
 }
 
-/** A section of the panel: its title (and a quiet link beside it), its rows, and what goes under them. */
-export function PanelSection({ title, action, lead, empty, footer, children }: { title: string; action?: ReactNode; /** Above its rows (a picker). */ lead?: ReactNode; empty?: ReactNode; footer?: ReactNode; children?: ReactNode }) {
-  const rows = Children.toArray(children);
-  return (
-    <section aria-label={title} className="border-b border-line px-[18px] pt-3.5 pb-3 last:border-b-0">
-      <div className="mb-1 flex min-h-7 items-center justify-between gap-2">
-        <h3 className="text-[15px] font-semibold">{title}</h3>
-        {action && <span className="flex shrink-0 items-center gap-1">{action}</span>}
-      </div>
-      {lead}
-      {rows.length ? <ul>{children}</ul> : empty ? <p className="my-1 text-sm text-muted">{empty}</p> : null}
-      {footer}
-    </section>
-  );
-}
+/** A section of the panel: the one side section (SideSection), so a record's panel and a step's look the same. */
+const PanelSection = SideSection;
 
 /** A quiet link beside a section's title ("All history", "Costs"). */
 export function PanelLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="text-[13px] font-medium text-primary hover:underline">
+    <Link href={href} className="text-md font-medium text-primary hover:underline">
       {children}
     </Link>
   );

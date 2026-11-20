@@ -13,7 +13,7 @@ export default async function Page() {
   if (!process.env.BASE_DOMAIN) notFound();
   const domain = await domainView();
   return (
-    <SettingsPage href="/settings/address" adminOnly description="Where your team signs in: your company's own address.">
+    <SettingsPage href="/settings/address" adminOnly>
       <AddressCard sendsTo={domain?.enabled && domain.status === "connected" ? domain.domain : null} />
       <DomainCard view={domain} />
     </SettingsPage>

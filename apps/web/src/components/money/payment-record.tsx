@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import { cn } from "@kebo/ui";
+import { THead, Th, cn } from "@kebo/ui";
 
 export interface RecordField {
   label: string;
@@ -94,18 +94,18 @@ export function RecordTable({ label, columns, rows, foot }: { label: string; col
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-surface">
       <table aria-label={label} data-fit="" className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-surface-2 text-left text-xs text-text-2">
+        <THead>
+          <tr>
             {columns.map((c) => (
-              <th key={c.label} scope="col" className={cn(cell(c), "py-2 font-medium whitespace-nowrap", c.width)}>
+              <Th key={c.label} scope="col" className={cn(cell(c), "py-2 font-medium whitespace-nowrap", c.width)}>
                 {c.label}
-              </th>
+              </Th>
             ))}
-            <th scope="col" className="relative w-10 py-2">
+            <Th scope="col" className="w-10">
               <span className="sr-only">Details</span>
-            </th>
+            </Th>
           </tr>
-        </thead>
+        </THead>
         <tbody>
           {rows.map((r) => {
             const isOpen = open === r.key;

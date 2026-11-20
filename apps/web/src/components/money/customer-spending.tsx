@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, cn, Td, Th, THead, Tr } from "@kebo/ui";
+import { Card, CardHeader, cn, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { date, money } from "@/lib/format";
 import type { CustomerAccount, ExpenseList } from "@/lib/types-money";
@@ -42,11 +42,8 @@ export function WhereMoneyWent({ a }: { a: CustomerAccount }) {
   ].filter(([, v]) => Number(v) > 0);
   return (
     <section id="where" aria-label="Where their money went" className="scroll-mt-24 overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-      <div className="border-b border-line px-4 py-3">
-        <h2 className="text-[15px] font-semibold">Where their money went</h2>
-        <p className="text-xs text-muted">In {c}, each cost at its own rate</p>
-      </div>
-      <dl className="flex flex-col px-4 py-2 text-[13px]">
+      <CardHeader title="Where their money went" description={`In ${c}, each cost at its own rate`} />
+      <dl className="flex flex-col px-4 py-2 text-md">
         {lines.map((l) => (
           <div key={l.label} className={cn("flex justify-between gap-3 py-1.5", l.strong && "border-t border-line font-semibold")}>
             <dt className={l.sub ? "text-text-2" : undefined}>{l.label}</dt>
@@ -105,12 +102,12 @@ export function CustomerSpending({
             )}
           </span>
         }
-        actions={<AddCost setup={setup} label="Add a cost for them" variant="secondary" />}
+        actions={<AddCost setup={setup} label="Add a cost for them" />}
       />
       {first.length === 0 ? (
-        <p className="border-t border-line px-[18px] py-3.5 text-[13px] text-text-2">Nothing spent on this customer yet.</p>
+        <EmptyLine className="border-t border-line px-[18px] py-3.5">Nothing spent on this customer yet.</EmptyLine>
       ) : (
-        <DataTable label="Spending on this customer" tableClassName="min-w-[760px] text-[13px]">
+        <DataTable label="Spending on this customer">
           <THead>
             <tr>
               <Th>Date</Th>
@@ -164,7 +161,7 @@ export function CustomerSpending({
         </DataTable>
       )}
       {rows.length > first.length && (
-        <p className="border-t border-line px-[18px] py-2.5 text-[13px]">
+        <p className="border-t border-line px-[18px] py-2.5 text-md">
           <Link href={`/payments?party=${customerId}&kind=expense`} className="font-medium text-primary hover:underline">
             All {rows.length} costs in Payments →
           </Link>
