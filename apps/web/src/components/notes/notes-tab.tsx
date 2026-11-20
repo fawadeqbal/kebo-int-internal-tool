@@ -1,6 +1,7 @@
 import { NOTE_KIND_LABEL, type NoteKind } from "@kebo/shared";
 import { Avatar, Badge, Card, CardHeader, EmptyLine } from "@kebo/ui";
-import { RecordBody } from "@/components/records/record-frame";
+import { Plus } from "lucide-react";
+import { PanelButton } from "@/components/orders/step-view";
 import { date, companyToday } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
 import type { Note } from "@/lib/types-notes";
@@ -16,7 +17,7 @@ const KIND_TONE: Record<NoteKind, "neutral" | "info" | "primary" | "ok" | "outli
 
 /**
  * A customer's or supplier's Notes tab (board "Customer — Notes tab"): "Notes and calls", the latest first —
- * who, the kind, the day and with whom, what was said — beside the "Add a note" card.
+ * who, the kind, the day and with whom, what was said — and Add a note in its head (a window).
  */
 export function NotesTab({
   notes,
@@ -30,21 +31,28 @@ export function NotesTab({
   contacts?: { id: string; name: string }[];
 }) {
   return (
-    <RecordBody
-      panelLabel="Add a note"
-      panel={
-        add ? (
-        <Card>
-          <CardHeader title="Add a note" />
-          <div className="p-5">
-            <NoteCardForm action={add} contacts={contacts} today={companyToday()} />
-          </div>
-        </Card>
-        ) : undefined
-      }
-    >
-      <Card>
-        <CardHeader title="Notes and calls" />
+    // One box: the notes, latest first; Add a note opens its window (like every add), not a form always open
+    // beside them. The record's side panel stays (its quick note is the short way).
+    <Card>
+      <CardHeader
+        title="Notes and calls"
+        actions={
+          add ? (
+            <PanelButton
+              size="sm"
+              icon={<Plus aria-hidden />}
+              label="Add a note"
+              title="Add a note"
+              description="A call, a visit or a message, and when."
+              body={
+                <div className="p-5">
+                  <NoteCardForm action={add} contacts={contacts} today={companyToday()} />
+                </div>
+              }
+            />
+          ) : undefined
+        }
+      />
         {notes.length === 0 ? (
           <EmptyLine inset>No notes yet. Calls, visits and messages show here, the latest first.</EmptyLine>
         ) : (
@@ -67,7 +75,6 @@ export function NotesTab({
             ))}
           </ol>
         )}
-      </Card>
-    </RecordBody>
+    </Card>
   );
 }

@@ -8,6 +8,9 @@ import { countryName } from "@/lib/countries";
 import { RecordTabs } from "@/components/common/record-tabs";
 import { RecordFrame } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
+import { CustomerSide } from "./side";
+import { MoreMenu } from "@/components/common/more-menu";
+import { removeCustomerAction } from "../actions";
 import { late } from "./shared";
 
 /** "Mar 2025" */
@@ -61,6 +64,24 @@ export default async function CustomerLayout({ children, params }: { children: R
                 </ButtonLink>
               )
             ),
+            // Remove lives in ⋯, last and in red (not under the Overview's boxes).
+            more: can(me, "customers.delete") ? (
+              <MoreMenu
+                label={`More for ${c.name}`}
+                items={[
+                  {
+                    label: "Remove this customer",
+                    danger: true,
+                    confirm: {
+                      title: `Remove ${c.name}?`,
+                      body: "They stay on past inquiries and orders, and can be brought back from Customers › Archived. Not possible while an order is open.",
+                      confirmLabel: "Remove",
+                    },
+                    action: removeCustomerAction.bind(null, c.id),
+                  },
+                ]}
+              />
+            ) : undefined,
             primary: (
               canAsk && (
                 <ButtonLink href={`/inquiries?panel=new-inquiry&for=${c.id}`} variant="primary">
@@ -85,6 +106,8 @@ export default async function CustomerLayout({ children, params }: { children: R
           }
         />
       }
+      panel={<CustomerSide id={c.id} />}
+      panelLabel="At a glance"
     >
       {children}
     </RecordFrame>

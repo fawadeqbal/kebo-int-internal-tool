@@ -23,7 +23,7 @@ export function ContactForm({ action, contact }: { action: Action; contact?: Con
     <ActionForm
       action={action}
       resetOnSuccess={!contact}
-      onDone={contact ? (s) => close(s) : undefined}
+      onDone={(s) => close(s)}
       className="grid grid-cols-2 gap-4 sm:grid-cols-3"
     >
       {(s) => (
