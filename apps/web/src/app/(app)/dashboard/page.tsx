@@ -1,7 +1,7 @@
 import { cache, Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { can, ORDER_WORD_TONE, type InquiryStage, type Priority } from "@kebo/shared";
-import { ButtonLink, Card, CardBody, CardHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ButtonLink, Card, CardBody, CardHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr, linkClass, cn } from "@kebo/ui";
 import { ArrowRight, Plus } from "lucide-react";
 import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import type { OrderRow } from "@/lib/types-orders";
@@ -231,7 +231,7 @@ function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
       <CardHeader
         title="Inquiries now"
         actions={
-          <Link href="/inquiries/board" className="inline-flex items-center gap-1 text-md font-semibold text-primary hover:underline">
+          <Link href="/inquiries/board" className={cn(linkClass, "inline-flex items-center gap-1 text-md")}>
             <ArrowRight className="size-4" aria-hidden /> Board
           </Link>
         }

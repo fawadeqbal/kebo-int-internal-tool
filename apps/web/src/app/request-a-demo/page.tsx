@@ -3,6 +3,7 @@ import { AuthShell } from "@/app/login/auth-shell";
 import { originOf } from "@/lib/origin";
 import { sitePath } from "@/app/site/links";
 import { RequestDemoForm } from "./form";
+import { linkClass } from "@kebo/ui";
 
 export const metadata = { title: "Request a demo" };
 
@@ -17,7 +18,7 @@ export default async function RequestDemoPage({ searchParams }: { searchParams: 
       footer={
         <>
           Already have an account?{" "}
-          <a href={sitePath("/sign-in")} className="font-medium text-primary hover:underline">
+          <a href={sitePath("/sign-in")} className={linkClass}>
             Sign in
           </a>
         </>

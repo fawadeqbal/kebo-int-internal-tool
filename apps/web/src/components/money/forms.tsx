@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind, type PaymentMethod } from "@kebo/shared";
-import { Button, Field, Input, RULES, Select, Textarea, Notice } from "@kebo/ui";
+import { Button, Field, Input, RULES, Select, Textarea, Notice, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { UrlWindow, WindowFooter } from "@/components/common/panel";
@@ -393,7 +393,7 @@ export function FactoryPaymentForm({
                 <>
                   {m.inPer !== null && m.currency !== orderCurrency && <span className="tabular">≈ {money(m.inPer, orderCurrency)} </span>}
                   {left && (
-                    <button type="button" className="text-primary hover:underline" onClick={() => m.setAmount(left)}>
+                    <button type="button" className={linkClass} onClick={() => m.setAmount(left)}>
                       Pay what is left ({money(left, m.currency)})
                     </button>
                   )}

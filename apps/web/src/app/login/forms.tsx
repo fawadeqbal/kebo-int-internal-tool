@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { Field, Input, Notice } from "@kebo/ui";
+import { Field, Input, Notice, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { loginAction, twoStepAction } from "./actions";
 
@@ -156,7 +156,7 @@ export function TwoStepForm({ next }: { next?: string }) {
       </SubmitButton>
       <p className="text-md text-muted">
         {recovery ? "Have your phone? " : "Lost your phone? "}
-        <button type="button" onClick={() => setRecovery((r) => !r)} className="font-semibold text-primary hover:underline">
+        <button type="button" onClick={() => setRecovery((r) => !r)} className={linkClass}>
           {recovery ? "Use the 6-digit code" : "Use a recovery code"}
         </button>
       </p>

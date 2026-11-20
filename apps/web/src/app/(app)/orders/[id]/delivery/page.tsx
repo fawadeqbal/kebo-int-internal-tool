@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
-import { Badge, RULES } from "@kebo/ui";
+import { Badge, RULES, linkClass, cn } from "@kebo/ui";
 import { getPeople } from "@/lib/loaders";
 import { date } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
@@ -210,7 +210,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
               { label: "Ends on", value: until ? date(until) : null },
             ]}
             actions={
-              <Link href={`/orders/${o.id}#agreed`} className="text-md font-medium whitespace-nowrap text-primary hover:underline">
+              <Link href={`/orders/${o.id}#agreed`} className={cn(linkClass, "text-md whitespace-nowrap")}>
                 As agreed with the customer
               </Link>
             }

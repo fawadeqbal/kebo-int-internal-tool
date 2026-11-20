@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Undo2 } from "lucide-react";
-import { cn } from "@kebo/ui";
+import { cn, linkClass } from "@kebo/ui";
 
 /**
  * The words for changes, one rule everywhere (canvas group 9, "The words for changes: Added, Changed, Removed"):
@@ -81,7 +81,7 @@ export function ChangeHint({ was, now, onUndo, className }: { was: string; now: 
       <span aria-hidden className={cn("size-1.5 rounded-full", k === "added" ? "bg-ok" : "bg-action-solid")} />
       {words}
       {onUndo && k !== "added" && (
-        <button type="button" onClick={onUndo} className="inline-flex items-center gap-0.5 font-semibold text-primary hover:underline">
+        <button type="button" onClick={onUndo} className={cn(linkClass, "inline-flex items-center gap-0.5")}>
           <Undo2 className="size-3" aria-hidden /> Undo
         </button>
       )}

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Fragment, Suspense } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, expenseShort, FACTORY_DUE_RULE_LABEL } from "@kebo/shared";
-import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
+import { buildHref, buttonClass, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Segmented, StatRow, StatTile, Table, Td, Th, THead, toPage, Tr, linkClass } from "@kebo/ui";
 import { addDays, daysBetween } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, money, companyToday } from "@/lib/format";
@@ -250,7 +250,7 @@ async function OrderParts({ id, me, today, back, auto }: { id: string; me: Me; t
       <div className="pb-1">
         <PlanInList orderId={o.id} plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} send={sendRequestAction.bind(null, o.id)} pay={pay} back={back} auto={auto} />
       </div>
-      <Link href={`/orders/${o.id}/payment`} className="w-fit text-md font-medium text-primary hover:underline">
+      <Link href={`/orders/${o.id}/payment`} className={cn(linkClass, "w-fit text-md")}>
         Open the order →
       </Link>
     </div>
@@ -408,7 +408,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
                     </Td>
                     <Td className="max-sm:hidden">
                       {r.order ? (
-                        <Link href={`/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}`} className="font-medium text-primary hover:underline">
+                        <Link href={`/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}`} className={linkClass}>
                           {r.order.refNo}
                         </Link>
                       ) : (
@@ -422,7 +422,7 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
                     <Td className="text-right">
                       {r.part ? (
                         !parts.canPay ? (
-                          <Link href={`/orders/${r.part.order.id}/factory`} className="text-md font-medium text-primary hover:underline">
+                          <Link href={`/orders/${r.part.order.id}/factory`} className={cn(linkClass, "text-md")}>
                             Open
                           </Link>
                         ) : sp.pay === r.key ? (

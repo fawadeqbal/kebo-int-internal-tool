@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Mail, MessageCircle, RefreshCw, X } from "lucide-react";
 import { FLOW_STEP_LABEL, inSentence, type PaperCheck } from "@kebo/shared";
-import { Badge, Button, buttonClass, Card, Checkbox, cn, Input, controlClass, controlSizes, Notice, chipClass } from "@kebo/ui";
+import { Badge, Button, buttonClass, Card, Checkbox, cn, Input, controlClass, controlSizes, Notice, chipClass, linkClass } from "@kebo/ui";
 import { FileActions } from "@/components/common/file-actions";
 import type { ActionState } from "@/lib/actions";
 import type { PaperChecks } from "@/lib/types-papers";
@@ -113,7 +113,7 @@ function CheckRow({
         ) : (
           <span className="ml-auto min-w-0 truncate text-right text-xs text-text-2" title={c.value}>
             {href ? (
-              <Link href={href} className="font-medium text-primary hover:underline">
+              <Link href={href} className={linkClass}>
                 {c.value} · add it
               </Link>
             ) : (
@@ -311,7 +311,7 @@ function TermsBox({ p }: { p: PaperChecks }) {
       <p className="mt-0.5 text-xs text-text-2">
         The document words the payment terms from the route; the agreed conditions are {t.printed ? "printed too" : "left off"}.{" "}
         {/* One place for how the order's papers print (design "terms that travel"). */}
-        <Link href={`/orders/${p.orderId}/documents`} className="font-medium text-primary hover:underline">
+        <Link href={`/orders/${p.orderId}/documents`} className={linkClass}>
           Change in How the documents print
         </Link>
       </p>
@@ -549,7 +549,7 @@ export function MakePaper({
                     href={`/print/orders/${p.orderId}/${p.kind}?${new URLSearchParams({ v: String(v.version), ...(p.ref ? { ref: p.ref } : {}) })}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-medium text-primary hover:underline"
+                    className={linkClass}
                   >
                     View
                   </a>

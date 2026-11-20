@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr, FactsLine } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, ScrollFade, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr, FactsLine, linkClass } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -79,7 +79,7 @@ function Changes({ r }: { r: AuditRow }) {
   return (
     <details className="group mt-1.5" data-no-row>
       {/* A target a thumb can hit: 24px tall at least (WCAG 2.2), even under a phone row's link. */}
-      <summary className="inline-flex min-h-6 cursor-pointer items-center text-xs font-medium text-primary select-none hover:underline">
+      <summary className={cn(linkClass, "inline-flex min-h-6 cursor-pointer items-center text-xs select-none")}>
         <span className="group-open:hidden">{diff.changed ? `Show ${diff.rows.length} change${diff.rows.length === 1 ? "" : "s"}` : "Show recorded values"}</span>
         <span className="hidden group-open:inline">{diff.changed ? "Hide changes" : "Hide values"}</span>
       </summary>

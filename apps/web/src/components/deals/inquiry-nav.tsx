@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { buttonClass } from "@kebo/ui";
+import { buttonClass, linkClass, cn } from "@kebo/ui";
 import { TabRow } from "@/components/common/record-tabs";
 
 export interface InquiryTab {
@@ -31,7 +31,7 @@ export function InquiryTabs({ base, tabs, order }: { base: string; tabs: Inquiry
       items={tabs.map((t) => ({ href: t.href, label: t.label, tag: t.tag, active: here(t.href) }))}
       end={
         order ? (
-          <Link href={order.href} className="-mb-px flex h-[42px] shrink-0 items-center gap-1.5 border-b-2 border-transparent text-md font-semibold whitespace-nowrap text-primary hover:underline">
+          <Link href={order.href} className={cn(linkClass, "-mb-px flex h-[42px] shrink-0 items-center gap-1.5 border-b-2 border-transparent text-md whitespace-nowrap")}>
             Order {order.refNo} <ArrowRight className="size-3.5" aria-hidden />
           </Link>
         ) : (

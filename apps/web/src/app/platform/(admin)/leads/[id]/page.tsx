@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { COMPANY_KIND_LABEL, LEAD_SOURCE_LABEL, LEAD_STATUS_LABEL, suggestSlug } from "@kebo/shared";
-import { ButtonLink, buttonClass, Card, EmptyState, StatusBadge, EmptyLine, CardHeader } from "@kebo/ui";
+import { ButtonLink, buttonClass, Card, EmptyState, StatusBadge, EmptyLine, CardHeader, linkClass, cn } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { loadPlatform } from "@/lib/platform";
 import { date, dateTime } from "@/lib/format";
@@ -238,7 +238,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               {
                 label: "Email",
                 value: (
-                  <a href={`mailto:${l.email}`} className="break-all text-primary hover:underline">
+                  <a href={`mailto:${l.email}`} className={cn(linkClass, "break-all")}>
                     {l.email}
                   </a>
                 ),

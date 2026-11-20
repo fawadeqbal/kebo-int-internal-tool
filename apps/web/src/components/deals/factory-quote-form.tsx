@@ -17,7 +17,7 @@ import {
   type LeadFrom,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, cn, controlClass, Field, Input, Select, Textarea, controlSizes, EmptyLine } from "@kebo/ui";
+import { Button, cn, controlClass, Field, Input, Select, Textarea, controlSizes, EmptyLine, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -791,7 +791,7 @@ export function OfferHeaderForm({
                       ) : !daysTyped && s.leadTime ? (
                         <>
                           Their words: “{s.leadTime}”, kept until you type the days.{" "}
-                          <button type="button" className="font-medium text-primary hover:underline" onClick={() => set("leadTime", "")}>
+                          <button type="button" className={linkClass} onClick={() => set("leadTime", "")}>
                             Clear
                           </button>
                         </>

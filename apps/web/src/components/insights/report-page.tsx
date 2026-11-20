@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
-import { buildHref, buttonClass, Input, LinkTabs, PageHeader, Segmented, toPage, Notice } from "@kebo/ui";
+import { buildHref, buttonClass, cardClass, cn, Input, LinkTabs, PageHeader, Segmented, toPage, Notice } from "@kebo/ui";
 import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { crumbsFor, labelFor } from "@/lib/nav";
@@ -172,7 +172,7 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
         </div>
       )}
       {periodic && p.kind === "custom" && (
-        <form action={path} className="no-print mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
+        <form action={path} className={cn(cardClass, "no-print mb-4 flex flex-wrap items-end gap-2 px-4 py-3 sm:px-5")}>
           <input type="hidden" name="period" value="custom" />
           <label className="text-xs text-text-2">
             From

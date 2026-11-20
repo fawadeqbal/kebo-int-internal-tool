@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LOST_REASON_LABEL } from "@kebo/shared";
-import { Card, CardHeader, StatTile, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
+import { Card, CardHeader, StatTile, Table, Td, Th, THead, Tr, EmptyLine, linkClass } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { money } from "@/lib/format";
 import { bigMoney, change, type Period } from "@/lib/insights-period";
@@ -68,7 +68,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
 
       <p className="text-md text-text-2">
         The company&apos;s own costs (rent, salaries, the office: {money(d.company, c)} {p.name}) are on{" "}
-        <Link href="/money/company-costs" className="font-medium text-primary hover:underline">
+        <Link href="/money/company-costs" className={linkClass}>
           Money › Company costs
         </Link>
         .

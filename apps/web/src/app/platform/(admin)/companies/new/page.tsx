@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardBody, PageHeader, RULES } from "@kebo/ui";
+import { Card, CardBody, PageHeader, RULES, linkClass } from "@kebo/ui";
 import { newCompanyData } from "./data";
 import { NewCompanyForm } from "./form";
 
@@ -16,7 +16,7 @@ export default async function NewCompanyPage({ searchParams }: { searchParams: P
           lead ? (
             <>
               For{" "}
-              <Link href={`/platform/leads/${lead.id}`} className="font-medium text-primary hover:underline">
+              <Link href={`/platform/leads/${lead.id}`} className={linkClass}>
                 {lead.name} ({lead.companyName})
               </Link>
               . Their own space, with them as its tenant admin.

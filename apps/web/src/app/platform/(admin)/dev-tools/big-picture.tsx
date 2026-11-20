@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { agoText, forText, type DevOverview } from "@kebo/shared";
-import { Card, CardHeader, EmptyState, StatRow, StatTile, Notice } from "@kebo/ui";
+import { Card, CardHeader, EmptyState, StatRow, StatTile, Notice, linkClass, cn } from "@kebo/ui";
 import { currentZone } from "@/lib/format";
 import { CheckMap, Dot, LineChart, NeedsYou, Timeline, UseBar, gbText } from "./parts";
 import { msText } from "./speed";
@@ -99,7 +99,7 @@ export function BigPicture({ o, days }: { o: DevOverview; days: 1 | 7 }) {
             title={days === 7 ? "What happened, last 7 days" : "What happened, last 24 hours"}
             description="deploys, restarts, warnings and backups on one line: see what changed before something broke"
             actions={
-              <Link href={days === 7 ? "/platform/dev-tools" : "/platform/dev-tools?days=7"} className="text-sm font-medium text-primary hover:underline">
+              <Link href={days === 7 ? "/platform/dev-tools" : "/platform/dev-tools?days=7"} className={cn(linkClass, "text-sm")}>
                 {days === 7 ? "Last 24 hours" : "Last 7 days"}
               </Link>
             }

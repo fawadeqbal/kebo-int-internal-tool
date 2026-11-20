@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { PaymentRoute } from "@kebo/shared";
-import { Notice } from "@kebo/ui";
+import { Notice, linkClass } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { BankContract } from "@/lib/types-flow";
 import { BankContractForm, RouteForm, type RouteTermsValue } from "@/components/orders/flow-forms";
@@ -121,7 +121,7 @@ export function ChangePaymentWindow({
           {transfer ? (
             <p className="text-sm text-text-2">
               This payment is part of one transfer over several orders. To change it, remove the transfer on{" "}
-              <Link href={`/customers/${customerId}/money`} className="font-medium text-primary hover:underline">
+              <Link href={`/customers/${customerId}/money`} className={linkClass}>
                 the customer&apos;s money
               </Link>{" "}
               and record it again.

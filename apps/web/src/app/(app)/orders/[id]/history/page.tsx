@@ -13,6 +13,7 @@ import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { orderTitle } from "@/lib/titles";
 import { RecordBox } from "@/components/common/record-box";
+import { linkClass } from "@kebo/ui";
 
 export const generateMetadata = orderTitle("History");
 
@@ -96,7 +97,7 @@ export default async function OrderHistory({
             deal && deal.notes.length > 0 ? (
               <p className="text-xs text-text-2">
                 The inquiry has {deal.notes.length} note{deal.notes.length === 1 ? "" : "s"} too ·{" "}
-                <Link href={`/inquiries/${deal.id}#notes`} className="font-medium text-primary hover:underline">
+                <Link href={`/inquiries/${deal.id}#notes`} className={linkClass}>
                   Read them on {deal.refNo}
                 </Link>
               </p>

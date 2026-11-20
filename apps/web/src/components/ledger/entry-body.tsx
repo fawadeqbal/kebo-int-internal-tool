@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { THead, Th, buttonClass, cn } from "@kebo/ui";
+import { THead, Th, buttonClass, cn, linkClass } from "@kebo/ui";
 import { dateTime, money } from "@/lib/format";
 import type { LedgerEntry } from "@/lib/types-ledger";
 import { amount, TypeBadge } from "./ledger-parts";
@@ -64,7 +64,7 @@ export function EntryBody({ e, main, back }: { e: LedgerEntry; main: string; bac
       ? ([
           [
             "Reverses",
-            <Link key="r" href={`?panel=entry&id=${e.reverses.groupId}`} scroll={false} className="text-primary hover:underline">
+            <Link key="r" href={`?panel=entry&id=${e.reverses.groupId}`} scroll={false} className={linkClass}>
               entry {e.reverses.entryNo} of {e.reverses.date}
             </Link>,
           ],
@@ -76,7 +76,7 @@ export function EntryBody({ e, main, back }: { e: LedgerEntry; main: string; bac
             "Reversed by",
             <span key="rb" className="flex flex-col">
               {e.reversedBy.map((r) => (
-                <Link key={r.groupId} href={`?panel=entry&id=${r.groupId}`} scroll={false} className="text-primary hover:underline">
+                <Link key={r.groupId} href={`?panel=entry&id=${r.groupId}`} scroll={false} className={linkClass}>
                   entry {r.entryNo} of {r.date}
                   {r.reason ? ` · ${r.reason}` : ""}
                 </Link>
@@ -154,7 +154,7 @@ export function EntryBody({ e, main, back }: { e: LedgerEntry; main: string; bac
           <ul className="flex flex-col gap-1 text-sm">
             {e.related.map((r) => (
               <li key={r.groupId}>
-                <Link href={`?panel=entry&id=${r.groupId}`} scroll={false} className="text-primary hover:underline">
+                <Link href={`?panel=entry&id=${r.groupId}`} scroll={false} className={linkClass}>
                   Entry {r.entryNo} · {r.date}
                 </Link>{" "}
                 <span className="text-text-2">{r.reason ?? ""}</span>

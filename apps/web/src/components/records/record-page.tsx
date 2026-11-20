@@ -3,6 +3,7 @@ import { boxTitleClass, cn, PageHeader } from "@kebo/ui";
 import { OwnPagerTop, OwnPagerUnder } from "@/components/deals/own-pager";
 import { SideSheet } from "@/components/common/side-sheet";
 import { RecordShell } from "./record-frame";
+import { SidePanelCard } from "@/components/orders/side-panel-parts";
 
 /** ‹ 2 of 5 › to a record's siblings (an inquiry's offers, its quotations). */
 export type RecordPager = Parameters<typeof OwnPagerTop>[0];
@@ -88,16 +89,16 @@ export function RecordPanel({ sections, summary }: { sections: PanelSection[]; s
   const title = sections.map((s) => (typeof s.title === "string" ? s.title : null)).filter(Boolean).join(" · ") || "More";
   return (
     <SideSheet title={title} summary={summary}>
-      <section className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
-        {sections.map((s, i) => (
-          <section key={s.id} aria-labelledby={s.id} className={cn("flex flex-col gap-1 px-4 py-3", i < sections.length - 1 && "border-b border-line")}>
+      <SidePanelCard>
+        {sections.map((s) => (
+          <section key={s.id} aria-labelledby={s.id} className="flex flex-col gap-1 border-b border-line px-4 pt-3.5 pb-3 last:border-b-0 sm:px-5">
             <h2 id={s.id} className={cn(boxTitleClass, "mb-1")}>
               {s.title}
             </h2>
             {s.children}
           </section>
         ))}
-      </section>
+      </SidePanelCard>
     </SideSheet>
   );
 }

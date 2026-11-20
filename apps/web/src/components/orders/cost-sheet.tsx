@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { cn, Table, Td, Th, THead, Tr, linkClass } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
 import { Section } from "@/components/order-sections/section";
@@ -95,7 +95,7 @@ export function CostSheetTable({
                 <span className="font-semibold">{kind}</span>
                 {detail && <span className="block text-xs text-text-2">{detail}</span>}
                 {receipt && (
-                  <a href={`/files/${receipt.id}?view=1`} target="_blank" rel="noreferrer" className="block text-xs text-primary hover:underline">
+                  <a href={`/files/${receipt.id}?view=1`} target="_blank" rel="noreferrer" className={cn(linkClass, "block text-xs")}>
                     Their bill
                   </a>
                 )}

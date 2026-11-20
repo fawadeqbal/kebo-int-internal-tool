@@ -338,6 +338,13 @@ describe("one of each", () => {
     expect(bad).toEqual([]);
   });
 
+  it("one text link (linkClass) and one card look (Card, cardClass): no page types its own", () => {
+    // A link in text: text-primary with hover:underline typed by hand (font-medium, -semibold, -normal…).
+    expect(found(/className="[^"]*\btext-primary\b[^"]*\bhover:underline\b[^"]*"/g).filter((m) => !/hover:text-/.test(m))).toEqual([]);
+    // A box drawn by hand with the card's frame (rounded-xl … shadow-card): Card, or cardClass where it cannot be one.
+    expect(found(/rounded-xl border border-line bg-surface shadow-card"/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

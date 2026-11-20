@@ -1,14 +1,14 @@
 "use client";
 
 import { Children, useEffect, useRef, useState, type ReactNode } from "react";
-import { boxTitleClass, cn, EmptyLine } from "@kebo/ui";
+import { boxTitleClass, cardClass, cn, EmptyLine, linkClass } from "@kebo/ui";
 
 /** How many rows a section shows before it folds behind "Show all n" (phone); on a wide screen it scrolls after about six. */
 const ROWS = 5;
 
 /**
- * The step side panel's card: sticky under the order's top bar on a wide
- * screen while it fits the window (taller, it scrolls with the page).
+ * The one side panel's card (every record and step: orders, inquiries, customers, suppliers, people): a Card,
+ * sticky under the top bar on a wide screen while it fits the window (taller, it scrolls with the page).
  */
 export function SidePanelCard({ children, label }: { children: ReactNode; /** Its name as a region; left out when a labelled <aside> already holds it. */ label?: string }) {
   const ref = useRef<HTMLElement>(null);
@@ -31,7 +31,7 @@ export function SidePanelCard({ children, label }: { children: ReactNode; /** It
       ref={ref}
       aria-label={label}
       data-sticky={fits ? "" : undefined}
-      className={cn("rounded-xl border border-line bg-surface shadow-card", fits && "lg:sticky lg:top-28")}
+      className={cn(cardClass, fits && "lg:sticky lg:top-28")}
     >
       {children}
     </section>
@@ -108,7 +108,7 @@ export function SideSection({
         empty && <EmptyLine className="my-1.5">{empty}</EmptyLine>
       )}
       {rows.length > ROWS && !all && (
-        <button type="button" className="mt-1 text-sm font-medium text-primary hover:underline lg:hidden" onClick={() => setAll(true)}>
+        <button type="button" className={cn(linkClass, "mt-1 text-sm lg:hidden")} onClick={() => setAll(true)}>
           Show all {rows.length}
         </button>
       )}

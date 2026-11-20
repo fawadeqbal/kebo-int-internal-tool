@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Avatar, ButtonLink, Card, CardBody, CardHeader, cn, EmptyLine } from "@kebo/ui";
+import { Avatar, ButtonLink, Card, CardBody, CardHeader, cn, EmptyLine, linkClass } from "@kebo/ui";
 import { ArrowRight, FileText } from "lucide-react";
 import { customerOf, customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
 import { timeAgo, whole, companyToday } from "@/lib/format";
@@ -84,7 +84,7 @@ export async function CustomerSide({ id }: { id: string }) {
                       )}
                     </strong>
                   </div>
-                  <Link href={`/customers/${c.id}/money#where`} className="w-fit font-medium text-primary hover:underline">
+                  <Link href={`/customers/${c.id}/money#where`} className={cn(linkClass, "w-fit")}>
                     Where their money went →
                   </Link>
                 </div>

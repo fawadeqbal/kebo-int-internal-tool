@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
-import { cn, RULES, searchFrameClass, controlSizes, EmptyLine, Button } from "@kebo/ui";
+import { cn, RULES, searchFrameClass, controlSizes, EmptyLine, Button, linkClass } from "@kebo/ui";
 import { FloatingMenu, useIsPhone } from "./floating";
 
 export interface FilterSelect {
@@ -474,7 +474,7 @@ export function FilterCard({
           ))}
           {month && <MonthStep m={month} onPick={pick} />}
           {anyOn && (
-            <button type="button" onClick={clear} className="h-10 shrink-0 rounded-md px-1.5 text-md font-semibold whitespace-nowrap text-primary hover:underline max-sm:hidden">
+            <button type="button" onClick={clear} className={cn(linkClass, "h-10 shrink-0 rounded-md px-1.5 text-md whitespace-nowrap max-sm:hidden")}>
               Clear all
             </button>
           )}
