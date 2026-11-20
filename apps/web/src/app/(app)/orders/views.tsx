@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Check, Factory, FileText, LayoutGrid, List as ListIcon, Lock, MessageSquare, Package, PieChart, Ship, X } from "lucide-react";
+import { Factory, FileText, LayoutGrid, List as ListIcon, Package, PieChart, Ship } from "lucide-react";
 import { ORDER_STAGE_LABEL, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
 import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, Segmented, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
@@ -98,14 +98,14 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
   const nextEta = atSea.map((x) => x.eta).filter((x): x is string => !!x).sort()[0];
 
   const chips = [
-    { key: "open", label: "Open", icon: ListIcon, n: c.open, href: href({ status: undefined, stage: undefined }), active: status === "open" && !stage },
-    { key: "confirmed", label: "Confirmed", icon: Check, n: c.confirmed, href: href({ status: undefined, stage: "confirmed" }), active: stage === "confirmed" },
-    { key: "in_production", label: "In production", icon: Factory, n: c.in_production, href: href({ status: undefined, stage: "in_production" }), active: stage === "in_production" },
-    { key: "shipped", label: "Shipped", icon: Ship, n: c.shipped, href: href({ status: undefined, stage: "shipped" }), active: stage === "shipped" },
-    { key: "done", label: "Done", icon: Package, n: c.done ?? 0, href: href({ status: undefined, stage: "done" }), active: stage === "done" },
-    { key: "late", label: "Late", icon: AlertTriangle, n: c.late, href: href({ status: "late", stage: undefined }), active: status === "late" },
-    { key: "closed", label: "Closed", icon: Lock, n: c.closed ?? 0, href: href({ status: "closed", stage: undefined }), active: status === "closed" },
-    { key: "cancelled", label: "Cancelled", icon: X, n: c.cancelled ?? 0, href: href({ status: "cancelled", stage: undefined }), active: status === "cancelled" },
+    { key: "open", label: "Open", n: c.open, href: href({ status: undefined, stage: undefined }), active: status === "open" && !stage },
+    { key: "confirmed", label: "Confirmed", n: c.confirmed, href: href({ status: undefined, stage: "confirmed" }), active: stage === "confirmed" },
+    { key: "in_production", label: "In production", n: c.in_production, href: href({ status: undefined, stage: "in_production" }), active: stage === "in_production" },
+    { key: "shipped", label: "Shipped", n: c.shipped, href: href({ status: undefined, stage: "shipped" }), active: stage === "shipped" },
+    { key: "done", label: "Done", n: c.done ?? 0, href: href({ status: undefined, stage: "done" }), active: stage === "done" },
+    { key: "late", label: "Late", n: c.late, href: href({ status: "late", stage: undefined }), active: status === "late" },
+    { key: "closed", label: "Closed", n: c.closed ?? 0, href: href({ status: "closed", stage: undefined }), active: status === "closed" },
+    { key: "cancelled", label: "Cancelled", n: c.cancelled ?? 0, href: href({ status: "cancelled", stage: undefined }), active: status === "cancelled" },
   ].filter((x) => x.key !== "late" || c.late > 0 || status === "late");
 
   const rowMenu = (o: OrderRow): MenuEntry[] => [
@@ -168,18 +168,12 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         label="Which orders"
         className="mb-4"
         tabs={chips.map((x) => {
-          const Icon = x.icon;
           return {
             href: x.href,
             active: x.active,
             count: x.n ?? 0,
             alert: x.key === "late" && x.n > 0,
-            label: (
-              <>
-                <Icon aria-hidden />
-                {x.label}
-              </>
-            ),
+            label: x.label,
           };
         })}
       />
@@ -350,30 +344,6 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
         crumbs={crumbsFor("/orders")}
         title="Sales orders"
         actions={<ViewSwitch view="board" mine={mine} />}
-      />
-      <LinkTabs
-        label="Boards"
-        className="mb-4"
-        tabs={[
-          {
-            href: "/inquiries/board",
-            active: false,
-            label: (
-              <>
-                <MessageSquare aria-hidden /> Inquiries
-              </>
-            ),
-          },
-          {
-            href: "/orders/board",
-            active: true,
-            label: (
-              <>
-                <Package aria-hidden /> Orders
-              </>
-            ),
-          },
-        ]}
       />
       <FilterCard
         search="Search…"

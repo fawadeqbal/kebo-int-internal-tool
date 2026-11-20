@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Check, Clock, Loader2, X } from "lucide-react";
-import { buttonClass, Select, type ButtonSize, type ButtonVariant } from "./primitives";
+import { buttonClass, segmentClass, segmentsClass, Select, type ButtonSize, type ButtonVariant } from "./primitives";
 import { cn } from "./cn";
 
 export { BackArrow, ListLink, NavMemoryKeeper, placeOf, readNav, writeNav, type NavMemory, type Place } from "./back";
@@ -238,7 +238,7 @@ export function SegmentedChoice<T extends string>({
 }) {
   const at = Math.max(0, options.findIndex((o) => o.value === value));
   return (
-    <div role="radiogroup" aria-label={label} className={cn("inline-flex max-w-full rounded-[10px] border border-line bg-surface-2 p-0.5", className)}>
+    <div role="radiogroup" aria-label={label} className={cn(segmentsClass, className)}>
       {options.map((o, i) => (
         <button
           key={o.value}
@@ -255,10 +255,7 @@ export function SegmentedChoice<T extends string>({
             onChange(options[n]!.value);
             (e.currentTarget.parentElement?.children[n] as HTMLElement | undefined)?.focus();
           }}
-          className={cn(
-            "inline-flex h-8 items-center rounded-lg px-3 text-md font-medium whitespace-nowrap text-muted transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text max-sm:h-10",
-            o.value === value && "bg-surface font-semibold text-primary shadow-card",
-          )}
+          className={cn(segmentClass(o.value === value), "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text")}
         >
           {o.label}
         </button>

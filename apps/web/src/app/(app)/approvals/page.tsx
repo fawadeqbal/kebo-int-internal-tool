@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Check, Clock, FileText } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, type ExpenseCategory } from "@kebo/shared";
-import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice } from "@kebo/ui";
+import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
@@ -81,6 +81,17 @@ export default async function ApprovalsPage({
         crumbs={[{ label: "Money" }, { label: "Payments", href: "/payments" }, { label: "To verify" }]}
         title="To verify"
         primary={!mine && status === "pending" && list.rows.some((r) => r.can.approve) ? <VerifyChosen action={approveManyAction} /> : undefined}
+        views={
+          approver && submitter ? (
+            <Segmented
+              label="Whose"
+              options={[
+                { href: base({ q: sp.q }), label: "To approve", active: !mine },
+                { href: base({ mine: "true", q: sp.q }), label: "Mine", active: mine },
+              ]}
+            />
+          ) : undefined
+        }
       />
       {!mine && (
         <StatRow facts>
@@ -95,16 +106,6 @@ export default async function ApprovalsPage({
           <StatTile label="Oldest" value={oldest === null ? "—" : oldest === 0 ? "today" : `${oldest} day${oldest === 1 ? "" : "s"}`} />
           <StatTile icon={Check} iconColor={1} label="Approved" value={all.counts.approved} sub={all.counts.sent_back ? `${all.counts.sent_back} sent back` : undefined} />
         </StatRow>
-      )}
-      {approver && submitter && (
-        <LinkTabs
-          label="Whose"
-          className="mb-4"
-          tabs={[
-            { href: base({ q: sp.q }), label: "To approve", active: !mine },
-            { href: base({ mine: "true", q: sp.q }), label: "Mine", active: mine },
-          ]}
-        />
       )}
       <LinkTabs
         label="Which ones"

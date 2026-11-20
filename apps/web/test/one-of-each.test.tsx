@@ -208,6 +208,18 @@ describe("one of each", () => {
     expect(found(/<button[^>]*className="[^"]*rounded-(?:lg|xl)[^"]*(?:border border-line-strong|bg-action-solid)/g)).toEqual([]);
   });
 
+  it("one switch and one row of tabs: list stages are tabs, every switch draws segmentClass, a page has one row", () => {
+    // Chips are only for a filter inside a box (look="chips"); a page's stages and views are LinkTabs' tabs.
+    expect(found(/look="chips"/g).filter((f) => !f.includes("companies/[id]/sections.tsx"))).toEqual([]);
+    // Segmented, SegmentedChoice, ViewSwitch and the order's Documents switch draw the one segment.
+    expect(found(/rounded-lg px-2\.5 text-xs font-medium whitespace-nowrap|rounded-xl bg-surface-3 p-1/g)).toEqual([]);
+    expect(found(/segmentClass\(/g).length).toBeGreaterThanOrEqual(3);
+    // A page's views go beside its title (PageHeader views), not as a second row over the tabs.
+    expect(found(/label="(?:Which side|Boards|Whose)"\s+className="mb-4"/g)).toEqual([]);
+    // No icons inside a list's tabs (they read as chips; Inquiries has none).
+    expect(found(/label: <><\w+ aria-hidden \/> /g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

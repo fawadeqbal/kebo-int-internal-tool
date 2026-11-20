@@ -601,6 +601,7 @@ export function HistorySection({ c, history, page }: { c: CompanyDetail; history
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
         <LinkTabs
+          look="chips"
           className="min-w-0 flex-1"
           label="Kinds of history"
           tabs={[

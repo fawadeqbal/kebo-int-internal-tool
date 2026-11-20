@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Segmented, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
-import { ArrowRight, Factory, Landmark, List, User, Users } from "lucide-react";
+import { buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice } from "@kebo/ui";
+import { ArrowRight } from "lucide-react";
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
@@ -95,10 +95,10 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
           </>
         }
       />
-      <Segmented
+      <LinkTabs
         label="Ledger views"
-        className="mb-3"
-        options={VIEWS.map((v) => ({
+        className="mb-4"
+        tabs={VIEWS.map((v) => ({
           href: buildHref(PATH, {}, { view: v.key === "balances" ? undefined : v.key, period: sp.period, from: sp.from, to: sp.to }),
           label: v.label,
           active: v.key === view,
@@ -261,11 +261,11 @@ async function OrderPicker() {
 
 type BalanceRow = { account: string; kind: "customer" | "supplier" | "account" | "person"; id: string | null; label: string; currency: string; in: string; out: string; balance: string };
 const WHO = [
-  { key: "all", label: "All", icon: List },
-  { key: "customer", label: "Customers", icon: Users },
-  { key: "supplier", label: "Suppliers", icon: Factory },
-  { key: "account", label: "Bank accounts", icon: Landmark },
-  { key: "person", label: "People", icon: User },
+  { key: "all", label: "All" },
+  { key: "customer", label: "Customers" },
+  { key: "supplier", label: "Suppliers" },
+  { key: "account", label: "Bank accounts" },
+  { key: "person", label: "People" },
 ] as const;
 
 /** Balances (board General ledger): who, currency, charged / in, paid / out, balance, and their statement. */
@@ -286,25 +286,14 @@ async function Balances({ sp }: { sp: Search }) {
   const fmt = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
     <div className="flex flex-col gap-4">
-      <LinkTabs
-        label="Whose"
-        tabs={WHO.map((w) => ({
-          href: buildHref(PATH, { q: sp.q, cur: sp.cur, has: sp.has }, { who: w.key === "all" ? undefined : w.key }),
-          label: (
-            <>
-              <w.icon aria-hidden /> {w.label}
-            </>
-          ),
-          active: who === w.key,
-        }))}
-      />
       <div>
         <FilterCard
           search="Search…"
           value={sp.q}
-          keep={{ who: who === "all" ? undefined : who }}
-          clearHref={buildHref(PATH, { who: who === "all" ? undefined : who, cur: sp.cur, has: sp.has }, {})}
+          clearHref={buildHref(PATH, { cur: sp.cur, has: sp.has }, {})}
           selects={[
+            // Whose balances: a filter like the others (one row of tabs on the page: the ledger's views).
+            { name: "who", label: "Who", value: who === "all" ? undefined : who, options: WHO.filter((w) => w.key !== "all").map((w) => ({ value: w.key, label: w.label })) },
             { name: "cur", label: "Currency", value: sp.cur, options: currencies.map((c) => ({ value: c, label: c })) },
             { name: "has", label: "Has balance", value: sp.has, options: [{ value: "all", label: "Any" }], all: "Yes", showDefault: true },
           ]}

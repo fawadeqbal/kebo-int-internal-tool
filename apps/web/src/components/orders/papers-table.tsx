@@ -1,5 +1,6 @@
 "use client";
 
+import { ViewSwitch } from "@/components/common/view-switch";
 import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -158,25 +159,11 @@ export function PapersTable({
       <CardHeader title="Documents" description={description} />
       <div className="flex flex-col px-4 pt-3 pb-3.5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <nav
-            aria-label="Documents"
-            className="inline-flex max-w-full overflow-x-auto rounded-lg border border-line bg-surface-2 p-0.5 [scrollbar-width:none]"
-          >
-            {tabs.map((t) => (
-              <Link
-                key={t.key}
-                href={`${base}?tab=${t.key}#papers`}
-                scroll={false}
-                aria-current={tab === t.key ? "page" : undefined}
-                className={cn(
-                  "inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium whitespace-nowrap text-muted hover:text-text",
-                  tab === t.key && "bg-surface text-text shadow-card",
-                )}
-              >
-                {t.label} · {t.n}
-              </Link>
-            ))}
-          </nav>
+          <ViewSwitch
+            label="Documents"
+            current={tab}
+            views={tabs.map((t) => ({ key: t.key, label: t.label, href: `${base}?tab=${t.key}#papers`, count: t.n }))}
+          />
           <span className="hidden text-xs text-muted sm:inline">Every document of the order, once.</span>
         </div>
         <div role="table" aria-label="Documents" className="text-sm">

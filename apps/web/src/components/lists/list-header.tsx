@@ -38,7 +38,7 @@ export function ListHeader({
       views={
         views && (
           <span className="max-sm:hidden">
-            <ViewSwitch label="View" current={views.current} compact views={views.options} />
+            <ViewSwitch label="View" current={views.current} views={views.options} />
           </span>
         )
       }
