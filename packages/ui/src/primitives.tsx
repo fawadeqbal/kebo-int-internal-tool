@@ -70,7 +70,7 @@ export function Button({
   type = "button",
   ...props
 }: ComponentProps<"button"> & { variant?: ButtonVariant; size?: ButtonSize }) {
-  return <button type={type} className={buttonClass(variant, size, className)} {...props} />;
+  return <button type={type} data-variant={variant} className={buttonClass(variant, size, className)} {...props} />;
 }
 
 export function ButtonLink({
@@ -82,7 +82,7 @@ export function ButtonLink({
   // A file (Excel export, PDF, a print or a download) is made only when clicked: never fetched ahead (a prefetch
   // of an export built the whole file on every visit to the list).
   const file = typeof props.href === "string" && /^\/(sheets|files|pdf|print|api)\//.test(props.href);
-  return <Link className={buttonClass(variant, size, className)} {...(file && props.prefetch === undefined ? { prefetch: false } : {})} {...props} />;
+  return <Link data-variant={variant} className={buttonClass(variant, size, className)} {...(file && props.prefetch === undefined ? { prefetch: false } : {})} {...props} />;
 }
 
 /* ---------------------------------------------------------------- Form controls */
@@ -262,7 +262,12 @@ export function HowMade({ title, rule, className }: { title: string; rule: strin
  * The one box head (canvas group 7): a 48px row under a line — the title (15px bold), what stands beside it, and its
  * buttons at the right. CardHeader and the record's boxes (RecordBox) both draw it from these.
  */
-export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-4 sm:pl-5";
+/**
+ * A box's head: its title at the box's inset, its buttons ending 10px in, where a small button's own 10px of room
+ * puts its words on the inset. A link-look button has no room of its own, so in a head it gets the same 10px: its
+ * words then end where an Edit's do ("Statement", "All orders" were 10px nearer the edge).
+ */
+export const boxHeadClass = "flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-2 pr-2.5 pl-4 sm:pl-5 [&_[data-variant=link]]:px-2.5";
 export const boxTitleClass = "min-w-0 text-lead font-bold text-text";
 
 /** A heading inside a box or a window, under its title (a group of fields, a part of a list): one look everywhere. */
@@ -315,7 +320,9 @@ export function CardHeader({
     // that do not fit beside the title (a narrow screen) go under it rather than past the edge.
     <div className={cn(boxHeadClass, "justify-between gap-x-3", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
       {/* The words shrink (a long description wraps) so the buttons stay at the right on a laptop. */}
-      <div className="min-w-0 flex-[1_1_12rem]">
+      {/* 8rem kept for the words before the buttons go under them: a short title keeps its buttons beside it in a
+          320px side box ("Money · Statement"), a long one still wraps its words rather than squeezing them. */}
+      <div className="min-w-0 flex-[1_1_8rem]">
         {how ? (
           <div className="flex items-center gap-1">
             {heading}
@@ -327,7 +334,7 @@ export function CardHeader({
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
       </div>
       {/* Never wider than the card: on a small screen the buttons wrap among themselves. */}
-      {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div>}
     </div>
   );
 }

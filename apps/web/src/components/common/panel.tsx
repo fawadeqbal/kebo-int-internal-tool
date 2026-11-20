@@ -459,6 +459,7 @@ export function OpenPanelButton({
       href={p.href(id)}
       aria-label={label}
       aria-haspopup="dialog"
+      data-variant={variant}
       className={buttonClass(variant, size, className)}
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;

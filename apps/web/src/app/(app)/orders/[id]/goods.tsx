@@ -11,7 +11,7 @@ import { FileActions } from "@/components/common/file-actions";
 import { EditButton } from "@/components/common/edit-button";
 import { SidePanel } from "@/components/common/panel";
 import { EditsChip, editedMark } from "@/components/edits/edits";
-import { OrderLines, OrderLinesEditor, PhoneLines } from "@/components/orders/order-lines";
+import { OrderLinesEditor, OrderLinesView } from "@/components/orders/order-lines";
 import { FieldsForm } from "@/components/orders/step-view";
 import type { EditCard, EditRef, EditsView } from "@/lib/types-edits";
 import { headerKey, sheetNumber, type ReadSheet, type SheetSpec } from "@/lib/sheet-spec";
@@ -182,7 +182,6 @@ export function PackingCard({
   marksAction,
   links,
   today,
-  toggle,
   edits,
 }: {
   title: string;
@@ -203,8 +202,6 @@ export function PackingCard({
   /** The paper's View / Print and PDF (once there is something on it). */
   links?: { view: string; pdf: string };
   today: string;
-  /** Short text lines on a phone. */
-  toggle?: boolean;
   /** The order's saved edits ("Edited n×" on the lines and the marks). */
   edits?: EditsView;
 }) {
@@ -259,8 +256,9 @@ export function PackingCard({
           </>
         }
       />
-      <CardBody className="flex flex-col gap-3">
-        {fromFile && (
+      {/* What a filled template would change, above the lines until it is saved or put away. */}
+      {fromFile && (
+        <CardBody>
           <div role="status" className={cn("rounded-lg border p-3 text-sm", fromFile.error ? "border-bad/30 bg-bad-soft" : "border-primary/30 bg-primary-soft/20")}>
             <p className="font-medium">From {fromFile.file}</p>
             {fromFile.error ? (
@@ -296,32 +294,22 @@ export function PackingCard({
               </Button>
             </div>
           </div>
-        )}
-        {toggle && (
-          <div className="sm:hidden">
-            <PhoneLines set="packing" lines={lines} />
-          </div>
-        )}
-        <div className={cn(toggle && "max-sm:hidden")}>
-          <OrderLines
-            set="packing"
-            orderId={orderId}
-            lines={lines}
-            canEdit={false}
-            today={today}
-            footer={
-              <PackingMarks
-                containerNo={containerNo}
-                containerHref={containerHref}
-                shippingMarks={shippingMarks}
-                canEdit={canEdit}
-                action={marksAction}
-                edit={ref("packing.marks")}
-                card={edits?.cards["packing.marks"]}
-              />
-            }
-          />
-        </div>
+        </CardBody>
+      )}
+      {/* The lines read only as every other box's items (OrderLinesView: a plain table edge to edge, a list on a
+          phone), never the grid editor locked: that one is for Edit items. */}
+      <OrderLinesView set="packing" lines={lines} label={`${title} · items`} />
+      <div className={cn(RULES.box.body, "border-t border-line")}>
+        <PackingMarks
+          containerNo={containerNo}
+          containerHref={containerHref}
+          shippingMarks={shippingMarks}
+          canEdit={canEdit}
+          action={marksAction}
+          edit={ref("packing.marks")}
+          card={edits?.cards["packing.marks"]}
+        />
+      </div>
         {editing && canEdit && (
           <SidePanel
             title="Edit packing list"
@@ -332,7 +320,6 @@ export function PackingCard({
             <OrderLinesEditor set="packing" orderId={orderId} lines={lines} today={today} edit={ref("lines.packing")} card={edits?.cards["lines.packing"]} />
           </SidePanel>
         )}
-      </CardBody>
     </Card>
   );
 }
@@ -363,7 +350,7 @@ function PackingMarks({
   ) : null;
   if (!containerNo && !shippingMarks && !canEdit) return null;
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-t border-line pt-2 text-sm">
+    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 text-sm">
       <dl className="flex min-w-0 flex-wrap gap-x-6 gap-y-1">
         <div className="flex flex-wrap items-baseline gap-1.5">
           <dt className="text-muted">Container</dt>

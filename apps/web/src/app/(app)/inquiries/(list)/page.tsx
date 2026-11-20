@@ -3,7 +3,7 @@ import { OpenPanelButton } from "@/components/common/panel";
 import { NewInquiryWindow } from "../inquiry-windows";
 import { MessageSquareText, Plus, X } from "lucide-react";
 import { can, INQUIRY, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { RefCode, buildHref, ButtonLink, LinkTabs, Pager, toPage } from "@kebo/ui";
+import { RefCode, buildHref, ButtonLink, LinkTabs, Pager, Stack, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { FilterCard } from "@/components/common/filter-card";
 import { FactLine, FollowUpDay, PriorityTag, Responsible, Stands } from "@/components/lists/list-parts";
@@ -64,7 +64,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
   const today = companyToday();
 
   return (
-    <div>
+    <Stack>
       <InquiriesHeader me={me} view="list" excel={excel} query={{ stage: keep.stage, q: sp.q, assignee, customer: sp.customer, priority, channel, category: sp.category }} />
 
       <FactLine facts={inquiryFacts(yearFunnel, c.late_follow_ups ?? 0, currency)} />
@@ -168,6 +168,6 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
       <Pager base="/inquiries" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
 
       {sp.panel === "new-inquiry" && <NewInquiryWindow customerId={sp.for} />}
-    </div>
+    </Stack>
   );
 }
