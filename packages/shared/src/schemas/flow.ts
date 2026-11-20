@@ -245,7 +245,7 @@ export const satInput = z.object({
 export type SatInput = z.infer<typeof satInput>;
 
 /** One tap on Delivery & SAT: every goods line delivered in full and in good condition, on this day (empty: today). */
-export const deliveryAllGoodInput = z.object({ deliveredOn: optionalDate.optional() });
+export const deliveryAllGoodInput = z.object({ deliveredOn: optionalDate.optional(), ...goAhead });
 export type DeliveryAllGoodInput = z.infer<typeof deliveryAllGoodInput>;
 
 /** One tap on the SAT: every open point passed, signed off on this day (empty: today) by this person. */

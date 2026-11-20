@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Columns3, Factory, List } from "lucide-react";
+import { ChevronRight, Columns3, List } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
-import { THead, Th, Tr, Badge, cn, EmptyState, Notice, subTitleClass, Dash } from "@kebo/ui";
+import { THead, Th, Tr, Badge, cn, EmptyLine, Notice, RULES, subTitleClass, Dash } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { dayMonth, money, plural, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
@@ -310,13 +310,9 @@ export default async function SourcingPage({
 function NoOffers({ items }: { items: SourcingView["items"] }) {
   return (
     <div>
-      <EmptyState
-        icon={Factory}
-        title="No supplier offer yet"
-        description="Enter one when a supplier sends its prices: the customer's items are listed with a price box each."
-      />
+      <EmptyLine inset>No supplier offer yet. Enter one when a supplier sends its prices: each item gets a price box.</EmptyLine>
       {items.length > 0 && (
-        <div className="border-t border-line px-5 py-4">
+        <div className={cn("border-t border-line", RULES.box.body)}>
           <h3 className={subTitleClass}>What the suppliers quote on</h3>
           <ul className="mt-1 flex flex-col divide-y divide-line">
             {items.map((it) => (

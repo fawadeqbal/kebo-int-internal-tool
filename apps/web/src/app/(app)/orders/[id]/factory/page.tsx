@@ -95,9 +95,11 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
     label: string,
     main: boolean,
     prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null },
+    name?: string,
   ) =>
     canPay ? (
       <PayFactoryWindow
+        name={name}
         label={label}
         main={main}
         sub={sub}
@@ -416,7 +418,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                     amount: r.open,
                     kind: r.dueRule === "on_order" ? "deposit" : "balance",
                     reference: r.supplierRef,
-                  })
+                  }, n === 0 ? "pay-supplier" : undefined)
                 }
                 orderCurrency={o.currency}
                 paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}

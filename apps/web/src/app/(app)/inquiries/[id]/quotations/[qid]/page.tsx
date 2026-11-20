@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment, type ReactNode } from "react";
-import { ChevronRight, Download, Eye, Lock, Send } from "lucide-react";
+import { ArrowRight, ChevronRight, Download, Eye, Lock, Send } from "lucide-react";
 import { BASIS_STEP_LABEL, can, PAPER, RECORD_KIND, RECORD_TITLE, REVISION_STATUS_LABEL, routeFromTerms, SENT_VIA_TEXT, unpricedItems, type BasisStep, type TermsCheck } from "@kebo/shared";
-import { cn, RULES, Notice } from "@kebo/ui";
+import { ButtonLink, cn, RULES, Notice } from "@kebo/ui";
 import { PanelButton } from "@/components/orders/step-view";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
 import { recordActions } from "@/components/records/actions";
@@ -136,6 +136,7 @@ export default async function QuotationOwnPage({
   const prev = at > 0 ? q.quotations[at - 1] : null;
   const next = at < q.quotations.length - 1 ? q.quotations[at + 1] : null;
 
+  const acceptedOrder = d.orders.find((o) => o.status !== "cancelled");
   // The quotation's list of actions (canvas board "Actions: one list per record type"): one strong button for its
   // state, Print and PDF beside ⋯ (in ⋯ on a phone), the rest in ⋯ with Delete draft last.
   const actions = recordActions(`More for ${quoteRef}`, [
@@ -165,6 +166,17 @@ export default async function QuotationOwnPage({
           overdue={r.validUntil < today}
           route={r.paymentRoute ?? routeFromTerms(r.balanceTerms).route}
         />
+      ),
+    },
+    {
+      // Accepted: the order it made is the next place to go, as the inquiry's "Go to the order".
+      id: "order",
+      place: "primary",
+      when: r.status === "accepted" && !!acceptedOrder,
+      node: acceptedOrder && (
+        <ButtonLink href={`/orders/${acceptedOrder.id}`} variant="primary">
+          Go to the order <ArrowRight aria-hidden />
+        </ButtonLink>
       ),
     },
     { id: "print", place: "paper", label: "Print", icon: <Eye aria-hidden />, href: printHref(r), newTab: true },

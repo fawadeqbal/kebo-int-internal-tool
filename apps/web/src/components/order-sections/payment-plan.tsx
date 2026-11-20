@@ -10,7 +10,7 @@ import type { OrderMoney } from "@/lib/types-money";
 import { requestPrintHref, requestWords } from "@/lib/requests";
 import { SendDialog } from "@/components/money/requests";
 import { RecordPaymentWindow } from "./payment-windows";
-import { ROW_LINK } from "./section-window";
+import { ROW_LINK, useOpenFromLink } from "./section-window";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 type Send = (ref: string, prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -79,6 +79,13 @@ export function PaymentPlanTable({
   // The dialog lives here, not in the row: once sent, the row's button changes and the dialog still says what to do next.
   const [sending, setSending] = useState<Sending | null>(null);
   const close = useCallback(() => setSending(null), []);
+  // The order's next step "Ask for the balance" (…/payment?do=ask-balance): the request of the first part still to
+  // come opens, as its own Send request would (bank-route parts are sent from Documents).
+  useOpenFromLink("ask-balance", () => {
+    const i = plan.items.find((x) => x.request.state !== "paid" && x.request.through !== "bank");
+    if (i && plan.canSend)
+      setSending({ action: send.bind(null, i.id), orderId, refId: i.id, number: i.number, label: i.label, amount: i.amount, currency, dueOn: i.dueOn, again: i.request.with === "request" });
+  });
   if (!plan.items.length && !plan.cancelled.length) return <EmptyLine>No plan yet.</EmptyLine>;
   const next = plan.items.find((i) => i.request.state !== "paid");
 

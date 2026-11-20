@@ -61,7 +61,7 @@ export function statusWords(d: DealDetail, f: OfferFacts | null, today: string):
   if (f) {
     if (f.asked > 0 && f.answered < f.asked) return { text: `${stage} · ${f.answered} of ${f.asked} offers in`, tone: "action" };
     if (f.offers > 0) return { text: `${stage} · ${plural(f.offers, "offer")} in`, tone: "action" };
-    return { text: `${stage} · no supplier asked yet`, tone: "action" };
+    return { text: `${stage} · no supplier offer yet`, tone: "action" };
   }
   return { text: stage, tone: "action" };
 }

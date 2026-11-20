@@ -61,7 +61,7 @@ export async function moveStageAction(orderId: string, _prev: ActionState, form:
     blNo: v.blNo?.trim() || null,
     reason: reasonOf(form),
   };
-  const r = await attempt(form, () => api.post(`/orders/${orderId}/stage`, body), "Order moved.");
+  const r = await attempt(form, () => api.post(`/orders/${orderId}/stage`, body), v.to === "done" ? "Order closed." : "Order moved.");
   if (r.ok) refresh(orderId);
   return r;
 }

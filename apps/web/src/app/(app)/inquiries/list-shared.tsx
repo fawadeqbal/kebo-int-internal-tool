@@ -109,7 +109,7 @@ export function whereItStands(d: DealRow, today: string): string {
         ? `${asked} asked · none answered`
         : r
           ? null
-          : "no supplier asked yet"
+          : "no supplier offer yet"
       : asked > offers
         ? `${offers} of ${asked} suppliers answered`
         : `${offers} offer${offers === 1 ? "" : "s"} in`;

@@ -85,20 +85,22 @@ export interface OrderStep {
   tab: OrderTab;
   /** The window on that tab the button opens (its `name`); none: the tab itself. */
   window?: string;
+  /** A page of the order other than a tab (the shipping advice paper), in place of the tab. */
+  path?: string;
 }
 
 const STEP: Record<OrderStepKey, Omit<OrderStep, "key">> = {
   choose_route: { label: "Choose how they pay", tab: "payment", window: "route" },
   record_deposit: { label: "Record the deposit", tab: "payment", window: "record-payment" },
   send_po: { label: "Send the PO", tab: "factory", window: "send-po" },
-  pay_supplier: { label: "Pay the supplier's deposit", tab: "factory" },
+  pay_supplier: { label: "Pay the supplier's deposit", tab: "factory", window: "pay-supplier" },
   set_ready: { label: "Set the ready date", tab: "production", window: "ready-date" },
   goods_in: { label: "Goods received", tab: "production", window: "all-received" },
-  book: { label: "Book the shipment", tab: "shipping" },
-  ask_balance: { label: "Ask for the balance", tab: "payment" },
-  sailed: { label: "Sailed", tab: "shipping" },
-  send_advice: { label: "Send the shipping advice", tab: "shipping" },
-  arrived: { label: "Arrived", tab: "shipping" },
+  book: { label: "Book the shipment", tab: "shipping", window: "booking" },
+  ask_balance: { label: "Ask for the balance", tab: "payment", window: "ask-balance" },
+  sailed: { label: "Record the sailing", tab: "shipping", window: "vessel" },
+  send_advice: { label: "Send the shipping advice", tab: "shipping", path: "papers/shipping-advice" },
+  arrived: { label: "Record the arrival", tab: "shipping", window: "arrival" },
   delivered: { label: "Delivered", tab: "delivery", window: "all-delivered" },
   sign_sat: { label: "Sign off the SAT", tab: "delivery", window: "sign-off" },
   close: { label: "Close the order", tab: "overview" },
@@ -121,16 +123,18 @@ export function orderNextStep(f: OrderStepFacts, today: ISODate): OrderStep | nu
     if (!f.poSent) return step("send_po");
     if (f.supplierDepositDue > 0) return step("pay_supplier");
     if (!f.goodsIn && !f.readyOn) return step("set_ready");
-    if (!f.goodsIn && f.readyOn && f.readyOn <= today) return step("goods_in");
+    // Ready within two weeks and not booked yet: book first (the shipping rule below); else the goods are what's next.
+    const bookFirst = f.shipping && !f.booked && !!f.readyOn && f.readyOn > today && f.readyOn <= addDays(today, 14);
+    if (!f.goodsIn && f.readyOn && !bookFirst) return step("goods_in");
   }
   if (f.shipping && !gone) {
     const soon = f.goodsIn || (!!f.readyOn && f.readyOn <= addDays(today, 14));
     if (!f.booked && soon) return step("book");
     if (f.balanceBeforeShipment > 0 && (f.booked || f.goodsIn)) return step("ask_balance");
-    if (f.booked && f.etd && f.etd <= today) return step("sailed");
+    if (f.booked) return step("sailed");
   }
   if (f.shipping && f.sailed && f.adviceSent === false && !f.delivered) return step("send_advice");
-  if (f.shipping && f.sailed && !f.arrived && !f.delivered && f.eta && f.eta <= today) return step("arrived");
+  if (f.shipping && f.sailed && !f.arrived && !f.delivered) return step("arrived");
   if (f.deliverySat && f.arrived && !f.delivered) return step("delivered");
   if (f.deliverySat && f.delivered && f.satOpen) return step("sign_sat");
   if (f.canClose) return step("close");

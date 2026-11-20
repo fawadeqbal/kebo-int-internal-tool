@@ -70,12 +70,14 @@ export function PayFactoryWindow({
   /** Open at once (a list's row asked for it), and what to do once it closes. */
   startOpen?: boolean;
   onClosed?: () => void;
+  /** A link opens it: ?do=<name> (the order's next step). */
+  name?: string;
 }) {
   const [fileError, setFileError] = useState<string | null>(null);
-  const { startOpen, onClosed, ...fields } = p;
+  const { startOpen, onClosed, name, ...fields } = p;
   return (
     <>
-      <FormWindow button={{ label, kind: main ? "main" : "plain" }} title="Pay the supplier" sub={sub} size="lg" disabled={!p.factories.length} startOpen={startOpen} onClosed={onClosed}>
+      <FormWindow button={{ label, kind: main ? "main" : "plain" }} title="Pay the supplier" sub={sub} size="lg" disabled={!p.factories.length} startOpen={startOpen} onClosed={onClosed} name={name}>
         {(close) => <FactoryPaymentForm {...fields} bare onClose={close} onFileError={setFileError} />}
       </FormWindow>
       {fileError && <Notice tone="bad">{fileError}</Notice>}

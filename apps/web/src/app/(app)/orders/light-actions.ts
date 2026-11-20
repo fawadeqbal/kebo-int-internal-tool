@@ -168,7 +168,7 @@ export async function lightAction(orderId: string, what: string, _prev: ActionSt
             ...pick(v, ["courier", "reference", "note"]),
           });
         case "delivered_all":
-          return api.post(`/orders/${orderId}/delivery/all-good`, { deliveredOn: v.deliveredOn || v.on || null });
+          return api.post(`/orders/${orderId}/delivery/all-good`, { deliveredOn: v.deliveredOn || v.on || null, ...ahead(v) });
         case "sat_all":
           return api.post(`/orders/${orderId}/sat/all-passed`, {
             satDoneOn: v.satDoneOn || v.on || null,
