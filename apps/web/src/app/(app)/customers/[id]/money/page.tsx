@@ -1,6 +1,6 @@
 import { Banknote, Printer } from "lucide-react";
 import { can, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
-import { ButtonLink, Card, CardHeader, EmptyState, RefCode, Td, Th, THead, Tr } from "@kebo/ui";
+import { PhoneList, PhoneRow, ButtonLink, Card, CardHeader, EmptyState, RefCode, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
 import { getPeople, getSettings } from "@/lib/loaders";
@@ -144,6 +144,20 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
             description="Their orders and payments show here as a statement, with the balance after each."
           />
         ) : (
+          <>
+          {/* A phone: a row per line — what, its day and order, what it moved; the balance after it on the right. */}
+          <PhoneList label="Statement">
+            {lines.map((l) => (
+              <PhoneRow
+                key={l.key}
+                href={l.order ? `/orders/${l.order.id}` : undefined}
+                title={l.what}
+                line={[date(l.date), l.order?.refNo, Math.abs(l.charged) >= 0.005 ? `${"charged"} ${amount(l.charged)}` : null, l.paid ? `paid ${amount(l.paid)}` : null].filter(Boolean).join(" · ")}
+                figure={l.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              />
+            ))}
+          </PhoneList>
+          <div className="max-sm:hidden">
           <DataTable label="Statement">
               <THead>
                 <tr>
@@ -186,6 +200,8 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
                 </tr>
               </tfoot>
           </DataTable>
+          </div>
+          </>
         )}
       </Card>
 

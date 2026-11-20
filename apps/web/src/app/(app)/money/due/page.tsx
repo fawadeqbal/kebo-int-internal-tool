@@ -158,12 +158,14 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
                     <span className="sr-only">Open</span>
                   </Th>
                   <Th>Customer · order</Th>
-                  <Th className="text-right">Order total</Th>
-                  <Th className="text-right">Received</Th>
+                  {/* A phone keeps the customer (with when it is due under it) and what is still due; the rest is in
+                      the parts, a tap away. */}
+                  <Th className="text-right max-sm:hidden">Order total</Th>
+                  <Th className="text-right max-sm:hidden">Received</Th>
                   <Th className="text-right">Still due</Th>
-                  <Th>Next part</Th>
-                  <Th>Due</Th>
-                  <Th>
+                  <Th className="max-sm:hidden">Next part</Th>
+                  <Th className="max-sm:hidden">Due</Th>
+                  <Th className="max-sm:hidden">
                     <span className="sr-only">What to do</span>
                   </Th>
                 </tr>
@@ -189,18 +191,21 @@ async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
                             {o.handledBy ? ` · ${o.handledBy.name}` : ""}
                             {o.closed ? " · closed" : ""}
                           </span>
+                          <span className={cn("block text-xs sm:hidden", o.daysLate > 0 ? "font-semibold text-bad" : "text-text-2")}>
+                            {o.daysLate > 0 ? `${days(o.daysLate)} late` : o.next?.dueOn ? `due ${date(o.next.dueOn)}` : (o.next?.when ?? "No date yet")}
+                          </span>
                         </Td>
-                        <Td className="text-right whitespace-nowrap tabular">{n2(o.total)}</Td>
-                        <Td className="text-right whitespace-nowrap tabular">{n2(o.received)}</Td>
+                        <Td className="text-right whitespace-nowrap tabular max-sm:hidden">{n2(o.total)}</Td>
+                        <Td className="text-right whitespace-nowrap tabular max-sm:hidden">{n2(o.received)}</Td>
                         <Td className="text-right font-semibold whitespace-nowrap tabular">
                           {n2(o.due)}
                           <span className="block text-xs font-normal text-text-2">{o.currency}</span>
                         </Td>
-                        <Td className="text-sm">{o.next ? `${o.next.label}${Number(o.next.open) !== Number(o.due) ? ` · ${n2(o.next.open)}` : ""}` : <span className="text-muted">—</span>}</Td>
-                        <Td className={cn("text-sm", o.daysLate > 0 ? "font-semibold text-bad" : soon(o) ? "font-medium text-warn" : "text-text")}>
+                        <Td className="text-sm max-sm:hidden">{o.next ? `${o.next.label}${Number(o.next.open) !== Number(o.due) ? ` · ${n2(o.next.open)}` : ""}` : <span className="text-muted">—</span>}</Td>
+                        <Td className={cn("text-sm max-sm:hidden", o.daysLate > 0 ? "font-semibold text-bad" : soon(o) ? "font-medium text-warn" : "text-text")}>
                           {o.daysLate > 0 ? `${days(o.daysLate)} late` : o.next?.dueOn ? `${date(o.next.dueOn)}${o.next.dueOn >= today ? ` · in ${days(daysBetween(today, o.next.dueOn))}` : ""}` : (o.next?.when ?? "No date yet")}
                         </Td>
-                        <Td className="text-right">
+                        <Td className="text-right max-sm:hidden">
                           {(can(me, "payments.record") || can(me, "money.submit")) && !open && (
                             <Link href={href({ open: o.id, do: "pay" })} scroll={false} className={buttonClass("secondary", "sm")}>
                               Record payment
@@ -375,12 +380,12 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
               <THead>
                 <tr>
                   <Th>Who we owe</Th>
-                  <Th>What for</Th>
-                  <Th>Order</Th>
-                  <Th className="text-right">Amount</Th>
-                  <Th className="text-right">Paid</Th>
+                  <Th className="max-sm:hidden">What for</Th>
+                  <Th className="max-sm:hidden">Order</Th>
+                  <Th className="text-right max-sm:hidden">Amount</Th>
+                  <Th className="text-right max-sm:hidden">Paid</Th>
                   <Th className="text-right">Still to pay</Th>
-                  <Th>Due</Th>
+                  <Th className="max-sm:hidden">Due</Th>
                   <Th>
                     <span className="sr-only">Pay</span>
                   </Th>
@@ -389,12 +394,19 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
               <tbody>
                 {shown.map((r) => (
                   <Tr key={r.key} id={r.key}>
-                    <Td className="font-semibold">{r.who}</Td>
-                    <Td>
+                    <Td className="font-semibold">
+                      {r.who}
+                      {/* A phone: what for, the order and when, under the name (their columns are a laptop's). */}
+                      <span className="block text-xs font-normal text-text-2 sm:hidden">
+                        {[r.what, r.order?.refNo ?? "Company"].join(" · ")}
+                      </span>
+                      <span className={cn("block text-xs font-normal sm:hidden", r.late > 0 ? "font-semibold text-bad" : "text-text-2")}>{r.dueWords}</span>
+                    </Td>
+                    <Td className="max-sm:hidden">
                       {r.what}
                       {r.detail && <span className="block text-xs text-text-2">{r.detail}</span>}
                     </Td>
-                    <Td>
+                    <Td className="max-sm:hidden">
                       {r.order ? (
                         <Link href={`/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}`} className="font-medium text-primary hover:underline">
                           {r.order.refNo}
@@ -403,10 +415,10 @@ async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
                         <span className="text-text-2">Company</span>
                       )}
                     </Td>
-                    <Td className="text-right whitespace-nowrap tabular">{money(r.amount, r.currency)}</Td>
-                    <Td className="text-right whitespace-nowrap tabular">{n2(r.paid)}</Td>
+                    <Td className="text-right whitespace-nowrap tabular max-sm:hidden">{money(r.amount, r.currency)}</Td>
+                    <Td className="text-right whitespace-nowrap tabular max-sm:hidden">{n2(r.paid)}</Td>
                     <Td className="text-right font-semibold whitespace-nowrap tabular">{money(r.open, r.currency)}</Td>
-                    <Td className={cn("text-sm", r.late > 0 ? "font-semibold text-bad" : soon(r) ? "font-medium text-warn" : r.dueOn ? "text-text" : "text-text-2")}>{r.dueWords}</Td>
+                    <Td className={cn("text-sm max-sm:hidden", r.late > 0 ? "font-semibold text-bad" : soon(r) ? "font-medium text-warn" : r.dueOn ? "text-text" : "text-text-2")}>{r.dueWords}</Td>
                     <Td className="text-right">
                       {r.part ? (
                         !parts.canPay ? (

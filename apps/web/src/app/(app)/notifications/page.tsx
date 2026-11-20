@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, FactsLine } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -13,7 +13,6 @@ import { markAllReadAction } from "./actions";
 import { readableDates } from "@/components/insights/readable-dates";
 
 export const metadata = { title: "Alerts" };
-
 
 /** Where a row goes: through /notifications/open (marks it read) when new, else straight to its link. */
 const openHref = (n: NotificationItem) =>
@@ -65,7 +64,6 @@ export default async function NotificationsPage({ searchParams }: { searchParams
           )
         }
       />
-      <FactsLine facts={unread ? [{ label: "New", value: unread }] : []} />
       <LinkTabs
         label="Which alerts"
         className="mb-4"

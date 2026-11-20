@@ -91,6 +91,7 @@ export default async function DealLayout({ children, params }: { children: React
         bare={["quotations", "offers"]}
         panelLabel="Beside the inquiry"
         panel={<InquirySide id={id} />}
+        folds
         top={
         <RecordTop
           header={{

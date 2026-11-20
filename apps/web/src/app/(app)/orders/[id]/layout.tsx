@@ -139,6 +139,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
         wide={["papers"]}
         panelLabel="Beside the order"
         panel={<OrderSide id={id} />}
+        folds
         top={
           <RecordTop
             header={{

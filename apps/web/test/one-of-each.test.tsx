@@ -275,6 +275,17 @@ describe("one of each", () => {
     expect(found(/cell: \(d\) => d\.refNo \}/g)).toEqual([]);
   });
 
+  it("on a phone: every record's panel folds into its bar, money tables are phone rows, no phone-only chip bar", () => {
+    // RecordBody folds a panel into a SideSheet bar unless the panel folds itself (inquiry, order: folds).
+    expect(SOURCES.find((f) => f.file.endsWith("records/record-frame.tsx"))?.text).toContain("<SideSheet");
+    expect(found(/export function RecordNav\b/g)).toEqual([]);
+    // The money lists have their phone rows (or phone-sized columns).
+    for (const f of ["finance/ledger/page.tsx", "finance/sections.tsx", "access/roles/page.tsx", "customers/[id]/money/page.tsx", "suppliers/[id]/costs/page.tsx"])
+      expect(SOURCES.find((s) => s.file.endsWith(f))?.text, f).toContain("<PhoneList");
+    // History is read through readableHistory (ids out, amounts grouped).
+    expect(found(/readableDates\(e\.summary\)|readableDates\(r\.summary\)/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });
