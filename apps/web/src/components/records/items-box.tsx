@@ -69,7 +69,7 @@ export function ItemsBody({
 }) {
   return rows.length ? (
     <>
-      <div className="p-3 max-sm:hidden">
+      <div className="max-sm:hidden">
         <LinesView label={label} rows={rows} columns={columns} numbers={numbers} after={after} />
       </div>
       <PhoneItems label={label} rows={phone} />

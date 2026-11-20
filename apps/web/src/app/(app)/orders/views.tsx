@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { Board as BoardColumns } from "@/components/lists/board";
 import { Factory, FileText, LayoutGrid, List as ListIcon, Package, PieChart, Ship } from "lucide-react";
-import { ORDER_STAGE_LABEL, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
+import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
 import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, Segmented, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
@@ -348,40 +349,36 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
         clearHref={mine ? "/orders/board?mine=1" : "/orders/board"}
         selects={[{ name: "customer", label: "Customer", value: sp.customer, options: (customers?.rows ?? []).map((c) => ({ value: c.id, label: c.name })) }]}
       />
-      <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
-        {cols.map((c) => {
-          const v = valueOf(c.rows);
+      <BoardColumns
+        columns={cols.map((c) => ({
+          key: c.stage,
+          label: c.stage === "done" ? "Done" : ORDER_STAGE_LABEL[c.stage],
+          tone: ORDER_STAGE_TONE[c.stage],
+          total: c.rows.length,
+          rows: c.rows.slice(0, 40),
+          value: valueOf(c.rows),
+          empty: c.stage === "done" ? "Nothing done lately." : `No orders ${ORDER_STAGE_LABEL[c.stage].toLowerCase()}.`,
+          moreHref: buildHref("/orders", {}, { stage: c.stage === "done" ? undefined : c.stage, status: c.stage === "done" ? "closed" : undefined }),
+        }))}
+        rowKey={(o) => o.id}
+        phoneKey={cols.some((c) => c.stage === sp.stage) ? String(sp.stage) : cols[0]!.stage}
+        phoneHref={(key) => buildHref("/orders/board", { mine: mine ? "1" : undefined, q: sp.q, customer: sp.customer }, { stage: key })}
+        card={(o) => {
+          const [word, meaning] = pill(o);
           return (
-            <section key={c.stage} aria-label={ORDER_STAGE_LABEL[c.stage]} className="flex w-[296px] min-w-[260px] flex-none flex-col gap-2.5 rounded-2xl bg-surface-3/60 p-3 lg:w-auto lg:flex-1">
-              <h2 className="flex items-baseline justify-between gap-2 px-1 text-sm">
-                <span className="font-bold">
-                  {c.stage === "done" ? "Done" : ORDER_STAGE_LABEL[c.stage]} <span className="font-normal text-muted">{c.rows.length}</span>
+            <li>
+              <Link href={`/orders/${o.id}`} className="block rounded-[10px] border border-line bg-surface px-3 py-2.5 text-md leading-[18px] transition-colors hover:border-primary-line">
+                <span className="flex items-center justify-between gap-2">
+                  <RefCode>{o.refNo}</RefCode>
+                  <StatusBadge meaning={meaning}>{word}</StatusBadge>
                 </span>
-                {v && <span className="text-xs text-muted">{v}</span>}
-              </h2>
-              {c.rows.slice(0, 40).map((o) => {
-                const [word, meaning] = pill(o);
-                return (
-                  <Link key={o.id} href={`/orders/${o.id}`} className="block rounded-xl border border-line bg-surface px-3 py-2.5 transition-shadow hover:shadow-card">
-                    <span className="flex items-center justify-between gap-2">
-                      <RefCode>{o.refNo}</RefCode>
-                      <StatusBadge meaning={meaning}>{word}</StatusBadge>
-                    </span>
-                    <strong className="mt-1.5 block truncate text-sm">{o.inquiry.title}</strong>
-                    <span className="block truncate text-xs text-muted">{line(o)}</span>
-                  </Link>
-                );
-              })}
-              {c.rows.length > 40 && (
-                <Link href={buildHref("/orders", {}, { stage: c.stage === "done" ? undefined : c.stage, status: c.stage === "done" ? "closed" : undefined })} className="px-1 text-xs font-semibold text-primary hover:underline">
-                  {c.rows.length - 40} more in the list →
-                </Link>
-              )}
-              {c.rows.length === 0 && <p className="rounded-xl border-2 border-dashed border-line-strong px-3 py-6 text-center text-xs text-muted">Nothing here</p>}
-            </section>
+                <span className="mt-1.5 block truncate text-md font-semibold text-text">{o.inquiry.title}</span>
+                <span className="block truncate text-xs text-text-2">{line(o)}</span>
+              </Link>
+            </li>
           );
-        })}
-      </div>
+        }}
+      />
     </div>
   );
 }

@@ -692,16 +692,25 @@ export function PhoneRow({
 
 /* ---------------------------------------------------------------- Detail list */
 
-/** Label/value grid for detail panels. */
+/**
+ * Label/value rows for detail panels: the record box's rows (label at the left, the value beside it), the same as
+ * DetailsCard and BoxFacts; `columns` 2 or 3: two pairs a row on a wide screen.
+ */
 export function DetailList({ items, columns = 2, className }: { items: { label: ReactNode; value: ReactNode; hidden?: boolean }[]; columns?: 1 | 2 | 3; className?: string }) {
   return (
-    <dl className={cn("grid gap-x-6 gap-y-3", columns === 1 ? "grid-cols-1" : columns === 3 ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-1 sm:grid-cols-2", className)}>
+    <dl
+      className={cn(
+        "grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm",
+        columns > 1 && "lg:grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1fr)] lg:gap-x-6",
+        className,
+      )}
+    >
       {items
         .filter((i) => !i.hidden)
         .map((i, idx) => (
-          <div key={idx} className="min-w-0">
-            <dt className="text-xs text-muted">{i.label}</dt>
-            <dd className="mt-0.5 text-sm break-words text-text">{i.value ?? "—"}</dd>
+          <div key={idx} className="contents">
+            <dt className="text-text-2">{i.label}</dt>
+            <dd className="min-w-0 font-medium break-words text-text">{i.value ?? "—"}</dd>
           </div>
         ))}
     </dl>

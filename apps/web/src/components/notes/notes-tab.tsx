@@ -1,5 +1,5 @@
 import { NOTE_KIND_LABEL, type NoteKind } from "@kebo/shared";
-import { Avatar, Badge, Card, CardHeader, EmptyState } from "@kebo/ui";
+import { Avatar, Badge, Card, CardHeader, EmptyLine } from "@kebo/ui";
 import { RecordBody } from "@/components/records/record-frame";
 import { date, companyToday } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
@@ -46,7 +46,7 @@ export function NotesTab({
       <Card>
         <CardHeader title="Notes and calls" />
         {notes.length === 0 ? (
-          <EmptyState title="No notes yet" description="Calls, visits and messages show here, the latest first." />
+          <EmptyLine inset>No notes yet. Calls, visits and messages show here, the latest first.</EmptyLine>
         ) : (
           <ol className="px-5 pb-4" aria-label="Notes and calls">
             {notes.map((n) => (

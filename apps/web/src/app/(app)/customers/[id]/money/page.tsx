@@ -1,16 +1,15 @@
 import { Banknote, Printer } from "lucide-react";
 import { can, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
-import { ButtonLink, Card, CardHeader, EmptyState, RefCode, StatRow, StatTile, Td, Th, THead, Tr } from "@kebo/ui";
+import { ButtonLink, Card, CardHeader, EmptyState, RefCode, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { CustomerAccount, ExpenseList } from "@/lib/types-money";
 import { CustomerSpending, WhereMoneyWent } from "@/components/money/customer-spending";
 import { customerOf, customerPaymentsOf } from "@/lib/party-data";
-import { date, whole, companyToday } from "@/lib/format";
+import { date, companyToday } from "@/lib/format";
 import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
-import { late } from "../shared";
 import { customerTitle } from "@/lib/titles";
 
 export const generateMetadata = customerTitle("Money");
@@ -54,11 +53,6 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
   ]);
   const totals = pay?.totals ?? [];
   const main = totals[0]?.currency ?? c.defaultCurrency;
-  const sum = (k: "total" | "received" | "due") => totals.filter((t) => t.currency === main).reduce((s, t) => s + Number(t[k]), 0);
-  const lateAmount = (pay?.orders ?? [])
-    .filter((o) => o.currency === main && late(o, today))
-    .reduce((s, o) => s + Number(o.next?.open ?? 0), 0);
-  const credit = pay?.credit.balances.find((b) => b.currency === main)?.amount ?? 0;
 
   // The statement in the customer's main currency.
   let lines: Line[];
@@ -115,18 +109,6 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
 
   return (
     <div className="flex flex-col gap-4">
-      <StatRow>
-        <StatTile label="Sold" value={whole(sum("total"), main)} />
-        <StatTile label="Received" value={whole(sum("received"), main)} />
-        <StatTile
-          label="They owe"
-          value={whole(sum("due"), main)}
-          tone={lateAmount > 0.005 ? "bad" : undefined}
-          sub={lateAmount > 0.005 ? `${whole(lateAmount, main)} late` : undefined}
-        />
-        <StatTile label="Credit" value={whole(credit, main)} />
-      </StatRow>
-
       {account && <WhereMoneyWent a={account} />}
 
       <Card className="overflow-clip">

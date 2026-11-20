@@ -232,6 +232,21 @@ describe("one of each", () => {
     expect(found(/actions=\{<ExportCsv/g)).toEqual([]);
   });
 
+  it("one box: one title style, no table or tiles framed inside a box, figures as the facts line, one details piece", () => {
+    // Box and panel titles draw boxTitleClass (not a semibold or base-size copy).
+    expect(found(/className="(?:mb-1 )?text-lead font-semibold"|id="details-title" className="text-base/g)).toEqual([]);
+    // Read-only lines and performance figures have no frame of their own inside their box.
+    expect(found(/overflow-x-auto rounded-lg border border-line focus-visible/g)).toEqual([]);
+    expect(found(/block h-full rounded-lg border border-line px-3 py-2\.5/g)).toEqual([]);
+    // The ledger's ageing and the roles' figures are the facts line; no hand-made grid of tiles.
+    expect(found(/<div className="grid grid-cols-2 gap-3 lg:grid-cols-4">\s*<StatTile/g)).toEqual([]);
+    expect(SOURCES.find((f) => f.file.endsWith("ledger/ledger-parts.tsx"))?.text).toContain("<FactsLine");
+    // Details: label at the left (DetailsCard, DetailList, BoxFacts), not a "label above value" grid.
+    expect(found(/<dt className="text-xs text-muted">/g).filter((f) => f.includes("common/record.tsx") || f.includes("primitives.tsx"))).toEqual([]);
+    // One board: the orders board draws the shared Board (no dashed "Nothing here").
+    expect(found(/border-2 border-dashed border-line-strong px-3 py-6 text-center text-xs text-muted">Nothing here/g)).toEqual([]);
+  });
+
   it("no page keeps its own small-button class (SMALL, editClass, BTN)", () => {
     expect(found(/const (?:SMALL|editClass|BTN) = /g)).toEqual([]);
   });

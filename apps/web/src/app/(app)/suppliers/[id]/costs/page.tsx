@@ -50,9 +50,6 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
   ]);
   const orders = (pos?.rows ?? []).filter((o) => o.status !== "cancelled");
   const cur = orders[0]?.currency ?? payables[0]?.currency ?? ledger?.currencies[0]?.currency ?? "CNY";
-  const sum = (k: "owed" | "paid" | "toPay") => orders.filter((o) => o.currency === cur).reduce((t, o) => t + Number(o[k]), 0);
-  const owing = pos ? sum("toPay") : payables.filter((p) => p.currency === cur).reduce((t, p) => t + Number(p.toPay), 0);
-  const firstOpen = orders.find((o) => Number(o.toPay) > 0.005);
 
   let lines: Line[];
   if (ledger) {
@@ -96,15 +93,8 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
 
   return (
     <div className="flex flex-col gap-4">
-      <StatRow>
-        <StatTile label="Bought" value={pos ? whole(sum("owed"), cur) : "—"} />
-        <StatTile label="Paid" value={pos ? whole(sum("paid"), cur) : "—"} />
-        <StatTile
-          label="We owe"
-          value={whole(owing, cur)}
-          tone={owing > 0.005 ? "warn" : undefined}
-          sub={owing > 0.005 && firstOpen ? `${firstOpen.refNo} first` : undefined}
-        />
+      {/* Bought, Paid and We owe are the side panel's Money box; only what it does not say is here, in the facts line. */}
+      <StatRow facts>
         <StatTile label="Other costs" value={costs ? whole(costs.total, costs.currency) : "—"} sub="visits, inspections" />
       </StatRow>
 

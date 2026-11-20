@@ -1427,7 +1427,7 @@ export function LineTable({
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        <div className={cn("overflow-hidden bg-surface", !readOnly && "rounded-lg border border-line")}>
           <ul aria-label={`${Noun}s`}>
             {phoneRows.map(({ r, i }, at) => {
               const bits = linePhoneParts(r, columns, valuesOf(r), !!inRowPrice);
@@ -1759,7 +1759,8 @@ export function LineTable({
       {phone ? (
         phoneList
       ) : (
-      <div className={cn("overflow-hidden rounded-lg border border-line bg-surface", fill && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
+      // Read-only lines sit in their record's box: no frame of their own (no box in a box). Editing, the grid is framed.
+      <div className={cn("overflow-hidden bg-surface", !readOnly && "rounded-lg border border-line", fill && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
         {/* Read-only lines have nothing to tab to inside, so the table itself takes the keyboard (arrow keys scroll
             it sideways); editable lines are reached through their cells. */}
         <div
