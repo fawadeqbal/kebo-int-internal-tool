@@ -15,7 +15,7 @@ import { createUserAction, remindTwoStepAction, setActiveAction } from "../actio
 import { NewUserPanel } from "../forms";
 import { crumbsFor } from "@/lib/nav";
 
-export const metadata = { title: "Users" };
+export const metadata = { title: "Staff" };
 
 type Params = Record<string, string | undefined>;
 
@@ -87,7 +87,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/users")}
-        title="Users"
+        title="Staff"
         primary={
           <OpenPanelButton panel="new-user" variant="strong" label="Add person">
             <Plus aria-hidden /> <span className="sm:hidden">Add</span>

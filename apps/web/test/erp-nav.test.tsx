@@ -76,7 +76,7 @@ describe("the groups", () => {
     expect(m.filter(isSingle)).toEqual([]);
     // Settings is two groups: the company's own (managers too), and the admin's.
     expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails", "Website form"]);
-    expect(pages(m, "admin")).toEqual(["Users", "Roles", "Login history", "Active sessions", "Email sending", "Audit log"]);
+    expect(pages(m, "admin")).toEqual(["Staff", "Roles", "Login history", "Active sessions", "Email sending", "Audit log"]);
   });
 
   it("have one name each, and two levels: a group and its pages", () => {
@@ -168,7 +168,7 @@ describe("the groups", () => {
     // Someone who only manages people sees Admin settings alone.
     const people = buildModules({ can: (p) => p === "users.manage", feature: () => true, approvals: null, approves: false, companyAddresses: false });
     expect(titles(people)).toEqual(["Sales", "Finance", "Admin settings"]);
-    expect(pages(people, "admin")).toEqual(["Users"]);
+    expect(pages(people, "admin")).toEqual(["Staff"]);
     // A recorder without expenses: receivables and payables; Reports without Profit & loss, Cash flow and Expenses.
     const recorder = buildModules({ can: (p) => ["sourcing.manage", "payments.record", "reports.view"].includes(p), feature: () => true, approvals: 0, approves: true, companyAddresses: false });
     expect(pages(recorder, "money")).toEqual(["Receivables & payables", "Payments"]);
@@ -208,7 +208,7 @@ describe("the groups", () => {
     expect(moduleOf("/settings/sales", all)).toBe("company");
     expect(crumbsFor("/suppliers")).toEqual([{ label: "Purchasing" }, { label: "Suppliers" }]);
     expect(pageOf("/operations/purchase-orders/0b6c/9a1b", flat)?.label).toBe("Purchase orders");
-    expect(crumbsFor("/users")).toEqual([{ label: "Admin settings" }, { label: "Users" }]);
+    expect(crumbsFor("/users")).toEqual([{ label: "Admin settings" }, { label: "Staff" }]);
     expect(moduleOf("/suppliers/9a1b", all)).toBe("purchasing");
     expect(moduleOf("/dashboard", all)).toBeUndefined();
     // The path above a page's title: the group, then the page. Two levels.
@@ -278,10 +278,10 @@ describe("the menu down the left", () => {
     const li = (name: string) => menu().getByRole("link", { name: new RegExp(`^${name}`) }).closest("li")!;
     expect(li("Audit log").className).toContain("before:bg-line");
     expect(li("Roles").className).not.toContain("before:bg-line");
-    expect(li("Users").className).not.toContain("before:bg-line");
+    expect(li("Staff").className).not.toContain("before:bg-line");
     // The pages hang on one thin guide line; the page you are on marks it in green.
-    expect(li("Users").closest("ul")!.className).toContain("border-l");
-    expect(menu().getByRole("link", { name: "Users" }).className).toContain("before:bg-primary");
+    expect(li("Staff").closest("ul")!.className).toContain("border-l");
+    expect(menu().getByRole("link", { name: "Staff" }).className).toContain("before:bg-primary");
   });
 });
 
@@ -338,7 +338,7 @@ describe("the folded strip", () => {
     const li = strip().getByRole("button", { name: "Admin settings" }).closest("li")!;
     fireEvent.mouseEnter(li);
     const m = screen.getByRole("menu", { name: "Admin settings" });
-    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["Users", "Roles", "Login history", "Active sessions", "Email sending", "Audit log"]);
+    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["Staff", "Roles", "Login history", "Active sessions", "Email sending", "Audit log"]);
     fireEvent.mouseLeave(li);
     act(() => vi.advanceTimersByTime(300));
     expect(screen.queryByRole("menu")).toBeNull();

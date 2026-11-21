@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Bell, BriefcaseBusiness, Building2, ChartColumn, ChevronRight, Inbox, Landmark, LayoutDashboard, LogOut, Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, Plus, ShoppingCart, User, X, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Banknote, Building, CalendarClock, ChartLine, ClipboardCheck, Contact, CreditCard, Factory, FileStack, FileText, Filter, Globe, History, KeyRound, LockKeyhole, Mail, MonitorSmartphone, Package, Receipt, ScrollText, Send, Target, Users, UserCog, Wallet, BellRing, Bell, BriefcaseBusiness, Building2, ChartColumn, ChevronRight, Inbox, Landmark, LayoutDashboard, LogOut, Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, Plus, ShoppingCart, User, X, ShieldCheck, type LucideIcon } from "lucide-react";
 import { Avatar, buttonClass, cn, RULES, Badge, CountDot } from "@kebo/ui";
 import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
@@ -12,6 +12,48 @@ import { PRODUCT_NAME } from "@/lib/product";
 import { PhoneSearch, TopSearch } from "./global-search";
 
 export type { NavModule, NavPage } from "@/lib/nav";
+
+/** One line icon per page (the same family and weight as the groups'), so every item is found by its picture too. */
+const PAGE_ICONS: Record<string, LucideIcon> = {
+  "/inquiries": Inbox,
+  "/orders": Package,
+  "/customers": Contact,
+  "/follow-ups": CalendarClock,
+  "/operations/purchase-orders": ClipboardCheck,
+  "/suppliers": Factory,
+  "/money/due": ArrowLeftRight,
+  "/payments": CreditCard,
+  "/finance/cash-book": Wallet,
+  "/money/company-costs": Receipt,
+  "/reports": LayoutDashboard,
+  "/reports/profit": ChartLine,
+  "/reports/cash": Banknote,
+  "/reports/spending": Receipt,
+  "/reports/customers": Users,
+  "/reports/factories": Factory,
+  "/reports/people": Target,
+  "/reports/funnel": Filter,
+  "/settings/company": Building,
+  "/settings/address": Globe,
+  "/settings/sales": FileText,
+  "/settings/books": LockKeyhole,
+  "/settings/papers": FileStack,
+  "/settings/reminders": BellRing,
+  "/settings/emails": Mail,
+  "/settings/website-form": Send,
+  "/users": UserCog,
+  "/access/roles": KeyRound,
+  "/access/sign-ins": History,
+  "/access/sessions": MonitorSmartphone,
+  "/settings/mail": Mail,
+  "/audit": ScrollText,
+};
+
+/** A page's icon (none known: a plain dot-sized gap keeps the names in line). */
+function PageIcon({ href, className }: { href: string; className?: string }) {
+  const Icon = PAGE_ICONS[href];
+  return Icon ? <Icon className={cn("size-[15px] shrink-0", className)} strokeWidth={1.75} aria-hidden /> : <span className={cn("size-[15px] shrink-0", className)} aria-hidden />;
+}
 
 /** One line icon per group, drawn the same weight (lucide): what each is in an office, not a picture of money or a box. */
 const ICONS: Record<NavIcon, LucideIcon> = {
@@ -247,12 +289,13 @@ function PageLink({ page, active, big }: { page: NavPage; active: boolean; big?:
       href={page.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex items-center gap-2 rounded-lg px-2.5 text-md text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+        "relative flex items-center gap-2.5 rounded-lg px-2.5 text-md text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
         big ? "min-h-11" : "h-8",
         active &&
           "bg-primary-soft font-semibold text-primary before:absolute before:inset-y-1.5 before:-left-[11px] before:w-0.5 before:rounded-full before:bg-primary hover:bg-primary-soft hover:text-primary",
       )}
     >
+      <PageIcon href={page.href} className={active ? "text-primary" : "text-muted"} />
       <span className="flex-1 truncate">{page.label}</span>
       {!!page.badge && <Count n={page.badge} label={page.badgeLabel ?? "unread"} />}
     </Link>
@@ -629,7 +672,10 @@ function StripGroup({ m, current, activeHref }: { m: NavModule; current: boolean
                       active && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
                     )}
                   >
-                    <span className="truncate">{p.label}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <PageIcon href={p.href} className={active ? "text-primary" : "text-muted"} />
+                      <span className="truncate">{p.label}</span>
+                    </span>
                     {!!p.badge && <Count n={p.badge} label={p.badgeLabel ?? "unread"} />}
                   </Link>
                 </li>

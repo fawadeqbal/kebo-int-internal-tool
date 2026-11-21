@@ -108,7 +108,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     title: "Admin settings",
     icon: "admin",
     pages: [
-      { href: "/users", label: "Users" },
+      { href: "/users", label: "Staff" },
       { href: "/access/roles", label: "Roles" },
       { href: "/access/sign-ins", label: "Login history" },
       { href: "/access/sessions", label: "Active sessions" },
