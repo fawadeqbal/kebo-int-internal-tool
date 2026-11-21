@@ -292,7 +292,7 @@ async function Balances({ sp }: { sp: Search }) {
             { name: "has", label: "Has balance", value: sp.has, options: [{ value: "all", label: "Any" }], all: "Yes", showDefault: true },
           ]}
         />
-        <Card className="overflow-x-auto">
+        <Card className="scroll-x">
           {shown.length === 0 ? (
             <EmptyState title="Nothing here" description="Balances appear when money is recorded: orders, payments, expenses, transfers." />
           ) : (

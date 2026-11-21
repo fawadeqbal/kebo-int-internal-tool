@@ -39,7 +39,7 @@ export function LinesView({
       role="region"
       aria-label={label}
       // The one table (Th, Td: live audit 20 Nov): inside its box, no frame and no lines between columns.
-      className="overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+      className="scroll-x scroll-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
     >
       <table className="w-full border-collapse text-md">
         <thead className="bg-faint">

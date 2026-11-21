@@ -634,7 +634,7 @@ export function MakePaper({
         </header>
 
         <div className="flex min-h-0 flex-1">
-          <aside aria-label={final ? "Send it" : "What it takes"} className="w-[368px] shrink-0 overflow-y-auto border-r border-line px-5 py-4 max-lg:w-80 max-sm:hidden">
+          <aside aria-label={final ? "Send it" : "What it takes"} className="w-[368px] shrink-0 scroll-y border-r border-line px-5 py-4 max-lg:w-80 max-sm:hidden">
             {side}
           </aside>
           <Stage src={preview} title={`${p.label} preview`} frame={frame} live={!final} />
@@ -670,7 +670,7 @@ export function MakePaper({
         {sheet && (
           <div className="absolute inset-0 z-10 flex flex-col justify-end sm:hidden">
             <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-black/45" onClick={() => setSheet(false)} />
-            <div role="dialog" aria-label={final ? "Send it" : "Before it is final"} className="relative max-h-[80%] overflow-y-auto rounded-t-2xl bg-surface px-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-pop">
+            <div role="dialog" aria-label={final ? "Send it" : "Before it is final"} className="relative max-h-[80%] scroll-y rounded-t-2xl bg-surface px-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-pop">
               <div aria-hidden className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-line-strong" />
               <div className="flex justify-end">
                 <Button size="icon" variant="ghost" aria-label="Close" onClick={() => setSheet(false)}>

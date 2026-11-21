@@ -77,7 +77,7 @@ export function HistoryButton({ title, entries, allHref }: { title: string; entr
                   <X aria-hidden />
                 </Button>
               </div>
-              <ol className="max-h-[min(60vh,420px)] overflow-y-auto">
+              <ol className="max-h-[min(60vh,420px)] scroll-y">
                 {entries.map((e, n) => (
                   <li
                     key={n}

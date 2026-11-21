@@ -229,7 +229,7 @@ export function Picker<T extends PickerOption>({
       {loading && <Loader2 className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted" aria-hidden />}
       {open && (
         <div className="absolute top-full right-0 left-0 z-30 mt-1 overflow-hidden rounded-xl border border-line bg-surface shadow-pop">
-          <ul id={listId} role="listbox" aria-label={listLabel} className="max-h-80 overflow-y-auto p-1">
+          <ul id={listId} role="listbox" aria-label={listLabel} className="max-h-80 scroll-y scroll-sm p-1">
             {firstRows.length > 0 && first && group(first.title)}
             {firstRows.map((r, i) => option(r, i, (first?.line ?? line)(r)))}
             {results.length > 0 && group(showRecent ? recentTitle : typed ? `Results for “${typed}”` : othersTitle)}

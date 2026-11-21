@@ -94,7 +94,7 @@ export function OfferCompare({ view, status, dealId, waiting }: { view: Sourcing
           {bases.size > 1 && <Notice tone="todo">Not like for like: the offers have different Incoterms ({[...bases].map((b) => (b === "?" ? "not said" : b)).join(", ")}).</Notice>}
         </div>
       )}
-      <div className="overflow-x-auto">
+      <div className="scroll-x">
         <div role="group" aria-label="Offers side by side" className="grid w-full" style={cols}>
           <div className={cn(cell, "bg-surface-2/40")} />
           {offers.map((q) => (

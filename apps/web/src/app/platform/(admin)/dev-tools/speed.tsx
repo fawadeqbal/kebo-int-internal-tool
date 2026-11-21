@@ -161,7 +161,7 @@ export function SpeedTab({ v, errors }: { v: DevSpeedView; errors: "open" | "fix
                         <Badge tone={e.status === "open" ? "bad" : "ok"}>{e.status === "open" ? "Open" : "Fixed"}</Badge>
                       </summary>
                       <div className="flex flex-col gap-3 px-4 pb-4">
-                        <pre className="max-h-64 overflow-auto rounded-lg bg-[#15141b] p-3 font-mono text-xs leading-[18px] whitespace-pre-wrap text-[#e6e5ee]">
+                        <pre className="max-h-64 scroll-xy rounded-lg bg-[#15141b] p-3 font-mono text-xs leading-[18px] whitespace-pre-wrap text-[#e6e5ee]">
                           {e.stack ?? `${e.name}: ${e.message}`}
                         </pre>
                         <p className="text-xs text-text-2">

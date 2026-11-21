@@ -114,7 +114,7 @@ function Review({
           </Button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 scroll-y p-4">
           {read.error ? (
             <p className="text-sm text-bad">{read.error}</p>
           ) : done ? (

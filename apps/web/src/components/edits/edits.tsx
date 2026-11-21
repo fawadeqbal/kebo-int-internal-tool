@@ -145,7 +145,7 @@ export function ReasonDialog({
       <div className="flex flex-col gap-4">
         {note && <Notice tone="todo">{note}</Notice>}
         {changes.length > 0 && (
-          <ul className="flex max-h-56 flex-col divide-y divide-line overflow-y-auto rounded-lg border border-line text-md">
+          <ul className="flex max-h-56 flex-col divide-y divide-line scroll-y rounded-lg border border-line text-md">
             {changes.map((c, i) => (
               <li key={i} className="px-3 py-2">
                 {c}

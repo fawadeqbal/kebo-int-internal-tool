@@ -226,7 +226,7 @@ export default async function SourcingPage({
                 </li>
               ))}
             </ul>
-            <div className="overflow-x-auto max-md:hidden">
+            <div className="scroll-x max-md:hidden">
               <table aria-label="Supplier offers" className="w-full border-collapse text-md">
                 <THead>
                   <tr>

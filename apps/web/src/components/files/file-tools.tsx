@@ -429,7 +429,7 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-t`}
-        className="relative flex max-h-[90dvh] w-full flex-col overflow-y-auto rounded-t-2xl border border-line bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-pop sm:max-w-md sm:rounded-xl"
+        className="relative flex max-h-[90dvh] w-full flex-col scroll-y rounded-t-2xl border border-line bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-pop sm:max-w-md sm:rounded-xl"
       >
         <h2 id={`${id}-t`} ref={head} tabIndex={-1} className="text-base font-semibold outline-none">
           {title}

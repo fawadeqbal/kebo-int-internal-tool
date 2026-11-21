@@ -361,7 +361,7 @@ export function useBackGuard(handle: () => void, wants: () => boolean) {
  * so a window's title stays on top and its buttons sit right on the keyboard. Without a keyboard: the whole screen.
  */
 export const FIT_VIEW = "max-md:bottom-auto max-md:top-[var(--vvt,0px)] max-md:h-[var(--vvh,100dvh)]";
-export const WINDOW_LAYER = "fixed inset-0 flex max-md:bottom-auto max-md:top-[var(--vvt,0px)] max-md:h-[var(--vvh,100dvh)] md:items-start md:justify-center md:overflow-y-auto md:px-6 md:py-[6vh]";
+export const WINDOW_LAYER = "fixed inset-0 flex max-md:bottom-auto max-md:top-[var(--vvt,0px)] max-md:h-[var(--vvh,100dvh)] md:items-start md:justify-center md:scroll-y md:px-6 md:py-[6vh]";
 export const WINDOW_BOX =
   "relative flex h-full w-full animate-in flex-col bg-surface shadow-pop md:h-auto md:max-h-[88vh] md:max-w-[calc(100vw-3rem)] md:overflow-hidden md:rounded-2xl md:border md:border-line";
 
@@ -465,7 +465,7 @@ export function Modal({
         className={`${WINDOW_BOX} ${MODAL_WIDTH[size]}`}
       >
         <WindowHead id={id} title={title} description={sub} onClose={close} disabled={busy} />
-        <div className={cn(RULES.window.body, "flex min-h-0 flex-1 flex-col overflow-y-auto *:shrink-0")}>{children}</div>
+        <div className={cn(RULES.window.body, "flex min-h-0 flex-1 flex-col scroll-y *:shrink-0")}>{children}</div>
         {footer && (
           <div className={cn(WINDOW_FOOTER, "max-md:[&>button]:min-h-12 max-md:[&>button]:flex-1")}>
             {cancel && (

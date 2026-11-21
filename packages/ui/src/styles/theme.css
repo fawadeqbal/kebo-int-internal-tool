@@ -1046,16 +1046,43 @@
   }
 }
 
-/* ScrollFade: the edge of a sideways-scrolling row with more to see fades out. */
-.scroll-fade[data-fade-r]:not([data-fade-l]) {
-  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+/*
+ * Scroll — the one scroll bar (scroll.tsx). A thin rounded thumb, no track; hidden at rest, shown on hover and while
+ * scrolling, bigger on its own hover, the brand colour while dragged. Sizes: scroll-sm 4px · md 6px (the default) · scroll-lg 8px · scroll-none.
+ * Every other box that scrolls (a library's, the page itself) gets the md look too.
+ */
+:root {
+  --scroll-thumb: color-mix(in oklab, var(--text) 28%, transparent);
+  --scroll-thumb-hover: color-mix(in oklab, var(--text) 50%, transparent);
+  --scroll-size: 10px; /* the thumb is this less 4px (its clear border) */
 }
-.scroll-fade[data-fade-l]:not([data-fade-r]) {
-  mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+::-webkit-scrollbar { width: var(--scroll-size); height: var(--scroll-size); background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: transparent;
+  transition: background-color 0.15s;
 }
-.scroll-fade[data-fade-l][data-fade-r] {
-  mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+:hover::-webkit-scrollbar-thumb,
+[data-scrolling]::-webkit-scrollbar-thumb,
+html::-webkit-scrollbar-thumb { background-color: var(--scroll-thumb); }
+::-webkit-scrollbar-thumb:hover { border-width: 1px; background-color: var(--scroll-thumb-hover); }
+::-webkit-scrollbar-thumb:active { border-width: 1px; background-color: var(--primary); }
+/* Browsers without the ::-webkit-scrollbar parts (Firefox): the thin standard bar, shown on hover. */
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  :hover, [data-scrolling], html { scrollbar-color: var(--scroll-thumb) transparent; }
 }
+
+/* Scroll's fade: the edge with more to see fades out (sideways and up and down). */
+.scroll[data-fade-r]:not([data-fade-l]) { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.scroll[data-fade-l]:not([data-fade-r]) { mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); }
+.scroll[data-fade-l][data-fade-r] { mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+.scroll[data-fade-b]:not([data-fade-t]) { mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
+.scroll[data-fade-t]:not([data-fade-b]) { mask-image: linear-gradient(to top, #000 calc(100% - 28px), transparent); }
+.scroll[data-fade-t][data-fade-b] { mask-image: linear-gradient(to bottom, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
 
 /*
  * On a phone, a table with four or more columns showing keeps a readable
@@ -1069,5 +1096,33 @@
   }
   table:not([data-fit]):has(> thead > tr > th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only)) {
     min-width: 46rem;
+  }
+}
+
+/*
+ * Scroll's classes, for a box that cannot be the Scroll piece itself (a dialog's body, a list inside a menu): the
+ * only way to make a box scroll (one-of-each keeps overflow-auto out). scroll-x · scroll-y · scroll-xy, and its
+ * size: scroll-sm · scroll-lg · scroll-none (md when none is said).
+ */
+@utility scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+@utility scroll-y {
+  overflow-y: auto;
+}
+@utility scroll-xy {
+  overflow: auto;
+}
+@utility scroll-sm {
+  --scroll-size: 8px;
+}
+@utility scroll-lg {
+  --scroll-size: 12px;
+}
+@utility scroll-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }

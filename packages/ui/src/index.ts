@@ -3,7 +3,7 @@ export * from "./primitives";
 export * from "./badge";
 export * from "./notice";
 export * from "./pagination";
-export * from "./scroll-fade";
+export * from "./scroll";
 export * from "./pending";
 export * from "./blocks";
 export * from "./rules";

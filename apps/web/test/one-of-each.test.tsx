@@ -369,6 +369,15 @@ describe("one of each", () => {
     expect(bad).toEqual([]);
   }, 30_000); // It reads every export against every file: a slow CI machine needs more than the default 5 s.
 
+  it("one scroll bar: every box that scrolls is Scroll or its classes (scroll-x / scroll-y / scroll-xy)", () => {
+    // overflow-auto would draw the browser's own bar (thick and grey on Windows); a hand-made hidden bar is scroll-none.
+    const raw = SOURCES.flatMap(({ file, text }) =>
+      [...text.matchAll(/(?<![\w-])(overflow-(?:x-|y-)?auto|overflow-(?:x-|y-)?scroll|scrollbar-width|::-webkit-scrollbar)/g)].map((m) => `${file}: ${m[1]}`),
+    );
+    expect(raw).toEqual([]);
+    expect(SOURCES.filter(({ text }) => /\bScrollFade\b/.test(text)).map(({ file }) => file)).toEqual([]);
+  });
+
   it("a list on a phone is PhoneList and PhoneRow: two compact lines a row, no list drawn by hand", () => {
     // Rows that hold their own controls to edit (prices, a plan's parts) are forms, not lists.
     const FORMS = ["components/deals/price-editor.tsx", "components/order-sections/payment-plan.tsx", "components/order-sections/supplier-plan.tsx", "components/common/skeletons.tsx", "packages/ui/src/primitives.tsx"];

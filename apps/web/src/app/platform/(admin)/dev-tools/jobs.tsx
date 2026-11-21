@@ -91,7 +91,7 @@ export function JobsTab({ v }: { v: DevJobsView }) {
         <Card>
           <CardHeader title="Not delivered" description="last 7 days" />
           {v.failures.length ? (
-            <ul className="flex max-h-[260px] flex-col overflow-auto">
+            <ul className="flex max-h-[260px] flex-col scroll-xy">
               {v.failures.map((f, k) => (
                 <li key={`${f.at}-${k}`} className="border-b border-line px-4 py-2.5 text-sm last:border-b-0">
                   <span className="block font-medium">{f.reason}</span>

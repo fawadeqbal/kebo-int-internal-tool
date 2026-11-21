@@ -30,7 +30,7 @@ export function TargetsGrid({ rows, people, actions, currency }: { rows: TargetR
   const [editing, setEditing] = useState<string | null>(null);
   const cols = ["company", ...people.map((p) => `p:${p.id}`)];
   return (
-    <div className="overflow-x-auto">
+    <div className="scroll-x scroll-lg">
       <table className="w-full text-sm">
         <THead>
           <tr>

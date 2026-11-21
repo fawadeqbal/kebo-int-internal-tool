@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Check, ClipboardList, Clock, Lock, Mail, MessageCircle, Minus, Phone as PhoneIcon, Plus, ShieldCheck, Users } from "lucide-react";
-import { ScrollFade } from "@kebo/ui";
+import { Scroll } from "@kebo/ui";
 import { PLAN_FEATURE_KEYS, PLAN_FEATURES, planFeatureName, type LeadOrigin, type SiteContent } from "@kebo/shared";
 import type { ActionState } from "@/lib/actions";
 import { ContactForm } from "./contact-form";
@@ -305,16 +305,16 @@ export function MarketingPage({
               </div>
               {s.screens.length > 1 ? (
                 // Two screens: side by side on a laptop; on a phone, one at a time with the next peeking in.
-                <ScrollFade
-                  scrollLabel={`${s.eyebrow}, ${s.screens.length} screens`}
-                  className="-mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0"
+                <Scroll axis="x" size="lg" fade
+                  label={`${s.eyebrow}, ${s.screens.length} screens`}
+                  className="-mx-5 px-5 sm:mx-0 sm:px-0"
                 >
                   <div className="flex snap-x snap-mandatory gap-5 py-6 sm:justify-center">
                     {s.screens.map((k) => (
                       <Phone key={k} screen={k} className="s-small shrink-0 snap-center" />
                     ))}
                   </div>
-                </ScrollFade>
+                </Scroll>
               ) : (
                 <Phone screen={s.screens[0]!} />
               )}
@@ -518,7 +518,7 @@ function ContactLines({ contact }: { contact: SiteContent["contact"] }) {
 function PlansTable({ plans, demo }: { plans: SitePlan[]; demo: (cta: string) => string }) {
   const per = (p: string) => (p === "year" ? "a year" : "a month");
   return (
-    <ScrollFade scrollLabel="The plans compared" className="mt-10 overflow-x-auto rounded-2xl border border-(--s-line) bg-white">
+    <Scroll axis="x" size="lg" fade label="The plans compared" className="mt-10 rounded-2xl border border-(--s-line) bg-white">
       <table className="w-full min-w-[40rem] border-collapse text-left">
         <caption className="sr-only">The plans compared</caption>
         <thead>
@@ -577,7 +577,7 @@ function PlansTable({ plans, demo }: { plans: SitePlan[]; demo: (cta: string) =>
           </tr>
         </tbody>
       </table>
-    </ScrollFade>
+    </Scroll>
   );
 }
 

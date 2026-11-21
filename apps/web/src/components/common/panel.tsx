@@ -215,7 +215,7 @@ export function PanelBody({ children, className, fill }: { children: ReactNode; 
       data-panel-body
       className={cn(
         // `fill`: a steps window fills the panel and scrolls inside itself (its rail and buttons stay put).
-        fill ? "flex min-h-0 flex-1 flex-col overflow-hidden *:min-h-0" : cn(RULES.window.body, "flex min-h-0 flex-1 flex-col overflow-y-auto *:shrink-0"),
+        fill ? "flex min-h-0 flex-1 flex-col overflow-hidden *:min-h-0" : cn(RULES.window.body, "flex min-h-0 flex-1 flex-col scroll-y *:shrink-0"),
         className,
       )}
     >

@@ -148,7 +148,7 @@ function NewQuotationsForm({
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-2 text-md font-semibold">Offers</legend>
               {/* Made to fit a phone (data-fit): the tick, the offer and its cost; where it is quoted goes under its name. */}
-              <div className="relative overflow-x-auto rounded-xl border border-line">
+              <div className="relative scroll-x rounded-xl border border-line">
                 <table data-fit className="w-full border-collapse text-md">
                   <THead>
                     <tr>
@@ -232,7 +232,7 @@ function NewQuotationsForm({
                 </Field>
               </div>
               {rows.length > 0 && (
-                <div className="relative overflow-x-auto rounded-xl border border-line">
+                <div className="relative scroll-x rounded-xl border border-line">
                   <table data-fit className="w-full border-collapse text-md">
                     <THead>
                       <tr>

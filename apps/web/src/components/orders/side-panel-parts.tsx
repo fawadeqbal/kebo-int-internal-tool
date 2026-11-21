@@ -97,7 +97,7 @@ export function SideSection({
           tabIndex={scrolls ? 0 : undefined}
           aria-label={scrolls ? title : undefined}
           className={cn(
-            "[scrollbar-width:thin] lg:-mr-2.5 lg:overflow-y-auto lg:pr-2.5",
+            "scroll-sm lg:-mr-2.5 lg:scroll-y lg:pr-2.5",
             dense ? "lg:max-h-[300px]" : "lg:max-h-[330px]",
             !all && "max-lg:[&>li:nth-child(n+6)]:hidden",
           )}
