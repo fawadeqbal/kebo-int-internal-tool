@@ -74,7 +74,7 @@ export function SideSheet({ title, summary, children }: { title: string; summary
             </div>
           )}
           {/* Beside the page (a laptop), several boxes keep the page's gap between them, as the boxes beside them do. */}
-          <div className={cn("lg:flex lg:flex-col lg:gap-4", open && "max-lg:min-h-0 max-lg:flex-1 max-lg:overflow-y-auto max-lg:pb-[env(safe-area-inset-bottom)] max-lg:[&>section]:rounded-none max-lg:[&>section]:border-0 max-lg:[&>section]:shadow-none max-lg:[&>section>section:first-child>div:first-child]:sr-only")}>
+          <div className={cn("lg:flex lg:flex-col lg:gap-4", open && "max-lg:min-h-0 max-lg:flex-1 max-lg:scroll-y max-lg:pb-[env(safe-area-inset-bottom)] max-lg:[&>section]:rounded-none max-lg:[&>section]:border-0 max-lg:[&>section]:shadow-none max-lg:[&>section>section:first-child>div:first-child]:sr-only")}>
             {/* (In the sheet the first section's title row is the sheet's own title, above: hidden, still read out;
                 so that section has no buttons on its title row.) */}
             {children}

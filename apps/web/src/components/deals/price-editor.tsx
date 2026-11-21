@@ -221,7 +221,7 @@ export function PriceSheet({
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             {/* One option (a quotation from one offer): nothing to choose between. */}
             {s.options.length > 1 && (
-              <div role="tablist" aria-label="Options" className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] max-sm:w-full">
+              <div role="tablist" aria-label="Options" className="-mx-1 flex min-w-0 gap-2 scroll-x px-1 py-0.5 scroll-none max-sm:w-full">
                 {s.options.map(optionCard)}
               </div>
             )}

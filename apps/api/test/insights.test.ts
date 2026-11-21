@@ -49,10 +49,10 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     const n = (await api(app, manager).get("/notifications").expect(200)).body;
     expect(n.items.some((x: { type: string; link: string }) => x.type === "inquiry.created" && x.link === `/inquiries/${created.id}`)).toBe(true);
     // The Alerts chips: Inquiries shows it, Payments does not.
-    const inq = (await api(app, manager).get("/notifications?group=inquiries&take=200").expect(200)).body;
+    const inq = (await api(app, manager).get("/notifications?group=inquiries&take=100").expect(200)).body;
     expect(inq.items.length).toBeGreaterThan(0);
     expect(inq.items.every((x: { type: string }) => /^(inquiry|quotation|reminder)\./.test(x.type))).toBe(true);
-    const pay = (await api(app, manager).get("/notifications?group=payments&take=200").expect(200)).body;
+    const pay = (await api(app, manager).get("/notifications?group=payments&take=100").expect(200)).body;
     expect(pay.items.some((x: { link: string }) => x.link === `/inquiries/${created.id}`)).toBe(false);
     await api(app, manager).get("/notifications?group=nope").expect(422);
     const own = (await api(app, staff).get("/notifications").expect(200)).body;

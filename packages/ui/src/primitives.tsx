@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { BackArrow, ListLink } from "./back";
 import { Pending } from "./pending";
-import { ScrollFade } from "./scroll-fade";
+import { Scroll } from "./scroll";
 import type { ComponentProps, ReactNode } from "react";
 import { Info, Package, Plus, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
@@ -620,9 +620,9 @@ export const tableClass = "w-full border-collapse text-md max-sm:[&_tbody_td:fir
 export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
-    <ScrollFade data-part="table" className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
+    <Scroll axis="x" size="lg" fade data-part="table" className="w-full focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
       <table className={cn(tableClass, className)} {...props} />
-    </ScrollFade>
+    </Scroll>
   );
 }
 export function THead({ className, ...props }: ComponentProps<"thead">) {
@@ -861,13 +861,13 @@ export function TabRow({
 }) {
   const chips = phone === "chips";
   return (
-    <ScrollFade
+    <Scroll axis="x" size="none" fade
       as="nav"
       aria-label={label}
       data-part={chips ? "tabs" : "record-tabs"}
       data-count={items.length}
       className={cn(
-        "no-print flex overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "no-print flex ",
         chips ? "-mx-4 items-center gap-2 px-4 py-0.5 sm:mx-0 sm:items-stretch sm:gap-x-[22px] sm:border-b sm:border-line sm:px-0 sm:py-0" : "items-stretch gap-x-[22px] border-b border-line",
         className,
       )}
@@ -899,7 +899,7 @@ export function TabRow({
         </Link>
       ))}
       {end}
-    </ScrollFade>
+    </Scroll>
   );
 }
 
@@ -934,13 +934,13 @@ export function LinkTabs({
       />
     );
   return (
-    <ScrollFade
+    <Scroll axis="x" size="none" fade
       as="nav"
       aria-label={label}
       data-part="tabs"
       data-count={tabs.length}
       className={cn(
-        "-mx-4 flex items-center gap-2 overflow-x-auto overflow-y-hidden px-4 py-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0.5 [&::-webkit-scrollbar]:hidden",
+        "-mx-4 flex items-center gap-2 px-4 py-0.5 sm:mx-0 sm:px-0.5",
         className,
       )}
     >
@@ -960,7 +960,7 @@ export function LinkTabs({
           <Pending />
         </Link>
       ))}
-    </ScrollFade>
+    </Scroll>
   );
 }
 
@@ -987,7 +987,7 @@ export function FilterChip({ href, active, count, children }: { href: string; ac
  * The one switch between a few views (List | Board, Month | Quarter, For the bank | All): its track and its
  * segments. Segmented (links), SegmentedChoice (buttons) and the app's ViewSwitch all draw these two.
  */
-export const segmentsClass = "inline-flex max-w-full overflow-x-auto rounded-[10px] border border-line bg-surface-2 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+export const segmentsClass = "inline-flex max-w-full scroll-x rounded-[10px] border border-line bg-surface-2 p-0.5 scroll-none";
 export const segmentClass = (active: boolean) =>
   cn(
     "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-md font-medium whitespace-nowrap text-muted transition-colors hover:text-text max-sm:h-10 [&_svg]:size-4",
@@ -997,7 +997,7 @@ export const segmentClass = (active: boolean) =>
 /** Pill links for a small set of options (e.g. This month / Last month). */
 export function Segmented({ options, className, label }: { options: { href: string; label: ReactNode; active: boolean }[]; className?: string; label: string }) {
   return (
-    <ScrollFade
+    <Scroll axis="x" size="lg" fade
       as="nav"
       aria-label={label}
       className={cn(segmentsClass, className)}
@@ -1007,7 +1007,7 @@ export function Segmented({ options, className, label }: { options: { href: stri
           {o.label}
         </Link>
       ))}
-    </ScrollFade>
+    </Scroll>
   );
 }
 

@@ -186,7 +186,7 @@ export const followUpListQuery = z
     about: z.preprocess(blank, z.enum(["inquiry", "order", "customer", "factory", "none"]).optional()),
     ...targets,
     page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(200).default(100),
+    pageSize: z.coerce.number().int().min(1).max(100).default(100),
   })
   .superRefine(oneTarget);
 export type FollowUpListQuery = z.infer<typeof followUpListQuery>;

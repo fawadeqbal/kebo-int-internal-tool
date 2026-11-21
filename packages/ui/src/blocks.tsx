@@ -13,7 +13,7 @@ export function SelectCardList({ label, children, column, className }: { label: 
     <ul
       aria-label={label}
       className={cn(
-        "-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pt-0.5 pb-1 sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:scroll-px-0 lg:px-0.5",
+        "-mx-4 flex snap-x scroll-px-4 gap-2 scroll-x px-4 pt-0.5 pb-1 sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:scroll-px-0 lg:px-0.5",
         column && "2xl:flex-col 2xl:overflow-visible 2xl:pb-0",
         className,
       )}
@@ -344,7 +344,7 @@ export function SectionList({
   return (
     <div className={cn("grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-6", className)}>
       <nav aria-label={label} className={cn("no-print lg:sticky lg:top-20", boxed && "lg:rounded-xl lg:border lg:border-line lg:bg-surface lg:p-2 lg:shadow-card")}>
-        <ul className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+        <ul className="-mx-4 flex gap-1.5 scroll-x px-4 pb-0.5 scroll-none sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0">
           {items.map((l) => (
             <li key={l.href} className="shrink-0">
               <Link

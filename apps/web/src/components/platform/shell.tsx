@@ -66,7 +66,7 @@ export function PlatformShell({
             <span className="block text-xs text-muted">Platform admin</span>
           </span>
         </Link>
-        <nav aria-label="Platform" className="flex-1 overflow-y-auto px-3">
+        <nav aria-label="Platform" className="flex-1 scroll-y px-3">
           <ul className="flex flex-col gap-0.5">
             {NAV.map((n) => {
               const on = active(n.href, "exact" in n && n.exact);
@@ -156,7 +156,7 @@ export function PlatformShell({
         </div>
         <nav
           aria-label="Platform (small screens)"
-          className={cn(RULES.page.width, RULES.page.sides, "flex gap-1 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}
+          className={cn(RULES.page.width, RULES.page.sides, "flex gap-1 scroll-x pb-2 scroll-none")}
         >
           {NAV.map((n) => {
             const on = active(n.href, "exact" in n && n.exact);

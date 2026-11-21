@@ -1,5 +1,5 @@
 import { MonitorSmartphone } from "lucide-react";
-import { buildHref, Card, CardHeader, EmptyState, PAGE_SIZE, Pager, toPage, Stack } from "@kebo/ui";
+import { buildHref, Card, CardHeader, EmptyState, Pager, toPage, toPageSize, Stack } from "@kebo/ui";
 import { PageHeader } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
@@ -14,11 +14,11 @@ import { getPeople } from "@/lib/loaders";
 export const metadata = { title: "Sessions" };
 
 /** Every browser and phone signed in now, newest use first; sign out one, or someone everywhere. 25 a page. */
-export default async function SessionsPage({ searchParams }: { searchParams: Promise<{ person?: string; q?: string; page?: string }> }) {
+export default async function SessionsPage({ searchParams }: { searchParams: Promise<{ person?: string; q?: string; page?: string; size?: string }> }) {
   const sp = await searchParams;
   const person = sp.person;
   const [list, people] = await Promise.all([
-    api.get<Paged<SessionRow> & { people: number }>("/security/sessions", { userId: person, q: sp.q?.trim() || undefined, page: toPage(sp.page), pageSize: PAGE_SIZE }),
+    api.get<Paged<SessionRow> & { people: number }>("/security/sessions", { userId: person, q: sp.q?.trim() || undefined, page: toPage(sp.page), pageSize: toPageSize(sp.size) }),
     getPeople(),
   ]);
   const who = person ? people.find((p) => p.id === person) : null;

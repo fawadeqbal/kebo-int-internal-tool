@@ -61,10 +61,6 @@ const AREA: Record<string, string> = {
   factory: "Supplier",
 };
 
-/** The words of one entry, for searching. */
-export const historyText = (e: HistoryEntry) =>
-  [e.summary ?? e.action, e.reason, ...e.changes.flatMap((c) => [fieldLabel(c.field), c.from, c.to])].filter(Boolean).join(" ").toLowerCase();
-
 /**
  * The same history as a table (board InquiryHistory): When, Who, What changed —
  * the summary, then each field's old → new, and the reason under it.

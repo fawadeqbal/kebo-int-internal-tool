@@ -203,7 +203,7 @@ export function TopSearch() {
       </span>
       {shown && (
         <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-[min(620px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-line bg-surface shadow-pop">
-          <div id={`${base}-list`} role="listbox" aria-label={q.length >= 2 ? `Results for ${q}` : "Recent searches"} className="max-h-[min(70vh,560px)] overflow-y-auto py-1.5">
+          <div id={`${base}-list`} role="listbox" aria-label={q.length >= 2 ? `Results for ${q}` : "Recent searches"} className="max-h-[min(70vh,560px)] scroll-y scroll-sm py-1.5">
             {q.length < 2 ? (
               <div role="group" aria-label="Recent searches">
                 <p aria-hidden className={cn(capsClass, "px-4 pt-2 pb-1")}>
@@ -348,7 +348,7 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
           )}
         </span>
       </form>
-      <div className="min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+      <div className="min-h-0 flex-1 scroll-y scroll-sm pb-[env(safe-area-inset-bottom)]">
         {q.length < 2 ? (
           recent.length > 0 && (
             <div className="flex flex-wrap gap-2 px-4 py-3" aria-label="Recent searches" role="group">

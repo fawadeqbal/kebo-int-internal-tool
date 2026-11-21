@@ -16,7 +16,7 @@ const auditQuery = z.object({
   /** Words in what was done, its summary or the reason. */
   q: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(200).default(50),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 @ApiTags("reports")

@@ -131,7 +131,7 @@ export function LiveLog({ service, services }: { service: string; services: { ke
           const el = e.currentTarget;
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
         }}
-        className="h-[460px] overflow-auto rounded-b-xl bg-[#15141b] px-4 py-3 font-mono text-xs leading-[19px] text-[#e6e5ee]"
+        className="h-[460px] scroll-xy rounded-b-xl bg-[#15141b] px-4 py-3 font-mono text-xs leading-[19px] text-[#e6e5ee]"
         role="log"
         aria-live="off"
         aria-label={`Live log of ${label}`}

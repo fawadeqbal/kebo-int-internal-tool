@@ -227,7 +227,7 @@ export function ReceivedFields({
             <p className="text-sm font-semibold">
               Counts as {fmt(a.countsMinor, currency)} · goes to
             </p>
-            <div className="overflow-x-auto">
+            <div className="scroll-x">
               <table className="w-full min-w-[22rem] border-collapse text-sm">
                 <thead>
                   <tr className="text-left text-xs text-text-2">
@@ -476,7 +476,7 @@ function ReceiptFields({
             {order.length === 0 ? (
               <EmptyLine>No open {currency} orders: it all becomes {customer}&apos;s credit.</EmptyLine>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="scroll-x">
                 <table className="w-full min-w-[22rem] border-collapse text-sm">
                   <thead>
                     <tr className="text-left text-xs text-text-2">

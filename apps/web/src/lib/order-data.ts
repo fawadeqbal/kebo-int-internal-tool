@@ -5,7 +5,7 @@ import { load } from "./session";
 import type { OrderCosts, OrderMoney } from "./types-money";
 import type { OrderView, PaymentsView } from "./types-orders";
 import type { OrderDefaults, OrderFlow } from "./types-flow";
-import type { HistoryEntry } from "./types";
+
 import type { OrderPapers } from "./types-papers";
 import type { OrderFiles } from "./types-files";
 import type { OrderSectionsView } from "./types-sections";
@@ -25,16 +25,6 @@ export const orderDefaultsOf = cache((id: string) => api.get<OrderDefaults>(`/or
 
 /** The flow after acceptance (payment route, production, shipping, papers and banks, delivery and SAT). */
 export const orderFlowOf = cache((id: string) => api.get<OrderFlow>(`/orders/${id}/flow`));
-
-/** The order's history, all of it or one step's (newest first). */
-export const orderHistoryOf = cache((id: string, step?: string, limit?: number) =>
-  api.get<(HistoryEntry & { step: string | null })[]>("/history", {
-    type: "order",
-    id,
-    ...(step ? { step } : {}),
-    ...(limit ? { limit: String(limit) } : {}),
-  }),
-);
 
 /** Every paper of the order with where it stands (step pages, Documents). */
 export const orderPapersOf = cache((id: string) => api.get<OrderPapers>(`/orders/${id}/papers`));

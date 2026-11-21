@@ -1,5 +1,5 @@
 import type { OwnDomainView } from "@kebo/shared";
-import { THead, Th, Card, CardBody, CardHeader, ScrollFade, StatusBadge, linkClass, cn, capsClass } from "@kebo/ui";
+import { THead, Th, Card, CardBody, CardHeader, Scroll, StatusBadge, linkClass, cn, capsClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { CheckDomain, ConnectDomain, CopyValue, RemoveDomain } from "./domain-forms";
 import { date } from "@/lib/format";
@@ -25,7 +25,7 @@ function Record({ view }: { view: DomainView }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-md font-semibold">Add this record where {r.zone} is managed</p>
-      <ScrollFade scrollLabel="The record to add" className="overflow-x-auto rounded-lg border border-line">
+      <Scroll axis="x" size="lg" fade label="The record to add" className="rounded-lg border border-line">
         <table className="w-full min-w-[420px] text-left text-md">
           <THead>
             <tr>
@@ -48,7 +48,7 @@ function Record({ view }: { view: DomainView }) {
             </tr>
           </tbody>
         </table>
-      </ScrollFade>
+      </Scroll>
     </div>
   );
 }

@@ -32,7 +32,7 @@ export async function DealExpensesCard({
   };
 }) {
   const today = companyToday();
-  const [list, people, settings] = await Promise.all([api.get<ExpenseList>("/expenses", { inquiryId: deal.id, pageSize: 200 }), getPeople(), getSettings()]);
+  const [list, people, settings] = await Promise.all([api.get<ExpenseList>("/expenses", { inquiryId: deal.id, pageSize: 100 }), getPeople(), getSettings()]);
   const main = list.currency;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   const setup: CostSetup = {

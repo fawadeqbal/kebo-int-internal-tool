@@ -110,7 +110,7 @@ export function TypeToPick({
       </button>
       {open && shown.length > 0 && (
         <FloatingList anchor={() => box.current} onClose={() => setOpen(false)} className="p-1">
-          <ul id={`${id}-list`} role="listbox" aria-label={listLabel} className="max-h-60 overflow-y-auto">
+          <ul id={`${id}-list`} role="listbox" aria-label={listLabel} className="max-h-60 scroll-y scroll-sm">
             {shown.map((o) => {
               const on = free ? o.label.toLowerCase() === q : o.value === value;
               return (

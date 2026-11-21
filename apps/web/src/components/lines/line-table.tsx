@@ -1769,7 +1769,7 @@ export function LineTable({
           onKeyDown={gridKeyDown}
           // Fill (design rules: the tools and the head stay, only the items scroll): the rows take what the window has left
           // and scroll inside; the table as a whole keeps its least height (min-h-80 below).
-          className={cn("relative overflow-x-auto", fill && "md:min-h-0 md:flex-1 md:overflow-auto", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
+          className={cn("relative scroll-x scroll-lg", fill && "md:min-h-0 md:flex-1 md:scroll-xy", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
           aria-label={`${noun[0]!.toUpperCase()}${noun.slice(1)}s`}
           role="region"
         >
@@ -2539,7 +2539,7 @@ function PastePanel({
         </p>
       )}
       {items.length > 0 && (
-        <ol className="max-h-48 overflow-auto rounded-md border border-line bg-surface text-sm">
+        <ol className="max-h-48 scroll-xy scroll-lg rounded-md border border-line bg-surface text-sm">
           {nos.map((no, n) => {
             const p = items[n]!;
             return (
@@ -2618,7 +2618,7 @@ function FilePanel({
             {bad > 0 && <span className="text-bad"> {plural(bad)} with a problem {bad === 1 ? "is" : "are"} left out: fix the file and upload it again, or type {bad === 1 ? "it" : "them"} in.</span>}
             {read.unused.length > 0 && <span className="text-muted"> Not used: {read.unused.map((h) => `“${h}”`).join(", ")}.</span>}
           </p>
-          <ol className="max-h-72 overflow-auto rounded-md border border-line bg-surface text-sm">
+          <ol className="max-h-72 scroll-xy scroll-lg rounded-md border border-line bg-surface text-sm">
             {read.lines.map((l) => (
               <li key={l.fileRow} className={cn("flex justify-between gap-3 border-b border-line px-2 py-1 last:border-0", l.problem && "bg-bad-soft/50", dups[read.lines.indexOf(l)] && "bg-warn-soft/50")}>
                 <span className="min-w-0">

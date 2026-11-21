@@ -258,7 +258,7 @@ export function CustomerForm({
             {s.errors?.contacts && !Object.keys(s.errors).some((k) => k.startsWith("contacts.")) && (
               <Notice tone="bad">{s.errors.contacts[0]}</Notice>
             )}
-            <div className="overflow-x-auto">
+            <div className="scroll-x">
               <table className="w-full text-md">
                 <thead className="bg-faint text-left text-text-2">
                   <tr>

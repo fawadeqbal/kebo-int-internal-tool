@@ -64,7 +64,7 @@ export function ChartCard({
 function FiguresTable({ table }: { table: ChartTable }) {
   const text = new Set([0, ...(table.textColumns ?? [])]);
   return (
-    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Figures">
+    <div className="scroll-x" tabIndex={0} role="region" aria-label="Figures">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>

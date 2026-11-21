@@ -384,7 +384,7 @@ function MenuContent({
           </span>
         </Link>
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 pt-1 pb-4" aria-label="Main">
+      <nav className="flex-1 scroll-y px-3 pt-1 pb-4" aria-label="Main">
         <GroupTree modules={modules} pathname={pathname} activeHref={activeHref} current={moduleOf(pathname, modules)} open={open} toggle={toggle} big={big} />
       </nav>
     </>

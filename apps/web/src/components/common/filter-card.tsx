@@ -252,7 +252,7 @@ function FilterSheet({
             <X className="size-5" aria-hidden />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-4">
+        <div className="min-h-0 flex-1 scroll-y px-4 pt-1 pb-4">
           {selects.map((f) => {
             const all = { value: "", label: f.all ?? "All" };
             // Choices as buttons; a long list (people, customers) as rows with a box to find in.

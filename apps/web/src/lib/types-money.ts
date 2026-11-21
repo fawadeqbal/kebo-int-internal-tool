@@ -464,6 +464,10 @@ export interface CashBook {
   closing: string | null;
   totals: { currency: string; in: string; out: string; net: string }[];
   unassigned: number;
+  /** The rows of the period (rows is one page of them, or the latest). */
+  total: number;
+  page: number;
+  pageSize: number;
   rows: CashRow[];
 }
 

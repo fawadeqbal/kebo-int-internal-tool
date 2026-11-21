@@ -73,9 +73,9 @@ export function StepsFrame<K extends string>({
     wasSingle.current = single;
   }, [single]);
   const body = cn(
-    "flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto px-6 pt-5 pb-6 max-md:px-4",
+    "flex min-h-0 min-w-0 flex-col gap-4 scroll-y px-6 pt-5 pb-6 max-md:px-4",
     // A short window: the step scrolls as a whole rather than squeezing the list to nothing (it keeps its least height).
-    fill ? "max-md:*:shrink-0 md:overflow-y-auto md:pb-4" : "*:shrink-0",
+    fill ? "max-md:*:shrink-0 md:scroll-y md:pb-4" : "*:shrink-0",
   );
   if (single)
     return (
@@ -109,7 +109,7 @@ export function StepsFrame<K extends string>({
       </div>
       {/* The side bar stays put and runs to the bottom; only the step's own fields scroll (asked 17 Nov). */}
       <div className={cn("grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] md:min-h-[min(520px,calc(100dvh-12rem))]", RULES.stepsRail)}>
-        <nav aria-label="Steps" className="min-h-0 overflow-y-auto border-r border-line bg-surface px-2.5 py-3 max-md:hidden md:row-span-2">
+        <nav aria-label="Steps" className="min-h-0 scroll-y border-r border-line bg-surface px-2.5 py-3 max-md:hidden md:row-span-2">
           <ol className="flex flex-col gap-0.5">
             {steps.map((s, k) => {
               const on = s.key === at;

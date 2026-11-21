@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@kebo/shared";
-import { buildHref, Card, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, StatRow, StatTile, toPage, Stack } from "@kebo/ui";
+import { buildHref, Card, EmptyState, LinkTabs, PageHeader, Pager, StatRow, StatTile, toPage, toPageSize, Stack } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { money, whole, companyToday, countOf } from "@/lib/format";
@@ -23,7 +23,7 @@ export const metadata = { title: "Company costs" };
 
 const HERE = "/money/company-costs";
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-type Search = { p?: string; kind?: string; page?: string; q?: string };
+type Search = { p?: string; kind?: string; page?: string; size?: string; q?: string };
 
 /** The first and the last day of a month ("2026-11"). */
 const span = (month: string) => ({ from: `${month}-01`, to: addDays(`${addDays(`${month}-28`, 4).slice(0, 7)}-01`, -1) });
@@ -49,7 +49,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const q = { kind: "company" };
   const text = sp.q?.trim() || undefined;
   const [list, unsearched, before, year, repeating, people, settings] = await Promise.all([
-    api.get<ExpenseList>("/expenses", { ...q, ...span(month), category, q: text, page: String(toPage(sp.page)), pageSize: String(PAGE_SIZE) }),
+    api.get<ExpenseList>("/expenses", { ...q, ...span(month), category, q: text, page: String(toPage(sp.page)), pageSize: String(toPageSize(sp.size)) }),
     // The figures over the list are the month's, whatever is searched.
     text ? api.get<ExpenseList>("/expenses", { ...q, ...span(month), pageSize: "1" }) : null,
     api.get<ExpenseList>("/expenses", { ...q, ...span(prev), pageSize: "1" }),

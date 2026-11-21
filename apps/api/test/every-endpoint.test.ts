@@ -81,7 +81,7 @@ describe("every read endpoint answers for every record", () => {
         await ok(who, `/follow-ups?${key[kind]}=${id}`);
       }
     }
-    const all = (await ok(manager, "/follow-ups?pageSize=200")) as { rows: { id: string }[] };
+    const all = (await ok(manager, "/follow-ups?pageSize=100")) as { rows: { id: string }[] };
     for (const f of all.rows) {
       await ok(manager, `/follow-ups/${f.id}`);
       await ok(staff, `/follow-ups/${f.id}`);
@@ -90,8 +90,8 @@ describe("every read endpoint answers for every record", () => {
   }, 60_000);
 
   it("every money submission and its photo", async () => {
-    const all = (await ok(manager, "/submissions?status=all&pageSize=200")) as { rows: { id: string; file: { id: string } | null }[] };
-    const mine = (await ok(staff, "/submissions?status=all&mine=true&pageSize=200")) as { rows: { id: string }[] };
+    const all = (await ok(manager, "/submissions?status=all&pageSize=100")) as { rows: { id: string; file: { id: string } | null }[] };
+    const mine = (await ok(staff, "/submissions?status=all&mine=true&pageSize=100")) as { rows: { id: string }[] };
     for (const s of all.rows) {
       await ok(manager, `/submissions/${s.id}`);
       if (s.file) await ok(manager, `/files/${s.file.id}`);
@@ -103,7 +103,7 @@ describe("every read endpoint answers for every record", () => {
   it("the ledger: lists, every entry, every party's ledger, ageing, accounts", async () => {
     for (const q of ["", "?lead=true", "?removed=false", "?type=correction", "?account=sales", "?account=money:", "?currency=USD&page=2&pageSize=5", `?from=2020-01-01&to=${today}`])
       await ok(manager, `/ledger/entries${q}`);
-    const all = (await ok(manager, "/ledger/entries?pageSize=500")) as { rows: { id: string; groupId: string }[] };
+    const all = (await ok(manager, "/ledger/entries?pageSize=100")) as { rows: { id: string; groupId: string }[] };
     expect(all.rows.length).toBeGreaterThan(0);
     for (const g of [...new Set(all.rows.map((r) => r.groupId))]) await ok(manager, `/ledger/entries/${g}`);
     for (const c of (await ok(manager, "/customers?pageSize=100")).rows as { id: string }[]) {

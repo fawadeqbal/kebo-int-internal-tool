@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, Boxes, ShoppingCart } from "lucide-react";
-import { buildHref, Card, EmptyState, PhoneList, PhoneRow, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, Stack } from "@kebo/ui";
+import { buildHref, Card, EmptyState, PhoneList, PhoneRow, LinkTabs, PAGE_SIZE, PageHeader, Pager, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, toPageSize, Tr, Stack } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
@@ -33,7 +33,7 @@ const PAGE = PAGE_SIZE;
 export default async function PurchaseOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; supplier?: string; ready?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; supplier?: string; ready?: string; page?: string; size?: string }>;
 }) {
   await requirePermission("sourcing.manage");
   const sp = await searchParams;
@@ -42,7 +42,7 @@ export default async function PurchaseOrdersPage({
   const page = toPage(sp.page);
   // Only the page shown comes from the server, with each tab's count and the tiles worked out there.
   const [data, settings] = await Promise.all([
-    api.get<PurchaseOrderPage>("/operations/purchase-orders/page", { status: chip, q: sp.q?.trim() || undefined, supplier: sp.supplier, ready, page: String(page), pageSize: String(PAGE) }),
+    api.get<PurchaseOrderPage>("/operations/purchase-orders/page", { status: chip, q: sp.q?.trim() || undefined, supplier: sp.supplier, ready, page: String(page), pageSize: String(toPageSize(sp.size, PAGE)) }),
     getSettings(),
   ]);
   const main = settings.sales.currency;
@@ -185,7 +185,7 @@ export default async function PurchaseOrdersPage({
           </>
         )}
       </Card>
-      <Pager base="/operations/purchase-orders" params={keep} page={page} pageSize={PAGE} total={data.total} bare />
+      <Pager base="/operations/purchase-orders" params={keep} page={page} pageSize={toPageSize(sp.size, PAGE)} total={data.total} bare />
     </Stack>
   );
 }

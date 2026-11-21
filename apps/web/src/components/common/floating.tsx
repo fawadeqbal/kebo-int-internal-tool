@@ -190,7 +190,7 @@ export function FloatingMenu({
             role="menu"
             aria-label={label}
             className={cn(
-              "flex min-h-0 flex-col overflow-y-auto px-2 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base [&_[role=menuitemradio]]:min-h-12 [&_[role=menuitemradio]]:text-base",
+              "flex min-h-0 flex-col scroll-y scroll-sm px-2 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base [&_[role=menuitemradio]]:min-h-12 [&_[role=menuitemradio]]:text-base",
               HIDE_EMPTY,
             )}
           >
@@ -215,7 +215,7 @@ export function FloatingMenu({
       onKeyDown={keys}
       style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width }}
       className={cn(
-        "fixed z-[110] flex max-h-[min(70vh,28rem)] flex-col overflow-y-auto rounded-lg border border-line bg-surface p-1 text-left shadow-pop",
+        "fixed z-[110] flex max-h-[min(70vh,28rem)] flex-col scroll-y scroll-sm rounded-lg border border-line bg-surface p-1 text-left shadow-pop",
         HIDE_EMPTY,
         !pos && "invisible",
       )}

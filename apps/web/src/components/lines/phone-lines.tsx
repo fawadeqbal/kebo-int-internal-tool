@@ -685,7 +685,7 @@ export function LineWindow({
           <div className="h-1 bg-primary transition-[width]" style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
       )}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 *:shrink-0">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 scroll-y px-4 py-4 *:shrink-0">
         {added && (
           <p role="status" className="flex items-center gap-2 rounded-[10px] bg-ok-soft px-3 py-2.5 text-sm font-semibold text-ok">
             <Check aria-hidden className="size-4 shrink-0" strokeWidth={2.5} />

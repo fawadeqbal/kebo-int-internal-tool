@@ -46,6 +46,11 @@ const cashBookQuery = z.object({
   account: z.union([z.uuid(), z.literal("none")]).optional(),
   currency: z.enum(CURRENCIES).optional(),
   removed: flag,
+  /** A page of the rows (the balances and totals are still of the whole period): { total, page, pageSize } too. */
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  /** Only the last n rows (an overview's latest moves). */
+  latest: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 const cashReportQuery = z.object({

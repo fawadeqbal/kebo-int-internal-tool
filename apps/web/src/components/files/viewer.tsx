@@ -514,7 +514,7 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
             {set.length > 1 && !phone && (
               <nav
                 aria-label="Files here"
-                className="flex h-[76px] shrink-0 items-center gap-2.5 overflow-x-auto border-t border-line bg-surface px-5"
+                className="flex h-[76px] shrink-0 items-center gap-2.5 scroll-x scroll-lg border-t border-line bg-surface px-5"
               >
                 {set.map((f, i) => {
                   const k = kindOf(f);
@@ -665,7 +665,7 @@ function Details({ file, phone, onClose, onDone }: { file: ViewFile; phone: bool
         <div
           role="dialog"
           aria-label="About this file"
-          className="relative max-h-[80%] overflow-y-auto rounded-t-2xl bg-surface pb-[max(1rem,env(safe-area-inset-bottom))] shadow-pop"
+          className="relative max-h-[80%] scroll-y rounded-t-2xl bg-surface pb-[max(1rem,env(safe-area-inset-bottom))] shadow-pop"
         >
           <div aria-hidden className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-line-strong" />
           <div className="flex items-center justify-between py-1 pr-2 pl-5">
@@ -679,7 +679,7 @@ function Details({ file, phone, onClose, onDone }: { file: ViewFile; phone: bool
       </div>
     );
   return (
-    <aside aria-label="About this file" className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-line">
+    <aside aria-label="About this file" className="flex w-80 shrink-0 flex-col scroll-y border-l border-line">
       <h3 className="px-5 pt-4 pb-1.5 text-md font-semibold">About this file</h3>
       {body}
     </aside>
@@ -742,7 +742,7 @@ function ImageStage({ src, name }: { src: string; name: string }) {
   const step = (d: number) => setZoom((z) => Math.min(4, Math.max(0.25, Math.round(((z ?? 1) + d) * 100) / 100)));
   return (
     <div className="absolute inset-0 flex flex-col">
-      <div className={cn("min-h-0 flex-1", zoom === null ? "flex items-center justify-center p-4 sm:p-6" : "overflow-auto p-4")}>
+      <div className={cn("min-h-0 flex-1", zoom === null ? "flex items-center justify-center p-4 sm:p-6" : "scroll-xy scroll-lg p-4")}>
         {/* eslint-disable-next-line @next/next/no-img-element -- a stored file, served by our own /files route */}
         <img
           src={src}
@@ -828,7 +828,7 @@ function SheetStage({ href }: { href: string }) {
         Read here as it is in the file: values only, no formulas or colours. Download it to edit it in Excel.
       </p>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-line bg-surface">
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 scroll-xy scroll-lg">
           <SheetGrid rows={s.rows} cols={s.cols} />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1 border-t border-line px-2 py-1.5">
@@ -932,7 +932,7 @@ function TextStage({ href, csv }: { href: string; csv: boolean }) {
   const lines = text.split(/\r?\n/).slice(0, MAX_ROWS);
   if (!csv)
     return (
-      <div className="absolute inset-0 overflow-auto p-3 sm:p-4">
+      <div className="absolute inset-0 scroll-xy scroll-lg p-3 sm:p-4">
         <pre className="min-h-full rounded-[10px] border border-line bg-surface p-4 font-mono text-md whitespace-pre-wrap">
           {lines.join("\n")}
         </pre>
@@ -941,8 +941,8 @@ function TextStage({ href, csv }: { href: string; csv: boolean }) {
   const rows = lines.filter((l) => l.trim()).map(splitCsv);
   const cols = Math.min(MAX_COLS, Math.max(0, ...rows.map((r) => r.length)));
   return (
-    <div className="absolute inset-0 overflow-auto p-3 sm:p-4">
-      <div className="overflow-auto rounded-[10px] border border-line bg-surface">
+    <div className="absolute inset-0 scroll-xy scroll-lg p-3 sm:p-4">
+      <div className="scroll-xy scroll-lg rounded-[10px] border border-line bg-surface">
         <SheetGrid rows={rows.map((r) => Array.from({ length: cols }, (_, c) => r[c] ?? ""))} cols={cols} />
       </div>
     </div>
