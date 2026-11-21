@@ -709,7 +709,7 @@ export interface OpenBills {
   totals: { currency: string; open: string; count: number }[];
 }
 
-/** GET /billing/to-pay: the open parts of every supplier's plan (Money › To receive and to pay). */
+/** GET /billing/to-pay: the open parts of every supplier's plan (Finance › Receivables & payables). */
 export interface ToPayList {
   rows: {
     key: string;
@@ -787,7 +787,7 @@ export interface SpendingReport {
   /** Spent to sell on orders, or before them on inquiries we won. */
   onWon: string;
   lost: { spent: string; deals: number };
-  /** The company's own costs: Money › Company costs. */
+  /** The company's own costs: Finance › Expenses. */
   company: string;
   owed: string;
   people: { person: { id: string; name: string }; spent: string; toSell: string; lost: string; owed: string }[];

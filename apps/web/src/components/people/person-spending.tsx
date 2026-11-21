@@ -103,7 +103,7 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
             <Bars title="What it was for" currency={c} rows={fors} />
           </div>
           <p className="border-t border-line px-4 py-2.5 text-xs text-text-2">
-            On orders: already in those orders&apos; profit. For the company: on Company costs. The others are what Profit after all costs takes off
+            On orders: already in those orders&apos; profit. For the company: on Expenses. The others are what Profit after all costs takes off
             {Number(s.outside) > 0 ? ` (${money(s.outside, c)})` : ""}.
           </p>
           <Scroll axis="x" size="lg" fade label="Spending, kind by kind" className="border-t border-line">

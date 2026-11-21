@@ -531,7 +531,7 @@ export function CostForm({
             ) : (
               <ChoiceChips labelledBy="cost-paid-label" value={paid} items={paidOptions} onChange={setPaid} />
             )}
-            {!settled && paid === "later" && <p className="text-xs text-text-2">It shows under Still to pay until it is paid. Pay it from its row, or from Money › To receive and to pay.</p>}
+            {!settled && paid === "later" && <p className="text-xs text-text-2">It shows under Still to pay until it is paid. Pay it from its row, or from Finance › Receivables & payables.</p>}
             {!settled && paid === "now" && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <AccountSelect key={currency} id="cost-account" label="From account" currency={currency} defaultValue={from?.account?.id ?? month?.account?.id} error={st.errors?.accountId} />

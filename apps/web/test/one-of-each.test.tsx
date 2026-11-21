@@ -281,8 +281,8 @@ describe("one of each", () => {
   it("one page top: no icon tile before a title, no help line on a list, a record titled by its name", () => {
     expect(found(/data-slot="page-icon"|MODULE_ICONS/g)).toEqual([]);
     expect(found(/"Every amount that came in or went out"|"Every account and what is in it"/g)).toEqual([]);
-    // The path says the menu's words ("Money", not "Finance").
-    expect(found(/\{ label: "Finance" \}/g)).toEqual([]);
+    // The path says the menu's words ("Finance" since 22 Nov 2026; never the old "Money").
+    expect(found(/\{ label: "Money" \}/g)).toEqual([]);
     // A role's page is titled by the role (not "Roles").
     expect(found(/title="Roles" \/>/g).filter((f) => f.includes("roles/[key]"))).toEqual([]);
   });

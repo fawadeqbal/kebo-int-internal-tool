@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/session";
 import { ordersBoardTarget } from "@/lib/old-addresses";
 import { List, type Params } from "../views";
 
-export const metadata = { title: "Orders" };
+export const metadata = { title: "Sales orders" };
 
 /** Orders › Orders: the list. The board has its own page (/orders/board); its old address (?view=board, ?stage=…) goes there. */
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<Params> }) {

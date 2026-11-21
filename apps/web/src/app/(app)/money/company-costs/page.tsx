@@ -19,7 +19,7 @@ import { companyKind } from "@/components/money/company-kinds";
 import { moneyAccess } from "../../finance/sections";
 import { FilterCard } from "@/components/common/filter-card";
 
-export const metadata = { title: "Company costs" };
+export const metadata = { title: "Expenses" };
 
 const HERE = "/money/company-costs";
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -29,7 +29,7 @@ type Search = { p?: string; kind?: string; page?: string; size?: string; q?: str
 const span = (month: string) => ({ from: `${month}-01`, to: addDays(`${addDays(`${month}-28`, 4).slice(0, 7)}-01`, -1) });
 
 /**
- * Money › Company costs (design "money, simple", board MCompany): what the company spends that is not a
+ * Finance › Expenses (design "money, simple", board MCompany): what the company spends that is not a
  * cost of one order: rent, salaries, the office, and what is spent on customers and deals before there is
  * an order. A cost that comes every month is proposed here each month; one click confirms it. An order's
  * costs are on the order.
@@ -39,7 +39,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const a = await moneyAccess(me);
   if (!a.managers) redirect("/forbidden");
   const crumbs = crumbsFor(HERE);
-  if (!a.expenses) return <PlanOff title="Company costs" what="Company costs" crumbs={crumbs} />;
+  if (!a.expenses) return <PlanOff title="Expenses" what="Expenses" crumbs={crumbs} />;
   const sp = await searchParams;
   const today = companyToday();
   const thisMonth = today.slice(0, 7);
@@ -78,7 +78,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
       <PageHeader
         kind="list"
         crumbs={crumbs}
-        title="Company costs"
+        title="Expenses"
         more={list.count > 0 ? <ExportCsv what="expenses" query={{ ...span(month), category, q: text }} /> : undefined}
         primary={<AddCost setup={setup} label="Add company cost" variant="strong" size="md" />}
       />
@@ -134,11 +134,11 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
           text ? (
             <EmptyState framed title="No cost matches" description={`Nothing in ${monthName} matches “${text}”. Try other words, or clear the search.`} />
           ) : (
-            <EmptyState framed title={`No company costs in ${monthName}`} description="Add the rent, the salaries and the office's bills here. A cost of one order is added on that order." />
+            <EmptyState framed title={`No expenses in ${monthName}`} description="Add the rent, the salaries and the office's bills here. A cost of one order is added on that order." />
           )
         ) : (
           <>
-            <ul className="flex flex-col divide-y divide-line" aria-label="Company costs">
+            <ul className="flex flex-col divide-y divide-line" aria-label="Expenses">
               {list.rows.map((e) => (
                 <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} />
               ))}

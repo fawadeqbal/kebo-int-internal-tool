@@ -34,7 +34,7 @@ export async function SupplierSide({ id }: { id: string }) {
           {/* Money (board): bought, paid, what we owe. */}
           <Card>
             <CardHeader
-              title="Money"
+              title="Finance"
               actions={
                 <ButtonLink href={`/suppliers/${f.id}/costs`} variant="link" size="sm">
                   <FileText aria-hidden /> Statement

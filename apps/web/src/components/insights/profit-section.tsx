@@ -63,7 +63,7 @@ export function ProfitSection({
         />
         <StatTile label="Costs of the orders" value={bigMoney(t.costs, c)} sub="goods, freight and the rest" how={how.costsOfOrders(span, c)} />
         <StatTile
-          label="Company costs"
+          label="Expenses"
           value={bigMoney(t.company, c)}
           sub={
             running === null
@@ -98,7 +98,7 @@ export function ProfitSection({
               <Th className="text-right">Sold</Th>
               <Th className="text-right hidden md:table-cell">Costs of the orders</Th>
               <Th className="text-right hidden md:table-cell">Profit from orders</Th>
-              <Th className="text-right hidden md:table-cell">Company costs</Th>
+              <Th className="text-right hidden md:table-cell">Expenses</Th>
               <Th className="text-right">Profit</Th>
               <Th className="text-right hidden sm:table-cell">%</Th>
             </tr>

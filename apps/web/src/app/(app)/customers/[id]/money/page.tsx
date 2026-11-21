@@ -12,7 +12,7 @@ import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
 import { customerTitle } from "@/lib/titles";
 
-export const generateMetadata = customerTitle("Money");
+export const generateMetadata = customerTitle("Finance");
 
 /** One line of the statement: charged (what they owe more) or paid, and the balance after it. */
 interface Line {

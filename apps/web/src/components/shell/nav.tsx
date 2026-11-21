@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Bell, Building2, ChevronRight, ClipboardList, House, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen, Plus, Settings, ShoppingCart, TrendingUp, User, Wallet, X, ShieldCheck } from "lucide-react";
+import { Bell, BriefcaseBusiness, Building2, ChartColumn, ChevronRight, Inbox, Landmark, LayoutDashboard, LogOut, Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, Plus, ShoppingCart, User, X, ShieldCheck, type LucideIcon } from "lucide-react";
 import { Avatar, buttonClass, cn, RULES, Badge, CountDot } from "@kebo/ui";
 import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
@@ -13,13 +13,14 @@ import { PhoneSearch, TopSearch } from "./global-search";
 
 export type { NavModule, NavPage } from "@/lib/nav";
 
-const ICONS: Record<NavIcon, typeof House> = {
-  home: House,
-  sales: Package,
+/** One line icon per group, drawn the same weight (lucide): what each is in an office, not a picture of money or a box. */
+const ICONS: Record<NavIcon, LucideIcon> = {
+  home: LayoutDashboard,
+  sales: BriefcaseBusiness,
   purchasing: ShoppingCart,
-  money: Wallet,
-  reports: TrendingUp,
-  company: Settings,
+  money: Landmark,
+  reports: ChartColumn,
+  company: Building2,
   admin: ShieldCheck,
 };
 
@@ -222,16 +223,34 @@ function writeCookie(name: string, value: string) {
   }
 }
 
-/** A page under its group (the menu, and the menu over the page on a phone). */
+/** Each group's tile colour on a phone (a soft tint and its ink), so a group is found by its colour as well as its name. */
+const TILES: Record<NavIcon, string> = {
+  home: "bg-surface-2 text-text-2",
+  sales: "bg-primary-soft text-primary",
+  purchasing: "bg-warn-soft text-warn",
+  money: "bg-trust-soft text-trust",
+  reports: "bg-info-soft text-info",
+  company: "bg-surface-2 text-text-2",
+  admin: "bg-surface-2 text-text-2",
+};
+
+/** The groups of everyday work, then the settings (their own heading). */
+const SETTINGS_GROUPS: ModuleKey[] = ["company", "admin"];
+
+/**
+ * A page under its group, on the group's thin guide line: the page you are on is green, with a short green
+ * mark on the line beside it.
+ */
 function PageLink({ page, active, big }: { page: NavPage; active: boolean; big?: boolean }) {
   return (
     <Link
       href={page.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2 rounded-lg pr-2 pl-9 text-md text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+        "relative flex items-center gap-2 rounded-lg px-2.5 text-md text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
         big ? "min-h-11" : "h-8",
-        active && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
+        active &&
+          "bg-primary-soft font-semibold text-primary before:absolute before:inset-y-1.5 before:-left-[11px] before:w-0.5 before:rounded-full before:bg-primary hover:bg-primary-soft hover:text-primary",
       )}
     >
       <span className="flex-1 truncate">{page.label}</span>
@@ -240,9 +259,16 @@ function PageLink({ page, active, big }: { page: NavPage; active: boolean; big?:
   );
 }
 
+/** A small heading over a part of the menu (Workspace, Settings). */
+function MenuLabel({ children, big }: { children: ReactNode; big?: boolean }) {
+  return <li className={cn("px-2.5 pt-4 pb-1.5 text-2xs font-semibold tracking-[0.09em] text-muted uppercase first:pt-1", big && "px-1.5")}>{children}</li>;
+}
+
 /**
  * Home, then each group: a button that opens and closes its pages (aria-expanded). Two levels and no
- * more. A closed group shows the total of what waits in it; the group the current page is in is bold.
+ * more; the pages hang on a thin guide line. A closed group shows the total of what waits in it; the
+ * group the current page is in has its icon in green. Workspace first, then Settings, each with its small
+ * heading. On a phone (big) each part is a card with bigger rows and a coloured tile for each group.
  */
 function GroupTree({
   modules,
@@ -263,78 +289,92 @@ function GroupTree({
 }) {
   const id = useId();
   const home = isActive(pathname, HOME_HREF);
-  const row = big ? "min-h-11" : "h-9";
-  return (
-    <ul className="space-y-0.5">
-      <li>
-        <Link
-          href={HOME_HREF}
-          aria-current={home ? "page" : undefined}
-          className={cn(
-            "flex items-center gap-2.5 rounded-lg px-2.5 text-md font-semibold text-text transition-colors hover:bg-surface-2",
-            row,
-            home && "bg-primary-soft text-primary hover:bg-primary-soft",
-          )}
+  const row = big ? "min-h-13 px-3" : "h-9 px-2.5";
+  const icon = (key: NavIcon, Icon: LucideIcon, on: boolean) =>
+    big ? (
+      <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", TILES[key])}>
+        <Icon className="size-[18px]" aria-hidden />
+      </span>
+    ) : (
+      <Icon className={cn("size-[17px] shrink-0", on ? "text-primary" : "text-text-2")} aria-hidden />
+    );
+  const card = big ? "overflow-hidden rounded-2xl border border-line bg-surface [&>li+li]:border-t [&>li+li]:border-line" : "space-y-0.5";
+  const group = (m: NavModule) => {
+    const Icon = ICONS[m.icon];
+    const isOpen = open.has(m.key);
+    const total = moduleTotal(m);
+    const listId = `${id}-${m.key}`;
+    const on = m.key === current;
+    // One page with the group's name: a link like Home, nothing to open.
+    if (isSingle(m)) {
+      return (
+        <li key={m.key}>
+          <Link
+            href={m.pages[0]!.href}
+            aria-current={on ? "page" : undefined}
+            className={cn("flex items-center gap-2.5 rounded-lg text-md font-semibold text-text transition-colors hover:bg-surface-2", row, on && "bg-primary-soft text-primary hover:bg-primary-soft")}
+          >
+            {icon(m.icon, Icon, on)}
+            <span className="flex-1 truncate">{m.title}</span>
+            {total > 0 && <Count n={total} label="to look at" />}
+          </Link>
+        </li>
+      );
+    }
+    return (
+      <li key={m.key}>
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          aria-controls={listId}
+          onClick={() => toggle(m.key)}
+          className={cn("flex w-full items-center gap-2.5 rounded-lg text-left text-md text-text transition-colors hover:bg-surface-2", on || isOpen ? "font-bold" : "font-semibold", row, big && "rounded-none")}
         >
-          <House className="size-[17px] shrink-0" aria-hidden />
-          <span className="flex-1 truncate">Home</span>
-        </Link>
-      </li>
-      {modules.map((m) => {
-        const Icon = ICONS[m.icon];
-        const isOpen = open.has(m.key);
-        const total = moduleTotal(m);
-        const listId = `${id}-${m.key}`;
-        // One page with the group's name (Reports): a link like Home, nothing to open.
-        if (isSingle(m)) {
-          const on = m.key === current;
-          return (
-            <li key={m.key}>
-              <Link
-                href={m.pages[0]!.href}
-                aria-current={on ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-lg px-2.5 text-md font-semibold text-text transition-colors hover:bg-surface-2",
-                  row,
-                  on && "bg-primary-soft text-primary hover:bg-primary-soft",
-                )}
-              >
-                <Icon className={cn("size-[17px] shrink-0", !on && "text-text-2")} aria-hidden />
-                <span className="flex-1 truncate">{m.title}</span>
-                {total > 0 && <Count n={total} label="to look at" />}
-              </Link>
+          {icon(m.icon, Icon, on || isOpen)}
+          <span className="flex-1 truncate">{m.title}</span>
+          {!isOpen && total > 0 && <Count n={total} label="to look at" />}
+          <ChevronRight className={cn("size-3.5 shrink-0 text-muted transition-transform", isOpen && "rotate-90")} aria-hidden />
+        </button>
+        {/* Closed: still in the page (hidden), so its addresses are there for the browser and the checks. The pages
+            hang on one thin line under the group's icon. */}
+        <ul id={listId} hidden={!isOpen} className={cn("space-y-0.5 border-l border-line pl-2.5", big ? "mt-0 mr-3 mb-2 ml-[27px]" : "mt-0.5 mb-1.5 ml-[18px]")}>
+          {m.pages.map((p) => (
+            <li key={p.href} className={cn(p.lineBefore && "relative mt-1.5 pt-1.5 before:absolute before:top-0 before:right-2 before:left-2.5 before:h-px before:bg-line")}>
+              <PageLink page={p} active={p.href === activeHref} big={big} />
             </li>
-          );
-        }
-        return (
-          <li key={m.key}>
-            <button
-              type="button"
-              aria-expanded={isOpen}
-              aria-controls={listId}
-              onClick={() => toggle(m.key)}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-md text-text transition-colors hover:bg-surface-2",
-                m.key === current ? "font-bold" : "font-semibold",
-                row,
-              )}
+          ))}
+        </ul>
+      </li>
+    );
+  };
+  const work = modules.filter((m) => !SETTINGS_GROUPS.includes(m.key));
+  const settings = modules.filter((m) => SETTINGS_GROUPS.includes(m.key));
+  return (
+    <ul className={cn(big && "space-y-1")}>
+      <MenuLabel big={big}>Workspace</MenuLabel>
+      <li>
+        <ul className={card}>
+          <li>
+            <Link
+              href={HOME_HREF}
+              aria-current={home ? "page" : undefined}
+              className={cn("flex items-center gap-2.5 rounded-lg text-md font-semibold text-text transition-colors hover:bg-surface-2", row, big && "rounded-none", home && "bg-primary-soft text-primary hover:bg-primary-soft")}
             >
-              <Icon className="size-[17px] shrink-0 text-text-2" aria-hidden />
-              <span className="flex-1 truncate">{m.title}</span>
-              {!isOpen && total > 0 && <Count n={total} label="to look at" />}
-              <ChevronRight className={cn("size-3.5 shrink-0 text-muted transition-transform", isOpen && "rotate-90")} aria-hidden />
-            </button>
-            {/* Closed: still in the page (hidden), so its addresses are there for the browser and the checks. */}
-            <ul id={listId} hidden={!isOpen} className="mt-0.5 mb-1 space-y-0.5">
-              {m.pages.map((p) => (
-                <li key={p.href} className={cn(p.lineBefore && "relative mt-1.5 pt-1.5 before:absolute before:top-0 before:right-2 before:left-9 before:h-px before:bg-line")}>
-                  <PageLink page={p} active={p.href === activeHref} big={big} />
-                </li>
-              ))}
-            </ul>
+              {icon("home", LayoutDashboard, home)}
+              <span className="flex-1 truncate">Home</span>
+            </Link>
           </li>
-        );
-      })}
+          {work.map(group)}
+        </ul>
+      </li>
+      {settings.length > 0 && (
+        <>
+          <MenuLabel big={big}>Settings</MenuLabel>
+          <li>
+            <ul className={card}>{settings.map(group)}</ul>
+          </li>
+        </>
+      )}
     </ul>
   );
 }
@@ -372,20 +412,47 @@ function MenuContent({
 }) {
   const pathname = usePathname();
   const activeHref = pageOf(pathname, modules.flatMap((m) => m.pages))?.href;
+  const tree = <GroupTree modules={modules} pathname={pathname} activeHref={activeHref} current={moduleOf(pathname, modules)} open={open} toggle={toggle} big={big} />;
+  // On a phone: the whole screen, "Menu" as its title, the company on a card, the parts as cards, Sign out last.
+  if (big)
+    return (
+      <>
+        <div className="flex h-16 shrink-0 items-center px-4">
+          <h2 className="text-2xl font-bold tracking-tight text-text">Menu</h2>
+        </div>
+        <nav className="flex-1 scroll-y px-4 pb-8" aria-label="Main">
+          <Link href={HOME_HREF} className="mb-3 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3" aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
+            <Logo companyName={companyName} logo={logo} size={40} />
+            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+              <span className="truncate text-lead font-semibold text-text">{companyName}</span>{" "}
+              <span className="truncate text-sm text-text-2">{PRODUCT_NAME}</span>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-muted" aria-hidden />
+          </Link>
+          {tree}
+          <form action={logoutAction} className="mt-5">
+            <button type="submit" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-line bg-surface text-md font-semibold text-bad">
+              <LogOut className="size-[18px]" aria-hidden />
+              Sign out
+            </button>
+          </form>
+        </nav>
+      </>
+    );
   return (
     <>
-      <div className="flex h-14 shrink-0 items-center px-4">
-        <Link href={HOME_HREF} className={cn("flex min-w-0 items-center gap-2.5 rounded-lg", big && "pr-10")} aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
+      <div className="flex h-16 shrink-0 items-center px-3">
+        <Link href={HOME_HREF} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-line px-2 py-1.5 hover:bg-surface-2" aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
           <Logo companyName={companyName} logo={logo} size={32} />
           <span className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-lead font-bold tracking-tight text-text">{PRODUCT_NAME}</span>{" "}
+            <span className="truncate text-md font-semibold text-text">{companyName}</span>{" "}
             {/* The space keeps the two names apart in the link's text, so what is read out matches what is shown (WCAG 2.5.3). */}
-            <span className="truncate text-xs text-muted">{companyName}</span>
+            <span className="truncate text-xs text-muted">{PRODUCT_NAME}</span>
           </span>
         </Link>
       </div>
       <nav className="flex-1 scroll-y px-3 pt-1 pb-4" aria-label="Main">
-        <GroupTree modules={modules} pathname={pathname} activeHref={activeHref} current={moduleOf(pathname, modules)} open={open} toggle={toggle} big={big} />
+        {tree}
       </nav>
     </>
   );
@@ -601,7 +668,7 @@ function Strip({ modules, companyName, logo }: { modules: NavModule[]; companyNa
                 home && "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary",
               )}
             >
-              <House className="size-[19px]" aria-hidden />
+              <LayoutDashboard className="size-[19px]" aria-hidden />
             </Link>
           </li>
           {modules.map((m) => {
@@ -709,19 +776,20 @@ export function AppShell({
     writeCookie(FOLD_COOKIE, folded ? "0" : "1");
   };
 
-  const tab = (href: string, label: string, Icon: typeof House, badge?: number) => {
+  const tab = (href: string, label: string, Icon: LucideIcon, badge?: number) => {
     const active = isActive(pathname, href);
     return (
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        className={cn("relative flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-2xs", active ? "font-semibold text-primary" : "text-muted")}
+        className={cn("relative flex flex-1 flex-col items-center justify-center gap-0.5 text-2xs", active ? "font-semibold text-primary" : "text-muted")}
       >
-        <Icon className="size-[22px]" strokeWidth={active ? 2.25 : 1.75} aria-hidden />
+        {/* The tab you are on: its icon on a soft green pill. */}
+        <span className={cn("grid h-7 w-11 place-items-center rounded-full", active && "bg-primary-soft")}>
+          <Icon className="size-[21px]" strokeWidth={active ? 2 : 1.75} aria-hidden />
+        </span>
         {label}
-        {!!badge && (
-          <CountDot n={badge} className="absolute top-1 left-1/2 ml-2" aria-label={`${badge} unread`} />
-        )}
+        {!!badge && <CountDot n={badge} className="absolute top-1 left-1/2 ml-2" aria-label={`${badge} unread`} />}
       </Link>
     );
   };
@@ -741,7 +809,7 @@ export function AppShell({
       </a>
 
       {/* Desktop: the menu beside the page (from 1280 px, unless folded) */}
-      <aside aria-label="Menu" className={cn("no-print sticky top-0 h-dvh w-[232px] shrink-0 flex-col border-r border-line bg-surface", folded ? "hidden" : "hidden xl:flex")}>
+      <aside aria-label="Menu" className={cn("no-print sticky top-0 h-dvh w-[248px] shrink-0 flex-col border-r border-line bg-surface", folded ? "hidden" : "hidden xl:flex")}>
         <MenuContent modules={modules} companyName={companyName} logo={logo} open={open} toggle={toggle} />
       </aside>
       {/* Desktop: the menu folded to a strip of icons (always under 1280 px) */}
@@ -753,9 +821,9 @@ export function AppShell({
       {drawer && (
         <div className="no-print fixed inset-0 z-50 xl:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} aria-hidden />
-          <aside aria-label="Menu" className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] animate-slide-in flex-col border-r border-line bg-surface shadow-pop">
-            <button className="absolute top-2 right-2 grid size-10 place-items-center rounded-md text-muted hover:bg-surface-2" onClick={() => setDrawer(false)} aria-label="Close menu">
-              <X className="size-4" />
+          <aside aria-label="Menu" className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] animate-slide-in flex-col border-r border-line bg-bg shadow-pop max-md:w-full max-md:max-w-none max-md:border-r-0">
+            <button className="absolute top-3 right-3 grid size-10 place-items-center rounded-full border border-line bg-surface text-text-2 hover:bg-surface-2" onClick={() => setDrawer(false)} aria-label="Close menu">
+              <X className="size-[18px]" />
             </button>
             <MenuContent modules={modules} companyName={companyName} logo={logo} open={open} toggle={toggle} big />
           </aside>
@@ -811,21 +879,27 @@ export function AppShell({
 
       {/* Phone: bottom tab bar, thumb-reachable, with the main action in the middle. On a record's page with a next
           step, that step's button takes its place (PageHeader's data-record-dock, globals.css). */}
-      <nav data-quick-nav="" aria-label="Quick" className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        {tab(HOME_HREF, "Home", House)}
-        {tab("/inquiries", "Inquiries", ClipboardList)}
+      <nav
+        data-quick-nav=""
+        aria-label="Quick"
+        className="no-print fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-30 flex h-16 items-stretch rounded-[22px] border border-line bg-surface/95 px-1.5 shadow-pop backdrop-blur md:hidden"
+      >
+        {tab(HOME_HREF, "Home", LayoutDashboard)}
+        {tab("/inquiries", "Inquiries", Inbox)}
         {canCreate ? (
-          <div data-quick-fab="" className="flex flex-1 items-start justify-center">
-            <Link href="/inquiries?panel=new-inquiry" aria-label="New inquiry" className="-mt-5 grid size-14 place-items-center rounded-full bg-primary-solid text-primary-fg shadow-pop ring-4 ring-bg active:scale-95">
-              <Plus className="size-7" strokeWidth={2.25} aria-hidden />
+          <div data-quick-fab="" className="flex flex-1 items-center justify-center">
+            <Link href="/inquiries?panel=new-inquiry" aria-label="New inquiry" className="grid size-[50px] place-items-center rounded-2xl bg-primary-solid text-primary-fg shadow-pop active:scale-95">
+              <Plus className="size-6" strokeWidth={2.25} aria-hidden />
             </Link>
           </div>
         ) : (
           tab("/customers", "Customers", Building2)
         )}
         {tab("/notifications", "Alerts", Bell, unread)}
-        <button type="button" onClick={() => setDrawer(true)} aria-expanded={drawer} className="flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-2xs text-muted">
-          <MenuIcon className="size-[22px]" strokeWidth={1.75} aria-hidden />
+        <button type="button" onClick={() => setDrawer(true)} aria-expanded={drawer} className="flex flex-1 flex-col items-center justify-center gap-0.5 text-2xs text-muted">
+          <span className="grid h-7 w-11 place-items-center rounded-full">
+            <MenuIcon className="size-[21px]" strokeWidth={1.75} aria-hidden />
+          </span>
           Menu
         </button>
       </nav>

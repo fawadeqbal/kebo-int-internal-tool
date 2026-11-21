@@ -12,7 +12,7 @@ import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
 import { supplierTitle } from "@/lib/titles";
 
-export const generateMetadata = supplierTitle("Money");
+export const generateMetadata = supplierTitle("Finance");
 
 interface Line {
   key: string;

@@ -17,7 +17,7 @@ const MONTH = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric"
  * Reports › Spending (design "spending", board Spending): who spends, on what, and what winning and losing cost
  * us. "Spent to sell" is trips, hotels, meals, gifts, samples, courier and checks on a customer, an inquiry or an
  * order; a person's "Spent" is everything they paid (as on their page). The company's own costs stay on
- * Money › Company costs.
+ * Finance › Expenses.
  */
 export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpending>>; p: Period }) {
   const c = d.currency;
@@ -68,7 +68,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
       <p className="text-md text-text-2">
         The company&apos;s own costs (rent, salaries, the office: {money(d.company, c)} {p.name}) are on{" "}
         <Link href="/money/company-costs" className={linkClass}>
-          Money › Company costs
+          Finance › Expenses
         </Link>
         .
       </p>

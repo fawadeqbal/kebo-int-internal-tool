@@ -175,7 +175,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 </li>
               ))}
             </SideSection>
-            <SideSection title="Money">
+            <SideSection title="Finance">
               {owed.flatMap((r) =>
                 (
                   [

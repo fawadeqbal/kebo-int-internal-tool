@@ -33,13 +33,13 @@ function statusOf(r: PaymentRow) {
 }
 
 /**
- * Money › Payments (design "money, simple", board MPayments): every amount that came in or went out, with
- * who recorded it. What is still owed either way is on "To receive and to pay"; this page is what happened.
+ * Finance › Payments (design "money, simple", board MPayments): every amount that came in or went out, with
+ * who recorded it. What is still owed either way is on "Receivables & payables"; this page is what happened.
  */
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const me = await requireUser();
   const sp = await searchParams;
-  // Its old tabs (Payment requests, To pay) are the two sides of "To receive and to pay".
+  // Its old tabs (Payment requests, To pay) are the two sides of "Receivables & payables".
   const old = paymentsTabTarget(sp);
   if (old) redirect(old);
   // People who see no payments used to land on the requests of their orders: that list is there too.

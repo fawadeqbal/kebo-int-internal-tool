@@ -51,7 +51,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             label="Paid out"
             value={bigMoney(d.paidOut.now, c)}
             delta={<Delta value={change(d.paidOut.now, d.paidOut.before)} goodWhenUp={false} vs={vs} />}
-            sub="suppliers, bills and company costs"
+            sub="suppliers, bills and expenses"
             href={href({ section: "cash" })}
             how={how.paidOut(span, c)}
           />
@@ -70,7 +70,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
           value={bigMoney(d.profit.now, c)}
           tone={d.profit.now < 0 ? "bad" : d.seeProfit && d.profit.now > 0 ? "ok" : undefined}
           delta={<Delta value={change(d.profit.now, d.profit.before)} vs={vs} />}
-          sub={d.seeProfit ? `${percent(d.profit.margin)} · after company costs` : `${percent(d.profit.margin)} of what was sold`}
+          sub={d.seeProfit ? `${percent(d.profit.margin)} · after expenses` : `${percent(d.profit.margin)} of what was sold`}
           href={d.seeProfit ? href({ section: "money" }) : undefined}
           how={d.seeProfit ? how.profit(span, c) : how.grossProfit(span, c)}
         />

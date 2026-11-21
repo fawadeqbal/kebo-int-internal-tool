@@ -61,7 +61,7 @@ export async function OrderSide({ id }: { id: string }) {
         followUp={nextUp ? { text: dueText(nextUp.dueOn, nextUp.dueAt), late: nextUp.late, href: `${base}/history#follow-ups` } : null}
       />
       <PanelFacts title="Dates" rows={dates} />
-      <PanelFacts title="Money" rows={money} action={o.money ? <PanelLink href={`${base}/costs`}>Costs</PanelLink> : undefined} />
+      <PanelFacts title="Finance" rows={money} action={o.money ? <PanelLink href={`${base}/costs`}>Costs</PanelLink> : undefined} />
       <PanelNotes notes={(notes ?? []).map((n) => ({ id: n.id, body: n.body, by: n.author.name, when: date(n.at) }))} allHref={`${base}/history`} form={form} max={3} />
     </PanelCard>
   );

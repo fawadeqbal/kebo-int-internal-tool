@@ -34,21 +34,21 @@ export function moneyTarget(q: Query, first?: { cashBook: boolean; expenses: boo
 export const DUE = "/money/due";
 
 /**
- * The pages that became "To receive and to pay": Invoices, To receive (customers), the two To pay lists
+ * The pages that became "Receivables & payables": Invoices, To receive (customers), the two To pay lists
  * (suppliers). A search typed there is kept; their own views (?view=, ?age=, ?cur=) are gone.
  */
 export function dueTarget(side: "customers" | "suppliers", q: Query = {}): string {
   return buildHref(DUE, {}, { side: side === "suppliers" ? "suppliers" : undefined, q: q.q });
 }
 
-/** Payments' old tabs: Payment requests and To pay are sides of "To receive and to pay"; the rest is Payments itself. */
+/** Payments' old tabs: Payment requests and To pay are sides of "Receivables & payables"; the rest is Payments itself. */
 export function paymentsTabTarget(q: Query): string | null {
   if (q.tab === "requests") return dueTarget("customers", q);
   if (q.tab === "to-pay") return dueTarget("suppliers", q);
   return null;
 }
 
-/** Expenses was one list of every cost: what is not a cost of one order is Company costs, month by month (a year or a customer's filter is dropped). */
+/** Expenses was one list of every cost: what is not a cost of one order is Expenses, month by month (a year or a customer's filter is dropped). */
 export function companyCostsTarget(q: Query = {}): string {
   const month = /^\d{4}-\d{2}$/.test(q.p ?? q.month ?? "") ? (q.p ?? q.month) : undefined;
   return buildHref("/money/company-costs", {}, { p: month, kind: q.category });

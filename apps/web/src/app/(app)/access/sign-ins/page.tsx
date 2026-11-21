@@ -9,7 +9,7 @@ import { SignInList } from "@/components/security/sign-in-list";
 import { getPeople } from "@/lib/loaders";
 import { FilterCard } from "@/components/common/filter-card";
 
-export const metadata = { title: "Sign-ins" };
+export const metadata = { title: "Login history" };
 
 /** Every sign-in attempt for a year, right and wrong: by person, failed only, or by email or address. */
 export default async function SignInsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -26,7 +26,7 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
   const filtered = !!(sp.person || failed || sp.q);
   return (
     <Stack>
-      <PageHeader kind="list" crumbs={crumbsFor("/access/sign-ins")} title="Sign-ins" />
+      <PageHeader kind="list" crumbs={crumbsFor("/access/sign-ins")} title="Login history" />
       <LinkTabs
         label="Which attempts"
         tabs={[

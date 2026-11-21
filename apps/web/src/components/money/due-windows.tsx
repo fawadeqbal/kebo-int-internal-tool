@@ -6,7 +6,7 @@ import { PaymentPlanTable } from "@/components/order-sections/payment-plan";
 import { PayFactoryWindow } from "@/components/order-sections/factory-windows";
 
 /**
- * Money › To receive and to pay: a row's button is a link that names the window to open (?do=pay, ?pay=…);
+ * Finance › Receivables & payables: a row's button is a link that names the window to open (?do=pay, ?pay=…);
  * the page then draws that row with its window already open. Once the window closes the name leaves the
  * address, so a refresh or the Back button does not open it again.
  */
