@@ -369,6 +369,28 @@ describe("one of each", () => {
     expect(bad).toEqual([]);
   }, 30_000); // It reads every export against every file: a slow CI machine needs more than the default 5 s.
 
+  it("one Pager, fed by the server: a list's total is the server's, never the length of rows it sent whole", () => {
+    // Lists whose rows come whole on purpose, each one bounded: a record's own rows with totals over all of them,
+    // the team, money still open, and the platform's own tables and reports (counted, not stored rows).
+    const WHOLE = [
+      "app/(app)/money/due/page.tsx",
+      "app/(app)/customers/[id]/orders/page.tsx",
+      "app/(app)/suppliers/[id]/offers/page.tsx",
+      "app/(app)/users/(list)/page.tsx",
+      "app/platform/(admin)/companies/page.tsx",
+      "app/platform/(admin)/leads/page.tsx",
+      "app/platform/(admin)/companies/[id]/sections.tsx",
+      "components/insights/parties-sections.tsx",
+      "components/insights/profit-section.tsx",
+    ];
+    const sliced = SOURCES.filter(({ file }) => !WHOLE.some((w) => file.endsWith(w))).flatMap(({ file, text }) =>
+      [...text.matchAll(/<Pager\b[^>]*total=\{[^}]*\.length\}/g)].map((m) => `${file}: ${m[0].slice(0, 90)}`),
+    );
+    expect(sliced).toEqual([]);
+    // And no hand-made pager: one look, one way.
+    expect(SOURCES.filter(({ file, text }) => !file.endsWith("pagination.tsx") && /aria-label="Pagination"/.test(text)).map(({ file }) => file)).toEqual([]);
+  });
+
   it("one scroll bar: every box that scrolls is Scroll or its classes (scroll-x / scroll-y / scroll-xy)", () => {
     // overflow-auto would draw the browser's own bar (thick and grey on Windows); a hand-made hidden bar is scroll-none.
     const raw = SOURCES.flatMap(({ file, text }) =>

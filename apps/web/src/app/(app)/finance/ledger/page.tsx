@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, Pager, Table, Td, Th, THead, toPage, Tr, Notice, linkClass, Stack } from "@kebo/ui";
+import { PhoneList, PhoneRow, buildHref, Card, cn, DataRow, EmptyState, LinkTabs, Pager, Table, Td, Th, THead, toPage, toPageSize, Tr, Notice, linkClass, Stack } from "@kebo/ui";
 
 import { FilterCard } from "@/components/common/filter-card";
 import { PageHeader } from "@kebo/ui";
@@ -29,7 +29,7 @@ type Search = {
   removed?: string;
   account?: string;
   order?: string;
-  page?: string;
+  page?: string; size?: string;
   panel?: string;
   id?: string;
 };
@@ -148,7 +148,7 @@ async function Entries({
     orderId: order,
     lead: "true",
     page: String(page),
-    pageSize: String(PAGE_SIZE),
+    pageSize: String(toPageSize(sp.size)),
   });
   const keep = { view: view === "all" ? undefined : view, order, account: sp.account };
   const open = (groupId: string) => buildHref(PATH, all, { panel: "entry", id: groupId });

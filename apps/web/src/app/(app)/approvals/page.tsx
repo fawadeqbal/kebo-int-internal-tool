@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Check, Clock, FileText } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, PAYMENT_METHOD_LABEL, type ExpenseCategory, type PaymentMethod } from "@kebo/shared";
-import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Tr, type StatusMeaning, Notice, linkClass, cn, Stack } from "@kebo/ui";
+import { Badge, Card, EmptyState, LinkTabs, PageHeader, Pager, Segmented, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, toPageSize, Tr, type StatusMeaning, Notice, linkClass, cn, Stack } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
@@ -44,7 +44,7 @@ const nameOf = (s: Submission) => [kindWords(s).toLowerCase(), s.order?.refNo, a
 export default async function ApprovalsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; mine?: string; page?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; mine?: string; page?: string; size?: string; q?: string }>;
 }) {
   const me = await requireUser();
   const approver = can(me, "payments.record") || (can(me, "expenses.manage") && (await hasFeature("expenses")));
@@ -56,7 +56,7 @@ export default async function ApprovalsPage({
   const page = toPage(sp.page);
   const text = sp.q?.trim() || undefined;
   const [list, everything] = await Promise.all([
-    api.get<SubmissionList>("/submissions", { status, mine: mine ? "true" : undefined, q: text, page, pageSize: PAGE_SIZE }),
+    api.get<SubmissionList>("/submissions", { status, mine: mine ? "true" : undefined, q: text, page, pageSize: toPageSize(sp.size, PAGE_SIZE) }),
     // The figures over the list are for everything waiting, whatever is searched.
     text ? api.get<SubmissionList>("/submissions", { status, mine: mine ? "true" : undefined, page: 1, pageSize: 1 }) : null,
   ]);
@@ -175,7 +175,7 @@ export default async function ApprovalsPage({
           </>
         )}
       </Card>
-      <Pager base="/approvals" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} bare />
+      <Pager base="/approvals" params={keep} page={page} pageSize={toPageSize(sp.size, PAGE_SIZE)} total={list.total} bare />
     </Stack>
   );
 }

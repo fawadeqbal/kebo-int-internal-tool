@@ -700,7 +700,7 @@ describe("the ledger", () => {
   });
 
   it("reads: entries with totals, one entry with its document, a party's ledger with ageing, ageing, accounts", async () => {
-    const list = (await api(app, manager).get(`/ledger/entries?customerId=${customerId}&lead=true&pageSize=200`).expect(200)).body;
+    const list = (await api(app, manager).get(`/ledger/entries?customerId=${customerId}&lead=true&pageSize=100`).expect(200)).body;
     expect(list.rows.length).toBeGreaterThan(5);
     expect(list.totals.balanced).toBe(true);
     // A payment on one order (a transfer over several orders is on none).
@@ -710,7 +710,7 @@ describe("the ledger", () => {
     );
     expect(payment.counter.label).toBeTruthy();
     expect(payment.with).toMatchObject({ kind: "customer", id: customerId });
-    const removed = (await api(app, manager).get(`/ledger/entries?customerId=${customerId}&removed=false&pageSize=500`).expect(200)).body;
+    const removed = (await api(app, manager).get(`/ledger/entries?customerId=${customerId}&removed=false&pageSize=100`).expect(200)).body;
     expect(removed.rows.every((r: { removed: unknown; reversesId: string | null }) => !r.removed && !r.reversesId)).toBe(true);
     const corrections = (await api(app, manager).get(`/ledger/entries?type=correction&customerId=${customerId}`).expect(200)).body;
     expect(corrections.rows.length).toBeGreaterThan(0);

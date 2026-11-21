@@ -26,7 +26,7 @@ const entriesQuery = z.object({
   removed: flag(true),
   lead: flag(false),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(500).default(50),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 const partyQuery = z.object({ from: day.optional(), to: day.optional(), onlyOpen: flag(false), removed: flag(false) });

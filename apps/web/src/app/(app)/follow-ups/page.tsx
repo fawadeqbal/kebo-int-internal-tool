@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { crumbsFor } from "@/lib/nav";
 import { Pencil, Plus } from "lucide-react";
-import { Badge, Card, cn, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, Td, Th, THead, toPage } from "@kebo/ui";
+import { Badge, Card, cn, EmptyState, LinkTabs, PageHeader, Pager, Td, Th, THead, toPage, toPageSize } from "@kebo/ui";
 import { can, type Tone } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -72,7 +72,7 @@ function duePill(f: FollowUp, today: string): { text: string; tone: Tone } {
 export default async function FollowUpsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; status?: string; q?: string; due?: string; who?: string; about?: string; page?: string }>;
+  searchParams: Promise<{ view?: string; status?: string; q?: string; due?: string; who?: string; about?: string; page?: string; size?: string }>;
 }) {
   const me = await requireUser();
   const sp = await searchParams;
@@ -92,7 +92,7 @@ export default async function FollowUpsPage({
       late: status === "late" ? "true" : undefined,
       ...filters,
       page,
-      pageSize: PAGE_SIZE,
+      pageSize: toPageSize(sp.size),
     }),
     getPeople().catch(() => [] as Person[]),
     api.get<OrderRow[]>("/orders", { status: "open" }).catch(() => [] as OrderRow[]),
@@ -269,7 +269,7 @@ export default async function FollowUpsPage({
             </DataTable>
           )}
         </Card>
-        <Pager base="/follow-ups" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} bare />
+        <Pager base="/follow-ups" params={keep} page={page} pageSize={toPageSize(sp.size)} total={list.total} bare />
       </div>
     </>
   );

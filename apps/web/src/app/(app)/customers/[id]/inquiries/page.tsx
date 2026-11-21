@@ -1,6 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { can, CHANNEL_LABEL, INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE, LOST_REASON_LABEL, type InquiryStage } from "@kebo/shared";
-import { Badge, ButtonLink, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, Td, Th, THead, toPage } from "@kebo/ui";
+import { Badge, ButtonLink, DataRow, EmptyState, Pager, PhoneList, PhoneRow, RefCode, Td, Th, THead, toPage, toPageSize } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { customerOf } from "@/lib/party-data";
@@ -33,14 +33,14 @@ export default async function CustomerInquiries({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; size?: string }>;
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const me = await requireUser();
   const status = STAGES.find((x) => x === sp.status);
   const [c, list] = await Promise.all([
     customerOf(id),
-    api.get<Paged<DealRow>>("/inquiries", { customerId: id, q: sp.q?.trim() || undefined, stage: status, page: toPage(sp.page), pageSize: PAGE_SIZE }).catch(() => null),
+    api.get<Paged<DealRow>>("/inquiries", { customerId: id, q: sp.q?.trim() || undefined, stage: status, page: toPage(sp.page), pageSize: toPageSize(sp.size, 10) }).catch(() => null),
   ]);
   const rows = list?.rows ?? [];
   const filtered = !!(sp.q || status);
@@ -127,7 +127,7 @@ export default async function CustomerInquiries({
           </>
         )}
       </TabList>
-      {list && <Pager base={base} params={{ q: sp.q, status }} page={list.page} pageSize={list.pageSize} total={list.total} bare />}
+      {list && <Pager base={base} params={{ q: sp.q, status }} page={list.page} pageSize={list.pageSize} total={list.total} bare compact />}
     </>
   );
 }

@@ -249,7 +249,7 @@ export class CashService {
    * balance before, after each line, and at the end), or "none" for what was
    * not put on any account yet. ?currency= one currency.
    */
-  async cashBook(user: SessionUser, q: { from: ISODate; to: ISODate; account?: string; currency?: string; removed?: boolean }) {
+  async cashBook(user: SessionUser, q: { from: ISODate; to: ISODate; account?: string; currency?: string; removed?: boolean; page?: number; pageSize?: number; latest?: number }) {
     this.assertManager(user);
     const range = { gte: toDbDate(q.from), lte: toDbDate(q.to) };
     const none = q.account === "none";
@@ -479,7 +479,11 @@ export class CashService {
       totals: [...totals.entries()].map(([currency, t]) => ({ currency, in: fromMinor(t.in), out: fromMinor(t.out), net: fromMinor(t.in - t.out) })),
       /** Amounts in this period not on any account yet (to put on one, for balances that match the bank). */
       unassigned,
-      rows: out,
+      // The whole period is read for its balances and totals; the browser gets one page of its rows (or the latest).
+      total: out.length,
+      page: q.page ?? 1,
+      pageSize: q.page ? (q.pageSize ?? 25) : out.length,
+      rows: q.latest ? out.slice(-q.latest) : q.page ? out.slice((q.page - 1) * (q.pageSize ?? 25), q.page * (q.pageSize ?? 25)) : out,
     };
   }
 

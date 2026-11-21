@@ -1,5 +1,5 @@
 import { History } from "lucide-react";
-import { buildHref, ButtonLink, Card, EmptyState, LinkTabs, PAGE_SIZE, Pager, toPage, Stack } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, EmptyState, LinkTabs, Pager, toPage, toPageSize, Stack } from "@kebo/ui";
 import { PageHeader } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
@@ -19,7 +19,7 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
   const ask = (onlyFailed: boolean, page: number, pageSize: number) =>
     api.get<Paged<SignInRow>>("/security/sign-ins", { userId: sp.person, failed: onlyFailed || undefined, q, page, pageSize });
   // The list, and the other tab's number (each tab counts what it lists, for the same person and search).
-  const [data, other, people] = await Promise.all([ask(failed, toPage(sp.page), PAGE_SIZE), ask(!failed, 1, 1), getPeople()]);
+  const [data, other, people] = await Promise.all([ask(failed, toPage(sp.page), toPageSize(sp.size)), ask(!failed, 1, 1), getPeople()]);
   const counts = failed ? { all: other.total, failed: data.total } : { all: data.total, failed: other.total };
   const keep = { person: sp.person, failed: sp.failed, q: sp.q };
   const href = (patch: Record<string, string | undefined>) => buildHref("/access/sign-ins", keep, { page: undefined, ...patch });

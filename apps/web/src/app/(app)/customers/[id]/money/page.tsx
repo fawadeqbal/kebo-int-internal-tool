@@ -47,7 +47,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
     customerPaymentsOf(id),
     ledgerOn ? api.get<LedgerParty>(`/ledger/parties/customer/${id}`, { from: "2000-01-01", to: today }).catch(() => null) : null,
     seesCosts ? api.get<CustomerAccount>(`/customers/${id}/account`).catch(() => null) : null,
-    seesCosts ? api.get<ExpenseList>("/expenses", { customerId: id, pageSize: 200 }).catch(() => null) : null,
+    seesCosts ? api.get<ExpenseList>("/expenses", { customerId: id, pageSize: 100 }).catch(() => null) : null,
     seesCosts ? getPeople() : null,
     seesCosts ? getSettings() : null,
   ]);

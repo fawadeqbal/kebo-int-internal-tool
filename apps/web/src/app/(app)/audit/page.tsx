@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, Scroll, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, Tr, linkClass, Stack } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, Scroll, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, toPageSize, Tr, linkClass, Stack } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -120,7 +120,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   if (!(await hasFeature("audit_log"))) return <PlanOff title="Activity log" what="The activity log" crumbs={crumbsFor("/audit")} />;
   const sp = await searchParams;
   const [data, people] = await Promise.all([
-    api.get<Paged<AuditRow> & { counts: Record<string, number> }>("/audit", { entityType: sp.type, userId: sp.person, q: sp.q?.trim() || undefined, page: toPage(sp.page), pageSize: PAGE_SIZE }),
+    api.get<Paged<AuditRow> & { counts: Record<string, number> }>("/audit", { entityType: sp.type, userId: sp.person, q: sp.q?.trim() || undefined, page: toPage(sp.page), pageSize: toPageSize(sp.size, PAGE_SIZE) }),
     getPeople(),
   ]);
   const keep = { type: sp.type, person: sp.person, q: sp.q };

@@ -72,7 +72,7 @@ describe("the company's costs that come every month", () => {
   });
 
   it("the company's list leaves the orders' costs out", async () => {
-    const list = (await api(app, manager).get(`/expenses?kind=company&from=${lastMonth}&to=${today}&pageSize=200`).expect(200)).body as { rows: { description: string; orderId: string | null }[] };
+    const list = (await api(app, manager).get(`/expenses?kind=company&from=${lastMonth}&to=${today}&pageSize=100`).expect(200)).body as { rows: { description: string; orderId: string | null }[] };
     expect(list.rows.every((r) => r.orderId === null)).toBe(true);
     expect(list.rows.some((r) => r.description === `Office rent ${tag}`)).toBe(true);
     expect(list.rows.some((r) => r.description === `Freight ${tag}`)).toBe(false);

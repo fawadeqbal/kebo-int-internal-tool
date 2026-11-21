@@ -1,12 +1,12 @@
-import { Card, Stack } from "@kebo/ui";
+import { Card, Pager, Stack, toPage, toPageSize } from "@kebo/ui";
 import { api } from "@/lib/api";
+import { historyPage, whoOptions } from "@/lib/history";
 import { requireUser } from "@/lib/session";
 import { getPeople } from "@/lib/loaders";
 import { dealOf } from "@/lib/deal-data";
-import type { HistoryEntry } from "@/lib/types";
 import type { FollowUpList } from "@/lib/types-notes";
 import { FilterCard } from "@/components/common/filter-card";
-import { HistoryTable, historyText } from "@/components/common/history-list";
+import { HistoryTable } from "@/components/common/history-list";
 import { FollowUpsCard } from "@/components/notes/cards";
 import { inquiryTitle } from "@/lib/titles";
 import { WithSide } from "../side";
@@ -14,27 +14,28 @@ import { WithSide } from "../side";
 export const generateMetadata = inquiryTitle("History");
 
 /** Every change on the deal and its prices, quotation, files and order: who, when, old → new, and why; searchable, by person. Then its follow-ups. */
-export default async function DealHistory({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string; who?: string }> }) {
+export default async function DealHistory({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string; who?: string; page?: string; size?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
   const me = await requireUser();
-  const [entries, d, followUps, staff] = await Promise.all([
-    api.get<HistoryEntry[]>("/history", { type: "deal", id }),
+  const page = toPage(sp.page);
+  const [list, d, followUps, staff] = await Promise.all([
+    historyPage("deal", id, { page, pageSize: toPageSize(sp.size), q: sp.q?.trim() || undefined, who: sp.who }),
     dealOf(id),
     api.get<FollowUpList>("/follow-ups", { inquiryId: id }).catch(() => null),
     getPeople().catch(() => []),
   ]);
-  const people = [...new Map(entries.map((e) => [e.by?.id ?? "system", e.by?.name ?? "System"])).entries()].map(([value, label]) => ({ value, label }));
-  const q = sp.q?.trim().toLowerCase() ?? "";
-  const shown = entries.filter((e) => (!q || historyText(e).includes(q)) && (!sp.who || (e.by?.id ?? "system") === sp.who));
+  const people = whoOptions(staff);
+  const q = sp.q?.trim() ?? "";
   return (
     // The same panel as every tab of the inquiry, beside its history.
     <WithSide id={id}>
       <Stack>
       <FilterCard search="Search history…" value={sp.q} clearHref={sp.who ? `?who=${sp.who}` : "?"} selects={[{ name: "who", label: "Who", value: sp.who, options: people }]} />
       <Card>
-        <HistoryTable entries={shown} showArea empty={q || sp.who ? "Nothing matches. Clear the search or choose everyone." : "Nothing has changed yet."} />
+        <HistoryTable entries={list.rows} showArea empty={q || sp.who ? "Nothing matches. Clear the search or choose everyone." : "Nothing has changed yet."} />
       </Card>
+      <Pager base={`/inquiries/${id}/history`} params={{ q: sp.q, who: sp.who }} page={list.page} pageSize={list.pageSize} total={list.total} bare />
       {followUps && (
         <div>
           <FollowUpsCard on={{ key: "inquiryId", id }} label={`${d.refNo} · ${d.customer.name}`} rows={followUps.rows} people={staff} meId={me.id} />

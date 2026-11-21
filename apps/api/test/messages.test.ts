@@ -33,7 +33,7 @@ describe("messages", () => {
   const customer = `Lagos Water ${tag}`;
   const phone = `+23480${String(Date.now()).slice(-7)}`;
   const bell = async (token: string, type: string) =>
-    ((await api(app, token).get("/notifications?take=200").expect(200)).body.items as Row[]).filter((n) => n.type === type && n.title.includes(tag));
+    ((await api(app, token).get(`/notifications?take=100&q=${tag}`).expect(200)).body.items as Row[]).filter((n) => n.type === type && n.title.includes(tag));
   const mailTo = (email: string, subject: RegExp) => sent.filter((m) => [m.to].flat().includes(email) && subject.test(m.subject));
 
   beforeAll(async () => {
@@ -204,7 +204,7 @@ describe("messages", () => {
     sent = [];
     const company = await prisma.platform.company.findUniqueOrThrow({ where: { id: FIRST_COMPANY_ID } });
     await CompanyContext.run(toInfo(company), () => app.get(RemindersService).run(true));
-    const mine = ((await api(app, sana).get("/notifications?take=200").expect(200)).body.items as Row[]).filter((n) => n.type === "reminder.quotationExpired" && n.title.includes(`Quiet Buyer ${tag}`));
+    const mine = ((await api(app, sana).get(`/notifications?take=100&q=${tag}`).expect(200)).body.items as Row[]).filter((n) => n.type === "reminder.quotationExpired" && n.title.includes(`Quiet Buyer ${tag}`));
     expect(mine).toHaveLength(1);
     expect(mine[0]).toMatchObject({ title: expect.stringMatching(new RegExp(`^Quotation to Quiet Buyer ${tag} ended without an answer \\(QUO-`)), message: expect.objectContaining({ tag: "Quotation ended", urgent: true }) });
     // Not emailed on its own: it is in the one morning email.

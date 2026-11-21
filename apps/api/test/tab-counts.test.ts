@@ -168,10 +168,10 @@ describe("tab counts match what each tab lists", () => {
     }
     const none = await get("/submissions", { status: "all", pageSize: "1", q: "zz-no-such-words" });
     expect(none.total).toBe(0);
-    const costs = await get("/expenses", { kind: "company", pageSize: "200" });
+    const costs = await get("/expenses", { kind: "company", pageSize: "100" });
     if (costs.rows.length) {
       const word = String(costs.rows[0].description).split(" ")[0];
-      const f = await get("/expenses", { kind: "company", pageSize: "200", q: word });
+      const f = await get("/expenses", { kind: "company", pageSize: "100", q: word });
       expect(f.rows.length).toBeGreaterThan(0);
       expect(f.listed).toBeLessThanOrEqual(costs.listed);
       expect(f.rows.every((r: { description: string; note?: string | null; payee?: string | null }) => [r.description, r.note, r.payee].some((v) => v?.toLowerCase().includes(word.toLowerCase())))).toBe(true);

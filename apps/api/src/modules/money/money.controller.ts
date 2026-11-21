@@ -57,7 +57,7 @@ const expenseQuery = z.object({
   /** What it was for, the note or who was paid. */
   q: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).max(10_000).optional(),
-  pageSize: z.coerce.number().int().min(1).max(200).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });
 const MAX_UPLOAD = 200 * 1024 * 1024; // hard ceiling; the configured limit is checked in the service
 const yearQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) });

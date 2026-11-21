@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Clock, Factory, type List, Plus, ShoppingCart, TrendingUp, X } from "lucide-react";
 import { can } from "@kebo/shared";
-import { RefCode, buildHref, ButtonLink, Card, LinkTabs, DataRow, EmptyState, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage, Stack } from "@kebo/ui";
+import { RefCode, buildHref, ButtonLink, Card, LinkTabs, DataRow, EmptyState, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage, toPageSize, Stack } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { PartyExcel } from "@/components/sheets/party-excel";
@@ -47,7 +47,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
   const year = new Date().getFullYear();
   const [data, all, mine, people, editing, owed, groups, thisYear, lastYear] = await Promise.all([
-    api.get<List>("/factories", { ...query, page: toPage(sp.page) }),
+    api.get<List>("/factories", { ...query, page: toPage(sp.page), pageSize: toPageSize(sp.size) }),
     api.get<List>("/factories", { pageSize: 1 }),
     api.get<List>("/factories", { pageSize: 1, mine: "true" }),
     getPeople().catch(() => []),

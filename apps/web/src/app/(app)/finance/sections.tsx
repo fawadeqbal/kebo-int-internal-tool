@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Banknote, Landmark, Wallet } from "lucide-react";
 import { can, CURRENCIES, MONEY_ACCOUNT_KIND_LABEL } from "@kebo/shared";
-import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice, linkClass, RULES, EmptyLine } from "@kebo/ui";
+import { PhoneList, PhoneRow, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, StatRow, StatTile, Notice, linkClass, RULES, EmptyLine, Pager, toPage, toPageSize } from "@kebo/ui";
 import { convertAmount } from "@kebo/money";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -16,6 +16,7 @@ import { voidTransferAction } from "../money/actions";
 import { getSettings } from "@/lib/loaders";
 
 export type Search = {
+  size?: string;
   year?: string;
   view?: string;
   month?: string;
@@ -71,8 +72,9 @@ export async function VaultOverview({ today }: { today: string }) {
     else all += x;
   }
   const first = open[0];
-  const book = first ? await api.get<CashBook>("/money/cash-book", { from: addDays(today, -90), to: today, account: first.id }) : null;
-  const latest = (book?.rows ?? []).slice(-6).reverse();
+  // Only the latest six moves come (the whole book is its own page).
+  const book = first ? await api.get<CashBook>("/money/cash-book", { from: addDays(today, -90), to: today, account: first.id, latest: "6" }) : null;
+  const latest = [...(book?.rows ?? [])].reverse();
   return (
     <div className="flex flex-col gap-4">
       <StatRow facts>
@@ -248,7 +250,14 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
   const accounts = await api.get<AccountRow[]>("/money/accounts");
   const acct = sp.acct === "none" || accounts.some((a) => a.id === sp.acct) ? sp.acct : undefined;
   const cur = (CURRENCIES as readonly string[]).includes(sp.cur ?? "") ? sp.cur : undefined;
-  const book = await api.get<CashBook>("/money/cash-book", { from: pr.from, to: pr.to, account: acct, currency: acct && acct !== "none" ? undefined : cur });
+  const book = await api.get<CashBook>("/money/cash-book", {
+    from: pr.from,
+    to: pr.to,
+    account: acct,
+    currency: acct && acct !== "none" ? undefined : cur,
+    page: String(toPage(sp.page)),
+    pageSize: String(toPageSize(sp.size)),
+  });
   const keep = { p: pr.period === pr.thisMonth ? undefined : pr.period, acct, cur };
   const href = (change: Record<string, string | undefined>) => buildHref("/finance/cash-book", keep, change);
   const one = book.account;
@@ -465,6 +474,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
           </>
         )}
       </Card>
+      <Pager base="/finance/cash-book" params={keep} page={book.page} pageSize={book.pageSize} total={book.total} bare />
       {book.rows.some((r) => r.kind === "transfer_out") && (
         <Card>
           <CardHeader title="Moves between our bank accounts" description="Remove one typed by mistake." />

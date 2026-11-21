@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, toPageSize } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -24,7 +24,7 @@ const openHref = (n: NotificationItem) =>
  * new, its kind as a label, what happened and when, in the one list table (a click opens it); phone rows on a phone.
  * 25 a page.
  */
-export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ show?: string; page?: string; q?: string }> }) {
+export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ show?: string; page?: string; size?: string; q?: string }> }) {
   await requireUser();
   const sp = await searchParams;
   const onlyUnread = sp.show === "unread";
@@ -36,7 +36,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
     group,
     counts: "true",
     q: sp.q?.trim() || undefined,
-    take: PAGE_SIZE,
+    take: toPageSize(sp.size),
     page,
   });
   const keep = { show: sp.show, q: sp.q };
@@ -150,7 +150,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
           </>
         )}
       </Card>
-      <Pager base="/notifications" params={keep} page={page} pageSize={PAGE_SIZE} total={total} bare />
+      <Pager base="/notifications" params={keep} page={page} pageSize={toPageSize(sp.size)} total={total} bare />
     </>
   );
 }

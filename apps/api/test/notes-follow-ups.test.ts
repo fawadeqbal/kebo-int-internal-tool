@@ -392,22 +392,28 @@ describe("notes and follow-ups", () => {
     await api(app, sana).post(`/follow-ups/${managers.id}/done`).expect(403);
     await api(app, sana).delete(`/follow-ups/${managers.id}`).expect(403);
 
-    // Lists: Sana sees hers (for her or made by her); the manager everyone's.
-    const sanas = (await api(app, sana).get("/follow-ups?pageSize=200").expect(200)).body as FollowUpList;
+    // Lists: Sana sees hers (for her or made by her); the manager everyone's. A page is at most 100: read them all.
+    const pages = async (token: string, path: string): Promise<FollowUpList> => {
+      const first = (await api(app, token).get(`${path}${path.includes("?") ? "&" : "?"}pageSize=100&page=1`).expect(200)).body as FollowUpList;
+      const rows = [...first.rows];
+      for (let p = 2; rows.length < first.total; p++) rows.push(...((await api(app, token).get(`${path}${path.includes("?") ? "&" : "?"}pageSize=100&page=${p}`).expect(200)).body as FollowUpList).rows);
+      return { ...first, rows };
+    };
+    const sanas = await pages(sana, "/follow-ups");
     expect(sanas.canViewAll).toBe(false);
     expect(sanas.rows.map((r) => r.id)).toEqual(expect.arrayContaining([mine.id, forBilal.id, general.id]));
     expect(sanas.rows.map((r) => r.id)).not.toContain(managers.id);
     expect(sanas.rows.every((r) => r.assignee.id === sanaId || r.createdBy.id === sanaId)).toBe(true);
-    const sanaMine = (await api(app, sana).get("/follow-ups?mine=true&pageSize=200").expect(200)).body as FollowUpList;
+    const sanaMine = await pages(sana, "/follow-ups?mine=true");
     expect(sanaMine.rows.map((r) => r.id)).not.toContain(forBilal.id);
-    const all = (await api(app, manager).get("/follow-ups?pageSize=200").expect(200)).body as FollowUpList;
+    const all = await pages(manager, "/follow-ups");
     expect(all.canViewAll).toBe(true);
     expect(all.rows.map((r) => r.id)).toEqual(expect.arrayContaining([mine.id, forBilal.id, general.id, managers.id]));
     // By day.
-    const tomorrow = (await api(app, manager).get(`/follow-ups?on=${addDays(today, 1)}&pageSize=200`).expect(200)).body as FollowUpList;
+    const tomorrow = await pages(manager, `/follow-ups?on=${addDays(today, 1)}`);
     expect(tomorrow.rows.map((r) => r.id)).toContain(forBilal.id);
     expect(tomorrow.rows.every((r) => r.dueOn === addDays(today, 1))).toBe(true);
-    const range = (await api(app, manager).get(`/follow-ups?from=${today}&to=${today}&pageSize=200`).expect(200)).body as FollowUpList;
+    const range = (await api(app, manager).get(`/follow-ups?from=${today}&to=${today}&pageSize=100`).expect(200)).body as FollowUpList;
     expect(range.rows.every((r) => r.dueOn === today)).toBe(true);
     await api(app, manager).get("/follow-ups?on=tomorrow").expect(422);
     await api(app, manager).get(`/follow-ups?orderId=${orderId}&customerId=${customerId}`).expect(422);

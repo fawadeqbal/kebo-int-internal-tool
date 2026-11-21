@@ -35,7 +35,7 @@ const listQuery = z.object({
   stage: z.enum(ORDER_STAGES).optional(),
   /** The most recently moved first (the board's Done column), and at most this many. */
   recent: flag,
-  limit: z.coerce.number().int().min(1).max(300).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
   q: z.string().trim().max(100).optional(),
   customer: z.string().uuid().optional(),
 });

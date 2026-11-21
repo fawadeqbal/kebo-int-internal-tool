@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, Plus } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow } from "@kebo/shared";
-import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, Notice, linkClass, Dash, Stack } from "@kebo/ui";
+import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, toPageSize, Notice, linkClass, Dash, Stack } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
@@ -18,7 +18,7 @@ import { moneyTile } from "@/lib/money-tile";
 
 export const metadata = { title: "Payments" };
 
-type Search = { tab?: string; mine?: string; p?: string; dir?: string; status?: string; kind?: string; q?: string; order?: string; party?: string; account?: string; method?: string; page?: string };
+type Search = { tab?: string; mine?: string; p?: string; dir?: string; status?: string; kind?: string; q?: string; order?: string; party?: string; account?: string; method?: string; page?: string; size?: string };
 const STATUS_MEANING = { to_verify: "warn", sent_back: "bad", recorded: "ok", void: "neutral" } as const;
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -69,7 +69,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     account,
     method,
     page,
-    pageSize: PAGE_SIZE,
+    pageSize: toPageSize(sp.size),
   });
   const keep = { p: sp.p, dir, status, kind, q, order, party, account, method };
   const href = (change: Record<string, string | undefined>) => buildHref("/payments", keep, { page: undefined, ...change });
@@ -237,7 +237,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           </>
         )}
       </Card>
-      <Pager base="/payments" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} bare />
+      <Pager base="/payments" params={keep} page={page} pageSize={toPageSize(sp.size)} total={list.total} bare />
     </Stack>
   );
 }

@@ -3,7 +3,7 @@ import { OpenPanelButton } from "@/components/common/panel";
 import { NewInquiryWindow } from "../inquiry-windows";
 import { MessageSquareText, Plus, X } from "lucide-react";
 import { can, INQUIRY, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { RefCode, buildHref, ButtonLink, LinkTabs, Pager, Stack, toPage } from "@kebo/ui";
+import { RefCode, buildHref, ButtonLink, LinkTabs, Pager, Stack, toPage, toPageSize } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { FilterCard } from "@/components/common/filter-card";
 import { FactLine, FollowUpDay, PriorityTag, Responsible, Stands } from "@/components/lists/list-parts";
@@ -44,7 +44,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
   const excel = await hasFeature("excel");
   const query = { stage: tab, ...f };
   const [data, settings, people, yearFunnel] = await Promise.all([
-    api.get<Paged<DealRow> & { counts: Record<string, number> }>("/inquiries", { ...query, page: toPage(sp.page) }),
+    api.get<Paged<DealRow> & { counts: Record<string, number> }>("/inquiries", { ...query, page: toPage(sp.page), pageSize: toPageSize(sp.size) }),
     getSettings(),
     getPeople().catch(() => []),
     insights ? api.get<Funnel>("/insights/facts/funnel", { from: `${year}-01-01`, to: `${year}-12-31` }).catch(() => null) : null,

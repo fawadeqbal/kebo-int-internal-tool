@@ -3,7 +3,7 @@ import { FileText, MessageSquare, Plus, TrendingUp, Users, X } from "lucide-reac
 import { ExportCsv } from "@/components/sheets/export-link";
 import type { OrderGroups } from "@/lib/types-facts";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { RefCode, buildHref, ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage, Tr, Stack } from "@kebo/ui";
+import { RefCode, buildHref, ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage, toPageSize, Tr, Stack } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { api } from "@/lib/api";
@@ -89,7 +89,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const empty: CustomerPage = { rows: [], total: 0, page: 1, pageSize: 25 };
   const owingIds = [...owes.keys()];
   const [data, all, openInquiries, askingCustomers, editing, sold, soldYear, soldLastYear, owingCount] = await Promise.all([
-    none ? empty : api.get<CustomerPage>("/customers", { ...query, page: toPage(sp.page) }),
+    none ? empty : api.get<CustomerPage>("/customers", { ...query, page: toPage(sp.page), pageSize: toPageSize(sp.size) }),
     api.get<CustomerPage & { newThisYear?: number }>("/customers", { pageSize: 1 }),
     api.get<Paged<unknown>>("/inquiries", { stage: "open", pageSize: 1 }).catch(() => null),
     api.get<Paged<CustomerRow>>("/customers", { status: "inquiry", pageSize: 1 }),

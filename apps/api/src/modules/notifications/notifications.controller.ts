@@ -26,7 +26,7 @@ export class NotificationsController {
       Validate(
         z.object({
           unread: z.enum(["true", "false"]).optional(),
-          take: z.coerce.number().int().min(1).max(200).optional(),
+          take: z.coerce.number().int().min(1).max(100).optional(),
           page: z.coerce.number().int().min(1).optional(),
           group: z.enum(NOTIFICATION_GROUPS).optional(),
           counts: z.enum(["true", "false"]).optional(),
