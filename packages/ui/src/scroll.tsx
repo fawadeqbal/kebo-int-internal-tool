@@ -94,7 +94,8 @@ export function Scroll({
       ref={ref as never}
       className={cn(
         "scroll relative",
-        axis === "x" ? "scroll-x" : axis === "y" ? "scroll-y" : "scroll-xy",
+        // A row that slides sideways never scrolls up and down too (a tab's underline would make it).
+        axis === "x" ? "scroll-x overflow-y-hidden" : axis === "y" ? "scroll-y" : "scroll-xy",
         size === "sm" ? "scroll-sm" : size === "lg" ? "scroll-lg" : size === "none" ? "scroll-none" : null,
         label && "focus-visible:-outline-offset-2",
         className,

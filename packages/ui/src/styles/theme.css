@@ -1106,7 +1106,6 @@ html::-webkit-scrollbar-thumb { background-color: var(--scroll-thumb); }
  */
 @utility scroll-x {
   overflow-x: auto;
-  overflow-y: hidden;
 }
 @utility scroll-y {
   overflow-y: auto;
