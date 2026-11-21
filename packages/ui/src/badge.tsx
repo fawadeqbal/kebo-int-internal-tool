@@ -35,6 +35,7 @@ export function Badge({
 }: { tone?: keyof typeof TONES; dot?: boolean; size?: "md" | "sm"; children: ReactNode; className?: string } & Omit<ComponentProps<"span">, "children" | "className">) {
   return (
     <span
+      data-badge=""
       className={cn(
         "inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold whitespace-nowrap [&_svg]:size-3",
         size === "sm" ? "h-5 px-2 align-middle text-2xs" : "h-6 px-2.5 text-xs",

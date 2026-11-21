@@ -4,7 +4,7 @@ import { BackArrow, ListLink } from "./back";
 import { Pending } from "./pending";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
-import { Info, Package, type LucideIcon } from "lucide-react";
+import { Info, Package, Plus, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 import { RULES } from "./rules";
 
@@ -376,6 +376,14 @@ export function CardBody({ className, ...props }: ComponentProps<"div">) {
 const DOCK =
   "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:flex max-md:gap-2 max-md:border-t max-md:border-line max-md:bg-surface max-md:px-3 max-md:pt-2 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-md:shadow-[0_-4px_12px_rgb(0_0_0/0.06)] max-md:[&:not(:has(a,button))]:hidden max-md:[&>*]:min-w-0 max-md:[&>*]:flex-1 max-md:[&_:is(a,button)]:h-12 max-md:[&_:is(a,button)]:w-full max-md:[&_:is(a,button)]:justify-center max-md:[&_:is(a,button)]:text-lead";
 
+/**
+ * A list's (a top page's) one strong button on a phone (canvas row "Phone list pages", 21 Nov): it becomes the round +
+ * in the middle of the bottom bar — the app's own + steps aside (globals.css) — so it takes no row of its own above the
+ * list. Its words stay its name for a screen reader ("Add customer").
+ */
+const FAB =
+  "max-md:fixed max-md:bottom-[calc(env(safe-area-inset-bottom)+18px)] max-md:left-1/2 max-md:z-40 max-md:grid max-md:-translate-x-1/2 max-md:place-items-center max-md:[&>:first-child]:size-14 max-md:[&>:first-child]:gap-0 max-md:[&>:first-child]:rounded-full max-md:[&>:first-child]:p-0 max-md:[&>:first-child]:[font-size:0] max-md:[&>:first-child]:shadow-pop max-md:[&>:first-child]:ring-4 max-md:[&>:first-child]:ring-bg max-md:[&>:first-child_svg]:hidden";
+
 export function PageHeader({
   title,
   badge,
@@ -392,6 +400,7 @@ export function PageHeader({
   phoneStack,
   record,
   children,
+  kind,
 }: {
   /** The page's name: a record's is a name from its data, never its number (RECORD_TITLE in @kebo/shared). */
   title: ReactNode;
@@ -443,6 +452,11 @@ export function PageHeader({
   // Phone: the top bar says the name, so the big title is only read out (still the page's heading).
   const titleInBar = !!named && (!!up || !!trail);
   const under = record ? [record.kind, record.number].filter(Boolean).join(" · ") : up?.label;
+  // A top page on a phone: its strong button is the bottom bar's +, its name in the bar, its ⋯ beside it; with
+  // nothing else to show, its header takes no room (the list starts under the bar).
+  const docked = !up && titleInBar && !!primary && kind === "list";
+  // (A list's List | Board is not on a phone: it folds into ⋯.)
+  const bare = !up && titleInBar && !actions && (!views || kind === "list") && !badge && !children && (summary === undefined || typeof summary === "string");
   return (
     <>
       {up && (
@@ -470,7 +484,7 @@ export function PageHeader({
           {more && <div className="pointer-events-auto shrink-0 [&>button]:size-10 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}
         </div>
       )}
-      <header data-page-label={name} data-part={record ? "record-top" : "header"}>
+      <header data-page-label={name} data-part={record ? "record-top" : "header"} className={cn(bare && "max-md:absolute max-md:size-px max-md:overflow-hidden")}>
         {/* Phone: room for the fixed bar above (inside the header, so the page's gap is not added to it). */}
         {up && <div aria-hidden className="h-14 md:hidden" />}
         {trail && <Breadcrumb items={trail} className={up || titleInBar ? "max-md:hidden" : undefined} />}
@@ -506,8 +520,9 @@ export function PageHeader({
               )}
               {views}
               {primary && (
-                <div data-slot="primary" data-record-dock={up ? "" : undefined} className={cn("contents", up && DOCK)}>
+                <div data-slot="primary" data-record-dock={up ? "" : undefined} data-list-dock={docked ? "" : undefined} className={cn("contents", up && DOCK, docked && FAB)}>
                   {primary}
+                  {docked && <Plus aria-hidden strokeWidth={2.25} className="pointer-events-none absolute size-7 text-primary-fg md:hidden" />}
                 </div>
               )}
               {more && (up || titleInBar) ? <div className="contents max-md:hidden">{more}</div> : more}
@@ -666,8 +681,9 @@ export function PhoneList({ label, children, className }: { label: string; child
 }
 
 /**
- * One record on a phone: its name, one line under it, and on the right its
- * status (StatusBadge) over the key number. The whole row opens the record.
+ * One record on a phone, in two lines (Fawad 21 Nov: "lists on a phone are still not compact"): its name and the key
+ * number on the first, one line about it and its status (a coloured word, not a pill) on the second. The whole row
+ * opens the record. Every list on a phone is these rows (PhoneList); the test one-of-each keeps it so.
  */
 export function PhoneRow({
   href,
@@ -690,25 +706,25 @@ export function PhoneRow({
   figure?: ReactNode;
   flash?: boolean;
   muted?: boolean;
-  /** Under the row, outside its link (e.g. a "Show changes" disclosure). */
+  /** Under the row, outside its link (e.g. a "Show changes" disclosure, a button). */
   extra?: ReactNode;
 }) {
   const hasFigure = figure !== undefined && figure !== null && figure !== "";
+  // The status as a word in its colour: the pill's ground and padding go (StatusBadge's data-badge).
+  const word = "[&_[data-badge]]:h-auto [&_[data-badge]]:bg-transparent! [&_[data-badge]]:px-0 [&_[data-badge]]:text-xs [&_[data-badge]]:gap-1";
   const inner = (
-    <>
-      <span className="min-w-0">
-        <span className={cn("block truncate text-sm font-semibold", muted && "text-text-2")}>{title}</span>
-        {line && <span className="block truncate text-xs text-text-2">{line}</span>}
-      </span>
-      {(status || hasFigure) && (
-        <span className="flex shrink-0 flex-col items-end gap-1 text-right text-xs text-text-2 tabular">
-          {status}
-          {hasFigure && <span className="block">{figure}</span>}
-        </span>
+    <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5">
+      <span className={cn("truncate text-sm font-semibold", muted && "text-text-2")}>{title}</span>
+      <span className={cn("text-right text-sm font-semibold whitespace-nowrap tabular", word)}>{hasFigure ? figure : status}</span>
+      {(line || (hasFigure && status)) && (
+        <>
+          <span className="truncate text-xs text-text-2">{line}</span>
+          <span className={cn("text-right text-xs whitespace-nowrap text-text-2", word)}>{hasFigure ? status : null}</span>
+        </>
       )}
-    </>
+    </span>
   );
-  const cls = "flex items-start justify-between gap-3 px-4 py-3";
+  const cls = "flex items-center gap-3 px-4 py-2.5";
   return (
     <li className={flash ? "animate-flash" : undefined}>
       {href ? (
@@ -718,7 +734,7 @@ export function PhoneRow({
       ) : (
         <div className={cls}>{inner}</div>
       )}
-      {extra && <div className="-mt-1.5 px-4 pb-3">{extra}</div>}
+      {extra && <div className="-mt-1 px-4 pb-2.5">{extra}</div>}
     </li>
   );
 }

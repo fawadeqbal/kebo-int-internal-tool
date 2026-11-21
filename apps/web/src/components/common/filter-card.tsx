@@ -171,8 +171,8 @@ function MonthStep({ m, onPick }: { m: FilterMonth; onPick: (name: string, value
   const next = month && month < m.thisMonth ? step(month, 1) : null;
   const arrow = "grid w-9 place-items-center text-text-2 outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-35";
   return (
-    <span className="inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border border-line-strong bg-surface text-md font-semibold">
-      <button type="button" aria-label="The month before" disabled={!prev} onClick={() => prev && go(prev)} className={arrow}>
+    <span className="inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border border-line-strong bg-surface text-md font-semibold max-sm:h-11">
+      <button type="button" aria-label="The month before" disabled={!prev} onClick={() => prev && go(prev)} className={cn(arrow, "max-sm:hidden")}>
         <ChevronLeft className="size-4" aria-hidden />
       </button>
       <button
@@ -182,14 +182,16 @@ function MonthStep({ m, onPick }: { m: FilterMonth; onPick: (name: string, value
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex items-center gap-1.5 border-x border-line px-3 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+          "inline-flex items-center gap-1.5 border-line px-3 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:border-x",
           open ? "bg-primary-soft text-primary" : "text-text",
         )}
       >
-        {m.label}
+        {/* A phone: "Nov 2026" (the arrows are in the list of months). */}
+        <span className="max-sm:hidden">{m.label}</span>
+        <span className="sm:hidden">{m.label.replace(/^([A-Za-z]{3})[a-z]+ (\d{4})$/, "$1 $2")}</span>
         <ChevronDown className="size-4 opacity-70" aria-hidden />
       </button>
-      <button type="button" aria-label="The month after" disabled={!next} onClick={() => next && go(next)} className={arrow}>
+      <button type="button" aria-label="The month after" disabled={!next} onClick={() => next && go(next)} className={cn(arrow, "max-sm:hidden")}>
         <ChevronRight className="size-4" aria-hidden />
       </button>
       {open && (
@@ -415,7 +417,8 @@ export function FilterCard({
 
   return (
     <div role="search" aria-label="Filter the list" aria-busy={pending} data-part="filter" data-count={selects.length} className="flex flex-wrap items-center gap-2">
-      <label className={cn(searchFrameClass, controlSizes.md, "relative flex min-w-0 flex-[0_1_340px] items-center", selects.length ? "max-sm:flex-1" : "max-sm:basis-full")}>
+      {/* A phone: one row — the search, the month (where the list has one), the filter icon. */}
+      <label className={cn(searchFrameClass, controlSizes.md, "relative flex min-w-0 flex-[0_1_340px] items-center", selects.length || month ? "max-sm:flex-1" : "max-sm:basis-full")}>
         <span className="sr-only">{search.replace(/…$/, "")}</span>
         {pending ? (
           <LoaderCircle className="pointer-events-none absolute left-3 size-4 animate-spin text-muted" aria-hidden />
@@ -456,17 +459,18 @@ export function FilterCard({
           aria-haspopup="dialog"
           aria-expanded={sheet}
           onClick={() => setSheet(true)}
+          aria-label={chosen ? `Filters, ${chosen} on` : "Filters"}
           className={cn(
-            "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-sm font-semibold sm:hidden",
+            "relative grid size-11 shrink-0 place-items-center rounded-[10px] border sm:hidden max-sm:order-3",
             chosen ? "border-primary-line bg-primary-soft text-primary" : "border-line-strong bg-surface text-text",
           )}
         >
-          <ListFilter className="size-4" aria-hidden /> Filters
-          {chosen > 0 && <CountDot n={chosen} tone="primary" />}
+          <ListFilter className="size-[18px]" aria-hidden />
+          {chosen > 0 && <CountDot n={chosen} tone="primary" className="absolute -top-1.5 -right-1.5" />}
         </button>
       )}
       {(selects.length > 0 || month || anyOn) && (
-        <div className={cn("flex min-w-0 items-center gap-2 max-sm:basis-full sm:flex-wrap", !month && "max-sm:hidden")}>
+        <div className={cn("flex min-w-0 items-center gap-2 max-sm:order-2 max-sm:shrink-0 sm:flex-wrap", !month && "max-sm:hidden")}>
           {selects.map((s) => (
             <span key={s.name} className="contents max-sm:hidden">
               <FilterButton s={s} onPick={pick} />

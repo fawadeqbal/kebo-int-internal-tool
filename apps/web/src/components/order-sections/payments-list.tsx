@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Badge, Table, Td, Th, THead, Tr, Dash, RULES, cn } from "@kebo/ui";
+import { Badge, PhoneList, PhoneRow, Table, Td, Th, THead, Tr, Dash, RULES, cn } from "@kebo/ui";
 import { date, dateTime, money } from "@/lib/format";
 
 /** One payment in an order's list of payments received or made. */
@@ -32,29 +32,35 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
   const none = <Dash />;
   return (
     <>
-      <ul aria-label={name} className="flex flex-col divide-y divide-line sm:hidden">
+      {/* A phone: a row per payment — what for and the amount; when, how and who under it; its buttons below. */}
+      <PhoneList label={name}>
         {rows.map((x) => (
-          <li key={x.id} className={cn(RULES.box.inset, "flex flex-col gap-1.5 py-3", x.voided && "text-muted")}>
-            <span className="flex items-baseline justify-between gap-3">
-              <span className="font-semibold">{x.for ?? "Payment"}</span>
-              <span className={x.voided ? "tabular line-through" : "font-semibold tabular"}>{money(x.amount, x.currency)}</span>
-            </span>
-            <span className="text-sm text-text-2">{[date(x.paidOn), x.how, x.account, x.reference].filter(Boolean).join(" · ")}</span>
-            {x.note && !x.voided && <span className="text-xs text-muted">{x.note}</span>}
-            {x.voided?.reason && <span className="text-xs">{x.voided.reason}</span>}
-            <span className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs text-muted">
-                {x.recordedBy ?? "—"} · {dateTime(x.recordedAt)}
+          <PhoneRow
+            key={x.id}
+            muted={!!x.voided}
+            title={x.for ?? "Payment"}
+            figure={<span className={x.voided ? "line-through" : undefined}>{money(x.amount, x.currency)}</span>}
+            line={[date(x.paidOn), x.how, x.account, x.reference].filter(Boolean).join(" · ")}
+            status={x.voided ? <Badge tone="neutral">Removed</Badge> : undefined}
+            extra={
+              <span className="flex flex-col gap-1.5">
+                {x.note && !x.voided && <span className="text-xs text-muted">{x.note}</span>}
+                {x.voided?.reason && <span className="text-xs">{x.voided.reason}</span>}
+                <span className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-xs text-muted">
+                    {x.recordedBy ?? "—"} · {dateTime(x.recordedAt)}
+                  </span>
+                  {!x.voided && x.actions}
+                </span>
               </span>
-              {x.voided ? <Badge tone="neutral">Removed</Badge> : x.actions}
-            </span>
-          </li>
+            }
+          />
         ))}
-        <li className={cn(RULES.box.inset, "flex items-baseline justify-between gap-3 py-3 font-bold")}>
+        <li className={cn(RULES.box.inset, "flex items-baseline justify-between gap-3 py-2.5 text-sm font-bold")}>
           <span>{total.label}</span>
           <span className="tabular">{total.amount}</span>
         </li>
-      </ul>
+      </PhoneList>
       <div className="hidden sm:block">
         {/* Five columns, so Receipt and Change always fit beside the amount (e2e 20 Nov: with eight, "Bank transfer
             (T/T)" took three lines and Change was cut off): when and who, what for, how (method, account, reference). */}

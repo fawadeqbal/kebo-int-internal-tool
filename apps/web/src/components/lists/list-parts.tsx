@@ -1,6 +1,5 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { Avatar, Badge, cn, Dash } from "@kebo/ui";
+import { Avatar, Badge, cn, Dash, PhoneRow } from "@kebo/ui";
 
 /*
  * The pieces every list page is made of (design "RFQ Desk — list pages", 18 Nov 2026): the facts line under the
@@ -57,24 +56,22 @@ export function Stands({ pill, fact }: { pill: ReactNode; fact?: ReactNode }) {
 }
 
 /**
- * One record on a phone, in three lines: what it is and its next step (right); who it is for and its number; where
- * it stands and who is responsible (right). The whole row opens it.
+ * One record of a list on a phone: the one PhoneRow (two lines) — what it is, its tag and its next day; who it is for
+ * and its number, where it stands as a coloured word. Who is responsible and the stage's words are the laptop's.
  */
-export function ListRow({ href, title, tag, end, line, stands, who }: { href: string; title: ReactNode; tag?: ReactNode; end?: ReactNode; line: ReactNode; stands: ReactNode; who?: ReactNode }) {
+export function ListRow({ href, title, tag, end, line, stands }: { href: string; title: ReactNode; tag?: ReactNode; end?: ReactNode; line: ReactNode; stands: ReactNode; who?: ReactNode }) {
   return (
-    <li>
-      <Link href={href} className="block px-4 py-3 text-md leading-[18px] active:bg-surface-2">
-        <span className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate text-sm leading-5 font-semibold text-text">{title}</span>
+    <PhoneRow
+      href={href}
+      title={
+        <span className="flex min-w-0 items-baseline gap-1.5">
+          <span className="truncate">{title}</span>
           {tag}
-          {end && <span className="shrink-0 text-md">{end}</span>}
         </span>
-        <span className="mt-px block truncate text-text-2">{line}</span>
-        <span className="mt-1.5 flex items-center gap-2">
-          <span className="min-w-0 flex-1">{stands}</span>
-          {who}
-        </span>
-      </Link>
-    </li>
+      }
+      figure={end ? <span className="text-xs font-medium">{end}</span> : undefined}
+      line={line}
+      status={stands}
+    />
   );
 }

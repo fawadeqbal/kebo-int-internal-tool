@@ -126,8 +126,7 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
           tag: <PriorityTag priority={d.priority} />,
           end: <FollowUpDay next={d.nextFollowUp} day={soonDay} />,
           line: `${d.customer.name} · ${d.refNo}`,
-          stands: <Stands pill={<StagePill d={d} />} fact={whereItStands(d, today)} />,
-          who: <Responsible name={d.assignee?.name} short />,
+          stands: <StagePill d={d} />,
         })}
         columns={[
           { key: "no", header: "No.", className: "w-[136px] whitespace-nowrap", cell: (d) => <RefCode>{d.refNo}</RefCode> },

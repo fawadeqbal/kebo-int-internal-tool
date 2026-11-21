@@ -30,8 +30,9 @@ function ButtonShape({ className }: { className?: string }) {
 
 /** PageHeader of a list or a settings page: the path, the title, the buttons on the right. */
 function Header({ buttons = 2 }: { buttons?: number }) {
+  // A phone: the name is in the bar and the strong button is the bottom bar's +, so nothing here (PageHeader).
   return (
-    <div data-part="header">
+    <div data-part="header" className="max-md:hidden">
       <div className="mb-2 flex h-4 items-center gap-1.5">
         <Bar className="h-3 w-10" />
         <Bar className="h-3 w-16" />
@@ -82,6 +83,11 @@ function RecordTop() {
 /** FactsLine: one row of label · figure · line, split by thin lines (a laptop only, as the page). */
 function Facts({ n }: { n: number }) {
   return (
+    <>
+    <span aria-hidden className="flex h-5 items-center gap-2 sm:hidden">
+      <Bar className="h-3 w-24" />
+      <Bar className="h-3 w-32" />
+    </span>
     <div data-part="facts" data-count={n} className="flex min-h-[46px] items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden">
       {Array.from({ length: n }, (_, i) => (
         <span key={i} className={cn("flex items-center gap-2 px-3.5", i > 0 && "border-l border-line")}>
@@ -91,6 +97,7 @@ function Facts({ n }: { n: number }) {
         </span>
       ))}
     </div>
+    </>
   );
 }
 
@@ -132,13 +139,14 @@ function RecordTabs({ n }: { n: number }) {
 function Filter({ n }: { n: number }) {
   return (
     <div data-part="filter" data-count={n} className="flex flex-wrap items-center gap-2">
-      <span aria-hidden className="flex h-10 min-w-0 flex-[0_1_340px] items-center gap-2 rounded-[10px] border border-line bg-surface px-3 max-sm:basis-full">
+      <span aria-hidden className={cn("flex h-10 min-w-0 flex-[0_1_340px] items-center gap-2 rounded-[10px] border border-line bg-surface px-3", n > 0 ? "max-sm:flex-1" : "max-sm:basis-full")}>
         <Block className="size-4 rounded" />
         <Bar className="h-3 w-40" />
       </span>
       {Array.from({ length: n }, (_, i) => (
-        <ButtonShape key={i} className="w-28 max-sm:flex-1" />
+        <ButtonShape key={i} className="w-28 max-sm:hidden" />
       ))}
+      {n > 0 && <ButtonShape className="w-11 sm:hidden" />}
       <Bar className="ml-auto h-3 w-24 max-sm:hidden" />
     </div>
   );
@@ -152,12 +160,15 @@ function TablePart({ rows = 8, cols = 7 }: { rows?: number; cols?: number }) {
     <div data-part="table" className="overflow-hidden rounded-2xl border border-line bg-surface">
       <ul className="divide-y divide-line sm:hidden">
         {Array.from({ length: Math.min(rows, 6) }, (_, i) => (
-          <li key={i} className="flex h-[69px] items-start justify-between gap-3 px-4 py-3">
-            <span className="flex min-w-0 flex-col gap-2 pt-0.5">
+          <li key={i} className="flex h-[58px] flex-col justify-center gap-2 px-4">
+            <span className="flex items-center justify-between gap-3">
               <Bar className="w-36" />
-              <Bar className="h-3 w-48 max-w-full" />
+              <Bar className="w-16" />
             </span>
-            <Bar className="mt-0.5 w-16" />
+            <span className="flex items-center justify-between gap-3">
+              <Bar className="h-3 w-48 max-w-[60%]" />
+              <Bar className="h-3 w-14" />
+            </span>
           </li>
         ))}
       </ul>

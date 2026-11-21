@@ -63,15 +63,19 @@ test("the inquiries list: New inquiry, the stages as tabs, Responsible person, t
   expect(errors).toEqual([]);
 });
 
-test("the inquiries list on a phone: chips, one Filters button with a sheet, rows of three lines; the Board's columns", async ({ page }) => {
+test("the inquiries list on a phone: chips, one Filters button with a sheet, rows of two lines; the Board's columns", async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   const { tag, a } = await twoInquiries(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/inquiries?q=${tag}`);
-  // The + in the bottom bar is the one New.
-  await expect(page.getByRole("main").getByRole("link", { name: "New inquiry" })).toBeHidden();
-  await expect(page.getByRole("navigation", { name: "Quick" }).getByRole("link", { name: "New inquiry" })).toBeVisible();
+  // The list's own button is the + in the middle of the bottom bar (the app's + steps aside under it): one New.
+  const plus = page.getByRole("main").getByRole("link", { name: "New inquiry" });
+  await expect(plus).toBeVisible();
+  const box = (await plus.boundingBox())!;
+  expect(box.width).toBe(56);
+  expect(box.y).toBeGreaterThan(700);
+  await expect(page.getByRole("navigation", { name: "Quick" }).getByRole("link", { name: "New inquiry" })).toBeHidden();
   const row = page.locator(`main ul > li > a[href="/inquiries/${a.id}"]`);
   await expect(row).toContainText(a.refNo);
   await expect(row).toContainText("Urgent");
@@ -83,7 +87,7 @@ test("the inquiries list on a phone: chips, one Filters button with a sheet, row
   await expect(sheet.getByRole("button", { name: /^Show 2 inquiries$/ })).toBeVisible();
   await sheet.getByRole("button", { name: /^Show/ }).click();
   await expect(sheet).toBeHidden();
-  await expect(page.getByRole("button", { name: /^Filters 1$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Filters, 1 on" })).toBeVisible();
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/inquiries/board?q=${tag}`);

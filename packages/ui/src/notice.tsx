@@ -6,9 +6,9 @@ import { cn } from "./cn";
 export type NoticeTone = "todo" | "bad" | "info" | "ok" | "neutral";
 
 const TONES: Record<NoticeTone, { box: string; dot: string; Icon: typeof Info }> = {
-  todo: { box: "border-action/25 bg-action-soft/60 [&_a]:text-action", dot: "bg-action-solid", Icon: AlertTriangle },
-  bad: { box: "border-bad/25 bg-bad-soft [&_a]:text-bad", dot: "bg-bad-solid", Icon: X },
-  info: { box: "border-info/20 bg-info-soft [&_a]:text-info", dot: "bg-info-solid", Icon: Info },
+  todo: { box: "border-action/25 bg-action-soft/60 [&_a:not([data-variant])]:text-action", dot: "bg-action-solid", Icon: AlertTriangle },
+  bad: { box: "border-bad/25 bg-bad-soft [&_a:not([data-variant])]:text-bad", dot: "bg-bad-solid", Icon: X },
+  info: { box: "border-info/20 bg-info-soft [&_a:not([data-variant])]:text-info", dot: "bg-info-solid", Icon: Info },
   ok: { box: "border-ok/20 bg-ok-soft", dot: "bg-ok", Icon: Check },
   neutral: { box: "border-line bg-surface-2", dot: "bg-text-2", Icon: Info },
 };
@@ -37,7 +37,7 @@ export function Notice({
     <div
       role={tone === "bad" ? "alert" : "status"}
       className={cn(
-        "flex flex-wrap items-start gap-x-2.5 gap-y-2 rounded-xl border px-3.5 py-3 text-md text-text [&_a]:font-bold [&_a]:underline [&_a]:underline-offset-2 [&_strong]:font-bold",
+        "flex flex-wrap items-start gap-x-2.5 gap-y-2 rounded-xl border px-3.5 py-3 text-md text-text [&_a:not([data-variant])]:font-bold [&_a:not([data-variant])]:underline [&_a:not([data-variant])]:underline-offset-2 [&_strong]:font-bold",
         t.box,
         className,
       )}

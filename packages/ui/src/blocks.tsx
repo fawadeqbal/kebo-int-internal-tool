@@ -89,6 +89,17 @@ export interface Fact {
 export function FactsLine({ facts, className }: { facts: Fact[]; className?: string }) {
   if (!facts.length) return null;
   return (
+    <>
+      {/* A phone: the same figures as words under the bar, no box: two lines at most, a figure never split. */}
+      <p data-phone-facts="" className="line-clamp-2 text-md text-muted sm:hidden">
+        {facts.map((f, i) => (
+          <span key={i} className="whitespace-nowrap">
+            {i > 0 && <span aria-hidden> · </span>}
+            {f.label}{" "}
+            <b className={cn("font-semibold text-text tabular", f.tone === "bad" && "text-bad", f.tone === "warn" && "text-warn")}>{f.value}</b>
+          </span>
+        ))}
+      </p>
     <dl aria-label="Facts" data-part="facts" data-count={facts.length} className={cn("flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>
       {facts.map((f, i) => {
         return (
@@ -108,6 +119,7 @@ export function FactsLine({ facts, className }: { facts: Fact[]; className?: str
         );
       })}
     </dl>
+    </>
   );
 }
 

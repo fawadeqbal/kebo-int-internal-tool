@@ -111,6 +111,10 @@
   [data-shell]:has([data-record-dock] :is(a, button)) [data-quick-nav] {
     display: none;
   }
+  /* A list's own strong button is the + (PageHeader's data-list-dock): the app's + steps aside under it. */
+  [data-shell]:has([data-list-dock] :is(a, button)) [data-quick-fab] > * {
+    visibility: hidden;
+  }
 }
 
 /* A window with a Cancel beside its save (canvas row "Cancel, not ✕", 19 Nov): on a phone that is how it closes, so
