@@ -80,7 +80,7 @@ export default async function ApprovalsPage({
         kind="list"
         crumbs={[{ label: "Money" }, { label: "Payments", href: "/payments" }, { label: "To verify" }]}
         title="To verify"
-        primary={!mine && status === "pending" && list.rows.some((r) => r.can.approve) ? <VerifyChosen action={approveManyAction} /> : undefined}
+        actions={!mine && status === "pending" && list.rows.some((r) => r.can.approve) ? <VerifyChosen action={approveManyAction} /> : undefined}
         views={
           approver && submitter ? (
             <Segmented
