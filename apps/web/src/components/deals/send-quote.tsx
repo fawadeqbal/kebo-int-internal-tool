@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Mail } from "lucide-react";
-import { SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type MailSenders, type SentVia } from "@kebo/shared";
+import { SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type SentVia } from "@kebo/shared";
 import { cn, Field, Input, RULES, Select, Textarea, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -53,7 +53,6 @@ export function SendWindow({
   together = [],
   subjectMany = "",
   messageMany = "",
-  senders = null,
 }: {
   number: number;
   customer: string;
@@ -76,8 +75,6 @@ export function SendWindow({
   /** The subject when several go: "{names}" is where their numbers go. */
   subjectMany?: string;
   messageMany?: string;
-  /** The connected addresses it may go from (Admin settings › Email accounts); a choice only when there are several and choosing is on. */
-  senders?: MailSenders | null;
 }) {
   const close = useClosePanel();
   const [by, setBy] = useState<"email" | "self">("email");
@@ -167,22 +164,6 @@ export function SendWindow({
         <ActionForm key="email" action={emailAction} onDone={(st) => close(st)} className={PANEL_FORM}>
           {(s) => (
             <>
-              {senders && !senders.choose && senders.chosen && (
-                <p className="text-sm text-text-2">
-                  From <span className="font-medium text-text">{senders.from.find((f) => f.id === senders.chosen)?.label}</span>
-                </p>
-              )}
-              {senders?.choose && (
-                <Field label="From" htmlFor="send-from" error={s.errors?.from}>
-                  <Select id="send-from" name="from" defaultValue={s.values?.from ?? senders.chosen ?? ""}>
-                    {senders.from.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              )}
               <div className="grid gap-3.5 sm:grid-cols-2">
                 <Field label="To" htmlFor="send-to" required error={s.errors?.to} hint="Several: separate them with commas">
                   <Input id="send-to" name="to" type="text" inputMode="email" defaultValue={s.values?.to ?? to} />

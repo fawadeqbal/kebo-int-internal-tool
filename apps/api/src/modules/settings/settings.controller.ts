@@ -1,6 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseEnumPipe, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseEnumPipe, Post, Put } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { MAIL_USES, mailAccountInput, mailTestInput, mailUsesInput, SETTINGS, type MailAccountInput, type MailTestInput, type MailUse, type MailUsesInput, type SettingsKey } from "@kebo/shared";
+import { mailSettingsInput, mailTestInput, SETTINGS, type MailSettingsInput, type MailTestInput, type SettingsKey } from "@kebo/shared";
 import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { Validate } from "../../common/http/zod.pipe";
@@ -34,12 +34,9 @@ class SettingsController {
   }
 }
 
-const USES = Object.fromEntries(MAIL_USES.map((u) => [u, u])) as Record<MailUse, MailUse>;
-
 /**
- * Admin settings › Email accounts: the addresses the company sends from (Gmail, an SMTP server or Resend),
- * which one each kind of email goes from, and whether people may choose when sending. Admins only; a password
- * or key is taken in and never given back.
+ * Admin settings › Email sending: how the company's own email goes out (Gmail, an SMTP server or Resend).
+ * Admins only; the password or key is taken in and never given back.
  */
 @ApiTags("settings")
 @Controller("mail-settings")
@@ -52,40 +49,13 @@ class MailSettingsController {
     return this.mail.view(user);
   }
 
-  /** For a send window: the addresses an email may go from (names only), and the one it starts on. */
-  @SignedIn("anyone who sends from a window")
-  @Get("senders")
-  senders(@Query("use", new ParseEnumPipe(USES)) use: MailUse) {
-    return this.mail.senders(use);
-  }
-
-  @Post("accounts")
-  @HttpCode(200)
+  @Put()
   @RequirePermissions("security.manage")
-  add(@CurrentUser() user: SessionUser, @Body(Validate(mailAccountInput)) body: MailAccountInput) {
-    return this.mail.add(user, body);
+  save(@CurrentUser() user: SessionUser, @Body(Validate(mailSettingsInput)) body: MailSettingsInput) {
+    return this.mail.save(user, body);
   }
 
-  @Put("accounts/:id")
-  @RequirePermissions("security.manage")
-  update(@CurrentUser() user: SessionUser, @Param("id") id: string, @Body(Validate(mailAccountInput)) body: MailAccountInput) {
-    return this.mail.update(user, id, body);
-  }
-
-  @Delete("accounts/:id")
-  @HttpCode(200)
-  @RequirePermissions("security.manage")
-  disconnect(@CurrentUser() user: SessionUser, @Param("id") id: string) {
-    return this.mail.disconnect(user, id);
-  }
-
-  @Put("uses")
-  @RequirePermissions("security.manage")
-  uses(@CurrentUser() user: SessionUser, @Body(Validate(mailUsesInput)) body: MailUsesInput) {
-    return this.mail.setUses(user, body);
-  }
-
-  /** Back to the server's own email: every account disconnected. */
+  /** Back to the server's own email. */
   @Delete()
   @HttpCode(200)
   @RequirePermissions("security.manage")
@@ -93,12 +63,12 @@ class MailSettingsController {
     return this.mail.remove(user);
   }
 
-  /** { to, accountId? }: one email, through that account (else the default). */
+  /** { to }: one email, sent the way it is set now. */
   @Post("test")
   @HttpCode(200)
   @RequirePermissions("security.manage")
   test(@CurrentUser() user: SessionUser, @Body(Validate(mailTestInput)) body: MailTestInput) {
-    return this.mail.test(user, body.to, body.accountId);
+    return this.mail.test(user, body.to);
   }
 }
 

@@ -76,7 +76,7 @@ describe("the groups", () => {
     expect(m.filter(isSingle).map((x) => x.key)).toEqual(["reports"]);
     // Settings is two groups: the company's own (managers too), and the admin's.
     expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails", "Website form"]);
-    expect(pages(m, "admin")).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Email accounts", "Activity log"]);
+    expect(pages(m, "admin")).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Email sending", "Activity log"]);
   });
 
   it("have one name each, and two levels: a group and its pages", () => {
@@ -173,7 +173,7 @@ describe("the groups", () => {
     expect(lines(everything(), "money")).toEqual([]);
     expect(lines(everything(), "company")).toEqual([]);
     // Admin settings has three kinds: the people and their access, how email goes out, the record.
-    expect(lines(everything(), "admin")).toEqual(["Email accounts", "Activity log"]);
+    expect(lines(everything(), "admin")).toEqual(["Email sending", "Activity log"]);
     // Only the record is left: no line above the first page.
     const onlyLog = buildModules({ can: (p) => p === "audit.view", feature: () => true, approvals: null, approves: false, companyAddresses: false });
     expect(pages(onlyLog, "admin")).toEqual(["Activity log"]);
@@ -323,7 +323,7 @@ describe("the folded strip", () => {
     const li = strip().getByRole("button", { name: "Admin settings" }).closest("li")!;
     fireEvent.mouseEnter(li);
     const m = screen.getByRole("menu", { name: "Admin settings" });
-    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Email accounts", "Activity log"]);
+    expect(within(m).getAllByRole("menuitem").map((a) => a.textContent)).toEqual(["People", "Roles", "Sign-ins", "Sessions", "Email sending", "Activity log"]);
     fireEvent.mouseLeave(li);
     act(() => vi.advanceTimersByTime(300));
     expect(screen.queryByRole("menu")).toBeNull();

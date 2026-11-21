@@ -22,7 +22,6 @@ import { CheckChip, checksOf, optionOf, optionTitle, PaymentParts, quoteCount, q
 import { UrlWindow } from "@/components/common/panel";
 import { EditAllWindow, NewRevisionWindow } from "@/components/deals/quote-windows";
 import { SendWindow, type SendItem } from "@/components/deals/send-quote";
-import type { MailSenders } from "@kebo/shared";
 import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offerPricesAction, offersAction, reviseAction, saidNoAction, updateRevisionAction } from "../../quotation/actions";
 import { ActionForm } from "@/components/common/action-form";
 import { SubmitButton } from "@kebo/ui/client";
@@ -71,11 +70,9 @@ export default async function QuotationOwnPage({
 
   // What the windows need: the draft's values (its Edit buttons), the next revision's starting values (New
   // revision), and the offers costed in the quotation's currency (also for "From the offer").
-  const [draftValues, startValues, senders] = await Promise.all([
+  const [draftValues, startValues] = await Promise.all([
     manage && draft ? api.get<RevisionDraft>(`/revisions/${draft.id}/values`).catch(() => null) : null,
     manage && x.canStartRevision ? api.get<RevisionDraft>(`/quotations/${x.id}/draft`).catch(() => null) : null,
-    // Which connected address the email goes from (Admin settings › Email accounts).
-    manage && (isDraft || r.status === "sent") ? api.get<MailSenders>("/mail-settings/senders?use=customers").catch(() => null) : null,
   ]);
   const loadOffers = offersAction.bind(null, d.id);
   const offers: QuoteOffers | null = manage || showCosts ? await loadOffers(draftValues?.currency ?? startValues?.currency ?? r.currency) : null;
@@ -111,7 +108,6 @@ export default async function QuotationOwnPage({
         printHref={printHref(r)}
         pdfHref={pdfHref(r)}
         today={today}
-        senders={senders}
       />
     ) : null;
 
