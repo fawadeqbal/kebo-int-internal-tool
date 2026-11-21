@@ -469,6 +469,8 @@ export const quotationsEmailForm = z.object({
   cc: z.string().optional().transform(listOf).pipe(z.array(z.string().email("Check the copy address")).max(10)),
   subject: text(300, "Write a subject"),
   message: optionalText(10000),
+  /** The connected address it goes from (Admin settings › Email accounts); empty: the one set for quotations. */
+  from: z.string().max(40).optional(),
 });
 export type QuotationsEmailForm = z.infer<typeof quotationsEmailForm>;
 
@@ -487,6 +489,8 @@ export const revisionEmailInput = z.object({
   message: optionalText(10000),
   pdf: z.string().max(20_000_000).nullish(),
   fileName: optionalText(200),
+  /** The connected address it goes from; left out: the one set for quotations. */
+  from: z.string().max(40).nullish(),
 });
 
 /* ---------------------------------------------------------------- orders */

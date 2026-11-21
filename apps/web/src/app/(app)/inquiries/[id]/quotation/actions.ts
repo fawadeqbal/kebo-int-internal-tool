@@ -198,7 +198,7 @@ export async function emailRevisionAction(dealId: string, revisionId: string, fi
     pdf = Buffer.from(made).toString("base64");
   }
   const r = await attempt(form, () =>
-    api.post(`/revisions/${revisionId}/email`, { to, cc: list(v.cc), subject: v.subject ?? "", message: v.message ?? "", pdf, fileName }),
+    api.post(`/revisions/${revisionId}/email`, { to, cc: list(v.cc), subject: v.subject ?? "", message: v.message ?? "", pdf, fileName, from: v.from || null }),
   );
   if (!r.ok) return r;
   refresh(dealId);
@@ -214,6 +214,7 @@ async function emailMany(dealId: string, ids: string[], to: string[], form: Form
   body.set("cc", list(v.cc).join(", "));
   body.set("subject", v.subject ?? "");
   body.set("message", v.message ?? "");
+  if (v.from) body.set("from", v.from);
   const attach = v.attach === "on";
   if (attach) {
     const session = (await cookies()).get(SESSION_COOKIE)?.value;

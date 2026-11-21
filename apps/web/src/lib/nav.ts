@@ -103,7 +103,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
       { href: "/access/roles", label: "Roles" },
       { href: "/access/sign-ins", label: "Sign-ins" },
       { href: "/access/sessions", label: "Sessions" },
-      { href: "/settings/mail", label: "Email sending", lineBefore: true },
+      { href: "/settings/mail", label: "Email accounts", lineBefore: true },
       { href: "/audit", label: "Activity log", lineBefore: true },
     ],
   },

@@ -183,10 +183,11 @@ export const MAIL_PROVIDER_LABEL: Record<MailProvider, string> = { gmail: "Gmail
 export const SMTP_PORTS = [25, 465, 587, 2525] as const;
 
 /**
- * Admin settings › Email sending. `secret` is the Gmail app password, the SMTP password or the Resend API
- * key: sent only when it is typed (left out: the one already stored is kept), never sent back.
+ * Admin settings › Email accounts: one address the company sends from. `secret` is the Gmail app password, the
+ * SMTP password or the Resend API key: sent only when it is typed (left out on a change: the stored one is kept),
+ * never sent back.
  */
-export const mailSettingsInput = z
+export const mailAccountInput = z
   .object({
     provider: z.enum(MAIL_PROVIDERS),
     fromName: z.string().trim().max(80).default(""),
@@ -201,25 +202,63 @@ export const mailSettingsInput = z
     if (!v.host || !/^[a-z0-9.-]+$/.test(v.host)) ctx.addIssue({ code: "custom", path: ["host"], message: "Type the mail server's name, like smtp.example.com" });
     if (!v.port || !(SMTP_PORTS as readonly number[]).includes(v.port)) ctx.addIssue({ code: "custom", path: ["port"], message: `Use port ${SMTP_PORTS.join(", ")}` });
   });
-export type MailSettingsInput = z.infer<typeof mailSettingsInput>;
+export type MailAccountInput = z.infer<typeof mailAccountInput>;
+/** The older name: one account. */
+export const mailSettingsInput = mailAccountInput;
+export type MailSettingsInput = MailAccountInput;
 
-export const mailTestInput = z.object({ to: z.string().trim().toLowerCase().email("Type an email address to send the test to").max(200) });
+/** What the company's email is for: each goes from the address chosen for it (else the default one). */
+export const MAIL_USES = ["customers", "staff"] as const;
+export type MailUse = (typeof MAIL_USES)[number];
+export const MAIL_USE_LABEL: Record<MailUse, { label: string; hint: string }> = {
+  customers: { label: "Quotations and documents to customers", hint: "Send quotation, a document's Email" },
+  staff: { label: "Sign-in codes, invitations and alerts to staff", hint: "Never answered, so any address does" },
+};
+/** Most accounts a company connects. */
+export const MAIL_ACCOUNTS_MAX = 20;
+
+/** Which address each use goes from, the default one, and whether people may choose another when sending. */
+export const mailUsesInput = z.object({
+  defaultId: z.string().max(40).nullish(),
+  uses: z.object({ customers: z.string().max(40).nullish(), staff: z.string().max(40).nullish() }).partial().default({}),
+  choose: z.coerce.boolean().default(true),
+});
+export type MailUsesInput = z.infer<typeof mailUsesInput>;
+
+export const mailTestInput = z.object({ to: z.string().trim().toLowerCase().email("Type an email address to send the test to").max(200), accountId: z.string().max(40).nullish() });
 export type MailTestInput = z.infer<typeof mailTestInput>;
 
-/** What the page is given: everything but the secret. */
-export interface MailSettingsView {
-  /** null: the company has not set its own; its email goes through the server's, when the server has one. */
-  provider: MailProvider | null;
+/** One connected address, as the page is given it: everything but the secret. */
+export interface MailAccountView {
+  id: string;
+  provider: MailProvider;
   fromName: string;
   fromEmail: string;
   host: string;
   port: number | null;
   username: string;
   hasSecret: boolean;
+}
+
+/** Admin settings › Email accounts. */
+export interface MailSettingsView {
+  accounts: MailAccountView[];
+  /** The address used when a use has none of its own (null: no account). */
+  defaultId: string | null;
+  uses: Partial<Record<MailUse, string | null>>;
+  /** People may pick another address when they send. */
+  choose: boolean;
   /** The server has its own email set up (used while the company has none). */
   serverDefault: boolean;
   /** Email can be sent right now, one way or the other. */
   enabled: boolean;
+}
+
+/** For a send window: the addresses this email may go from, the one it starts on, and whether to show the choice. */
+export interface MailSenders {
+  from: { id: string; label: string }[];
+  chosen: string | null;
+  choose: boolean;
 }
 
 export const SETTINGS = {
