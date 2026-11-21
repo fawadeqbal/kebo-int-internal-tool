@@ -230,7 +230,8 @@ describe("ageing", () => {
         ]}
       />,
     );
-    const tiles = within(screen.getByRole("region", { name: "Ageing" }));
+    // The laptop's facts line (a phone says the same figures again as one line of words).
+    const tiles = within(screen.getByRole("region", { name: "Ageing" }).querySelector("dl") ?? screen.getByRole("region", { name: "Ageing" }));
     expect(tiles.getByText("SO-2026-0461 · Deposit")).toBeTruthy();
     expect(tiles.getByText("USD 62.00").className).toContain("text-warn");
     expect(tiles.getAllByText("USD 10,391.88")[1]!.className).toContain("text-bad");

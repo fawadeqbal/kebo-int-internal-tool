@@ -373,40 +373,33 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
           <EmptyState title={`Nothing in ${pr.name}`} description="Money recorded on orders and expenses shows here by its date." />
         ) : (
           <>
-          {/* Phone: one line per amount. */}
-          <ul className="flex flex-col divide-y divide-line sm:hidden" aria-label="Cash book">
+          {/* Phone: a row per amount — what, the day and who; in or out on the right, the balance under it. */}
+          <PhoneList label="Cash book">
             {book.rows.map((r) => {
               const n = Number(r.amount);
               return (
-                <li key={r.key} className={cn("flex flex-col gap-1 px-4 py-2.5 text-sm", r.voided && "text-muted line-through")}>
-                  <span className="flex items-start justify-between gap-3">
-                    {r.href ? (
-                      <Link href={r.href} className="min-w-0 font-medium hover:text-primary">
-                        {r.what}
-                      </Link>
-                    ) : (
-                      <span className="min-w-0 font-medium">{r.what}</span>
-                    )}
-                    <span className={cn("shrink-0 font-medium tabular", n > 0 && r.kind === "in" && "text-ok")}>
+                <PhoneRow
+                  key={r.key}
+                  href={r.href ?? undefined}
+                  muted={!!r.voided}
+                  title={r.voided ? <span className="line-through">{r.what}</span> : r.what}
+                  line={[date(r.on), kindOf(r.kind), r.party?.name, !one ? r.account?.name : null].filter(Boolean).join(" · ")}
+                  figure={
+                    <span className={cn(n > 0 && r.kind === "in" && "text-ok", r.voided && "line-through")}>
                       {n > 0 ? "+ " : "− "}
                       {money(Math.abs(n), r.currency)}
                     </span>
-                  </span>
-                  <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted">
-                    <span>
-                      {date(r.on)} · {kindOf(r.kind)}
-                      {r.party && ` · ${r.party.name}`}
-                      {!one && r.account && ` · ${r.account.name}`}
-                    </span>
-                    {one && r.balance && <span className="tabular">Balance {money(r.balance, r.currency)}</span>}
-                  </span>
-                  {!one && !r.account && (r.kind === "in" || r.kind === "factory" || r.kind === "expense") && (
-                    <PutOnAccount kind={r.kind} id={r.id} currency={r.currency} accounts={accounts} />
-                  )}
-                </li>
+                  }
+                  status={one && r.balance ? <span className="tabular">Balance {money(r.balance, r.currency)}</span> : undefined}
+                  extra={
+                    !one && !r.account && (r.kind === "in" || r.kind === "factory" || r.kind === "expense") ? (
+                      <PutOnAccount kind={r.kind} id={r.id} currency={r.currency} accounts={accounts} />
+                    ) : undefined
+                  }
+                />
               );
             })}
-          </ul>
+          </PhoneList>
           <div className="hidden sm:block">
             <Table>
               <THead>

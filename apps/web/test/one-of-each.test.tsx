@@ -369,6 +369,15 @@ describe("one of each", () => {
     expect(bad).toEqual([]);
   }, 30_000); // It reads every export against every file: a slow CI machine needs more than the default 5 s.
 
+  it("a list on a phone is PhoneList and PhoneRow: two compact lines a row, no list drawn by hand", () => {
+    // Rows that hold their own controls to edit (prices, a plan's parts) are forms, not lists.
+    const FORMS = ["components/deals/price-editor.tsx", "components/order-sections/payment-plan.tsx", "components/order-sections/supplier-plan.tsx", "components/common/skeletons.tsx", "packages/ui/src/primitives.tsx"];
+    const hand = SOURCES.filter(({ file }) => !FORMS.some((f) => file.endsWith(f))).flatMap(({ file, text }) =>
+      [...text.matchAll(/<ul\b[^>]*\bsm:hidden\b[^>]*>/g)].map((m) => `${file}: ${m[0].slice(0, 80)}`),
+    );
+    expect(hand).toEqual([]);
+  });
+
   it("files and papers open in the app's viewer, never in a new tab (only WhatsApp, tracking and the live site do)", () => {
     // A link to a stored file or one of our papers, told to open a new tab (or window.open on one).
     const tabs = SOURCES.flatMap(({ file, text }) =>
