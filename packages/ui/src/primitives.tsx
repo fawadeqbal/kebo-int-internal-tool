@@ -455,7 +455,8 @@ export function PageHeader({
   // A top page on a phone: its strong button is the bottom bar's +, its name in the bar, its ⋯ beside it; with
   // nothing else to show, its header takes no room (the list starts under the bar).
   const docked = !up && titleInBar && !!primary && kind === "list";
-  const bare = !up && titleInBar && !actions && !views && !badge && !children && (summary === undefined || typeof summary === "string");
+  // (A list's List | Board is not on a phone: it folds into ⋯.)
+  const bare = !up && titleInBar && !actions && (!views || kind === "list") && !badge && !children && (summary === undefined || typeof summary === "string");
   return (
     <>
       {up && (

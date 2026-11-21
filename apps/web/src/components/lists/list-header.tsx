@@ -44,12 +44,11 @@ export function ListHeader({
       }
       more={<MoreMenu label={moreLabel} items={more} phoneItems={phoneMore} />}
       primary={
+        // On a phone this is the + of the bottom bar (PageHeader).
         create && (
-          <span className="max-sm:hidden">
-            <OpenPanelButton panel={create.panel} variant="strong" label={create.label}>
-              <Plus aria-hidden /> {create.label}
-            </OpenPanelButton>
-          </span>
+          <OpenPanelButton panel={create.panel} variant="strong" label={create.label}>
+            <Plus aria-hidden /> {create.label}
+          </OpenPanelButton>
         )
       }
     />
