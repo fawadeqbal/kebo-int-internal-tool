@@ -217,7 +217,7 @@ export class NotificationsService implements OnModuleInit {
     }
   }
 
-  /** Email can be sent now: the company's own (Admin settings › Email accounts), or the server's. */
+  /** Email can be sent now: the company's own (Admin settings › Email sending), or the server's. */
   async canEmail(): Promise<boolean> {
     return (await this.mail.mailer()).enabled;
   }

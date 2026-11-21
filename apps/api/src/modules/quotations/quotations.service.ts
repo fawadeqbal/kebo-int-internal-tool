@@ -1015,17 +1015,17 @@ export class QuotationsService {
    * Emails the revision to the customer with its PDF (made by the web app from
    * the print page) and, while it is a draft, marks it sent "By email to …".
    */
-  async email(user: SessionUser, revisionId: string, input: { to: string[]; cc: string[]; subject: string; message?: string | null; pdf?: string | null; fileName?: string | null; from?: string | null }) {
+  async email(user: SessionUser, revisionId: string, input: { to: string[]; cc: string[]; subject: string; message?: string | null; pdf?: string | null; fileName?: string | null }) {
     this.assertCan(user);
     const head = await this.prisma.db.quotationRevision.findFirst({ where: { id: revisionId, deletedAt: null }, include: { quotation: true } });
     if (!head) throw new NotFoundError("Quotation");
     const { r, inquiry } = await this.loadRevision(user, revisionId, this.prisma.db);
     await this.inquiries.findWorkable(user, inquiry.id, this.prisma.db);
     if (r.status !== "draft" && r.status !== "sent") throw new GateError(`A ${r.status} revision is not sent again.`, "revision_move");
-    // The address chosen in the window, else the one set for customers (Admin settings › Email accounts), else the server's.
-    const mailer = await this.mail.mailer("customers", input.from);
+    // The company's own email (Admin settings › Email sending), else the server's.
+    const mailer = await this.mail.mailer();
     if (!mailer.enabled)
-      throw new DomainError("Email is not set up yet (an admin sets it under Admin settings › Email accounts). Download the PDF, send it yourself, then use “Sent another way — mark as sent”.");
+      throw new DomainError("Email is not set up yet (an admin sets it under Admin settings › Email sending). Download the PDF, send it yourself, then use “Sent another way — mark as sent”.");
     await mailer.send({
       to: input.to,
       cc: input.cc.length ? input.cc : undefined,
@@ -1067,11 +1067,11 @@ export class QuotationsService {
    * Several quotations in one email (design "one way, any number"): their PDFs attached (made by the web app,
    * in the same order), then each draft marked sent by email.
    */
-  async emailMany(user: SessionUser, inquiryId: string, input: { revisionIds: string[]; to: string[]; cc: string[]; subject: string; message?: string | null; from?: string | null }, pdfs: { buffer: Buffer }[]) {
+  async emailMany(user: SessionUser, inquiryId: string, input: { revisionIds: string[]; to: string[]; cc: string[]; subject: string; message?: string | null }, pdfs: { buffer: Buffer }[]) {
     const revs = await this.sendable(user, inquiryId, input.revisionIds);
-    const mailer = await this.mail.mailer("customers", input.from);
+    const mailer = await this.mail.mailer();
     if (!mailer.enabled)
-      throw new DomainError("Email is not set up yet (an admin sets it under Admin settings › Email accounts). Download the PDFs, send them yourself, then use “I sent it myself”.");
+      throw new DomainError("Email is not set up yet (an admin sets it under Admin settings › Email sending). Download the PDFs, send them yourself, then use “I sent it myself”.");
     await mailer.send({
       to: input.to,
       cc: input.cc.length ? input.cc : undefined,
