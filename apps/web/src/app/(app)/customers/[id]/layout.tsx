@@ -98,7 +98,7 @@ export default async function CustomerLayout({ children, params }: { children: R
                 { path: "", label: "Overview" },
                 { path: "orders", label: "Orders", count: c.orders.length, alert: lateOrders > 0 },
                 { path: "inquiries", label: "Inquiries", count: c.inquiries.length },
-                { path: "money", label: "Money" },
+                { path: "money", label: "Finance" },
                 { path: "contacts", label: "Contacts", count: c.contacts.length },
                 { path: "notes", label: "Notes" },
               ]}

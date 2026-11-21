@@ -72,7 +72,7 @@ export const how = {
   /** Cash report: open accounts' balances, today's rate. */
   cashNow: (c: string) =>
     [
-      `What every open account holds today: its opening balance and every payment in and out of it since it opened, the same as on Money › Cash & bank. A closed account is left out.`,
+      `What every open account holds today: its opening balance and every payment in and out of it since it opened, the same as on Finance › Cash & bank. A closed account is left out.`,
       `${TODAY_RATE(c)} Each currency's own total is shown too.`,
     ].join("\n"),
 
@@ -149,7 +149,7 @@ export const how = {
   spentToSell: (s: Span, c: string) =>
     [
       `Trips, hotels, meals, gifts, samples, courier and checks spent ${s.days} on a customer, an inquiry or an order, each in ${c} at the rate it was paid at.`,
-      `The company's own costs (rent, salaries, the office) are not in it: they are on Money › Company costs.`,
+      `The company's own costs (rent, salaries, the office) are not in it: they are on Finance › Expenses.`,
       ARROW(s),
     ].join("\n"),
 

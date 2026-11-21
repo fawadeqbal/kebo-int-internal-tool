@@ -4,8 +4,8 @@
  * page: addresses did not move, only the grouping and the names changed. The group's name is the
  * first part of the path above a page's title ("Sales / Inquiries"), the page's name is its title.
  * The layout keeps only the pages a person may open (each page's own permission and plan checks);
- * a group whose pages are all hidden is hidden. Reports is one page (its reports are tabs on it), so
- * it is a link of its own like Home; notifications open from the bell.
+ * a group whose pages are all hidden is hidden. Reports is a group (22 Nov 2026: each report a page);
+ * notifications open from the bell.
  *
  * Clean-up (14 Nov 2026): Shipments is no longer a page of its own (a shipment is on its order);
  * Purchase orders has its list again, and each one a page of its own that shows it (it is still made
@@ -45,7 +45,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     pages: [
       { href: "/inquiries", label: "Inquiries" },
       // The list and the board are two views of one page (a switch on it): one item.
-      { href: "/orders", label: "Orders" },
+      { href: "/orders", label: "Sales orders" },
       { href: "/customers", label: "Customers" },
       { href: "/follow-ups", label: "Follow-ups" },
     ],
@@ -61,23 +61,32 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
   },
   {
     key: "money",
-    title: "Money",
+    title: "Finance",
     icon: "money",
-    // Money, simple (14 Nov 2026): four pages. Payment requests, Invoices, To receive and the two To pay lists
-    // are one page; To verify and the Ledger keep their addresses and left the menu.
+    // Four pages (Finance, 22 Nov 2026: the words an accounts team uses). Payment requests, Invoices, To receive
+    // and the two To pay lists are one page; To verify and the Ledger keep their addresses and left the menu.
     pages: [
-      { href: "/money/due", label: "To receive and to pay" },
+      { href: "/money/due", label: "Receivables & payables" },
       { href: "/payments", label: "Payments" },
       { href: "/finance/cash-book", label: "Cash & bank" },
-      { href: "/money/company-costs", label: "Company costs" },
+      { href: "/money/company-costs", label: "Expenses" },
     ],
   },
   {
     key: "reports",
     title: "Reports",
     icon: "reports",
-    // Money, simple (14 Nov 2026): one page with tabs (Overview, Profit, Customers, Suppliers, Cash, People, Funnel).
-    pages: [{ href: "/reports", label: "Reports" }],
+    // A group of its own (22 Nov 2026): each report is a page in the menu (they were tabs on one page).
+    pages: [
+      { href: "/reports", label: "Overview" },
+      { href: "/reports/profit", label: "Profit & loss" },
+      { href: "/reports/cash", label: "Cash flow" },
+      { href: "/reports/spending", label: "Expenses" },
+      { href: "/reports/customers", label: "Customers", lineBefore: true },
+      { href: "/reports/factories", label: "Suppliers" },
+      { href: "/reports/people", label: "Sales team" },
+      { href: "/reports/funnel", label: "Sales funnel" },
+    ],
   },
   {
     key: "company",
@@ -99,12 +108,12 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     title: "Admin settings",
     icon: "admin",
     pages: [
-      { href: "/users", label: "People" },
+      { href: "/users", label: "Staff" },
       { href: "/access/roles", label: "Roles" },
-      { href: "/access/sign-ins", label: "Sign-ins" },
-      { href: "/access/sessions", label: "Sessions" },
+      { href: "/access/sign-ins", label: "Login history" },
+      { href: "/access/sessions", label: "Active sessions" },
       { href: "/settings/mail", label: "Email sending", lineBefore: true },
-      { href: "/audit", label: "Activity log", lineBefore: true },
+      { href: "/audit", label: "Audit log", lineBefore: true },
     ],
   },
 ];
@@ -134,7 +143,7 @@ export function moduleOf(pathname: string, modules: { key: ModuleKey; pages: { h
   return pageOf(pathname, all)?.key;
 }
 
-/** "Money / Cash & bank": the path above a page's title (its title is the page's name). */
+/** "Finance / Cash & bank": the path above a page's title (its title is the page's name). */
 export function crumbsFor(href: string): { label: string; href?: string }[] {
   const p = ALL_PAGES.find((x) => x.href === href);
   if (!p) return [];
@@ -198,6 +207,14 @@ export function buildModules({
   /** Who may open each page; a page not listed is open to everyone signed in. */
   const show: Record<string, boolean> = {
     "/reports": reports,
+    // Profit, cash and spending: for people who may see money (as on the pages themselves).
+    "/reports/profit": reports && managers,
+    "/reports/cash": reports && managers,
+    "/reports/spending": reports && managers,
+    "/reports/customers": reports,
+    "/reports/factories": reports,
+    "/reports/people": reports,
+    "/reports/funnel": reports,
     "/audit": can("audit.view") && feature("audit_log"),
     // The company's own web address and its website form's key are the admin's (managers run the rest of Company settings).
     "/settings/website-form": settings && security,

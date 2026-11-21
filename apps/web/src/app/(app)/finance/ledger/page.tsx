@@ -71,7 +71,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
     <Stack>
       <PageHeader
         kind="list"
-        crumbs={[{ label: "Money" }, { label: "Ledger" }]}
+        crumbs={[{ label: "Finance" }, { label: "Ledger" }]}
         title="Ledger"
         more={
           view === "all" ? (

@@ -35,7 +35,7 @@ export async function CustomerSide({ id }: { id: string }) {
           {/* Money (board): sold, received, they owe, credit, per currency. */}
           <Card>
             <CardHeader
-              title="Money"
+              title="Finance"
               actions={
                 <ButtonLink href={`/customers/${c.id}/money`} variant="link" size="sm">
                   <FileText aria-hidden /> Statement

@@ -78,7 +78,7 @@ export default async function ApprovalsPage({
     <Stack>
       <PageHeader
         kind="list"
-        crumbs={[{ label: "Money" }, { label: "Payments", href: "/payments" }, { label: "To verify" }]}
+        crumbs={[{ label: "Finance" }, { label: "Payments", href: "/payments" }, { label: "To verify" }]}
         title="To verify"
         actions={!mine && status === "pending" && list.rows.some((r) => r.can.approve) ? <VerifyChosen action={approveManyAction} /> : undefined}
         views={

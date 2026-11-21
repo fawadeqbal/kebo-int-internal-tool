@@ -382,7 +382,7 @@ const DOCK =
  * list. Its words stay its name for a screen reader ("Add customer").
  */
 const FAB =
-  "max-md:fixed max-md:bottom-[calc(env(safe-area-inset-bottom)+18px)] max-md:left-1/2 max-md:z-40 max-md:grid max-md:-translate-x-1/2 max-md:place-items-center max-md:[&>:first-child]:size-14 max-md:[&>:first-child]:gap-0 max-md:[&>:first-child]:rounded-full max-md:[&>:first-child]:p-0 max-md:[&>:first-child]:[font-size:0] max-md:[&>:first-child]:shadow-pop max-md:[&>:first-child]:ring-4 max-md:[&>:first-child]:ring-bg max-md:[&>:first-child_svg]:hidden";
+  "max-md:fixed max-md:bottom-[calc(env(safe-area-inset-bottom)+19px)] max-md:left-1/2 max-md:z-40 max-md:grid max-md:-translate-x-1/2 max-md:place-items-center max-md:[&>:first-child]:size-[50px] max-md:[&>:first-child]:gap-0 max-md:[&>:first-child]:rounded-2xl max-md:[&>:first-child]:p-0 max-md:[&>:first-child]:[font-size:0] max-md:[&>:first-child]:shadow-pop max-md:[&>:first-child_svg]:hidden";
 
 export function PageHeader({
   title,

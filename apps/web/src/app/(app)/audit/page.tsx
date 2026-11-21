@@ -15,7 +15,7 @@ import type { AuditRow } from "@/lib/types-people";
 import { crumbsFor } from "@/lib/nav";
 import { getPeople } from "@/lib/loaders";
 
-export const metadata = { title: "Activity log" };
+export const metadata = { title: "Audit log" };
 
 const ENTITY_LABEL: Record<string, string> = {
   inquiry: "Inquiry",
@@ -117,7 +117,7 @@ function Changes({ r }: { r: AuditRow }) {
  */
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const me = await requirePermission("audit.view");
-  if (!(await hasFeature("audit_log"))) return <PlanOff title="Activity log" what="The activity log" crumbs={crumbsFor("/audit")} />;
+  if (!(await hasFeature("audit_log"))) return <PlanOff title="Audit log" what="The audit log" crumbs={crumbsFor("/audit")} />;
   const sp = await searchParams;
   const [data, people] = await Promise.all([
     api.get<Paged<AuditRow> & { counts: Record<string, number> }>("/audit", { entityType: sp.type, userId: sp.person, q: sp.q?.trim() || undefined, page: toPage(sp.page), pageSize: toPageSize(sp.size, PAGE_SIZE) }),
@@ -150,7 +150,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/audit")}
-        title="Activity log"
+        title="Audit log"
         more={<ExportCsv what="audit" query={{ type: sp.type, person: sp.person, q: sp.q }} />}
       />
       {/* How many entries is said once, beside the search (the filter's count), not again in a facts line. */}

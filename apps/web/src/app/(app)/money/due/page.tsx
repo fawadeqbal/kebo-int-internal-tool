@@ -21,7 +21,7 @@ import { factoryPaymentAction, sendRequestAction } from "../actions";
 import { paymentAction, submitPaymentAction } from "../../orders/actions";
 import { moneyTile } from "@/lib/money-tile";
 
-export const metadata = { title: "To receive and to pay" };
+export const metadata = { title: "Receivables & payables" };
 
 const HERE = "/money/due";
 const PAGE = PAGE_SIZE;
@@ -32,7 +32,7 @@ const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
 const add = (m: Map<string, number>, currency: string, v: string | number) => m.set(currency, (m.get(currency) ?? 0) + Number(v));
 
 /**
- * Money › To receive and to pay (design "money, simple", boards MRecv and MPayb): what customers owe us,
+ * Finance › Receivables & payables (design "money, simple", boards MRecv and MPayb): what customers owe us,
  * one row per order, and what we owe suppliers and on bills, one row per part or bill. The work is done
  * on the row: an order opens to its parts with Send request and Record payment; a part or a bill is
  * paid in a window. It replaces Payment requests, Invoices, To receive and the two To pay lists.
@@ -49,7 +49,7 @@ export default async function DuePage({ searchParams }: { searchParams: Promise<
       <PageHeader
         kind="list"
         crumbs={crumbsFor(HERE)}
-        title="To receive and to pay"
+        title="Receivables & payables"
         views={
           seesSuppliers ? (
             <Segmented

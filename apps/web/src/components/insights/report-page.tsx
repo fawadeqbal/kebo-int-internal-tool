@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
-import { buildHref, buttonClass, cardClass, cn, Input, LinkTabs, PageHeader, Segmented, toPage, Notice, Stack } from "@kebo/ui";
+import { buildHref, buttonClass, cardClass, cn, Input, PageHeader, Segmented, toPage, Notice, Stack } from "@kebo/ui";
 import { CardSkeleton, TilesSkeleton } from "@/components/common/skeletons";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { crumbsFor, labelFor } from "@/lib/nav";
@@ -56,44 +56,18 @@ const PATH_OF: Record<ReportKind, string> = {
   funnel: "/reports/funnel",
   spending: "/reports/spending",
 };
-/** One page, its reports as tabs under the title: the same period goes with you. Profit and Cash are for people who see money. */
-const REPORT_TABS: { key: ReportKind; href: string; label: string; money?: boolean }[] = [
-  { key: "overview", href: "/reports", label: "Overview" },
-  { key: "profit", href: "/reports/profit", label: "Profit", money: true },
-  { key: "customers", href: "/reports/customers", label: "Customers" },
-  { key: "factories", href: "/reports/factories", label: "Suppliers" },
-  { key: "cash", href: "/reports/cash", label: "Cash", money: true },
-  { key: "people", href: "/reports/people", label: "People" },
-  { key: "funnel", href: "/reports/funnel", label: "Funnel" },
-  { key: "spending", href: "/reports/spending", label: "Spending", money: true },
-];
-/** Targets is a view of People (it opens from there), so People stays the tab. */
-const TAB_OF = (kind: ReportKind): ReportKind => (kind === "targets" ? "people" : kind);
-
-function ReportTabs({ current, keep, seeMoney }: { current: ReportKind; keep: Record<string, string | undefined>; seeMoney: boolean }) {
-  return (
-    <LinkTabs
-      label="Reports"
-      className="no-print mt-3"
-      tabs={REPORT_TABS.filter((t) => seeMoney || !t.money).map((t) => ({
-        href: buildHref(t.href, keep, {}),
-        label: t.label,
-        active: t.key === current,
-      }))}
-    />
-  );
-}
-
 /**
- * Reports (design "money, simple", boards ROverview to RCash): one page in the menu, its reports as tabs,
+ * Reports (design "money, simple", boards ROverview to RCash; a menu of its own since 22 Nov 2026): each report a page,
  * one period for every figure with the period before to compare. Excel, View / Print and PDF are in the
  * header of every tab. Figures come from the Insights tables (GET /insights/facts/*) and, for cash, from
  * the cash book's own rows (GET /money/cash-report).
  */
 export async function ReportPage({ kind, searchParams }: { kind: ReportKind; searchParams: Promise<ReportSearch> }) {
   const me = await requirePermission("reports.view");
-  const crumbs = crumbsFor("/reports");
-  const title = labelFor("/reports");
+  // Each report is a page of the Reports menu (22 Nov 2026): its own name and path; Targets is under Sales team.
+  const own = PATH_OF[kind === "targets" ? "people" : kind];
+  const crumbs = kind === "targets" ? [{ label: "Reports" }, { label: labelFor(own), href: own }] : crumbsFor(own);
+  const title = kind === "targets" ? "Targets" : labelFor(own);
   if (!(await hasFeature("insights"))) return <PlanOff title={title} what="Insights (sales, profit and team reports)" crumbs={crumbs} />;
   const seeMoney = can(me, "expenses.manage");
   // Profit, cash and setting targets: for people who may see money.
@@ -161,7 +135,6 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
             />
           </div>
         )}
-        <ReportTabs current={TAB_OF(kind)} keep={keep} seeMoney={seeMoney} />
       </PageHeader>
       {periodic && (
         <div className="md:hidden">

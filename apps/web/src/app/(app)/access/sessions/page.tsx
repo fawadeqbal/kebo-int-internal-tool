@@ -11,7 +11,7 @@ import { SessionList } from "@/components/security/session-list";
 import { endSessionAction, signOutEverywhereAction } from "../actions";
 import { getPeople } from "@/lib/loaders";
 
-export const metadata = { title: "Sessions" };
+export const metadata = { title: "Active sessions" };
 
 /** Every browser and phone signed in now, newest use first; sign out one, or someone everywhere. 25 a page. */
 export default async function SessionsPage({ searchParams }: { searchParams: Promise<{ person?: string; q?: string; page?: string; size?: string }> }) {
@@ -30,7 +30,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
       <PageHeader
         kind="list"
         crumbs={crumbsFor("/access/sessions")}
-        title="Sessions"
+        title="Active sessions"
         actions={
           who && list.total ? (
             <ConfirmAction action={signOutEverywhereAction.bind(null, who.id)} confirm={`Sign ${who.name} out on every device?`} label="Sign out everywhere" pendingText="Signing out…" variant="secondary" size="md" />

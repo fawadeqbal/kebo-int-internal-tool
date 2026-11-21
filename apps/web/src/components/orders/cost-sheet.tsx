@@ -167,7 +167,7 @@ export function owedOf(rows: Pick<ExpenseView, "id" | "ownMoney" | "repaid" | "p
 
 /**
  * "Owed back" (design "spending"): who paid costs here from their own money and is not paid back yet, with
- * Pay back. The same money shows under Owed back on their page and on Money › To receive and to pay.
+ * Pay back. The same money shows under Owed back on their page and on Finance › Receivables & payables.
  */
 export function OwedBack({ owed, where, orderId, today, canPay, canFiles = false }: { owed: OwedPerson[]; where: string; orderId: string | null; today: string; canPay: boolean; canFiles?: boolean }) {
   if (!owed.length) return null;

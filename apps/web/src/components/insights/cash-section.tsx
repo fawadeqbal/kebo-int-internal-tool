@@ -56,7 +56,7 @@ export function CashSection({ r, p }: { r: CashReport; p: Period }) {
               <Th className="text-right">From customers</Th>
               <Th className="text-right hidden md:table-cell">To suppliers</Th>
               <Th className="text-right hidden md:table-cell">Freight and other bills</Th>
-              <Th className="text-right hidden md:table-cell">Company costs</Th>
+              <Th className="text-right hidden md:table-cell">Expenses</Th>
               <Th className="text-right">Net</Th>
               <Th className="text-right hidden sm:table-cell">Cash at the end</Th>
             </tr>

@@ -735,7 +735,7 @@ function MoneyScreen() {
   );
   return (
     <Screen>
-      <AppBar title="To receive and to pay" />
+      <AppBar title="Receivables & payables" />
       <Body>
         <p className={cn("text-[13px] leading-[18px] text-muted", NUM)}>
           To receive <b className="text-text">USD 34,020.00</b> · to pay <b className="text-text">CNY 218,400.00</b>
@@ -828,7 +828,7 @@ const SCREENS: Record<ScreenKey, { draw: () => ReactNode; label: string }> = {
   invoice: { draw: InvoiceScreen, label: "A proforma invoice on your letterhead, kept as sent" },
   packing: { draw: PackingScreen, label: "An order's packages with weights and volume" },
   shipping: { draw: ShippingScreen, label: "An order's shipping, step by step" },
-  money: { draw: MoneyScreen, label: "To receive and to pay: payments in, payments out, and those waiting for a second check" },
+  money: { draw: MoneyScreen, label: "Receivables & payables: payments in, payments out, and those waiting for a second check" },
 };
 
 /** One screen in a phone, scaled to fit (the screen keeps its real 390 × 844 layout inside). */

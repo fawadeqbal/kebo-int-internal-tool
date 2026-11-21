@@ -13,7 +13,7 @@ import { homeSpan, how } from "@/lib/figures";
 /*
  * Home (design "money, simple", board Home). Every card answers one question and opens the page behind it.
  * The figures come from GET /insights/home; "Needs you today" is the reminders list; "Customers owe us" is
- * the same list as Money › To receive and to pay.
+ * the same list as Finance › Receivables & payables.
  */
 
 const MORE = "inline-flex items-center gap-1 whitespace-nowrap text-sm font-medium text-primary underline-offset-2 hover:underline";
@@ -175,7 +175,7 @@ export function NextWeeks({ h }: { h: HomeFigures }) {
       </Table>
       <p className={cn(RULES.box.inset, "border-t border-line py-3 text-xs text-text-2 [&_a]:text-xs")}>
         If everyone pays on their date. Lowest: <strong className={cn("font-semibold", Number(lowest.after) < 0 ? "text-bad" : "text-text")}>{signed(Number(lowest.after), c)}</strong>{" "}
-        {at === 0 ? "this week" : `in the week of ${short(lowest.from)}`}. <More href="/money/due">To receive and to pay</More>
+        {at === 0 ? "this week" : `in the week of ${short(lowest.from)}`}. <More href="/money/due">Receivables & payables</More>
       </p>
     </Card>
   );
