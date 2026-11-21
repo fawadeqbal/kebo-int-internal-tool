@@ -5,7 +5,8 @@ import { appRoutes, foundPages } from "./routes";
  * The skeleton rule (Fawad 21 Nov): every page loads in its own shape. For every page of the app, the skeleton
  * its loading.tsx draws (held still at /loading-preview) has the same parts as the page itself, in the same order,
  * with the same counts: header or record top, facts line, tiles, tabs, filter and its choices, the table, the
- * record's tabs and body with or without its side panel. A page that changes its parts fails here until its line
+ * record's tabs and body with or without its side panel (a list's tabs and facts may show up to two fewer than the
+ * skeleton draws: those with nothing in them are left out). A page that changes its parts fails here until its line
  * in apps/web/src/lib/page-shapes.ts says the same.
  */
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -38,7 +39,13 @@ test.describe("every page loads in its own shape", () => {
       const real = await partsOf(page);
       await page.goto(`/loading-preview?path=${encodeURIComponent(address!)}`);
       const skeleton = await partsOf(page);
-      expect(skeleton, `the skeleton of ${r.route} (lib/page-shapes.ts) against the page`).toEqual(real);
+      // The parts, their order and the record's side panel must be the same. A count may run up to two short of
+      // the skeleton's: a list's tabs and facts that show only when they have something (the demo data varies).
+      const name = (x: string) => x.replace(/:\d+$/, "");
+      const n = (x: string) => Number(/:(\d+)$/.exec(x)?.[1] ?? 0);
+      expect(skeleton.map(name), `the skeleton of ${r.route} (lib/page-shapes.ts) against the page`).toEqual(real.map(name));
+      const off = real.filter((x, i) => n(skeleton[i]!) - n(x) < 0 || n(skeleton[i]!) - n(x) > 2 || (/^(record-tabs|filter)/.test(x) && x !== skeleton[i]));
+      expect(off, `counts in ${r.route}: page ${real.join(" · ")}; skeleton ${skeleton.join(" · ")}`).toEqual([]);
     });
   }
 
