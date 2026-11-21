@@ -454,6 +454,8 @@ export function PageHeader({
   const under = record ? [record.kind, record.number].filter(Boolean).join(" · ") : up?.label;
   // A top page on a phone: its strong button is the bottom bar's +, its name in the bar, its ⋯ beside it; with
   // nothing else to show, its header takes no room (the list starts under the bar).
+  // Only an add button docks as the +: a page whose strong button does something else (mark all read, approve
+  // chosen) passes it as `actions`, so it stays in the header.
   const docked = !up && titleInBar && !!primary && kind === "list";
   // (A list's List | Board is not on a phone: it folds into ⋯.)
   const bare = !up && titleInBar && !actions && (!views || kind === "list") && !badge && !children && (summary === undefined || typeof summary === "string");
@@ -715,11 +717,11 @@ export function PhoneRow({
   const inner = (
     <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5">
       <span className={cn("truncate text-sm font-semibold", muted && "text-text-2")}>{title}</span>
-      <span className={cn("text-right text-sm font-semibold whitespace-nowrap tabular", word)}>{hasFigure ? figure : status}</span>
+      <span className={cn("max-w-[45vw] truncate text-right text-sm font-semibold whitespace-nowrap tabular", word)}>{hasFigure ? figure : status}</span>
       {(line || (hasFigure && status)) && (
         <>
           <span className="truncate text-xs text-text-2">{line}</span>
-          <span className={cn("text-right text-xs whitespace-nowrap text-text-2", word)}>{hasFigure ? status : null}</span>
+          <span className={cn("max-w-[45vw] truncate text-right text-xs whitespace-nowrap text-text-2", word)}>{hasFigure ? status : null}</span>
         </>
       )}
     </span>

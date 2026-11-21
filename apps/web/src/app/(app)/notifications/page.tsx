@@ -50,7 +50,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
         kind="list"
         crumbs={[{ label: "Alerts" }]}
         title="Alerts"
-        primary={
+        actions={
           unread > 0 && (
             <ConfirmAction
               action={markAllReadAction}
@@ -140,9 +140,10 @@ export default async function NotificationsPage({ searchParams }: { searchParams
                     href={openHref(n)}
                     prefetch={false}
                     title={readableDates(n.title)}
-                    line={n.body ? readableDates(n.body) : timeAgo(n.createdAt)}
-                    status={<Badge tone={kind.tone}>{!n.readAt ? `New · ${kind.label}` : kind.label}</Badge>}
-                    figure={n.body ? timeAgo(n.createdAt) : undefined}
+                    line={n.body ? readableDates(n.body) : undefined}
+                    status={<Badge tone={kind.tone}>{kind.label}</Badge>}
+                    figure={timeAgo(n.createdAt)}
+                    muted={!!n.readAt}
                   />
                 );
               })}
