@@ -1,6 +1,2 @@
-import { FormPageSkeleton } from "@/components/common/skeletons";
-
-/** The new inquiry form on its way. */
-export default function Loading() {
-  return <FormPageSkeleton sections={1} fields={6} />;
-}
+// The page on its way, in its own shape (lib/page-shapes.ts).
+export { default } from "@/components/common/page-loading";

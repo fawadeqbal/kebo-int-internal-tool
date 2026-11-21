@@ -1,6 +1,2 @@
-import { BoardSkeleton } from "@/components/common/skeletons";
-
-/** Shipments on its way. */
-export default function Loading() {
-  return <BoardSkeleton columns={4} chips={2} />;
-}
+// The page on its way, in its own shape (lib/page-shapes.ts).
+export { default } from "@/components/common/page-loading";

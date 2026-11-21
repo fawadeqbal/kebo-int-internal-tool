@@ -89,7 +89,7 @@ export interface Fact {
 export function FactsLine({ facts, className }: { facts: Fact[]; className?: string }) {
   if (!facts.length) return null;
   return (
-    <dl aria-label="Facts" className={cn("flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>
+    <dl aria-label="Facts" data-part="facts" data-count={facts.length} className={cn("flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>
       {facts.map((f, i) => {
         return (
           <div key={i} className={cn("flex items-baseline gap-1.5 px-3.5 text-md whitespace-nowrap text-muted", i > 0 && "border-l border-line")}>
@@ -125,7 +125,11 @@ export function StatRow({ children, className, facts }: { children: ReactNode; c
       });
     return <FactsLine facts={list} className={className} />;
   }
-  return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]", className)}>{children}</div>;
+  return (
+    <div data-part="tiles" data-count={Children.toArray(children).filter(isValidElement).length} className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]", className)}>
+      {children}
+    </div>
+  );
 }
 
 /**

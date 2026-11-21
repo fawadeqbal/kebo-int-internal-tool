@@ -1,6 +1,2 @@
-import { ListPageSkeleton } from "@/components/common/skeletons";
-
-/** Cash & bank on its way. */
-export default function Loading() {
-  return <ListPageSkeleton tiles={4} chips={0} filter={false} buttons={2} cols={6} />;
-}
+// The page on its way, in its own shape (lib/page-shapes.ts).
+export { default } from "@/components/common/page-loading";

@@ -1,6 +1,2 @@
-import { ReportSkeleton } from "@/components/common/skeletons";
-
-/** Insights on its way. */
-export default function Loading() {
-  return <ReportSkeleton />;
-}
+// The page on its way, in its own shape (lib/page-shapes.ts).
+export { default } from "@/components/common/page-loading";

@@ -1,6 +1,2 @@
-import { TabSkeleton } from "@/components/common/skeletons";
-
-/** An order's tab on its way: only its boxes show their outline; the order's top, tabs and panel stay. */
-export default function Loading() {
-  return <TabSkeleton side={false} />;
-}
+// A record's tab on its way: its body only (the top and tabs stay). Shapes: lib/page-shapes.ts.
+export { TabLoading as default } from "@/components/common/page-loading";
