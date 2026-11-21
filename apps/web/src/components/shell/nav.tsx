@@ -421,7 +421,7 @@ function MenuContent({
           <h2 className="text-2xl font-bold tracking-tight text-text">Menu</h2>
         </div>
         <nav className="flex-1 scroll-y px-4 pb-8" aria-label="Main">
-          <Link href={HOME_HREF} className="mb-3 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3" aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
+          <Link href={HOME_HREF} className="mb-3 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3" aria-label={`${companyName}, ${PRODUCT_NAME}, home`}>
             <Logo companyName={companyName} logo={logo} size={40} />
             <span className="flex min-w-0 flex-1 flex-col leading-tight">
               <span className="truncate text-lead font-semibold text-text">{companyName}</span>{" "}
@@ -442,7 +442,8 @@ function MenuContent({
   return (
     <>
       <div className="flex h-16 shrink-0 items-center px-3">
-        <Link href={HOME_HREF} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-line px-2 py-1.5 hover:bg-surface-2" aria-label={`${PRODUCT_NAME}, ${companyName}, home`}>
+        {/* The company's name first, as it is shown (the name read out starts with what is seen: WCAG 2.5.3). */}
+        <Link href={HOME_HREF} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-line px-2 py-1.5 hover:bg-surface-2" aria-label={`${companyName}, ${PRODUCT_NAME}, home`}>
           <Logo companyName={companyName} logo={logo} size={32} />
           <span className="flex min-w-0 flex-col leading-tight">
             <span className="truncate text-md font-semibold text-text">{companyName}</span>{" "}

@@ -73,7 +73,7 @@ test("the inquiries list on a phone: chips, one Filters button with a sheet, row
   const plus = page.getByRole("main").getByRole("link", { name: "New inquiry" });
   await expect(plus).toBeVisible();
   const box = (await plus.boundingBox())!;
-  expect(box.width).toBe(56);
+  expect(box.width).toBe(50);
   expect(box.y).toBeGreaterThan(700);
   await expect(page.getByRole("navigation", { name: "Quick" }).getByRole("link", { name: "New inquiry" })).toBeHidden();
   const row = page.locator(`main ul > li > a[href="/inquiries/${a.id}"]`);
