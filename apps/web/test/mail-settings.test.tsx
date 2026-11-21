@@ -6,7 +6,7 @@ import type { MailSettingsView } from "@kebo/shared";
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/", useSearchParams: () => new URLSearchParams() }));
 
-const { MailCards } = await import("@/app/(app)/settings/mail/cards");
+const { MailCards } = await import("@/components/common/mail-cards");
 
 const none: MailSettingsView = { provider: null, fromName: "", fromEmail: "", host: "", port: null, username: "", hasSecret: false, serverDefault: false, enabled: false };
 const noop = async () => ({ ok: true });
@@ -55,5 +55,22 @@ describe("the email sending page", () => {
     show({ ...none, serverDefault: true, enabled: true });
     expect(screen.getByText("Not set: sent through the server's own email")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Send test" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("Platform settings › where its emails go", async () => {
+  const { InboxCard } = await import("@/components/platform/inbox-card");
+  const base = { provider: null, fromName: "", fromEmail: "", host: "", port: null, username: "", hasSecret: false, serverDefault: false, enabled: false } as const;
+
+  it("shows the addresses set here, one a line, and where they go now", () => {
+    render(<InboxCard view={{ ...base, inbox: ["ops@rfq.test", "boss@rfq.test"], inboxNow: ["ops@rfq.test", "boss@rfq.test"], inboxFrom: "here" }} action={async () => ({ ok: true })} />);
+    expect((document.getElementById("inbox-emails") as HTMLTextAreaElement).value).toBe("ops@rfq.test\nboss@rfq.test");
+    expect(screen.getByText("ops@rfq.test, boss@rfq.test")).toBeTruthy();
+  });
+
+  it("says when every platform admin gets them", () => {
+    render(<InboxCard view={{ ...base, inbox: [], inboxNow: ["a@rfq.test"], inboxFrom: "admins" }} action={async () => ({ ok: true })} />);
+    expect((document.getElementById("inbox-emails") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getByText("every platform admin (1)")).toBeTruthy();
   });
 });

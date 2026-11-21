@@ -2506,6 +2506,17 @@ model SiteContent {
   @@map("site_content")
 }
 
+/// The platform's own settings, set from Platform settings (not a company's: no company_id). "mail": its
+/// sending email (the secret sealed with the server's key); "inbox": where its emails go.
+model PlatformSetting {
+  key       String   @id @db.VarChar(40)
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String?  @map("updated_by") @db.VarChar(120)
+
+  @@map("platform_settings")
+}
+
 /// Marketing site visits per day and channel, counted without cookies.
 model SiteVisit {
   day      DateTime @db.Date

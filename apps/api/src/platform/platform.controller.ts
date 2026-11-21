@@ -34,7 +34,14 @@ import {
   PLATFORM_LOG_KINDS,
   platformLogKind,
   type PlatformLogKind,
+  mailSettingsInput,
+  mailTestInput,
+  platformInboxInput,
+  type MailSettingsInput,
+  type MailTestInput,
+  type PlatformInboxInput,
 } from "@kebo/shared";
+import { PlatformMail } from "./platform-mail";
 import { DomainError, NotFoundError } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
 import { CompaniesService } from "../common/company/companies.service";
@@ -353,6 +360,7 @@ export class PlatformController {
     private readonly prisma: PrismaService,
     private readonly site: SiteService,
     private readonly domains: OwnDomainService,
+    private readonly mail: PlatformMail,
   ) {}
 
   /* ---------------------------------------------------------------- the marketing site */
@@ -408,11 +416,47 @@ export class PlatformController {
     return { companies, newLeads, plans };
   }
 
+  /** Platform settings › Emails: the platform's own sending email (secret never sent back) and where its emails go. */
+  @PlatformRoute()
+  @Get("mail")
+  mailView() {
+    return this.mail.view();
+  }
+
+  @PlatformRoute()
+  @Put("mail")
+  saveMail(@CurrentAdmin() admin: PlatformAdminUser, @Body(Validate(mailSettingsInput)) body: MailSettingsInput) {
+    return this.mail.saveAccount(admin, body);
+  }
+
+  /** Back to the server's own email. */
+  @PlatformRoute()
+  @Delete("mail")
+  @HttpCode(200)
+  removeMail(@CurrentAdmin() admin: PlatformAdminUser) {
+    return this.mail.removeAccount(admin);
+  }
+
+  @PlatformRoute()
+  @Post("mail/test")
+  @HttpCode(200)
+  testMail(@Body(Validate(mailTestInput)) body: MailTestInput) {
+    return this.mail.test(body.to);
+  }
+
+  /** { emails: [] }: where the platform's emails go; empty, back to PLATFORM_EMAIL, else every platform admin. */
+  @PlatformRoute()
+  @Put("mail/inbox")
+  saveInbox(@CurrentAdmin() admin: PlatformAdminUser, @Body(Validate(platformInboxInput)) body: PlatformInboxInput) {
+    return this.mail.saveInbox(admin, body.emails);
+  }
+
   /** How the platform is set up (Platform settings): the server's settings (read-only), the platform admins, the server's warnings. */
   @PlatformRoute()
   @Get("settings")
-  settings() {
-    return this.companies.settings(this.leads.signUpOpen);
+  async settings() {
+    // Email is on when the platform's own email (Platform settings › Emails) or the server's is set.
+    return { ...(await this.companies.settings(this.leads.signUpOpen)), emailOn: this.mail.enabled };
   }
 
   /**

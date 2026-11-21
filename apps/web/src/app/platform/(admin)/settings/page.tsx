@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
-import { LIFECYCLE, marketingOrigin } from "@kebo/shared";
+import { LIFECYCLE, marketingOrigin, type PlatformMailView } from "@kebo/shared";
 import { buttonClass, Card, CardBody, CardHeader, EmptyState, PageHeader, SectionList, StatusBadge, Table, Td, Th, THead, Tr, Notice, Stack } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { requirePlatformAdmin } from "@/lib/platform";
@@ -12,6 +12,10 @@ import { SiteEditor } from "../website/editor";
 import { PublishButtons } from "../website/publish";
 import type { SiteEditorView, SiteNumbers } from "../website/types";
 import { PasswordEdit } from "../account/form";
+import { MailCards } from "@/components/common/mail-cards";
+import { InboxCard } from "@/components/platform/inbox-card";
+import { MoreMenu } from "@/components/common/more-menu";
+import { removePlatformMailAction, savePlatformInboxAction, savePlatformMailAction, testPlatformMailAction } from "./actions";
 
 export const metadata = { title: "Settings" };
 
@@ -40,6 +44,7 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
   const sp = await searchParams;
   const section: Section = SECTIONS.find((s) => s.key === sp.section)?.key ?? "website";
   const [me, s] = await Promise.all([requirePlatformAdmin(), platformApi.get<PlatformSettings>("/settings")]);
+  const mail = section === "emails" ? await platformApi.get<PlatformMailView>("/mail") : null;
   const [site, numbers] =
     section === "website"
       ? await Promise.all([platformApi.get<SiteEditorView>("/site"), platformApi.get<SiteNumbers>("/site/numbers").catch(() => null)])
@@ -54,6 +59,26 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
     <Stack>
       <PageHeader
         title="Platform settings"
+        // Back to the server's email: last in ⋯, in red, with a confirm (as a company's Email sending).
+        more={
+          mail?.provider ? (
+            <MoreMenu
+              label="More for the platform's email"
+              items={[
+                {
+                  label: "Remove the platform's own email",
+                  danger: true,
+                  confirm: {
+                    title: "Remove the platform's own email?",
+                    body: mail.serverDefault ? "Its emails will go through the server's settings (.env) again." : "No platform email will be sent until one is set again.",
+                    confirmLabel: "Remove",
+                  },
+                  action: removePlatformMailAction,
+                },
+              ]}
+            />
+          ) : undefined
+        }
       />
       <SectionList
         label="Settings sections"
@@ -143,34 +168,10 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
           </>
         )}
 
-        {section === "emails" && (
+        {section === "emails" && mail && (
           <>
-            <GroupCard
-              id="email"
-              title="Sending email"
-              description="set-password links, demo and renewal emails, warnings"
-              note={`${SERVER}SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM. Without it, links are shown to you to send yourself.`}
-              items={[{ label: "Email", value: onOff(s.emailOn) }]}
-            />
-            <GroupCard
-              id="platform-email"
-              title="Where platform emails go"
-              description="new client inquiries, sign-ups, demos ending, server warnings"
-              note={`${SERVER}PLATFORM_EMAIL (comma-separated). Empty: every platform admin.`}
-              items={[
-                {
-                  label: "Sent to",
-                  value:
-                    s.platformEmail?.join(", ") ??
-                    `every platform admin (${s.admins
-                      .filter((a) => a.active)
-                      .map((a) => a.email)
-                      .join(", ")})`,
-                  wide: true,
-                },
-              ]}
-              columns={2}
-            />
+            <MailCards view={mail} me={me.email} saveAction={savePlatformMailAction} testAction={testPlatformMailAction} />
+            <InboxCard view={mail} action={savePlatformInboxAction} />
           </>
         )}
 
