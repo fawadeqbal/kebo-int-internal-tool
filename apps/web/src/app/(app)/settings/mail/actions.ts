@@ -3,20 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { attempt, formValues, type ActionState } from "@/lib/actions";
+import { mailBody } from "@/lib/mail-form";
 
 const PAGE = "/settings/mail";
 
 /** Admin settings › Email sending: save how the company's email goes out. A password or key left empty keeps the stored one. */
 export async function saveMailAction(_prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const body = {
-    provider: v.provider,
-    fromName: v.fromName ?? "",
-    fromEmail: v.fromEmail ?? "",
-    ...(v.provider === "smtp" ? { host: v.host ?? "", port: v.port ?? "" } : {}),
-    ...(v.provider !== "resend" && v.username?.trim() ? { username: v.username } : {}),
-    ...(v.secret ? { secret: v.secret } : {}),
-  };
+  const body = mailBody(form);
   const r = await attempt(form, () => api.put("/mail-settings", body), "Saved. Send a test email to check it.");
   // The password or key is never put back in the form.
   if (r.values) delete r.values.secret;

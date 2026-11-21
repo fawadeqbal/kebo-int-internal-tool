@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { requirePermission } from "@/lib/session";
 import { removeMailAction, saveMailAction, testMailAction } from "./actions";
-import { MailCards } from "./cards";
+import { MailCards } from "@/components/common/mail-cards";
 import { MoreMenu } from "@/components/common/more-menu";
 
 export const metadata = { title: "Email sending · Admin settings" };

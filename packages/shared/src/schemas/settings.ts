@@ -222,6 +222,24 @@ export interface MailSettingsView {
   enabled: boolean;
 }
 
+/** Platform settings › Emails: where the platform's own emails go (new client inquiries, sign-ups, server warnings). Empty: every platform admin. */
+export const platformInboxInput = z.object({
+  emails: z
+    .array(z.string().trim().toLowerCase().email("Type email addresses, like you@example.com").max(200))
+    .max(10, "At most 10 addresses")
+    .transform((list) => [...new Set(list)]),
+});
+export type PlatformInboxInput = z.infer<typeof platformInboxInput>;
+
+/** Platform settings › Emails: the platform's own sending email (like a company's) and where its emails go. */
+export interface PlatformMailView extends MailSettingsView {
+  /** Set here; empty: the server's PLATFORM_EMAIL, else every platform admin. */
+  inbox: string[];
+  /** Where they go now, whichever way. */
+  inboxNow: string[];
+  inboxFrom: "here" | "server" | "admins";
+}
+
 export const SETTINGS = {
   company: companySettings,
   sales: salesSettings,

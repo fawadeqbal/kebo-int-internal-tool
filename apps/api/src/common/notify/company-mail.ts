@@ -14,8 +14,8 @@ import { getMailer, renderEmail, resendMailer, smtpMailer, type Mailer } from ".
 /** The settings row that holds a company's own outgoing email. Not one of the settings the app hands out (GET /settings). */
 const KEY = "mail";
 
-/** As stored: the secret (Gmail app password, SMTP password, Resend API key) sealed with the server's key. */
-interface Stored {
+/** As stored (a company's, or the platform's own): the secret (Gmail app password, SMTP password, Resend API key) sealed with the server's key. */
+export interface Stored {
   provider: MailProvider;
   fromName: string;
   fromEmail: string;
@@ -25,7 +25,7 @@ interface Stored {
   secret: string;
 }
 
-const isStored = (v: unknown): v is Stored =>
+export const isStored = (v: unknown): v is Stored =>
   !!v && typeof v === "object" && ["gmail", "smtp", "resend"].includes((v as Stored).provider) && typeof (v as Stored).secret === "string" && typeof (v as Stored).fromEmail === "string";
 
 /** "Kebo International <sales@kebo.example>": the name without anything that could break the header. */
@@ -56,6 +56,78 @@ export function oneAccount(value: unknown): Stored | null {
   return isStored(found) ? found : null;
 }
 
+/** The mailer for one stored account. */
+export function mailerFor(s: Stored, key: string): Mailer {
+  const from = fromHeader(s.fromName, s.fromEmail);
+  const secret = openSecret(s.secret, key);
+  if (s.provider === "resend") return resendMailer({ apiKey: secret, from });
+  if (s.provider === "gmail") return smtpMailer({ host: "smtp.gmail.com", port: 465, user: s.username || s.fromEmail, password: secret, from });
+  return smtpMailer({ host: s.host!, port: s.port ?? 587, user: s.username || null, password: secret, from });
+}
+
+/** A mail server is somewhere on the internet: never this machine or its network. */
+export async function checkMailHost(host: string) {
+  if (process.env.NODE_ENV === "test" && host.endsWith(".test")) return;
+  const found = isIP(host) ? [{ address: host }] : await lookup(host, { all: true }).catch(() => []);
+  if (!found.length) throw new DomainError(`The mail server "${host}" was not found. Check its name.`);
+  if (found.some((a) => isPrivateAddress(a.address))) throw new DomainError(`"${host}" is not a mail server on the internet.`);
+}
+
+/**
+ * The account as it will be stored: the typed secret sealed (the spaces of an app password dropped), or the
+ * stored one kept, but only for the same account: another provider, server or user needs its own.
+ */
+export async function accountToStore(input: MailSettingsInput, before: Stored | null, key: string): Promise<{ value: Stored; typed: boolean }> {
+  const typed = input.secret?.replace(input.provider === "gmail" ? /\s+/g : /^\s+|\s+$/g, "") ?? "";
+  const same =
+    !!before &&
+    before.provider === input.provider &&
+    (input.provider === "resend" || ((before.host ?? "") === (input.host ?? "") && (before.username ?? "") === (input.username ?? "") && (input.provider !== "gmail" || before.fromEmail === input.fromEmail)));
+  if (!typed && !same) throw new DomainError(`Type the ${input.provider === "resend" ? "API key" : input.provider === "gmail" ? "app password" : "password"}.`);
+  if (input.provider === "smtp") await checkMailHost(input.host!);
+  return {
+    typed: !!typed,
+    value: {
+      provider: input.provider,
+      fromName: input.fromName,
+      fromEmail: input.fromEmail,
+      host: input.provider === "smtp" ? input.host! : null,
+      port: input.provider === "smtp" ? input.port! : null,
+      username: input.provider === "resend" ? null : input.username?.trim() || null,
+      secret: typed ? sealSecret(typed, key) : before!.secret,
+    },
+  };
+}
+
+/** What the settings page is given: everything but the secret. */
+export function mailView(s: Stored | null, serverDefault: boolean): MailSettingsView {
+  return {
+    provider: s?.provider ?? null,
+    fromName: s?.fromName ?? "",
+    fromEmail: s?.fromEmail ?? "",
+    host: s?.host ?? "",
+    port: s?.port ?? null,
+    username: s?.username ?? "",
+    hasSecret: !!s,
+    serverDefault,
+    enabled: !!s || serverDefault,
+  };
+}
+
+/** One test email through a mailer, with why it failed in words. */
+export async function sendTestEmail(mailer: Mailer, s: Stored | null, to: string, footer: string): Promise<{ ok: true; via: string }> {
+  if (!mailer.enabled) throw new DomainError("Email is not set up yet: choose how to send it and save first.");
+  if (s?.provider === "smtp") await checkMailHost(s.host!);
+  const via = s ? MAIL_PROVIDER_LABEL[s.provider] : "the server's own email";
+  const { html, text } = renderEmail({ heading: "Email works", body: `This is a test from RFQ Desk, sent through ${via}.`, footer });
+  try {
+    await mailer.send({ to, subject: "Test email from RFQ Desk", html, text });
+  } catch (e) {
+    throw new DomainError(`The test was not sent: ${String((e as Error).message ?? e).replace(/\s+/g, " ").slice(0, 300)}`);
+  }
+  return { ok: true, via };
+}
+
 /**
  * A company's own outgoing email (Admin settings › Email sending): its Gmail account, any SMTP server, or
  * Resend. Everything the company's work sends (quotations, reminders, the two-step note) goes through it;
@@ -78,19 +150,11 @@ export class CompanyMail {
     return row ? oneAccount(row.value) : null;
   }
 
-  private mailerOf(s: Stored): Mailer {
-    const from = fromHeader(s.fromName, s.fromEmail);
-    const secret = openSecret(s.secret, this.env.AUTH_SECRET);
-    if (s.provider === "resend") return resendMailer({ apiKey: secret, from });
-    if (s.provider === "gmail") return smtpMailer({ host: "smtp.gmail.com", port: 465, user: s.username || s.fromEmail, password: secret, from });
-    return smtpMailer({ host: s.host!, port: s.port ?? 587, user: s.username || null, password: secret, from });
-  }
-
   /** The mailer for the company of this request: its own, else the server's (which may be off). */
   async mailer(): Promise<Mailer> {
     try {
       const s = await this.stored();
-      if (s) return this.mailerOf(s);
+      if (s) return mailerFor(s, this.env.AUTH_SECRET);
     } catch {
       // A setting that cannot be read (the server's key changed) falls back to the server's own email.
     }
@@ -99,49 +163,13 @@ export class CompanyMail {
 
   async view(user: SessionUser): Promise<MailSettingsView> {
     this.assertCan(user);
-    const s = await this.stored();
-    const serverDefault = getMailer().enabled;
-    return {
-      provider: s?.provider ?? null,
-      fromName: s?.fromName ?? "",
-      fromEmail: s?.fromEmail ?? "",
-      host: s?.host ?? "",
-      port: s?.port ?? null,
-      username: s?.username ?? "",
-      hasSecret: !!s,
-      serverDefault,
-      enabled: !!s || serverDefault,
-    };
-  }
-
-  /** A company's mail server is somewhere on the internet: never this machine or its network. */
-  private async checkHost(host: string) {
-    if (process.env.NODE_ENV === "test" && host.endsWith(".test")) return;
-    const found = isIP(host) ? [{ address: host }] : await lookup(host, { all: true }).catch(() => []);
-    if (!found.length) throw new DomainError(`The mail server "${host}" was not found. Check its name.`);
-    if (found.some((a) => isPrivateAddress(a.address))) throw new DomainError(`"${host}" is not a mail server on the internet.`);
+    return mailView(await this.stored(), getMailer().enabled);
   }
 
   async save(user: SessionUser, input: MailSettingsInput): Promise<MailSettingsView> {
     this.assertCan(user);
     const before = await this.stored();
-    const typed = input.secret?.replace(input.provider === "gmail" ? /\s+/g : /^\s+|\s+$/g, "") ?? "";
-    // The stored secret is kept only for the same account: another provider, server or user needs its own.
-    const same =
-      !!before &&
-      before.provider === input.provider &&
-      (input.provider === "resend" || ((before.host ?? "") === (input.host ?? "") && (before.username ?? "") === (input.username ?? "") && (input.provider !== "gmail" || before.fromEmail === input.fromEmail)));
-    if (!typed && !same) throw new DomainError(`Type the ${input.provider === "resend" ? "API key" : input.provider === "gmail" ? "app password" : "password"}.`);
-    if (input.provider === "smtp") await this.checkHost(input.host!);
-    const value: Stored = {
-      provider: input.provider,
-      fromName: input.fromName,
-      fromEmail: input.fromEmail,
-      host: input.provider === "smtp" ? input.host! : null,
-      port: input.provider === "smtp" ? input.port! : null,
-      username: input.provider === "resend" ? null : input.username?.trim() || null,
-      secret: typed ? sealSecret(typed, this.env.AUTH_SECRET) : before!.secret,
-    };
+    const { value, typed } = await accountToStore(input, before, this.env.AUTH_SECRET);
     await this.prisma.tx(async (tx) => {
       await tx.setting.upsert({
         where: { companyId_key: { companyId: user.companyId, key: KEY } },
@@ -173,16 +201,6 @@ export class CompanyMail {
   async test(user: SessionUser, to: string): Promise<{ ok: true; via: string }> {
     this.assertCan(user);
     const s = await this.stored();
-    const mailer = await this.mailer();
-    if (!mailer.enabled) throw new DomainError("Email is not set up yet: choose how to send it and save first.");
-    if (s?.provider === "smtp") await this.checkHost(s.host!);
-    const via = s ? MAIL_PROVIDER_LABEL[s.provider] : "the server's own email";
-    const { html, text } = renderEmail({ heading: "Email works", body: `This is a test from RFQ Desk, sent through ${via}.`, footer: "Sent from Admin settings › Email sending." });
-    try {
-      await mailer.send({ to, subject: "Test email from RFQ Desk", html, text });
-    } catch (e) {
-      throw new DomainError(`The test was not sent: ${String((e as Error).message ?? e).replace(/\s+/g, " ").slice(0, 300)}`);
-    }
-    return { ok: true, via };
+    return sendTestEmail(await this.mailer(), s, to, "Sent from Admin settings › Email sending.");
   }
 }
