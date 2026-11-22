@@ -49,7 +49,14 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const q = { kind: "company" };
   const text = sp.q?.trim() || undefined;
   const [list, unsearched, before, year, repeating, people, settings] = await Promise.all([
-    api.get<ExpenseList>("/expenses", { ...q, ...span(month), category, q: text, page: String(toPage(sp.page)), pageSize: String(toPageSize(sp.size)) }),
+    api.get<ExpenseList>("/expenses", {
+      ...q,
+      ...span(month),
+      category,
+      q: text,
+      page: String(toPage(sp.page)),
+      pageSize: String(toPageSize(sp.size)),
+    }),
     // The figures over the list are the month's, whatever is searched.
     text ? api.get<ExpenseList>("/expenses", { ...q, ...span(month), pageSize: "1" }) : null,
     api.get<ExpenseList>("/expenses", { ...q, ...span(prev), pageSize: "1" }),
@@ -83,10 +90,26 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         primary={<AddCost setup={setup} label="Add company cost" variant="strong" size="md" />}
       />
       <StatRow facts>
-        <StatTile label={month === thisMonth ? "This month" : monthName} value={whole(monthTotal, c)} sub={`${monthCount} cost${monthCount === 1 ? "" : "s"}`} />
-        <StatTile label={month === thisMonth ? "Last month" : "The month before"} value={whole(before.total, c)} sub={change === null ? "—" : `${change > 0 ? "+" : ""}${change}% since`} />
+        <StatTile
+          label={month === thisMonth ? "This month" : monthName}
+          value={whole(monthTotal, c)}
+          sub={`${monthCount} cost${monthCount === 1 ? "" : "s"}`}
+        />
+        <StatTile
+          label={month === thisMonth ? "Last month" : "The month before"}
+          value={whole(before.total, c)}
+          sub={change === null ? "—" : `${change > 0 ? "+" : ""}${change}% since`}
+        />
         <StatTile label={`In ${month.slice(0, 4)}`} value={whole(year.total, c)} sub={`${year.count} cost${year.count === 1 ? "" : "s"}`} />
-        <StatTile label="Biggest kind" value={biggest ? companyKind(biggest.category) : "—"} sub={biggest && monthTotal > 0 ? `${whole(biggest.total, c)} · ${Math.round((Number(biggest.total) / monthTotal) * 100)}%` : "nothing yet"} />
+        <StatTile
+          label="Biggest kind"
+          value={biggest ? companyKind(biggest.category) : "—"}
+          sub={
+            biggest && monthTotal > 0
+              ? `${whole(biggest.total, c)} · ${Math.round((Number(biggest.total) / monthTotal) * 100)}%`
+              : "nothing yet"
+          }
+        />
       </StatRow>
 
       {month === thisMonth && repeating.waiting.length > 0 && (
@@ -106,7 +129,12 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
           label="Which kind"
           tabs={[
             { href: href({ kind: undefined }), label: "All", count: foundCount, active: !category },
-            ...list.byCategory.map((k) => ({ href: href({ kind: k.category }), label: companyKind(k.category), count: k.count, active: category === k.category })),
+            ...list.byCategory.map((k) => ({
+              href: href({ kind: k.category }),
+              label: companyKind(k.category),
+              count: k.count,
+              active: category === k.category,
+            })),
           ]}
         />
       </div>
@@ -132,9 +160,17 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
       <Card data-part="table" className="overflow-hidden">
         {list.rows.length === 0 ? (
           text ? (
-            <EmptyState framed title="No cost matches" description={`Nothing in ${monthName} matches “${text}”. Try other words, or clear the search.`} />
+            <EmptyState
+              framed
+              title="No cost matches"
+              description={`Nothing in ${monthName} matches “${text}”. Try other words, or clear the search.`}
+            />
           ) : (
-            <EmptyState framed title={`No expenses in ${monthName}`} description="Add the rent, the salaries and the office's bills here. A cost of one order is added on that order." />
+            <EmptyState
+              framed
+              title={`No expenses in ${monthName}`}
+              description="Add the rent, the salaries and the office's bills here. A cost of one order is added on that order."
+            />
           )
         ) : (
           <>

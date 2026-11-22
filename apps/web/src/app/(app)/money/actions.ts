@@ -11,10 +11,13 @@ import { money } from "@/lib/format";
 
 /** "Sea / air freight · USD 1,350.00": a cost as a note says it. */
 const costWords = (category: string | undefined, amount: string | undefined, currency: string | undefined) =>
-  [EXPENSE_CATEGORY_LABEL[category as keyof typeof EXPENSE_CATEGORY_LABEL], amount && currency ? money(amount, currency) : null].filter(Boolean).join(" · ");
+  [EXPENSE_CATEGORY_LABEL[category as keyof typeof EXPENSE_CATEGORY_LABEL], amount && currency ? money(amount, currency) : null]
+    .filter(Boolean)
+    .join(" · ");
 /** What a cost is on, from the saved cost: its order, inquiry or customer. */
 const costOn = (saved: unknown) => {
-  const s = saved as { order?: { refNo?: string } | null; deal?: { refNo?: string } | null; customer?: { name?: string } | null } | undefined;
+  const s = saved as
+    { order?: { refNo?: string } | null; deal?: { refNo?: string } | null; customer?: { name?: string } | null } | undefined;
   return s?.order?.refNo ?? s?.deal?.refNo ?? s?.customer?.name ?? null;
 };
 
@@ -40,7 +43,11 @@ export async function savePlanAction(orderId: string, _prev: ActionState, form: 
  * Sent again, the API asks why (the form shows "Why?" and sends again with the reason): R2, the first stays.
  */
 export async function sendRequestAction(orderId: string, ref: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.post(`/orders/${orderId}/requests/send`, { ref, reason: reasonOf(form) }), "Payment request sent.");
+  const r = await attempt(
+    form,
+    () => api.post(`/orders/${orderId}/requests/send`, { ref, reason: reasonOf(form) }),
+    "Payment request sent.",
+  );
   if (!r.ok) return r;
   refresh(orderId);
   const d = r.data as { number?: string; amount?: string; currency?: string } | undefined;
@@ -123,12 +130,33 @@ export async function factoryPaymentAction(
   if (!r.ok) return r;
   refresh(orderId);
   // Named: how much to which factory, and what is still to pay it.
-  const d = r.data as { createdId?: string; factories?: { payments?: { id: string; factory?: { name?: string }; after?: { toPay?: string } | null; currency?: string }[] } | null } | undefined;
+  const d = r.data as
+    | {
+        createdId?: string;
+        factories?: {
+          payments?: { id: string; factory?: { name?: string }; after?: { toPay?: string } | null; currency?: string }[];
+        } | null;
+      }
+    | undefined;
   const p = d?.factories?.payments?.find((x) => x.id === (paymentId ?? d.createdId));
   const name = p?.factory?.name;
-  const left = p?.after?.toPay && p.currency ? (Number(p.after.toPay) > 0 ? `${money(p.after.toPay, p.currency)} still to pay` : "nothing more to pay") : null;
-  if (paymentId) return { ...r, message: name ? `Payment to ${name} changed` : r.message, detail: ["your reason is kept in History", left].filter(Boolean).join(" · ") };
-  return { ...r, message: `${money(body.amount, body.currency)} paid${name ? ` to ${name}` : " to the supplier"}`, detail: left ?? undefined };
+  const left =
+    p?.after?.toPay && p.currency
+      ? Number(p.after.toPay) > 0
+        ? `${money(p.after.toPay, p.currency)} still to pay`
+        : "nothing more to pay"
+      : null;
+  if (paymentId)
+    return {
+      ...r,
+      message: name ? `Payment to ${name} changed` : r.message,
+      detail: ["your reason is kept in History", left].filter(Boolean).join(" · "),
+    };
+  return {
+    ...r,
+    message: `${money(body.amount, body.currency)} paid${name ? ` to ${name}` : " to the supplier"}`,
+    detail: left ?? undefined,
+  };
 }
 
 export async function voidFactoryPaymentAction(
@@ -236,7 +264,11 @@ export async function repayAction(orderId: string | null, expenseIds: string[], 
   const body = { repaidOn: v.repaidOn, accountId: v.accountId || null };
   let r: ActionState = { ok: true };
   for (const id of expenseIds) {
-    r = await attempt(form, () => api.post(`/expenses/${id}/repay`, body, { once: onceOf(form, id) }), expenseIds.length > 1 ? `${expenseIds.length} expenses repaid.` : "Repaid.");
+    r = await attempt(
+      form,
+      () => api.post(`/expenses/${id}/repay`, body, { once: onceOf(form, id) }),
+      expenseIds.length > 1 ? `${expenseIds.length} expenses repaid.` : "Repaid.",
+    );
     if (!r.ok) break;
   }
   refresh(orderId);
@@ -279,7 +311,11 @@ export async function saveAccountAction(id: string | null, _prev: ActionState, f
     // Asked when Settings has no rate for the currency (code "rate_needed"): kept there.
     rate: v.rate?.trim() || null,
   };
-  const r = await attempt(form, () => (id ? api.patch(`/money/accounts/${id}`, body) : api.post("/money/accounts", body)), id ? "Account saved." : "Account added.");
+  const r = await attempt(
+    form,
+    () => (id ? api.patch(`/money/accounts/${id}`, body) : api.post("/money/accounts", body)),
+    id ? "Account saved." : "Account added.",
+  );
   if (r.ok) revalidatePath("/", "layout");
   return r;
 }
@@ -303,7 +339,11 @@ export async function submitCostAction(_prev: ActionState, form: FormData): Prom
     paidById: own ? v.paidById || null : null,
     accountId: own ? null : v.accountId || null,
   };
-  const r = await attempt(form, () => api.post("/submissions", { kind: "expense", orderId, body }, { once: onceOf(form) }), "Sent to a manager to verify.");
+  const r = await attempt(
+    form,
+    () => api.post("/submissions", { kind: "expense", orderId, body }, { once: onceOf(form) }),
+    "Sent to a manager to verify.",
+  );
   if (!r.ok) return r;
   revalidatePath("/", "layout");
   // Waiting for someone: blue, and what it will count for once verified.
@@ -314,7 +354,11 @@ export async function submitCostAction(_prev: ActionState, form: FormData): Prom
  * An account added from inside a money window (name and kind; it starts empty, today): the window chooses it
  * at once, so the answer carries its id. Its opening balance and note are changed on Cash & bank.
  */
-export async function quickAccountAction(name: string, kind: string, currency: string): Promise<{ ok: boolean; message?: string; id?: string }> {
+export async function quickAccountAction(
+  name: string,
+  kind: string,
+  currency: string,
+): Promise<{ ok: boolean; message?: string; id?: string }> {
   const body = { name: name.trim(), kind, currency, openingBalance: "0", openingOn: todayIn(await companyZone()), note: null };
   const r = await attempt(null, () => api.post<{ id: string }>("/money/accounts", body), "Account added.");
   if (r.ok) revalidatePath("/", "layout");
@@ -345,7 +389,11 @@ export async function voidTransferAction(id: string, _prev: ActionState, form: F
 }
 
 /** Put an amount recorded without an account on one. */
-export async function setEntryAccountAction(kind: "in" | "factory" | "expense", id: string, accountId: string | null): Promise<ActionState> {
+export async function setEntryAccountAction(
+  kind: "in" | "factory" | "expense",
+  id: string,
+  accountId: string | null,
+): Promise<ActionState> {
   const r = await attempt(null, () => api.put(`/money/entries/${kind}/${id}/account`, { accountId }), "Saved.");
   if (r.ok) revalidatePath("/", "layout");
   return r;
@@ -355,7 +403,12 @@ export async function setEntryAccountAction(kind: "in" | "factory" | "expense", 
  * A month's row of targets: the company's and each person's (fields `company`
  * and `p:<userId>`). Only the fields that changed are sent; empty removes one.
  */
-export async function saveTargetRowAction(month: string, before: Record<string, string>, _prev: ActionState, form: FormData): Promise<ActionState> {
+export async function saveTargetRowAction(
+  month: string,
+  before: Record<string, string>,
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
   const v = formValues(form);
   const clean = (x: string | undefined) => (x ?? "").replace(/[,\s]/g, "");
   const changed = Object.keys(v).filter((k) => (k === "company" || k.startsWith("p:")) && clean(v[k]) !== clean(before[k]));

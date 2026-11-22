@@ -15,7 +15,7 @@ import { SendCost as SendCostButton } from "@/components/money/cost-window";
 import { WaitingToVerify } from "@/components/money/waiting-money";
 import { CustomersOwe, InquiriesNow, MonthFigures, NeedsYou, NextWeeks, OrdersNow, SoldByMonth, StandsOut, ThinProfit } from "@/components/home/board";
 
-export const metadata = { title: "Home" };
+export const metadata = { title: "Dashboard" };
 
 interface DealLine {
   id: string;
@@ -51,8 +51,8 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* Who, when, how much waits; the three things people start from here. */}
-      {/* data-page-label: Back from a page opened here says "Back to Home". */}
-      <header data-page-label="Home" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      {/* data-page-label: Back from a page opened here says "Back to Dashboard". */}
+      <header data-page-label="Dashboard" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="text-xl leading-7 font-bold text-text">
             {hello}, {me.name.split(" ")[0]}

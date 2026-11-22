@@ -193,11 +193,11 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             title="To pay in the next 7 days"
             how={how.toPaySoon}
             total={totals(d.pay.totals.map(([currency, amount]) => ({ currency, amount })))}
-            all={{ href: "/money/due?side=suppliers", label: `All ${d.pay.count}` }}
+            all={{ href: "/money/payables", label: `All ${d.pay.count}` }}
             empty="Nothing to pay this week."
             rows={d.pay.rows.map((r) => ({
               key: r.key,
-              href: "/money/due?side=suppliers",
+              href: "/money/payables",
               name: r.name,
               sub: `${r.what} · ${r.late > 0 ? `${plural(r.late, "day")} late` : r.dueOn ? date(r.dueOn) : "no date"}`,
               value: whole(r.amount, r.currency),

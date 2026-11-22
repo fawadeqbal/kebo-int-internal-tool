@@ -57,6 +57,7 @@ export const PAGE_SHAPES: Record<string, string> = {
   "/payments/requests/[order]": "record-top · record-body:panel",
 
   "/money/due": "header · facts:4 · tabs:3 · filter:1 · table · ~pager",
+  "/money/payables": "header · facts:3 · tabs:6 · filter:0 · table · ~pager",
   "/money/company-costs": "header · facts:4 · tabs:9 · filter:0 · table",
   "/finance/cash-book": "header · facts:4 · table",
   "/finance/ledger": "header · tabs:7 · filter:3 · table · ~pager",

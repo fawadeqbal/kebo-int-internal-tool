@@ -32,13 +32,15 @@ export function moneyTarget(q: Query, first?: { cashBook: boolean; expenses: boo
 
 /** Where what customers owe and what we owe is now: one page, two sides. */
 export const DUE = "/money/due";
+/** What we owe: its own page since 22 Nov 2026 (it was the supplier side of DUE). */
+export const PAYABLES = "/money/payables";
 
 /**
  * The pages that became "Receivables & payables": Invoices, To receive (customers), the two To pay lists
  * (suppliers). A search typed there is kept; their own views (?view=, ?age=, ?cur=) are gone.
  */
 export function dueTarget(side: "customers" | "suppliers", q: Query = {}): string {
-  return buildHref(DUE, {}, { side: side === "suppliers" ? "suppliers" : undefined, q: q.q });
+  return buildHref(side === "suppliers" ? PAYABLES : DUE, {}, { q: q.q });
 }
 
 /** Payments' old tabs: Payment requests and To pay are sides of "Receivables & payables"; the rest is Payments itself. */

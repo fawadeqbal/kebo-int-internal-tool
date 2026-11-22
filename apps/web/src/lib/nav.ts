@@ -63,10 +63,11 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     key: "money",
     title: "Finance",
     icon: "money",
-    // Four pages (Finance, 22 Nov 2026: the words an accounts team uses). Payment requests, Invoices, To receive
-    // and the two To pay lists are one page; To verify and the Ledger keep their addresses and left the menu.
+    // Four pages (Finance, 22 Nov 2026: the words an accounts team uses). Receivables and Payables
+    // (22 Nov 2026: two pages, they were two sides of one); To verify and the Ledger keep their addresses and left the menu.
     pages: [
-      { href: "/money/due", label: "Receivables & payables" },
+      { href: "/money/due", label: "Receivables" },
+      { href: "/money/payables", label: "Payables" },
       { href: "/payments", label: "Payments" },
       { href: "/finance/cash-book", label: "Cash & bank" },
       { href: "/money/company-costs", label: "Expenses" },
@@ -219,6 +220,7 @@ export function buildModules({
     // The company's own web address and its website form's key are the admin's (managers run the rest of Company settings).
     "/settings/website-form": settings && security,
     "/suppliers": sourcing,
+    "/money/payables": sourcing,
     "/operations/purchase-orders": sourcing,
     "/money/company-costs": sourcing && managers && feature("expenses"),
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
