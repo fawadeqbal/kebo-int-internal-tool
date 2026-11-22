@@ -113,9 +113,13 @@ export function RecordShell({ top, panel, panelLabel, folds, children }: { top: 
   return (
     <div data-record-frame="" className="relative" style={{ "--record-top": `${SHELL + height}px`, overflowAnchor: "none" } as CSSProperties}>
       <span ref={mark} aria-hidden className="pointer-events-none absolute top-0 left-0 h-px w-px" style={{ top: FOLD_AT }} />
-      <div ref={box} data-record-top="" data-stuck={stuck ? "" : undefined} className={cn(RULES.page.stack, "sticky top-0 z-20 -mx-4 bg-bg px-4 sm:-mx-6 sm:px-6 xl:-mx-8 xl:px-8 md:top-14")} style={{ marginBottom: keep }}>
+      <div ref={box} data-record-top="" data-stuck={stuck ? "" : undefined} className={cn(RULES.page.stack, "sticky top-0 z-20 -mx-4 bg-bg px-4 sm:-mx-6 sm:px-6 xl:-mx-8 xl:px-8 md:top-14")}>
         {top}
       </div>
+      {/* The room the folded top gave up, as a block of its own: as a margin it ran into the body's top margin and
+          16px went missing, so a page that just scrolled far enough to fold got shorter, unfolded, grew and folded
+          again, many times a second (the flicker, 22 Nov 2026). */}
+      <div aria-hidden data-record-keep="" style={{ height: keep }} />
       <RecordBody panel={panel} panelLabel={panelLabel} folds={folds} className="mt-4">
         {children}
       </RecordBody>
