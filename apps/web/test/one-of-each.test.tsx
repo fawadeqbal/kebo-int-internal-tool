@@ -373,7 +373,7 @@ describe("one of each", () => {
     // Lists whose rows come whole on purpose, each one bounded: a record's own rows with totals over all of them,
     // the team, money still open, and the platform's own tables and reports (counted, not stored rows).
     const WHOLE = [
-      "app/(app)/money/due/page.tsx",
+      "app/(app)/money/due/lists.tsx",
       "app/(app)/customers/[id]/orders/page.tsx",
       "app/(app)/suppliers/[id]/offers/page.tsx",
       "app/(app)/users/(list)/page.tsx",

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { ArrowLeftRight, Banknote, Building, CalendarClock, ChartLine, ClipboardCheck, Contact, CreditCard, Factory, FileStack, FileText, Filter, Globe, History, KeyRound, LockKeyhole, Mail, MonitorSmartphone, Package, Receipt, ScrollText, Send, Target, Users, UserCog, Wallet, BellRing, Bell, BriefcaseBusiness, Building2, ChartColumn, ChevronRight, Inbox, Landmark, LayoutDashboard, LogOut, Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, Plus, ShoppingCart, User, X, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Banknote, Building, CalendarClock, ChartLine, ClipboardCheck, Contact, CreditCard, Factory, FileStack, FileText, Filter, Globe, History, KeyRound, LockKeyhole, Mail, MonitorSmartphone, Package, Receipt, ScrollText, Send, Target, Users, UserCog, Wallet, BellRing, Bell, BriefcaseBusiness, Building2, ChartColumn, ChevronRight, Inbox, Landmark, LayoutDashboard, LogOut, Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, Plus, ShoppingCart, User, X, ShieldCheck, type LucideIcon, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { Avatar, buttonClass, cn, RULES, Badge, CountDot } from "@kebo/ui";
 import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
@@ -21,7 +21,8 @@ const PAGE_ICONS: Record<string, LucideIcon> = {
   "/follow-ups": CalendarClock,
   "/operations/purchase-orders": ClipboardCheck,
   "/suppliers": Factory,
-  "/money/due": ArrowLeftRight,
+  "/money/due": ArrowDownToLine,
+  "/money/payables": ArrowUpFromLine,
   "/payments": CreditCard,
   "/finance/cash-book": Wallet,
   "/money/company-costs": Receipt,
@@ -404,7 +405,7 @@ function GroupTree({
               className={cn("flex items-center gap-2.5 rounded-lg text-md font-semibold text-text transition-colors hover:bg-surface-2", row, big && "rounded-none", home && "bg-primary-soft text-primary hover:bg-primary-soft")}
             >
               {icon("home", LayoutDashboard, home)}
-              <span className="flex-1 truncate">Home</span>
+              <span className="flex-1 truncate">Dashboard</span>
             </Link>
           </li>
           {work.map(group)}
@@ -707,8 +708,8 @@ function Strip({ modules, companyName, logo }: { modules: NavModule[]; companyNa
             <Link
               href={HOME_HREF}
               data-strip-item
-              aria-label="Home"
-              title="Home"
+              aria-label="Dashboard"
+              title="Dashboard"
               aria-current={home ? "page" : undefined}
               className={cn(
                 "grid size-10 place-items-center rounded-lg text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
@@ -931,7 +932,7 @@ export function AppShell({
         aria-label="Quick"
         className="no-print fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-30 flex h-16 items-stretch rounded-[22px] border border-line bg-surface/95 px-1.5 shadow-pop backdrop-blur md:hidden"
       >
-        {tab(HOME_HREF, "Home", LayoutDashboard)}
+        {tab(HOME_HREF, "Dashboard", LayoutDashboard)}
         {tab("/inquiries", "Inquiries", Inbox)}
         {canCreate ? (
           <div data-quick-fab="" className="flex flex-1 items-center justify-center">

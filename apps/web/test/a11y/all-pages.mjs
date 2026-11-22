@@ -581,7 +581,7 @@ async function run(page, list, title) {
     "/access/roles/manager",
     "/access/roles/new",
     "/money/due",
-    "/money/due?side=suppliers",
+    "/money/payables",
     "/payments",
     "/finance/cash-book",
     "/money/company-costs",

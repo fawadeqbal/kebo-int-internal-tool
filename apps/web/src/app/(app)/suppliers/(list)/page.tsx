@@ -136,7 +136,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                 ? `${short(overdueTotal, owed.currency)} past its date`
                 : `to ${plural(owed.rows.length, "supplier", "suppliers")}`
             }
-            href="/money/due?side=suppliers"
+            href="/money/payables"
           />
         )}
         {thisYear && (

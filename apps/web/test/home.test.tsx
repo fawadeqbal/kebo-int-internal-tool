@@ -131,7 +131,7 @@ describe("Home: cash, orders, inquiries", () => {
     const lowest = screen.getByText("− USD 22,973");
     expect(lowest.className).toContain("text-bad");
     expect(lowest.parentElement!.textContent).toContain("in the week of 4 Dec");
-    expect(link(/Receivables & payables/).getAttribute("href")).toBe("/money/due");
+    expect(link(/Receivables/).getAttribute("href")).toBe("/money/due");
   });
 
   it("is left out for someone who does not see the cash", () => {

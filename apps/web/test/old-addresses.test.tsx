@@ -8,21 +8,21 @@ describe("/money?tab=…", () => {
     ["cash", "/finance/cash-book"],
     ["expenses", "/money/company-costs"],
     ["receive", "/money/due"],
-    ["owe", "/money/due?side=suppliers"],
+    ["owe", "/money/payables"],
     ["pnl", "/reports/profit"],
   ])("tab=%s → %s", (tab, to) => expect(moneyTarget({ tab })).toBe(to));
 
   it("keeps the filters", () => {
     expect(moneyTarget({ tab: "expenses", p: "2026-10" })).toBe("/money/company-costs?p=2026-10");
     expect(moneyTarget({ tab: "cash", acct: "none" })).toBe("/finance/cash-book?acct=none");
-    expect(moneyTarget({ tab: "owe", q: "jiangsu" })).toBe("/money/due?side=suppliers&q=jiangsu");
+    expect(moneyTarget({ tab: "owe", q: "jiangsu" })).toBe("/money/payables?q=jiangsu");
   });
 
   it("without a tab: the first page this person may open, as the old page did", () => {
     expect(moneyTarget({}, { cashBook: true, expenses: true, recorders: true })).toBe("/finance/cash-book");
     expect(moneyTarget({}, { cashBook: false, expenses: true, recorders: true })).toBe("/money/company-costs");
     expect(moneyTarget({}, { cashBook: false, expenses: false, recorders: true })).toBe("/money/due");
-    expect(moneyTarget({}, { cashBook: false, expenses: false, recorders: false })).toBe("/money/due?side=suppliers");
+    expect(moneyTarget({}, { cashBook: false, expenses: false, recorders: false })).toBe("/money/payables");
   });
 });
 
@@ -30,17 +30,17 @@ describe("/money?tab=…", () => {
 describe("the Money pages that became “To receive and to pay”", () => {
   it("Invoices and To receive open the customers' side; the two To pay lists the suppliers' side", () => {
     expect(dueTarget("customers")).toBe("/money/due");
-    expect(dueTarget("suppliers")).toBe("/money/due?side=suppliers");
+    expect(dueTarget("suppliers")).toBe("/money/payables");
   });
 
   it("keep a search, and drop the views that are gone", () => {
     expect(dueTarget("customers", { q: "lagos", view: "invoices", age: "d90_plus" })).toBe("/money/due?q=lagos");
-    expect(dueTarget("suppliers", { q: "jiangsu", mine: "1" })).toBe("/money/due?side=suppliers&q=jiangsu");
+    expect(dueTarget("suppliers", { q: "jiangsu", mine: "1" })).toBe("/money/payables?q=jiangsu");
   });
 
   it("Payments' tabs Payment requests and To pay go there too; its list stays on Payments", () => {
     expect(paymentsTabTarget({ tab: "requests" })).toBe("/money/due");
-    expect(paymentsTabTarget({ tab: "to-pay", q: "pack" })).toBe("/money/due?side=suppliers&q=pack");
+    expect(paymentsTabTarget({ tab: "to-pay", q: "pack" })).toBe("/money/payables?q=pack");
     expect(paymentsTabTarget({ tab: "paid" })).toBeNull();
     expect(paymentsTabTarget({ order: "o1" })).toBeNull();
   });

@@ -70,7 +70,7 @@ describe("the groups", () => {
     // Purchase orders keep their list (each one has a page of its own that shows it).
     expect(pages(m, "purchasing")).toEqual(["Purchase orders", "Suppliers"]);
     // Money, simple (14 Nov 2026): four pages. To verify and the Ledger keep their addresses and left the menu.
-    expect(pages(m, "money")).toEqual(["Receivables & payables", "Payments", "Cash & bank", "Expenses"]);
+    expect(pages(m, "money")).toEqual(["Receivables", "Payables", "Payments", "Cash & bank", "Expenses"]);
     // Reports is a group (22 Nov 2026): each report a page; money ones first.
     expect(pages(m, "reports")).toEqual(["Overview", "Profit & loss", "Cash flow", "Expenses", "Customers", "Suppliers", "Sales team", "Sales funnel"]);
     expect(m.filter(isSingle)).toEqual([]);
@@ -98,6 +98,7 @@ describe("the groups", () => {
         "/operations/purchase-orders",
         "/suppliers",
         "/money/due",
+        "/money/payables",
         "/payments",
         "/finance/cash-book",
         "/money/company-costs",
@@ -141,15 +142,15 @@ describe("the groups", () => {
     // What customers owe on the orders a person sees, and Payments, are open to everyone who sees orders.
     expect(titles(m)).toEqual(["Sales", "Finance"]);
     expect(pages(m, "sales")).toEqual(["Inquiries", "Sales orders", "Customers", "Follow-ups"]);
-    expect(pages(m, "money")).toEqual(["Receivables & payables", "Payments"]);
+    expect(pages(m, "money")).toEqual(["Receivables", "Payments"]);
     const none = buildModules({ can: () => false, feature: () => true, approvals: null, approves: false, companyAddresses: false });
     expect(titles(none)).toEqual(["Sales", "Finance"]);
-    expect(pages(none, "money")).toEqual(["Receivables & payables", "Payments"]);
+    expect(pages(none, "money")).toEqual(["Receivables", "Payments"]);
   });
 
   it("follow the plan: no cash and bank, expenses, reports or activity log when the plan leaves them out", () => {
     const m = buildModules({ can: () => true, feature: (f) => !["cash_book", "expenses", "insights", "audit_log"].includes(f), approvals: 0, approves: true, companyAddresses: false });
-    expect(pages(m, "money")).toEqual(["Receivables & payables", "Payments"]);
+    expect(pages(m, "money")).toEqual(["Receivables", "Payables", "Payments"]);
     expect(titles(m)).not.toContain("Reports");
     expect(pages(m, "admin")).not.toContain("Activity log");
   });
@@ -171,7 +172,7 @@ describe("the groups", () => {
     expect(pages(people, "admin")).toEqual(["Staff"]);
     // A recorder without expenses: receivables and payables; Reports without Profit & loss, Cash flow and Expenses.
     const recorder = buildModules({ can: (p) => ["sourcing.manage", "payments.record", "reports.view"].includes(p), feature: () => true, approvals: 0, approves: true, companyAddresses: false });
-    expect(pages(recorder, "money")).toEqual(["Receivables & payables", "Payments"]);
+    expect(pages(recorder, "money")).toEqual(["Receivables", "Payables", "Payments"]);
     expect(pages(recorder, "reports")).toEqual(["Overview", "Customers", "Suppliers", "Sales team", "Sales funnel"]);
     // The money reports are hidden: the line stays between Overview and the sales reports.
     expect(lines(recorder, "reports")).toEqual(["Customers"]);
@@ -221,7 +222,7 @@ describe("the menu down the left", () => {
   it("has Home first, then one button per group; the group of the current page is open and its page marked", () => {
     at.path = "/finance/cash-book";
     shell(everything());
-    expect(menu().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
+    expect(menu().getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("/dashboard");
     // Reports is a group like the others (22 Nov 2026).
     expect(menu().getAllByRole("button").map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Purchasing", "Finance", "Reports", "Company settings", "Admin settings"]);
     // Two parts, each with its small heading.
@@ -242,7 +243,7 @@ describe("the menu down the left", () => {
     unmount();
     at.path = "/dashboard";
     shell(everything());
-    expect(menu().getByRole("link", { name: "Home" }).getAttribute("aria-current")).toBe("page");
+    expect(menu().getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBe("page");
     for (const b of menu().getAllByRole("button")) expect(b.getAttribute("aria-expanded")).toBe("false");
   });
 
@@ -326,7 +327,7 @@ describe("the folded strip", () => {
   it("has Home and one icon per group, named for screen readers, the current group marked", () => {
     at.path = "/finance/cash-book";
     shell(everything(2));
-    expect(strip().getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/dashboard");
+    expect(strip().getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("/dashboard");
     expect(strip().getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Sales", "Purchasing", "Finance, 2 to look at", "Reports", "Company settings", "Admin settings"]);
     expect(strip().getByRole("button", { name: /^Finance/ }).className).toContain("bg-primary-soft");
     expect(strip().getByRole("button", { name: "Sales" }).className).not.toContain("bg-primary-soft");
@@ -353,23 +354,23 @@ describe("the folded strip", () => {
     const m = screen.getByRole("menu", { name: "Finance" });
     expect(money.getAttribute("aria-controls")).toBe(m.id);
     const items = within(m).getAllByRole("menuitem");
-    expect(items.map((a) => a.textContent?.replace(/\d+/g, ""))).toEqual(["Receivables & payables", "Payments", "Cash & bank", "Expenses"]);
-    expect(items[3]!.getAttribute("aria-current")).toBe("page");
+    expect(items.map((a) => a.textContent?.replace(/\d+/g, ""))).toEqual(["Receivables", "Payables", "Payments", "Cash & bank", "Expenses"]);
+    expect(items[4]!.getAttribute("aria-current")).toBe("page");
     fireEvent.keyDown(money, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(items[0]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(items[1]!, { key: "ArrowUp" });
     fireEvent.keyDown(items[0]!, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(items[3]);
-    fireEvent.keyDown(items[3]!, { key: "Home" });
+    expect(document.activeElement).toBe(items[4]);
+    fireEvent.keyDown(items[4]!, { key: "Home" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(money);
     expect(money.getAttribute("aria-expanded")).toBe("false");
     fireEvent.keyDown(money, { key: "Enter" });
-    expect(document.activeElement?.textContent).toBe("Receivables & payables");
+    expect(document.activeElement?.textContent).toBe("Receivables");
   });
 
   it("Tab in a group's pages closes them and moves on to the next icon", () => {
@@ -425,14 +426,14 @@ describe("the menu over the page (phone)", () => {
     const drawer = within(screen.getAllByRole("complementary", { name: "Menu" })[1]!);
     expect(drawer.getAllByRole("button", { expanded: false }).map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Finance"]);
     for (const b of drawer.getAllByRole("button", { expanded: false })) expect(b.className).toContain("min-h-13");
-    expect(drawer.getByRole("link", { name: "Home" }).className).toContain("min-h-13");
+    expect(drawer.getByRole("link", { name: "Dashboard" }).className).toContain("min-h-13");
     fireEvent.click(drawer.getByRole("button", { name: /^Sales/ }));
     expect(drawer.getByRole("link", { name: "Customers" }).className).toContain("min-h-11");
   });
 
-  it("the bottom bar starts with Home", () => {
+  it("the bottom bar starts with Dashboard", () => {
     shell(everything());
     const bar = within(screen.getByRole("navigation", { name: "Quick" }));
-    expect(bar.getAllByRole("link").map((a) => a.textContent || a.getAttribute("aria-label"))).toEqual(["Home", "Inquiries", "New inquiry", "Alerts5"]);
+    expect(bar.getAllByRole("link").map((a) => a.textContent || a.getAttribute("aria-label"))).toEqual(["Dashboard", "Inquiries", "New inquiry", "Alerts5"]);
   });
 });

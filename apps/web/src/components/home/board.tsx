@@ -175,7 +175,7 @@ export function NextWeeks({ h }: { h: HomeFigures }) {
       </Table>
       <p className={cn(RULES.box.inset, "border-t border-line py-3 text-xs text-text-2 [&_a]:text-xs")}>
         If everyone pays on their date. Lowest: <strong className={cn("font-semibold", Number(lowest.after) < 0 ? "text-bad" : "text-text")}>{signed(Number(lowest.after), c)}</strong>{" "}
-        {at === 0 ? "this week" : `in the week of ${short(lowest.from)}`}. <More href="/money/due">Receivables & payables</More>
+        {at === 0 ? "this week" : `in the week of ${short(lowest.from)}`}. <More href="/money/due">Receivables</More>
       </p>
     </Card>
   );
