@@ -38,6 +38,9 @@ test.describe("every page loads in its own shape", () => {
       await page.waitForLoadState("networkidle");
       const real = await partsOf(page);
       await page.goto(`/loading-preview?path=${encodeURIComponent(address!)}`);
+      // The preview itself streams in behind the app's own loading screen: read it once it is there.
+      await page.waitForLoadState("networkidle");
+      await expect(page.locator("main [data-preview]")).toBeAttached();
       const skeleton = await partsOf(page);
       // The parts, their order and the record's side panel must be the same. A count may run up to two short of
       // the skeleton's: a list's tabs and facts that show only when they have something (the demo data varies).
@@ -53,6 +56,7 @@ test.describe("every page loads in its own shape", () => {
     const address = foundPages()["/orders/[id]/payment"];
     test.skip(!address, "no order in the demo data");
     await page.goto(`/loading-preview?path=${encodeURIComponent(address!)}&tab=1`);
+    await expect(page.locator("main [data-preview]")).toBeAttached();
     expect(await partsOf(page)).toEqual(["record-body:panel"]);
   });
 });

@@ -9,5 +9,10 @@ export const metadata = { title: "Loading" };
  */
 export default async function LoadingPreview({ searchParams }: { searchParams: Promise<{ path?: string; tab?: string }> }) {
   const { path = "/dashboard", tab } = await searchParams;
-  return <PageSkeleton shape={shapeOf(path)} tab={tab === "1"} />;
+  // data-preview: the test waits for it, so it never reads the app's own loading screen in its place.
+  return (
+    <div data-preview="" className="contents">
+      <PageSkeleton shape={shapeOf(path)} tab={tab === "1"} />
+    </div>
+  );
 }
