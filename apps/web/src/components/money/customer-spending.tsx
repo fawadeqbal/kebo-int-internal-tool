@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, cn, Td, Th, THead, Tr, EmptyLine, linkClass, RULES } from "@kebo/ui";
+import { Card, CardHeader, cn, Td, Th, THead, Tr, EmptyLine, linkClass, RULES, PhoneList, PhoneRow } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { date, money } from "@/lib/format";
 import type { CustomerAccount, ExpenseList } from "@/lib/types-money";
@@ -63,8 +63,8 @@ export function WhereMoneyWent({ a }: { a: CustomerAccount }) {
       </dl>
       <p className="border-t border-line px-4 py-2.5 text-xs text-text-2">
         Spent on them: <strong className="text-text">{money(t.spent, c)}</strong>
-        {parts.length > 0 && ` — ${parts.map(([l, v]) => `${l} ${money(v, c)}`).join(" · ")}`}. The orders&apos; profit is the same number as on each order and in
-        Reports; only the costs outside the orders are taken off here.
+        {parts.length > 0 && ` — ${parts.map(([l, v]) => `${l} ${money(v, c)}`).join(" · ")}`}. The orders&apos; profit is the same number
+        as on each order and in Reports; only the costs outside the orders are taken off here.
       </p>
     </Card>
   );
@@ -107,58 +107,82 @@ export function CustomerSpending({
       {first.length === 0 ? (
         <EmptyLine className={cn(RULES.box.inset, "border-t border-line py-3.5")}>Nothing spent on this customer yet.</EmptyLine>
       ) : (
-        <DataTable label="Spending on this customer">
-          <THead>
-            <tr>
-              <Th>Date</Th>
-              <Th>What for</Th>
-              <Th>For</Th>
-              <Th>Who paid</Th>
-              <Th className="text-right">Amount {c}</Th>
-              <Th>
-                <span className="sr-only">Change</span>
-              </Th>
-            </tr>
-          </THead>
-          <tbody>
+        <>
+          <PhoneList label="Spending on this customer">
             {first.map((e) => (
-              <Tr key={e.id} href={e.order ? `/orders/${e.order.id}/costs` : e.deal ? `/inquiries/${e.deal.id}/costs` : undefined}>
-                <Td className="whitespace-nowrap text-text-2">{date(e.spentOn)}</Td>
-                <Td>
-                  {e.description}
-                  <span className="block text-xs text-text-2">{costKind(e.category)}</span>
-                </Td>
-                <Td>
-                  {e.order ? (
-                    <Link href={`/orders/${e.order.id}/costs`} className="font-medium hover:text-primary hover:underline">
-                      {e.order.refNo}
-                    </Link>
-                  ) : e.deal ? (
-                    <>
-                      <Link href={`/inquiries/${e.deal.id}/costs`} className="font-medium hover:text-primary hover:underline">
-                        {e.deal.refNo}
-                      </Link>
-                      {e.deal.stage === "lost" && <span className="text-text-2"> lost</span>}
-                    </>
+              <PhoneRow
+                key={e.id}
+                href={e.order ? `/orders/${e.order.id}/costs` : e.deal ? `/inquiries/${e.deal.id}/costs` : undefined}
+                title={e.description}
+                figure={money(e.inMain, c)}
+                line={[date(e.spentOn), e.order?.refNo ?? e.deal?.refNo ?? "The customer", e.paidBy?.name].filter(Boolean).join(" · ")}
+                status={
+                  e.ownMoney ? (
+                    <span className={cn(!e.repaid && "text-warn")}>{e.repaid ? "paid back" : "owed back"}</span>
                   ) : (
-                    <span className="text-text-2">The customer</span>
-                  )}
-                </Td>
-                <Td className="text-text-2">
-                  {e.paidBy?.name ?? "Not said"}
-                  {e.ownMoney && <span className={cn("block text-xs", !e.repaid && "text-warn")}>{e.repaid ? "own money · paid back" : "own money · owed back"}</span>}
-                </Td>
-                <Td className="text-right whitespace-nowrap tabular">
-                  {money(e.inMain, c)}
-                  {e.currency !== c && <span className="block text-xs text-text-2">{money(e.amount, e.currency)}</span>}
-                </Td>
-                <Td className="text-right">
-                  <ChangeCost setup={{ ...setup, for: costForOf(e) }} expense={e} iconOnly removeOrderId={e.orderId} />
-                </Td>
-              </Tr>
+                    <span className="text-text-2">{costKind(e.category)}</span>
+                  )
+                }
+              />
             ))}
-          </tbody>
-        </DataTable>
+          </PhoneList>
+          <DataTable label="Spending on this customer" className="max-sm:hidden">
+            <THead>
+              <tr>
+                <Th>Date</Th>
+                <Th>What for</Th>
+                <Th>For</Th>
+                <Th>Who paid</Th>
+                <Th className="text-right">Amount {c}</Th>
+                <Th>
+                  <span className="sr-only">Change</span>
+                </Th>
+              </tr>
+            </THead>
+            <tbody>
+              {first.map((e) => (
+                <Tr key={e.id} href={e.order ? `/orders/${e.order.id}/costs` : e.deal ? `/inquiries/${e.deal.id}/costs` : undefined}>
+                  <Td className="whitespace-nowrap text-text-2">{date(e.spentOn)}</Td>
+                  <Td>
+                    {e.description}
+                    <span className="block text-xs text-text-2">{costKind(e.category)}</span>
+                  </Td>
+                  <Td>
+                    {e.order ? (
+                      <Link href={`/orders/${e.order.id}/costs`} className="font-medium hover:text-primary hover:underline">
+                        {e.order.refNo}
+                      </Link>
+                    ) : e.deal ? (
+                      <>
+                        <Link href={`/inquiries/${e.deal.id}/costs`} className="font-medium hover:text-primary hover:underline">
+                          {e.deal.refNo}
+                        </Link>
+                        {e.deal.stage === "lost" && <span className="text-text-2"> lost</span>}
+                      </>
+                    ) : (
+                      <span className="text-text-2">The customer</span>
+                    )}
+                  </Td>
+                  <Td className="text-text-2">
+                    {e.paidBy?.name ?? "Not said"}
+                    {e.ownMoney && (
+                      <span className={cn("block text-xs", !e.repaid && "text-warn")}>
+                        {e.repaid ? "own money · paid back" : "own money · owed back"}
+                      </span>
+                    )}
+                  </Td>
+                  <Td className="text-right whitespace-nowrap tabular">
+                    {money(e.inMain, c)}
+                    {e.currency !== c && <span className="block text-xs text-text-2">{money(e.amount, e.currency)}</span>}
+                  </Td>
+                  <Td className="text-right">
+                    <ChangeCost setup={{ ...setup, for: costForOf(e) }} expense={e} iconOnly removeOrderId={e.orderId} />
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </DataTable>
+        </>
       )}
       {rows.length > first.length && (
         <p className={cn(RULES.box.inset, "border-t border-line py-2.5 text-md")}>
