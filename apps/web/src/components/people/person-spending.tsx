@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { THead, Th, Card, cn, Scroll, EmptyLine, CardHeader } from "@kebo/ui";
+import { THead, Th, Card, cn, Scroll, EmptyLine, CardHeader, PhoneList, PhoneRow } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
 import { date, money, dayMonth, num0 as n0 } from "@/lib/format";
@@ -106,7 +106,19 @@ export function PersonSpendingCard({ s, year }: { s: PersonSpending; year: strin
             On orders: already in those orders&apos; profit. For the company: on Expenses. The others are what Profit after all costs takes off
             {Number(s.outside) > 0 ? ` (${money(s.outside, c)})` : ""}.
           </p>
-          <Scroll axis="x" size="lg" fade label="Spending, kind by kind" className="border-t border-line">
+          <PhoneList label="Spending, cost by cost" className="border-t border-line">
+            {s.latest.map((e) => (
+              <PhoneRow
+                key={e.id}
+                href={e.order ? `/orders/${e.order.id}/costs` : e.inquiry ? `/inquiries/${e.inquiry.id}/costs` : undefined}
+                title={e.description}
+                figure={n0(e.inMain)}
+                line={[dayMonth(e.spentOn), e.order?.refNo ?? e.inquiry?.refNo ?? costKind(e.category)].join(" · ")}
+                status={<span className={cn("text-text-2", e.paid === "own" && "text-warn")}>{paidWords(e, name)}</span>}
+              />
+            ))}
+          </PhoneList>
+          <Scroll axis="x" size="lg" fade label="Spending, kind by kind" className="border-t border-line max-sm:hidden">
             <table className="w-full border-collapse text-md">
               <THead>
                 <tr>

@@ -6,7 +6,22 @@ import type { FactoryOrders } from "@/lib/types-facts";
 import { DataTable } from "@/components/common/data-table";
 import { factoryOf } from "@/lib/party-data";
 import { ArrowRight } from "lucide-react";
-import { ButtonLink, Card, CardHeader, RefCode, StatusBadge, Table, Td, Th, THead, Tr, type StatusMeaning, EmptyLine } from "@kebo/ui";
+import {
+  ButtonLink,
+  Card,
+  CardHeader,
+  RefCode,
+  StatusBadge,
+  Table,
+  Td,
+  Th,
+  THead,
+  Tr,
+  type StatusMeaning,
+  EmptyLine,
+  PhoneList,
+  PhoneRow,
+} from "@kebo/ui";
 import { date, whole, companyToday } from "@/lib/format";
 import { getPeople } from "@/lib/loaders";
 import type { Person } from "@/lib/types";
@@ -21,7 +36,8 @@ export const generateMetadata = supplierTitle();
 /** Where an order with the factory is: ready date passed, else the order's stage; closed or cancelled. */
 function poState(o: FactoryOrders["rows"][number], today: string): { label: string; meaning: StatusMeaning } {
   const word = o.word ?? (o.status === "closed" ? "Done" : o.status === "cancelled" ? "Cancelled" : "Confirmed");
-  if (!o.ready && o.readyOn && o.readyOn < today && (word === "Confirmed" || word === "In production")) return { label: "Ready date passed", meaning: "bad" };
+  if (!o.ready && o.readyOn && o.readyOn < today && (word === "Confirmed" || word === "In production"))
+    return { label: "Ready date passed", meaning: "bad" };
   return { label: word, meaning: ORDER_WORD_TONE[word] };
 }
 
@@ -57,72 +73,104 @@ export default async function FactoryOverview({
   return (
     <div className="flex flex-col gap-4">
       <RecordLanding />
-          <DetailsCard
-            flash={sp.saved === f.id}
-            edit={{ panel: "edit-factory", id: f.id, label: `Edit ${f.name}` }}
-            items={[
-              { label: "Contact person", value: f.contactPerson },
-              { label: "Phone", value: f.phone && <a href={`tel:${f.phone}`}>{f.phone}</a> },
-              { label: "WeChat", value: f.wechat },
-              {
-                label: "Email",
-                value: f.email && (
-                  <a href={`mailto:${f.email}`} className="break-all">
-                    {f.email}
-                  </a>
-                ),
-              },
-              { label: "Responsible person", value: f.owner?.name },
-              { label: "Address", value: f.address && <span className="whitespace-pre-line">{f.address}</span> },
-              { label: "Bank details", value: f.bankDetails && <span className="whitespace-pre-line">{f.bankDetails}</span>, wide: true },
-              { label: "Notes", value: f.notes && <span className="whitespace-pre-line">{f.notes}</span>, wide: true },
-            ]}
-          />
-          {/* Purchase orders (board): what each order with this factory costs us, what we paid, ready, where it is. */}
-          <Card className="overflow-hidden">
-            <CardHeader
-              title="Purchase orders"
-              actions={
-                <ButtonLink href={`/suppliers/${f.id}/orders`} variant="link" size="sm">
-                  <ArrowRight aria-hidden /> All
-                </ButtonLink>
-              }
-            />
-            {pos ? (
-              pos.rows.length ? (
-                <DataTable label="Purchase orders">
-                    <THead>
-                      <tr>
-                        <Th>Sales order</Th>
-                        <Th className="text-right">Total</Th>
-                        <Th className="text-right">Paid</Th>
-                        <Th>Ready</Th>
-                        <Th>Status</Th>
-                      </tr>
-                    </THead>
-                    <tbody>
-                      {pos.rows.slice(0, 5).map((o) => {
-                        const st = poState(o, today);
-                        return (
-                          <Tr key={o.orderId} href={`/orders/${o.orderId}`}>
-                            <Td>
-                              <RefCode href={`/orders/${o.orderId}`}>{o.refNo}</RefCode>
-                            </Td>
-                            <Td className="text-right whitespace-nowrap tabular">{whole(o.owed, o.currency)}</Td>
-                            <Td className="text-right whitespace-nowrap tabular">{whole(o.paid, o.currency)}</Td>
-                            <Td className="whitespace-nowrap">{o.readyOn ? date(o.readyOn) : "—"}</Td>
-                            <Td>
-                              <StatusBadge meaning={st.meaning}>{st.label}</StatusBadge>
-                            </Td>
-                          </Tr>
-                        );
-                      })}
-                    </tbody>
-                </DataTable>
-              ) : (
-                <EmptyLine inset>No purchase orders yet. When an order buys from this supplier, it shows here with what we owe and paid.</EmptyLine>
-              )
-            ) : r.openOrders.length ? (
+      <DetailsCard
+        flash={sp.saved === f.id}
+        edit={{ panel: "edit-factory", id: f.id, label: `Edit ${f.name}` }}
+        items={[
+          { label: "Contact person", value: f.contactPerson },
+          { label: "Phone", value: f.phone && <a href={`tel:${f.phone}`}>{f.phone}</a> },
+          { label: "WeChat", value: f.wechat },
+          {
+            label: "Email",
+            value: f.email && (
+              <a href={`mailto:${f.email}`} className="break-all">
+                {f.email}
+              </a>
+            ),
+          },
+          { label: "Responsible person", value: f.owner?.name },
+          { label: "Address", value: f.address && <span className="whitespace-pre-line">{f.address}</span> },
+          { label: "Bank details", value: f.bankDetails && <span className="whitespace-pre-line">{f.bankDetails}</span>, wide: true },
+          { label: "Notes", value: f.notes && <span className="whitespace-pre-line">{f.notes}</span>, wide: true },
+        ]}
+      />
+      {/* Purchase orders (board): what each order with this factory costs us, what we paid, ready, where it is. */}
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Purchase orders"
+          actions={
+            <ButtonLink href={`/suppliers/${f.id}/orders`} variant="link" size="sm">
+              <ArrowRight aria-hidden /> All
+            </ButtonLink>
+          }
+        />
+        {pos ? (
+          pos.rows.length ? (
+            <>
+              <PhoneList label="Purchase orders">
+                {pos.rows.slice(0, 5).map((o) => {
+                  const st = poState(o, today);
+                  return (
+                    <PhoneRow
+                      key={o.orderId}
+                      href={`/orders/${o.orderId}`}
+                      title={o.refNo}
+                      figure={whole(o.owed, o.currency)}
+                      line={`${whole(o.paid, o.currency)} paid${o.readyOn ? ` · ready ${date(o.readyOn)}` : ""}`}
+                      status={<StatusBadge meaning={st.meaning}>{st.label}</StatusBadge>}
+                    />
+                  );
+                })}
+              </PhoneList>
+              <DataTable label="Purchase orders" className="max-sm:hidden">
+                <THead>
+                  <tr>
+                    <Th>Sales order</Th>
+                    <Th className="text-right">Total</Th>
+                    <Th className="text-right">Paid</Th>
+                    <Th>Ready</Th>
+                    <Th>Status</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {pos.rows.slice(0, 5).map((o) => {
+                    const st = poState(o, today);
+                    return (
+                      <Tr key={o.orderId} href={`/orders/${o.orderId}`}>
+                        <Td>
+                          <RefCode href={`/orders/${o.orderId}`}>{o.refNo}</RefCode>
+                        </Td>
+                        <Td className="text-right whitespace-nowrap tabular">{whole(o.owed, o.currency)}</Td>
+                        <Td className="text-right whitespace-nowrap tabular">{whole(o.paid, o.currency)}</Td>
+                        <Td className="whitespace-nowrap">{o.readyOn ? date(o.readyOn) : "—"}</Td>
+                        <Td>
+                          <StatusBadge meaning={st.meaning}>{st.label}</StatusBadge>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </DataTable>
+            </>
+          ) : (
+            <EmptyLine inset>
+              No purchase orders yet. When an order buys from this supplier, it shows here with what we owe and paid.
+            </EmptyLine>
+          )
+        ) : r.openOrders.length ? (
+          <>
+            <PhoneList label="In production">
+              {r.openOrders.map((o) => (
+                <PhoneRow
+                  key={o.id}
+                  href={`/orders/${o.id}`}
+                  title={o.refNo}
+                  line={o.customer}
+                  figure={o.readyOn ? date(o.readyOn) : undefined}
+                />
+              ))}
+            </PhoneList>
+            <div className="max-sm:hidden">
               <Table>
                 <THead>
                   <tr>
@@ -143,11 +191,15 @@ export default async function FactoryOverview({
                   ))}
                 </tbody>
               </Table>
-            ) : (
-              <EmptyLine inset>Nothing in production. Orders this supplier makes for us show here.</EmptyLine>
-            )}
-          </Card>
-      {editing && <FactoryPanel action={saveFactoryAction.bind(null, f.id, f.updatedAt)} factory={f} people={people} meId={me.id} onRecord />}
+            </div>
+          </>
+        ) : (
+          <EmptyLine inset>Nothing in production. Orders this supplier makes for us show here.</EmptyLine>
+        )}
+      </Card>
+      {editing && (
+        <FactoryPanel action={saveFactoryAction.bind(null, f.id, f.updatedAt)} factory={f} people={people} meId={me.id} onRecord />
+      )}
     </div>
   );
 }

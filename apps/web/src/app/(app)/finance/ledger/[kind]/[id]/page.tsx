@@ -1,7 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { LedgerPartyKind } from "@kebo/shared";
-import { buildHref, Card, cn, DataRow, EmptyState, FilterChip, PageHeader, Segmented, Td, Th, THead, Stack } from "@kebo/ui";
+import {
+  buildHref,
+  Card,
+  cn,
+  DataRow,
+  EmptyState,
+  FilterChip,
+  PageHeader,
+  Segmented,
+  Td,
+  Th,
+  THead,
+  Stack,
+  PhoneList,
+  PhoneRow,
+} from "@kebo/ui";
 import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
 import { money, companyToday } from "@/lib/format";
@@ -152,75 +167,114 @@ export default async function PartyLedgerPage({
             description="Try a longer period: the opening balance carries what came before."
           />
         ) : (
-          <DataTable label={`${p.party.name}: ledger`}>
-            <THead>
-              <tr>
-                <Th>Day</Th>
-                <Th>What</Th>
-                <Th>Type</Th>
-                <Th className="text-right">{head.debit}</Th>
-                <Th className="text-right">{head.credit}</Th>
-                <Th className="text-right">Balance{single ? ` (${single})` : ""}</Th>
-              </tr>
-            </THead>
-            <tbody>
+          <>
+            {/* A phone: the shared two-line rows (what, and the amount in or out; the day and the balance after it),
+              between the opening and closing balance. */}
+            <PhoneList label={`${p.party.name}: ledger`}>
               {currencies.map((c) => (
-                <tr key={`o-${c.currency}`} className="border-b border-line">
-                  <Td />
-                  <Td className="text-text-2">
-                    Opening balance on {day(period.from, today)}
+                <li key={`o-${c.currency}`} className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm text-text-2">
+                  <span>
+                    Opening {day(period.from, today)}
                     {!single && ` · ${c.currency}`}
-                  </Td>
-                  <Td />
-                  <Td />
-                  <Td />
-                  <Td className="text-right font-semibold tabular">{bal(c.opening, c.currency)}</Td>
-                </tr>
+                  </span>
+                  <span className="font-semibold text-text tabular">{bal(c.opening, c.currency)}</span>
+                </li>
               ))}
               {rows.map((r) => (
-                <DataRow key={r.id} href={openEntry(r.groupId)} className={cn(r.removed && "text-muted")}>
-                  <Td className="whitespace-nowrap tabular">{day(r.date, today)}</Td>
-                  <Td className="min-w-56">
-                    <Link href={openEntry(r.groupId)} scroll={false} className={cn("hover:text-primary", r.removed && "line-through")}>
-                      {r.memo || r.accountLabel}
-                    </Link>
-                    <span className="block text-xs text-muted tabular">
-                      {[
-                        r.memo.includes(r.ref) ? null : r.ref,
-                        r.order && !r.ref.includes(r.order.refNo) && !r.memo.includes(r.order.refNo) ? r.order.refNo : null,
-                        r.reason,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                  </Td>
-                  <Td>
-                    <TypeBadge type={r.type} />
-                  </Td>
-                  <Td className="text-right whitespace-nowrap tabular">{cell(r.debit, r.currency)}</Td>
-                  <Td className="text-right whitespace-nowrap tabular">{cell(r.credit, r.currency)}</Td>
-                  <Td className="text-right whitespace-nowrap tabular">{bal(r.balance, r.currency)}</Td>
-                </DataRow>
+                <PhoneRow
+                  key={r.id}
+                  href={openEntry(r.groupId)}
+                  prefetch={false}
+                  muted={r.removed}
+                  title={r.memo || r.accountLabel}
+                  figure={Number(r.debit) ? cell(r.debit, r.currency) : cell(r.credit, r.currency)}
+                  line={`${day(r.date, today)} · balance ${bal(r.balance, r.currency)}`}
+                  status={<TypeBadge type={r.type} />}
+                />
               ))}
               {currencies.map((c) => (
-                <tr key={`c-${c.currency}`} className="bg-surface-2/40">
-                  <Td />
-                  <Td className="font-medium">
-                    Closing balance on {day(period.to, today)}
+                <li
+                  key={`c-${c.currency}`}
+                  className="flex items-baseline justify-between gap-3 bg-surface-2/40 px-4 py-2.5 text-sm font-medium"
+                >
+                  <span>
+                    Closing {day(period.to, today)}
                     {!single && ` · ${c.currency}`}
-                  </Td>
-                  <Td />
-                  <Td className="text-right font-semibold tabular">
-                    {single ? Number(p.totals.debit).toLocaleString("en-US", { minimumFractionDigits: 2 }) : ""}
-                  </Td>
-                  <Td className="text-right font-semibold tabular">
-                    {single ? Number(p.totals.credit).toLocaleString("en-US", { minimumFractionDigits: 2 }) : ""}
-                  </Td>
-                  <Td className="text-right font-semibold tabular">{bal(c.closing, c.currency)}</Td>
-                </tr>
+                  </span>
+                  <span className="font-semibold tabular">{bal(c.closing, c.currency)}</span>
+                </li>
               ))}
-            </tbody>
-          </DataTable>
+            </PhoneList>
+            <DataTable label={`${p.party.name}: ledger`} className="max-sm:hidden">
+              <THead>
+                <tr>
+                  <Th>Day</Th>
+                  <Th>What</Th>
+                  <Th>Type</Th>
+                  <Th className="text-right">{head.debit}</Th>
+                  <Th className="text-right">{head.credit}</Th>
+                  <Th className="text-right">Balance{single ? ` (${single})` : ""}</Th>
+                </tr>
+              </THead>
+              <tbody>
+                {currencies.map((c) => (
+                  <tr key={`o-${c.currency}`} className="border-b border-line">
+                    <Td />
+                    <Td className="text-text-2">
+                      Opening balance on {day(period.from, today)}
+                      {!single && ` · ${c.currency}`}
+                    </Td>
+                    <Td />
+                    <Td />
+                    <Td />
+                    <Td className="text-right font-semibold tabular">{bal(c.opening, c.currency)}</Td>
+                  </tr>
+                ))}
+                {rows.map((r) => (
+                  <DataRow key={r.id} href={openEntry(r.groupId)} className={cn(r.removed && "text-muted")}>
+                    <Td className="whitespace-nowrap tabular">{day(r.date, today)}</Td>
+                    <Td className="min-w-56">
+                      <Link href={openEntry(r.groupId)} scroll={false} className={cn("hover:text-primary", r.removed && "line-through")}>
+                        {r.memo || r.accountLabel}
+                      </Link>
+                      <span className="block text-xs text-muted tabular">
+                        {[
+                          r.memo.includes(r.ref) ? null : r.ref,
+                          r.order && !r.ref.includes(r.order.refNo) && !r.memo.includes(r.order.refNo) ? r.order.refNo : null,
+                          r.reason,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </Td>
+                    <Td>
+                      <TypeBadge type={r.type} />
+                    </Td>
+                    <Td className="text-right whitespace-nowrap tabular">{cell(r.debit, r.currency)}</Td>
+                    <Td className="text-right whitespace-nowrap tabular">{cell(r.credit, r.currency)}</Td>
+                    <Td className="text-right whitespace-nowrap tabular">{bal(r.balance, r.currency)}</Td>
+                  </DataRow>
+                ))}
+                {currencies.map((c) => (
+                  <tr key={`c-${c.currency}`} className="bg-surface-2/40">
+                    <Td />
+                    <Td className="font-medium">
+                      Closing balance on {day(period.to, today)}
+                      {!single && ` · ${c.currency}`}
+                    </Td>
+                    <Td />
+                    <Td className="text-right font-semibold tabular">
+                      {single ? Number(p.totals.debit).toLocaleString("en-US", { minimumFractionDigits: 2 }) : ""}
+                    </Td>
+                    <Td className="text-right font-semibold tabular">
+                      {single ? Number(p.totals.credit).toLocaleString("en-US", { minimumFractionDigits: 2 }) : ""}
+                    </Td>
+                    <Td className="text-right font-semibold tabular">{bal(c.closing, c.currency)}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
+          </>
         )}
       </Card>
       <p className="px-1 text-xs text-muted">

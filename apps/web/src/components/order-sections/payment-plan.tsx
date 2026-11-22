@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
-import { Badge, Button, cn, Table, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
+import { Badge, Button, cn, Table, Td, Th, THead, Tr, EmptyLine, PhoneList, PhoneRow } from "@kebo/ui";
 import { dueText, money, num2 as grouped } from "@/lib/format";
 import { useTime } from "@/lib/time-client";
 import type { ActionState } from "@/lib/actions";
@@ -16,7 +16,6 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 type Send = (ref: string, prev: ActionState, form: FormData) => Promise<ActionState>;
 type Item = OrderMoney["plan"]["items"][number];
 type Sending = Parameters<typeof SendDialog>[0]["what"];
-
 
 /** Where a part stands, as a badge: paid (and when), part paid, sent (how), not sent. */
 function Stand({ i }: { i: Item }) {
@@ -73,7 +72,16 @@ export function PaymentPlanTable({
   send: Send;
   /** Null: this person may not record payments, or the order takes none. */
   /** `verify`: the person sends the payment for a manager to verify (it does not count until then). */
-  pay: { action: Action; customer: string; refNo: string; due: string; depositDue: string; fx: Parameters<typeof RecordPaymentWindow>[0]["fx"]; today: string; verify?: boolean } | null;
+  pay: {
+    action: Action;
+    customer: string;
+    refNo: string;
+    due: string;
+    depositDue: string;
+    fx: Parameters<typeof RecordPaymentWindow>[0]["fx"];
+    today: string;
+    verify?: boolean;
+  } | null;
 }) {
   const { date, style } = useTime();
   // The dialog lives here, not in the row: once sent, the row's button changes and the dialog still says what to do next.
@@ -84,7 +92,17 @@ export function PaymentPlanTable({
   useOpenFromLink("ask-balance", () => {
     const i = plan.items.find((x) => x.request.state !== "paid" && x.request.through !== "bank");
     if (i && plan.canSend)
-      setSending({ action: send.bind(null, i.id), orderId, refId: i.id, number: i.number, label: i.label, amount: i.amount, currency, dueOn: i.dueOn, again: i.request.with === "request" });
+      setSending({
+        action: send.bind(null, i.id),
+        orderId,
+        refId: i.id,
+        number: i.number,
+        label: i.label,
+        amount: i.amount,
+        currency,
+        dueOn: i.dueOn,
+        again: i.request.with === "request",
+      });
   });
   if (!plan.items.length && !plan.cancelled.length) return <EmptyLine>No plan yet.</EmptyLine>;
   const next = plan.items.find((i) => i.request.state !== "paid");
@@ -104,7 +122,12 @@ export function PaymentPlanTable({
   );
   const receipts = (i: Item): ReactNode =>
     i.request.receipts.map((x, n) => (
-      <a key={x.id} href={`/print/orders/${orderId}/payment-receipt?${new URLSearchParams({ ref: x.id, back })}`} title={x.number} className={ROW_LINK}>
+      <a
+        key={x.id}
+        href={`/print/orders/${orderId}/payment-receipt?${new URLSearchParams({ ref: x.id, back })}`}
+        title={x.number}
+        className={ROW_LINK}
+      >
         {i.request.receipts.length > 1 ? `Receipt ${n + 1}` : "Receipt"}
       </a>
     ));
@@ -126,7 +149,19 @@ export function PaymentPlanTable({
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => setSending({ action: send.bind(null, i.id), orderId, refId: i.id, number: i.number, label: i.label, amount: i.amount, currency, dueOn: i.dueOn, again: r.with === "request" })}
+              onClick={() =>
+                setSending({
+                  action: send.bind(null, i.id),
+                  orderId,
+                  refId: i.id,
+                  number: i.number,
+                  label: i.label,
+                  amount: i.amount,
+                  currency,
+                  dueOn: i.dueOn,
+                  again: r.with === "request",
+                })
+              }
             >
               {r.with === "request" ? "Send again" : "Send request"}
             </Button>
@@ -140,23 +175,21 @@ export function PaymentPlanTable({
   return (
     <div className="flex flex-col gap-3">
       {/* Phones: one block per part, so where it stands and what to do are never off the screen. */}
-      <ul className="flex flex-col divide-y divide-line border-b border-line sm:hidden" aria-label="Payment plan">
+      <PhoneList label="Payment plan" className="border-b border-line">
         {plan.items.map((i) => (
-          <li key={i.id} className="flex flex-col gap-1.5 px-4 py-3">
-            <span className="flex items-baseline justify-between gap-3">
-              <span className="font-semibold">{i.label}</span>
-              <span className="font-semibold tabular">{grouped(i.amount)}</span>
-            </span>
-            {under(i)}
-            <span className="text-sm text-text-2">
-              {dueText(i, style)}
-              {Number(i.paid) > 0 && i.request.state !== "paid" ? ` · ${grouped(i.paid)} received` : ""}
-            </span>
-            <span className="flex flex-wrap items-center justify-between gap-3">
-              <Stand i={i} />
-              {actions(i)}
-            </span>
-          </li>
+          <PhoneRow
+            key={i.id}
+            title={i.label}
+            figure={grouped(i.amount)}
+            line={`${dueText(i, style)}${Number(i.paid) > 0 && i.request.state !== "paid" ? ` · ${grouped(i.paid)} received` : ""}`}
+            status={<Stand i={i} />}
+            extra={
+              <div className="flex flex-col gap-1.5 px-4 pb-3 text-sm empty:hidden">
+                {under(i)}
+                <span className="flex justify-end empty:hidden">{actions(i)}</span>
+              </div>
+            }
+          />
         ))}
         {plan.cancelled.map((c) => (
           <li key={c.paperId} className="flex items-center justify-between gap-3 px-4 py-3 text-sm text-muted">
@@ -168,7 +201,7 @@ export function PaymentPlanTable({
             </a>
           </li>
         ))}
-      </ul>
+      </PhoneList>
       <div className="hidden sm:block">
         <Table>
           <THead>
@@ -189,10 +222,14 @@ export function PaymentPlanTable({
                   <span className="font-semibold">{i.label}</span>
                   {under(i)}
                 </Td>
-                <Td className={cn("min-w-[7.5rem] text-sm", i.late > 0 && i.request.state !== "paid" && "font-medium text-bad")}>{dueText(i, style)}</Td>
+                <Td className={cn("min-w-[7.5rem] text-sm", i.late > 0 && i.request.state !== "paid" && "font-medium text-bad")}>
+                  {dueText(i, style)}
+                </Td>
                 <Td className="text-right whitespace-nowrap tabular">
                   {grouped(i.amount)}
-                  {Number(i.paid) > 0 && i.request.state !== "paid" && <span className="block text-xs text-muted">{grouped(i.paid)} received</span>}
+                  {Number(i.paid) > 0 && i.request.state !== "paid" && (
+                    <span className="block text-xs text-muted">{grouped(i.paid)} received</span>
+                  )}
                 </Td>
                 <Td>
                   <Stand i={i} />
@@ -227,7 +264,15 @@ export function PaymentPlanTable({
       {/* Asked for from a list's row: one window, open at once (the rows' own buttons are drawn twice, for phone and desk). */}
       {auto === "pay" && pay && next && (
         <span className="hidden">
-          <RecordPaymentWindow main {...pay} currency={currency} forWhat={next.label} amount={next.open} startOpen onClosed={onAutoClosed} />
+          <RecordPaymentWindow
+            main
+            {...pay}
+            currency={currency}
+            forWhat={next.label}
+            amount={next.open}
+            startOpen
+            onClosed={onAutoClosed}
+          />
         </span>
       )}
       <div data-target="payments.received" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-4 text-sm sm:px-3.5">

@@ -1,14 +1,13 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { PAYMENT_METHOD_LABEL, type CustomerMoneyState, type FactoryDueRule, type PaymentRoute, type Tone } from "@kebo/shared";
-import { Badge, cn, Table, Td, Th, THead, Tr, EmptyLine, RULES } from "@kebo/ui";
+import { Badge, cn, Table, Td, Th, THead, Tr, EmptyLine, RULES, PhoneList, PhoneRow } from "@kebo/ui";
 import { date, dayMonth, dueText, money, num2 as grouped } from "@/lib/format";
 import type { FactoryPaymentView, FactoryPlanView } from "@/lib/types-money";
 import { ROW_LINK } from "./section-window";
 import { BoxNote } from "@/components/common/record-box";
 
 type Row = FactoryPlanView["rows"][number];
-
 
 /** When a part of a supplier's plan falls due, in the words the customer's plan uses (a fixed date: none, its date says it). */
 export function supplierRule(r: { dueRule: FactoryDueRule; dueDays?: number | null }): string | null {
@@ -26,7 +25,8 @@ export const supplierPlanWords = (plan: FactoryPlanView) =>
   plan.rows.map((r) => `${r.label} ${supplierRule(r) ?? (r.due ? `on ${date(r.due)}` : "on a date")}`).join(" · ");
 
 /** The invoices the factory sent, each with the part it is for: "JP-INV-301 (advance)". */
-export const theirInvoices = (plan: FactoryPlanView) => plan.rows.filter((r) => r.supplierRef).map((r) => `${r.supplierRef} (${partName(r).toLowerCase()})`);
+export const theirInvoices = (plan: FactoryPlanView) =>
+  plan.rows.filter((r) => r.supplierRef).map((r) => `${r.supplierRef} (${partName(r).toLowerCase()})`);
 
 const TONE: Record<Row["status"], Tone> = { paid: "ok", part: "warn", due: "warn", late: "bad", later: "neutral" };
 
@@ -122,25 +122,27 @@ export function SupplierPlanTable({
   return (
     <div className="flex flex-col gap-3">
       {/* Phones: one block per part, so where it stands and what to do are never off the screen. */}
-      <ul className="flex flex-col divide-y divide-line border-b border-line sm:hidden" aria-label={`Parts to pay ${plan.factory.name}`}>
+      <PhoneList label={`Parts to pay ${plan.factory.name}`} className="border-b border-line">
         {plan.rows.map((r, i) => (
-          <li key={r.id ?? i} className="flex flex-col gap-1.5 px-4 py-3">
-            <span className="flex items-baseline justify-between gap-3">
-              <span className="font-semibold">{r.label}</span>
-              <span className="font-semibold tabular">{grouped(r.amount)}</span>
-            </span>
-            {under(r)}
-            <span className={cn("text-sm text-text-2", late(r) && "font-medium text-bad")}>
-              {due(r)}
-              {Number(r.paid) > 0 && r.status !== "paid" ? ` · ${grouped(r.paid)} paid` : ""}
-            </span>
-            <span className="flex flex-wrap items-center justify-between gap-3">
-              <Stand r={r} paidOn={lastPaid(r)} />
-              {actions(r)}
-            </span>
-          </li>
+          <PhoneRow
+            key={r.id ?? i}
+            title={r.label}
+            figure={grouped(r.amount)}
+            line={
+              <span
+                className={cn(late(r) && "font-medium text-bad")}
+              >{`${due(r)}${Number(r.paid) > 0 && r.status !== "paid" ? ` · ${grouped(r.paid)} paid` : ""}`}</span>
+            }
+            status={<Stand r={r} paidOn={lastPaid(r)} />}
+            extra={
+              <div className="flex flex-col gap-1.5 px-4 pb-3 text-sm empty:hidden">
+                {under(r)}
+                <span className="flex justify-end empty:hidden">{actions(r)}</span>
+              </div>
+            }
+          />
         ))}
-      </ul>
+      </PhoneList>
       <div className="hidden sm:block">
         <Table>
           <THead>
@@ -181,7 +183,9 @@ export function SupplierPlanTable({
         </span>
         <span className="text-muted">
           Paid <span className="font-semibold text-text tabular">{money(plan.paid, c)}</span>
-          {paidInOrder && c !== orderCurrency && Number(plan.paid) > 0 && <span className="tabular"> = {money(paidInOrder, orderCurrency)}</span>}
+          {paidInOrder && c !== orderCurrency && Number(plan.paid) > 0 && (
+            <span className="tabular"> = {money(paidInOrder, orderCurrency)}</span>
+          )}
         </span>
         <span className="text-muted">
           Still to pay <span className="font-semibold text-text tabular">{money(plan.toPay, c)}</span>
@@ -189,7 +193,9 @@ export function SupplierPlanTable({
       </div>
       {(Number(plan.takenOff ?? 0) > 0 || overpaid) && (
         <div className="flex flex-col gap-1 px-4 text-xs sm:px-3.5">
-          {Number(plan.takenOff ?? 0) > 0 && <p className="text-muted">Paid counts {money(plan.takenOff!, c)} of costs this supplier bears, taken off what we owe it.</p>}
+          {Number(plan.takenOff ?? 0) > 0 && (
+            <p className="text-muted">Paid counts {money(plan.takenOff!, c)} of costs this supplier bears, taken off what we owe it.</p>
+          )}
           {overpaid && <p className="text-warn">Paid {money(overpaid, c)} more than its prices add up to.</p>}
         </div>
       )}
@@ -254,7 +260,11 @@ export function CustomerMoneyLine({
       </>
     );
   return (
-    <BoxNote data-target="factory.customer" tone={warn ? "warn" : "neutral"} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+    <BoxNote
+      data-target="factory.customer"
+      tone={warn ? "warn" : "neutral"}
+      className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
+    >
       <span className={warn ? "font-medium" : "text-text-2"}>{text}</span>
       <Link href={`/orders/${orderId}/payment`} className={ROW_LINK}>
         Payment tab

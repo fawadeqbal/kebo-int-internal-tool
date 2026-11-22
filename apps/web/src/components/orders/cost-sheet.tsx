@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { cn, Table, Td, Th, THead, Tr, linkClass, Dash, RULES } from "@kebo/ui";
+import { cn, Table, Td, Th, THead, Tr, linkClass, Dash, RULES, PhoneList, PhoneRow } from "@kebo/ui";
 import { costKind } from "@/components/money/cost-kinds";
 import { RepayWindow } from "@/components/order-sections/costs-windows";
 import { Section } from "@/components/order-sections/section";
@@ -66,77 +66,141 @@ export function CostSheetTable({
 }) {
   const c = currency;
   const toPay = Number(totals?.toPay ?? 0);
+  const kindOf = (r: CostSheetRow) =>
+    r.kind === "goods"
+      ? "Goods from the supplier"
+      : r.kind === "estimate"
+        ? "Estimated on the quotation"
+        : r.category && r.kind === "cost"
+          ? costKind(r.category)
+          : r.label;
   return (
-    <Table>
-      <THead>
-        <tr>
-          <Th>What for</Th>
-          <Th>Who we owe</Th>
-          <Th>Comes from</Th>
-          <Th className="text-right">Cost {c}</Th>
-          <Th className="text-right">Paid</Th>
-          <Th className="text-right">Still to pay</Th>
-          <Th>
-            <span className="sr-only">Pay or change</span>
-          </Th>
-        </tr>
-      </THead>
-      <tbody>
+    <>
+      {/* A phone: the shared two-line rows (what for and the cost; who and where from, and what is still to pay), the
+        row's button under it, the total last. */}
+      <PhoneList label="Costs">
         {rows.map((r) => {
-          const ours = r.borneBy === "us";
+          const due = Number(r.toPayInOrder ?? 0) > 0 && r.kind !== "estimate";
           const receipt = receiptOf(r);
-          const kind = r.kind === "goods" ? "Goods from the supplier" : r.kind === "estimate" ? "Estimated on the quotation" : r.category && r.kind === "cost" ? costKind(r.category) : r.label;
-          const detail = r.kind === "cost" && r.label !== kind ? r.label : r.kind === "estimate" ? r.label : null;
-          const how = howOf?.(r);
+          const act = action(r);
           return (
-            <Tr key={r.key} className={r.kind === "estimate" || !ours ? "text-text-2" : undefined}>
-              <Td>
-                <span className="font-semibold">{kind}</span>
-                {detail && <span className="block text-xs text-text-2">{detail}</span>}
-                {receipt && (
-                  <a href={`/files/${receipt.id}?view=1`} className={cn(linkClass, "block text-xs")}>
-                    Their bill
-                  </a>
-                )}
-              </Td>
-              <Td>{r.owedTo ?? dash}</Td>
-              <Td className="text-text-2">
-                {fromHref[r.from] ? (
-                  <Link href={fromHref[r.from]!} className="hover:text-primary hover:underline">
-                    {COST_FROM[r.from]}
-                  </Link>
+            <PhoneRow
+              key={r.key}
+              muted={r.kind === "estimate" || r.borneBy !== "us"}
+              title={kindOf(r)}
+              figure={r.inOrder !== null ? n2(r.inOrder) : money(r.amount, r.currency)}
+              line={[r.owedTo, COST_FROM[r.from], howOf?.(r)].filter(Boolean).join(" · ")}
+              status={
+                due ? (
+                  <span className="font-semibold text-warn">{n2(r.toPayInOrder!)} to pay</span>
+                ) : r.kind === "estimate" ? (
+                  <span className="text-text-2">estimate</span>
                 ) : (
-                  COST_FROM[r.from]
-                )}
-                {how && <span className="block text-xs">{how}</span>}
-              </Td>
-              <Td className="text-right whitespace-nowrap tabular">
-                {r.inOrder !== null ? n2(r.inOrder) : dash}
-                {(r.currency !== c || r.inOrder === null) && <span className="block text-xs text-text-2">{money(r.amount, r.currency)}</span>}
-              </Td>
-              <Td className="text-right whitespace-nowrap tabular">{r.paidInOrder !== null && r.kind !== "estimate" ? n2(r.paidInOrder) : dash}</Td>
-              <Td className={cn("text-right whitespace-nowrap tabular", Number(r.toPayInOrder ?? 0) > 0 && "font-semibold text-warn")}>
-                {r.toPayInOrder !== null && r.kind !== "estimate" ? n2(r.toPayInOrder) : dash}
-              </Td>
-              <Td className="text-right">{action(r)}</Td>
-            </Tr>
+                  <span className="text-ok">paid</span>
+                )
+              }
+              extra={
+                act || receipt ? (
+                  <div className="flex items-center justify-end gap-3 px-4 pb-3">
+                    {receipt && (
+                      <a href={`/files/${receipt.id}?view=1`} className={cn(linkClass, "mr-auto text-sm")}>
+                        Their bill
+                      </a>
+                    )}
+                    {act}
+                  </div>
+                ) : undefined
+              }
+            />
           );
         })}
-      </tbody>
-      {totals && (
-        <tfoot>
-          <tr className="border-t-2 border-line-strong font-bold">
-            <td className="px-3.5 py-3" colSpan={3}>
-              Total
-            </td>
-            <td className="px-3.5 py-3 text-right tabular">{n2(totals.costs)}</td>
-            <td className="px-3.5 py-3 text-right tabular">{n2(totals.paid)}</td>
-            <td className={cn("px-3.5 py-3 text-right tabular", toPay > 0 && "text-warn")}>{n2(totals.toPay)}</td>
-            <td />
-          </tr>
-        </tfoot>
-      )}
-    </Table>
+        {totals && (
+          <li className="flex items-baseline justify-between gap-3 px-4 py-3 text-sm font-bold">
+            <span>Total {c}</span>
+            <span className="tabular">
+              {n2(totals.costs)}
+              {toPay > 0 && <span className="ml-2 font-semibold text-warn">{n2(totals.toPay)} to pay</span>}
+            </span>
+          </li>
+        )}
+      </PhoneList>
+      <div className="max-sm:hidden">
+        <Table>
+          <THead>
+            <tr>
+              <Th>What for</Th>
+              <Th>Who we owe</Th>
+              <Th>Comes from</Th>
+              <Th className="text-right">Cost {c}</Th>
+              <Th className="text-right">Paid</Th>
+              <Th className="text-right">Still to pay</Th>
+              <Th>
+                <span className="sr-only">Pay or change</span>
+              </Th>
+            </tr>
+          </THead>
+          <tbody>
+            {rows.map((r) => {
+              const ours = r.borneBy === "us";
+              const receipt = receiptOf(r);
+              const kind = kindOf(r);
+              const detail = r.kind === "cost" && r.label !== kind ? r.label : r.kind === "estimate" ? r.label : null;
+              const how = howOf?.(r);
+              return (
+                <Tr key={r.key} className={r.kind === "estimate" || !ours ? "text-text-2" : undefined}>
+                  <Td>
+                    <span className="font-semibold">{kind}</span>
+                    {detail && <span className="block text-xs text-text-2">{detail}</span>}
+                    {receipt && (
+                      <a href={`/files/${receipt.id}?view=1`} className={cn(linkClass, "block text-xs")}>
+                        Their bill
+                      </a>
+                    )}
+                  </Td>
+                  <Td>{r.owedTo ?? dash}</Td>
+                  <Td className="text-text-2">
+                    {fromHref[r.from] ? (
+                      <Link href={fromHref[r.from]!} className="hover:text-primary hover:underline">
+                        {COST_FROM[r.from]}
+                      </Link>
+                    ) : (
+                      COST_FROM[r.from]
+                    )}
+                    {how && <span className="block text-xs">{how}</span>}
+                  </Td>
+                  <Td className="text-right whitespace-nowrap tabular">
+                    {r.inOrder !== null ? n2(r.inOrder) : dash}
+                    {(r.currency !== c || r.inOrder === null) && (
+                      <span className="block text-xs text-text-2">{money(r.amount, r.currency)}</span>
+                    )}
+                  </Td>
+                  <Td className="text-right whitespace-nowrap tabular">
+                    {r.paidInOrder !== null && r.kind !== "estimate" ? n2(r.paidInOrder) : dash}
+                  </Td>
+                  <Td className={cn("text-right whitespace-nowrap tabular", Number(r.toPayInOrder ?? 0) > 0 && "font-semibold text-warn")}>
+                    {r.toPayInOrder !== null && r.kind !== "estimate" ? n2(r.toPayInOrder) : dash}
+                  </Td>
+                  <Td className="text-right">{action(r)}</Td>
+                </Tr>
+              );
+            })}
+          </tbody>
+          {totals && (
+            <tfoot>
+              <tr className="border-t-2 border-line-strong font-bold">
+                <td className="px-3.5 py-3" colSpan={3}>
+                  Total
+                </td>
+                <td className="px-3.5 py-3 text-right tabular">{n2(totals.costs)}</td>
+                <td className="px-3.5 py-3 text-right tabular">{n2(totals.paid)}</td>
+                <td className={cn("px-3.5 py-3 text-right tabular", toPay > 0 && "text-warn")}>{n2(totals.toPay)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </Table>
+      </div>
+    </>
   );
 }
 
@@ -151,7 +215,9 @@ export interface OwedPerson {
 }
 
 /** Costs paid from someone's own money, not paid back yet, per person and currency. */
-export function owedOf(rows: Pick<ExpenseView, "id" | "ownMoney" | "repaid" | "paidBy" | "currency" | "amount" | "spentOn" | "voided">[]): OwedPerson[] {
+export function owedOf(
+  rows: Pick<ExpenseView, "id" | "ownMoney" | "repaid" | "paidBy" | "currency" | "amount" | "spentOn" | "voided">[],
+): OwedPerson[] {
   const by = new Map<string, OwedPerson>();
   for (const e of rows) {
     if (!e.ownMoney || e.repaid || !e.paidBy || e.voided) continue;
@@ -169,7 +235,21 @@ export function owedOf(rows: Pick<ExpenseView, "id" | "ownMoney" | "repaid" | "p
  * "Owed back" (design "spending"): who paid costs here from their own money and is not paid back yet, with
  * Pay back. The same money shows under Owed back on their page and on Finance › Receivables & payables.
  */
-export function OwedBack({ owed, where, orderId, today, canPay, canFiles = false }: { owed: OwedPerson[]; where: string; orderId: string | null; today: string; canPay: boolean; canFiles?: boolean }) {
+export function OwedBack({
+  owed,
+  where,
+  orderId,
+  today,
+  canPay,
+  canFiles = false,
+}: {
+  owed: OwedPerson[];
+  where: string;
+  orderId: string | null;
+  today: string;
+  canPay: boolean;
+  canFiles?: boolean;
+}) {
   if (!owed.length) return null;
   return (
     <Section title="Owed back" state={`${owed.length} ${owed.length === 1 ? "person" : "people"}`} tone="warn">
@@ -177,7 +257,10 @@ export function OwedBack({ owed, where, orderId, today, canPay, canFiles = false
         {owed.map((o) => {
           const amount = money(o.amount, o.currency);
           return (
-            <li key={`${o.person.id}:${o.currency}`} className={cn(RULES.box.inset, "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3")}>
+            <li
+              key={`${o.person.id}:${o.currency}`}
+              className={cn(RULES.box.inset, "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3")}
+            >
               <span className="min-w-0 text-md">
                 <span className="block font-semibold">{o.person.name}</span>
                 <span className="block text-text-2">
@@ -185,7 +268,16 @@ export function OwedBack({ owed, where, orderId, today, canPay, canFiles = false
                 </span>
               </span>
               {canPay ? (
-                <RepayWindow orderId={orderId} ids={o.ids} currency={o.currency} name={o.person.name} amount={amount} today={today} canFiles={canFiles} label={`Pay back ${o.person.name} · ${amount}`} />
+                <RepayWindow
+                  orderId={orderId}
+                  ids={o.ids}
+                  currency={o.currency}
+                  name={o.person.name}
+                  amount={amount}
+                  today={today}
+                  canFiles={canFiles}
+                  label={`Pay back ${o.person.name} · ${amount}`}
+                />
               ) : (
                 <span className="text-sm font-semibold tabular">{amount}</span>
               )}
