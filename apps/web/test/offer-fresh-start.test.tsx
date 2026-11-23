@@ -45,6 +45,6 @@ describe("a new supplier offer starts fresh", () => {
     expect(value("leadDays")).toBe("40");
     expect(value("paymentTerms")).toBe("");
     // The payment starts from the company's usual advance.
-    expect(screen.getAllByLabelText("Share").map((x) => (x as HTMLInputElement).value)).toEqual(["30", "70"]);
+    expect(screen.getAllByLabelText("Percentage").map((x) => (x as HTMLInputElement).value)).toEqual(["30", "70"]);
   });
 });

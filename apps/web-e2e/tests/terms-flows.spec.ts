@@ -53,7 +53,7 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await offer.getByRole("button", { name: /^Next/ }).click();
   await offer.getByLabel("Lead time").fill("30");
   await offer.getByRole("button", { name: "50 / 50" }).click();
-  await expect(offer.getByText("Adds up: 100%")).toBeVisible();
+  await expect(offer.getByText(/Fully allocated · 100%/)).toBeVisible();
   await offer.getByRole("button", { name: /^Next/ }).click();
   await offer.getByLabel("Months").fill("12");
   expect(await accessibilityProblems(page), "the offer's form meets WCAG 2.2 AA").toEqual([]);

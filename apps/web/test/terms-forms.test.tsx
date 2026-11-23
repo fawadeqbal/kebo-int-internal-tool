@@ -92,7 +92,7 @@ describe("the quotation's form, in the four groups", () => {
   it("a usual payment in one tap; the parts are what is sent, with the deposit and balance worked out", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: "30 · 60 · 10 after the site test" }));
-    expect(screen.getAllByLabelText("Share").map((x) => (x as HTMLInputElement).value)).toEqual(["30", "60", "10"]);
+    expect(screen.getAllByLabelText("Percentage").map((x) => (x as HTMLInputElement).value)).toEqual(["30", "60", "10"]);
     const p = sent();
     expect(p.paymentParts.map((x: { percent: string; rule: string }) => `${x.percent} ${x.rule}`)).toEqual(["30 on_order", "60 before_shipment", "10 after_sat"]);
     expect(p).toMatchObject({ depositPercent: 30, balanceTerms: "before_shipment", paymentRoute: null, warrantyMonths: "12", warrantyFrom: "sat" });
@@ -104,11 +104,11 @@ describe("the quotation's form, in the four groups", () => {
 
   it("parts that do not add up stop the save and say why", () => {
     show();
-    const [, balance] = screen.getAllByLabelText("Share");
+    const [, balance] = screen.getAllByLabelText("Percentage");
     fireEvent.change(balance!, { target: { value: "60" } });
-    expect(screen.getByText("10% short · 90%")).toBeTruthy();
+    expect(screen.getByText("10% not allocated · 90%")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Save draft/ }));
-    expect(screen.getByText("The parts must add up to 100%: 10% short.")).toBeTruthy();
+    expect(screen.getByText("The installments must add up to 100%: 10% not allocated.")).toBeTruthy();
   });
 });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Plus, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import {
   LEAD_FROM_LABEL,
   LEAD_FROMS,
@@ -17,7 +17,9 @@ import {
   type TermsSide,
   type WarrantyFrom,
 } from "@kebo/shared";
-import { Button, cn, Field, Input, Select } from "@kebo/ui";
+import { fromMinor } from "@kebo/money";
+import { cn, Field, Input, Select } from "@kebo/ui";
+import { PERCENT_TOTAL, PartsEditor, PartsSummary, type EditorPart, type PartRule } from "@/components/common/parts-editor";
 
 /**
  * The terms' fields that the factory offer's form and the quotation's share (design "RFQ Desk — terms that
@@ -82,45 +84,19 @@ export const rowsAsParts = (rows: PartRow[]): TermPart[] =>
 
 /** What stops the parts from being saved, in a sentence (null: nothing). */
 export function partsProblem(rows: PartRow[]): string | null {
-  if (!rows.length) return "Add a part.";
-  if (rows.some((r) => !r.label.trim())) return "Give each part a name.";
-  if (rows.some((r) => !(num(r.share) > 0 && num(r.share) <= 100))) return "Give each part a share above 0%.";
+  if (!rows.length) return "Add an installment.";
+  if (rows.some((r) => !r.label.trim())) return "Name each installment.";
+  if (rows.some((r) => !(num(r.share) > 0 && num(r.share) <= 100))) return "Give each installment a percentage above 0%.";
   const sum = sharesOf(rows);
   if (Math.abs(sum - 100) >= 0.005)
-    return `The parts must add up to 100%: ${sum < 100 ? `${percentText(100 - sum)}% short` : `${percentText(sum - 100)}% over`}.`;
+    return `The installments must add up to 100%: ${percentText(Math.abs(100 - sum))}% ${sum < 100 ? "not allocated" : "over-allocated"}.`;
   return null;
 }
 
-const presetRows = (p: PartsPreset, side: TermsSide): PartRow[] =>
-  p.parts.map((x) => {
-    const usual = PART_RULE_DAYS[side][x.rule];
-    return {
-      key: newKey(),
-      label: x.share < 100 ? `${x.name} ${x.share}%` : x.name,
-      share: String(x.share),
-      rule: x.rule,
-      days: x.days !== undefined ? String(x.days) : usual !== undefined ? String(usual) : "",
-    };
-  });
-const isPreset = (rows: PartRow[], p: PartsPreset) =>
-  rows.length === p.parts.length &&
-  p.parts.every(
-    (x, i) => rows[i]!.rule === x.rule && num(rows[i]!.share) === x.share && (x.days === undefined || num(rows[i]!.days) === x.days),
-  );
-
-/** "Deposit 30%" follows its share; a name of its own stays as typed. */
-const relabel = (label: string, share: string) => {
-  const m = /^(.*\S)\s+\d+(?:\.\d+)?%$/.exec(label);
-  return m && share ? `${m[1]} ${share}%` : label;
-};
-
-const CHIP =
-  "inline-flex min-h-8 items-center rounded-full border px-3 text-md font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none";
-
 /**
- * The payment as parts, inside a bigger form: a usual payment to start from, each part on its own line (what
- * it is, its share, when it falls due, its days where the rule takes them), "Add a part", and a bar that adds
- * the shares up as they are typed (with what 100% is, when it is known).
+ * The payment as installments, inside a bigger form: the one installments editor the order's plans use too
+ * (components/common/parts-editor), counting in percentages here (100% is the total, money is not known yet),
+ * with a bar that adds them up (and what 100% is, when it is known).
  */
 export function PartsField({
   id,
@@ -143,157 +119,51 @@ export function PartsField({
   amounts?: string | null;
   error?: string[] | string;
 }) {
-  const set = (key: string, patch: Partial<PartRow>) => onChange(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  const sum = sharesOf(rows);
-  const ok = Math.abs(sum - 100) < 0.005;
-  const fid = (r: PartRow, f: string) => `${idPrefix}-${r.key}-${f}`;
-  const message = Array.isArray(error) ? error[0] : error;
-  const add = () => {
-    const left = Math.round((100 - sum) * 100) / 100;
-    const rule = side === "customer" ? "before_shipment" : "on_ready";
-    onChange([...rows, { key: newKey(), label: "", share: left > 0 ? percentText(left) : "", rule, days: "" }]);
+  const rules: PartRule[] = PART_RULES[side].map((v) => {
+    const days = PART_RULE_DAYS[side][v];
+    return {
+      value: v,
+      label: PART_RULE_LABEL[side][v],
+      ...(days !== undefined ? { needs: "days" as const, days, ...(v === "lc" ? { daysLabel: "Days (0 at sight)" } : {}) } : {}),
+    };
+  });
+  const parts: EditorPart[] = rows.map((r) => {
+    const v = num(r.share);
+    return {
+      key: r.key,
+      id: null,
+      label: r.label,
+      share: r.share,
+      amount: Number.isFinite(v) ? fromMinor(Math.round(v * 100)) : "",
+      rule: r.rule,
+      dueOn: "",
+      dueDays: r.days,
+      invoice: "",
+      paidMinor: 0,
+      locked: false,
+      note: null,
+    };
+  });
+  const change = (next: EditorPart[] | ((old: EditorPart[]) => EditorPart[])) => {
+    const made = typeof next === "function" ? next(parts) : next;
+    onChange(made.map((p) => ({ key: p.key, label: p.label, share: p.share, rule: p.rule, days: p.dueDays })));
   };
+  const message = Array.isArray(error) ? error[0] : error;
   return (
     <div id={id} className="flex scroll-mt-24 flex-col gap-3 sm:col-span-2 md:col-span-full">
-      {presets.length > 0 && (
-        <div role="group" aria-label="Start from a usual payment" className="flex flex-wrap items-center gap-2">
-          <span className="text-md text-text-2">Start from</span>
-          {presets.map((p) => {
-            const on = isPreset(rows, p);
-            return (
-              <button
-                key={p.label}
-                type="button"
-                aria-pressed={on}
-                onClick={() => onChange(presetRows(p, side))}
-                className={cn(
-                  CHIP,
-                  on ? "border-primary bg-primary-soft text-primary" : "border-line-strong bg-surface text-text hover:bg-surface-2",
-                )}
-              >
-                {p.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      <ol className="flex flex-col gap-2" aria-label="The parts">
-        {rows.map((r, n) => {
-          const takesDays = PART_RULE_DAYS[side][r.rule] !== undefined;
-          const remove = (className?: string) => (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              className={className}
-              onClick={() => onChange(rows.filter((x) => x.key !== r.key))}
-              disabled={rows.length === 1}
-              aria-label={`Remove part ${n + 1}`}
-            >
-              <X aria-hidden />
-            </Button>
-          );
-          return (
-            <li key={r.key} className="rounded-lg border border-line bg-surface p-2.5">
-              {/* A phone: the part's number and its remove on top; the share beside when it falls due. */}
-              <div className="mb-1.5 flex items-center justify-between md:hidden">
-                <span className="text-md font-semibold">Part {n + 1}</span>
-                {remove()}
-              </div>
-              <div
-                role="group"
-                aria-label={`Part ${n + 1}`}
-                className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 md:grid-cols-[1.5rem_minmax(0,1.3fr)_5.5rem_minmax(0,1.4fr)_6.5rem_2rem] md:items-end"
-              >
-                <span
-                  aria-hidden
-                  className="grid size-6 place-items-center rounded-full bg-text text-xs font-bold text-surface max-md:hidden md:mb-2"
-                >
-                  {n + 1}
-                </span>
-                <Field label="What it is" htmlFor={fid(r, "label")} className="col-span-2 md:col-span-1">
-                  <Input
-                    id={fid(r, "label")}
-                    value={r.label}
-                    maxLength={80}
-                    onChange={(e) => set(r.key, { label: e.target.value })}
-                  />
-                </Field>
-                <Field label="Share" htmlFor={fid(r, "share")}>
-                  <Input
-                      id={fid(r, "share")}
-                      inputMode="decimal"
-                      unit="%"
-                      className="tabular"
-                      value={r.share}
-                      onChange={(e) => {
-                        const share = e.target.value;
-                        const v = num(share);
-                        set(r.key, { share, label: relabel(r.label, Number.isFinite(v) ? String(v) : "") });
-                      }}
-                    />
-                </Field>
-                <Field label="When" htmlFor={fid(r, "rule")}>
-                  <Select
-                    id={fid(r, "rule")}
-                    value={r.rule}
-                    onChange={(e) => {
-                      const rule = e.target.value;
-                      const usual = PART_RULE_DAYS[side][rule];
-                      set(r.key, { rule, days: usual === undefined ? "" : r.days || String(usual) });
-                    }}
-                  >
-                    {PART_RULES[side].map((v) => (
-                      <option key={v} value={v}>
-                        {PART_RULE_LABEL[side][v]}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                {takesDays ? (
-                  <Field label={r.rule === "lc" ? "Days (0 at sight)" : "Days after"} htmlFor={fid(r, "days")}>
-                    <Input
-                      id={fid(r, "days")}
-                      type="number"
-                      min={0}
-                      max={3650}
-                      className="tabular"
-                      value={r.days}
-                      onChange={(e) => set(r.key, { days: e.target.value })}
-                    />
-                  </Field>
-                ) : (
-                  <span aria-hidden className="max-md:hidden" />
-                )}
-                <span className="max-md:hidden md:mb-2 md:justify-self-end">{remove()}</span>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-      <Button size="sm" variant="ghost" className="w-fit" onClick={add} disabled={rows.length >= 8}>
-        <Plus aria-hidden /> Add a part
-      </Button>
-      <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2", ok ? "bg-ok-soft" : "bg-bad-soft")}>
-        <b role="status" className={cn("text-md tabular sm:whitespace-nowrap", ok ? "text-ok" : "text-bad")}>
-          {ok
-            ? `Adds up: 100%${amounts ? ` · ${amounts}` : ""}`
-            : sum < 100
-              ? `${percentText(100 - sum)}% short · ${percentText(sum)}%`
-              : `${percentText(sum - 100)}% over · ${percentText(sum)}%`}
-        </b>
-        <span aria-hidden className="flex h-2 min-w-24 flex-1 basis-full overflow-hidden rounded-full bg-text/10 sm:basis-auto">
-          {rows.map((r, i) => {
-            const v = num(r.share);
-            return (
-              <i
-                key={r.key}
-                className={cn("block h-full", (ok ? ["bg-ok", "bg-ok/55"] : ["bg-bad", "bg-bad/55"])[i % 2])}
-                style={{ width: `${Number.isFinite(v) ? Math.max(Math.min((v * 100) / Math.max(sum, 100), 100), 0) : 0}%` }}
-              />
-            );
-          })}
-        </span>
-      </div>
+      <PartsEditor
+        parts={parts}
+        onChange={change}
+        totalMinor={PERCENT_TOTAL}
+        rules={rules}
+        presets={presets.map((p) => ({
+          label: p.label,
+          parts: p.parts.map((x) => ({ name: x.name, share: x.share, rule: x.rule, ...(x.days !== undefined ? { dueDays: x.days } : {}) })),
+        }))}
+        idPrefix={idPrefix}
+        max={8}
+      />
+      <PartsSummary parts={parts} onChange={change} totalMinor={PERCENT_TOTAL} note={amounts} />
       {message && <p className="text-xs text-bad">{message}</p>}
     </div>
   );
