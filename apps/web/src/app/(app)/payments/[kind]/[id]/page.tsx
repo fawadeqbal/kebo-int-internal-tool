@@ -132,10 +132,10 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
             }
           />
         }
-        panelLabel="Beside the payment"
+        panelLabel="Activity beside the payment"
         panel={
           <Card>
-          <CardHeader title="History" />
+          <CardHeader title="Activity" />
           <CardBody className="flex flex-col gap-3 text-sm">
             <HistoryLine who={p.recordedBy} what={p.kind === "submission" ? "Sent for verification" : "Recorded"} at={p.recordedAt} />
             {p.voided && <HistoryLine who={null} what={`Removed${p.voided.reason ? `: ${p.voided.reason}` : ""}`} at={p.voided.at} />}
@@ -149,13 +149,13 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
         }
       >
           <Card>
-            <CardHeader title="Payment" />
+            <CardHeader title="Details" />
             <CardBody>
               <DetailList columns={3} items={fieldItems} />
             </CardBody>
           </Card>
           <Card>
-            <CardHeader title="Proof" />
+            <CardHeader title="Attachments" />
             <CardBody>
               {proof ? (
                 proof
@@ -164,18 +164,18 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
                   <FileText className="size-4" aria-hidden /> {p.file.name}
                 </a>
               ) : (
-                <EmptyLine>No file attached.</EmptyLine>
+                <EmptyLine>No attachment.</EmptyLine>
               )}
             </CardBody>
           </Card>
           {p.parts && p.parts.length > 0 && (
             <Card>
-              <CardHeader title="Where it goes" />
+              <CardHeader title="Applied to" />
               <Table>
                 <THead>
                   <tr>
                     <Th>Order</Th>
-                    <Th>Part</Th>
+                    <Th>Installment</Th>
                     <Th className="text-right">Amount</Th>
                   </tr>
                 </THead>

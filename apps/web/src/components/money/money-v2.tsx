@@ -188,10 +188,10 @@ export function ReceivedFields({
                 <MoneyInput id="r-amount" name="receivedAmount" currency={a.received} value={a.amount} onChange={(e) => a.setAmount(e.target.value)} placeholder="0.00" />
               </div>
             </Field>
-            <Field label="Paid on" htmlFor="r-paidOn" error={s.errors?.paidOn}>
+            <Field label="Date" htmlFor="r-paidOn" error={s.errors?.paidOn}>
               <Input id="r-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
             </Field>
-            <Field label="How" htmlFor="r-method" error={s.errors?.method}>
+            <Field label="Method" htmlFor="r-method" error={s.errors?.method}>
               <Select id="r-method" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
                 {METHODS.map((m) => (
                   <option key={m} value={m}>
@@ -200,7 +200,7 @@ export function ReceivedFields({
                 ))}
               </Select>
             </Field>
-            <AccountSelect id="r-account" label="Into account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+            <AccountSelect id="r-account" label="Deposit to account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
             <Field label="Reference" htmlFor="r-reference" optional error={s.errors?.reference}>
               <Input id="r-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
             </Field>
@@ -274,7 +274,7 @@ export function ReceivedFields({
               </p>
             )}
           </div>
-          <FilePicker id="r-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} />
+          <FilePicker id="r-file" label="Attachment" hint="Photo or PDF" file={file} onChange={setFile} />
           <Field label="Note" htmlFor="r-note" optional error={s.errors?.note}>
             <Textarea id="r-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
           </Field>
@@ -430,11 +430,11 @@ function ReceiptFields({
                 <MoneyInput id="rc-amount" name="receivedAmount" currency={a.received} value={a.amount} onChange={(e) => a.setAmount(e.target.value)} placeholder="0.00" />
               </div>
             </Field>
-            <AccountSelect id="rc-account" label="Into account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
-            <Field label="Paid on" htmlFor="rc-on" error={s.errors?.paidOn}>
+            <AccountSelect id="rc-account" label="Deposit to account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+            <Field label="Date" htmlFor="rc-on" error={s.errors?.paidOn}>
               <Input id="rc-on" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
             </Field>
-            <Field label="How" htmlFor="rc-method">
+            <Field label="Method" htmlFor="rc-method">
               <Select id="rc-method" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
                 {METHODS.map((m) => (
                   <option key={m} value={m}>

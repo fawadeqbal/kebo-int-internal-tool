@@ -145,8 +145,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         label="Which payments"
         tabs={[
           { href: chip({}), label: "All", count: list.counts.all, active: !dir && !status && !kind },
-          { href: chip({ dir: "in" }), label: "Money in", count: list.counts.in, active: dir === "in" && !status },
-          { href: chip({ dir: "out" }), label: "Money out", count: list.counts.out, active: dir === "out" && !status && !kind },
+          { href: chip({ dir: "in" }), label: "Received", count: list.counts.in, active: dir === "in" && !status },
+          { href: chip({ dir: "out" }), label: "Paid", count: list.counts.out, active: dir === "out" && !status && !kind },
           { href: chip({ kind: "expense" }), label: "Expenses", count: list.counts.expense, active: kind === "expense" },
           { href: chip({ dir: "move" }), label: "Transfers", count: list.counts.move, active: dir === "move" },
           ...(list.counts.to_verify ? [{ href: chip({ status: "to_verify" }), label: "To verify", count: list.counts.to_verify, alert: true, active: status === "to_verify" }] : []),

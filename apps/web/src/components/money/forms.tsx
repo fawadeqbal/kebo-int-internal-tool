@@ -207,10 +207,10 @@ export function EditCustomerPayment({
             <Field label="Bank charges" htmlFor="ep-charges" optional error={s.errors?.bankCharges}>
               <MoneyInput id="ep-charges" name="bankCharges" currency={currency} defaultValue={s.values?.bankCharges ?? payment.bankCharges} />
             </Field>
-            <Field label="Paid on" htmlFor="ep-paidOn" error={s.errors?.paidOn}>
+            <Field label="Date" htmlFor="ep-paidOn" error={s.errors?.paidOn}>
               <Input id="ep-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? payment.paidOn} />
             </Field>
-            <Field label="How" htmlFor="ep-method">
+            <Field label="Method" htmlFor="ep-method">
               <Choice
                 id="ep-method"
                 name="method"
@@ -222,7 +222,7 @@ export function EditCustomerPayment({
             <Field label="Reference" htmlFor="ep-reference" optional>
               <Input id="ep-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment.reference ?? ""} />
             </Field>
-            <AccountSelect id="ep-account" label="Into account" currency={received} defaultValue={s.values?.accountId ?? payment.account?.id} error={s.errors?.accountId} />
+            <AccountSelect id="ep-account" label="Deposit to account" currency={received} defaultValue={s.values?.accountId ?? payment.account?.id} error={s.errors?.accountId} />
           </div>
           <input type="hidden" name="paidByName" value={payment.paidByName ?? ""} />
           <input type="hidden" name="note" value={payment.note ?? ""} />
@@ -375,7 +375,7 @@ export function FactoryPaymentForm({
                 value={(s.values?.kind as PaymentKind) ?? payment?.kind ?? prefill?.kind ?? (chosen && Number(chosen.paid) > 0 ? "balance" : "deposit")}
               />
             </Field>
-            <Field label="Paid on" htmlFor="fp-paidOn" error={s.errors?.paidOn}>
+            <Field label="Date" htmlFor="fp-paidOn" error={s.errors?.paidOn}>
               <Input id="fp-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? payment?.paidOn ?? today} />
             </Field>
             <Field label="Currency" htmlFor="fp-currency" error={s.errors?.currency}>
@@ -439,7 +439,7 @@ export function FactoryPaymentForm({
             </Notice>
           )}
           <div className={RULES.form.fields}>
-            <Field label="How" htmlFor="fp-method">
+            <Field label="Method" htmlFor="fp-method">
               <Choice
                 id="fp-method"
                 name="method"
@@ -448,7 +448,7 @@ export function FactoryPaymentForm({
                 value={(s.values?.method as PaymentMethod) ?? payment?.method ?? "bank_transfer"}
               />
             </Field>
-            <AccountSelect id="fp-account" label="From account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
+            <AccountSelect id="fp-account" label="Paid from account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
             <Field label="Reference" htmlFor="fp-reference" optional>
               <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? prefill?.reference ?? ""} />
             </Field>
@@ -467,7 +467,7 @@ export function FactoryPaymentForm({
             </Field>
           </div>
           {!payment && (
-            <FilePicker id="fp-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} />
+            <FilePicker id="fp-file" label="Attachment" hint="Photo or PDF" file={file} onChange={setFile} />
           )}
           <Field label="Note" htmlFor="fp-note" optional>
             <Textarea id="fp-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? payment?.note ?? ""} />

@@ -561,7 +561,7 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
               <Table>
                 <THead>
                   <tr>
-                    <Th>Who we owe</Th>
+                    <Th>Payable to</Th>
                     <Th className="max-sm:hidden">What for</Th>
                     <Th className="max-sm:hidden">Order</Th>
                     <Th className="text-right max-sm:hidden">Amount</Th>

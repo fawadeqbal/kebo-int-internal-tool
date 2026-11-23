@@ -26,8 +26,8 @@ import { opensPayments } from "../shared";
 
 type Kind = "in" | "out" | "expense" | "transfer";
 const KINDS: { kind: Kind; label: string }[] = [
-  { kind: "in", label: "Money in" },
-  { kind: "out", label: "Money out" },
+  { kind: "in", label: "Payment received" },
+  { kind: "out", label: "Payment made" },
   { kind: "expense", label: "Expense" },
   { kind: "transfer", label: "Transfer" },
 ];

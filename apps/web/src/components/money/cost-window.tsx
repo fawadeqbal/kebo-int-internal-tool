@@ -477,11 +477,6 @@ export function CostForm({
                 
               />
             </Field>
-            {!send && (
-              <Field label="Who we owe" htmlFor="cost-payee" optional error={st.errors?.payee}>
-                <Input id="cost-payee" name="payee" maxLength={120} defaultValue={st.values?.payee ?? from?.payee ?? ""} />
-              </Field>
-            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -534,7 +529,7 @@ export function CostForm({
             {!settled && paid === "later" && <p className="text-xs text-text-2">It shows under Still to pay until it is paid. Pay it from its row, or from Finance › Receivables & payables.</p>}
             {!settled && paid === "now" && (
               <div className="grid gap-3 sm:grid-cols-2">
-                <AccountSelect key={currency} id="cost-account" label="From account" currency={currency} defaultValue={from?.account?.id ?? month?.account?.id} error={st.errors?.accountId} />
+                <AccountSelect key={currency} id="cost-account" label="Paid from account" currency={currency} defaultValue={from?.account?.id ?? month?.account?.id} error={st.errors?.accountId} />
                 {send ? (
                   <input type="hidden" name="paidById" value="" />
                 ) : (
@@ -624,7 +619,7 @@ export function CostForm({
 
           <div className="grid gap-3 sm:grid-cols-2">
             {!send && (
-              <Field label="Their bill no." htmlFor="cost-reference" optional error={st.errors?.reference}>
+              <Field label="Bill / receipt no." htmlFor="cost-reference" optional error={st.errors?.reference}>
                 <Input id="cost-reference" name="reference" maxLength={120} defaultValue={st.values?.reference ?? expense?.reference ?? ""} />
               </Field>
             )}
