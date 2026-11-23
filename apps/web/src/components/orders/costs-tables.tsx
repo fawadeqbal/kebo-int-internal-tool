@@ -30,7 +30,7 @@ export function CostsExcel({ costs }: { costs: OrderCosts }) {
         onClick={async () => {
           setBusy(true);
           const text = (key: string, label: string, align?: "right"): LineColumn => ({ key, label, width: "8rem", align, format: (v) => v[key] ?? "" });
-          const columns = [text("what", "What for"), text("owedTo", "Who we owe"), text("from", "Comes from"), text("cost", "Cost", "right"), text("inOrder", `In ${c}`, "right"), text("paid", "Paid", "right"), text("toPay", "Still to pay", "right"), text("state", "Status")];
+          const columns = [text("what", "What for"), text("owedTo", "Payable to"), text("from", "Comes from"), text("cost", "Cost", "right"), text("inOrder", `In ${c}`, "right"), text("paid", "Paid", "right"), text("toPay", "Still to pay", "right"), text("state", "Status")];
           const rows: LineRow[] = costs.sheet.rows.map((r) => ({
             key: r.key,
             parentKey: null,

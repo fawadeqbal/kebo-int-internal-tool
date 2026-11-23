@@ -129,7 +129,7 @@ export function CostSheetTable({
           <THead>
             <tr>
               <Th>What for</Th>
-              <Th>Who we owe</Th>
+              <Th>Payable to</Th>
               <Th>Comes from</Th>
               <Th className="text-right">Cost {c}</Th>
               <Th className="text-right">Paid</Th>

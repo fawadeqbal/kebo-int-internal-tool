@@ -69,6 +69,32 @@ const relabel = (label: string, share: string) => {
   return m && share ? `${m[1]} ${share}%` : label;
 };
 
+/** A new, open installment holding `amount` (minor units), due by the first rule. */
+function freshPart(amountMinor: number, totalMinor: number, rule: PlanRule): PlanPart {
+  return {
+    key: newKey(),
+    id: null,
+    label: "",
+    share: amountMinor > 0 ? shareText(amountMinor, totalMinor) : "",
+    amount: amountMinor > 0 ? fromMinor(amountMinor) : "",
+    rule: rule.value,
+    dueOn: "",
+    dueDays: rule.days !== undefined ? String(rule.days) : "",
+    invoice: "",
+    paidMinor: 0,
+    locked: false,
+    note: null,
+  };
+}
+
+/** How the amounts are typed: each as an amount, each as a percentage, or split into equal installments. */
+type Basis = "amount" | "percent" | "equal";
+const BASES: { value: Basis; label: string }[] = [
+  { value: "amount", label: "Amount" },
+  { value: "percent", label: "Percentage" },
+  { value: "equal", label: "Equal installments" },
+];
+
 /** A preset's amounts: each its share of the total, the last one the rest, so they add up exactly. */
 function presetAmounts(p: PlanPreset, totalMinor: number) {
   let left = totalMinor;
@@ -114,7 +140,9 @@ export function PlanEditor({
   onDone: () => void;
 }) {
   const base = useId();
-  const [parts, setParts] = useState<PlanPart[]>(start);
+  const [parts, setParts] = useState<PlanPart[]>(() => (start.length ? start : [freshPart(totalMinor, totalMinor, rules[0]!)]));
+  const [basis, setBasis] = useState<Basis>("amount");
+  const [count, setCount] = useState(() => Math.max(start.length, 2));
   const [tried, setTried] = useState(false);
   const ruleOf = (v: string) => rules.find((r) => r.value === v);
   const set = (key: string, p: Partial<PlanPart>) => setParts((all) => all.map((x) => (x.key === key ? { ...x, ...p } : x)));
@@ -126,9 +154,9 @@ export function PlanEditor({
   const problem = (p: PlanPart): { field: string; text: string } | null => {
     if (p.locked) return null;
     const minor = minorOf(p.amount);
-    if (!p.label.trim()) return { field: "label", text: "Give it a name" };
+    if (!p.label.trim()) return { field: "label", text: "Name the installment" };
     if (minor <= 0) return { field: "amount", text: "More than 0" };
-    if (minor < p.paidMinor) return { field: "amount", text: `At least ${formatMinor(p.paidMinor, currency)}: that much is paid on it` };
+    if (minor < p.paidMinor) return { field: "amount", text: `At least ${formatMinor(p.paidMinor, currency)}: that amount is already applied` };
     if (ruleOf(p.rule)?.needs === "date" && !p.dueOn) return { field: "dueOn", text: "Choose its date" };
     return null;
   };
@@ -173,24 +201,40 @@ export function PlanEditor({
       }),
     );
   };
-  const add = () =>
-    setParts((all) => [
-      ...all,
-      {
-        key: newKey(),
-        id: null,
-        label: "",
-        share: diff > 0 ? shareText(diff, totalMinor) : "",
-        amount: diff > 0 ? fromMinor(diff) : "",
-        rule: rules[0]!.value,
-        dueOn: "",
-        dueDays: rules[0]!.days !== undefined ? String(rules[0]!.days) : "",
-        invoice: "",
-        paidMinor: 0,
-        locked: false,
-        note: null,
-      },
-    ]);
+  /** A new installment: empty, or holding the balance that no installment holds yet. */
+  const add = (withBalance: boolean) => setParts((all) => [...all, freshPart(withBalance && diff > 0 ? diff : 0, totalMinor, rules[0]!)]);
+  /** The balance goes onto the last open installment. */
+  const addToLast = () =>
+    setParts((all) => {
+      const at = all.map((p) => p.locked).lastIndexOf(false);
+      if (at < 0 || diff <= 0) return all;
+      return all.map((p, i) => {
+        if (i !== at) return p;
+        const minor = minorOf(p.amount) + diff;
+        const share = shareText(minor, totalMinor);
+        return { ...p, amount: fromMinor(minor), share, label: relabel(p.label, share) };
+      });
+    });
+  /** n equal installments: those already settled stay, the rest of the total is shared out evenly (the last takes any cent over). */
+  const splitEqual = (n: number) => {
+    const size = Math.min(Math.max(Math.round(n) || 2, 1), 12);
+    setCount(size);
+    setParts((old) => {
+      const kept = old.filter((p) => p.locked);
+      const open = old.filter((p) => !p.locked);
+      const k = Math.max(size - kept.length, 1);
+      const free = Math.max(totalMinor - kept.reduce((t, p) => t + minorOf(p.amount), 0), 0);
+      const each = Math.floor(free / k);
+      const made = Array.from({ length: k }, (_, i): PlanPart => {
+        const minor = i === k - 1 ? free - each * (k - 1) : each;
+        const was = open[i];
+        const base = was ?? freshPart(minor, totalMinor, rules[0]!);
+        const share = shareText(minor, totalMinor);
+        return { ...base, amount: fromMinor(minor), share, label: relabel(base.label, share) };
+      });
+      return [...kept, ...made];
+    });
+  };
 
   const check = () => {
     const at = problems.findIndex(Boolean);
@@ -216,9 +260,41 @@ export function PlanEditor({
       <PanelBody className="flex flex-col gap-4">
         <input type="hidden" name="payload" value={JSON.stringify(toPayload(parts))} />
         <p className="text-sm text-text-2">{intro}</p>
+        <div role="group" aria-label="Basis of the installments" className="flex flex-wrap items-center gap-2">
+          <span className="text-md text-text-2">Set by</span>
+          {BASES.map((b) => (
+            <button
+              key={b.value}
+              type="button"
+              aria-pressed={basis === b.value}
+              onClick={() => {
+                setBasis(b.value);
+                if (b.value === "equal") splitEqual(count);
+              }}
+              className={cn(
+                "inline-flex min-h-8 items-center rounded-full border px-3 text-md font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+                basis === b.value ? "border-primary bg-primary-soft text-primary" : "border-line-strong bg-surface text-text hover:bg-surface-2",
+              )}
+            >
+              {b.label}
+            </button>
+          ))}
+          {basis === "equal" && (
+            <span className="ml-1 inline-flex items-center gap-2 text-md text-text-2">
+              <Button size="icon-xs" variant="ghost" aria-label="Fewer installments" onClick={() => splitEqual(count - 1)} disabled={count <= 1}>
+                −
+              </Button>
+              <b className="w-5 text-center font-semibold text-text tabular">{count}</b>
+              <Button size="icon-xs" variant="ghost" aria-label="More installments" onClick={() => splitEqual(count + 1)} disabled={count >= 12}>
+                +
+              </Button>
+              installments
+            </span>
+          )}
+        </div>
         {presets.length > 0 && (
-          <div role="group" aria-label="Start from a usual plan" className="flex flex-wrap items-center gap-2">
-            <span className="text-md text-text-2">Start from</span>
+          <div role="group" aria-label="Start from a template" className="flex flex-wrap items-center gap-2">
+            <span className="text-md text-text-2">Start from template</span>
             {presets.map((p) => {
               const on = chosen(p);
               const can = fits(p);
@@ -228,7 +304,7 @@ export function PlanEditor({
                   type="button"
                   aria-pressed={on}
                   disabled={!can}
-                  title={can ? undefined : "A paid part would change: change the parts one by one"}
+                  title={can ? undefined : "A settled installment would change: change the installments one by one"}
                   onClick={() => apply(p)}
                   className={cn(
                     "inline-flex min-h-8 items-center rounded-full border px-3 text-md font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
@@ -252,17 +328,17 @@ export function PlanEditor({
                 variant="ghost"
                 onClick={() => setParts((all) => all.filter((x) => x.key !== p.key))}
                 disabled={parts.length === 1 || p.paidMinor > 0}
-                title={p.paidMinor > 0 ? "Money is paid on it: it stays" : undefined}
-                aria-label={`Remove part ${n + 1}`}
+                title={p.paidMinor > 0 ? "A payment is applied to it: it stays" : undefined}
+                aria-label={`Remove installment ${n + 1}`}
               >
                 <X aria-hidden />
               </Button>
             );
             return (
               <li key={p.key} className={cn("rounded-lg border border-line p-3", p.locked ? "bg-surface-2/60" : "bg-surface")}>
-                <div role="group" aria-label={`Part ${n + 1}`}>
+                <div role="group" aria-label={`Installment ${n + 1}`}>
                   <div className="mb-2 flex items-center justify-between md:hidden">
-                    <span className="text-md font-semibold">Part {n + 1}</span>
+                    <span className="text-md font-semibold">Installment {n + 1}</span>
                     {remove}
                   </div>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 md:grid-cols-[1.75rem_minmax(0,1.2fr)_5rem_8rem_minmax(0,1.4fr)_8rem_2rem] md:items-end">
@@ -273,7 +349,7 @@ export function PlanEditor({
                       {n + 1}
                     </span>
                     <Field
-                      label="What it is"
+                      label="Installment"
                       htmlFor={fid(p, "label")}
                       error={bad?.field === "label" ? bad.text : undefined}
                       className="col-span-2 md:col-span-1"
@@ -286,14 +362,15 @@ export function PlanEditor({
                         onChange={(e) => set(p.key, { label: e.target.value })}
                       />
                     </Field>
-                    <Field label="Share" htmlFor={fid(p, "share")}>
+                    <Field label="Percentage" htmlFor={fid(p, "share")}>
                       <div className="relative">
                         <Input
                           id={fid(p, "share")}
                           inputMode="decimal"
-                          className="pr-7 tabular"
+                          className={cn("pr-7 tabular", basis !== "percent" && !p.locked && "bg-surface-2 text-text-2")}
                           value={p.share}
                           disabled={p.locked}
+                          readOnly={basis !== "percent"}
                           onChange={(e) => {
                             const share = e.target.value;
                             const v = num(share);
@@ -311,10 +388,11 @@ export function PlanEditor({
                     <Field label="Amount" htmlFor={fid(p, "amount")} error={bad?.field === "amount" ? bad.text : undefined}>
                       <MoneyInput
                         id={fid(p, "amount")}
-                        className="h-10"
+                        className={cn("h-10", basis === "percent" && !p.locked && "bg-surface-2 text-text-2")}
                         currency={currency}
                         value={p.amount}
                         disabled={p.locked}
+                        readOnly={basis === "percent"}
                         onChange={(e) => {
                           const amount = e.target.value;
                           const share = shareText(minorOf(amount), totalMinor);
@@ -322,7 +400,7 @@ export function PlanEditor({
                         }}
                       />
                     </Field>
-                    <Field label="When" htmlFor={fid(p, "rule")} className="col-span-2 md:col-span-1">
+                    <Field label="Due" htmlFor={fid(p, "rule")} className="col-span-2 md:col-span-1">
                       <Select
                         id={fid(p, "rule")}
                         value={p.rule}
@@ -371,14 +449,14 @@ export function PlanEditor({
                         />
                       </Field>
                     ) : (
-                      <span className="max-md:hidden md:mb-2.5 md:text-md md:text-muted">Dated by the rule</span>
+                      <span className="max-md:hidden md:mb-2.5 md:text-md md:text-muted">Dated by its rule</span>
                     )}
                     <span className="max-md:hidden md:mb-0.5">{remove}</span>
                   </div>
                   {(invoices || words || p.note) && (
                     <div className="mt-2.5 flex flex-col gap-2 md:flex-row md:items-end md:gap-3 md:pl-[2.5rem]">
                       {invoices && (
-                        <Field label="Their invoice no." htmlFor={fid(p, "invoice")} optional className="md:w-56 md:shrink-0">
+                        <Field label="Supplier invoice no." htmlFor={fid(p, "invoice")} optional className="md:w-56 md:shrink-0">
                           <Input
                             id={fid(p, "invoice")}
                             maxLength={60}
@@ -400,20 +478,32 @@ export function PlanEditor({
             );
           })}
         </ol>
-        <Button size="sm" variant="ghost" className="w-fit" onClick={add} disabled={parts.length >= 12}>
-          <Plus aria-hidden /> Add a part
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="ghost" className="w-fit" onClick={() => add(false)} disabled={parts.length >= 12}>
+            <Plus aria-hidden /> Add installment
+          </Button>
+          {diff > 0 && (
+            <Button size="sm" variant="ghost" className="w-fit" onClick={() => add(true)} disabled={parts.length >= 12}>
+              <Plus aria-hidden /> Add balance as new installment
+            </Button>
+          )}
+        </div>
       </PanelBody>
       {/* Under the parts, outside the scrolling: the sum stays in view above Save. */}
       <WindowFooter outside cancel={false}>
         <div className={cn("flex basis-full items-center gap-3 rounded-lg px-3 py-2", ok ? "bg-ok-soft" : "bg-bad-soft")}>
           <b role="status" className={cn("text-md whitespace-nowrap tabular", ok ? "text-ok" : "text-bad")}>
             {ok
-              ? `Adds up: 100% · ${formatMinor(totalMinor, currency)}`
+              ? `Fully allocated · 100% · ${formatMinor(totalMinor, currency)}`
               : diff > 0
-                ? `${formatMinor(diff, currency)} short · ${pct}%`
-                : `${formatMinor(-diff, currency)} over · ${pct}%`}
+                ? `${formatMinor(diff, currency)} not allocated · ${pct}%`
+                : `${formatMinor(-diff, currency)} over-allocated · ${pct}%`}
           </b>
+          {diff > 0 && parts.some((p) => !p.locked) && (
+            <Button size="xs" variant="ghost" className="text-primary hover:text-primary" onClick={addToLast}>
+              Add to final installment
+            </Button>
+          )}
           <span aria-hidden className="flex h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-black/10">
             {parts.map((p, i) => (
               <i
@@ -429,13 +519,13 @@ export function PlanEditor({
         {tried && (problems.some(Boolean) || !ok) && (
           <p role="alert" className="basis-full text-md font-medium text-bad">
             {!ok
-              ? `The parts must add up to ${formatMinor(totalMinor, currency)}: ${diff > 0 ? `${formatMinor(diff, currency)} short` : `${formatMinor(-diff, currency)} over`}.`
-              : "Fix the part marked in red."}
+              ? `The installments must add up to ${formatMinor(totalMinor, currency)}: ${diff > 0 ? `${formatMinor(diff, currency)} not allocated` : `${formatMinor(-diff, currency)} over-allocated`}.`
+              : "Correct the installment marked in red."}
           </p>
         )}
         <span className="mr-auto text-xs text-muted max-md:hidden">Ctrl+Enter saves · Esc closes</span>
         <WindowCancelIn />
-        <SubmitButton pendingText="Saving…">Save the plan</SubmitButton>
+        <SubmitButton pendingText="Saving…">Save plan</SubmitButton>
       </WindowFooter>
     </ActionForm>
   );
@@ -447,16 +537,25 @@ function PlanEditWindow({
   title,
   sub,
   editor,
+  create,
 }: {
   label: string;
   title: string;
   sub: string;
   editor: Omit<Parameters<typeof PlanEditor>[0], "onDone">;
+  /** No plan yet: the button says "Create payment plan" (the same editor, one blank installment holding the total). */
+  create?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <EditButton label={label} onClick={() => setOpen(true)} />
+      {create ? (
+        <Button size="sm" onClick={() => setOpen(true)}>
+          <Plus aria-hidden /> Create payment plan
+        </Button>
+      ) : (
+        <EditButton label={label} onClick={() => setOpen(true)} />
+      )}
       {open && (
         <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={RULES.window.wideRows}>
           <PlanEditor {...editor} onDone={() => setOpen(false)} />
@@ -470,8 +569,8 @@ function PlanEditWindow({
 
 const CUSTOMER_RULES: PlanRule[] = [
   { value: "fixed", label: "On a date", needs: "date" },
-  { value: "on_ready", label: "On the ready date" },
-  { value: "on_ship_plus_days", label: "Days after shipping", needs: "days", days: 14 },
+  { value: "on_ready", label: "On goods ready" },
+  { value: "on_ship_plus_days", label: "Days after shipment", needs: "days", days: 14 },
   { value: "after_papers", label: "After the documents (LC)", needs: "days", days: 0 },
   { value: "after_sat", label: "After the site test (SAT)", needs: "days", days: 0 },
   { value: "", label: "No date yet" },
@@ -531,13 +630,14 @@ export function CustomerPlanWindow({
   return (
     <PlanEditWindow
       label="Edit plan"
-      title="Payment plan"
+      title="Customer payment plan"
       sub={sub}
+      create={plan.items.length === 0}
       editor={{
         intro: (
           <>
-            {customer} pays <b className="font-semibold text-text tabular">{money(total, currency)}</b> for this order. Each part gets its
-            own payment request.
+            Customer payments from {customer}: total <b className="font-semibold text-text tabular">{money(total, currency)}</b>. Each
+            installment gets its own payment request.
           </>
         ),
         totalMinor,
@@ -545,7 +645,7 @@ export function CustomerPlanWindow({
         rules: CUSTOMER_RULES,
         presets: [
           {
-            label: "30% now · 70% before shipment",
+            label: "30% on confirmation · 70% before shipment",
             parts: [
               { name: "Deposit", share: 30, rule: "fixed", dueOn: depositOn },
               { name: "Balance", share: 70, rule: "on_ready" },
@@ -558,9 +658,9 @@ export function CustomerPlanWindow({
               { name: "Balance", share: 50, rule: "on_ready" },
             ],
           },
-          { label: "All before shipment", parts: [{ name: "Payment before shipment", share: 100, rule: "on_ready" }] },
+          { label: "100% before shipment", parts: [{ name: "Payment before shipment", share: 100, rule: "on_ready" }] },
           {
-            label: "All against the B/L copy",
+            label: "100% against B/L copy",
             parts: [{ name: "Payment against B/L copy", share: 100, rule: "on_ship_plus_days", dueDays: 14 }],
           },
         ],
@@ -596,10 +696,10 @@ export function CustomerPlanWindow({
 /* ---------------------------------------------------------------- a supplier's plan */
 
 const SUPPLIER_RULES: PlanRule[] = [
-  { value: "on_order", label: "When we order" },
-  { value: "on_ready", label: "When they say ready" },
+  { value: "on_order", label: "On order placement" },
+  { value: "on_ready", label: "On goods ready" },
   { value: "fixed", label: "On a fixed date", needs: "date" },
-  { value: "on_ship_plus_days", label: "Days after shipping", needs: "days", days: 30 },
+  { value: "on_ship_plus_days", label: "Days after shipment", needs: "days", days: 30 },
 ];
 
 /** "Edit plan" (and "Change") on Factory order: what we pay one supplier, in parts, with their invoice numbers. */
@@ -645,19 +745,20 @@ export function SupplierPlanWindow({
   return (
     <PlanEditWindow
       label={label}
-      title={`Paying ${plan.factory.name}`}
+      title={`Supplier payment plan · ${plan.factory.name}`}
       sub={sub}
+      create={plan.rows.length === 0}
       editor={{
         intro: (
           <>
-            We owe {plan.factory.name} <b className="font-semibold text-text tabular">{money(plan.owed, c)}</b> for this order.
+            Payable to {plan.factory.name}: <b className="font-semibold text-text tabular">{money(plan.owed, c)}</b>.
             {Number(plan.paid) > 0 && (
               <>
                 {" "}
-                <b className="font-semibold text-text tabular">{money(plan.paid, c)}</b> is paid: what is paid stays.
+                <b className="font-semibold text-text tabular">{money(plan.paid, c)}</b> is settled and remains as paid.
               </>
             )}
-            {!plan.saved && " This is the company's usual plan until it is saved."}
+            {!plan.saved && " This is the company's standard plan until it is saved."}
           </>
         ),
         totalMinor,
@@ -665,7 +766,7 @@ export function SupplierPlanWindow({
         rules: SUPPLIER_RULES,
         presets: [
           {
-            label: "30% when we order · 70% when ready",
+            label: "30% on order placement · 70% on goods ready",
             parts: [
               { name: "Deposit", share: 30, rule: "on_order" },
               { name: "Balance", share: 70, rule: "on_ready" },
@@ -678,8 +779,8 @@ export function SupplierPlanWindow({
               { name: "Balance", share: 50, rule: "on_ready" },
             ],
           },
-          { label: "All when ready", parts: [{ name: "Payment", share: 100, rule: "on_ready" }] },
-          { label: "All after shipping", parts: [{ name: "Payment after shipping", share: 100, rule: "on_ship_plus_days", dueDays: 30 }] },
+          { label: "100% on goods ready", parts: [{ name: "Payment", share: 100, rule: "on_ready" }] },
+          { label: "100% after shipment", parts: [{ name: "Payment after shipping", share: 100, rule: "on_ship_plus_days", dueDays: 30 }] },
         ],
         start,
         invoices: true,

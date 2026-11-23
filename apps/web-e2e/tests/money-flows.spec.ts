@@ -80,25 +80,25 @@ test("Edit plan, a supplier's: a paid part stays, the bar adds up, Save checks i
   await orderWith(page, "factory", (p) => p.getByRole("region", { name: /^Payment plan/ }).filter({ hasText: /Paid \d/ }).getByRole("button", { name: "Pay", exact: true }));
   const plan = page.getByRole("region", { name: /^Payment plan/ }).first();
   await plan.getByRole("button", { name: "Edit plan", exact: true }).click();
-  const form = page.getByRole("dialog", { name: /^Paying / });
-  const first = form.getByRole("group", { name: "Part 1" });
-  const second = form.getByRole("group", { name: "Part 2" });
+  const form = page.getByRole("dialog", { name: /^Supplier payment plan/ });
+  const first = form.getByRole("group", { name: "Installment 1" });
+  const second = form.getByRole("group", { name: "Installment 2" });
   expect(await accessibilityProblems(page), "the editor meets WCAG 2.2 AA").toEqual([]);
   // The advance is paid: it stays as it was paid.
-  await expect(first.getByRole("textbox", { name: "What it is" })).toBeDisabled();
+  await expect(first.getByRole("textbox", { name: "Installment" })).toBeDisabled();
   await expect(first).toContainText("it stays as it was paid");
   // Not adding up: the bar says so, and Save says it again instead of sending.
   await second.getByRole("textbox", { name: "Amount" }).fill("100");
-  await expect(form.getByRole("status").filter({ hasText: "short" })).toBeVisible();
-  await form.getByRole("button", { name: "Save the plan" }).click();
-  await expect(form.getByRole("alert")).toContainText("The parts must add up to");
+  await expect(form.getByRole("status").filter({ hasText: "not allocated" })).toBeVisible();
+  await form.getByRole("button", { name: "Save plan" }).click();
+  await expect(form.getByRole("alert")).toContainText("The installments must add up to");
   // One tap back to a usual plan; then the balance some days after shipping, with their invoice.
-  await form.getByRole("button", { name: "30% when we order · 70% when ready" }).click();
-  await expect(form.getByRole("status")).toContainText("Adds up: 100%");
-  await second.getByRole("combobox", { name: "When" }).selectOption("on_ship_plus_days");
+  await form.getByRole("button", { name: "30% on order placement · 70% on goods ready" }).click();
+  await expect(form.getByRole("status")).toContainText("Fully allocated · 100%");
+  await second.getByRole("combobox", { name: "Due" }).selectOption("on_ship_plus_days");
   await second.getByRole("spinbutton", { name: "Days after" }).fill("45");
-  await second.getByRole("textbox", { name: "Their invoice no." }).fill("INV-E2E-45");
-  await form.getByRole("button", { name: "Save the plan" }).click();
+  await second.getByRole("textbox", { name: "Supplier invoice no." }).fill("INV-E2E-45");
+  await form.getByRole("button", { name: "Save plan" }).click();
   await expect(form).toBeHidden();
   await expect(plan).toContainText("45 days after shipping");
   await expect(plan).toContainText("Their invoice INV-E2E-45");
@@ -113,18 +113,18 @@ test("Edit plan, the customer's: the same editor, a part's days changed and save
     p.getByRole("region", { name: "Payment plan" }).filter({ has: p.getByRole("link", { name: /^Receipt/ }) }).getByRole("button", { name: "Edit plan", exact: true }),
   );
   await page.getByRole("region", { name: "Payment plan" }).getByRole("button", { name: "Edit plan", exact: true }).click();
-  const form = page.getByRole("dialog", { name: "Payment plan" });
-  await expect(form.getByRole("group", { name: "Start from a usual plan" })).toBeVisible();
-  await expect(form.getByRole("status")).toContainText("Adds up: 100%");
+  const form = page.getByRole("dialog", { name: "Customer payment plan" });
+  await expect(form.getByRole("group", { name: "Start from a template" })).toBeVisible();
+  await expect(form.getByRole("status")).toContainText("Fully allocated · 100%");
   // On a phone: each part a card, the sum kept above Save.
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(form.getByRole("button", { name: "Save the plan" })).toBeInViewport();
+  await expect(form.getByRole("button", { name: "Save plan" })).toBeInViewport();
   expect(await accessibilityProblems(page), "the editor meets WCAG 2.2 AA on a phone").toEqual([]);
   await page.setViewportSize({ width: 1280, height: 900 });
-  const last = form.getByRole("group", { name: /^Part \d+$/ }).last();
-  await last.getByRole("combobox", { name: "When" }).selectOption("on_ship_plus_days");
+  const last = form.getByRole("group", { name: /^Installment \d+$/ }).last();
+  await last.getByRole("combobox", { name: "Due" }).selectOption("on_ship_plus_days");
   await last.getByRole("spinbutton", { name: "Days after" }).fill("21");
-  await form.getByRole("button", { name: "Save the plan" }).click();
+  await form.getByRole("button", { name: "Save plan" }).click();
   // The customer has paid: the plan says why it changes, kept in the history.
   await expect(form.getByRole("alert").filter({ hasText: "Why?" })).toBeVisible();
   await form.getByRole("textbox", { name: "Reason" }).fill("Customer asked for more time");
