@@ -336,6 +336,7 @@ export function OfferHeaderForm({
   lines,
   linesReview,
   linesCount,
+  linesTotalMinor,
   linesChanges = [],
   onUndoLines,
   extra,
@@ -373,6 +374,8 @@ export function OfferHeaderForm({
   linesReview?: (h: { currency: string; taxRate: number; taxIncluded: boolean }) => ReactNode;
   /** "4 lines, 2 parts". */
   linesCount?: string;
+  /** What the lines add up to now, in the offer's currency (minor units): the installments show amounts from it. */
+  linesTotalMinor?: number;
   /** What changed in the lines (an edit), and Undo for them. */
   linesChanges?: string[];
   onUndoLines?: () => void;
@@ -764,8 +767,8 @@ export function OfferHeaderForm({
                       onChange={(rows) => set("parts", rows)}
                       presets={OFFER_PRESETS}
                       amounts={totalText}
-                      totalMinor={quote && Number(quote.factoryTotal) > 0 ? toMinor(quote.factoryTotal) : null}
-                      currency={quote?.currency}
+                      totalMinor={linesTotalMinor || (quote && Number(quote.factoryTotal) > 0 ? toMinor(quote.factoryTotal) : null)}
+                      currency={currency || quote?.currency}
                       error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts}
                     />
                     {changedNote("parts")}

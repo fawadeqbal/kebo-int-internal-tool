@@ -250,6 +250,8 @@ function goodsSummary(o: Pick<OrderRow, "lines" | "packedAt" | "shipments" | "sh
     packedAt: o.packedAt,
     /** Shipment 1's container (edited on the shipment; read-only on the packing form). */
     containerNo: shipFacts(o.shipments).containerNo,
+    /** Its type as booked ("1 × 20GP"), until the number is known. */
+    containerType: shipFacts(o.shipments).containerType,
     shippingMarks: o.shippingMarks,
     totals: {
       packages: sum((l) => l.packages ?? 0),

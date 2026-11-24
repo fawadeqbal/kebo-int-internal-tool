@@ -836,7 +836,7 @@ function paymentReceipt(c: PaperCtx): Built {
       boxTitle: "Account",
       bullets: p
         ? [
-            `Received with thanks by ${PAYMENT_METHOD_LABEL[p.method].toLowerCase()} on ${paperDateText(fromDbDate(p.paidOn))}.`,
+            `Received with thanks by ${PAYMENT_METHOD_LABEL[p.method]} on ${paperDateText(fromDbDate(p.paidOn))}.`,
             ...(rowsPaid.length ? [`Against payment request${rowsPaid.length > 1 ? "s" : ""} ${rowsPaid.map((r) => r.number).join(" and ")}.`] : []),
             { label: "Order total:", value: money(pos.total, c.o.currency) },
             ...(pos.chargedMinor > 0 ? [{ label: "Charged to you:", value: money(pos.charged, c.o.currency) }] : []),

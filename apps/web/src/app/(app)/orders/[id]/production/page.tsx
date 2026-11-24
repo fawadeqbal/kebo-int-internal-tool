@@ -15,6 +15,8 @@ import { PanelButton } from "@/components/orders/step-view";
 import { factoryTestAction, goodsReceivedAction, readyDateAction } from "../../section-actions";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
+import { api } from "@/lib/api";
+import type { PurchaseOrderView } from "@/components/orders/purchase-order-card";
 
 export const generateMetadata = orderTitle("Production");
 
@@ -29,7 +31,13 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
   const { id } = await params;
   const d = await stageData(id, "production");
   const { me, o, now, defaults } = d;
-  const [sections, people, edits] = await Promise.all([orderSectionsOf(id), optional(() => getPeople()), editsOf("order", id)]);
+  const [sections, people, edits, pos] = await Promise.all([
+    orderSectionsOf(id),
+    optional(() => getPeople()),
+    editsOf("order", id),
+    // The supplier's own lead time and the ready date it works out to (the PO tab shows the same date).
+    optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${id}/purchase-orders`)),
+  ]);
   const canEdit = can(me, "orders.update") && d.open;
   const rows = sections.production;
   const many = rows.length > 1;
@@ -50,6 +58,14 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
         const of = many && r.factory ? ` · ${r.factory.name}` : "";
         const sub = `${o.refNo} · ${r.factory?.name ?? "the supplier"}`;
         const left = r.readyOn ? Math.round((Date.parse(r.readyOn) - Date.parse(now)) / DAY) : null;
+        // What the supplier's lead time works out to (their offer or the PO), until they give a date of their own.
+        const agreed = pos?.items.find((x) => x.supplier.id === fid)?.agreed;
+        const expected = agreed?.readyBy && "readyOn" in agreed.readyBy ? agreed.readyBy.readyOn : null;
+        const leadHint = agreed?.leadDays
+          ? `The supplier's lead time: ${agreed.leadDays} days${expected ? `, which works out to ${date(expected)}` : ""}.`
+          : defaults.leadTime
+            ? `Lead time we promised the customer: ${defaults.leadTime.text}.`
+            : undefined;
         const allIn = o.goods.allReceived;
         const readyWindow = (kind: "edit" | "main") =>
           canEdit && (
@@ -65,8 +81,8 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
                   name: "readyOn",
                   label: "Supplier says ready on",
                   type: "date",
-                  value: r.readyOn,
-                  hint: defaults.leadTime ? `Lead time on the quotation: ${defaults.leadTime.text}` : undefined,
+                  value: r.readyOn ?? expected,
+                  hint: leadHint,
                 },
                 { name: "readyToldOn", label: "Told on", type: "date", value: r.readyToldOn, max: now },
                 {
@@ -152,7 +168,15 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
                 files={fid === first ? <SectionFiles orderId={o.id} section="ready_date" canAdd={d.canFiles} /> : undefined}
               />
             ) : (
-              <EmptySection title={`Ready date${of}`} text="No ready date from the supplier yet." action={readyWindow("main")} />
+              <EmptySection
+                title={`Ready date${of}`}
+                text={
+                  expected
+                    ? `No date from the supplier yet. Their lead time works out to ${date(expected)}.`
+                    : "No ready date from the supplier yet."
+                }
+                action={readyWindow("main")}
+              />
             )}
             {hasFat ? (
               <Section
