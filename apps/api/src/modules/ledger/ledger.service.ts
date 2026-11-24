@@ -20,7 +20,7 @@ import { LimitsService } from "../../common/company/limits.service";
 import { Clock, companyDay } from "../../common/time/clock.service";
 import { CompanyContext } from "../../common/company/company-context";
 import { toInfo } from "../../common/company/companies.service";
-import { SettingsService } from "../settings/settings.service";
+import { companySnapshot, SettingsService } from "../settings/settings.service";
 import { factoryPositionsSql, positionsSql } from "../billing/api";
 import { orderRate } from "../money/order-money";
 import { chargedExpenses, fxOf, positionOf, type MoneyCtx } from "../billing/api";
@@ -28,7 +28,6 @@ import { livePlansOf } from "../billing/api";
 import { factoryPlansFor } from "../billing/api";
 import { LedgerPosting } from "./posting.service";
 import { ledgerCheck, type LedgerCheck } from "./check";
-import { companySnapshot } from "../quotations/quotations.service";
 
 type Row = Prisma.LedgerEntryGetPayload<object>;
 

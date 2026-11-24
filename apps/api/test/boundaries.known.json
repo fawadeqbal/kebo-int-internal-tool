@@ -41,7 +41,6 @@
   "insights -> treasury",
   "ledger -> billing",
   "ledger -> money",
-  "ledger -> quotations",
   "ledger -> settings",
   "money -> billing",
   "money -> insights",
