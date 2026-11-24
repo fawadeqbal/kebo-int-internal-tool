@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { setPasswordAction } from "./actions";
+import { PasswordInput } from "@/components/common/password-input";
 
 export function SetPasswordForm({ token, email, platform = false }: { token: string; email: string; platform?: boolean }) {
   const [state, action] = useActionState(setPasswordAction, {});
@@ -19,7 +20,7 @@ export function SetPasswordForm({ token, email, platform = false }: { token: str
         hint="At least 10 characters, with letters and a number"
         error={state.errors?.password}
       >
-        <Input id="password" name="password" type="password" autoComplete="new-password" autoFocus required />
+        <PasswordInput id="password" name="password" autoComplete="new-password" autoFocus required />
       </Field>
       <Field label="The same password again" htmlFor="confirm" error={state.errors?.confirm}>
         <Input id="confirm" name="confirm" type="password" autoComplete="new-password" required />

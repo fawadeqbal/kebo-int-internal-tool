@@ -32,6 +32,7 @@ export function SessionList({ sessions, end, showPerson = false }: { sessions: S
         action={end(s.id)}
         confirm={showPerson ? `Sign ${s.user.name} out of ${s.device}?` : `Sign out ${s.device}? It will need the password again.`}
         label="Sign out"
+        what={showPerson ? `${s.user.name}, ${s.device}` : s.device}
         icon={<LogOut aria-hidden />}
         pendingText="Signing out…"
         variant="secondary"

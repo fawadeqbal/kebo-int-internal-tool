@@ -7,6 +7,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { forgetAccountAction, loginAction, twoStepAction } from "./actions";
 import { initialsOf } from "@/lib/initials";
 import type { RememberedAccount } from "@/lib/remembered";
+import { PasswordInput } from "@/components/common/password-input";
 
 export interface DemoLogin {
   label: string;
@@ -17,7 +18,6 @@ export interface DemoLogin {
 
 export function LoginForm({ next, demo, remembered }: { next?: string; demo?: DemoLogin[]; remembered?: RememberedAccount | null }) {
   const [state, action] = useActionState(loginAction, {});
-  const [showPassword, setShowPassword] = useState(false);
   const form = useRef<HTMLFormElement>(null);
   const pick = (d: DemoLogin) => {
     const f = form.current;
@@ -92,29 +92,15 @@ export function LoginForm({ next, demo, remembered }: { next?: string; demo?: De
         </Field>
       )}
       <Field label="Password" required htmlFor="password" error={state.errors?.password}>
-        <div className="relative">
-          <Input
-            id="password"
-            name="password"
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            required
-            autoFocus={state.code === "choose_company" || !!remembered}
-            className="pr-16 pl-10"
-          />
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted" aria-hidden>
-            <KeyRound className="size-4" />
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? "Hide password" : "Show password"}
-            aria-pressed={showPassword}
-            className="absolute inset-y-1 right-1 rounded-md px-2.5 text-md font-semibold text-text-2 hover:bg-surface-2"
-          >
-            {showPassword ? "Hide" : "Show"}
-          </button>
-        </div>
+        <PasswordInput
+          id="password"
+          name="password"
+          autoComplete="current-password"
+          required
+          autoFocus={state.code === "choose_company" || !!remembered}
+          leading={<KeyRound aria-hidden />}
+          className="pl-10"
+        />
       </Field>
       <input type="hidden" name="keepAsked" value="1" />
       <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-text lg:min-h-0">

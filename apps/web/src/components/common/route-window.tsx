@@ -81,7 +81,9 @@ export function RouteWindow({
           e.preventDefault();
           request();
         }}
-        className={cn(WINDOW_BOX, WIDTH[size])}
+        // Focusable itself: a click on its text keeps focus in the window, so Esc still closes it (review 24 Nov).
+        tabIndex={-1}
+        className={cn("outline-none", WINDOW_BOX, WIDTH[size])}
       >
         <WindowHead id={id} title={title} description={description} onClose={request} headRef={head} />
         <div ref={body} className={cn(RULES.window.body, "flex min-h-0 flex-1 flex-col gap-4 scroll-y *:shrink-0")}>

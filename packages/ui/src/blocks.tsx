@@ -107,7 +107,8 @@ export function FactsLine({ facts, className }: { facts: Fact[]; className?: str
             <dt>{f.label}</dt>
             <dd className={cn("text-sm font-bold text-text tabular", f.tone === "bad" && "text-bad", f.tone === "warn" && "text-warn")}>
               {f.href ? (
-                <Link href={f.href} className="hover:underline">
+                // At least 24 px each way, however short the figure (WCAG 2.5.8; review 24 Nov: a "0" was 9 × 17 px).
+                <Link href={f.href} className="-my-1 inline-flex min-h-6 min-w-6 items-center justify-center px-1 hover:underline">
                   {f.value}
                 </Link>
               ) : (

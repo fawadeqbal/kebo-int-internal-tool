@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { platformLoginAction, platformTwoStepAction } from "../actions";
+import { PasswordInput } from "@/components/common/password-input";
 
 export function PlatformLoginForm() {
   const [state, action] = useActionState(platformLoginAction, {});
@@ -14,7 +15,7 @@ export function PlatformLoginForm() {
         <Input id="email" name="email" type="email" autoComplete="username" autoFocus required defaultValue={state.values?.email ?? ""} />
       </Field>
       <Field label="Password" htmlFor="password" error={state.errors?.password}>
-        <Input id="password" name="password" type="password" autoComplete="current-password" required />
+        <PasswordInput id="password" name="password" autoComplete="current-password" required />
       </Field>
       <SubmitButton pendingText="Signing in…" size="lg" className="w-full">
         Sign in

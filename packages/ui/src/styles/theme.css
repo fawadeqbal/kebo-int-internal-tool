@@ -999,6 +999,8 @@
   *::before,
   *::after {
     animation-duration: 1ms !important;
+    /* Once, then still: an endless animation at 1 ms flickered every frame (review 24 Nov: loading skeletons). */
+    animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
 }

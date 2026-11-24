@@ -319,7 +319,8 @@ describe("the fold button", () => {
     shell(everything());
     expect(screen.getAllByRole("complementary", { name: "Menu" })).toHaveLength(1);
     fireEvent.click(screen.getAllByRole("button", { name: "Open the menu" })[0]!);
-    expect(screen.getAllByRole("complementary", { name: "Menu" })).toHaveLength(2);
+    // Over the page it is a window (focus inside, Esc closes it), named Menu.
+    expect(screen.getByRole("dialog", { name: "Menu" })).toBeTruthy();
     expect(document.cookie).not.toContain("nav-fold");
   });
 
@@ -435,12 +436,16 @@ describe("the menu over the page (phone)", () => {
     at.path = "/dashboard";
     shell(staff());
     fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
-    const drawer = within(screen.getAllByRole("complementary", { name: "Menu" })[1]!);
+    const menu = screen.getByRole("dialog", { name: "Menu" });
+    const drawer = within(menu);
     expect(drawer.getAllByRole("button", { expanded: false }).map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Sales", "Finance"]);
     for (const b of drawer.getAllByRole("button", { expanded: false })) expect(b.className).toContain("min-h-13");
     expect(drawer.getByRole("link", { name: "Dashboard" }).className).toContain("min-h-13");
     fireEvent.click(drawer.getByRole("button", { name: /^Sales/ }));
     expect(drawer.getByRole("link", { name: "Customers" }).className).toContain("min-h-11");
+    // Esc closes it (review 24 Nov: it did nothing).
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull();
   });
 
   it("the bottom bar starts with Dashboard", () => {

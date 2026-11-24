@@ -74,11 +74,48 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
     };
     document.addEventListener("keydown", tab);
     document.addEventListener("focusin", back);
+    // Focus goes into the window as it opens (review 24 Nov: left on the button behind it, Esc did nothing and Tab
+    // went on through the page), unless the window focused something itself: to what asks for it, else its title (read
+    // out first, and no phone keyboard pops up), else its first control.
+    const into = requestAnimationFrame(() => {
+      const el = box.current;
+      if (!el || el.contains(document.activeElement)) return;
+      const target =
+        el.querySelector<HTMLElement>("[autofocus],[data-autofocus]") ??
+        el.querySelector<HTMLElement>("[data-window-head] h2[tabindex='-1']") ??
+        focusables(el).find((x) => !x.matches("[data-window-x]")) ??
+        null;
+      if (target) target.focus({ preventScroll: true });
+      else {
+        if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+        el.focus({ preventScroll: true });
+      }
+    });
     return () => {
+      cancelAnimationFrame(into);
       document.removeEventListener("keydown", tab);
       document.removeEventListener("focusin", back);
-      // Give focus back to the opener, if it is still on the page.
+      // Give focus back to the opener; when the page drew it again meanwhile (a row's Pay link while its window was
+      // open), to the one in its place, found by its id, address or name (review 24 Nov: focus was lost).
       if (opener && opener.isConnected && typeof opener.focus === "function") opener.focus({ preventScroll: true });
+      else if (opener && opener !== document.body) {
+        const href = opener.getAttribute("href");
+        const name = opener.getAttribute("aria-label");
+        const find = () =>
+          (opener.id && document.getElementById(opener.id)) ||
+          (href && document.querySelector<HTMLElement>(`a[href="${CSS.escape(href)}"]`)) ||
+          (name && document.querySelector<HTMLElement>(`[aria-label="${CSS.escape(name)}"]`)) ||
+          null;
+        let tries = 0;
+        const again = () => {
+          // Only while focus is nowhere (the person may have moved on already).
+          if (document.activeElement && document.activeElement !== document.body) return;
+          const el = find();
+          if (el) el.focus({ preventScroll: true });
+          else if (++tries < 20) requestAnimationFrame(again);
+        };
+        requestAnimationFrame(again);
+      }
     };
   }, [box, active]);
 }
@@ -462,7 +499,9 @@ export function Modal({
           e.stopPropagation();
           close();
         }}
-        className={`${WINDOW_BOX} ${MODAL_WIDTH[size]}`}
+        // Focusable itself: a click on its text keeps focus in the window, so Esc still closes it (review 24 Nov).
+        tabIndex={-1}
+        className={`outline-none ${WINDOW_BOX} ${MODAL_WIDTH[size]}`}
       >
         <WindowHead id={id} title={title} description={sub} onClose={close} disabled={busy} />
         <div className={cn(RULES.window.body, "flex min-h-0 flex-1 flex-col scroll-y *:shrink-0")}>{children}</div>

@@ -98,6 +98,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                       action={endMySessionAction.bind(null, s.id)}
                       confirm={`Sign out ${s.device}?`}
                       label="Sign out"
+                      what={`${s.device}${s.ip ? `, ${s.ip}` : ""}`}
                       icon={<LogOut aria-hidden />}
                       pendingText="Signing out…"
                       variant="secondary"

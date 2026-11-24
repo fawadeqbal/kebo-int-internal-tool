@@ -9,6 +9,7 @@ import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
 import { FOLD_COOKIE, HOME_HREF, isSingle, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
 import { PRODUCT_NAME } from "@/lib/product";
+import { useFocusTrap } from "@/components/common/dialog";
 import { PhoneSearch, TopSearch } from "./global-search";
 
 export type { NavModule, NavPage } from "@/lib/nav";
@@ -438,6 +439,39 @@ function Logo({ companyName, logo, size = 40 }: { companyName: string; logo?: st
   );
 }
 
+/**
+ * The whole menu over the page on a phone: a window like the others (review 24 Nov: focus stayed on the button, Tab
+ * went on through the page behind, Esc did nothing). Focus goes to its title and stays inside; Esc closes it, and
+ * focus goes back to the Menu button.
+ */
+function PhoneMenu({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  const box = useRef<HTMLElement>(null);
+  useFocusTrap(box, true);
+  return (
+    <div className="no-print fixed inset-0 z-50 xl:hidden" data-layer>
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
+      <aside
+        ref={box}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") return;
+          e.stopPropagation();
+          onClose();
+        }}
+        className="outline-none absolute inset-y-0 left-0 flex w-80 max-w-[85vw] animate-slide-in flex-col border-r border-line bg-bg shadow-pop max-md:w-full max-md:max-w-none max-md:border-r-0"
+      >
+        <button className="absolute top-3 right-3 grid size-10 place-items-center rounded-full border border-line bg-surface text-text-2 hover:bg-surface-2" onClick={onClose} aria-label="Close menu">
+          <X className="size-[18px]" />
+        </button>
+        {children}
+      </aside>
+    </div>
+  );
+}
+
 /** The open menu's contents: the logo, Home and the groups. The same on a desktop and over the page on a phone. */
 function MenuContent({
   modules,
@@ -462,7 +496,9 @@ function MenuContent({
     return (
       <>
         <div className="flex h-16 shrink-0 items-center px-4">
-          <h2 className="text-2xl font-bold tracking-tight text-text">Menu</h2>
+          <h2 data-autofocus="" tabIndex={-1} className="text-2xl font-bold tracking-tight text-text outline-none">
+            Menu
+          </h2>
         </div>
         <nav className="flex-1 scroll-y px-4 pb-8" aria-label="Main">
           <Link href={HOME_HREF} className="mb-3 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3" aria-label={`${companyName}, ${PRODUCT_NAME}, home`}>
@@ -888,15 +924,9 @@ export function AppShell({
 
       {/* Phone and small screens: the whole menu over the page, rows easy to tap */}
       {drawer && (
-        <div className="no-print fixed inset-0 z-50 xl:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} aria-hidden />
-          <aside aria-label="Menu" className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] animate-slide-in flex-col border-r border-line bg-bg shadow-pop max-md:w-full max-md:max-w-none max-md:border-r-0">
-            <button className="absolute top-3 right-3 grid size-10 place-items-center rounded-full border border-line bg-surface text-text-2 hover:bg-surface-2" onClick={() => setDrawer(false)} aria-label="Close menu">
-              <X className="size-[18px]" />
-            </button>
-            <MenuContent modules={modules} companyName={companyName} logo={logo} open={open} toggle={toggle} big />
-          </aside>
-        </div>
+        <PhoneMenu onClose={() => setDrawer(false)}>
+          <MenuContent modules={modules} companyName={companyName} logo={logo} open={open} toggle={toggle} big />
+        </PhoneMenu>
       )}
 
       <div className="min-w-0 flex-1">

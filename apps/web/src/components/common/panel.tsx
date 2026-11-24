@@ -176,7 +176,9 @@ export function SidePanel({
             form.requestSubmit();
           }
         }}
-        className={cn(WINDOW_BOX, RULES.window.wideRows, className)}
+        // Focusable itself: a click on its text keeps focus in the window, so Esc still closes it (review 24 Nov).
+        tabIndex={-1}
+        className={cn("outline-none", WINDOW_BOX, RULES.window.wideRows, className)}
       >
         <WindowHead id={id} title={title} description={description} onClose={() => request()} headRef={head} />
         <PanelCloseProvider value={request}>
@@ -264,7 +266,13 @@ export function PanelSection({
       {title && (
         <legend className={quiet ? "sr-only" : "float-left mb-1 w-full text-sm font-bold text-text"}>
           {title}
-          {sub && <span className="text-xs font-normal text-muted max-sm:block sm:ml-2">{sub}</span>}
+          {/* A comma read out between the two (review 24 Nov: "Deliverywhere we hand…"), not shown. */}
+          {sub && (
+            <>
+              <span className="sr-only">, </span>
+              <span className="text-xs font-normal text-muted max-sm:block sm:ml-2">{sub}</span>
+            </>
+          )}
         </legend>
       )}
       {inner}
