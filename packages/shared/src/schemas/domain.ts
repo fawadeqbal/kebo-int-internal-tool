@@ -855,6 +855,11 @@ export const factoryPaymentInput = z.object({
   note: optionalText(2000),
   /** Which of our accounts it was paid from (same currency). */
   accountId: optionalId,
+  /**
+   * What our bank charged to send it (same currency): kept as the order's "Bank charges" cost, from the same
+   * account (review 24 Nov, M-38: the form had no place for it). Only when it is recorded, not on a change.
+   */
+  bankCharges: amount().optional(),
   reason: optionalText(500).optional(),
 });
 export type FactoryPaymentInput = z.infer<typeof factoryPaymentInput>;

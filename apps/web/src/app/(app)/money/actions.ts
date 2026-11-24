@@ -105,6 +105,7 @@ const factoryBody = (form: FormData) => {
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
     accountId: v.accountId || null,
+    ...(v.bankCharges?.trim() ? { bankCharges: v.bankCharges.replace(/,/g, "").trim() } : {}),
     reason: reasonOf(form),
   };
 };

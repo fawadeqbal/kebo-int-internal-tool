@@ -12,7 +12,7 @@ const howMuch = (s: Submission | undefined) => (s?.amount && s.currency ? money(
 
 /** Records it as the approver (the usual payment or expense), with its photo. */
 export async function approveAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.post(`/submissions/${id}/approve`, {}), "Approved. It counts now.");
+  const r = await attempt(form, () => api.post(`/submissions/${id}/approve`, {}), "Verified. It counts now.");
   if (!r.ok) return r;
   revalidatePath("/", "layout");
   const s = (r.data as { submission?: Submission } | undefined)?.submission;
@@ -52,7 +52,7 @@ export async function approveManyAction(_prev: ActionState, form: FormData): Pro
       await api.post(`/submissions/${id}/approve`, {});
       done += 1;
     } catch (e) {
-      failed.push(e instanceof Error ? e.message : "could not be approved");
+      failed.push(e instanceof Error ? e.message : "could not be verified");
     }
   }
   revalidatePath("/", "layout");

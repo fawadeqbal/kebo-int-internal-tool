@@ -72,7 +72,7 @@ export async function RecordPayment({ sp, inWindow = false }: { sp: Search; inWi
       customerId ? (
         <FromCustomer customerId={customerId} today={today} />
       ) : (
-        <OnOrder kind={kind} orderId={orderId} today={today} prefill={prefill} back={back} />
+        <OnOrder kind={kind} orderId={orderId} today={today} prefill={prefill} back={back} inWindow={inWindow} />
       )
     ) : kind === "expense" ? (
       <Expense today={today} />
@@ -152,8 +152,9 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
                       {x.number} · {requestWords(x.request)}
                     </span>
                   </Td>
-                  <Td className="whitespace-nowrap">{x.dueOn ? date(x.dueOn) : (x.when ?? x.rule ?? "—")}</Td>
-                  <Td className="text-right tabular">{Number(x.open).toLocaleString("en-US", { minimumFractionDigits: 2 })}</Td>
+                  {/* In the narrow side panel a rule wraps and the amount never does (review 24 Nov, M-39: Still due was cut). */}
+                  <Td className="text-sm">{x.dueOn ? <span className="whitespace-nowrap">{date(x.dueOn)}</span> : (x.when ?? x.rule ?? "—")}</Td>
+                  <Td className="text-right whitespace-nowrap tabular">{Number(x.open).toLocaleString("en-US", { minimumFractionDigits: 2 })}</Td>
                 </Tr>
               ))}
             </tbody>
@@ -189,6 +190,22 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
   );
 }
 
+/**
+ * The order or customer picker's form. On the full page, choosing loads the page again (a plain form): the app's
+ * navigation would open the same form as a window over it (review 24 Nov, M-23). In the window it stays there.
+ */
+function ChooseForm({ inWindow, children }: { inWindow?: boolean; children: ReactNode }) {
+  return inWindow ? (
+    <Form action="/payments/new" replace data-no-change className="flex flex-wrap items-end gap-2">
+      {children}
+    </Form>
+  ) : (
+    <form action="/payments/new" method="get" data-no-change className="flex flex-wrap items-end gap-2">
+      {children}
+    </form>
+  );
+}
+
 /** Money in from the customer, or out to a supplier: choose the order, then the same form the order uses. */
 async function OnOrder({
   kind,
@@ -196,12 +213,14 @@ async function OnOrder({
   today,
   prefill,
   back,
+  inWindow,
 }: {
   kind: "in" | "out";
   orderId?: string;
   today: string;
   prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" };
   back?: string;
+  inWindow?: boolean;
 }) {
   const open = await api.get<OrderRow[]>("/orders", { status: "open" });
   const picker = (
@@ -211,7 +230,7 @@ async function OnOrder({
         description={kind === "in" ? "The order the customer paid for." : "The order the supplier is paid for."}
       />
       <CardBody>
-        <Form action="/payments/new" replace data-no-change className="flex flex-wrap items-end gap-2">
+        <ChooseForm inWindow={inWindow}>
           <input type="hidden" name="kind" value={kind} />
           {back && <input type="hidden" name="back" value={back} />}
           <AutoSelect name="order" defaultValue={orderId ?? ""} aria-label="Order" className="sm:w-96">
@@ -227,7 +246,7 @@ async function OnOrder({
           <noscript>
             <button className={buttonClass("secondary", "sm")}>Continue</button>
           </noscript>
-        </Form>
+        </ChooseForm>
       </CardBody>
     </Card>
   );
@@ -239,7 +258,7 @@ async function OnOrder({
           description="The oldest due is filled in first; the rest is kept as the customer's credit."
         />
         <CardBody>
-          <Form action="/payments/new" replace data-no-change className="flex flex-wrap items-end gap-2">
+          <ChooseForm inWindow={inWindow}>
             <input type="hidden" name="kind" value="in" />
             {back && <input type="hidden" name="back" value={back} />}
             <AutoSelect name="customer" defaultValue="" aria-label="Customer" className="sm:w-96">
@@ -257,7 +276,7 @@ async function OnOrder({
             <noscript>
               <button className={buttonClass("secondary", "sm")}>Continue</button>
             </noscript>
-          </Form>
+          </ChooseForm>
         </CardBody>
       </Card>
     ) : null;

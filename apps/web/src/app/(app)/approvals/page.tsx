@@ -17,7 +17,7 @@ export const metadata = { title: "To verify" };
 const PAGE_SIZE = 25;
 const STATUS_LABEL: Record<SubmissionStatus, string> = {
   pending: "Waiting",
-  approved: "Approved",
+  approved: "Verified",
   sent_back: "Sent back",
   withdrawn: "Withdrawn",
 };
@@ -86,7 +86,7 @@ export default async function ApprovalsPage({
             <Segmented
               label="Whose"
               options={[
-                { href: base({ q: sp.q }), label: "To approve", active: !mine },
+                { href: base({ q: sp.q }), label: "To verify", active: !mine },
                 { href: base({ mine: "true", q: sp.q }), label: "Mine", active: mine },
               ]}
             />
@@ -104,13 +104,13 @@ export default async function ApprovalsPage({
             tone={all.counts.pending ? "warn" : undefined}
           />
           <StatTile label="Oldest" value={oldest === null ? "—" : oldest === 0 ? "today" : `${oldest} day${oldest === 1 ? "" : "s"}`} />
-          <StatTile icon={Check} iconColor={1} label="Approved" value={all.counts.approved} sub={all.counts.sent_back ? `${all.counts.sent_back} sent back` : undefined} />
+          <StatTile icon={Check} iconColor={1} label="Verified" value={all.counts.approved} sub={all.counts.sent_back ? `${all.counts.sent_back} sent back` : undefined} />
         </StatRow>
       )}
       <LinkTabs
         label="Which ones"
         tabs={STATUSES.map((s) => ({
-          label: mine || s !== "pending" ? STATUS_LABEL[s] : "To approve",
+          label: mine || s !== "pending" ? STATUS_LABEL[s] : "To verify",
           count: list.counts[s],
           href: base({ mine: keep.mine, status: s === "pending" ? undefined : s, q: sp.q }),
           active: status === s,
@@ -119,7 +119,7 @@ export default async function ApprovalsPage({
       <FilterCard search="Search order, customer, who sent it…" value={sp.q} keep={{ mine: keep.mine, status: keep.status }} clearHref={base({ mine: keep.mine, status: keep.status })} />
       {!mine && status === "pending" && list.counts.pending > 0 && (
         <Notice tone="info" className="mb-3">
-          They added it; you approve it. Nothing counts until you do.
+          They added it; you verify it. Nothing counts until you do.
         </Notice>
       )}
       <Card className="overflow-clip">
@@ -127,19 +127,19 @@ export default async function ApprovalsPage({
           <EmptyState
             framed
             title={
-              text ? "Nothing matches" : status === "pending" ? (mine ? "Nothing waiting" : "Nothing to approve") : `Nothing ${STATUS_LABEL[status].toLowerCase()}`
+              text ? "Nothing matches" : status === "pending" ? (mine ? "Nothing waiting" : "Nothing to verify") : `Nothing ${STATUS_LABEL[status].toLowerCase()}`
             }
             description={
               text
                 ? "Try other words, or clear the search."
                 : mine
                 ? "Add money a customer sent, or an expense, on the phone app and tap “Send for approval”."
-                : "When someone adds money received or an expense for approval, it shows here and you are told."
+                : "When someone sends money received or an expense to verify, it shows here and you are told."
             }
           />
         ) : (
           <>
-            <ul aria-label={mine ? "Sent for approval" : "To approve"} className="divide-y divide-line md:hidden">
+            <ul aria-label={mine ? "Sent to verify" : "To verify"} className="divide-y divide-line md:hidden">
               {list.rows.map((s) => (
                 <Row key={s.id} s={s} />
               ))}
@@ -217,7 +217,7 @@ function Row({ s }: { s: Submission }) {
           {s.decidedBy && s.status !== "pending" && s.status !== "withdrawn" && (
             <>
               {" "}
-              · {s.status === "approved" ? "approved" : "sent back"} by {s.decidedBy.name}
+              · {s.status === "approved" ? "verified" : "sent back"} by {s.decidedBy.name}
             </>
           )}
         </p>
