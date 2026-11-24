@@ -22,6 +22,7 @@ import type { PersonSpending } from "@/lib/types-money";
 import { resetTwoStepAction, setActiveAction, setPasswordAction, updateUserAction } from "../actions";
 import { EditUserPanel, PasswordPanel } from "../forms";
 import { cache } from "react";
+import { EmailText } from "@/components/common/email-text";
 
 /** The company's people, read once per request (the page and its tab title). */
 const usersOf = cache(() => api.get<UserRow[]>("/users"));
@@ -146,7 +147,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
                 <RoleBadge name={u.access.name} superAdmin={u.access.superAdmin} />
               </>),
                 summary: (<>
-                <span className="break-all">{u.email}</span> · {u.lastLoginAt ? `last signed in ${timeAgo(u.lastLoginAt)}` : "never signed in"}
+                <span className="break-words"><EmailText email={u.email} /></span> · {u.lastLoginAt ? `last signed in ${timeAgo(u.lastLoginAt)}` : "never signed in"}
                 {isMe && <span className="block text-muted">This is you: change your own password and two-step sign-in under My account.</span>}
               </>),
                 papers: (!isMe && (
@@ -188,7 +189,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
                 description="Name, sign-in email and what they may do · click a value or Edit"
                 items={[
                   { label: "Name", value: u.name },
-                  { label: "Sign-in email", value: <span className="break-all">{u.email}</span> },
+                  { label: "Sign-in email", value: <span className="break-words"><EmailText email={u.email} /></span> },
                   { label: "Role", value: u.access.name },
                   { label: "Two-step sign-in", value: twoStep, readOnly: true },
                   { label: "Last signed in", value: u.lastLoginAt ? dateTime(u.lastLoginAt) : "Never", readOnly: true },

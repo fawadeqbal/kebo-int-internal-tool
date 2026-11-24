@@ -749,8 +749,15 @@ function Strip({ modules, companyName, logo }: { modules: NavModule[]; companyNa
 
 /* ------------------------------------------------------------------ Shell */
 
-/** From this width the menu is open beside the page unless it was folded; below it, it is the strip of icons. */
+/** From this width the menu can be open beside the page; below it, it is the strip of icons. */
 const WIDE = "(min-width: 1280px)";
+/*
+ * Until the person chooses, the menu is open beside the page only from 1440 px: on a 1280–1439 px laptop the strip
+ * leaves the page 188 px more, so a record's tables fit beside its panel (e2e 24 Nov: at 1280 the last column of
+ * prices, plans, packing and payments was cut off). Opening or folding it with its button is remembered and wins.
+ * Arbitrary breakpoints sort before the named ones, so "under 1440" is written max-[1439.98px], never md:flex with
+ * min-[1440px]:hidden after it (that left the strip showing beside the open menu).
+ */
 
 /**
  * The frame around every signed-in screen. Desktop: the menu down the left (Home and the groups with
@@ -817,12 +824,20 @@ export function AppShell({
     writeCookie(OPEN_COOKIE, [...next].join("."));
   };
   const folded = fold === true;
+  /** Never chosen: open from 1440 px, the strip under it. */
+  const auto = fold === null;
   // On a wide screen the button folds and opens the menu beside the page; on a smaller one it opens it over the page.
-  const onFoldButton = () => {
+  const choose = (toFold: boolean) => {
     if (!window.matchMedia(WIDE).matches) return setDrawer(true);
-    setFold(!folded);
-    writeCookie(FOLD_COOKIE, folded ? "0" : "1");
+    setFold(toFold);
+    writeCookie(FOLD_COOKIE, toFold ? "1" : "0");
   };
+  /** The button beside the logo: it opens a menu shown as the strip, and folds one shown open. */
+  const foldButton = (shownFolded: boolean, className: string) => (
+    <button type="button" className={cn(buttonClass("ghost", "icon"), className)} onClick={() => choose(!shownFolded)} aria-label={shownFolded ? "Open the menu" : "Fold the menu"} aria-pressed={shownFolded}>
+      {shownFolded ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
+    </button>
+  );
 
   const tab = (href: string, label: string, Icon: LucideIcon, badge?: number) => {
     const active = isActive(pathname, href);
@@ -843,8 +858,8 @@ export function AppShell({
   };
 
   return (
-    // data-menu: lists read it to know how much width the page has (DataTable).
-    <div className="group/shell min-h-dvh md:flex" data-shell="" data-menu={folded ? "folded" : "open"}>
+    // data-menu: lists read it to know how much width the page has (DataTable, globals.css "fits" and "roomy").
+    <div className="group/shell min-h-dvh md:flex" data-shell="" data-menu={folded ? "folded" : auto ? "auto" : "open"}>
       {/* Where you have been in this tab: Back returns to a list as you left it. */}
       <Suspense fallback={null}>
         <NavMemoryKeeper />
@@ -856,12 +871,18 @@ export function AppShell({
         Skip to content
       </a>
 
-      {/* Desktop: the menu beside the page (from 1280 px, unless folded) */}
-      <aside aria-label="Menu" className={cn("no-print sticky top-0 h-dvh w-[248px] shrink-0 flex-col border-r border-line bg-surface", folded ? "hidden" : "hidden xl:flex")}>
+      {/* Desktop: the menu beside the page (from 1440 px until chosen, from 1280 px when opened, never when folded) */}
+      <aside
+        aria-label="Menu"
+        className={cn("no-print sticky top-0 h-dvh w-[248px] shrink-0 flex-col border-r border-line bg-surface", folded ? "hidden" : auto ? "hidden min-[1440px]:flex" : "hidden xl:flex")}
+      >
         <MenuContent modules={modules} companyName={companyName} logo={logo} open={open} toggle={toggle} />
       </aside>
-      {/* Desktop: the menu folded to a strip of icons (always under 1280 px) */}
-      <aside aria-label="Menu, folded" className={cn("no-print sticky top-0 h-dvh w-[60px] shrink-0 flex-col border-r border-line bg-surface", folded ? "hidden md:flex" : "hidden md:flex xl:hidden")}>
+      {/* Desktop: the menu folded to a strip of icons (always under 1280 px; under 1440 px until chosen) */}
+      <aside
+        aria-label="Menu, folded"
+        className={cn("no-print sticky top-0 h-dvh w-[60px] shrink-0 flex-col border-r border-line bg-surface", folded ? "hidden md:flex" : auto ? "hidden md:max-[1439.98px]:flex" : "hidden md:flex xl:hidden")}
+      >
         <Strip modules={modules} companyName={companyName} logo={logo} />
       </aside>
 
@@ -894,9 +915,14 @@ export function AppShell({
             <button type="button" className={cn(buttonClass("ghost", "icon"), "hidden md:inline-flex xl:hidden")} onClick={() => setDrawer(true)} aria-label="Open the menu" aria-expanded={drawer}>
               <PanelLeftOpen aria-hidden />
             </button>
-            <button type="button" className={cn(buttonClass("ghost", "icon"), "hidden xl:inline-flex")} onClick={onFoldButton} aria-label={folded ? "Open the menu" : "Fold the menu"} aria-pressed={folded}>
-              {folded ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
-            </button>
+            {auto ? (
+              <>
+                {foldButton(true, "hidden xl:max-[1439.98px]:inline-flex")}
+                {foldButton(false, "hidden min-[1440px]:inline-flex")}
+              </>
+            ) : (
+              foldButton(folded, "hidden xl:inline-flex")
+            )}
             <TopSearch />
             <div className="ml-auto flex items-center gap-1.5">
               <PhoneSearch />

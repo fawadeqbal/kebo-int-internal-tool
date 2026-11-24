@@ -160,11 +160,11 @@ export function SupplierPlanTable({
           <tbody>
             {plan.rows.map((r, i) => (
               <Tr key={r.id ?? i} data-target={r.dueRule === "on_order" ? "factory.plan.advance" : "factory.plan.balance"}>
-                <Td className="min-w-[10rem]">
+                <Td className="min-w-[8rem]">
                   <span className="font-semibold">{r.label}</span>
                   {under(r)}
                 </Td>
-                <Td className={cn("min-w-[7.5rem] text-sm", late(r) && "font-medium text-bad")}>{due(r)}</Td>
+                <Td className={cn("text-sm whitespace-nowrap", late(r) && "font-medium text-bad")}>{due(r)}</Td>
                 <Td className="text-right whitespace-nowrap tabular">
                   {grouped(r.amount)}
                   {Number(r.paid) > 0 && r.status !== "paid" && <span className="block text-xs text-muted">{grouped(r.paid)} paid</span>}

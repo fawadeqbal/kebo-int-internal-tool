@@ -291,9 +291,10 @@ describe("the fold button", () => {
     shell(everything());
     const open = screen.getByRole("complementary", { name: "Menu" });
     const folded = screen.getByRole("complementary", { name: "Menu, folded" });
-    // Not chosen yet: the open menu from 1280 px, the strip under it.
-    expect(open.className).toContain("xl:flex");
-    expect(folded.className).toContain("xl:hidden");
+    // Not chosen yet: the open menu from 1440 px, the strip under it (a 1280 px laptop keeps the room for the page).
+    expect(open.className).toContain("min-[1440px]:flex");
+    expect(folded.className).toContain("md:max-[1439.98px]:flex");
+    expect(open.closest("[data-menu]")!.getAttribute("data-menu")).toBe("auto");
     fireEvent.click(screen.getByRole("button", { name: "Fold the menu" }));
     expect(open.className.split(" ")).toContain("hidden");
     expect(open.className).not.toContain("xl:flex");
@@ -317,9 +318,20 @@ describe("the fold button", () => {
     wide.on = false;
     shell(everything());
     expect(screen.getAllByRole("complementary", { name: "Menu" })).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Open the menu", pressed: undefined }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Open the menu" })[0]!);
     expect(screen.getAllByRole("complementary", { name: "Menu" })).toHaveLength(2);
     expect(document.cookie).not.toContain("nav-fold");
+  });
+
+  it("on a 1280–1439 px laptop, opening the menu from the strip keeps it open beside the page", () => {
+    document.cookie = "nav-fold=; max-age=0";
+    shell(everything());
+    // The button that pins it (pressed: shown folded); the other "Open the menu" opens it over the page under 1280 px.
+    fireEvent.click(screen.getAllByRole("button", { name: "Open the menu", pressed: true })[0]!);
+    const open = screen.getByRole("complementary", { name: "Menu" });
+    expect(open.className).toContain("xl:flex");
+    expect(open.className).not.toContain("min-[1440px]");
+    expect(document.cookie).toContain("nav-fold=0");
   });
 });
 
