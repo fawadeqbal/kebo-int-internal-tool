@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { OrderSection } from "@kebo/shared";
+import { REASON_CHOICES, type OrderSection } from "@kebo/shared";
 import { Pencil } from "lucide-react";
-import { Button, cn, Field, linkClass, Notice, RULES, Textarea } from "@kebo/ui";
+import { Button, cn, linkClass, Notice, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { ReasonChips } from "@/components/edits/reason-chips";
 import { useChangeCount } from "@/components/common/changes";
 import { changeWords } from "@/components/common/change-words";
 import { PANEL_FORM, PanelBody, SidePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
@@ -199,17 +200,20 @@ export function SectionWindow({
   );
 }
 
-/** An order check that asks first (a date out of order): what it saw, why it is saved anyway, and confirm. */
+/**
+ * An order check that asks first (a date out of order): what it saw, why it is saved anyway (the same quick reasons
+ * and own words as every "Why?": review 24 Nov, O-14), and confirm.
+ */
 function GoAhead({ message, reason }: { message?: string; reason?: string }) {
+  const [why, setWhy] = useState(reason ?? "");
   return (
     <div role="alert" className="flex flex-col gap-2">
       <Notice tone="todo" title="Check before you save">
         {message ?? "Something looks out of order."}
       </Notice>
       <input type="hidden" name="confirm" value="true" />
-      <Field label="Why save it anyway?" htmlFor="go-ahead-why">
-        <Textarea id="go-ahead-why" name="reason" rows={2} className="min-h-0" required defaultValue={reason} />
-      </Field>
+      <ReasonChips title="Why save it anyway?" choices={REASON_CHOICES.anyway} value={why} onChange={setWhy} />
+      <input type="hidden" name="reason" value={why} />
     </div>
   );
 }

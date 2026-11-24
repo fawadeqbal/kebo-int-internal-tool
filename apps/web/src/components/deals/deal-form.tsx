@@ -402,13 +402,9 @@ export function DealForm({
           setAskWhy(false);
           return canSave;
         }}
-        banner={(st) =>
-          st.message && st.ok === false ? (
-            <Notice tone="bad">
-              <strong>Not saved.</strong> {notSaved(st)}
-            </Notice>
-          ) : null
-        }
+        // What to fix is said as every form says it: "2 things to fix", each a way to its field, on its step
+        // (review 24 Nov, X-16: three ways of saying a form could not save).
+        reveal={(f) => setStep(f === "items" || f.startsWith("items.") ? "items" : DETAIL_FIELDS.has(f) ? "details" : "customer")}
       >
         {(s) => (
           <>
@@ -1050,15 +1046,6 @@ function open(file: File, download: boolean) {
   a.rel = "noopener";
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
-
-/** "Choose a category. Write what the customer needs, or add their list of items." */
-function notSaved(st: ActionState) {
-  const all = Object.values(st.errors ?? {})
-    .flat()
-    .filter((x): x is string => !!x);
-  const list = [...new Set(all.length ? all : [st.message ?? ""])].filter(Boolean);
-  return list.map((m) => (/[.!?]$/.test(m) ? m : `${m}.`)).join(" ");
 }
 
 /** Enter in these small inputs must not save the whole inquiry. */

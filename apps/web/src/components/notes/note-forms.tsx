@@ -10,7 +10,7 @@ import { followUpReopenAction, removeFollowUpAction, removeNoteAction } from "@/
 import Link from "next/link";
 import { ActionForm } from "@/components/common/action-form";
 import { Modal, useConfirm } from "@/components/common/dialog";
-import { PANEL_FORM, PanelBody, PanelSection, useClosePanel, WindowCancel, WindowFooter } from "@/components/common/panel";
+import { PanelBody, useClosePanel, WindowCancel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { NOTE_ICON } from "./kinds";
 import { MentionTextarea } from "./mention-textarea";
@@ -121,66 +121,15 @@ export function FollowUpForm({
   record?: string;
 }) {
   const close = useClosePanel();
-  const id = useId();
+  // The same fields as on the Follow-ups page (review 24 Nov, S-14: two different forms), with the record named.
   return (
     <PanelBody>
-      <ActionForm action={action} onDone={close} className={PANEL_FORM}>
-        {(s) => (
-          <>
-            {record && (
-              <p className="text-sm text-text-2">
-                On <span className="font-medium text-text">{record}</span>
-              </p>
-            )}
-            <PanelSection first>
-              <Field label="What" htmlFor={`${id}-title`} error={s.errors?.title} className="sm:col-span-2">
-                <Input
-                  id={`${id}-title`}
-                  name="title"
-                  maxLength={200}
-                  required
-                  defaultValue={s.values?.title}
-                />
-              </Field>
-              <Field label="Kind" htmlFor={`${id}-kind`} error={s.errors?.kind}>
-                <Select id={`${id}-kind`} name="kind" defaultValue={s.values?.kind ?? "call"}>
-                  {FOLLOW_UP_KINDS.map((k) => (
-                    <option key={k} value={k}>
-                      {FOLLOW_UP_KIND_LABEL[k]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="For" htmlFor={`${id}-who`} error={s.errors?.assigneeId}>
-                <Select id={`${id}-who`} name="assigneeId" defaultValue={s.values?.assigneeId ?? meId}>
-                  {people.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.id === meId ? `Me (${p.name})` : p.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="When" htmlFor={`${id}-on`} error={s.errors?.dueOn}>
-                <Input id={`${id}-on`} name="dueOn" type="date" required defaultValue={s.values?.dueOn ?? today} />
-              </Field>
-              <Field label="At" optional htmlFor={`${id}-at`} error={s.errors?.dueAt}>
-                <Input id={`${id}-at`} name="dueAt" type="time" defaultValue={s.values?.dueAt} />
-              </Field>
-              <Field label="Where" optional htmlFor={`${id}-place`} error={s.errors?.place} className="sm:col-span-2">
-                <Input id={`${id}-place`} name="place" maxLength={160} defaultValue={s.values?.place} />
-              </Field>
-              <Field label="Note" optional htmlFor={`${id}-note`} error={s.errors?.note} className="sm:col-span-2">
-                <Textarea id={`${id}-note`} name="note" rows={3} maxLength={2000} className="min-h-0" defaultValue={s.values?.note} />
-              </Field>
-            </PanelSection>
-            <WindowFooter>
-              <SubmitButton size="sm" pendingText="Adding…">
-                Add the follow-up
-              </SubmitButton>
-            </WindowFooter>
-          </>
-        )}
-      </ActionForm>
+      {record && (
+        <p className="mb-4 text-sm text-text-2">
+          On <span className="font-medium text-text">{record}</span>
+        </p>
+      )}
+      <FollowUpFields action={action} people={people} meId={meId} today={today} submit="Add the follow-up" onDone={() => close({ ok: true })} />
     </PanelBody>
   );
 }
@@ -378,6 +327,23 @@ export function FollowUpFields({
               defaultValue={s.values?.place ?? initial?.place ?? undefined}
             />
           </Field>
+          {/* A new one says its kind and a note too (one form for a follow-up, on its page and on a record: S-14). */}
+          {!initial && (
+            <>
+              <Field label="Kind" htmlFor={`${id}-kind`} error={s.errors?.kind}>
+                <Select id={`${id}-kind`} name="kind" defaultValue={s.values?.kind ?? "call"}>
+                  {FOLLOW_UP_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {FOLLOW_UP_KIND_LABEL[k]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Note" optional htmlFor={`${id}-note`} error={s.errors?.note} className="col-span-2 sm:col-span-3">
+                <Textarea id={`${id}-note`} name="note" rows={2} maxLength={2000} className="min-h-0" defaultValue={s.values?.note} />
+              </Field>
+            </>
+          )}
           {about && (
             <Field label="About" htmlFor={`${id}-about`} className="col-span-2 sm:col-span-3">
               <Select id={`${id}-about`} name="about" defaultValue={s.values?.about ?? initial?.about ?? ""}>

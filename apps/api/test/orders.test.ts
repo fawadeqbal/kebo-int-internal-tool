@@ -75,6 +75,12 @@ describe("orders: four stages", () => {
     // Pages: one a page, the second page of a single order is empty.
     expect((await api(app, manager).get(`/orders/page?status=all&q=${encodeURIComponent(tag)}&pageSize=1&page=2`).expect(200)).body.rows).toEqual([]);
     await api(app, manager).get("/orders/page?status=nope").expect(422);
+    // Sorted by a column, either way (review 24 Nov, O-39).
+    const byTotal = (await api(app, manager).get("/orders/page?sort=total&dir=desc&pageSize=100").expect(200)).body.rows as { total: string }[];
+    expect(byTotal.map((r) => Number(r.total))).toEqual([...byTotal.map((r) => Number(r.total))].sort((a, b) => b - a));
+    const byNumber = (await api(app, manager).get("/orders/page?sort=order&dir=asc&pageSize=100").expect(200)).body.rows as { refNo: string }[];
+    expect(byNumber.map((r) => r.refNo)).toEqual([...byNumber.map((r) => r.refNo)].sort());
+    await api(app, manager).get("/orders/page?sort=nope").expect(422);
   });
 
   it("shows staff only their own orders on a customer's page", async () => {

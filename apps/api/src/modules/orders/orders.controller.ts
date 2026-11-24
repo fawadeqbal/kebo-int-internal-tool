@@ -51,6 +51,9 @@ const pageQuery = z.object({
   q: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  /** A column to sort the open and late lists by (review 24 Nov, O-39); none: the late first, then by what is due. */
+  sort: z.enum(["order", "date", "total", "due"]).optional(),
+  dir: z.enum(["asc", "desc"]).optional(),
 });
 
 @ApiTags("orders")

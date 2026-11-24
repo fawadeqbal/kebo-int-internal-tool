@@ -63,14 +63,16 @@ function shortSpan(from: string, to: string): string {
   if (!whole) return spanLabel(from, to);
   if (from.slice(0, 7) === to.slice(0, 7)) return fmt(from, { month: "short" });
   const sameYear = from.slice(0, 4) === to.slice(0, 4);
+  // A whole year says which: "Jan – Dec 2025".
+  if (sameYear && from.slice(5, 7) === "01" && to.slice(5, 7) === "12") return `Jan – Dec ${from.slice(0, 4)}`;
   return sameYear
     ? `${fmt(from, { month: "short" })} – ${fmt(to, { month: "short" })}`
     : `${fmt(from, { month: "short", year: "numeric" })} – ${fmt(to, { month: "short", year: "numeric" })}`;
 }
 
 /**
- * The period every figure on the page is for, and the one it is compared with: this month, the 3 or 12 months
- * ending with this one, or your own dates (compared with as many days just before). Quarter by default.
+ * The period every figure on the page is for, and the one it is compared with: this month, this calendar quarter
+ * or year, or your own dates (compared with as many days just before). Quarter by default.
  */
 export function periodOf(q: { period?: string; from?: string; to?: string }, today: string): Period {
   let kind: PeriodKind = (PERIOD_KINDS as readonly string[]).includes(q.period ?? "") ? (q.period as PeriodKind) : "quarter";
@@ -92,12 +94,16 @@ export function periodOf(q: { period?: string; from?: string; to?: string }, tod
       name: spanLabel(from, to),
     };
   }
+  // Calendar periods (review 24 Nov, M-30: Quarter and Year were the last 3 and 12 months): this month, this
+  // quarter (Oct–Dec), this year (Jan–Dec), each against the whole one before it.
   const n = MONTHS[kind];
-  const from = monthStart(today, -(n - 1));
-  const to = monthEnd(today);
-  const prevFrom = monthStart(today, -(2 * n - 1));
+  const month = Number(today.slice(5, 7));
+  const back = kind === "month" ? 0 : kind === "quarter" ? (month - 1) % 3 : month - 1;
+  const from = monthStart(today, -back);
+  const to = monthEnd(monthStart(from, n - 1));
+  const prevFrom = monthStart(from, -n);
   const prevTo = addDays(from, -1);
-  const name = kind === "month" ? "this month" : kind === "quarter" ? "this quarter" : "these 12 months";
+  const name = kind === "month" ? "this month" : kind === "quarter" ? "this quarter" : "this year";
   return { kind, from, to, prevFrom, prevTo, label: spanLabel(from, to), vsLabel: shortSpan(prevFrom, prevTo), name };
 }
 
@@ -138,8 +144,10 @@ export const compact = (v: number) =>
 /** "USD 63k" */
 export const compactMoney = (v: number | null | undefined, c: string) => (v === null || v === undefined ? "—" : `${c} ${compact(v)}`);
 /** "USD 288,000" (whole units); from a million "USD 1.21M". */
-export function bigMoney(v: number | null | undefined, c: string) {
+export function bigMoney(v: number | null | undefined, c: string): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return "—";
+  // One shape for a negative amount: "− USD 1,250" (as lib/format's money and whole).
+  if (v < 0) return `− ${bigMoney(-v, c)}`;
   // Whole units up to ten million, so a row of figures reads one way ("USD 1,150,000" beside "USD 231,293", not
   // "USD 1.15M": review 24 Nov, M-33); only beyond that, millions.
   if (Math.abs(v) >= 10_000_000) return `${c} ${(v / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 2 })}M`;

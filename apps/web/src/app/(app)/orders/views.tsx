@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Board as BoardColumns } from "@/components/lists/board";
 import { Factory, FileText, LayoutGrid, List as ListIcon, Package, PieChart, Ship } from "lucide-react";
 import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, ORDER_WORD_TONE, orderWordColumn, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
-import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, Segmented, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage, toPageSize, Stack } from "@kebo/ui";
+import { ButtonLink, Card, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, Segmented, SortTh, StatRow, StatTile, StatusBadge, THead, Td, Th, buildHref, cn, toPage, toPageSize, Stack } from "@kebo/ui";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { DataTable } from "@/components/common/data-table";
@@ -51,6 +51,7 @@ export type Params = Record<string, string | undefined>;
 const RECENT_DONE = 8;
 
 const STATUSES = ["open", "late", "closed", "cancelled", "all"] as const;
+const SORTS = ["order", "date", "total", "due"] as const;
 type Status = (typeof STATUSES)[number];
 
 /**
@@ -69,8 +70,25 @@ function statusBadge(o: OrderRow) {
 export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
   const status: Status = STATUSES.includes(sp.status as Status) ? (sp.status as Status) : sp.view === "cancelled" ? "cancelled" : "open";
   const stage = (["confirmed", "in_production", "shipped"] as const).find((x) => x === sp.stage);
-  const keep = { q: sp.q, mine: mine ? "1" : undefined, status: status === "open" ? undefined : status, stage, customer: sp.customer, assignee: sp.assignee };
+  // A column chosen to sort the open or late orders by (review 24 Nov, O-39); none: the late first.
+  const sortable = status === "open" || status === "late";
+  const sort = sortable ? SORTS.find((x) => x === sp.sort) : undefined;
+  const dir = sp.dir === "desc" ? "desc" : "asc";
+  const keep = { q: sp.q, mine: mine ? "1" : undefined, status: status === "open" ? undefined : status, stage, customer: sp.customer, assignee: sp.assignee, sort, dir: sort ? dir : undefined };
   const href = (patch: Params) => buildHref("/orders", keep, { page: undefined, ...patch });
+  /** A column's head: by it, up; pressed again, down; a third time, back to the late first. */
+  const head = (key: (typeof SORTS)[number], label: string, className?: string) =>
+    sortable ? (
+      <SortTh
+        className={className}
+        sorted={sort === key ? dir : null}
+        href={href(sort !== key ? { sort: key, dir: key === "date" || key === "total" || key === "due" ? "desc" : "asc" } : dir === (key === "order" ? "asc" : "desc") ? { sort: key, dir: key === "order" ? "desc" : "asc" } : { sort: undefined, dir: undefined })}
+      >
+        {label}
+      </SortTh>
+    ) : (
+      <Th className={className}>{label}</Th>
+    );
   const year = new Date().getFullYear();
   const [data, owed, facts, shipments, customers, people, settings] = await Promise.all([
     api.get<Paged<OrderRow & { purchaseOrders?: string[] }> & { counts: Record<Status | OrderStage | "lateInProduction", number> }>("/orders/page", {
@@ -82,6 +100,8 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
       q: sp.q,
       page: toPage(sp.page),
       pageSize: toPageSize(sp.size),
+      sort,
+      dir: sort ? dir : undefined,
     }),
     optional(() => api.get<{ currency: string; rows: { total: string; overdue: string }[] }>("/insights/facts/owed", { side: "receivable" })),
     optional(() => api.get<{ currency: string; rows: { sales: string; profitExpected: string | null; margin: number | null }[] }>("/insights/facts/orders/groups", { from: `${year}-01-01`, to: `${year}-12-31`, period: "all" })),
@@ -246,13 +266,13 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
             <DataTable label="Orders" className="max-sm:hidden">
               <THead>
                 <tr>
-                  <Th>Order</Th>
+                  {head("order", "Order")}
                   <Th>What · customer</Th>
                   {/* Shown only where the page has room (roomy): the list fits beside the open menu without it. */}
                   <Th className="hidden roomy:table-cell">Purchase order</Th>
-                  <Th>Date</Th>
-                  <Th className="text-right">Total</Th>
-                  <Th className="text-right">They owe</Th>
+                  {head("date", "Date")}
+                  {head("total", "Total", "text-right")}
+                  {head("due", "They owe", "text-right")}
                   <Th>Now</Th>
                   <Th>Status</Th>
                   <Th className="w-12">

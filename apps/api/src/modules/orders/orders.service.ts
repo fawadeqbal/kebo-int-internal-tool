@@ -1155,6 +1155,8 @@ export class OrdersService {
       q?: string;
       page: number;
       pageSize: number;
+      sort?: "order" | "date" | "total" | "due";
+      dir?: "asc" | "desc";
     },
   ) {
     const where: Prisma.OrderWhereInput = {
@@ -1179,9 +1181,20 @@ export class OrdersService {
     const urgentFirst = (a: (typeof openRows)[number], b: (typeof openRows)[number]) =>
       Number(!!b.needs?.late) - Number(!!a.needs?.late) || (a.needs?.due ?? "9999").localeCompare(b.needs?.due ?? "9999");
     const pick = q.status === "late" ? late : q.stage ? openRows.filter((o) => at(o) === q.stage) : openRows;
+    // A column chosen: by it (ties by number), up or down; else the late first.
+    const sign = q.dir === "desc" ? -1 : 1;
+    const byColumn = (a: (typeof openRows)[number], b: (typeof openRows)[number]) =>
+      sign *
+        (q.sort === "order"
+          ? a.refNo.localeCompare(b.refNo)
+          : q.sort === "date"
+            ? a.orderedOn.localeCompare(b.orderedOn)
+            : q.sort === "total"
+              ? Number(a.total) - Number(b.total)
+              : Number(a.due) - Number(b.due)) || a.refNo.localeCompare(b.refNo);
     const rows =
       q.status === "open" || q.status === "late"
-        ? pick.sort(urgentFirst).slice(skip, skip + q.pageSize)
+        ? pick.sort(q.sort ? byColumn : urgentFirst).slice(skip, skip + q.pageSize)
         : await this.list(user, { ...narrow, status: q.status, recent: true, skip, limit: q.pageSize });
     const total = q.status === "open" || q.status === "late" ? pick.length : counts[q.status];
     // Each row's purchase orders (PO-2026-0044), for the list's Purchase order column.
