@@ -756,8 +756,10 @@ function SendIt({
   const [message, setMessage] = useState(first);
   const [busy, setBusy] = useState(false);
   const id = useId();
-  const name = `${p.label} ${p.number}.pdf`;
-  const subject = send?.subject ?? `${p.label} ${p.number} · order ${p.refNo}`;
+  // A paper not numbered yet (a draft proforma) is named for its order (review 24 Nov: "Proforma invoice null.pdf").
+  const named = [p.label, p.number ?? p.refNo].filter(Boolean).join(" ");
+  const name = `${named}.pdf`;
+  const subject = send?.subject ?? (p.number ? `${p.label} ${p.number} · order ${p.refNo}` : `${p.label} · order ${p.refNo}`);
   const download = () => {
     const a = document.createElement("a");
     a.href = pdf;

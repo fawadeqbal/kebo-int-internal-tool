@@ -2,55 +2,8 @@ import { MessageSquareQuote } from "lucide-react";
 import { cn, Table, Td, Th, THead, Tr, RULES } from "@kebo/ui";
 import type { HistoryEntry } from "@/lib/types";
 import { dateTime } from "@/lib/format";
-import { INQUIRY_STAGE_LABEL, ORDER_STAGE_LABEL } from "@kebo/shared";
 import { readableHistory } from "@/components/insights/readable-dates";
-
-/** Field names as people say them. */
-const FIELD: Record<string, string> = {
-  blNo: "B/L number",
-  shippedOn: "Shipped on",
-  departedOn: "Left on",
-  containerNo: "Container",
-  shipBy: "Ship by",
-  readyOn: "Ready on",
-  onHold: "On hold",
-  lookedAfterBy: "Looked after by",
-  taxNo: "Tax no.",
-  regNo: "Reg. no.",
-  defaultCurrency: "Currency",
-  validUntil: "Valid until",
-  documentTitle: "Document title",
-  portOfDischarge: "Port of discharge",
-  contactPerson: "Contact person",
-  bankDetails: "Bank details",
-  exchangeRates: "Exchange rates",
-  defaultMarginPercent: "Default margin %",
-  defaultDepositPercent: "Default deposit %",
-  defaultBalanceTerms: "Balance terms",
-  defaultPaymentTerms: "Payment terms",
-  defaultDeliveryTerms: "Incoterm",
-  warrantyTerms: "Warranty",
-  paymentTerms: "Payment terms",
-  deliveryTerms: "Incoterm",
-  warranty: "Warranty",
-  incotermPlace: "Place",
-  leadTime: "Lead time",
-  deliveryConditions: "Delivery conditions",
-  paymentConditions: "Payment conditions",
-  notes: "Notes",
-  printQuotedTerms: "Agreed payment conditions printed",
-  sentVia: "Sent by",
-  step: "Stage",
-};
-/** Not for people: a record's id (by its name or by its value), and the "yes, save it anyway" a form sends. */
-const HIDDEN = /^(ask|id|.+Id|followUp)$/;
-const IS_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** A stage's word, not its key ("sourcing" → "Sourcing"). */
-const STAGE: Record<string, string> = { ...ORDER_STAGE_LABEL, ...INQUIRY_STAGE_LABEL };
-const hidden = (c: { field: string; from: string | null; to: string | null }) => HIDDEN.test(c.field) || IS_ID.test(c.to ?? "") || IS_ID.test(c.from ?? "");
-const fieldLabel = (f: string) => FIELD[f] ?? f.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
-const shown = (v: string | null) =>
-  v === null ? "—" : v === "true" ? "yes" : v === "false" ? "no" : (STAGE[v] ?? readableHistory(v.length > 80 ? `${v.slice(0, 80)}…` : v));
+import { fieldLabel, hiddenChange, shown } from "@/components/common/history-words";
 
 const AREA: Record<string, string> = {
   factory_quote: "Supplier prices",
@@ -101,7 +54,7 @@ export function HistoryTable({
               {showArea && AREA[e.entityType] && <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-text-2">{AREA[e.entityType]}</span>}
               {e.summary ? readableHistory(e.summary) : e.action.replace(/_/g, " ")}
               {e.changes
-                .filter((c) => !hidden(c))
+                .filter((c) => !hiddenChange(c))
                 .slice(0, 8)
                 .map((c) => (
                   <span key={c.field}>

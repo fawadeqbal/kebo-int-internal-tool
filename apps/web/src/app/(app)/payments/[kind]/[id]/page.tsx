@@ -18,6 +18,7 @@ import type { ExpenseView } from "@/lib/types-money";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { Me } from "@/lib/session";
+import { fieldLabel, hiddenChange, shown } from "@/components/common/history-words";
 import { editPaymentAction, factoryPaymentAction } from "../../../money/actions";
 import { removeRecordFileAction, voidPaymentAction } from "../../actions";
 import { opensPayments } from "../../shared";
@@ -190,6 +191,15 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
             <CardHeader title="Activity" />
             <CardBody className="flex flex-col gap-3 text-sm">
               <HistoryLine who={p.recordedBy} what={p.kind === "submission" ? "Sent for verification" : "Recorded"} at={p.recordedAt} />
+              {(p.changes ?? []).map((c) => (
+                <HistoryLine
+                  key={c.at}
+                  who={c.by}
+                  what={`Changed${c.what.length ? `: ${c.what.filter((x) => !hiddenChange(x)).map((x) => `${fieldLabel(x.field)} ${shown(x.from)} → ${shown(x.to)}`).join(" · ")}` : ""}`}
+                  reason={c.reason}
+                  at={c.at}
+                />
+              ))}
               {p.voided && <HistoryLine who={null} what={`Removed${p.voided.reason ? `: ${p.voided.reason}` : ""}`} at={p.voided.at} />}
               {p.ledgerHref && (
                 <Link href={p.ledgerHref} className={linkClass}>
@@ -279,13 +289,17 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
 }
 
 /** One line of a payment's history: who (initials), what, when. */
-function HistoryLine({ who, what, at }: { who: string | null; what: string; at: string }) {
+function HistoryLine({ who, what, at, reason }: { who: string | null; what: string; at: string; reason?: string | null }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-start gap-3">
       <Avatar name={who ?? "System"} size={28} />
-      <span>
+      <span className="min-w-0 [overflow-wrap:anywhere]">
         <span className="block">{what}</span>
-        <span className="block text-xs text-muted">{dateTime(at)}</span>
+        {reason && <span className="block text-xs text-text-2">Why: {reason}</span>}
+        <span className="block text-xs text-muted">
+          {who ? `${who} · ` : ""}
+          {dateTime(at)}
+        </span>
       </span>
     </div>
   );

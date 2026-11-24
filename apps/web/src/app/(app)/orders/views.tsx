@@ -128,7 +128,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         crumbs={crumbsFor("/orders")}
         title="Sales orders"
         views={<ViewSwitch view="list" mine={mine} />}
-        more={<ExportCsv what="orders" query={{ status, mine: keep.mine, q: sp.q }} />}
+        more={<ExportCsv what="orders" query={{ status, stage, customer: sp.customer, assignee: mine ? undefined : sp.assignee, mine: keep.mine, q: sp.q }} />}
       />
 
       <StatRow facts>

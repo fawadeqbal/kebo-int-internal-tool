@@ -9,10 +9,13 @@ import { CompanyContext } from "./common/company/company-context";
 import { FactsService } from "./modules/insights/facts/facts.service";
 import type { Env } from "./config/env";
 import { RequestStats } from "./platform/watch";
+import { plainErrors } from "@kebo/shared";
 
 /** Everything main.ts and the tests share: prefix, security headers, CORS, errors, API docs. */
 
 export function configureApp(app: INestApplication, env: Env) {
+  // Every check's own words in plain English (a schema's own message still wins).
+  plainErrors();
   app.setGlobalPrefix("api");
   // req.ip honours X-Forwarded-For only for the configured number of proxy hops.
   (app.getHttpAdapter().getInstance() as { set(key: string, value: unknown): void }).set("trust proxy", env.TRUST_PROXY);

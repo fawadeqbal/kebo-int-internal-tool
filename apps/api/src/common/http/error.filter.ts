@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { ZodError, z } from "zod";
 import { ConflictError, DomainError, DuplicateError, ForbiddenError, GateError, NotFoundError, ReasonNeededError } from "@kebo/utils";
 import { DB_ERROR, isDbError } from "@kebo/database";
+import { fieldWords, isPlainError } from "@kebo/shared";
 
 /**
  * One error shape for every client: { error, code?, fieldErrors? }.
@@ -20,7 +21,11 @@ export class ErrorFilter implements ExceptionFilter {
     const send = (status: number, body: Record<string, unknown>) => res.status(status).json(body);
 
     if (error instanceof ZodError) {
-      return send(422, { error: error.issues[0]?.message ?? "Some details are not valid.", fieldErrors: z.flattenError(error).fieldErrors });
+      // A plain message says which field it is about ("Amount: type a number."); a schema's own says it already.
+      const first = error.issues[0];
+      const key = first?.path.filter((x) => typeof x === "string").at(-1);
+      const message = first ? (key && isPlainError(first.message) ? `${fieldWords(key)}: ${first.message.charAt(0).toLowerCase()}${first.message.slice(1)}` : first.message) : "Some details are not valid.";
+      return send(422, { error: message, fieldErrors: z.flattenError(error).fieldErrors });
     }
     if (error instanceof DuplicateError) return send(409, { error: error.message, code: "duplicate", matches: error.matches });
     if (error instanceof ReasonNeededError) return send(409, { error: error.message, code: error.code, choices: error.choices });

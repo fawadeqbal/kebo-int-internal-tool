@@ -126,6 +126,8 @@ export interface PaymentView extends PaymentRow {
   parts?: { order: string; href: string; part: string; amount: string; currency: string; released: boolean }[];
   recordedBy: string | null;
   recordedAt: string;
+  /** Each change made to it since it was recorded: when, who, why and what (field, from, to). */
+  changes?: { at: string; by: string | null; reason: string | null; what: { field: string; from: string | null; to: string | null }[] }[];
   voided: { at: string; reason: string | null } | null;
   /** Remove it (with a reason): the endpoint that does it, when this person may. */
   voidPath: string | null;

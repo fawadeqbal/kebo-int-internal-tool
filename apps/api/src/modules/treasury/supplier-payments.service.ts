@@ -179,6 +179,8 @@ export class SupplierPaymentsService {
           reference: p.reference,
         },
         newValues: {
+          // Its page reads its own changes by this (the order's history keeps them too).
+          paymentId: p.id,
           factory: factoryName,
           amount: `${formatMinor(toMinor(data.amount), data.currency)}`,
           paidOn: input.paidOn,

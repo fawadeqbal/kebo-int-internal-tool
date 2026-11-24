@@ -57,7 +57,7 @@ export default async function PurchaseOrdersPage({
         kind="list"
         crumbs={crumbsFor("/operations/purchase-orders")}
         title="Purchase orders"
-        more={<ExportCsv what="purchase-orders" />}
+        more={<ExportCsv what="purchase-orders" query={{ status: chip, q: sp.q, supplier: sp.supplier, ready }} />}
       />
       <StatRow facts>
         <StatTile label="Open purchase orders" value={tiles.open} />

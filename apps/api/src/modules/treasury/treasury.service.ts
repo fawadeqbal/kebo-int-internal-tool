@@ -22,6 +22,7 @@ import {
 } from "@kebo/shared";
 import { convert, formatMinor, fromMinor, fxRate, orderRate } from "@kebo/money";
 import { ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
+import { changesOf } from "../../common/audit/changes";
 import { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { LimitsService } from "../../common/company/limits.service";
@@ -554,11 +555,23 @@ export class TreasuryService {
         })
       : null;
     const detail = await this.detail(user, kind, id);
+    // Each change made to it since it was recorded, with its reason (review 24 Nov: the page said only "Recorded").
+    const edits = await this.prisma.db.auditLog.findMany({
+      where: { action: { in: ["payment_edit", "payment_out_edit"] }, newValues: { path: ["paymentId"], equals: id } },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true, reason: true, oldValues: true, newValues: true, user: { select: { name: true } } },
+    });
     return {
       ...row,
       // Its name in words (design rule 3: a title is never a number).
       title: row.name,
       ...detail,
+      changes: edits.map((e) => ({
+        at: e.createdAt.toISOString(),
+        by: e.user?.name ?? null,
+        reason: e.reason,
+        what: changesOf(e.oldValues, e.newValues).filter((c) => c.field !== "paymentId"),
+      })),
       ledgerHref: posting ? `/finance/ledger?panel=entry&id=${posting.groupId}` : null,
     };
   }

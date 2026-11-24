@@ -25,5 +25,6 @@ export const readableHistory = (text: string, style: TimeStyle = timeStyle()) =>
     .join(" · ")
     .replace(/(?<![\w./:-])(\d{5,}(?:\.\d{1,2})?|\d{4}\.\d{1,2})(?![\w/:-])/g, (n) => {
       const [whole, cents] = n.split(".");
-      return Number(whole).toLocaleString("en-US") + (cents !== undefined ? `.${cents}` : "");
+      // Money keeps two decimals ("5000.5" → "5,000.50", not "5,000.5": review 24 Nov).
+      return Number(whole).toLocaleString("en-US") + (cents !== undefined ? `.${cents.padEnd(2, "0")}` : "");
     });

@@ -5,8 +5,10 @@ import {
   EXPENSE_CATEGORY_LABEL,
   INQUIRY_STAGE_LABEL,
   ORDER_STAGE_LABEL,
+  PAYMENT_STATUS_LABEL,
   PRIORITY_LABEL,
   REVISION_STATUS_LABEL,
+  type PaymentRow,
 } from "@kebo/shared";
 import { fromMinor, landedUnitCosts, toMinor } from "@kebo/money";
 import { api } from "./api";
@@ -21,6 +23,7 @@ import type { Receivables } from "./types-insights";
 import type { LedgerListRow, LedgerParty } from "./types-ledger";
 import { insightsSheets } from "./insights-data";
 import { UUID } from "@/lib/ids";
+import { PURCHASE_ORDER_STATUS } from "@/lib/purchase-orders";
 import { dateIn, formatTime } from "@kebo/utils";
 import { companyToday, currentZone } from "@/lib/format";
 
@@ -120,8 +123,9 @@ async function orders(q: Q): Promise<SheetSpec> {
   const mine = q.mine === "1" ? "true" : undefined;
   const cancelled = q.view === "cancelled" || q.status === "cancelled";
   // From the list: what its status chip and search show. Without one (older links): open and done.
+  // Every filter the list has (review 24 Nov: a customer filter with 8 rows on screen exported 532).
   const rows = q.status
-    ? await allPages<OrderRow>("/orders/page", { status: q.status, mine, q: q.q })
+    ? await allPages<OrderRow>("/orders/page", { status: q.status, stage: q.stage, customer: q.customer, assignee: q.assignee, mine, q: q.q })
     : cancelled
       ? await api.get<OrderRow[]>("/orders", { status: "cancelled", mine })
       : [
@@ -139,7 +143,7 @@ async function orders(q: Q): Promise<SheetSpec> {
       text("Inquiry", 14),
       text("Inquiry title", 30),
       text("Responsible person", 16),
-      text("Stage", 13),
+      text("Where it stands", 14),
       text("Ordered on", 12),
       text("Ready on", 12),
       text("Shipped on", 12),
@@ -157,7 +161,8 @@ async function orders(q: Q): Promise<SheetSpec> {
       o.inquiry.refNo,
       o.inquiry.title,
       o.inquiry.assignee?.name ?? null,
-      o.status === "cancelled" ? "Cancelled" : ORDER_STAGE_LABEL[o.stage],
+      // The one word the list, the board and the order show.
+      o.word,
       day(o.orderedOn),
       day(o.readyOn),
       day(o.shippedOn),
@@ -499,7 +504,7 @@ async function expenses(q: Q): Promise<SheetSpec> {
 }
 
 async function audit(q: Q): Promise<SheetSpec> {
-  const rows = (await allPages<AuditRow>("/audit", { entityType: q.type, userId: q.person })).slice(0, 10_000);
+  const rows = (await allPages<AuditRow>("/audit", { entityType: q.type, userId: q.person, q: q.q?.trim() || undefined })).slice(0, 10_000);
   return {
     name: `Activity log ${stamp()}`,
     title: "Activity log",
@@ -687,9 +692,10 @@ async function factoryList(q: Q): Promise<SheetSpec> {
 }
 
 /** Purchase orders (Purchasing › Purchase orders): every one, with what it costs and where it stands. */
-async function purchaseOrders(): Promise<SheetSpec> {
+async function purchaseOrders(q: Q): Promise<SheetSpec> {
   type Row = { po: { number: string } | null; status: string; supplier: { name: string }; order: { refNo: string }; customer: { name: string }; currency: string; owed: string; paid: string; toPay: string; readyOn: string | null; orderedOn: string | null; supplierRef: string | null };
-  const rows = await api.get<Row[]>("/operations/purchase-orders", { all: "true" });
+  // What the list shows: its tab, search, supplier and ready filters (every one without them).
+  const rows = await allPages<Row>("/operations/purchase-orders/page", { status: q.status ?? "all", q: q.q, supplier: q.supplier, ready: q.ready });
   return {
     name: `Purchase orders ${stamp()}`,
     title: "Purchase orders",
@@ -706,7 +712,57 @@ async function purchaseOrders(): Promise<SheetSpec> {
       day(r.readyOn),
       day(r.orderedOn),
       r.supplierRef,
-      r.status.replace(/_/g, " "),
+      PURCHASE_ORDER_STATUS[r.status as keyof typeof PURCHASE_ORDER_STATUS]?.label ?? r.status.replace(/_/g, " "),
+    ]),
+  };
+}
+
+/** Payments (Finance › Payments): what the list shows, with its period, tab, method, account and search, and each one's number. */
+async function payments(q: Q): Promise<SheetSpec> {
+  const rows = await allPages<PaymentRow>("/treasury/payments", {
+    from: q.from,
+    to: q.to,
+    dir: q.dir,
+    status: q.status,
+    kind: q.kind,
+    q: q.q,
+    order: q.order,
+    party: q.party,
+    account: q.account,
+    method: q.method,
+  });
+  return {
+    name: `Payments ${stamp()}`,
+    title: "Payments",
+    columns: [
+      text("Number", 16),
+      text("Date", 12),
+      text("In or out", 10),
+      text("What", 36),
+      text("Party", 26),
+      text("For", 22),
+      text("Account", 18),
+      text("Method", 16),
+      text("Reference", 16),
+      text("Currency", 9),
+      money("Amount"),
+      text("Status", 14),
+      text("Recorded by", 14),
+    ],
+    rows: rows.map((r): Cell[] => [
+      r.number,
+      day(r.on),
+      r.direction === "in" ? "In" : r.direction === "out" ? "Out" : "Transfer",
+      r.what,
+      r.party?.label ?? null,
+      r.for.map((f) => f.label).join(", ") || null,
+      r.account,
+      r.method,
+      r.reference,
+      r.currency,
+      num(r.amount),
+      PAYMENT_STATUS_LABEL[r.status] ?? r.status,
+      r.by,
     ]),
   };
 }
@@ -720,6 +776,7 @@ export const EXPORTS = {
   receivables,
   payables,
   "cash-book": cashBook,
+  payments,
   expenses,
   audit,
   report,
