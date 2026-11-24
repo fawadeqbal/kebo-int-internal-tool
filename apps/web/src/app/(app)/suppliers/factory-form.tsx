@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Factory as FactoryIcon, Landmark, Phone } from "lucide-react";
 import { cn, Field, Input, Select, Textarea, RULES } from "@kebo/ui";
@@ -42,6 +43,7 @@ function FactoryForm({
   onSaved: (s: ActionState) => void;
 }) {
   const [step, setStep] = useState<SupplierStep>("who");
+  const [name, setName] = useState(factory?.name ?? "");
   const at = Math.max(0, SUPPLIER_STEPS.findIndex((x) => x.key === step));
   const last = at === SUPPLIER_STEPS.length - 1;
   const go = (i: number) => setStep(SUPPLIER_STEPS[Math.max(0, Math.min(SUPPLIER_STEPS.length - 1, i))]!.key);
@@ -68,7 +70,8 @@ function FactoryForm({
             <>
               <JumpToStep errors={s.errors} stepOf={stepOfField} onJump={setStep} />
               <StepsFrame
-                steps={SUPPLIER_STEPS.map((x, k) => ({ key: x.key, label: x.label, icon: x.icon, done: !factory && k < at }))}
+                // "Who they are" is ticked only with a name (review 24 Nov, O-38).
+                steps={SUPPLIER_STEPS.map((x, k) => ({ key: x.key, label: x.label, icon: x.icon, done: !factory && k < at && (x.key !== "who" || !!name.trim()) }))}
                 at={step}
                 onGo={setStep}
                 footer={
@@ -83,7 +86,7 @@ function FactoryForm({
               >
                 <div className={cn(grid, step !== "who" && "hidden")}>
               <Field label="Supplier name" required htmlFor="name" error={s.errors?.name} className="sm:col-span-2">
-                <Input id="name" name="name" defaultValue={val("name")} autoComplete="organization" {...invalid("name")} />
+                <Input id="name" name="name" defaultValue={val("name")} autoComplete="organization" onInput={(e) => setName(e.currentTarget.value)} {...invalid("name")} />
               </Field>
               <Field label="Responsible person" htmlFor="ownerId" error={s.errors?.ownerId}>
                 <Select id="ownerId" name="ownerId" defaultValue={s.values?.ownerId ?? (factory ? (factory.ownerId ?? "") : meId)}>
@@ -109,7 +112,7 @@ function FactoryForm({
               <Field label="Email" htmlFor="email" error={s.errors?.email}>
                 <Input id="email" name="email" type="email" defaultValue={val("email")} {...invalid("email")} />
               </Field>
-              <Field label="Address" htmlFor="address" error={s.errors?.address} className="sm:col-span-2">
+              <Field label="Address" htmlFor="address" hint="Its city last (“…, Ningbo”): the list shows it and filters by it." error={s.errors?.address} className="sm:col-span-2">
                 <Input id="address" name="address" defaultValue={val("address")} />
               </Field>
                 </div>
@@ -156,9 +159,16 @@ export function FactoryPanel({
   onRecord?: boolean;
 }) {
   const panel = useSidePanel(factory ? "edit-factory" : "new-factory");
+  const router = useRouter();
   const saved = (s: ActionState) => {
     const d = s.data as { id: string; name: string } | undefined;
     if (!d) return panel.close();
+    // A new supplier opens its own page, as a new customer does (review 24 Nov, O-38: it stayed on the list).
+    if (!factory && !onRecord) {
+      toast({ message: `Supplier ${d.name} added` });
+      router.push(`/suppliers/${d.id}`);
+      return;
+    }
     toast({
       message: factory ? `${d.name} saved` : `Supplier ${d.name} added`,
       action: onRecord ? undefined : { label: "Open", href: `/suppliers/${d.id}` },

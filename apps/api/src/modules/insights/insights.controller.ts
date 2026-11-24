@@ -90,8 +90,9 @@ export class InsightsController {
   /** What needs me now ("Needs attention" on Home). */
   @SignedIn("checked inside: expenses.manage, settings.manage, sourcing.manage")
   @Get("reminders")
-  list(@CurrentUser() user: SessionUser) {
-    return this.reminders.list(user);
+  list(@CurrentUser() user: SessionUser, @Query("all") all?: string) {
+    // ?all=1: every one, for the Needs you page (review 24 Nov, S-23: "212 more" opened Alerts, another list).
+    return this.reminders.list(user, all === "1");
   }
 
   @SignedIn("their own reminders")

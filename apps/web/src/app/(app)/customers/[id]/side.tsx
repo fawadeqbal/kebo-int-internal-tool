@@ -1,3 +1,4 @@
+import { getPeople } from "@/lib/loaders";
 import Link from "next/link";
 import { can } from "@kebo/shared";
 import { Avatar, ButtonLink, Card, CardBody, CardHeader, cn, EmptyLine, linkClass } from "@kebo/ui";
@@ -21,11 +22,13 @@ const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 export async function CustomerSide({ id }: { id: string }) {
   const me = await requireUser();
   const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const [c, pay, notes, account] = await Promise.all([
+  const [c, pay, notes, account, people] = await Promise.all([
     customerOf(id),
     customerPaymentsOf(id),
     partyNotesOf("customers", id),
     seesCosts ? api.get<CustomerAccount>(`/customers/${id}/account`).catch(() => null) : null,
+    // For "@" in a note: who can be told.
+    getPeople().catch(() => []),
   ]);
   const totals = pay?.totals ?? [];
   const primary = c.contacts.find((p) => p.isPrimary) ?? c.contacts[0] ?? null;
@@ -143,7 +146,7 @@ export async function CustomerSide({ id }: { id: string }) {
           <Card>
             <CardHeader title="Activity" />
             <CardBody className="flex flex-col gap-3">
-              {canNote && <QuickNote action={addNoteAction.bind(null, { key: "customerId", id: c.id })} />}
+              {canNote && <QuickNote action={addNoteAction.bind(null, { key: "customerId", id: c.id })} people={people} />}
               {notes.length ? (
                 <ol className="flex flex-col gap-3">
                   {notes.slice(0, 5).map((n) => (

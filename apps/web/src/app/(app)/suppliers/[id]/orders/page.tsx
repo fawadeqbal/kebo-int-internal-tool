@@ -19,15 +19,23 @@ export default async function FactoryOrders({ params }: { params: Promise<{ id: 
   const owed = new Map(
     payables.flatMap((p) => p.orders.filter((o) => Number(o.toPay) > 0.005).map((o) => [o.id, { ...o, currency: p.currency }] as const)),
   );
-  const making = new Map(f.record.openOrders.map((o) => [o.id, o]));
+  // Every order it made for us, the latest first (review 24 Nov, O-38: only the ones in production were listed).
+  const all = f.record.orders ?? f.record.openOrders.map((o) => ({ ...o, status: "open" as const, stage: "in_production" }));
+  const listed = new Set(all.map((o) => o.id));
   const rows = [
-    ...f.record.openOrders.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer, readyOn: o.readyOn, making: true })),
+    ...all.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer, readyOn: o.status === "open" ? o.readyOn : null, status: o.status, stage: o.stage })),
     ...[...owed.values()]
-      .filter((o) => !making.has(o.id))
-      .map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer, readyOn: null, making: false })),
+      .filter((o) => !listed.has(o.id))
+      .map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer, readyOn: null, status: "open" as const, stage: "shipped" })),
   ];
   const state = (o: (typeof rows)[number]) =>
-    o.making ? <StatusBadge meaning="info">Making</StatusBadge> : <StatusBadge meaning="ok">Made</StatusBadge>;
+    o.status !== "open" ? (
+      <StatusBadge meaning="ok">Done</StatusBadge>
+    ) : o.stage === "confirmed" || o.stage === "in_production" ? (
+      <StatusBadge meaning="info">Making</StatusBadge>
+    ) : (
+      <StatusBadge meaning="info">Shipped</StatusBadge>
+    );
   const toPay = (id: string) => {
     const p = owed.get(id);
     return p ? <span className={p.next?.status === "late" ? "font-semibold text-bad" : undefined}>{whole(p.toPay, p.currency)}</span> : "—";

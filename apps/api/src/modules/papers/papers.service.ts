@@ -705,7 +705,10 @@ export class PapersService implements OnModuleInit {
         if (!used(kind) && !latest && !recorded) continue;
         // A PO marked sent on the Purchase order tab is sent, made here or not (e2e 24 Nov: "Can be made" beside "PO sent").
         const poSent = !latest && !recorded ? (pos?.get(r.ref)?.sentOn ?? null) : null;
-        const state: PaperState = latest ? this.stateOf(latest, ready) : recorded ? docState(recorded) : poSent ? "ready" : this.stateOf(null, ready);
+        // Version 2 started as a draft: version 1 is still final, so the paper is in (review 24 Nov, O-28: the bank
+        // set called the contract missing).
+        const finalBefore = latest?.status === "draft" ? ([...rows].reverse().find((x) => x.status === "final") ?? null) : null;
+        const state: PaperState = finalBefore ? "ready" : latest ? this.stateOf(latest, ready) : recorded ? docState(recorded) : poSent ? "ready" : this.stateOf(null, ready);
         out.push(
           row({
             ...base,
@@ -717,7 +720,9 @@ export class PapersService implements OnModuleInit {
             paperId: latest?.id ?? null,
             draft: latest?.status === "draft",
             sub:
-              latest && state === "ready"
+              finalBefore && latest
+                ? `version ${finalBefore.version} final · version ${latest.version} a draft`
+                : latest && state === "ready"
                 ? `version ${latest.version}${latest.finalAt ? ` · ${latest.finalAt.toISOString().slice(0, 10)}` : ""}`
                 : recorded && (state === "ready" || state === "up")
                   ? `recorded${recorded.issuedOn ? ` · ${fromDbDate(recorded.issuedOn)}` : ""}`

@@ -71,7 +71,9 @@ export class InquiriesService {
     if (q.stage === "open") and.push({ stage: { in: [...OPEN_STAGES] } });
     else if (q.stage === "overdue") and.push({ stage: { in: [...OPEN_STAGES] }, requiredBy: { lt: today } });
     else if (q.stage === "on_hold") and.push({ onHold: true, stage: { in: [...OPEN_STAGES] } });
-    else if (q.stage && q.stage !== "all") and.push({ stage: q.stage });
+    // A stage of an open inquiry lists the ones going on; those on hold are under On hold, as on the board
+    // (review 24 Nov, S-22: On hold looked like its own tab but was counted inside Sourcing).
+    else if (q.stage && q.stage !== "all") and.push({ stage: q.stage, ...((OPEN_STAGES as readonly string[]).includes(q.stage) ? { onHold: false } : {}) });
     if (q.assignee === "me") and.push({ assigneeId: user.id });
     else if (q.assignee === "unassigned") and.push({ assigneeId: null });
     else if (q.assignee) and.push({ assigneeId: q.assignee });
@@ -137,7 +139,7 @@ export class InquiriesService {
         },
       }),
       this.prisma.db.inquiry.count({ where }),
-      this.prisma.db.inquiry.groupBy({ by: ["stage"], where: this.where(user, { ...q, stage: undefined }), _count: true }),
+      this.prisma.db.inquiry.groupBy({ by: ["stage"], where: { AND: [this.where(user, { ...q, stage: undefined }), { OR: [{ onHold: false }, { stage: { notIn: [...OPEN_STAGES] } }] }] }, _count: true }),
       // The list's two other chips (past needed-by, on hold), for the same search.
       this.prisma.db.inquiry.count({ where: this.where(user, { ...q, stage: "overdue" }) }),
       this.prisma.db.inquiry.count({ where: this.where(user, { ...q, stage: "on_hold" }) }),

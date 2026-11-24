@@ -93,7 +93,7 @@ type Dialog =
   | { kind: "replace"; file: OrderFile }
   | { kind: "delete"; files: OrderFile[] }
   | { kind: "attach-many"; files: OrderFile[] }
-  | { kind: "share"; files: OrderFile[]; papers: { key: string; label: string }[] };
+  | { kind: "share"; files: OrderFile[]; papers: { key: string; label: string; draft?: boolean }[] };
 
 export interface ShareContext {
   refNo: string;
@@ -703,11 +703,13 @@ function ShareDialog({
   onClose,
 }: {
   files: OrderFile[];
-  papers: { key: string; label: string }[];
+  papers: { key: string; label: string; draft?: boolean }[];
   tools: Tools;
   onClose: () => void;
 }) {
   const id = useId();
+  // A paper not issued yet goes out marked DRAFT: said before it is sent (review 24 Nov, O-30).
+  const drafts = papers.filter((p) => p.draft).map((p) => p.label);
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -776,6 +778,11 @@ function ShareDialog({
       description="Share opens the share sheet with the files themselves (WhatsApp, email, WeChat) where the device has one. WhatsApp and Email download the files (several as one zip) and open the chat or a new email with the message, to attach them."
       onClose={onClose}
     >
+      {drafts.length > 0 && (
+        <Notice tone="todo">
+          {drafts.join(", ")} {drafts.length === 1 ? "is a draft" : "are drafts"}: not issued yet, so {drafts.length === 1 ? "it goes" : "they go"} out marked DRAFT, without a number. Issue it first to send the real one.
+        </Notice>
+      )}
       {error && <Notice tone="bad">{error}</Notice>}
       {copied && <Notice tone="ok">Downloaded, and the message is copied: attach the file in WhatsApp or your email (📎).</Notice>}
       <Field label="Message" htmlFor={`${id}-m`}>

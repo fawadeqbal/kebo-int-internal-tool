@@ -60,7 +60,8 @@ export class ReportsService {
       assignee: { select: { id: true, name: true } },
     } as const;
     const [byStage, overdue, onHold, unassigned, todo, myDeals, fresh, expiring] = await Promise.all([
-      this.prisma.db.inquiry.groupBy({ by: ["stage"], where: open, _count: true }),
+      // The ones going on, as the list's stage tabs count them (those on hold apart: S-22).
+      this.prisma.db.inquiry.groupBy({ by: ["stage"], where: { ...open, onHold: false }, _count: true }),
       this.prisma.db.inquiry.count({ where: { ...open, requiredBy: { lt: day(today) } } }),
       this.prisma.db.inquiry.count({ where: { ...open, onHold: true } }),
       manager ? this.prisma.db.inquiry.count({ where: { ...open, assigneeId: null } }) : Promise.resolve(0),

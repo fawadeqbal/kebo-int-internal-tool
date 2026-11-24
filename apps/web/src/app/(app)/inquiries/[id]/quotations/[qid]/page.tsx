@@ -128,7 +128,11 @@ export default async function QuotationOwnPage({
           text: `${r.sentOn ? `Sent ${date(r.sentOn)}${r.sentVia ? ` ${SENT_VIA_TEXT[r.sentVia]}` : ""}` : "Sent"} · ${passed ? "its validity has passed" : "waiting for their answer"}`,
           tone: passed ? "bad" : "action",
         }
-      : { text: REVISION_STATUS_LABEL[r.status], tone: r.status === "accepted" ? "ok" : r.status === "rejected" ? "bad" : "mute" };
+      : {
+          // Accepted: the sales order it made, named (review 24 Nov, S-33).
+          text: [REVISION_STATUS_LABEL[r.status], r.status === "accepted" ? d.orders.find((o) => o.status !== "cancelled")?.refNo : null].filter(Boolean).join(" · "),
+          tone: r.status === "accepted" ? "ok" : r.status === "rejected" ? "bad" : "mute",
+        };
   const checks = isDraft ? draftChecks(r) : [];
   // The supplier's offer changed after this was quoted (people who see costs; not once the customer answered).
   const changed = isDraft || r.status === "sent" ? r.options.flatMap((opt) => (opt.factory && opt.offerChanged?.length ? [{ opt, lines: opt.offerChanged }] : [])) : [];
@@ -177,7 +181,7 @@ export default async function QuotationOwnPage({
       when: r.status === "accepted" && !!acceptedOrder,
       node: acceptedOrder && (
         <ButtonLink href={`/orders/${acceptedOrder.id}`} variant="primary">
-          Go to the order <ArrowRight aria-hidden />
+          Go to {acceptedOrder.refNo} <ArrowRight aria-hidden />
         </ButtonLink>
       ),
     },

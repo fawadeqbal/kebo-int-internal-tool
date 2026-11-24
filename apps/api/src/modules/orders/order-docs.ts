@@ -3,10 +3,12 @@ import { documentTotals, fromMinor } from "@kebo/money";
 import {
   BALANCE_TERMS_LABEL,
   balanceTermsOf,
+  leadWords,
   packingListNo,
   portsOf,
   routeAsAccepted,
   orderPaymentSentence,
+  warrantyLine,
   type BalanceTerms,
   type BuyerSnapshot,
   type Settings,
@@ -137,8 +139,12 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       /** Heading over the lines, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE". */
       documentTitle: o.documentTitle,
       portOfDischarge: o.portOfDischarge,
-      /** e.g. "90 days after receiving advance payment". */
-      leadTime: figuresOf(rev).leadTime,
+      /** e.g. "90 days after receiving advance payment": the order's own agreed days first (review 24 Nov, O-29). */
+      leadTime: o.leadDays !== null && o.leadDays !== undefined ? leadWords(o.leadDays, o.leadFrom, "customer") : figuresOf(rev).leadTime,
+      /** The warranty agreed, as papers print it ("12 months from shipment, parts and service."). */
+      warranty: warrantyLine({ warrantyMonths: o.warrantyMonths ?? null, warrantyFrom: o.warrantyFrom ?? null, warranty: o.warrantyWords ?? null }),
+      /** The customer's own order number, when they gave one. */
+      customerRef: o.customerRef ?? null,
     },
     /**
      * The packing list: the shipment it goes with (Shipment 1), its ports as the papers print them (its own,

@@ -80,7 +80,7 @@ export default async function FactoryLayout({ children, params }: { children: Re
               label="The supplier"
               tabs={[
                 { path: "", label: "Overview" },
-                { path: "orders", label: "Orders", count: r.openOrders.length, alert: r.lateSteps > 0 },
+                { path: "orders", label: "Orders", count: (r.orders ?? r.openOrders).length, alert: r.lateSteps > 0 },
                 { path: "offers", label: "Offers", count: f.quotes.length },
                 ...(managers ? [{ path: "costs", label: "Finance" }] : []),
                 { path: "notes", label: "Notes" },

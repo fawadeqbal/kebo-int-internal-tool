@@ -204,6 +204,14 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "defaultBalanceTerms", label: "Usual balance terms", kind: "select", options: BALANCE_TERMS.map((b) => ({ value: b, label: BALANCE_TERMS_LABEL[b] })) },
       { name: "defaultIncoterm", label: "Usual Incoterm", kind: "select", options: INCOTERMS.map((i) => ({ value: i, label: i })) },
       {
+        name: "quoteUnitPrices",
+        label: "Customer copies show",
+        hint: "Quotations and the proforma invoice",
+        kind: "bool",
+        on: "Each line's price",
+        off: "The total only",
+      },
+      {
         name: "factoryTaxIncluded",
         label: "Tax included in supplier prices",
         kind: "bool",
@@ -229,7 +237,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
         key: "quotations",
         title: "New quotations start with",
         description: "Margin, validity, deposit and terms. Made from a supplier's offer, a quotation takes its port, its warranty and its days plus the spare days, and is never valid longer than its prices. People can change them on each quotation.",
-        fields: ["defaultMarginPercent", "marginFloorPercent", "quotationValidityDays", "leadSpareDays", "defaultDepositPercent", "defaultBalanceTerms", "defaultIncoterm"],
+        fields: ["defaultMarginPercent", "marginFloorPercent", "quotationValidityDays", "leadSpareDays", "defaultDepositPercent", "defaultBalanceTerms", "defaultIncoterm", "quoteUnitPrices"],
       },
       {
         key: "factory",

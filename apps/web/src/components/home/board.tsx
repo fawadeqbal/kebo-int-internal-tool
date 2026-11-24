@@ -83,6 +83,26 @@ export function MonthFigures({ h }: { h: HomeFigures }) {
   );
 }
 
+/** Reminders, the most urgent first, each with its one button (Home's five, and the Needs you page). */
+export function ReminderList({ items }: { items: Reminders["items"] }) {
+  return (
+    <ul className="divide-y divide-line">
+      {items.map((i) => (
+        <li key={i.key} className={cn(RULES.box.inset, "flex items-center gap-3 py-3")}>
+          <span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[i.level] ?? "bg-info")} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">{readableDates(i.title)}</span>
+            {i.detail && <span className="block truncate text-xs text-text-2">{readableDates(i.detail)}</span>}
+          </span>
+          <Link href={i.href} className={cn(buttonClass("secondary", "sm"), "shrink-0")}>
+            {i.action}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** The five most urgent things, each with its button; the rest behind one link. */
 export function NeedsYou({ r }: { r: Reminders }) {
   const top = r.items.slice(0, 5);
@@ -96,24 +116,12 @@ export function NeedsYou({ r }: { r: Reminders }) {
       {top.length === 0 ? (
         <EmptyLine inset>Nothing needs you right now.</EmptyLine>
       ) : (
-        <ul className="divide-y divide-line">
-          {top.map((i) => (
-            <li key={i.key} className={cn(RULES.box.inset, "flex items-center gap-3 py-3")}>
-              <span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[i.level] ?? "bg-info")} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold">{readableDates(i.title)}</span>
-                {i.detail && <span className="block truncate text-xs text-text-2">{readableDates(i.detail)}</span>}
-              </span>
-              <Link href={i.href} className={cn(buttonClass("secondary", "sm"), "shrink-0")}>
-                {i.action}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <ReminderList items={top} />
       )}
       {rest > 0 && (
         <p className={cn(RULES.box.inset, "border-t border-line py-3")}>
-          <More href="/notifications">{rest} more</More>
+          {/* Every one of them, on their own page, not the alerts (review 24 Nov, S-23). */}
+          <More href="/needs-you">{rest} more</More>
         </p>
       )}
     </Card>
