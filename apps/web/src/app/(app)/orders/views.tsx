@@ -98,6 +98,10 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
   const owedLate = (owed?.rows ?? []).reduce((t, r) => t + Number(r.overdue), 0);
   const yearRow = facts?.rows[0];
   const atSea = (shipments ?? []).filter((x) => x.status === "departed");
+  // The counts follow the search and filters; what customers owe, the ships at sea and the year's profit are the
+  // whole company's: said so while a filter is on (review 24 Nov, O-25).
+  const filtered = !!(sp.q || sp.customer || sp.assignee || mine);
+  const allOrders = (sub?: string) => (filtered ? [sub, "all orders"].filter(Boolean).join(" · ") : sub);
   const nextEta = atSea.map((x) => x.eta).filter((x): x is string => !!x).sort()[0];
 
   const chips = [
@@ -139,7 +143,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
           label="Customers owe"
           value={short(owedTotal, main)}
           tone={owedLate > 0 ? "bad" : undefined}
-          sub={owedLate > 0 ? `${short(owedLate, main)} late` : "nothing late"}
+          sub={allOrders(owedLate > 0 ? `${short(owedLate, main)} late` : "nothing late")}
           href="/money/due"
         />
         <StatTile
@@ -150,7 +154,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
           sub={c.lateInProduction ? `${c.lateInProduction} late` : undefined}
           href={href({ status: undefined, stage: "in_production" })}
         />
-        <StatTile icon={Ship} iconColor={4} label="At sea" value={atSea.length} sub={nextEta ? `next ETA ${date(nextEta)}` : undefined} href={href({ status: undefined, stage: "shipped" })} />
+        <StatTile icon={Ship} iconColor={4} label="At sea" value={atSea.length} sub={allOrders(nextEta ? `next ETA ${date(nextEta)}` : undefined)} href={href({ status: undefined, stage: "shipped" })} />
         {yearRow && (
           <StatTile
             icon={PieChart}
@@ -158,7 +162,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
             label="Profit this year"
             value={short(yearRow.profitExpected ?? "0", facts!.currency)}
             tone="ok"
-            sub={yearRow.margin !== null ? `margin ${yearRow.margin.toFixed(1)}%` : undefined}
+            sub={allOrders(yearRow.margin !== null ? `margin ${yearRow.margin.toFixed(1)}%` : undefined)}
           />
         )}
       </StatRow>

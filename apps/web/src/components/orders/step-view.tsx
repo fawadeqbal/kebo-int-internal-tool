@@ -61,7 +61,15 @@ export interface DetailField {
   target?: string;
   /** Filled, it is not changed in place (only in the panel). */
   fixed?: boolean;
+  /**
+   * The value is only worked out (the ready date from the lead time), not saved: the field starts with it, and
+   * saving it is a first entry, never a change that asks why (review 24 Nov, O-14).
+   */
+  suggested?: boolean;
 }
+
+/** What is saved in a field: nothing yet when its value is only worked out. */
+const savedOf = (f: DetailField) => (f.suggested ? "" : (f.value ?? "").trim());
 
 function Control({ f, id, value, onChange, autoFocus, onKeyDown }: { f: DetailField; id: string; value?: string; onChange?: (v: string) => void; autoFocus?: boolean; onKeyDown?: (e: React.KeyboardEvent) => void }) {
   const common = {
@@ -129,7 +137,7 @@ export function FieldsForm({
   const close = useClosePanel();
   const id = useId();
   const editable = fields.filter((f) => f.name && !f.cardOnly);
-  const fresh = editable.every((f) => !(f.value ?? "").trim());
+  const fresh = editable.every((f) => !savedOf(f));
   const groups = [...new Set(editable.map((f) => f.group ?? ""))];
   const [errors, setErrors] = useState<Record<string, string>>({});
   const saver = useEditSave({ edit, card, what: "values" });
@@ -145,11 +153,11 @@ export function FieldsForm({
     for (const f of editable) {
       if (!data.has(f.name!)) continue;
       const v = String(data.get(f.name!) ?? "").trim();
-      if (changeKind(f.value, v)) now[f.name!] = v;
+      if (changeKind(savedOf(f), v)) now[f.name!] = v;
     }
     setNowOf((was) => (JSON.stringify(was) === JSON.stringify(now) ? was : now));
   };
-  const counts = countChanges(editable.filter((f) => f.name! in nowOf).map((f) => ({ from: f.value ?? "", to: nowOf[f.name!]! })));
+  const counts = countChanges(editable.filter((f) => f.name! in nowOf).map((f) => ({ from: savedOf(f), to: nowOf[f.name!]! })));
   // A window that names its own button (Add the shipment) keeps it, and so does one for something new (plain);
   // the Save of saved values counts.
   const counting = !save && !plain;
@@ -163,7 +171,7 @@ export function FieldsForm({
     for (const f of editable) {
       if (!data.has(f.name!)) continue;
       const now = String(data.get(f.name!) ?? "").trim();
-      const was = (f.value ?? "").trim();
+      const was = savedOf(f);
       if (now === was) continue;
       if (was) filledChanged = true;
       keys.push(f.name!);
@@ -224,9 +232,9 @@ export function FieldsForm({
                   hint={
                     // A first fill (nothing saved yet, or a window that never asks why: a first booking) has nothing
                     // to compare: no "Added" on every field typed in (e2e 24 Nov).
-                    f.name! in nowOf && !fresh && !(plain && !(f.value ?? "").trim()) ? (
+                    f.name! in nowOf && !fresh && !(plain && !savedOf(f)) ? (
                       <>
-                        <ChangeHint was={changeText(f, (f.value ?? "").trim())} now={changeText(f, nowOf[f.name!]!)} />
+                        <ChangeHint was={changeText(f, savedOf(f))} now={changeText(f, nowOf[f.name!]!)} />
                         {f.hint}
                       </>
                     ) : (

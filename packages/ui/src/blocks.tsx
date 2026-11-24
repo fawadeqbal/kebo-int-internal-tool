@@ -204,9 +204,11 @@ export function StatTile({
       <span
         data-stat-value=""
         title={typeof value === "string" ? value : undefined}
+        // On a narrow phone a big figure goes onto two lines at its space ("USD" / "11,234,567"), smaller,
+        // rather than being cut to "USD 11…" (review 24 Nov, X-09); from sm up it stays on one line.
         className={cn(
-          "truncate font-bold tracking-tight tabular",
-          size === "sm" ? "text-lg sm:text-xl" : "text-xl leading-7 sm:text-xl",
+          "font-bold tracking-tight break-normal tabular sm:truncate",
+          size === "sm" ? "text-lg sm:text-xl" : "text-lg leading-6 sm:text-xl sm:leading-7",
         )}
       >
         {value}

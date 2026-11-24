@@ -5,7 +5,7 @@ import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, FileText, MoreHorizontal, Plus, Share2 } from "lucide-react";
-import { paperDone, type FlowStep, type PaperKind } from "@kebo/shared";
+import { BANK_PAPERS, paperDone, type FlowStep, type PaperKind } from "@kebo/shared";
 import { Badge, Button, buttonClass, Card, CardHeader, cn, capsClass } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { useConfirm } from "@/components/common/dialog";
@@ -127,7 +127,8 @@ export function PapersTable({
   const missing = rows.filter((r) => r.state === "miss");
   const base = `/orders/${orderId}/documents`;
   const shown = tab === "bank" ? bank : tab === "missing" ? missing : rows;
-  const ready = bank.filter((r) => paperDone(r.state));
+  const setDocs = bank.filter((r) => !(BANK_PAPERS as readonly string[]).includes(r.kind));
+  const bankOwn = bank.filter((r) => (BANK_PAPERS as readonly string[]).includes(r.kind));
   const still = bank.filter((r) => !paperDone(r.state));
   const makeable = rows.filter((r) => r.makeable && !paperDone(r.state));
   const setKeys = (tab === "bank" ? bank : shown).filter((r) => paperDone(r.state) || r.live);
@@ -206,7 +207,14 @@ export function PapersTable({
         <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
           <p className="text-xs text-text-2">
             {/* Named for its set: the tab counts every document, this only the bank's (e2e 24 Nov: "0 of 5" beside "0 of 4"). */}
-            {bank.length > 0 && <b className="text-text">{ready.length} of the {bank.length} for the bank ready. </b>}
+            {/* The shipment's documents counted as the order's tab counts them ("3 of 6"), the bank's own papers
+                apart (review 24 Nov, O-12: the tab said "of 6" and this "of the 7"). */}
+            {bank.length > 0 && (
+              <b className="text-text">
+                {setDocs.filter((r) => paperDone(r.state)).length} of the {setDocs.length} documents ready
+                {bankOwn.length > 0 && `, ${bankOwn.filter((r) => paperDone(r.state)).length} of ${bankOwn.length} bank papers made`}.{" "}
+              </b>
+            )}
             {still.length ? `Still needed: ${still.map((r) => r.label).join(", ")}.` : bank.length ? "The set can go to the bank." : ""}
           </p>
           <span className="flex flex-wrap items-center gap-1.5">

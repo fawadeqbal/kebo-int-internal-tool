@@ -223,7 +223,8 @@ export function PaymentPlanTable({
                   <span className="font-semibold">{i.label}</span>
                   {under(i)}
                 </Td>
-                <Td className={cn("text-sm whitespace-nowrap", i.late > 0 && i.request.state !== "paid" && "font-medium text-bad")}>
+                {/* A rule ("14 days after shipping · not known yet") wraps, so What to do stays in the box (review 24 Nov, O-07). */}
+                <Td className={cn("min-w-28 text-sm", i.late > 0 && i.request.state !== "paid" && "font-medium text-bad")}>
                   {dueText(i, style)}
                 </Td>
                 <Td className="text-right whitespace-nowrap tabular">

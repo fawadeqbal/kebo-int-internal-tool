@@ -116,19 +116,28 @@ export function FormButtons({
   cancelHref,
   onCancel,
   reset,
+  note,
   className,
 }: {
   children: ReactNode;
   cancelHref?: string;
   onCancel?: () => void;
+  /** Why the save waits, beside a button that cannot be pressed yet (no grey button without a reason: X-16). */
+  note?: ReactNode;
   /** Cancel puts the form back as it was (a form that stays on the page, like My account's profile). */
   reset?: boolean;
   className?: string;
 }) {
   const inWindow = useWindowDone() !== null;
-  if (inWindow) return <WindowFooter onCancel={onCancel}>{children}</WindowFooter>;
+  if (inWindow)
+    return (
+      <WindowFooter onCancel={onCancel} note={note}>
+        {children}
+      </WindowFooter>
+    );
   return (
     <div className={cn("flex flex-wrap items-center justify-end gap-3", className)}>
+      {note && <span className="mr-auto min-w-0 text-xs text-text-2 max-md:basis-full">{note}</span>}
       {reset ? (
         <Button type="reset" variant="ghost">
           Cancel

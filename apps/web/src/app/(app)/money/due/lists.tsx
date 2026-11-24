@@ -459,6 +459,8 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
   if (sp.pay && !all.some((r) => r.key === sp.pay)) redirect(href({ pay: undefined }));
   const lateCount = all.filter((r) => r.late > 0).length;
   const soonCount = all.filter(soon).length;
+  // The figures count everything we owe, not only what a search finds: said so while one is on (review 24 Nov, O-25).
+  const whole = (sub: string) => (q ? `${sub} · whole list` : sub);
 
   /** Pay on a row (the laptop's last column, under the row on a phone). */
   const payOf = (r: Owed) =>
@@ -501,18 +503,18 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
   return (
     <>
       <StatRow facts>
-        <StatTile label="We owe" {...moneyTile(owe, main)} sub={`${all.length} to pay`} />
+        <StatTile label="We owe" {...moneyTile(owe, main)} sub={whole(`${all.length} to pay`)} />
         <StatTile
           label="Late"
           {...moneyTile(late, main)}
-          sub={lateCount ? `${lateCount} to pay` : "nothing late"}
+          sub={whole(lateCount ? `${lateCount} to pay` : "nothing late")}
           tone={lateCount ? "bad" : undefined}
           href={lateCount ? href({ show: "late", page: undefined }) : undefined}
         />
         <StatTile
           label="Due in the next 7 days"
           {...moneyTile(dueSoon, main)}
-          sub={`${soonCount} to pay`}
+          sub={whole(`${soonCount} to pay`)}
           tone={soonCount ? "warn" : undefined}
           href={soonCount ? href({ show: "week", page: undefined }) : undefined}
         />

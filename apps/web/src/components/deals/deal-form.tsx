@@ -312,6 +312,9 @@ export function DealForm({
           : k === "changes"
             ? total
             : 0;
+  /** A step that still lacks what Save will ask for: not ticked as done. */
+  const missingIn = (k: string) =>
+    k === "customer" ? !v.customer : k === "details" ? !String(v.category ?? "").trim() || (required && !String(v.requirements ?? "").trim()) : false;
   const needWhy = !create && counts.changed > 0;
   // Something changed: Save asks why, once, in a sheet (canvas board "Why the change? at Save").
   const canSave = create || total > 0;
@@ -431,7 +434,8 @@ export function DealForm({
                           : files.length + staged.length
                             ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
                             : undefined,
-                done: create && k < at && seen.has(x.key),
+                // Ticked only when what it needs is there (review 24 Nov, S-08: steps ticked with the customer missing).
+                done: create && k < at && seen.has(x.key) && !missingIn(x.key),
                 icon: STEP_ICON[x.key],
                 count: create ? undefined : changesIn(x.key) || undefined,
                 apart: x.key === "review" || x.key === "changes",

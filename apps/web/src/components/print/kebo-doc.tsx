@@ -80,6 +80,18 @@ const label: CSSProperties = { fontSize: "11px", fontWeight: 700, letterSpacing:
 /* ---------------------------------------------------------------- formatting, as on Kebo's documents */
 
 /** "SEP 16, 2026" */
+/**
+ * An A4 sheet on a narrow screen: the whole page smaller, as it prints, rather than squeezed to the screen's
+ * width (review 24 Nov, X-08: the address a word per line). Inside the app's viewer it is drawn at its size.
+ */
+export const paperZoomCss = (sheet: string) => `@media screen and (max-width: 820px) { ${sheet} { zoom: 0.9; } }
+@media screen and (max-width: 720px) { ${sheet} { zoom: 0.72; } }
+@media screen and (max-width: 600px) { ${sheet} { zoom: 0.58; } }
+@media screen and (max-width: 480px) { ${sheet} { zoom: 0.47; } }
+@media screen and (max-width: 400px) { ${sheet} { zoom: 0.42; } }
+@media screen and (max-width: 360px) { ${sheet} { zoom: 0.38; } }
+html[data-embedded] ${sheet} { zoom: 1 !important; }`;
+
 export function docDate(iso: string) {
   // One style on every paper, the same as inside its sentences: "04 Sep 2026" (review 24 Nov: "SEP 4, 2026" beside
   // "04 Sep 2026"). Papers go abroad, so the month is in letters whatever the company's own date setting.
@@ -308,13 +320,7 @@ export function KeboDoc<T>({
   @bottom-right { content: "Page " counter(page) " of " counter(pages); text-align: right; font: 11.5px ${SANS}; color: ${TEXT_2}; vertical-align: top; padding-top: 12px; border-top: 1px solid ${RULE}; }
 }
 @media print { .kebo-doc { width: auto !important; min-height: 0 !important; padding: 0 !important; } .kebo-doc-foot { display: none !important; } }
-@media screen and (max-width: 820px) { .kebo-doc { zoom: 0.9; } }
-@media screen and (max-width: 720px) { .kebo-doc { zoom: 0.72; } }
-@media screen and (max-width: 600px) { .kebo-doc { zoom: 0.58; } }
-@media screen and (max-width: 480px) { .kebo-doc { zoom: 0.47; } }
-@media screen and (max-width: 400px) { .kebo-doc { zoom: 0.42; } }
-@media screen and (max-width: 360px) { .kebo-doc { zoom: 0.38; } }
-html[data-embedded] .kebo-doc { zoom: 1 !important; }`}</style>
+${paperZoomCss(".kebo-doc")}`}</style>
       {watermark && (
         // The stamp (DRAFT, VOID, PREVIEW) is meant to be faint behind the paper, so it is drawn (CSS content) and
         // not text a contrast check reads as hard to read: decoration in WCAG 1.4.3's sense. Its word is still

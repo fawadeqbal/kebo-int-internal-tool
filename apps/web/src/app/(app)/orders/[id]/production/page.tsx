@@ -82,6 +82,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
                   label: "Supplier says ready on",
                   type: "date",
                   value: r.readyOn ?? expected,
+                  suggested: !r.readyOn && !!expected,
                   hint: leadHint,
                 },
                 { name: "readyToldOn", label: "Told on", type: "date", value: r.readyToldOn, max: now },

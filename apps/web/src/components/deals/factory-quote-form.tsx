@@ -526,7 +526,15 @@ export function OfferHeaderForm({
       onBack={!only && at > 0 ? () => go(at - 1) : null}
       start={footerStart}
       jump={at < STEPS.length - 2 ? { label: "Review", onClick: () => setStep("review") } : null}
-      onNext={step === "review" ? null : () => go(at + 1)}
+      // Leaving the payment step says at once if its parts add up to more than 100%, not only at the last save (S-08).
+      onNext={
+        step === "review"
+          ? null
+          : () => {
+              if (step === "terms") setPartsTried(true);
+              go(at + 1);
+            }
+      }
       nextLabel={at === STEPS.length - 2 ? "Review" : undefined}
       save={{
         label: "Add the offer",
@@ -594,7 +602,8 @@ export function OfferHeaderForm({
               key: x.key,
               label: x.label,
               icon: STEP_ICON[x.key],
-              done: create && k < at,
+              // Ticked only when it has what Save needs: a supplier, a plan that adds up (review 24 Nov, S-08).
+              done: create && k < at && !(x.key === "factory" ? !s.factory : x.key === "terms" ? !!partsBad : false),
               count: create ? undefined : changesIn(x.key) || undefined,
               apart: x.key === "review" || x.key === "changes",
             }))}
