@@ -27,7 +27,7 @@ test("Purchase order: what was agreed with the supplier, the plan with Pay on th
 
   // Its payment is in what was agreed with the factory (the "How we pay them" card went there: design "terms that travel").
   const how = page.getByRole("region", { name: /^Agreed with the supplier/ }).first();
-  await expect(how).toContainText(/\d+ parts?/);
+  await expect(how).toContainText(/\d+ installments?/);
   await expect(how).toContainText("Their invoices");
 
   const plan = page.getByRole("region", { name: /^Payment plan/ }).first();
@@ -65,9 +65,9 @@ test("Purchase order: what was agreed with the supplier, the plan with Pay on th
 
 test("Payment: the payments received are the same list, cards on a phone", async ({ page }) => {
   const errors = watchErrors(page);
-  await orderWith(page, "payment", (p) => p.getByRole("region", { name: "Payments received" }).getByRole("columnheader", { name: "How" }));
+  await orderWith(page, "payment", (p) => p.getByRole("region", { name: "Payments received" }).getByRole("columnheader", { name: "Method" }));
   const got = page.getByRole("region", { name: "Payments received" });
-  await expect(got.getByRole("columnheader", { name: "How" })).toBeVisible();
+  await expect(got.getByRole("columnheader", { name: "Method" })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(got.getByRole("list", { name: "Payments received" })).toBeVisible();
   await expect(got.getByRole("link", { name: "Receipt" }).first()).toBeVisible();
