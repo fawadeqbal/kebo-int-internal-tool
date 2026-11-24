@@ -47,8 +47,8 @@ export class AccountsService {
   /** What an expense can be for: customers, their deals and orders, and factories. */
   async expenseTargets(user: SessionUser) {
     this.assertManager(user);
-    // Open deals and orders, and those of the last year: an expense is almost always on one of them,
-    // and a pick list of thousands is neither quick to send nor to use.
+    // Every open deal and order, and those of the last year: an expense is almost always on one of them. No cap
+    // (review 24 Nov: the 400 newest left older open orders such as SO-2026-0002 without a way to get a cost).
     const since = new Date(`${addDays(this.clock.today(), -365)}T00:00:00Z`);
     const [customers, deals, orders, factories] = await Promise.all([
       this.prisma.db.party.findMany({ where: { ...isCustomer, deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -56,13 +56,11 @@ export class AccountsService {
         where: { deletedAt: null, OR: [{ stage: { in: ["new", "sourcing", "quoted"] } }, { createdAt: { gte: since } }] },
         select: { id: true, refNo: true, title: true, stage: true, customer: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
-        take: 400,
       }),
       this.prisma.db.order.findMany({
         where: { status: { not: "cancelled" }, OR: [{ status: "open" }, { createdAt: { gte: since } }] },
         select: { id: true, refNo: true, inquiryId: true, customer: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
-        take: 400,
       }),
       this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     ]);

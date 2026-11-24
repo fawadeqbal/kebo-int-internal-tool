@@ -17,6 +17,8 @@ import { getSettings } from "@/lib/loaders";
 
 export type Search = {
   size?: string;
+  /** Cash & bank: every account card, not only the first nine. */
+  accounts?: string;
   year?: string;
   view?: string;
   month?: string;
@@ -245,6 +247,9 @@ export async function VaultOverview({ today }: { today: string }) {
  * moves between our accounts. One account shows its balance line by line, like
  * a bank statement, so the two can be checked against each other.
  */
+/** Account cards shown before "Show all". */
+const FEW_ACCOUNTS = 9;
+
 export async function CashBody({ sp, today }: { sp: Search; today: string }) {
   const pr = periodOf(sp.p, today);
   const accounts = await api.get<AccountRow[]>("/money/accounts");
@@ -258,7 +263,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
     page: String(toPage(sp.page)),
     pageSize: String(toPageSize(sp.size)),
   });
-  const keep = { p: pr.period === pr.thisMonth ? undefined : pr.period, acct, cur };
+  const keep = { p: pr.period === pr.thisMonth ? undefined : pr.period, acct, cur, accounts: sp.accounts };
   const href = (change: Record<string, string | undefined>) => buildHref("/finance/cash-book", keep, change);
   const one = book.account;
   const open = accounts.filter((a) => !a.archived);
@@ -281,7 +286,12 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
         <CardBody className="flex flex-col gap-3">
           {accounts.length > 0 && (
             <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {accounts.map((a) => {
+              {/* Nine cards, then "Show all", so the statement under them is in reach (review 24 Nov: 107 cards
+                  before it); the account being looked at is always shown. */}
+              {(sp.accounts === "all" || accounts.length <= FEW_ACCOUNTS
+                ? accounts
+                : accounts.filter((a, i) => i < FEW_ACCOUNTS || a.id === acct)
+              ).map((a) => {
                 const Icon = KIND_ICON[a.kind];
                 return (
                   <li key={a.id} className={cn("flex items-start justify-between gap-2 rounded-lg border p-3", acct === a.id ? "border-primary ring-1 ring-primary/30" : "border-line", a.archived && "opacity-60")}>
@@ -302,8 +312,13 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
               })}
             </ul>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <NewAccount today={today} />
+            {accounts.length > FEW_ACCOUNTS && (
+              <Link href={buildHref("/finance/cash-book", { ...keep, accounts: sp.accounts === "all" ? undefined : "all" }, {})} scroll={false} className={cn(linkClass, "text-md")}>
+                {sp.accounts === "all" ? "Show fewer accounts" : `Show all ${accounts.length} accounts`}
+              </Link>
+            )}
           </div>
         </CardBody>
       </Card>

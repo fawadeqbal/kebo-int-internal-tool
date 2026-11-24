@@ -4,10 +4,11 @@ import { Pencil, Plus } from "lucide-react";
 import { Badge, Card, cn, EmptyState, LinkTabs, PageHeader, Pager, Td, Th, THead, toPage, toPageSize } from "@kebo/ui";
 import { can, type Tone } from "@kebo/shared";
 import { api } from "@/lib/api";
+import { allPages } from "@/lib/exports";
 import { requireUser } from "@/lib/session";
 import { countOf, date } from "@/lib/format";
 import { FilterCard } from "@/components/common/filter-card";
-import type { DealRow, Paged, Person } from "@/lib/types";
+import type { DealRow, Person } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
 import type { FollowUp, FollowUpList } from "@/lib/types-notes";
 import { PanelButton } from "@/components/orders/step-view";
@@ -85,7 +86,7 @@ export default async function FollowUpsPage({
   const about = ABOUT.find((a) => a.value === sp.about)?.value;
   const q = sp.q?.trim() || undefined;
   const filters = { ...dueRange(due, today), q, who: viewAll ? sp.who || undefined : undefined, about };
-  const [list, people, orders, inquiries, other] = await Promise.all([
+  const [list, people, orders, inquiries, customers, suppliers, other] = await Promise.all([
     api.get<FollowUpList>("/follow-ups", {
       mine: viewAll && !everyone ? "true" : undefined,
       open: status === "done" ? "false" : "true",
@@ -96,7 +97,10 @@ export default async function FollowUpsPage({
     }),
     getPeople().catch(() => [] as Person[]),
     api.get<OrderRow[]>("/orders", { status: "open" }).catch(() => [] as OrderRow[]),
-    api.get<Paged<DealRow>>("/inquiries", { stage: "open", pageSize: 100 }).catch(() => null),
+    // Every open inquiry, customer and supplier too (review 24 Nov: 100 inquiries, and no customers or suppliers).
+    allPages<DealRow>("/inquiries", { stage: "open" }).catch(() => [] as DealRow[]),
+    api.get<{ id: string; name: string }[]>("/customers/names").catch(() => [] as { id: string; name: string }[]),
+    allPages<{ id: string; name: string }>("/factories", {}).catch(() => [] as { id: string; name: string }[]),
     // The other of Mine / Everyone, for its tab's count (the same search).
     viewAll ? api.get<FollowUpList>("/follow-ups", { mine: everyone ? "true" : undefined, open: "true", ...filters, page: 1, pageSize: 1 }).catch(() => null) : null,
   ]);
@@ -108,7 +112,9 @@ export default async function FollowUpsPage({
   };
   const aboutOptions: AboutOption[] = [
     ...orders.map((o) => ({ value: `orderId:${o.id}`, label: `${o.refNo} · ${o.customer.name}`, group: "Orders" })),
-    ...(inquiries?.rows ?? []).map((d) => ({ value: `inquiryId:${d.id}`, label: `${d.refNo} · ${d.customer.name}`, group: "Inquiries" })),
+    ...inquiries.map((d) => ({ value: `inquiryId:${d.id}`, label: `${d.refNo} · ${d.customer.name}`, group: "Inquiries" })),
+    ...customers.map((c) => ({ value: `customerId:${c.id}`, label: c.name, group: "Customers" })),
+    ...suppliers.map((f) => ({ value: `factoryId:${f.id}`, label: f.name, group: "Suppliers" })),
   ];
 
   return (

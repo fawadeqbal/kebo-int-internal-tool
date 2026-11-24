@@ -45,8 +45,8 @@ const text = (h: string, width = 16): SheetCol => ({ header: h, width });
 const money = (h: string): SheetCol => ({ header: h, kind: "number", width: 14 });
 const count = (h: string): SheetCol => ({ header: h, kind: "number", width: 10 });
 
-/** Every page of a paged list (100 at a time, up to 10,000 rows). */
-async function allPages<T>(path: string, query: Q): Promise<T[]> {
+/** Every page of a paged list (100 at a time, up to 10,000 rows): exports, and pick lists that must hold them all. */
+export async function allPages<T>(path: string, query: Q): Promise<T[]> {
   const rows: T[] = [];
   for (let page = 1; page <= 100; page++) {
     const r = await api.get<Paged<T>>(path, { ...query, page, pageSize: 100 });

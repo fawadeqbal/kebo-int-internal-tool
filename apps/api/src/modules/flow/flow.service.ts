@@ -540,7 +540,6 @@ export class FlowService {
         claims: { select: { status: true } },
       },
       orderBy: { stageSince: "asc" },
-      take: 300,
     });
     const [features, settings, expensesOn] = await Promise.all([this.limits.features(), this.settings.get(), this.limits.allows("expenses")]);
     const fx = fxOf(settings, expensesOn);

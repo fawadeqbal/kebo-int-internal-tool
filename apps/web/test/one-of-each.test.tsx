@@ -377,6 +377,9 @@ describe("one of each", () => {
       "app/(app)/customers/[id]/orders/page.tsx",
       "app/(app)/suppliers/[id]/offers/page.tsx",
       "app/(app)/users/(list)/page.tsx",
+      // The company's roles, and one balance per party and currency: whole from the server, paged here.
+      "app/(app)/access/roles/page.tsx",
+      "app/(app)/finance/ledger/page.tsx",
       "app/platform/(admin)/companies/page.tsx",
       "app/platform/(admin)/leads/page.tsx",
       "app/platform/(admin)/companies/[id]/sections.tsx",

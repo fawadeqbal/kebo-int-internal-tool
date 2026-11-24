@@ -86,7 +86,8 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
     optional(() => api.get<{ currency: string; rows: { total: string; overdue: string }[] }>("/insights/facts/owed", { side: "receivable" })),
     optional(() => api.get<{ currency: string; rows: { sales: string; profitExpected: string | null; margin: number | null }[] }>("/insights/facts/orders/groups", { from: `${year}-01-01`, to: `${year}-12-31`, period: "all" })),
     optional(() => api.get<{ status: string; eta: string | null; arrivedOn: string | null }[]>("/operations/shipments", {})),
-    api.get<Paged<{ id: string; name: string }>>("/customers", { status: "order", pageSize: 100 }).catch(() => null),
+    // Every customer with an order (the first 100 left most of them out of the filter: review 24 Nov).
+    api.get<{ id: string; name: string }[]>("/customers/names", { with: "orders" }).catch(() => null),
     getPeople().catch(() => []),
     getSettings(),
   ]);
@@ -182,7 +183,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         keep={{ status: keep.status, stage: keep.stage, mine: keep.mine }}
         clearHref={href({ q: undefined })}
         selects={[
-          { name: "customer", label: "Customer", value: sp.customer, options: (customers?.rows ?? []).map((x) => ({ value: x.id, label: x.name })) },
+          { name: "customer", label: "Customer", value: sp.customer, options: (customers ?? []).map((x) => ({ value: x.id, label: x.name })) },
           ...(mine ? [] : [{ name: "assignee", label: "Handles", value: sp.assignee, options: people.map((p) => ({ value: p.id, label: p.name })) }]),
         ]}
       />
@@ -310,7 +311,8 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
   const [openRows, recentDone, customers, flow] = await Promise.all([
     api.get<OrderRow[]>("/orders", { ...q, status: "open" }),
     api.get<OrderRow[]>("/orders", { ...q, status: "closed", recent: "true", limit: String(RECENT_DONE) }),
-    api.get<Paged<{ id: string; name: string }>>("/customers", { status: "order", pageSize: 100 }).catch(() => null),
+    // Every customer with an order (the first 100 left most of them out of the filter: review 24 Nov).
+    api.get<{ id: string; name: string }[]>("/customers/names", { with: "orders" }).catch(() => null),
     optional(() => api.get<{ items: { id: string; current: { key: FlowStep; label: string; sub: string } | null }[] }>("/order-board", { mine: q.mine })),
   ]);
   const at = new Map((flow?.items ?? []).map((i) => [i.id, i.current]));
@@ -347,7 +349,7 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
         value={sp.q}
         keep={{ mine: mine ? "1" : undefined }}
         clearHref={mine ? "/orders/board?mine=1" : "/orders/board"}
-        selects={[{ name: "customer", label: "Customer", value: sp.customer, options: (customers?.rows ?? []).map((c) => ({ value: c.id, label: c.name })) }]}
+        selects={[{ name: "customer", label: "Customer", value: sp.customer, options: (customers ?? []).map((c) => ({ value: c.id, label: c.name })) }]}
       />
       <BoardColumns
         columns={cols.map((c) => ({

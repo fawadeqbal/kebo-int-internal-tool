@@ -275,6 +275,10 @@ async function Balances({ sp }: { sp: Search }) {
     .filter((r) => !sp.cur || r.currency === sp.cur)
     .filter((r) => all || Math.abs(Number(r.balance)) >= 0.005)
     .sort((a, b) => Math.abs(Number(b.balance)) - Math.abs(Number(a.balance)));
+  // A page at a time, as every list (review 24 Nov: 561 rows on one page, 35,000 px on a phone).
+  const size = toPageSize(sp.size);
+  const page = Math.min(toPage(sp.page), Math.max(1, Math.ceil(shown.length / size)));
+  const rowsHere = shown.slice((page - 1) * size, page * size);
   const statement = (r: BalanceRow) =>
     !r.id ? null : r.kind === "account" ? `/finance/cash-book?acct=${r.id}` : partyHref(r.kind === "customer" ? "customer" : r.kind === "supplier" ? "factory" : "staff", r.id);
   const fmt = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -299,7 +303,7 @@ async function Balances({ sp }: { sp: Search }) {
             <>
             {/* A phone: one row each — who, what they are, the balance (the statement opens from the row). */}
             <PhoneList label="Balances">
-              {shown.map((r) => (
+              {rowsHere.map((r) => (
                 <PhoneRow
                   key={`${r.account}:${r.currency}`}
                   href={statement(r) ?? undefined}
@@ -324,7 +328,7 @@ async function Balances({ sp }: { sp: Search }) {
                 </tr>
               </THead>
               <tbody>
-                {shown.map((r) => {
+                {rowsHere.map((r) => {
                   const href = statement(r);
                   return (
                     <Tr key={`${r.account}:${r.currency}`} href={href ?? undefined}>
@@ -353,6 +357,7 @@ async function Balances({ sp }: { sp: Search }) {
             </>
           )}
         </Card>
+        <Pager base={PATH} params={{ view: sp.view, who: sp.who, q: sp.q, cur: sp.cur, has: sp.has, size: sp.size }} page={page} total={shown.length} pageSize={size} bare />
       </Stack>
     </div>
   );

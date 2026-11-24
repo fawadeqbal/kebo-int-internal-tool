@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus, ShieldAlert, ShieldCheck } from "lucide-react";
-import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage, FactsLine, Stack } from "@kebo/ui";
+import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage, toPageSize, FactsLine, Stack } from "@kebo/ui";
 import { FilterCard } from "@/components/common/filter-card";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
@@ -51,8 +51,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const term = sp.q?.trim().toLowerCase();
   const found = term ? users.filter((u) => u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)) : users;
   const rows = found.filter(shows[show]);
-  const page = Math.min(toPage(sp.page), Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
-  const keep = { q: sp.q, show: show === "all" ? undefined : show };
+  // The page size chosen under the list (10, 25, 50, 100), as on every other list (review 24 Nov: always 25).
+  const size = toPageSize(sp.size);
+  const page = Math.min(toPage(sp.page), Math.max(1, Math.ceil(rows.length / size)));
+  const keep = { q: sp.q, show: show === "all" ? undefined : show, size: sp.size };
   const href = (patch: Params) => buildHref("/users", keep, { page: undefined, ...patch });
   // Every tab, with its number even when 0 (the same on every list).
   const chips = SHOWS.map((s) => ({
@@ -142,7 +144,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         ) : (
           <>
             <PhoneList label="People">
-              {rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((u) => (
+              {rows.slice((page - 1) * size, page * size).map((u) => (
                 <PhoneRow
                   key={u.id}
                   href={`/users/${u.id}`}
@@ -169,7 +171,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 </tr>
               </THead>
               <tbody>
-                {rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((u) => (
+                {rows.slice((page - 1) * size, page * size).map((u) => (
                   <DataRow key={u.id} href={`/users/${u.id}`} flash={sp.saved === u.id} className={cn(!u.isActive && "text-text-2")}>
                     <Td>
                       <span className="flex items-center gap-3">
@@ -209,7 +211,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           </>
         )}
       </Card>
-      <Pager base="/users" params={keep} page={page} total={rows.length} bare />
+      <Pager base="/users" params={keep} page={page} pageSize={size} total={rows.length} bare />
 
       {roles && <NewUserPanel action={createUserAction} roles={roles} />}
     </Stack>

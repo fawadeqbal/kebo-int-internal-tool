@@ -1085,7 +1085,9 @@ export class OrdersService {
       // Waiting longest first on the board; the latest first for Done.
       orderBy: [{ stageSince: filter.recent ? "desc" : "asc" }, { id: "asc" }],
       skip: filter.skip,
-      take: filter.limit ?? 300,
+      // Every order asked for unless a limit is given: a silent 300 left the board, the Record payment list and
+      // the export short (review 24 Nov: 300 of 532 open orders on the board, SO-2026-0512 not offered).
+      take: filter.limit,
     });
     const settings = await this.settings.get();
     const days = settings.reminders;

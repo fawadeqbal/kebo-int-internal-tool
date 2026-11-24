@@ -44,8 +44,8 @@ export class CustomersController {
   /** Every customer the person may see, by name: [{ id, name }] for pickers. */
   @SignedIn("anyone signed in to the company")
   @Get("names")
-  names(@CurrentUser() user: SessionUser) {
-    return this.customers.names(user);
+  names(@CurrentUser() user: SessionUser, @Query("with") withWhat?: string) {
+    return this.customers.names(user, withWhat === "orders");
   }
 
   @SignedIn("anyone signed in to the company")
