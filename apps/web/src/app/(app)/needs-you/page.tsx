@@ -21,7 +21,7 @@ export default async function NeedsYouPage({ searchParams }: { searchParams: Pro
   return (
     <Stack>
       <PageHeader crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Needs you today" }]} title="Needs you today" summary={countOf(r.counts.total, "thing")} />
-      <Card>{shown.length ? <ReminderList items={shown} /> : <EmptyLine inset>Nothing needs you right now.</EmptyLine>}</Card>
+      <Card data-part="table" className="overflow-hidden">{shown.length ? <ReminderList items={shown} /> : <EmptyLine inset>Nothing needs you right now.</EmptyLine>}</Card>
       <Pager base="/needs-you" params={{}} page={page} pageSize={size} total={r.items.length} bare />
     </Stack>
   );
