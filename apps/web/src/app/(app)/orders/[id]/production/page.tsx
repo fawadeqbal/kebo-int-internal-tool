@@ -221,11 +221,11 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
           state={
             o.goods.allReceived
               ? `${o.goods.received} of ${o.goods.lines} received`
-              : o.goods.received > 0
-                ? `${o.goods.received} of ${o.goods.lines} received`
+              : o.goods.received > 0 || (o.goods.started ?? 0) > 0
+                ? [`${o.goods.received} of ${o.goods.lines} received`, o.goods.started ? `${o.goods.started} in part` : null].filter(Boolean).join(" · ")
                 : "Not received yet"
           }
-          tone={o.goods.allReceived ? "ok" : o.goods.received > 0 ? "warn" : "neutral"}
+          tone={o.goods.allReceived ? "ok" : o.goods.received > 0 || (o.goods.started ?? 0) > 0 ? "warn" : "neutral"}
           rows={
             o.goods.received > 0 || place
               ? [

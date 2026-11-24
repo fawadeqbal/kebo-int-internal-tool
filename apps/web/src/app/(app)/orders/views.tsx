@@ -207,9 +207,20 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
               title="No orders match these filters"
               description={sp.q ? `Nothing matches “${sp.q}” here. Try part of the order number, the customer or the inquiry.` : "Try another status, or clear the filters."}
               action={
-                <ButtonLink href={c.open > 0 && !narrowed ? "/orders" : "/orders?status=all"} size="sm">
-                  Clear filters
-                </ButtonLink>
+                // The same search finds orders under another tab: offered first (review 24 Nov: a closed order was not
+                // found from Open, and Clear filters landed on a hidden "All" view with no tab lit).
+                (() => {
+                  const elsewhere = (["closed", "cancelled"] as const).find((k) => status !== k && (c[k] ?? 0) > 0);
+                  return elsewhere && sp.q ? (
+                    <ButtonLink href={href({ status: elsewhere, stage: undefined })} size="sm">
+                      Show {c[elsewhere]} under {elsewhere === "closed" ? "Closed" : "Cancelled"}
+                    </ButtonLink>
+                  ) : (
+                    <ButtonLink href="/orders" size="sm">
+                      Clear filters
+                    </ButtonLink>
+                  );
+                })()
               }
             />
           )

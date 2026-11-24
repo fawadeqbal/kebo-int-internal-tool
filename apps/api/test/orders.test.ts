@@ -180,7 +180,10 @@ describe("orders: four stages", () => {
   it("serves two clicks at once one after the other: exactly one moves", async () => {
     const o = await order();
     await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "balance", amount: o.money.due, currency: "USD", paidOn: day(-17) }).expect(201);
-    const [a, b] = await Promise.all([move(sana, { to: "done" }), move(sana, { to: "done" })]);
+    // The supplier is still owed: closing asks first (review 24 Nov), and is confirmed here.
+    const asked = (await move(sana, { to: "done" }).expect(409)).body;
+    expect(asked).toMatchObject({ code: "confirm", error: expect.stringMatching(/^We still owe CNY [\d,.]+ to /) });
+    const [a, b] = await Promise.all([move(sana, { to: "done", confirm: true }), move(sana, { to: "done", confirm: true })]);
     expect([a.status, b.status].sort()).toEqual([200, 409]);
     const done = await order();
     expect(done).toMatchObject({ stage: "done", status: "closed", next: null, needs: null, back: { to: "shipped" } });
@@ -190,7 +193,7 @@ describe("orders: four stages", () => {
 
   it("reopens when moved back from Done", async () => {
     expect((await move(sana, { to: "shipped", note: "Customer claims a short shipment" }).expect(200)).body).toMatchObject({ stage: "shipped", status: "open" });
-    expect((await move(sana, { to: "done" }).expect(200)).body.status).toBe("closed");
+    expect((await move(sana, { to: "done", confirm: true }).expect(200)).body.status).toBe("closed");
   });
 
   it("makes the documents from the order", async () => {

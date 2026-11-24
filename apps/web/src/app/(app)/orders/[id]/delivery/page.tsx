@@ -53,7 +53,8 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
   // typed here before (an older order) stays as it was, from the SAT day or, without a SAT, the delivery day.
   const agreedW = !dv.warrantyMonths && o.agreed?.warrantyMonths ? { months: o.agreed.warrantyMonths, from: o.agreed.warrantyFrom ?? "shipment" } : null;
   const months = dv.warrantyMonths ?? agreedW?.months ?? null;
-  const from = !agreedW ? (dv.satDoneOn ?? dv.deliveredOn) : agreedW.from === "shipment" ? o.shippedOn : agreedW.from === "delivery" ? dv.deliveredOn : (dv.satDoneOn ?? dv.deliveredOn);
+  // Counted from the SAT: it starts on the SAT day only (review 24 Nov: delivery before any SAT started it).
+  const from = !agreedW ? (dv.satDoneOn ?? dv.deliveredOn) : agreedW.from === "shipment" ? o.shippedOn : agreedW.from === "delivery" ? dv.deliveredOn : dv.satDoneOn;
   const until = from && months ? addMonths(from, months) : null;
   const passed = dv.sat.filter((c) => c.result === "pass" || c.result === "not_applicable").length;
   const action = fieldsAction.bind(null, o.id, "delivery");

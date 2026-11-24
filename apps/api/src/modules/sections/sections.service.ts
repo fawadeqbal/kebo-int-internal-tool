@@ -113,6 +113,9 @@ export class SectionsService {
     if (factoryId ? !ids.includes(factoryId) : ids.length > 0) throw new DomainError("Choose a supplier of this order.");
     if (input.fatAttendedById && !(await this.prisma.db.user.findFirst({ where: { id: input.fatAttendedById }, select: { id: true } }))) throw new DomainError("Choose a person of the company.");
     const name = o.lines.find((l) => l.factoryId === factoryId)?.factory?.name ?? null;
+    // A test that has a result has been done: not on a day still to come (review 24 Nov: a future day was kept as Passed).
+    if (input.fatDoneOn && input.fatDoneOn > this.clock.today())
+      throw new DomainError("The factory test cannot be done on a day still to come: plan it with the planned day.");
 
     const data: Record<string, unknown> = {};
     for (const k of ["readyToldVia", "readyNote", "fatAttendedById", "fatResult", "fatRemarks", "goodsReceivedAt"] as const) if (input[k] !== undefined) data[k] = input[k];

@@ -122,10 +122,13 @@ describe("order sections: files and reminders", () => {
     expect(planned.production[0]).toMatchObject({ readyToldOn: "2026-11-20", readyToldVia: "wechat", fat: { plannedOn: "2026-12-03", doneOn: null, result: null } });
     expect(planned.production[0]!.fat.attendedBy).toBeTruthy();
     // Only the fields sent change.
-    const done = (await api(app, sana).put(`/orders/${orderId}/factory-facts`, { fatDoneOn: "2026-12-03", fatResult: "passed_with_remarks", fatRemarks: "Small leak fixed on the spot", goodsReceivedAt: "Forwarder's warehouse" }).expect(200)).body as View;
+    // A test is done on a day that has come (review 24 Nov: a future day was kept as Passed).
+    await api(app, sana).put(`/orders/${orderId}/factory-facts`, { fatDoneOn: "2099-01-01", fatResult: "passed" }).expect(400);
+    const doneOn = today;
+    const done = (await api(app, sana).put(`/orders/${orderId}/factory-facts`, { fatDoneOn: doneOn, fatResult: "passed_with_remarks", fatRemarks: "Small leak fixed on the spot", goodsReceivedAt: "Forwarder's warehouse" }).expect(200)).body as View;
     expect(done.production[0]).toMatchObject({
       readyToldVia: "wechat",
-      fat: { plannedOn: "2026-12-03", doneOn: "2026-12-03", result: "passed_with_remarks", remarks: "Small leak fixed on the spot" },
+      fat: { plannedOn: "2026-12-03", doneOn, result: "passed_with_remarks", remarks: "Small leak fixed on the spot" },
       goodsReceivedAt: "Forwarder's warehouse",
     });
     // A result needs its day; a factory that is not on the order, a made-up result and a made-up channel are refused.
@@ -136,14 +139,15 @@ describe("order sections: files and reminders", () => {
     await api(app, bilal).put(`/orders/${orderId}/factory-facts`, { fatPlannedOn: "2026-12-04" }).expect(404);
     // The history says it in words, and the FAT report prints from it.
     const h = (await api(app, sana).get(`/history?type=order&id=${orderId}`).expect(200)).body as { action: string; summary: string }[];
-    expect(h.some((e) => e.action === "flow.production" && e.summary.includes("factory test passed with remarks on 2026-12-03"))).toBe(true);
+    expect(h.some((e) => e.action === "flow.production" && e.summary.includes(`factory test passed with remarks on ${today}`))).toBe(true);
     const papers = (await api(app, sana).get(`/orders/${orderId}/papers`).expect(200)).body.papers as { kind: string; state: string }[];
     expect(papers.some((p) => p.kind === "fat-report")).toBe(true);
     const checks = (await api(app, sana).get(`/orders/${orderId}/papers/fat-report/checks`).expect(200)).body as { checks: { key: string; ok: boolean; value: string }[] };
     expect(checks.checks.find((c) => c.key === "done")).toMatchObject({ ok: true });
     // The stage's line says the test, too.
     const stand = ((await api(app, sana).get(`/orders/${orderId}/sections`).expect(200)).body.stands as { stage: string; fact: string }[]).find((x) => x.stage === "production")!;
-    expect(stand.fact).toContain("factory test passed with remarks 3 Dec");
+    const dm = new Date(`${today}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+    expect(stand.fact).toContain(`factory test passed with remarks ${dm}`);
   });
 
   it("a shipment keeps how the freight is paid and what the goods are insured for", async () => {

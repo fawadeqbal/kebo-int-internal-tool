@@ -541,11 +541,19 @@ export class CustomerPaymentsService {
     let createdId = "";
     const event = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
-      const { o, a, parts, leftMinor, thisMinor } = await this.prepare(tx, user, orderId, input, cashBook);
+      const { o, a, parts, leftMinor, thisMinor, paidUp } = await this.prepare(tx, user, orderId, input, cashBook);
       const { ids, movementId } = await this.save(tx, user, o.customerId, a, parts, leftMinor);
       // The new part (its proof follows on the payment entry); only credit: the entry itself.
       createdId = thisMinor > 0 ? ids[0]! : movementId;
       if (input.bankStep && thisMinor > 0) await this.moneyReachedUs(tx, user, o, createdId, input.paidOn, input.reference);
+      // A payment recorded from anywhere that pays the order up, on a bank route: "Money reached us" is ticked too
+      // (review 24 Nov: it stayed Waiting after the bank's payment was recorded on Record payment).
+      else if (
+        paidUp &&
+        bankStepsFor(routeOf(o) as never).includes("bank_paid_us") &&
+        !(await tx.orderBankStep.findUnique({ where: { orderId_step: { orderId: o.id, step: "bank_paid_us" } }, select: { doneOn: true } }))?.doneOn
+      )
+        await this.moneyReachedUs(tx, user, o, createdId, input.paidOn, input.reference);
       return {
         type: "payment.recorded" as const,
         orderId,
@@ -627,7 +635,9 @@ export class CustomerPaymentsService {
       paidByName: input.paidByName,
       note: input.note,
     };
-    return { o, a, parts, leftMinor, thisMinor };
+    // It pays what is left on the order (the balance included): on a bank route the bank's money has reached us.
+    const paidUp = thisMinor > 0 && kind !== "deposit" && thisMinor + chargesMinor >= before.dueMinor;
+    return { o, a, parts, leftMinor, thisMinor, paidUp };
   }
 
   /** "Money reached us" ticked by the payment that recorded it (bank routes only). */
