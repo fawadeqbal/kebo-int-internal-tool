@@ -47,7 +47,8 @@ export function MonthFigures({ h }: { h: HomeFigures }) {
         label="Sold this month"
         value={bigMoney(Number(m.sold.now), c)}
         delta={<Delta value={change(Number(m.sold.now), Number(m.sold.before))} vs={vs} />}
-        sub={`${plural(m.sold.orders, "order")} · against ${m.before} by this day`}
+        // The figure it is set against, not only the month (review 24 Nov, S-31).
+        sub={`${plural(m.sold.orders, "order")} · ${bigMoney(Number(m.sold.before), c)} by this day in ${m.before}`}
         href="/reports/profit?period=month"
         how={how.sold(span, c)}
       />

@@ -95,11 +95,6 @@ function PanelForm({
     >
       {(s) => (
         <>
-          {s.ok === false && s.errors && Object.keys(s.errors).length > 0 && (
-            <p role="alert" className="text-sm text-bad">
-              {s.message ?? "Some values need fixing."}
-            </p>
-          )}
           {children(s)}
           <WindowFooter>
             <SubmitButton variant={danger ? "danger" : "primary"} pendingText="Saving…">

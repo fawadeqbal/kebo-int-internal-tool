@@ -10,7 +10,7 @@ export default function Forbidden() {
       </span>
       <h1 className="text-base font-bold text-text">You cannot open this page</h1>
       <p className="text-sm text-muted">
-        Your role does not include it. Ask the owner or a manager to give your role access if you need it.
+        Your role does not include it. If you need it, ask whoever looks after roles in your company to add it to yours.
       </p>
       <Link href="/dashboard" className={buttonClass("secondary")}>
         <ArrowLeft aria-hidden />

@@ -1,4 +1,5 @@
 import "server-only";
+import { newPasswordField } from "@kebo/shared";
 import { ApiError } from "./api";
 import { ONCE_FIELD, ONCE_KEY } from "./once";
 
@@ -87,4 +88,17 @@ export async function attempt(form: FormData | null, fn: () => Promise<unknown>,
     console.error("[action]", e);
     return { ok: false, message: "Something went wrong. Please try again.", values: form ? formValues(form) : undefined };
   }
+}
+
+/**
+ * A new password typed twice: its own rule (length, a letter and a number) and whether the two agree, said
+ * together, so a short password typed differently twice is not told only to match (review 24 Nov, A-43).
+ */
+export function newPasswordProblems(v: Record<string, string>): ActionState | null {
+  const errors: Record<string, string[]> = {};
+  const rule = newPasswordField.safeParse(v.next ?? "");
+  if (v.next && !rule.success) errors.next = rule.error.issues.map((i) => i.message);
+  if ((v.next || v.confirm) && v.confirm !== v.next) errors.confirm = ["Type the same new password again"];
+  if (!Object.keys(errors).length) return null;
+  return { ok: false, message: errors.next ? errors.next[0] : "The two new passwords are not the same.", errors };
 }

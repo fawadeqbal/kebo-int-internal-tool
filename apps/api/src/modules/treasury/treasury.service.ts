@@ -461,7 +461,8 @@ export class TreasuryService {
         reference: e.reference,
         status: statusOf(e.voidedAt),
         fromCredit: false,
-        method: e.ownMoney ? "Own money" : from?.kind === "cash" ? "Cash" : from ? "Bank transfer" : null,
+        // The same words as payments (one "Bank transfer (T/T)" in the method list, not two: review 24 Nov, M-29).
+        method: e.ownMoney ? "Own money" : from?.kind === "cash" ? PAYMENT_METHOD_LABEL.cash : from ? PAYMENT_METHOD_LABEL.bank_transfer : null,
         by: first(e.recordedBy),
         accountId: e.payLater ? e.repaidAccountId : e.accountId,
       });
@@ -642,6 +643,19 @@ export class TreasuryService {
     // The page draws what every payment has (date, who from or to, method, account, reference, who paid, the amount
     // and what it paid) the same way for every kind; `fields` holds only what is this kind's own.
     const none = { paidBy: null, inMain: null };
+    // Sent for approval: who added it and when, and who approved it apart (review 24 Nov, M-37: an approved
+    // payment named the approver as the one who recorded it).
+    const approvedFrom = async (ids: string[], recorder: { name: string }, at: Date) => {
+      const sent = await db.moneySubmission.findFirst({
+        where: { createdId: { in: ids }, status: "approved" },
+        select: { submittedBy: name, decidedBy: name, submittedAt: true },
+      });
+      return {
+        by: sent?.submittedBy.name ?? recorder.name,
+        at: (sent?.submittedAt ?? at).toISOString(),
+        fields: sent ? [{ label: "Approved by", value: sent.decidedBy?.name ?? recorder.name }] : [],
+      };
+    };
     switch (kind) {
       case "customer": {
         const m = await db.moneyMovement.findUniqueOrThrow({
@@ -656,6 +670,7 @@ export class TreasuryService {
         const one = m.allocations.length === 1 && decimalToMinor(m.allocatable) === decimalToMinor(m.allocations[0]!.amount) ? m.allocations[0]! : null;
         const leftMinor = decimalToMinor(m.allocatable) - m.allocations.reduce((t, a) => t + decimalToMinor(a.amount), 0);
         const charges = live.reduce((t, a) => t + decimalToMinor(a.bankCharges), 0);
+        const added = await approvedFrom([m.id, ...m.allocations.map((a) => a.id)], m.recordedBy, m.createdAt);
         return {
           fields: [
             ...(m.currency !== m.allocCurrency ? [{ label: "Rate", value: `${Number(m.rate)} ${m.currency} per ${m.allocCurrency}` }] : []),
@@ -665,12 +680,13 @@ export class TreasuryService {
               .filter((a) => a.voidedAt && !m.voidedAt)
               .map((a) => ({ label: `Released from ${a.order!.refNo}`, value: a.voidReason ?? "order cancelled" })),
             ...(m.note ? [{ label: "Note", value: m.note }] : []),
+            ...added.fields,
           ],
           paidBy: m.paidByName ?? null,
           inMain: m.currency === m.allocCurrency ? null : { amount: m.allocatable.toFixed(2), currency: m.allocCurrency, rate: String(Number(m.rate)) },
           file: fileOf(m.files[0]),
-          recordedBy: m.recordedBy.name,
-          recordedAt: m.createdAt.toISOString(),
+          recordedBy: added.by,
+          recordedAt: added.at,
           voided: voidOf(m.voidedAt, m.voidReason),
           orderId: one?.orderId ?? null,
           partId: one?.id ?? null,
@@ -764,6 +780,7 @@ export class TreasuryService {
             : e.borneBy === "factory"
               ? "The supplier (taken off what we owe)"
               : "Us";
+        const added = await approvedFrom([e.id], e.recordedBy, e.createdAt);
         return {
           fields: [
             { label: "Category", value: category },
@@ -777,13 +794,14 @@ export class TreasuryService {
                 ]
               : []),
             ...(e.note ? [{ label: "Note", value: e.note }] : []),
+            ...added.fields,
           ],
           paidBy: e.paidBy?.name ?? null,
           inMain: inMainOf(e.amount, e.currency, main, Number(e.rate)),
           parts: on ? [{ ...on, part: category, amount: money(e.amount), currency: e.currency, released: false }] : [],
           file: fileOf(e.files[0]),
-          recordedBy: e.recordedBy.name,
-          recordedAt: e.createdAt.toISOString(),
+          recordedBy: added.by,
+          recordedAt: added.at,
           voided: voidOf(e.voidedAt, e.voidReason),
           orderId: e.orderId,
           voidPath: !e.voidedAt && can(user, "expenses.manage") ? `/expenses/${e.id}/void` : null,

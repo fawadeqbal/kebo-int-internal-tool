@@ -1,14 +1,14 @@
 "use client";
 
 import { FormButtons } from "@/components/common/route-window";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound, Smartphone } from "lucide-react";
 import { Button, Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { EditButton } from "@/components/common/edit-button";
-import { PanelBody, SidePanel, useSidePanel } from "@/components/common/panel";
+import { PanelBody, SidePanel, useReportDirty, useSidePanel } from "@/components/common/panel";
 import { PasswordForm } from "@/components/people/password-form";
 import type { ActionState } from "@/lib/actions";
 import type { TwoStepStatus } from "@/lib/types-people";
@@ -109,6 +109,13 @@ export function TwoStepPanel({
   doneHref?: string;
 }) {
   const router = useRouter();
+  // Each step saves as it goes, so closing its window loses nothing worth asking about (review 24 Nov, A-22:
+  // Esc after set-up asked to discard a form that had already been saved).
+  const reportDirty = useReportDirty();
+  useEffect(() => {
+    reportDirty(false);
+    return () => reportDirty(null);
+  }, [reportDirty]);
   const [setup, setSetup] = useState<{ secret: string; qr: string } | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [manage, setManage] = useState<"codes" | "off" | null>(null);
@@ -311,19 +318,20 @@ export function ProfileForm({
   phone?: string | null;
 }) {
   return (
-    <ActionForm action={action} className="grid gap-4 sm:grid-cols-3">
+    <ActionForm action={action} className="grid gap-4 sm:grid-cols-2">
       {(s) => (
         <>
-          <Field label="Name" required htmlFor="profile-name" error={s.errors?.name} className="sm:col-span-2">
+          <Field label="Name" required htmlFor="profile-name" error={s.errors?.name}>
             <Input id="profile-name" name="name" maxLength={120} required autoComplete="name" defaultValue={s.values?.name ?? name} />
-          </Field>
-          <Field label="Email" required htmlFor="profile-email">
-            <Input id="profile-email" type="email" value={email} readOnly className="bg-surface-2 text-text-2" />
           </Field>
           <Field label="Phone" htmlFor="profile-phone" error={s.errors?.phone}>
             <Input id="profile-phone" name="phone" type="tel" maxLength={40} autoComplete="tel" defaultValue={s.values?.phone ?? phone ?? ""} />
           </Field>
-          <FormButtons reset className="border-t border-line pt-4 sm:col-span-3">
+          {/* Shown, not typed: not marked required, and the whole width so it is never cut (review 24 Nov, A-44). */}
+          <Field label="Email" htmlFor="profile-email" hint="Someone who manages people can change it." className="sm:col-span-2">
+            <Input id="profile-email" type="email" value={email} readOnly className="bg-surface-2 text-text-2" />
+          </Field>
+          <FormButtons reset className="border-t border-line pt-4 sm:col-span-2">
             <SubmitButton pendingText="Saving…">
               <Check aria-hidden />
               Save changes

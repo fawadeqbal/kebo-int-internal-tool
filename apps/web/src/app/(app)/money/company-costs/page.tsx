@@ -98,7 +98,8 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         <StatTile
           label={month === thisMonth ? "Last month" : "The month before"}
           value={whole(before.total, c)}
-          sub={change === null ? "—" : `${change > 0 ? "+" : ""}${change}% since`}
+          // Says which month moved and which way (review 24 Nov, M-34: "+677% since").
+          sub={change === null ? "—" : change === 0 ? `${month === thisMonth ? "This month" : monthName}: the same` : `${month === thisMonth ? "This month" : monthName}: ${change >= 900 ? `${Math.round(change / 100 + 1)} times as much` : `${Math.abs(change)}% ${change > 0 ? "more" : "less"}`}`}
         />
         <StatTile label={`In ${month.slice(0, 4)}`} value={whole(year.total, c)} sub={`${year.count} cost${year.count === 1 ? "" : "s"}`} />
         <StatTile
@@ -154,7 +155,8 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
             .filter((m, i, all) => all.indexOf(m) === i)
             .map((m) => ({ value: m, label: MONTH_YEAR.format(new Date(`${m}-01T00:00:00Z`)) })),
         }}
-        count={countOf(list.count, "cost")}
+        // The list shows removed costs crossed out too: say how many, so the tabs and the pages add up (M-27).
+        count={`${countOf(list.count, "cost")}${list.listed > list.count ? ` · ${list.listed - list.count} removed` : ""}`}
       />
 
       <Card data-part="table" className="overflow-hidden">

@@ -80,7 +80,7 @@ export async function WaitingToVerify({
               )}
             </div>
             {s.can.approve ? (
-              <ApproveButtons approve={approveAction.bind(null, s.id)} sendBack={sendBackAction.bind(null, s.id)} what={`${whatOf(s).toLowerCase()} · ${amountOf(s)}`} verb="Verify" />
+              <ApproveButtons approve={approveAction.bind(null, s.id)} sendBack={sendBackAction.bind(null, s.id)} what={`${whatOf(s).charAt(0).toLowerCase()}${whatOf(s).slice(1)} · ${amountOf(s)}`} verb="Verify" />
             ) : s.can.withdraw ? (
               <WithdrawButton action={withdrawAction.bind(null, s.id)} />
             ) : (

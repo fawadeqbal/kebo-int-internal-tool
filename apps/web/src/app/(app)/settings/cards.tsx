@@ -13,6 +13,7 @@ import type { ActionState } from "@/lib/actions";
 import { ColoursCard } from "./colours";
 import { BrandPreview, Control, CurrenciesControl, rateText } from "./forms";
 import { useTime } from "@/lib/time-client";
+import { plural } from "@/lib/format";
 import { SETTING_GROUPS, toFormText, type SettingCard, type SettingField, type SettingGroup } from "./groups";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -34,12 +35,12 @@ function ValueText({ f, value }: { f: SettingField; value: unknown }) {
         ))}
       </span>
     );
-  if (f.kind === "select") return <>{f.options?.find((o) => o.value === String(value))?.label ?? String(value)}</>;
+  if (f.kind === "select") return <>{f.options?.find((o) => o.value === toFormText(f, value))?.label ?? String(value)}</>;
   if (f.kind === "number")
     return (
       <span className="tabular">
-        {String(value)}
-        {f.unit && ` ${f.unit}`}
+        {/* "15%" and "1 day", not "15 %" and "1 days" (review 24 Nov, A-19). */}
+        {f.unit === "%" ? `${String(value)}%` : f.unit === "days" ? plural(Number(value), "day") : `${String(value)}${f.unit ? ` ${f.unit}` : ""}`}
       </span>
     );
   if (f.kind === "bool") return <>{value ? (f.on ?? "On") : (f.off ?? "Off")}</>;
@@ -207,11 +208,7 @@ function CardForm({
       {(s) => (
         <>
           <input type="hidden" name="_fields" value={fields.map((f) => f.name).join(",")} />
-          {s.ok === false && s.errors && Object.keys(s.errors).length > 0 && (
-            <p role="alert" className="text-sm text-bad">
-              {s.message ?? "Some values need fixing."}
-            </p>
-          )}
+          {/* What to fix is listed once by the form (each a way to its field) and under the field: no third copy (A-17). */}
           <PanelSection first>
             {card.preview && <BrandPreview initial={values} />}
             {fields.map((f) =>

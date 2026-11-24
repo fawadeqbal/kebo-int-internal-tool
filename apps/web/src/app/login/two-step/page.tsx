@@ -24,7 +24,6 @@ export default async function TwoStepPage({ searchParams }: { searchParams: Prom
         </span>
         <div>
           <h1 className="text-xl leading-7 font-semibold tracking-tight text-text">Two-step verification</h1>
-          <p className="mt-1 text-sm text-muted">Enter the 6-digit code from your authenticator app.</p>
         </div>
       </div>
       <div className="mt-6 text-center">

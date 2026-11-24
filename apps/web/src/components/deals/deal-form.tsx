@@ -979,7 +979,7 @@ export function DealForm({
               const r = await asking.remove!();
               setAsking(null);
               if (r.ok) router.refresh();
-              else toast(r.message ?? "The file was not removed.");
+              else toast({ kind: "fail", message: r.message ?? "The file was not removed." });
             })
           }
         >

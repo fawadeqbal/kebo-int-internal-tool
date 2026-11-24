@@ -284,7 +284,8 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                     <Td>
                       {o.needs ? (
                         <>
-                          <span className="block max-w-48 truncate text-sm" title={o.needs.title}>
+                          {/* Two lines before it is cut, so an amount is never cut in half (review 24 Nov, O-40: "USD 33,1…"). */}
+                          <span className="line-clamp-2 block max-w-56 text-sm" title={o.needs.title}>
                             {o.needs.title}
                           </span>
                           <span className={cn("block text-xs", o.needs.late ? "font-medium text-bad" : "text-text-2")}>
@@ -343,8 +344,11 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
     return [cur?.label ?? "Production", "info"];
   };
   const line = (o: OrderRow) => {
-    const who = o.customer.name.split(" ").slice(0, 2).join(" ");
-    const sub = o.needs ? (o.needs.late ? `was ${date(o.needs.due)}` : o.needs.title.toLowerCase()) : (at.get(o.id)?.sub ?? "");
+    // The customer's whole name, and what is needed with its capitals kept ("collect USD 33,100", not "usd"):
+    // review 24 Nov, O-33.
+    const who = o.customer.name;
+    const need = o.needs?.title ?? "";
+    const sub = o.needs ? (o.needs.late ? `was ${date(o.needs.due)}` : `${need.charAt(0).toLowerCase()}${need.slice(1)}`) : (at.get(o.id)?.sub ?? "");
     return [who, sub.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d))].filter(Boolean).join(" · ");
   };
   return (

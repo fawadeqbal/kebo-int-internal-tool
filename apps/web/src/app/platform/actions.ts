@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { api, apiFetch, platformApi, PLATFORM_COOKIE, SESSION_COOKIE } from "@/lib/api";
-import { attempt, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formValues, newPasswordProblems, type ActionState } from "@/lib/actions";
 import { FLASH_COOKIE } from "@/lib/platform";
 
 const cookieOptions = (maxAge: number) => ({
@@ -73,8 +73,8 @@ export async function platformNoopAction(): Promise<ActionState> {
 
 export async function platformPasswordAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  if (v.next !== v.confirm)
-    return { ok: false, message: "The two new passwords are not the same.", errors: { confirm: ["Type the same new password again"] } };
+  const problems = newPasswordProblems(v);
+  if (problems) return problems;
   return forget(
     await attempt(
       form,

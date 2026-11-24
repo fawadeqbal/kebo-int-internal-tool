@@ -251,6 +251,14 @@ describe("money sent for approval", () => {
     expect(made.file).toMatchObject({ id: withFile.file.id });
     const slip = await api(app, manager).get(slipFile).buffer(true).expect(200);
     expect(Buffer.from(slip.body).equals(png)).toBe(true);
+    // Its page in Payments names who added it, and who approved it apart (review 24 Nov, M-37).
+    const entry = ((await api(app, manager).get(`/treasury/payments?q=SLIP-${tag}`).expect(200)).body as { rows: { id: string }[] }).rows[0]!;
+    const page = (await api(app, manager).get(`/treasury/payments/customer/${entry.id}`).expect(200)).body as {
+      recordedBy: string;
+      fields: { label: string; value: string }[];
+    };
+    expect(page.recordedBy).toBe((await api(app, sana).get("/auth/me")).body.name);
+    expect(page.fields).toContainEqual({ label: "Approved by", value: "Manager" });
 
     // Recorded directly, the same way: the next receipt number of the same series.
     const direct = (await api(app, manager).post(`/orders/${orderId}/payments`, { amount: 1, currency: "USD", paidOn: today }).expect(201))

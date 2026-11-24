@@ -35,6 +35,10 @@ export class ErrorFilter implements ExceptionFilter {
     if (error instanceof ConflictError) return send(409, { error: error.message });
     if (error instanceof DomainError) return send(400, { error: error.message });
     if (isDbError(error, DB_ERROR.notFound)) return send(404, { error: "This record no longer exists. Reload and try again." });
+    // A malformed id in a link ("/orders/not-an-id"): nothing has it, so the page is not found, not a server fault
+    // (review 24 Nov, X-24: "Could not reach the server").
+    if (isDbError(error, DB_ERROR.badValue) || (error instanceof Error && /invalid input syntax for type uuid|Error creating UUID/i.test(error.message)))
+      return send(404, { error: "Nothing has this number. Check the link." });
     if (isDbError(error, DB_ERROR.uniqueViolation)) return send(409, { error: "That already exists (someone may have just saved it). Reload and try again." });
     // Another company's row (row-level security refused it): as if it did not exist.
     if (error instanceof Error && /row-level security/i.test(error.message)) return send(404, { error: "This record no longer exists. Reload and try again." });
@@ -52,6 +56,8 @@ export class ErrorFilter implements ExceptionFilter {
     if (error instanceof HttpException) {
       const r = error.getResponse();
       const message = typeof r === "string" ? r : ((r as { message?: string | string[] }).message ?? error.message);
+      // ParseUUIDPipe on a link's id ("/orders/not-an-id"): nothing has it (X-24, as above).
+      if (error.getStatus() === 400 && /uuid is expected/i.test(String(message))) return send(404, { error: "Nothing has this number. Check the link." });
       const extra = typeof r === "object" && r ? (r as { code?: string; companies?: unknown }) : {};
       return send(error.getStatus(), {
         error: Array.isArray(message) ? message[0] : message,

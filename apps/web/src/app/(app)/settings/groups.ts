@@ -55,7 +55,33 @@ export interface SettingGroup {
 
 const days = (name: string, label: string, hint: string): SettingField => ({ name, label, hint, kind: "number", unit: "days" });
 
-/** Every time zone, with how far it is from UTC now: "Asia/Karachi (GMT+5)". */
+/**
+ * Old names some browsers and servers still list, by the name the zone has today (review 24 Nov, A-41:
+ * "Asia/Calcutta"). Both work for dates; a setting saved under the old name shows as the new one.
+ */
+const RENAMED_ZONES: Record<string, string> = {
+  "Asia/Calcutta": "Asia/Kolkata",
+  "Asia/Katmandu": "Asia/Kathmandu",
+  "Asia/Rangoon": "Asia/Yangon",
+  "Asia/Saigon": "Asia/Ho_Chi_Minh",
+  "Europe/Kiev": "Europe/Kyiv",
+  "America/Godthab": "America/Nuuk",
+  "Atlantic/Faeroe": "Atlantic/Faroe",
+  "Pacific/Enderbury": "Pacific/Kanton",
+  "Pacific/Truk": "Pacific/Chuuk",
+  "Pacific/Ponape": "Pacific/Pohnpei",
+  "America/Buenos_Aires": "America/Argentina/Buenos_Aires",
+  "America/Indianapolis": "America/Indiana/Indianapolis",
+  "America/Louisville": "America/Kentucky/Louisville",
+  "Asia/Ulan_Bator": "Asia/Ulaanbaatar",
+  "Asia/Dacca": "Asia/Dhaka",
+  "Asia/Thimbu": "Asia/Thimphu",
+  "Asia/Macao": "Asia/Macau",
+  "Asia/Ujung_Pandang": "Asia/Makassar",
+};
+const zoneToday = (zone: string) => RENAMED_ZONES[zone] ?? zone;
+
+/** Every time zone by today's name, with how far it is from UTC now: "Asia/Karachi (GMT+5)". */
 const ZONES = (() => {
   const zones = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : ["UTC"];
   const offset = (zone: string) => {
@@ -65,7 +91,7 @@ const ZONES = (() => {
       return "";
     }
   };
-  return zones.map((z) => ({ value: z, label: `${z.replace(/_/g, " ")} (${offset(z)})` }));
+  return [...new Set(zones.map(zoneToday))].sort().map((z) => ({ value: z, label: `${z.replace(/_/g, " ")} (${offset(z)})` }));
 })();
 
 /** How a date and a time are written, each shown as it looks. */
@@ -93,7 +119,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
         kind: "image",
         wide: true,
         noun: "logo",
-        hint: "PNG or JPEG",
+        hint: "PNG, JPG or WebP, under 5 MB",
         maxPixels: 360,
       },
       { name: "brandMark", label: "Title on documents", kind: "text" },
@@ -109,7 +135,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "bankDetails", label: "Bank details for customers", kind: "textarea", wide: true },
       { name: "invoiceFooter", label: "Invoice footer", kind: "textarea", wide: true },
       { name: "proformaPrefix", label: "Proforma number starts with", kind: "text" },
-      { name: "stamp", label: "Company stamp", kind: "image", wide: true, noun: "stamp", hint: "PNG or JPEG, under 300 KB" },
+      { name: "stamp", label: "Company stamp", kind: "image", wide: true, noun: "stamp", hint: "PNG, JPG or WebP, under 300 KB" },
       {
         name: "timeZone",
         label: "Time zone",
@@ -287,5 +313,6 @@ export const SETTING_GROUPS: SettingGroup[] = [
 /** Stored value → what the form box shows. */
 export function toFormText(field: SettingField, value: unknown): string {
   if (field.kind === "lines") return ((value ?? []) as string[]).join("\n");
+  if (field.options === ZONES && typeof value === "string") return zoneToday(value);
   return value === null || value === undefined ? "" : String(value);
 }

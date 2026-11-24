@@ -120,12 +120,23 @@ function Pagination({
           </span>
         </Link>
       )}
-      <span className={cn("tabular", more && "max-sm:w-full max-sm:text-center")}>
-        <b className="font-semibold text-text">
-          {from}–{to}
-        </b>{" "}
-        of {total}
-      </span>
+      {/* Past the last page (an old link, a list that shrank): said, with the way to the last one (review 24 Nov:
+          "24951–599 of 599" over an empty table). */}
+      {page > pages ? (
+        <span className={cn(more && "max-sm:w-full max-sm:text-center")}>
+          Page {page} is past the end ({total}).{" "}
+          <Link href={href({ page: pages > 1 ? String(pages) : undefined })} className="font-semibold text-primary underline underline-offset-2">
+            Go to page {pages}
+          </Link>
+        </span>
+      ) : (
+        <span className={cn("tabular", more && "max-sm:w-full max-sm:text-center")}>
+          <b className="font-semibold text-text">
+            {from}–{to}
+          </b>{" "}
+          of {total}
+        </span>
+      )}
       <span className={cn("flex gap-1.5", more && "max-sm:hidden")}>
         {link(page - 1, "‹", "Previous page", page <= 1)}
         {!compact &&

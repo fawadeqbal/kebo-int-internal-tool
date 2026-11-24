@@ -44,7 +44,7 @@ export function ModulesList({
       const r = await action({}, form);
       if (r.ok === false) {
         setOff(back);
-        toast(r.message ?? "Could not save that. Try again.");
+        toast({ kind: "fail", message: r.message ?? "Could not save that. Try again." });
         return;
       }
       toast(`Saved · ${said}`);

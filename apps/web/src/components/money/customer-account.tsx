@@ -22,7 +22,8 @@ export async function CustomerHistoryNote({ customerId, dealId }: { customerId: 
   if (orders > 0) {
     parts.push(`${orders} order${orders === 1 ? "" : "s"}`);
     if (a.margin !== null) parts.push(`avg. margin ${a.margin.toFixed(1)}%`);
-  } else parts.push(`${others.length} other inquir${others.length === 1 ? "y" : "ies"}, no order yet`);
+    // Said of the other inquiries, not of this one (which may have its order: review 24 Nov, S-27).
+  } else parts.push(`${others.length} other inquir${others.length === 1 ? "y" : "ies"}, ${others.length === 1 ? "not ordered" : "none ordered"}`);
   if (lost.length) parts.push(`${lost.length} lost (${[...new Set(lost.map((d) => (d.lostReason ? lostReasonLabel(d.lostReason) : "no reason")))].join(", ").toLowerCase()})`);
   if (a.depositDaysLate !== null)
     parts.push(a.depositDaysLate > 0 ? `pays deposits about ${a.depositDaysLate} day${a.depositDaysLate === 1 ? "" : "s"} late` : "pays deposits on time");

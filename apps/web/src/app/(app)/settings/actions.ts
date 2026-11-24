@@ -12,6 +12,9 @@ const lines = (v: string | undefined, splitCommas = false) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+/** Looks like an email address (the API checks it properly). */
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /** The schema's built-in messages, in plainer words. */
 const plain = (m: string) =>
   m
@@ -56,9 +59,13 @@ export async function saveSettingsAction(key: SettingsKey, _prev: ActionState, f
         if (!raw?.trim()) errors[f.name] = ["Enter a number"];
         else body[f.name] = raw.trim();
         break;
-      case "lines":
+      case "lines": {
         body[f.name] = lines(raw, f.name === "emails");
+        // Name the address that is wrong, not "one of these" (review 24 Nov, A-20).
+        const bad = f.name === "emails" ? (body[f.name] as string[]).filter((x) => !EMAIL.test(x)) : [];
+        if (bad.length) errors[f.name] = [`${bad.map((x) => `"${x}"`).join(", ")} ${bad.length === 1 ? "is not an email address" : "are not email addresses"}.`];
         break;
+      }
       case "currencies": {
         // The main currency, and a rate for each of the others (how many of it 1 main buys).
         const main = (raw ?? "USD").toUpperCase();

@@ -205,8 +205,9 @@ export function ReceivedFields({
             <Field label="Reference" htmlFor="r-reference" optional error={s.errors?.reference}>
               <Input id="r-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
             </Field>
-            <Field label="Paid by" htmlFor="r-paidBy" optional error={s.errors?.paidByName}>
-              <Input id="r-paidBy" name="paidByName" maxLength={120} defaultValue={s.values?.paidByName ?? ""} placeholder={customer} />
+            {/* Not the customer's name as a grey example: it saved empty while it looked filled in (review 24 Nov, M-35). */}
+            <Field label="Paid by" htmlFor="r-paidBy" optional hint={customer ? `Only when someone other than ${customer} paid` : "Only when someone other than the customer paid"} error={s.errors?.paidByName}>
+              <Input id="r-paidBy" name="paidByName" maxLength={120} defaultValue={s.values?.paidByName ?? ""} />
             </Field>
             {!a.same && (
               <Field label="Rate" htmlFor="r-rate" hint={a.settingsRate ? undefined : "No rate in Settings: type the rate you agreed"} error={s.errors?.rate}>
@@ -449,7 +450,7 @@ function ReceiptFields({
             <Field label="Reference" htmlFor="rc-ref" optional error={s.errors?.reference}>
               <Input id="rc-ref" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
             </Field>
-            <Field label="Paid by" htmlFor="rc-by" optional>
+            <Field label="Paid by" htmlFor="rc-by" optional hint="Only when someone other than the customer paid">
               <Input id="rc-by" name="paidByName" maxLength={120} defaultValue={s.values?.paidByName ?? ""} />
             </Field>
             {currencies.length > 1 && (
