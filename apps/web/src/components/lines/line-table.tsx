@@ -474,6 +474,7 @@ export function LineTable({
       e.preventDefault();
       toPart(e.key === "ArrowRight");
     } else if (e.key === "Escape" && (entryAt.afterKey || entryAt.parentKey)) {
+      e.stopPropagation();
       setEntryAt({ afterKey: null, parentKey: null });
     }
   };
@@ -654,7 +655,9 @@ export function LineTable({
       e.preventDefault();
       commit(e.shiftKey ? "prev" : "next");
     } else if (e.key === "Escape") {
+      // Esc cancels the cell, not the window around the grid (review 24 Nov: it closed the whole window).
       e.preventDefault();
+      e.stopPropagation();
       open.current = null;
       setCell(null);
       requestAnimationFrame(() => gridRef.current?.focus({ preventScroll: true }));
@@ -727,6 +730,8 @@ export function LineTable({
       e.preventDefault();
       void navigator.clipboard?.writeText(valueOf(row, col.key));
     } else if (k === "Escape") {
+      // The first Esc lets go of the cell; the next one (nothing chosen) is the window's.
+      e.stopPropagation();
       setSel(null);
     } else if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && col.input && !isChoice(col)) {
       // Typing on a selected cell replaces what it holds, like a spreadsheet.
@@ -1761,15 +1766,23 @@ export function LineTable({
       ) : (
       // Read-only lines sit in their record's box: no frame of their own (no box in a box). Editing, the grid is framed.
       <div className={cn("overflow-hidden bg-surface", !readOnly && "rounded-lg border border-line", fill && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
-        {/* Read-only lines have nothing to tab to inside, so the table itself takes the keyboard (arrow keys scroll
-            it sideways); editable lines are reached through their cells. */}
+        {/* The table takes the keyboard: Tab comes to it, the arrow keys move between cells (or scroll read-only lines
+            sideways), Enter or typing changes the chosen cell, Esc lets go of it. */}
         <div
           ref={gridRef}
-          tabIndex={readOnly ? 0 : -1}
+          // Reached with Tab whether or not it can be changed (review 24 Nov: an editable grid could not be reached
+          // from the keyboard at all); coming in, the first cell is chosen, and the arrow keys move from there.
+          tabIndex={0}
+          onFocus={(e) => {
+            if (readOnly || sel || cell || e.target !== gridRef.current) return;
+            const first = rows[0];
+            const col = columns.find((c) => c.input) ?? columns[0];
+            if (first && col) setSel({ row: first.key, col: col.key });
+          }}
           onKeyDown={gridKeyDown}
           // Fill (design rules: the tools and the head stay, only the items scroll): the rows take what the window has left
           // and scroll inside; the table as a whole keeps its least height (min-h-80 below).
-          className={cn("relative scroll-x scroll-lg", fill && "md:min-h-0 md:flex-1 md:scroll-xy", readOnly ? "focus-visible:-outline-offset-2" : "outline-none")}
+          className={cn("relative scroll-x scroll-lg focus-visible:-outline-offset-2", fill && "md:min-h-0 md:flex-1 md:scroll-xy")}
           aria-label={`${noun[0]!.toUpperCase()}${noun.slice(1)}s`}
           role="region"
         >

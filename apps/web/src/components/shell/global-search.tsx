@@ -308,7 +308,21 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
     router.push(href);
   };
   return (
-    <div role="dialog" aria-modal="true" aria-label="Search everything" className="fixed inset-0 z-[70] flex flex-col bg-surface md:hidden">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search everything"
+      tabIndex={-1}
+      // Esc clears the words, and with none closes the search (review 24 Nov: it only ever cleared).
+      onKeyDown={(e) => {
+        if (e.key !== "Escape") return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (text) setText("");
+        else onClose();
+      }}
+      className="fixed inset-0 z-[70] flex flex-col bg-surface outline-none md:hidden"
+    >
       <form
         role="search"
         className="flex items-center gap-2 border-b border-line px-2 py-2"

@@ -7,6 +7,7 @@ import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelBody, PanelKeys, PanelSection, SidePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { RoleRow } from "@/lib/types-people";
+import { PasswordInput } from "@/components/common/password-input";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -90,7 +91,7 @@ export function NewUserPanel({ action, roles }: { action: Action; roles: RoleRow
             <PanelSection title="Access">
               <RoleField value={s.values?.role ?? start} roles={roles} error={s.errors?.role} />
               <Field label="First password" htmlFor="password" error={s.errors?.password} hint={PASSWORD_HINT}>
-                <Input id="password" name="password" type="text" autoComplete="new-password" spellCheck={false} defaultValue={s.values?.password} {...invalid(s.errors?.password)} />
+                <PasswordInput id="password" name="password" autoComplete="new-password" defaultValue={s.values?.password} {...invalid(s.errors?.password)} />
               </Field>
             </PanelSection>
           </>
@@ -152,7 +153,7 @@ export function PasswordPanel({ action, name }: { action: Action; name: string }
         {(s) => (
           <PanelSection title="Password" first className="sm:grid-cols-1">
             <Field label="New password" htmlFor="new-password" error={s.errors?.password} hint={PASSWORD_HINT}>
-              <Input id="new-password" name="password" type="text" autoComplete="new-password" spellCheck={false} {...invalid(s.errors?.password)} />
+              <PasswordInput id="new-password" name="password" autoComplete="new-password" {...invalid(s.errors?.password)} />
             </Field>
           </PanelSection>
         )}

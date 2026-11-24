@@ -66,6 +66,8 @@ export function MoreMenu({
   if (!entries.length) return null;
 
   const run = (e: MenuEntry) => {
+    // Focus back on ⋯ before the menu goes (review 24 Nov: it was lost), so whatever opens next returns there too.
+    button.current?.focus({ preventScroll: true });
     setOpen(false);
     if ("separator" in e) return;
     if ("href" in e) {
@@ -120,7 +122,17 @@ export function MoreMenu({
             "separator" in e ? (
               <span key={`sep-${i}`} role="separator" className="my-1 block h-px bg-line" />
             ) : "href" in e && e.download ? (
-              <a key={e.label} role="menuitem" href={e.href} download className={itemClass} onClick={() => setOpen(false)}>
+              <a
+                key={e.label}
+                role="menuitem"
+                href={e.href}
+                download
+                className={itemClass}
+                onClick={() => {
+                  button.current?.focus({ preventScroll: true });
+                  setOpen(false);
+                }}
+              >
                 {e.label}
               </a>
             ) : (

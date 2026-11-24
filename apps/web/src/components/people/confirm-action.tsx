@@ -23,10 +23,13 @@ export function ConfirmAction({
   size = "sm",
   className,
   showSuccess = true,
+  what,
 }: {
   action: Action;
   confirm?: string;
   label: string;
+  /** What it is done to, read out after the label ("Sign out" "Sana's phone"): each of many alike buttons apart. */
+  what?: string;
   icon?: ReactNode;
   pendingText?: string;
   variant?: ButtonVariant;
@@ -40,11 +43,13 @@ export function ConfirmAction({
         <ConfirmSubmit confirmLabel={label} message={confirm} variant={variant} size={size} pendingText={pendingText}>
           {icon}
           {label}
+          {what && <span className="sr-only"> {what}</span>}
         </ConfirmSubmit>
       ) : (
         <SubmitButton variant={variant} size={size} pendingText={pendingText}>
           {icon}
           {label}
+          {what && <span className="sr-only"> {what}</span>}
         </SubmitButton>
       )}
     </ActionForm>

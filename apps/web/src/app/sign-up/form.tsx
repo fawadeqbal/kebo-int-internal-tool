@@ -7,6 +7,7 @@ import { MailCheck } from "lucide-react";
 import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { signUpAction, slugCheckAction } from "./actions";
+import { PasswordInput } from "@/components/common/password-input";
 
 export function SignUpForm({ trialDays, origin }: { trialDays: number; origin: LeadOrigin }) {
   const [state, action] = useActionState(signUpAction, {});
@@ -71,7 +72,7 @@ export function SignUpForm({ trialDays, origin }: { trialDays: number; origin: L
         </Field>
       </div>
       <Field label="Password" htmlFor="password" hint="At least 10 characters, with letters and a number" error={state.errors?.password}>
-        <Input id="password" name="password" type="password" autoComplete="new-password" required />
+        <PasswordInput id="password" name="password" autoComplete="new-password" required />
       </Field>
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
       <OriginFields origin={origin} />
