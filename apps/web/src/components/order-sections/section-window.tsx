@@ -21,8 +21,21 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
  */
 export type WindowButton = { label: string; kind?: "edit" | "main" | "plain" | "danger" | "link"; what?: string };
 
-/** The address a window was last opened from by a link (so one link opens one window, once). */
-let claimed = "";
+/** The asks already taken this moment: a link's address, or "start" for a window that opens as it is drawn. */
+const claimed = new Set<string>();
+
+/**
+ * True for the first window on the page to ask for `key` in this moment, false for the others. A list draws its
+ * rows twice (the phone's rows and the laptop's table, one of them hidden) and each copy holds the same window;
+ * only one may open (review 24 Nov: two Pay windows on top of each other, their focus traps fighting).
+ */
+export function firstToAsk(key: string): boolean {
+  if (claimed.has(key)) return false;
+  claimed.add(key);
+  // Every window on the page has looked by now; the same ask can open one again later.
+  setTimeout(() => claimed.delete(key), 0);
+  return true;
+}
 
 /**
  * A window a link can open (the order's next step in the header: …/payment?do=record-payment): the first window
@@ -35,17 +48,12 @@ export function useOpenFromLink(name: string | undefined, open: () => void) {
   const pathname = usePathname();
   const want = params.get("do");
   useEffect(() => {
-    if (!name || want !== name || claimed === window.location.href) return;
-    claimed = window.location.href;
+    if (!name || want !== name || !firstToAsk(window.location.href)) return;
     open();
     const p = new URLSearchParams(params.toString());
     p.delete("do");
     const rest = p.toString();
     router.replace(rest ? `${pathname}?${rest}` : pathname, { scroll: false });
-    // Every window on the page has looked by now; the same link can open it again later.
-    setTimeout(() => {
-      claimed = "";
-    }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the ask arrives
   }, [name, want]);
 }

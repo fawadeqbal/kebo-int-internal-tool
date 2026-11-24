@@ -241,16 +241,25 @@ export function AssignSelect({ action, people, current }: { action: Action; peop
   return (
     // Saved as soon as it is chosen: the note says who handles it now.
     <ActionForm action={action} showSuccess={false} onDone={(s) => s.message && toast({ message: s.message })}>
-      <Field label="Responsible person" htmlFor="handles-it">
-        <Select id="handles-it" name="assigneeId" defaultValue={current ?? ""} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
-          <option value="">Nobody yet</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      {/* While it asks why, the form is drawn again: from the person chosen, not the one saved (review 24 Nov:
+          the choice jumped back and the save after the reason kept the old person). */}
+      {(s) => (
+        <Field label="Responsible person" htmlFor="handles-it">
+          <Select
+            id="handles-it"
+            name="assigneeId"
+            defaultValue={s.values?.assigneeId ?? current ?? ""}
+            onChange={(e) => e.currentTarget.form?.requestSubmit()}
+          >
+            <option value="">Nobody yet</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
     </ActionForm>
   );
 }

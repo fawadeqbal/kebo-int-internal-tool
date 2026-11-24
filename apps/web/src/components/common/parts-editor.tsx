@@ -45,6 +45,8 @@ export interface EditorPart {
   locked: boolean;
   /** A word under the installment: paid, sent. */
   note: { text: string; warn?: boolean } | null;
+  /** Its name comes from elsewhere (the deposit and balance: from how they pay): shown, not typed; why, in words. */
+  named?: string;
 }
 
 /** A usual split to start from ("30% on confirmation · 70% before shipment"). */
@@ -338,6 +340,9 @@ export function PartsEditor({
                         value={p.label}
                         maxLength={80}
                         disabled={p.locked}
+                        readOnly={!!p.named}
+                        title={p.named}
+                        className={p.named ? "bg-surface-2 text-text-2" : undefined}
                         aria-invalid={bad?.field === "label" || undefined}
                         onChange={(e) => set(p.key, { label: e.target.value })}
                       />

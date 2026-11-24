@@ -574,7 +574,7 @@ export class InquiriesService {
       await this.assertAssignable(user, assigneeId);
       if (i.assigneeId === assigneeId) return [];
       // Taking work over from someone needs a reason; first assignment does not.
-      const reason = i.assigneeId ? requireReason(reasonInput, "reassign", "the inquiry moves to another person") : (reasonInput ?? null);
+      const reason = i.assigneeId ? requireReason(reasonInput, "reassign", "the work moves to another person") : (reasonInput ?? null);
       await tx.inquiry.update({ where: { id }, data: { assigneeId } });
       await tx.inquiryAssignment.create({ data: { inquiryId: id, assigneeId, assignedById: user.id } });
       await this.audit.record(tx, {
