@@ -142,7 +142,14 @@ export async function VaultOverview({ today }: { today: string }) {
                       </Td>
                       <Td className="text-text-2">{MONEY_ACCOUNT_KIND_LABEL[a.kind]}</Td>
                       <Td className={cn("text-right whitespace-nowrap tabular", Number(a.balance) < 0 && "font-semibold text-bad")}>{money(a.balance, a.currency)}</Td>
-                      <Td className="text-right whitespace-nowrap tabular">{eq === null ? <span className="text-muted">no rate</span> : eq.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
+                      <Td className="text-right whitespace-nowrap tabular">{eq === null ? (
+                          // Payments keep the rate they were made at; a balance today needs today's rate (review 24 Nov).
+                          <Link href="/settings/sales" className={cn(linkClass, "text-md")}>
+                            no rate · set it
+                          </Link>
+                        ) : (
+                          eq.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        )}</Td>
                       <Td className="text-right">
                         <Link href={`/finance/cash-book?acct=${a.id}`} className={cn(linkClass, "text-md whitespace-nowrap")}>
                           Statement

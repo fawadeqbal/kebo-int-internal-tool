@@ -133,7 +133,9 @@ export function StatRow({ children, className, facts }: { children: ReactNode; c
       .filter(isValidElement)
       .map((el) => {
         const p = el.props as { label: ReactNode; value: ReactNode; sub?: ReactNode; also?: ReactNode; tone?: Fact["tone"]; href?: string };
-        return { label: p.label, value: p.value, sub: p.sub ?? p.also, tone: p.tone === "ok" ? undefined : p.tone, href: p.href };
+        // The other currencies ("and USD 1,093,317") stay with the count under them: a sub never hides them (review
+        // 24 Nov: "In this month PKR 9,018,000" and the USD received nowhere).
+        return { label: p.label, value: p.value, sub: p.also && p.sub ? <>{p.also} · {p.sub}</> : (p.sub ?? p.also), tone: p.tone === "ok" ? undefined : p.tone, href: p.href };
       });
     return <FactsLine facts={list} className={className} />;
   }

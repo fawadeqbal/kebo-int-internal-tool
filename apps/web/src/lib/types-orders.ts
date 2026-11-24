@@ -111,6 +111,9 @@ export interface OrderView {
   };
   currency: string;
   total: string;
+  /** The lines before the discount, and the discount ("0.00": none). */
+  subtotal: string;
+  discount: string;
   depositPercent: number;
   balanceTerms: BalanceTerms;
   incoterm: Incoterm;

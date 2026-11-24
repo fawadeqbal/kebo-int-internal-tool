@@ -64,6 +64,7 @@ const CUSTOMER_CHIPS = [
 type CustomerChip = (typeof CUSTOMER_CHIPS)[number]["key"];
 
 export async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
+  const main = (await getSettings()).sales.currency;
   const r = await api.get<Receivables>("/money/receivables");
   const week = addDays(today, 7);
   const soon = (o: Order) => o.daysLate === 0 && !!o.next?.dueOn && o.next.dueOn >= today && o.next.dueOn <= week;
@@ -98,10 +99,10 @@ export async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; toda
   return (
     <>
       <StatRow facts>
-        <StatTile label="Customers owe us" {...moneyTile(owed)} sub={`${r.rows.length} order${r.rows.length === 1 ? "" : "s"}`} />
+        <StatTile label="Customers owe us" {...moneyTile(owed, main)} sub={`${r.rows.length} order${r.rows.length === 1 ? "" : "s"}`} />
         <StatTile
           label="Late"
-          {...moneyTile(late)}
+          {...moneyTile(late, main)}
           sub={
             lateRows.length
               ? `${lateRows.length} order${lateRows.length === 1 ? "" : "s"} · oldest ${days(Math.max(...lateRows.map((o) => o.daysLate)))}`
@@ -112,12 +113,12 @@ export async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; toda
         />
         <StatTile
           label="Due in the next 7 days"
-          {...moneyTile(dueSoon)}
+          {...moneyTile(dueSoon, main)}
           sub={`${soonRows.length} order${soonRows.length === 1 ? "" : "s"}`}
           tone={soonRows.length ? "warn" : undefined}
           href={soonRows.length ? href({ show: "week", page: undefined, open: undefined }) : undefined}
         />
-        {held.size > 0 && <StatTile label="Held for customers" {...moneyTile(held)} sub="their credit, to use or pay back" />}
+        {held.size > 0 && <StatTile label="Held for customers" {...moneyTile(held, main)} sub="their credit, to use or pay back" />}
       </StatRow>
       <LinkTabs
         label="Which orders"
@@ -373,6 +374,7 @@ const OWE_CHIPS = [
 type OweChip = (typeof OWE_CHIPS)[number]["key"];
 
 export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: string }) {
+  const main = (await getSettings()).sales.currency;
   const seesBills = can(me, "expenses.manage") && (await hasFeature("expenses"));
   const [parts, bills] = await Promise.all([
     api.get<ToPayList>("/billing/to-pay"),
@@ -498,17 +500,17 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
   return (
     <>
       <StatRow facts>
-        <StatTile label="We owe" {...moneyTile(owe)} sub={`${all.length} to pay`} />
+        <StatTile label="We owe" {...moneyTile(owe, main)} sub={`${all.length} to pay`} />
         <StatTile
           label="Late"
-          {...moneyTile(late)}
+          {...moneyTile(late, main)}
           sub={lateCount ? `${lateCount} to pay` : "nothing late"}
           tone={lateCount ? "bad" : undefined}
           href={lateCount ? href({ show: "late", page: undefined }) : undefined}
         />
         <StatTile
           label="Due in the next 7 days"
-          {...moneyTile(dueSoon)}
+          {...moneyTile(dueSoon, main)}
           sub={`${soonCount} to pay`}
           tone={soonCount ? "warn" : undefined}
           href={soonCount ? href({ show: "week", page: undefined }) : undefined}

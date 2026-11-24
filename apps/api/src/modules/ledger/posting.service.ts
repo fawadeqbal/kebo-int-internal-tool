@@ -327,12 +327,13 @@ export class LedgerPosting {
           toAccount: { select: { id: true, currency: true } },
         },
       });
-      // FP-2026-0031-n: the n-th payment to the suppliers on the order, in the order they were recorded (never renumbered).
+      // FP-2026-0031-n: the n-th payment on that purchase order, in the order they were recorded (never renumbered).
+      // Counted per purchase order: its allocations carry no order, so counting per order mixed the POs together.
       const purchaseIds = rows.flatMap((m) => (m.partyRole === "supplier" ? m.allocations.map((a) => a.id) : []));
       const ranks = purchaseIds.length
         ? await tx.$queryRaw<{ id: string; n: number }[]>`
             select id, n::int from (
-              select id, row_number() over (partition by order_id order by created_at, id) as n
+              select id, row_number() over (partition by purchase_order_id order by created_at, id) as n
                 from allocations where target = 'purchase'
                  and purchase_order_id in (select purchase_order_id from allocations where id = any(${purchaseIds}::uuid[]))) x
              where id = any(${purchaseIds}::uuid[])`

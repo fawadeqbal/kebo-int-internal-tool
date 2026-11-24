@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, Lock, Pencil } from "lucide-react";
-import { toMinor } from "@kebo/money";
-import { isWarrantyFrom, LINE_TYPE_LABEL, partsWords, partWhen, percentText, termsChecks, warrantyLine, type TermsCheck, type WarrantyFrom } from "@kebo/shared";
+import { fromMinor, toMinor } from "@kebo/money";
+import { isWarrantyFrom, LINE_TYPE_LABEL, partAmounts, partsWords, partWhen, percentText, termsChecks, warrantyLine, type TermsCheck, type WarrantyFrom } from "@kebo/shared";
 import { Badge, cn, Dash } from "@kebo/ui";
 import { money, qty } from "@/lib/format";
 import type { OptionView, RevisionView } from "@/lib/types-deals";
@@ -210,12 +210,16 @@ export function quotePrices(o: OptionView, currency: string, phone: { edit?: boo
 /** A quotation's payment, a part a line: "30% with the order", its amount under it. */
 export function PaymentParts({ r, total }: { r: RevisionView; total: number }) {
   if (!r.paymentParts.length) return null;
+  const amounts = partAmounts(
+    r.paymentParts.map((p) => p.percent),
+    toMinor(total),
+  );
   return (
     <span className="flex flex-col gap-1">
       {r.paymentParts.map((p, i) => (
         <span key={i} className="tabular">
           {percentText(p.percent)}% {partWhen(p, "customer")}
-          {total > 0 && <span className="block text-xs font-normal text-text-2">{money((total * p.percent) / 100, r.currency)}</span>}
+          {total > 0 && <span className="block text-xs font-normal text-text-2">{money(fromMinor(amounts[i]!), r.currency)}</span>}
         </span>
       ))}
     </span>

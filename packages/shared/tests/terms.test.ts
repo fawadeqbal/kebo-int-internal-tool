@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   balanceTermsOfParts,
+  partAmounts,
   depositOfParts,
   leadCheck,
   leadWords,
@@ -250,5 +251,15 @@ describe("the supplier's plan on an order, from its offer's parts", () => {
     ].map((r, i, all) => (i === all.length - 1 ? { ...r, amountMinor: 18_600_001 - 5_580_000 - 11_160_001 } : r)));
     // Parts that do not add up are not a plan.
     expect(offerPlan([part("Advance 30%", 30, "on_order"), part("Later", 60, "after_shipping", 30)], 1000)).toBeNull();
+  });
+});
+
+describe("each part's amount adds up to the total", () => {
+  it("the last part takes what is left, so the plan never ends a cent over or under", () => {
+    // The review's quotation: 30% / 70% of 71,064.65 rounded each way made 71,064.66.
+    expect(partAmounts([30, 70], 7_106_465)).toEqual([2_131_940, 4_974_525]);
+    expect(partAmounts([30, 40, 30], 100_001).reduce((t, a) => t + a, 0)).toBe(100_001);
+    // Parts that are not the whole are each rounded on their own.
+    expect(partAmounts([30], 7_106_465)).toEqual([2_131_940]);
   });
 });

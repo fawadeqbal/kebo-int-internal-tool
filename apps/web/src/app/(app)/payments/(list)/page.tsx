@@ -15,6 +15,7 @@ import { periodOf } from "@/components/common/period";
 import { DUE, paymentsTabTarget } from "@/lib/old-addresses";
 import { opensPayments, paymentHref } from "../shared";
 import { moneyTile } from "@/lib/money-tile";
+import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Payments" };
 
@@ -57,6 +58,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const q = sp.q?.trim() || undefined;
   const method = sp.method?.trim() || undefined;
   const page = toPage(sp.page);
+  const main = (await getSettings()).sales.currency;
   const list = await api.get<PaymentList>("/treasury/payments", {
     from: allDates ? undefined : pr.from,
     to: allDates ? undefined : pr.to,
@@ -137,9 +139,9 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         </Notice>
       )}
       <StatRow facts>
-        <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} {...moneyTile(t.in)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />
-        <StatTile icon={ArrowUpFromLine} iconColor={2} label={`Out${when}`} {...moneyTile(t.out)} sub={`${t.outCount} payment${t.outCount === 1 ? "" : "s"} out`} />
-        <StatTile icon={Banknote} iconColor={4} label="Expenses" {...moneyTile(t.expenses)} sub={`${list.counts.expense} entr${list.counts.expense === 1 ? "y" : "ies"}`} />
+        <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} {...moneyTile(t.in, main)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />
+        <StatTile icon={ArrowUpFromLine} iconColor={2} label={`Out${when}`} {...moneyTile(t.out, main)} sub={`${t.outCount} payment${t.outCount === 1 ? "" : "s"} out`} />
+        <StatTile icon={Banknote} iconColor={4} label="Expenses" {...moneyTile(t.expenses, main)} sub={`${list.counts.expense} entr${list.counts.expense === 1 ? "y" : "ies"}`} />
       </StatRow>
       <LinkTabs
         label="Which payments"

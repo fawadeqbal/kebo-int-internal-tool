@@ -20,7 +20,7 @@ import {
   type PaymentPaper,
   type PaperDoc,
 } from "@kebo/shared";
-import { convert, fromMinor, fxRate, orderRate } from "@kebo/money";
+import { convert, formatMinor, fromMinor, fxRate, orderRate } from "@kebo/money";
 import { ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -147,6 +147,24 @@ export class TreasuryService {
       throw new ForbiddenError("You do not see payments.");
     const rows = await this.rows(user, s, q);
     const term = q.q?.trim().toLowerCase();
+    // A payment's own number (RC-, FP-, EX-…) is given by the ledger and filled in only for the page shown: a
+    // search looks the number up there first (review 24 Nov: "Search number…" did not find RC-2026-0012-1).
+    if (term && /^[a-z]{2,3}-\d/.test(term)) {
+      const posted = await this.prisma.db.ledgerEntry.findMany({
+        where: { ref: { contains: term, mode: "insensitive" }, part: "" },
+        select: { sourceType: true, sourceId: true, ref: true },
+        distinct: ["sourceType", "sourceId"],
+        take: 200,
+      });
+      if (posted.length) {
+        const byKey = new Map(posted.map((p) => [`${p.sourceType}:${p.sourceId}`, p.ref]));
+        const sourceId = await this.sourceIds(rows.filter((r) => r.kind === "supplier"));
+        for (const r of rows) {
+          const ref = LEDGER_SOURCE[r.kind] ? byKey.get(`${LEDGER_SOURCE[r.kind]}:${sourceId(r)}`) : undefined;
+          if (ref && !r.number) r.number = ref;
+        }
+      }
+    }
     const found = term
       ? rows.filter((r) =>
           [r.what, r.number, r.reference, r.party?.label, r.account, ...r.for.map((f) => f.label)].some((v) =>
@@ -166,7 +184,9 @@ export class TreasuryService {
       expense: kept.filter((r) => r.kind === "expense").length,
       void: narrowed.filter((r) => r.status === "void").length,
     };
-    const live = found.filter((r) => r.status === "recorded" && !r.fromCredit);
+    // The figures follow the account and method chosen, as the tab counts do (review 24 Nov: In and Out stayed
+    // company-wide under an account filter while Expenses followed it).
+    const live = narrowed.filter((r) => r.status === "recorded" && !r.fromCredit);
     const moneyIn = live.filter((r) => r.direction === "in");
     const moneyOut = live.filter((r) => r.direction === "out" && r.kind !== "expense");
     const totals = {
@@ -174,7 +194,7 @@ export class TreasuryService {
       inCount: moneyIn.length,
       out: sums(moneyOut),
       outCount: moneyOut.length,
-      toVerify: sums(found.filter((r) => r.status === "to_verify")),
+      toVerify: sums(narrowed.filter((r) => r.status === "to_verify")),
       expenses: sums(live.filter((r) => r.kind === "expense")),
     };
     const accounts = [...new Map(rows.filter((r) => r.accountId && r.account).map((r) => [r.accountId!, { id: r.accountId!, name: r.account! }])).values()].sort((a, b) =>
@@ -626,8 +646,8 @@ export class TreasuryService {
         return {
           fields: [
             ...(m.currency !== m.allocCurrency ? [{ label: "Rate", value: `${Number(m.rate)} ${m.currency} per ${m.allocCurrency}` }] : []),
-            ...(charges ? [{ label: "Bank charges", value: `${m.allocCurrency} ${(charges / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}` }] : []),
-            ...(leftMinor > 0 ? [{ label: "Kept as the customer's credit", value: `${m.allocCurrency} ${(leftMinor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`, href: `/customers/${m.partyId}` }] : []),
+            ...(charges ? [{ label: "Bank charges", value: formatMinor(charges, m.allocCurrency) }] : []),
+            ...(leftMinor > 0 ? [{ label: "Kept as the customer's credit", value: formatMinor(leftMinor, m.allocCurrency), href: `/customers/${m.partyId}` }] : []),
             ...m.allocations
               .filter((a) => a.voidedAt && !m.voidedAt)
               .map((a) => ({ label: `Released from ${a.order!.refNo}`, value: a.voidReason ?? "order cancelled" })),
@@ -642,11 +662,15 @@ export class TreasuryService {
           orderId: one?.orderId ?? null,
           partId: one?.id ?? null,
           voidPath: !m.voidedAt && can(user, "orders.manage") ? (one ? `/payments/${one.id}/void` : `/customer-receipts/${m.id}/void`) : null,
+          // What came off each order: the part and the bank's charges on it, as the order counts it (review 24 Nov:
+          // Applied to said 1,234.56 while 1,250.06 came off).
           parts: m.allocations.map((a) => ({
             order: a.order!.refNo,
             href: `/orders/${a.order!.id}`,
-            part: PAYMENT_KIND_LABEL[a.kind as PaymentKind],
-            amount: money(a.amount),
+            part: decimalToMinor(a.bankCharges)
+              ? `${PAYMENT_KIND_LABEL[a.kind as PaymentKind]} · with ${formatMinor(decimalToMinor(a.bankCharges), m.allocCurrency)} bank charges`
+              : PAYMENT_KIND_LABEL[a.kind as PaymentKind],
+            amount: fromMinor(decimalToMinor(a.amount) + decimalToMinor(a.bankCharges)),
             currency: m.allocCurrency,
             released: !!a.voidedAt && !m.voidedAt,
           })),

@@ -163,6 +163,7 @@ export function ReceivedFields({
   const partMinor = part === null ? auto : toMinor(part);
   const leftMinor = a.countsMinor - partMinor;
   const tooMuch = partMinor + chargesMinor > dueMinor;
+  const offOrder = chargesMinor > 0 ? `${fmt(partMinor + chargesMinor, currency)} (${fmt(partMinor, currency)} received + ${fmt(chargesMinor, currency)} bank charges)` : fmt(partMinor, currency);
   // The slip goes with the save itself: the page re-draws once the payment is saved.
   const save = useSaveThenSend(action, file, (id) => (verify ? `/files/submissions/${id}` : `/files/payments/${id}`), verify ? "The payment is sent to verify" : "The payment is recorded", onFileError);
   const done = () => onClose();
@@ -268,9 +269,11 @@ export function ReceivedFields({
             )}
             {a.receivedMinor > 0 && (
               <p className="text-xs text-text-2">
+                {/* Off the order: what reached us and the bank's charges, as the save counts it (review 24 Nov: the
+                    window said 1,234.56 and 1,250.06 came off). */}
                 {a.same
-                  ? `Kept as ${fmt(a.receivedMinor, a.received)} in the account, ${fmt(partMinor, currency)} off the order.`
-                  : `Kept as both: ${fmt(a.receivedMinor, a.received)} in the account, ${fmt(partMinor, currency)} off the order. The rate is kept with the payment, so later rate changes never move it.`}
+                  ? `Kept as ${fmt(a.receivedMinor, a.received)} in the account, ${offOrder} off the order.`
+                  : `Kept as both: ${fmt(a.receivedMinor, a.received)} in the account, ${offOrder} off the order. The rate is kept with the payment, so later rate changes never move it.`}
               </p>
             )}
           </div>
@@ -396,15 +399,15 @@ function ReceiptFields({
   const [typed, setTyped] = useState<Record<string, string>>({});
   const [method, setMethod] = useState<PaymentMethod>("bank_transfer");
   const mine = orders.filter((o) => o.currency === currency && Number(o.due) > 0);
-  const auto = useMemo(
-    () =>
-      allocateOldestFirst(
-        // Each order's next part (the deposit, the balance…): more can be typed on a line, up to what it owes.
-        mine.map((o) => ({ id: o.id, dueOn: o.next?.dueOn ?? null, orderedOn: o.orderedOn, openMinor: toMinor(o.next?.open ?? o.due) })),
-        a.countsMinor,
-      ),
-    [mine, a.countsMinor],
-  );
+  const auto = useMemo(() => {
+    // First each order's next part (the deposit, the balance…), oldest due first; then what is left pays
+    // the rest each order owes, in the same order. Only money beyond everything owed is kept as credit.
+    const lines = (open: (o: (typeof mine)[number]) => number) => mine.map((o) => ({ id: o.id, dueOn: o.next?.dueOn ?? null, orderedOn: o.orderedOn, openMinor: open(o) }));
+    const first = allocateOldestFirst(lines((o) => toMinor(o.next?.open ?? o.due)), a.countsMinor);
+    const took = (id: string) => first.takes.find((t) => t.id === id)?.takesMinor ?? 0;
+    const rest = allocateOldestFirst(lines((o) => toMinor(o.due) - took(o.id)), first.leftMinor);
+    return { takes: first.takes.map((t) => ({ id: t.id, takesMinor: t.takesMinor + (rest.takes.find((r) => r.id === t.id)?.takesMinor ?? 0) })), leftMinor: rest.leftMinor };
+  }, [mine, a.countsMinor]);
   const order = auto.takes.map((t) => mine.find((o) => o.id === t.id)!);
   const takes = (id: string) => (typed[id] !== undefined ? toMinor(typed[id]) : (auto.takes.find((t) => t.id === id)?.takesMinor ?? 0));
   const used = order.reduce((t, o) => t + takes(o.id), 0);
@@ -514,7 +517,7 @@ function ReceiptFields({
                       <td colSpan={3} className="py-2 pr-2 text-right font-semibold">
                         Customer credit
                       </td>
-                      <td className={cn("py-2 text-right font-semibold tabular", leftMinor < 0 && "text-bad")}>{fromMinor(leftMinor)}</td>
+                      <td className={cn("py-2 text-right font-semibold tabular", leftMinor < 0 && "text-bad")}>{grouped(fromMinor(leftMinor))}</td>
                     </tr>
                   </tbody>
                 </table>

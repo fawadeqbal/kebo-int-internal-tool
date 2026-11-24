@@ -325,7 +325,20 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
             columns={items.columns}
             numbers={items.numbers}
             phone={items.phone}
-            totals={<Totals rows={[{ label: "Total", value: money(o.total, o.currency), big: true }]} />}
+            totals={
+              <Totals
+                rows={[
+                  // A discount on the quotation: the lines add up to more than the total, so both are shown (as on the proforma).
+                  ...(Number(o.discount) > 0
+                    ? [
+                        { label: "Subtotal", value: money(o.subtotal, o.currency) },
+                        { label: "Discount", value: money(-Number(o.discount), o.currency) },
+                      ]
+                    : []),
+                  { label: "Total", value: money(o.total, o.currency), big: true },
+                ]}
+              />
+            }
             empty="No items."
           />
         }
