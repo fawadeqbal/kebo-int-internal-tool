@@ -85,7 +85,7 @@ test("Edit plan, a supplier's: a paid part stays, the bar adds up, Save checks i
   const second = form.getByRole("group", { name: "Installment 2" });
   expect(await accessibilityProblems(page), "the editor meets WCAG 2.2 AA").toEqual([]);
   // The advance is paid: it stays as it was paid.
-  await expect(first.getByRole("textbox", { name: "Installment" })).toBeDisabled();
+  await expect(first.getByRole("textbox", { name: "Description" })).toBeDisabled();
   await expect(first).toContainText("it stays as it was paid");
   // Not adding up: the bar says so, and Save says it again instead of sending.
   await second.getByRole("textbox", { name: "Amount" }).fill("100");
@@ -93,7 +93,7 @@ test("Edit plan, a supplier's: a paid part stays, the bar adds up, Save checks i
   await form.getByRole("button", { name: "Save plan" }).click();
   await expect(form.getByRole("alert")).toContainText("The installments must add up to");
   // One tap back to a usual plan; then the balance some days after shipping, with their invoice.
-  await form.getByRole("button", { name: "30% on order placement · 70% on goods ready" }).click();
+  await form.getByRole("combobox", { name: "Apply template" }).selectOption("30% on order placement · 70% on goods ready");
   await expect(form.getByRole("status")).toContainText("Fully allocated · 100%");
   await second.getByRole("combobox", { name: "Due" }).selectOption("on_ship_plus_days");
   await second.getByRole("spinbutton", { name: "Days after" }).fill("45");
@@ -114,7 +114,7 @@ test("Edit plan, the customer's: the same editor, a part's days changed and save
   );
   await page.getByRole("region", { name: "Payment plan" }).getByRole("button", { name: "Edit plan", exact: true }).click();
   const form = page.getByRole("dialog", { name: "Customer payment plan" });
-  await expect(form.getByRole("group", { name: "Start from a template" })).toBeVisible();
+  await expect(form.getByRole("combobox", { name: "Apply template" })).toBeVisible();
   await expect(form.getByRole("status")).toContainText("Fully allocated · 100%");
   // On a phone: each part a card, the sum kept above Save.
   await page.setViewportSize({ width: 390, height: 844 });

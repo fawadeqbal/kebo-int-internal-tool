@@ -52,7 +52,7 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await expect(offer.getByRole("grid")).toContainText("DPP-260");
   await offer.getByRole("button", { name: /^Next/ }).click();
   await offer.getByLabel("Lead time").fill("30");
-  await offer.getByRole("button", { name: "50 / 50" }).click();
+  await offer.getByRole("combobox", { name: "Apply template" }).selectOption("50 / 50");
   await expect(offer.getByText(/Fully allocated · 100%/)).toBeVisible();
   await offer.getByRole("button", { name: /^Next/ }).click();
   await offer.getByLabel("Months").fill("12");
@@ -104,7 +104,7 @@ test("the offer and the quotation in four groups; the quotation checked against 
   // What was saved in the part is there.
   await expect(form.getByLabel("Option A lead time", { exact: true })).toHaveValue("45");
   await steps.getByRole("button", { name: /Payment/ }).click();
-  await form.getByRole("button", { name: "30 · 60 · 10 after the site test" }).click();
+  await form.getByRole("combobox", { name: "Apply template" }).selectOption("30 · 60 · 10 after the site test");
   await steps.getByRole("button", { name: /Warranty & conditions/ }).click();
   await form.getByLabel("Counted from").selectOption("sat");
   await expect(form.getByText(/the last 2 months of ours are not covered by the supplier/)).toBeVisible();

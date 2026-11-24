@@ -10,6 +10,8 @@ export const RULES = {
     part: "md:w-[640px]",
     /** A part with wide rows, like a payment plan, and any window that sets no width (rule 4). */
     wideRows: "md:w-[720px]",
+    /** Lines to edit as a table, like a payment plan's installments (rule 4). */
+    table: "md:w-[960px]",
     /** Items, prices, and every part at once (Edit all, a new record's steps) (rules 4 and 7). */
     items: "md:w-[1180px]",
     /** The one inset of a window: its head, its body, its buttons (20px; 24px from 640). */

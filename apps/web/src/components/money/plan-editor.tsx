@@ -144,7 +144,7 @@ function PlanEditWindow({
         <EditButton label={label} onClick={() => setOpen(true)} />
       )}
       {open && (
-        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={RULES.window.wideRows}>
+        <SidePanel title={title} description={sub} onClose={() => setOpen(false)} className={RULES.window.table}>
           <PlanEditor {...editor} onDone={() => setOpen(false)} />
         </SidePanel>
       )}
