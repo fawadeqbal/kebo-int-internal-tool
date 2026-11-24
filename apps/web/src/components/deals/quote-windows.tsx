@@ -64,7 +64,7 @@ export function NewRevisionWindow({
       name="new-revision"
       title={`New quotation R${draft.number}`}
       description={`Starts as a copy of R${draft.number - 1}. Change what is different, then save the draft.`}
-      className={RULES.window.wideRows}
+      className={RULES.window.table}
     >
       <TermsPanel
         number={draft.number}

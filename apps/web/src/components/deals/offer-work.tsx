@@ -100,8 +100,8 @@ export function OfferPanel({ kit, q, step, only = false, onClose }: { kit: Offer
       title={one && part ? `Edit ${OFFER_PART_LABEL[part].toLowerCase()}` : "Edit offer"}
       description={[q.factory.name, kit.refNo].filter(Boolean).join(" · ")}
       onClose={onClose}
-      // The payment's parts need a little more room than 640.
-      className={!one || part === "prices" ? RULES.window.items : part === "terms" ? RULES.window.wideRows : RULES.window.part}
+      // The payment's installments are a table (as on the order's plan): its window is as wide as the plan's.
+      className={!one || part === "prices" ? RULES.window.items : part === "terms" ? RULES.window.table : RULES.window.part}
     >
       <OfferWindow {...kit} q={q} startStep={step} only={one} />
     </SidePanel>

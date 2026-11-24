@@ -3,7 +3,7 @@
 import { Picker } from "@/components/common/picker";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { CircleCheck, Factory, History, ShieldCheck, Tag, Truck } from "lucide-react";
-import { fxRate } from "@kebo/money";
+import { fxRate, toMinor } from "@kebo/money";
 import {
   basisText,
   INCOTERMS,
@@ -764,6 +764,8 @@ export function OfferHeaderForm({
                       onChange={(rows) => set("parts", rows)}
                       presets={OFFER_PRESETS}
                       amounts={totalText}
+                      totalMinor={quote && Number(quote.factoryTotal) > 0 ? toMinor(quote.factoryTotal) : null}
+                      currency={quote?.currency}
                       error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts}
                     />
                     {changedNote("parts")}

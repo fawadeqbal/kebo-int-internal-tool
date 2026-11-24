@@ -19,7 +19,7 @@ import {
 } from "@kebo/shared";
 import { fromMinor } from "@kebo/money";
 import { cn, Field, Input, Select } from "@kebo/ui";
-import { PERCENT_TOTAL, PartsEditor, PartsSummary, type EditorPart, type PartRule } from "@/components/common/parts-editor";
+import { PERCENT_TOTAL, PartsEditor, PartsSummary, sumOf, type EditorPart, type PartRule } from "@/components/common/parts-editor";
 
 /**
  * The terms' fields that the factory offer's form and the quotation's share (design "RFQ Desk — terms that
@@ -43,6 +43,8 @@ export interface PartRow {
   rule: string;
   /** Its days, for the rules that take them. */
   days: string;
+  /** Its amount as typed, where the total is known (kept so typing is not rounded under the cursor; the share is what is saved). */
+  amount?: string;
 }
 
 /** A usual payment to start from ("30% now · 70% before shipment"). */
@@ -106,6 +108,8 @@ export function PartsField({
   onChange,
   presets,
   amounts,
+  totalMinor,
+  currency,
   error,
 }: {
   /** The whole block's id (a save that is stopped scrolls to it). */
@@ -117,8 +121,13 @@ export function PartsField({
   presets: PartsPreset[];
   /** What 100% is, after the sum ("CNY 186,000.00", "A USD 30,125.00 · B USD 32,070.00"). */
   amounts?: string | null;
+  /** The total, in minor units, when there is one: then each installment takes an amount too, as on the order. */
+  totalMinor?: number | null;
+  currency?: string;
   error?: string[] | string;
 }) {
+  const money = Boolean(currency && totalMinor && totalMinor > 0);
+  const total = money ? totalMinor! : PERCENT_TOTAL;
   const rules: PartRule[] = PART_RULES[side].map((v) => {
     const days = PART_RULE_DAYS[side][v];
     return {
@@ -134,7 +143,7 @@ export function PartsField({
       id: null,
       label: r.label,
       share: r.share,
-      amount: Number.isFinite(v) ? fromMinor(Math.round(v * 100)) : "",
+      amount: money && r.amount !== undefined ? r.amount : Number.isFinite(v) ? fromMinor(Math.round((total * v) / 100)) : "",
       rule: r.rule,
       dueOn: "",
       dueDays: r.days,
@@ -146,7 +155,20 @@ export function PartsField({
   });
   const change = (next: EditorPart[] | ((old: EditorPart[]) => EditorPart[])) => {
     const made = typeof next === "function" ? next(parts) : next;
-    onChange(made.map((p) => ({ key: p.key, label: p.label, share: p.share, rule: p.rule, days: p.dueDays })));
+    const out: PartRow[] = made.map((p) => ({
+      key: p.key,
+      label: p.label,
+      share: p.share,
+      rule: p.rule,
+      days: p.dueDays,
+      ...(money ? { amount: p.amount } : {}),
+    }));
+    // Amounts that add up to the total save as shares that add up to 100%: the last takes the rounding.
+    if (money && out.length > 1 && sumOf(made) === total) {
+      const others = out.slice(0, -1).reduce((t, r) => t + (Number.isFinite(num(r.share)) ? num(r.share) : 0), 0);
+      out[out.length - 1] = { ...out[out.length - 1]!, share: percentText(Math.round((100 - others) * 100) / 100) };
+    }
+    onChange(out);
   };
   const message = Array.isArray(error) ? error[0] : error;
   return (
@@ -154,7 +176,8 @@ export function PartsField({
       <PartsEditor
         parts={parts}
         onChange={change}
-        totalMinor={PERCENT_TOTAL}
+        totalMinor={total}
+        currency={money ? currency : undefined}
         rules={rules}
         presets={presets.map((p) => ({
           label: p.label,
@@ -163,7 +186,13 @@ export function PartsField({
         idPrefix={idPrefix}
         max={8}
       />
-      <PartsSummary parts={parts} onChange={change} totalMinor={PERCENT_TOTAL} note={amounts} />
+      <PartsSummary
+        parts={parts}
+        onChange={change}
+        totalMinor={total}
+        currency={money ? currency : undefined}
+        note={money ? null : amounts}
+      />
       {message && <p className="text-xs text-bad">{message}</p>}
     </div>
   );
@@ -360,12 +389,7 @@ export function WarrantyFields({
         hint={coversHint}
         className="sm:col-span-2 md:col-span-1"
       >
-        <Input
-          id={`${idPrefix}-warranty`}
-          maxLength={300}
-          value={covers}
-          onChange={(e) => onCovers(e.target.value)}
-        />
+        <Input id={`${idPrefix}-warranty`} maxLength={300} value={covers} onChange={(e) => onCovers(e.target.value)} />
       </Field>
     </>
   );
