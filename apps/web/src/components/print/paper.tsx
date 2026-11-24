@@ -81,7 +81,7 @@ export function PaperSheet({ doc, brand, watermark }: { doc: PaperDoc; brand: Do
     <KeboDoc
       brand={brand}
       company={doc.company}
-      customer={doc.party}
+      customer={{ ...doc.party, label: doc.party.label ?? (doc.kind === "payment-receipt" ? "Received from" : null) }}
       title={doc.title}
       numberLabel={doc.numberLabel}
       number={doc.number}

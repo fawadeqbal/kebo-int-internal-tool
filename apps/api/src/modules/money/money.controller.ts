@@ -211,6 +211,13 @@ export class MoneyController {
 
   @RequireFeature("expenses")
   @SignedIn("checked inside: expenses.manage")
+  @Get("expenses/:id")
+  expense(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.money.oneExpense(user, id);
+  }
+
+  @RequireFeature("expenses")
+  @SignedIn("checked inside: expenses.manage")
   @Post("expenses")
   @Once()
   createExpense(@CurrentUser() user: SessionUser, @Body(Validate(expenseInput)) body: ExpenseInput) {

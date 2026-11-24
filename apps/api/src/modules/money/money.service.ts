@@ -460,6 +460,14 @@ export class MoneyService {
    * filter and the one by customer the customer filter, so each still shows the
    * whole picture for the rest.
    */
+  /** One expense as its lists show it (the payment page changes it with the same window). */
+  async oneExpense(user: SessionUser, id: string) {
+    this.assertExpenses(user);
+    const e = await this.prisma.db.expense.findUnique({ where: { id }, include: expenseInclude });
+    if (!e) throw new NotFoundError("Expense");
+    return this.expenseView(e);
+  }
+
   async listExpenses(
     user: SessionUser,
     q: {

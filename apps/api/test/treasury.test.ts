@@ -193,16 +193,21 @@ describe("treasury: every payment in one list", () => {
       voidPath: `/payments/${v.partId}/void`,
     });
     expect(v.partId).toBeTruthy();
-    expect(v.fields).toEqual(
-      expect.arrayContaining([
-        { label: "Received", value: "USD 900.00" },
-        { label: "Paid on", value: today },
-      ]),
-    );
+    // The page draws the amount, date, method and what it paid the same for every kind; fields are this kind's own.
+    expect(v).toMatchObject({ amount: "900.00", currency: "USD", on: today, inMain: null });
+    expect(v.fields.map((f) => f.label)).not.toEqual(expect.arrayContaining(["Received", "Paid on", "Method"]));
+    expect(v.parts).toEqual([expect.objectContaining({ amount: "900.00", currency: "USD" })]);
     expect(v.ledgerHref).toMatch(/^\/finance\/ledger\?panel=entry&id=[0-9a-f-]{36}$/);
     expect(v.orderId).toBe(orderId);
     const e = (await api(app, manager).get(`/treasury/payments/expense/${expenseId}`).expect(200)).body as PaymentView;
     expect(e).toMatchObject({ status: "void", voided: { reason: "Typed twice" }, voidPath: null });
+    // An expense names who was paid, never the customer it was for, and says what order it is on.
+    expect(e.party?.href ?? "").not.toMatch(/^\/customers\//);
+    expect(e.parts?.[0]).toMatchObject({ currency: e.currency });
+    // A supplier payment and an expense print a voucher; a customer payment prints its receipt from the order.
+    const sv = (await api(app, manager).get(`/treasury/payments/supplier/${supplierPaymentId}/paper`).expect(200)).body as { doc: { title: string; total: { amount: string } } };
+    expect(sv.doc.title).toBe("PAYMENT VOUCHER");
+    await api(app, manager).get(`/treasury/payments/customer/${paymentId}/paper`).expect(404);
     await api(app, manager).get(`/treasury/payments/supplier/${paymentId}`).expect(404);
     await api(app, manager).get(`/treasury/payments/nothing/${paymentId}`).expect(400);
   });
