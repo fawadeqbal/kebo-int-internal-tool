@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/session";
 import { orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
 import { getPeople } from "@/lib/loaders";
 import { optional } from "@/components/print/data";
-import { date, whole } from "@/lib/format";
+import { date, money } from "@/lib/format";
 import type { FollowUpList, Note } from "@/lib/types-notes";
 import { dueText } from "@/components/notes/kinds";
 import { today } from "@/components/orders/today";
@@ -34,11 +34,12 @@ export async function OrderSide({ id }: { id: string }) {
   ]);
   const base = `/orders/${o.id}`;
   const paid = (m?.factories?.rows ?? []).filter((r) => Number(r.owed) > 0 || Number(r.paid) > 0);
-  const money = [
-    { label: "Order total", value: whole(o.money.total, o.currency) },
-    { label: "Received", value: whole(o.money.received, o.currency) },
-    { label: "They still owe", value: whole(o.money.due, o.currency) },
-    ...paid.map((r) => ({ label: paid.length > 1 ? `Paid to ${r.factory.name}` : "Paid to supplier", value: whole(r.paid, r.currency) })),
+  // Exact, as the order's own pages show them (whole units are for headline tiles only).
+  const figures = [
+    { label: "Order total", value: money(o.money.total, o.currency) },
+    { label: "Received", value: money(o.money.received, o.currency) },
+    { label: "Still due", value: money(o.money.due, o.currency) },
+    ...paid.map((r) => ({ label: paid.length > 1 ? `Paid to ${r.factory.name}` : "Paid to supplier", value: money(r.paid, r.currency) })),
   ];
   const dates = keyDates(o, flow, today());
   const nextUp = [...(followUps?.rows ?? [])].sort((a, b) => `${a.dueOn}${a.dueAt ?? ""}`.localeCompare(`${b.dueOn}${b.dueAt ?? ""}`))[0];
@@ -48,7 +49,7 @@ export async function OrderSide({ id }: { id: string }) {
   const bar = [
     o.inquiry.assignee?.name ?? "Nobody handles it",
     late ? `${late.label.toLowerCase()} ${late.value}` : null,
-    o.status === "open" && due > 0 ? `${whole(o.money.due, o.currency)} to come` : due <= 0 ? "paid in full" : null,
+    o.status === "open" && due > 0 ? `${money(o.money.due, o.currency)} to come` : due <= 0 ? "paid in full" : null,
   ];
   const form: ReactNode = o.status !== "cancelled" ? <QuickNote action={addNoteAction.bind(null, { key: "orderId", id: o.id })} /> : undefined;
   return (
@@ -61,7 +62,7 @@ export async function OrderSide({ id }: { id: string }) {
         followUp={nextUp ? { text: dueText(nextUp.dueOn, nextUp.dueAt), late: nextUp.late, href: `${base}/history#follow-ups` } : null}
       />
       <PanelFacts title="Dates" rows={dates} />
-      <PanelFacts title="Finance" rows={money} action={o.money ? <PanelLink href={`${base}/costs`}>Costs</PanelLink> : undefined} />
+      <PanelFacts title="Finance" rows={figures} action={o.money ? <PanelLink href={`${base}/costs`}>Costs</PanelLink> : undefined} />
       <PanelNotes notes={(notes ?? []).map((n) => ({ id: n.id, body: n.body, by: n.author.name, when: date(n.at) }))} allHref={`${base}/history`} form={form} max={3} />
     </PanelCard>
   );

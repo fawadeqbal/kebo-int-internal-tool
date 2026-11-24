@@ -94,7 +94,8 @@ export class SourcingService {
         const unitPriceMinor = decimalToMinor(l.unitPrice);
         const costInFactoryCurrency = factoryUnitCostMinor(unitPriceMinor, taxRate, q.taxIncluded);
         // What it costs us (Ours only): with its tax, less the export VAT refund in Settings.
-        const cost = rate ? convertMinor(quoteUnitCostMinor(unitPriceMinor, taxRate, q.taxIncluded, sales.exportVatRefundPercent), rate) : null;
+        const unitCostHere = quoteUnitCostMinor(unitPriceMinor, taxRate, q.taxIncluded, sales.exportVatRefundPercent);
+        const cost = rate ? convertMinor(unitCostHere, rate) : null;
         // The line's total at the factory's prices, and the tax on top of it (without tax), in the factory's currency.
         const totalMinor = multiplyMinor(unitPriceMinor, l.quantity.toString());
         const taxMinor = q.taxIncluded ? 0 : multiplyMinor(costInFactoryCurrency, l.quantity.toString()) - totalMinor;
@@ -117,7 +118,8 @@ export class SourcingService {
           costNote: taxSentence(unitPriceMinor, taxRate, q.currency, q.taxIncluded),
           /** One unit's landed cost in the selling currency. */
           unitCost: cost === null ? null : fromMinor(cost),
-          costMinor: cost === null || l.alternativeOfId ? (cost === null ? null : 0) : Math.round(cost * Number(l.quantity)),
+          /** The line's cost in the factory's currency (the offer's total is converted once, so it agrees with "≈" beside it). */
+          costMinor: l.alternativeOfId ? 0 : multiplyMinor(unitCostHere, l.quantity.toString()),
           /** The same product in other factories' offers (lines copied from each other share it). */
           productKey: l.productKey ?? l.id,
           /** A quotation is priced from it: changing its price, quantity or place asks why. */
@@ -176,7 +178,7 @@ export class SourcingService {
             : lines.reduce((t, l) => t + l.taxMinor, 0),
         ),
         /** What the whole offer costs us in the selling currency (null when a rate is missing). */
-        totalCost: rate === null ? null : fromMinor(lines.reduce((t, l) => t + (l.costMinor ?? 0), 0)),
+        totalCost: rate === null ? null : fromMinor(convertMinor(lines.reduce((t, l) => t + l.costMinor, 0), rate)),
         /** Items still without a price (a part is priced in its item; an item priced in its parts is priced). */
         unpriced: unpricedItems(q.lines.map((l) => ({ id: l.id, parentId: l.parentId, price: l.unitPrice.toString() }))),
         /** Which of the customer's items it answers, and which it misses. */

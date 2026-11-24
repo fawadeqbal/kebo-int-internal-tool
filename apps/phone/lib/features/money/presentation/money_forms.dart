@@ -166,7 +166,7 @@ class _MoneyInState extends ConsumerState<_MoneyIn> {
           },
         ),
         const SizedBox(height: KSpace.s4),
-        Text('How', style: KType.label.copyWith(color: c.ink)),
+        Text('Method', style: KType.label.copyWith(color: c.ink)),
         const SizedBox(height: KSpace.s2),
         Wrap(
           spacing: KSpace.s2,

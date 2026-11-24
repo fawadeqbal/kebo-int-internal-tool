@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
-import { fromMinor, toMinor, type Minor } from "@kebo/money";
+import { formatMinor, fromMinor, type Minor, toMinor } from "@kebo/money";
 import { can, EXPENSE_CATEGORY_LABEL, PAYMENT_KIND_LABEL, type ExpenseCategory, type MoneyAccountInput, type TransferInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -216,7 +216,7 @@ export class CashService {
         action: "transfer",
         entityType: "money_account",
         entityId: from.id,
-        summary: `Moved ${from.currency} ${fromMinor(toMinor(input.amountOut))} from ${from.name} to ${to.name}${from.currency !== to.currency ? ` (${to.currency} ${fromMinor(toMinor(amountIn!))} arrived)` : ""}`,
+        summary: `Moved ${formatMinor(toMinor(input.amountOut), from.currency)} from ${from.name} to ${to.name}${from.currency !== to.currency ? ` (${formatMinor(toMinor(amountIn!), to.currency)} arrived)` : ""}`,
       });
       await this.ledger.post(tx, [{ type: "movement", id: row.id }], { userId: user.id });
       return { id: row.id };
@@ -235,7 +235,7 @@ export class CashService {
         action: "transfer_void",
         entityType: "money_account",
         entityId: t.accountId!,
-        summary: `Removed the move of ${t.currency} ${t.amount.toFixed(2)} from ${t.account!.name} to ${t.toAccount!.name}`,
+        summary: `Removed the move of ${formatMinor(toMinor(t.amount), t.currency)} from ${t.account!.name} to ${t.toAccount!.name}`,
         reason,
       });
       await this.ledger.post(tx, [{ type: "movement", id }], { userId: user.id, reason });
@@ -347,7 +347,7 @@ export class CashService {
         kind: "in",
         minor: decimalToMinor(m.amount),
         what: one
-          ? `${PAYMENT_KIND_LABEL[one.kind]} for ${one.order!.refNo}${conv ? ` (${m.allocCurrency} ${one.amount.toFixed(2)} at ${Number(m.rate)})` : ""}${decimalToMinor(one.bankCharges) ? ` (bank charges ${one.bankCharges.toFixed(2)})` : ""}${m.paidByName ? `, paid by ${m.paidByName}` : ""}`
+          ? `${PAYMENT_KIND_LABEL[one.kind]} for ${one.order!.refNo}${conv ? ` (${formatMinor(toMinor(one.amount), m.allocCurrency)} at ${Number(m.rate)})` : ""}${decimalToMinor(one.bankCharges) ? ` (bank charges ${one.bankCharges.toFixed(2)})` : ""}${m.paidByName ? `, paid by ${m.paidByName}` : ""}`
           : `One transfer for ${[...new Set(parts.map((p) => p.order!.refNo))].join(", ") || "the customer's credit"}${conv ? ` (at ${Number(m.rate)} per ${m.allocCurrency})` : ""}`,
         party,
         reference: m.reference,

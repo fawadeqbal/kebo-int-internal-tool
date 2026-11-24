@@ -132,7 +132,7 @@ export function CustomerSpending({
                 <Th>Date</Th>
                 <Th>What for</Th>
                 <Th>For</Th>
-                <Th>Who paid</Th>
+                <Th>Paid by</Th>
                 <Th className="text-right">Amount {c}</Th>
                 <Th>
                   <span className="sr-only">Change</span>

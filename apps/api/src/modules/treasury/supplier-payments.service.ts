@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { asSupplierPayment, createSupplierPayment, fromDbDate, isSupplier, liveFile, purchasePart, supplierPayment, toDbDate } from "@kebo/database";
-import { fromMinor, fxRate, toMinor } from "@kebo/money";
+import { formatMinor, fxRate, toMinor } from "@kebo/money";
 import { can, type FactoryPaymentInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import type { Prisma } from "@kebo/database";
@@ -173,14 +173,14 @@ export class SupplierPaymentsService {
         summary: `${o.refNo}: changed the payment to ${factoryName}`,
         oldValues: {
           factory: p.factory.name,
-          amount: `${p.currency} ${p.amount.toFixed(2)}`,
+          amount: `${formatMinor(toMinor(p.amount), p.currency)}`,
           paidOn: fromDbDate(p.paidOn),
           rate: Number(p.rate),
           reference: p.reference,
         },
         newValues: {
           factory: factoryName,
-          amount: `${data.currency} ${fromMinor(toMinor(data.amount))}`,
+          amount: `${formatMinor(toMinor(data.amount), data.currency)}`,
           paidOn: input.paidOn,
           rate: data.rate,
           reference: data.reference,
@@ -204,7 +204,7 @@ export class SupplierPaymentsService {
         action: "payment_out_void",
         entityType: "order",
         entityId: o.id,
-        summary: `${o.refNo}: removed the payment of ${p.currency} ${p.amount.toFixed(2)} to ${p.factory.name}`,
+        summary: `${o.refNo}: removed the payment of ${formatMinor(toMinor(p.amount), p.currency)} to ${p.factory.name}`,
         reason,
       });
       await this.ledger.post(tx, [{ type: "movement", id: p.movementId }, { type: "order", id: o.id }], { userId: user.id, reason });

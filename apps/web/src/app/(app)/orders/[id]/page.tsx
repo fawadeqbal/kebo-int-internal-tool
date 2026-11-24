@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
-import { can, PAPER, ROUTE_NAME, type Tone } from "@kebo/shared";
+import { can, PAPER, PAYMENT_ROUTE_LABEL, type Tone } from "@kebo/shared";
 import { Badge, cn, Notice, linkClass, Dash } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
@@ -152,7 +152,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const poSent = !!flow?.factory.orderedOn || o.word !== "Confirmed";
   const route = m?.route.route ?? flow?.payment.route ?? null;
   const payLine = m
-    ? [route ? ROUTE_NAME[route] : "How they pay: not decided yet", ...m.plan.items.map((i) => `${i.label}${i.status === "paid" ? ", paid" : ""}`)].join(" · ")
+    ? [route ? PAYMENT_ROUTE_LABEL[route] : "How they pay: not decided yet", ...m.plan.items.map((i) => `${i.label}${i.status === "paid" ? ", paid" : ""}`)].join(" · ")
     : "The plan is on the Payment tab.";
 
   // Something late: the one notice, with its own way to fix it (the dates themselves are in the panel).
@@ -301,7 +301,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
                 terms={terms}
                 kind="order"
                 box="terms"
-                values={{ route: route ? ROUTE_NAME[route] : null, payment }}
+                values={{ route: route ? PAYMENT_ROUTE_LABEL[route] : null, payment }}
                 after={{
                   shipBy: note && (
                     <span className={cn("flex items-start gap-1 text-xs font-normal", note.ok ? "text-ok" : "text-text-2")}>

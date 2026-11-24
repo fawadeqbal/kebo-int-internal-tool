@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, livePurchase, toDbDate } from "@kebo/database";
-import { fromMinor, fxRate } from "@kebo/money";
+import { formatMinor, fromMinor, fxRate } from "@kebo/money";
 import { can, type CancelOrderInput } from "@kebo/shared";
 import { DomainError, ForbiddenError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -131,7 +131,7 @@ export class CancelOrderService {
         action: "cancel",
         entityType: "order",
         entityId: id,
-        summary: `Cancelled order ${o.refNo}${customerMoney ? ` · ${o.currency} ${fromMinor(inMinor)} received: ${customerMoney === "credit" ? "kept as credit" : customerMoney === "fee" ? "kept as a fee" : money.refundNow ? "refunded" : "to refund"}` : ""}${factoryMoney ? ` · paid to the supplier: ${factoryMoney === "loss" ? "a loss" : "refund expected"}` : ""}`,
+        summary: `Cancelled order ${o.refNo}${customerMoney ? ` · ${formatMinor(inMinor, o.currency)} received: ${customerMoney === "credit" ? "kept as credit" : customerMoney === "fee" ? "kept as a fee" : money.refundNow ? "refunded" : "to refund"}` : ""}${factoryMoney ? ` · paid to the supplier: ${factoryMoney === "loss" ? "a loss" : "refund expected"}` : ""}`,
         reason,
         oldValues: { status: o.status },
         newValues: { status: "cancelled", customerMoney, factoryMoney },

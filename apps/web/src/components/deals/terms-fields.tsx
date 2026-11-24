@@ -8,6 +8,9 @@ import {
   PART_RULE_DAYS,
   PART_RULE_LABEL,
   PART_RULES,
+  PAYMENT_ROUTE_HINT,
+  PAYMENT_ROUTE_LABEL,
+  PAYMENT_ROUTES,
   percentText,
   WARRANTY_FROM_LABEL,
   WARRANTY_FROMS,
@@ -201,10 +204,8 @@ export function PartsField({
 /* ---------------------------------------------------------------- how the customer pays */
 
 const ROUTES: { value: PaymentRoute | ""; label: string; sub: string }[] = [
-  { value: "", label: "Not decided yet", sub: "asked on the order" },
-  { value: "informal", label: "Informal", sub: "T/T, cash, Alipay, WeChat" },
-  { value: "bank_contract", label: "Bank contract", sub: "through the banks" },
-  { value: "letter_of_credit", label: "Letter of credit", sub: "LC at sight or after days" },
+  { value: "", label: "Not decided yet", sub: "Asked on the order" },
+  ...PAYMENT_ROUTES.map((r) => ({ value: r, label: PAYMENT_ROUTE_LABEL[r], sub: PAYMENT_ROUTE_HINT[r] })),
 ];
 
 /** "How they pay": the route, or not decided yet (chosen on the order). */

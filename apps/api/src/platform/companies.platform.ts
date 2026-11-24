@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import { formatMinor, toMinor } from "@kebo/money";
 import type { z } from "zod";
 import { fromDbDateOrNull, seedCompanyBase, seedDemoData, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
 import {
@@ -550,7 +551,7 @@ export class PlatformCompaniesService {
     await this.log(
       actor,
       "payment",
-      `${c.name} paid ${input.currency} ${input.amount.toFixed(2)} on ${input.paidOn}; paid until ${input.paidUntil}`,
+      `${c.name} paid ${formatMinor(toMinor(input.amount), input.currency)} on ${input.paidOn}; paid until ${input.paidUntil}`,
       { companyId: id },
     );
     this.companies.forget(id);

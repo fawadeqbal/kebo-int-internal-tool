@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, toDbDate } from "@kebo/database";
-import { formatMinor, fxRate } from "@kebo/money";
+import { formatMinor, fxRate, toMinor } from "@kebo/money";
 import { SHIP_MODE_LABEL, type ShipMode } from "@kebo/shared";
 import { DomainError } from "@kebo/utils";
 import { AuditService } from "../../common/audit/audit.service";
@@ -84,7 +84,7 @@ export class ShipmentCosts {
         continue;
       }
       await tx.expense.update({ where: { id: e.id }, data: { voidedAt: new Date(), voidReason: "The shipment no longer has it" } });
-      await log(e.id, `removed the cost "${e.description}" (${e.currency} ${e.amount.toFixed(2)}): the shipment no longer has it`, "expense_void");
+      await log(e.id, `removed the cost "${e.description}" (${formatMinor(toMinor(e.amount), e.currency)}): the shipment no longer has it`, "expense_void");
       touched.push(e.id);
     }
     for (const w of wanted) {
@@ -97,7 +97,7 @@ export class ShipmentCosts {
           where: { id: e.id },
           data: { amount: w.amount, currency: w.currency, payee: w.payee, description: w.description, ...(e.currency === w.currency ? {} : { rate: rateOf(w.currency) }) },
         });
-        if (!same) await log(e.id, `the cost "${w.description}" is now ${formatMinor(decimalToMinor(w.amount), w.currency)} (was ${e.currency} ${e.amount.toFixed(2)})`, "expense_edit");
+        if (!same) await log(e.id, `the cost "${w.description}" is now ${formatMinor(decimalToMinor(w.amount), w.currency)} (was ${formatMinor(toMinor(e.amount), e.currency)})`, "expense_edit");
         touched.push(e.id);
         continue;
       }

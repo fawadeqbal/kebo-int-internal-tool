@@ -155,7 +155,7 @@ describe("Change what we agreed with the customer", () => {
           notes: null,
         }}
         shipHint="Worked out: 45 days after the deposit of 16 Nov."
-        payment="Bank transfer (T/T) · Deposit 30%, paid · Before shipment 60%"
+        payment="Informal · Deposit 30%, paid · Before shipment 60%"
         paymentHref="/orders/o1/payment"
       />,
     );

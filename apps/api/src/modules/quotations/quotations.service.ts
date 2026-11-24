@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, Prisma, toDbDate } from "@kebo/database";
-import { convertMinor, costSummary, documentTotals, fromMinor, fxRate, priceForMargin, quoteUnitCostMinor, toMinor } from "@kebo/money";
+import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRate, multiplyMinor, priceForMargin, quoteUnitCostMinor, toMinor } from "@kebo/money";
 import {
   BASIS_STEP_LABEL,
   BASIS_STEPS,
@@ -197,7 +197,8 @@ export class QuotationsService {
       const rate = fxRate(q.currency, currency, sales.currency, sales.exchangeRates);
       const no = lineNumbers(q.lines.map((l) => ({ key: l.id, parentKey: l.parentId })));
       const lines = q.lines.map((l, n) => {
-        const cost = rate ? convertMinor(quoteUnitCostMinor(decimalToMinor(l.unitPrice), Number(l.taxRate), q.taxIncluded, sales.exportVatRefundPercent), rate) : null;
+        const unitCostHere = quoteUnitCostMinor(decimalToMinor(l.unitPrice), Number(l.taxRate), q.taxIncluded, sales.exportVatRefundPercent);
+        const cost = rate ? convertMinor(unitCostHere, rate) : null;
         return {
           id: l.id,
           no: no[n]!,
@@ -209,7 +210,8 @@ export class QuotationsService {
           quantity: l.quantity.toString(),
           unit: l.unit,
           unitCost: cost === null ? null : fromMinor(cost),
-          costMinor: cost,
+          /** The line's cost in the factory's currency: the offer's total is converted once (as its "≈" is). */
+          costMinor: multiplyMinor(unitCostHere, l.quantity.toString()),
         };
       });
       return {
@@ -238,7 +240,7 @@ export class QuotationsService {
         missingRate: rate === null,
         /** Items still without a supplier price (a part is priced in its item; an item priced in its parts is priced). */
         unpriced: unpricedItems(q.lines.map((l) => ({ id: l.id, parentId: l.parentId, price: l.unitPrice.toString() }))),
-        totalCost: rate === null ? null : fromMinor(lines.reduce((t, l) => t + Math.round((l.costMinor ?? 0) * Number(l.quantity)), 0)),
+        totalCost: rate === null ? null : fromMinor(convertMinor(lines.reduce((t, l) => t + l.costMinor, 0), rate)),
         lines: lines.map(({ costMinor: _c, ...l }) => l),
       };
     });
@@ -681,7 +683,7 @@ export class QuotationsService {
           action: "create",
           entityType: "quotation",
           entityId: rev.id,
-          summary: `${q.refNo} R${number} drafted for ${inquiry.refNo} from ${offer ? `${offer.factory.name}'s offer` : "own prices"} — ${input.currency} ${String(built[0]!.option.total)}`,
+          summary: `${q.refNo} R${number} drafted for ${inquiry.refNo} from ${offer ? `${offer.factory.name}'s offer` : "own prices"} — ${formatMinor(toMinor(built[0]!.option.total), input.currency)}`,
         });
         out.push({ id: q.id, refNo: q.refNo, letter: q.letter, revisionId: rev.id, number });
       }
@@ -893,7 +895,7 @@ export class QuotationsService {
         action: "create",
         entityType: "quotation",
         entityId: rev.id,
-        summary: `${q.refNo} R${number} drafted for ${inquiry.refNo} — ${built.map((b) => `Option ${b.option.letter} ${input.currency} ${String(b.option.total)}`).join(", ")}`,
+        summary: `${q.refNo} R${number} drafted for ${inquiry.refNo} — ${built.map((b) => `Option ${b.option.letter} ${formatMinor(toMinor(b.option.total), input.currency)}`).join(", ")}`,
         reason,
       });
       return rev.id;
@@ -1223,7 +1225,7 @@ export class QuotationsService {
         action: "status_change",
         entityType: "quotation",
         entityId: r.id,
-        summary: `${r.quotation.refNo} R${r.number}: ${r.status} → ${to}${chosen ? ` (Option ${chosen.letter}, ${r.currency} ${chosen.total.toFixed(2)})` : ""}`,
+        summary: `${r.quotation.refNo} R${r.number}: ${r.status} → ${to}${chosen ? ` (Option ${chosen.letter}, ${formatMinor(toMinor(chosen.total), r.currency)})` : ""}`,
         oldValues: { status: r.status },
         newValues: { status: to, ...(chosen ? { option: chosen.letter } : {}) },
         reason,

@@ -539,7 +539,7 @@ export function CostForm({
                 {send ? (
                   <input type="hidden" name="paidById" value="" />
                 ) : (
-                  <Field label="Who paid" htmlFor="cost-paidBy" optional error={st.errors?.paidById} >
+                  <Field label="Paid by" htmlFor="cost-paidBy" optional error={st.errors?.paidById} >
                     <Select id="cost-paidBy" name="paidById" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
                       <option value="">Not said</option>
                       {s0.people.map((p) => (
