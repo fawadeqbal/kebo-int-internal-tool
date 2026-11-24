@@ -24,7 +24,10 @@ export function FileActions({
   allCount,
   of,
   className,
+  printHere,
 }: {
+  /** Print this page itself (the browser's print, its own "Save as PDF"), where no paper of its own exists. */
+  printHere?: boolean;
   excel?: ReactNode;
   excelHref?: string;
   viewHref?: string;
@@ -38,7 +41,7 @@ export function FileActions({
 }) {
   // Excel is a plan feature.
   if (!useExcelAllowed()) excelHref = undefined;
-  if (!excel && !excelHref && !viewHref && !pdfHref && !allHref) return null;
+  if (!excel && !excelHref && !viewHref && !pdfHref && !allHref && !printHere) return null;
   const b = buttonClass("secondary", "sm");
   return (
     <span className={cn("no-print flex flex-wrap items-center gap-2", className)}>
@@ -48,6 +51,11 @@ export function FileActions({
             <FileSpreadsheet aria-hidden /> Excel{of && <span className="sr-only"> of the {of}</span>}
           </a>
         ))}
+      {printHere && (
+        <button type="button" className={b} onClick={() => window.print()}>
+          <Printer aria-hidden /> Print{of && <span className="sr-only"> the {of}</span>}
+        </button>
+      )}
       {viewHref && (
         <Link href={viewHref} className={b}>
           {/* The words on the button start its name (what voice control users say); "of" only adds to it. */}
