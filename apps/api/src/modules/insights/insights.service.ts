@@ -320,6 +320,8 @@ export class InsightsService {
       })),
       /** Held for customers (their credit), per currency. */
       held: [...held.entries()].map(([currency, h]) => ({ currency, amount: fromMinor(h.minor), customers: h.customers })),
+      /** "mine": only the orders this person may see (no money rights), so an empty list says nothing of the rest. */
+      scope: recorder ? ("all" as const) : ("mine" as const),
     };
   }
 }

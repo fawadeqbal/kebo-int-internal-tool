@@ -145,7 +145,12 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
     title: "Administration",
     items: [
       { permission: "users.manage", label: "People", hint: "Add people, give them a role, set passwords, switch them off." },
-      { permission: "settings.manage", label: "Company settings", hint: "The company's details, sales and quotation defaults, document templates, reminders, email texts and the website form." },
+      {
+        permission: "settings.manage",
+        label: "Company settings",
+        // All it allows (review 24 Nov: closing months, rates and margins were not said; the website form is the Super Admin's).
+        hint: "The company's details, sales and quotation defaults (exchange rates and margins included), closing months, document templates, reminders and email texts.",
+      },
       { permission: "security.manage", label: "Security", hint: "Roles, two-step rules, everyone's sessions and sign-in history." },
     ],
   },

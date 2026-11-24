@@ -682,7 +682,9 @@ export class PlatformCompaniesService {
     });
     const overdue = clients.filter((c) => c.renewsOn && fromDbDateOrNull(c.renewsOn)! < today);
     const renewing = clients.filter((c) => c.renewsOn && fromDbDateOrNull(c.renewsOn)! >= today && fromDbDateOrNull(c.renewsOn)! <= in30);
-    const ending = trials.filter((c) => c.endsAt && c.endsAt <= week);
+    // Ending within the week from now: a demo whose day has passed has ended, it does not "end soon" (review 24 Nov).
+    const now = new Date();
+    const ending = trials.filter((c) => c.endsAt && c.endsAt > now && c.endsAt <= week);
     const due = new Map<string, number>();
     for (const c of renewing) if (c.plan?.priceMinor) due.set(c.plan.currency, (due.get(c.plan.currency) ?? 0) + c.plan.priceMinor);
     return {

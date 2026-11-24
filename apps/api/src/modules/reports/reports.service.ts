@@ -259,7 +259,15 @@ export class ReportsService {
   async audit(user: SessionUser, q: { entityType?: string; entityId?: string; userId?: string; q?: string; page: number; pageSize: number }) {
     if (!can(user, "audit.view")) throw new ForbiddenError();
     const term = q.q?.trim();
+    // What the person may not see elsewhere stays out of the log too, as on a record's History (review 24 Nov: a
+    // role with only the Audit log saw supplier prices and payments to suppliers): supplier prices and payments
+    // without "supplier prices", expenses without "expenses".
+    const hidden: Prisma.AuditLogWhereInput[] = [
+      ...(can(user, "sourcing.manage") ? [] : [{ entityType: { in: ["factory_quote", "factory"] } }, { action: { startsWith: "payment_out" } }]),
+      ...(can(user, "expenses.manage") ? [] : [{ action: { startsWith: "expense" } }, { entityType: "expense" }]),
+    ];
     const where: Prisma.AuditLogWhereInput = {
+      ...(hidden.length ? { NOT: hidden } : {}),
       ...(q.entityType ? { entityType: q.entityType } : {}),
       ...(q.entityId ? { entityId: q.entityId } : {}),
       ...(q.userId ? { userId: q.userId } : {}),
