@@ -115,6 +115,32 @@ export class SupplierPaymentsService {
         summary: `${o.refNo}: paid ${factoryName} ${input.currency} ${data.amount}${input.reference ? ` (${input.reference})` : ""}`,
       });
       await this.ledger.post(tx, [{ type: "movement", id: created.movementId }, { type: "order", id: orderId }], { userId: user.id });
+      // Our bank's charge for sending it: the order's own cost, paid from the same account on the same day.
+      const charges = Number(input.bankCharges ?? 0);
+      if (charges > 0) {
+        const { sales } = await this.settings.get();
+        const rate = fxRate(input.currency, sales.currency, sales.currency, sales.exchangeRates);
+        if (rate === null) throw new DomainError(`There is no exchange rate for ${input.currency} in Settings: add it, so the bank charges can be counted.`);
+        const fee = await tx.expense.create({
+          data: {
+            orderId,
+            customerId: o.customerId,
+            inquiryId: o.inquiryId,
+            category: "bank_charges",
+            description: `Bank charges on paying ${factoryName}`,
+            amount: charges.toFixed(2),
+            currency: input.currency,
+            rate,
+            spentOn: paidOn,
+            borneBy: "us",
+            accountId: data.accountId ?? null,
+            payee: "Bank",
+            reference: input.reference ?? null,
+            recordedById: user.id,
+          },
+        });
+        await this.ledger.post(tx, [{ type: "expense", id: fee.id }], { userId: user.id });
+      }
       return created.id;
     });
     /** `createdId`: the new payment, so its proof can follow. */

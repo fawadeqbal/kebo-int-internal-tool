@@ -173,9 +173,11 @@ export function CustomerForm({
                 {...invalid("initials", s.errors?.initials)}
               />
             </Field>
+            {/* Marked as in the quick New customer window (review 24 Nov, S-25); "Not set" is still a choice. */}
             <Field
               label="Country"
               htmlFor="country"
+              required
               error={s.errors?.country}
               hint={
                 draft.country === UNKNOWN_COUNTRY ? (

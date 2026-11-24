@@ -98,6 +98,9 @@ export function valuesByName(box: HTMLElement): Map<string, string> {
   return out;
 }
 
+/** What each open form started with (useChangeCount), so a form drawn again keeps its start. */
+const STARTS = new WeakMap<Element, Map<string, string>>();
+
 /**
  * How many of a window's fields differ from what it opened with, as it is typed — changed (or removed) and added
  * apart, for changeWords ("No changes", "Save", "Save 2 changes"): the start is taken once the window is drawn; `recount` after each input
@@ -106,12 +109,6 @@ export function valuesByName(box: HTMLElement): Map<string, string> {
 export function useChangeCount(box: RefObject<HTMLElement | null>) {
   const start = useRef<Map<string, string> | null>(null);
   const [counts, setCounts] = useState({ changed: 0, added: 0 });
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (box.current) start.current = valuesByName(box.current);
-    }, 0);
-    return () => clearTimeout(t);
-  }, [box]);
   const recount = useCallback(() => {
     setTimeout(() => {
       if (!box.current || !start.current) return;
@@ -122,5 +119,18 @@ export function useChangeCount(box: RefObject<HTMLElement | null>) {
       setCounts((c) => (c.changed === next.changed && c.added === next.added ? c : next));
     }, 0);
   }, [box]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!box.current) return;
+      // Kept with the form: when it is drawn again to ask "Why?", the start stays what the window opened with, so
+      // the button still counts the changes waiting for the reason (review 24 Nov, O-32: it said "No changes").
+      const form = box.current.closest("form") ?? box.current;
+      const kept = STARTS.get(form);
+      start.current = kept ?? valuesByName(box.current);
+      if (!kept) STARTS.set(form, start.current);
+      else recount();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [box, recount]);
   return { ...counts, recount };
 }

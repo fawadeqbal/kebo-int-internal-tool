@@ -38,7 +38,8 @@ describe("tab counts match what each tab lists", () => {
     for (const base of [{}, { q: "a" }]) {
       const open = (b: Record<string, unknown>) => {
         const c = b.counts as Record<string, number>;
-        return { ...c, open: (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0) };
+        // As the list counts it: the stages count the ones going on, Open adds those on hold (review 24 Nov, S-22).
+        return { ...c, open: (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0) + (c.on_hold ?? 0) };
       };
       await check(
         "/inquiries",

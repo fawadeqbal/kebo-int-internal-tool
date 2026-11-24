@@ -142,7 +142,8 @@ export function Toaster() {
       onFocus={() => setHeld(true)}
       onBlur={() => setHeld(false)}
       data-note={kind}
-      className="no-print fixed inset-x-3 bottom-24 z-[95] flex animate-in items-start gap-3 overflow-hidden rounded-[14px] bg-note py-3 pr-2.5 pl-3.5 text-sm text-note-fg shadow-pop sm:inset-x-auto sm:right-5 sm:w-[400px] md:bottom-5"
+      // Above a window's footer while one is open, never over its Save (review 24 Nov, X-17).
+      className="no-print fixed inset-x-3 bottom-24 z-[95] flex animate-in items-start gap-3 overflow-hidden rounded-[14px] bg-note py-3 pr-2.5 pl-3.5 text-sm text-note-fg shadow-pop sm:inset-x-auto sm:right-5 sm:w-[400px] md:bottom-5 [body:has([data-window-footer])_&]:bottom-28"
     >
       <span className={`mt-px grid size-6 shrink-0 place-items-center rounded-full text-white ${k.className}`}>
         {k.icon}

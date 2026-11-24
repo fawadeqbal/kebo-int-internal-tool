@@ -8,6 +8,7 @@ import type { PaperDocView } from "@/lib/types-papers";
 import { PaperSheet } from "@/components/print/paper";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo } from "@/components/print/data";
+import { getSettings } from "@/lib/loaders";
 import {
   docDate,
   docFootCell,
@@ -22,6 +23,7 @@ import {
   portBullets,
   textBullets,
   type DocColumn,
+  totalPriceLabel,
 } from "@/components/print/kebo-doc";
 import { UUID } from "@/lib/ids";
 
@@ -111,6 +113,7 @@ export default async function OrderDocumentPrint({
   const packing = d.kind === "packing-list";
   const internal = !packing && sp.copy === "internal";
   const costs = internal && d.lines.some((l) => l.unitCost != null);
+  const unitPrices = !packing && (await getSettings()).sales.quoteUnitPrices;
 
   const toolbar = (
     <PrintToolbar
@@ -165,7 +168,16 @@ export default async function OrderDocumentPrint({
           { label: "Unit price", width: 66, align: "right", render: (l) => docMoney(l.unitPrice ?? 0, c) },
           { label: "Amount", width: 74, align: "right", render: (l) => docMoney(l.lineTotal ?? 0, c) },
         ]
-      : [no, description, qty];
+      : unitPrices
+        ? // Settings › Sales: customer copies show each line's price (review 24 Nov, O-29).
+          [
+            no,
+            description,
+            qty,
+            { label: "Unit price", width: 66, align: "right", render: (l) => docMoney(l.unitPrice ?? 0, c) },
+            { label: "Amount", width: 74, align: "right", render: (l) => docMoney(l.lineTotal ?? 0, c) },
+          ]
+        : [no, description, qty];
 
   // Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
   const sums =
@@ -189,9 +201,11 @@ export default async function OrderDocumentPrint({
         "Country of origin: China",
       ]
     : [
+        o.customerRef ? labelled("Your order No.:", o.customerRef) : null,
         d.paymentSentence,
         ...textBullets(d.paymentTermsText),
         o.leadTime ? `Delivery: ${o.leadTime}` : null,
+        o.warranty ? `Warranty: ${o.warranty}` : null,
         ...textBullets(d.deliveryTermsText),
         ...textBullets(d.notes),
         ...ports,
@@ -285,9 +299,10 @@ export default async function OrderDocumentPrint({
         columns={columns}
         rows={d.lines}
         sums={sums}
-        total={t ? { label: `Total ${o.incoterm} Price :`, words: docWords(t.total, c), amount: docMoney(t.total, c) } : null}
+        total={t ? { label: totalPriceLabel(o.incoterm, d.lines), words: docWords(t.total, c), amount: docMoney(t.total, c) } : null}
         foot={packingTotals}
-        boxTitle={packing ? "Shipping details:" : "Payment terms:"}
+        // Payment, delivery, warranty and packing words: "Terms", not all under "Payment terms" (O-29).
+        boxTitle={packing ? "Shipping details:" : "Terms:"}
         bullets={bullets.filter(Boolean)}
         bank={packing ? null : d.bankDetails}
         internal={internalPart}

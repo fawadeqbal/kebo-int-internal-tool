@@ -1107,7 +1107,10 @@ function NewCustomerForm({
   const [found, setFound] = useState<{ name: string; list: CustomerOption[] }>({ name: "", list: [] });
   const set = (k: keyof QuickCustomer, value: string) => setQ((s) => ({ ...s, [k]: value }));
   const err = (k: string) => result?.errors?.[k]?.[0];
-  const contactErr = (k: string) => result?.errors?.[`contacts.0.${k}`]?.[0] ?? (k === "name" ? result?.errors?.contacts?.[0] : undefined);
+  // A contact-wide message goes where it belongs: "at least one way to reach" under Phone, not under Name (S-25).
+  const contactWide = result?.errors?.contacts?.[0];
+  const contactErr = (k: string) =>
+    result?.errors?.[`contacts.0.${k}`]?.[0] ?? (contactWide && k === (/way to reach/i.test(contactWide) ? "phone" : "name") ? contactWide : undefined);
 
   // A customer with a similar name is shown while typing (nothing is stopped: a new one can still be added).
   const name = q.name.trim();

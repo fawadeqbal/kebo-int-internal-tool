@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FilterCard } from "@/components/common/filter-card";
 import { Plus } from "lucide-react";
@@ -12,7 +13,7 @@ import { BillingBadge, CompanyStatusBadge, KindBadge } from "@/components/platfo
 
 export const metadata = { title: "Companies & demos" };
 
-type Search = { kind?: string; status?: string; q?: string; page?: string };
+type Search = { kind?: string; status?: string; q?: string; page?: string; from?: string };
 
 const KINDS = ["client", "demo", "trial"] as const;
 
@@ -30,6 +31,9 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
     platformApi.get<CompanyRow[]>("/companies", { q: sp.q }),
     platformApi.get<CompanyRow[]>("/companies", { q: sp.q, status: "deleted" }),
   ]);
+  // Back from working inside a company: its own page, not the top of the list (review 24 Nov, A-38).
+  const cameFrom = sp.from ? live.find((r) => r.slug === sp.from) : undefined;
+  if (cameFrom) redirect(`/platform/companies/${cameFrom.id}`);
   const keep = { kind: sp.kind, status: sp.status, q: sp.q };
   const href = (patch: Partial<Search>) => buildHref("/platform/companies", keep, { page: undefined, ...patch });
   const ofKind = (r: CompanyRow) => !sp.kind || r.kind === sp.kind;

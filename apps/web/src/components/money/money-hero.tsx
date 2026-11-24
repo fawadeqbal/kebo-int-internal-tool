@@ -42,11 +42,17 @@ export function MoneyHero({
         <p className={cn("text-xs font-bold tracking-wide uppercase", tone)}>{kind}</p>
         <p className={cn("mt-0.5 text-2xl font-extrabold tracking-tight tabular sm:text-3xl", tone)}>
           {sign && <span aria-hidden>{sign} </span>}
-          {currency} {figure(amount)}
+          {/* A currency and its number stay together on a phone (review 24 Nov, X-33: "~ USD / 74,023.02"). */}
+          <span className="whitespace-nowrap">
+            {currency} {figure(amount)}
+          </span>
         </p>
         {inMain && (
           <p className="text-md text-text-2 tabular">
-            ≈ {inMain.currency} {figure(inMain.amount)} at {Number(inMain.rate).toLocaleString("en-US", { maximumFractionDigits: 4 })}{" "}
+            <span className="whitespace-nowrap">
+              ≈ {inMain.currency} {figure(inMain.amount)}
+            </span>{" "}
+            at {Number(inMain.rate).toLocaleString("en-US", { maximumFractionDigits: 4 })}{" "}
             {currency} per {inMain.currency}
           </p>
         )}

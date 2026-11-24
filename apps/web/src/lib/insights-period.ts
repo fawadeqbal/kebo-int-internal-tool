@@ -140,7 +140,9 @@ export const compactMoney = (v: number | null | undefined, c: string) => (v === 
 /** "USD 288,000" (whole units); from a million "USD 1.21M". */
 export function bigMoney(v: number | null | undefined, c: string) {
   if (v === null || v === undefined || !Number.isFinite(v)) return "—";
-  if (Math.abs(v) >= 1_000_000) return `${c} ${(v / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 2 })}M`;
+  // Whole units up to ten million, so a row of figures reads one way ("USD 1,150,000" beside "USD 231,293", not
+  // "USD 1.15M": review 24 Nov, M-33); only beyond that, millions.
+  if (Math.abs(v) >= 10_000_000) return `${c} ${(v / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 2 })}M`;
   return `${c} ${Math.round(v).toLocaleString("en-US")}`;
 }
 /** "1,234" (whole units) for table cells in the main currency named in the header. */

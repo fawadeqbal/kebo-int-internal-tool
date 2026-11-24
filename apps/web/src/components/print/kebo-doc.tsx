@@ -81,6 +81,16 @@ const label: CSSProperties = { fontSize: "11px", fontWeight: 700, letterSpacing:
 
 /** "SEP 16, 2026" */
 /**
+ * The name of a paper's total: "Total FOB Price :", but not when its lines also charge the freight or insurance
+ * past that point (review 24 Nov, S-21: "Total FOB Price" with sea freight in it), then "Total Price :".
+ */
+export function totalPriceLabel(incoterm: string | null | undefined, lines: { type: string; description: string }[], lead = "") {
+  const beforeShipping = !incoterm || ["EXW", "FCA", "FAS", "FOB"].includes(incoterm);
+  const carriage = lines.some((l) => l.type !== "goods" && /\b(freight|shipping|carriage|insurance)\b/i.test(l.description));
+  return `${lead}Total ${incoterm && !(beforeShipping && carriage) ? `${incoterm} ` : ""}Price :`;
+}
+
+/**
  * An A4 sheet on a narrow screen: the whole page smaller, as it prints, rather than squeezed to the screen's
  * width (review 24 Nov, X-08: the address a word per line). Inside the app's viewer it is drawn at its size.
  */
@@ -447,7 +457,7 @@ ${paperZoomCss(".kebo-doc")}`}</style>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {customer.taxNo && (
               <div>
-                <div style={{ ...label, color: BLUE }}>Business License Number</div>
+                <div style={{ ...label, color: BLUE }}>Tax No.</div>
                 <div>{customer.taxNo}</div>
               </div>
             )}

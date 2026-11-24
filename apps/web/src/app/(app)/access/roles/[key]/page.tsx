@@ -39,9 +39,9 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
   );
   const people = (
     <Card className="overflow-hidden">
-        <CardHeader title={`People in this role (${r.members.length})`} description="Change someone's role under Users." />
+        <CardHeader title={`People in this role (${r.members.length})`} description="Change someone's role under Staff." />
         {r.members.length === 0 ? (
-          <EmptyLine inset>Nobody yet. Give it to someone under Users.</EmptyLine>
+          <EmptyLine inset>Nobody yet. Give it to someone under Staff.</EmptyLine>
         ) : (
           <ul className="divide-y divide-line">
             {r.members.map((m) => (

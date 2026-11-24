@@ -13,6 +13,7 @@ import { Modal, useConfirm } from "@/components/common/dialog";
 import { PANEL_FORM, PanelBody, PanelSection, useClosePanel, WindowCancel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { NOTE_ICON } from "./kinds";
+import { MentionTextarea } from "./mention-textarea";
 import { useTime } from "@/lib/time-client";
 import { addDays } from "@kebo/utils";
 
@@ -449,14 +450,15 @@ export function FollowUpCheck({ action, done, what }: { action: Action; done: bo
 }
 
 /** The Activity card's quick note (board): one box, sent with the button or Ctrl+Enter; kind "note", now. */
-export function QuickNote({ action }: { action: Action }) {
+export function QuickNote({ action, people = [] }: { action: Action; people?: { id: string; name: string }[] }) {
   const id = useId();
   return (
     <ActionForm action={action} resetOnSuccess showSuccess={false} className="flex flex-col gap-2">
       {(s) => (
         <>
           <Field label="Add a note" htmlFor={`${id}-body`} error={s.errors?.body}>
-            <Textarea
+            <MentionTextarea
+              people={people}
               id={`${id}-body`}
               name="body"
               rows={2}

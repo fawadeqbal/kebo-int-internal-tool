@@ -108,7 +108,7 @@ describe("Home: what needs you", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
     expect(link("Record payment").getAttribute("href")).toBe("/orders/o1/payment");
     expect(screen.getByText(/Thing 1 by 01 Nov/)).toBeTruthy();
-    expect(link(/2 more/).getAttribute("href")).toBe("/notifications");
+    expect(link(/2 more/).getAttribute("href")).toBe("/needs-you");
   });
 
   it("with nothing waiting, it says so", () => {

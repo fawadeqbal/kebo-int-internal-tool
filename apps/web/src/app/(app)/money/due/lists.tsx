@@ -58,7 +58,9 @@ const add = (m: Map<string, number>, currency: string, v: string | number) => m.
 type Order = Receivables["rows"][number];
 const CUSTOMER_CHIPS = [
   { key: "all", label: "All open" },
-  { key: "late", label: "Late" },
+  // Money late, not work late: the orders list's "Late" counts orders behind on their next step (review 24 Nov,
+  // O-47: "Late 76" here and "Late 63" there).
+  { key: "late", label: "Payment late" },
   { key: "week", label: "Due this week" },
 ] as const;
 type CustomerChip = (typeof CUSTOMER_CHIPS)[number]["key"];
@@ -101,7 +103,7 @@ export async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; toda
       <StatRow facts>
         <StatTile label="Customers owe us" {...moneyTile(owed, main)} sub={`${r.rows.length} order${r.rows.length === 1 ? "" : "s"}`} />
         <StatTile
-          label="Late"
+          label="Payment late"
           {...moneyTile(late, main)}
           sub={
             lateRows.length

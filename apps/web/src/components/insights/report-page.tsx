@@ -93,7 +93,10 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
   };
   // The printable report (unchanged), for the period up to today.
   const reportTo = p.to < today ? p.to : today;
-  const excel = kind === "targets" || kind === "spending" ? undefined : buildHref("/sheets/export/insights", {}, { section, period: p.kind, from: p.from, to: p.to });
+  const excel =
+    kind === "targets"
+      ? undefined
+      : buildHref("/sheets/export/insights", {}, { ...(kind === "spending" ? { report: "spending" } : { section }), period: p.kind, from: p.from, to: p.to });
 
   const periodPicker = (
     <Segmented

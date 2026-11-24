@@ -1,7 +1,7 @@
 import "server-only";
 import { api } from "./api";
 import { countryName } from "./countries";
-import { can, type Permission } from "@kebo/shared";
+import { can, EXPENSE_CATEGORY_LABEL, type Permission } from "@kebo/shared";
 import { addDays } from "@kebo/utils";
 import { lastMonths, monthEnd, monthStart, periodOf, SECTIONS, type Period, type Section } from "./insights-period";
 import type { SheetSpec } from "./sheet-spec";
@@ -714,6 +714,8 @@ export async function insightsSheets(q: Record<string, string | undefined>): Pro
   const me = await api.get<{ permissions: Permission[] }>("/auth/me");
   const today = companyToday();
   const p = periodOf(q, today);
+  // The Spending report, as the other reports (review 24 Nov, M-32: it had no Excel).
+  if (q.report === "spending") return spendingSheets(await loadSpending(p));
   const section: Section = (SECTIONS as readonly string[]).includes(q.section ?? "") ? (q.section as Section) : "overview";
   const money = can(me, "expenses.manage");
   switch (section) {
@@ -732,4 +734,63 @@ export async function insightsSheets(q: Record<string, string | undefined>): Pro
     case "funnel":
       return (await loadFunnel(p)).sheets;
   }
+}
+
+/** The Spending report's tables, one tab each: by person, by kind, by month, by customer and by supplier visited. */
+function spendingSheets(s: Awaited<ReturnType<typeof loadSpending>>): SheetSpec[] {
+  const c = s.currency;
+  const name = `Spending ${s.from} to ${s.to}`;
+  return [
+    {
+      name,
+      title: "By person",
+      columns: [
+        { header: "Person", width: 24 },
+        { header: `Spent (${c})`, kind: "number", width: 16 },
+        { header: `To sell (${c})`, kind: "number", width: 16 },
+        { header: `On lost inquiries (${c})`, kind: "number", width: 22 },
+        { header: `Still to pay back (${c})`, kind: "number", width: 22 },
+        { header: `Sold (${c})`, kind: "number", width: 16 },
+      ],
+      rows: s.people.map((x) => [x.person.name, xl(n(x.spent)), xl(n(x.toSell)), xl(n(x.lost)), xl(n(x.owed)), xl(x.sold)]),
+    },
+    {
+      name,
+      title: "By kind",
+      columns: [
+        { header: "Kind", width: 28 },
+        { header: `Amount (${c})`, kind: "number", width: 16 },
+      ],
+      rows: s.kinds.map((k) => [EXPENSE_CATEGORY_LABEL[k.category] ?? k.category, xl(n(k.amount))]),
+    },
+    {
+      name,
+      title: "By month",
+      columns: [
+        { header: "Month", width: 12 },
+        { header: `To sell (${c})`, kind: "number", width: 16 },
+        { header: `Sold (${c})`, kind: "number", width: 16 },
+      ],
+      rows: s.months.map((m) => [m.month, xl(n(m.toSell)), xl(m.sold)]),
+    },
+    {
+      name,
+      title: "By customer",
+      columns: [
+        { header: "Customer", width: 30 },
+        { header: `Spent (${c})`, kind: "number", width: 16 },
+      ],
+      rows: s.customers.map((x) => [x.customer.name, xl(n(x.spent))]),
+    },
+    {
+      name,
+      title: "Suppliers visited",
+      columns: [
+        { header: "Supplier", width: 30 },
+        { header: "Visits", kind: "number", width: 10 },
+        { header: `Spent (${c})`, kind: "number", width: 16 },
+      ],
+      rows: s.factories.map((x) => [x.factory.name, x.visits, xl(n(x.spent))]),
+    },
+  ];
 }

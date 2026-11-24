@@ -1,3 +1,4 @@
+import { backTo } from "@/components/print/data";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { isPaperKind, paperDateText, PAPER_LABEL, PAPER_STEP, portsOf, STEP_PATH } from "@kebo/shared";
@@ -59,13 +60,14 @@ export default async function MakePaperPage({
   searchParams,
 }: {
   params: Promise<{ id: string; kind: string }>;
-  searchParams: Promise<{ ref?: string }>;
+  searchParams: Promise<{ ref?: string; back?: string }>;
 }) {
   const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
   if (!isPaperKind(kind)) notFound();
   const me = await requireUser();
   const base = `/orders/${id}`;
-  const backHref = `${base}/${STEP_PATH[PAPER_STEP[kind]]}`;
+  // Back where it was opened from (Documents), else its step's page.
+  const backHref = backTo(sp.back, `${base}/${STEP_PATH[PAPER_STEP[kind]]}`);
   const ref = sp.ref && /^[\w-]{1,60}$/.test(sp.ref) ? sp.ref : undefined;
   let p: PaperChecks;
   try {

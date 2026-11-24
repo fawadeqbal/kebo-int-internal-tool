@@ -64,7 +64,7 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
   const counts = lists[0]!.counts;
   // On hold has its own column: the open stages' columns hold only the ones going on (held=no).
   const cols = COLUMNS.map((c, i) => ({ ...c, rows: lists[i]!.rows, total: lists[i]!.total }));
-  const open = (counts.new ?? 0) + (counts.sourcing ?? 0) + (counts.quoted ?? 0);
+  const open = (counts.new ?? 0) + (counts.sourcing ?? 0) + (counts.quoted ?? 0) + (counts.on_hold ?? 0);
   const today = companyToday();
   const keep = { q: sp.q, assignee: f.assignee, category: f.category, channel: f.channel, priority: f.priority, customer: sp.customer };
   const phoneKey: Column = cols.some((c) => c.key === sp.stage) ? (sp.stage as Column) : "new";

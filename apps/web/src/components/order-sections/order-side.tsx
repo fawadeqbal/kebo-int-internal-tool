@@ -30,7 +30,7 @@ export async function OrderSide({ id }: { id: string }) {
     can(me, "sourcing.manage") ? optional(() => orderMoneyOf(id)) : Promise.resolve(null),
     optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
     optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id, open: "true" })),
-    mayAssign ? getPeople().catch(() => []) : Promise.resolve([]),
+    getPeople().catch(() => []),
   ]);
   const base = `/orders/${o.id}`;
   const paid = (m?.factories?.rows ?? []).filter((r) => Number(r.owed) > 0 || Number(r.paid) > 0);
@@ -51,7 +51,7 @@ export async function OrderSide({ id }: { id: string }) {
     late ? `${late.label.toLowerCase()} ${late.value}` : null,
     o.status === "open" && due > 0 ? `${money(o.money.due, o.currency)} to come` : due <= 0 ? "paid in full" : null,
   ];
-  const form: ReactNode = o.status !== "cancelled" ? <QuickNote action={addNoteAction.bind(null, { key: "orderId", id: o.id })} /> : undefined;
+  const form: ReactNode = o.status !== "cancelled" ? <QuickNote action={addNoteAction.bind(null, { key: "orderId", id: o.id })} people={people} /> : undefined;
   return (
     <PanelCard title="Order" bar={bar}>
       <PanelWho

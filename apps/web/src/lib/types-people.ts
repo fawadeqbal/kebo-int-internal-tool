@@ -109,6 +109,8 @@ export interface FactoryDetail extends Factory {
     noReply: number;
     avgDaysToAnswer: number | null;
     openOrders: { id: string; refNo: string; customer: string; readyOn: string | null }[];
+    /** Every order it made for us (not cancelled), the latest first. */
+    orders?: { id: string; refNo: string; customer: string; status: "open" | "closed" | "cancelled"; stage: string; readyOn: string | null }[];
     lateSteps: number;
   };
 }

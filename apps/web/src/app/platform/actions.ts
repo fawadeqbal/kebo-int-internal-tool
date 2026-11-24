@@ -95,12 +95,13 @@ export async function openCompanyAction(id: string) {
   redirect("/dashboard");
 }
 
-/** Leave the company the platform admin opened: back to the platform. */
-export async function leaveCompanyAction() {
+/** Leave the company the platform admin opened: back to the platform, on that company's page. */
+export async function leaveCompanyAction(slug?: string) {
   await api.post("/auth/logout").catch(() => undefined);
   (await cookies()).set(SESSION_COOKIE, "", cookieOptions(0));
   const base = process.env.BASE_DOMAIN;
-  redirect(base ? `https://admin.${base}/platform/companies` : "/platform/companies");
+  const list = `/platform/companies${slug && /^[a-z0-9-]{1,63}$/.test(slug) ? `?from=${slug}` : ""}`;
+  redirect(base ? `https://admin.${base}${list}` : list);
 }
 
 /* ---------------------------------------------------------------- companies */

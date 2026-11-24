@@ -131,6 +131,8 @@ export const salesSettings = z.object({
    */
   factoryTaxIncluded: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()).default(false),
   factoryTaxRate: z.coerce.number().min(0, "Cannot be negative").max(100, "Cannot be more than 100%").refine((n) => Math.round(n * 100) === n * 100, "Use at most 2 decimals").default(0),
+  /** The customer's copy of a quotation shows each line's unit price and amount, not only the total (review 24 Nov, S-21). */
+  quoteUnitPrices: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()).default(false),
   /** Payment terms that go on every new quotation (beyond the deposit and balance). */
   defaultPaymentTerms: z.string().trim().max(5000).default(""),
   /** Delivery terms that go on every new quotation (packing, inspection, warranty…). */

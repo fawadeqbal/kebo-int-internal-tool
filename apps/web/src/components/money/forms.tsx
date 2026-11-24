@@ -442,6 +442,12 @@ export function FactoryPaymentForm({
             <Field label="Reference" htmlFor="fp-reference" optional>
               <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? prefill?.reference ?? ""} />
             </Field>
+            {/* What our bank charged to send it: kept as the order's bank charges, from the same account (M-38). */}
+            {!payment && (
+              <Field label="Our bank's charges" htmlFor="fp-charges" optional hint="Kept as the order's cost" error={s.errors?.bankCharges}>
+                <MoneyInput id="fp-charges" name="bankCharges" currency={m.currency} defaultValue={s.values?.bankCharges ?? ""} placeholder="0.00" />
+              </Field>
+            )}
             <Field
               label="Paid by"
               htmlFor="fp-paidBy"

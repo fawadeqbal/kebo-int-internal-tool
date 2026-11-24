@@ -33,15 +33,16 @@ export const framed = "flex flex-col gap-3 rounded-lg border border-line bg-surf
 
 function Actions({ save, pending, onCancel }: { save: string; pending: string; onCancel?: () => void }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      <SubmitButton size="sm" pendingText={pending}>
-        {save}
-      </SubmitButton>
+    // Cancel, then the save, at the right (review 24 Nov, O-31: Save came first).
+    <div className="flex flex-wrap justify-end gap-2">
       {onCancel && (
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
       )}
+      <SubmitButton size="sm" pendingText={pending}>
+        {save}
+      </SubmitButton>
     </div>
   );
 }
@@ -102,7 +103,8 @@ export function RouteForm({
       {pick === "informal" && <input type="hidden" name="balanceWhen" value={when} />}
       {pick === "letter_of_credit" && <input type="hidden" name="lcTerms" value={lcTerms} />}
       {pick === "letter_of_credit" && lcTerms === "deferred" && <input type="hidden" name="lcDays" value={lcDays} />}
-      <SelectCardList label="How the customer pays">
+      {/* The ways wrap onto the next line instead of running off the box's edge (review 24 Nov, O-31: LC was cut off). */}
+      <SelectCardList label="How the customer pays" className="flex-wrap overflow-visible [&>li]:w-auto [&>li]:min-w-56 [&>li]:flex-1">
         {options.map((r) => (
           <SelectCard key={r} title={PAYMENT_ROUTE_LABEL[r]} meta={ROUTE_TEXT[r]} selected={pick === r} onSelect={() => setPick(r)} />
         ))}
@@ -130,15 +132,16 @@ export function RouteForm({
           {fromQuotation ? "From the quotation's terms. " : ""}Change it and the plan is rebuilt (payments already recorded and instalments changed by hand stay).
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
-        <SubmitButton size="sm" variant="secondary" pendingText="Saving…" disabled={!pick || !changed || (pick === "letter_of_credit" && lcTerms === "deferred" && !Number(lcDays))}>
-          Save the payment route
-        </SubmitButton>
+      {/* Cancel, then the save, at the right: as every form ends (O-31). */}
+      <div className="flex flex-wrap justify-end gap-2">
         {onDone && (
           <Button type="button" size="sm" variant="ghost" onClick={onDone}>
             Cancel
           </Button>
         )}
+        <SubmitButton size="sm" variant="secondary" pendingText="Saving…" disabled={!pick || !changed || (pick === "letter_of_credit" && lcTerms === "deferred" && !Number(lcDays))}>
+          Save the payment route
+        </SubmitButton>
       </div>
     </ActionForm>
   );

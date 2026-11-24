@@ -987,7 +987,7 @@ export function AppShell({
               )}
               <Link href="/notifications" className={cn(buttonClass("ghost", "icon"), "relative")}>
                 <Bell aria-hidden />
-                <span className="sr-only">{unread ? `Notifications, ${unread} unread` : "Notifications"}</span>
+                <span className="sr-only">{unread ? `Alerts, ${unread} unread` : "Alerts"}</span>
                 {!!unread && (
                   <CountDot n={unread} className="absolute top-0.5 right-0" aria-hidden />
                 )}

@@ -333,9 +333,12 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
   ]);
   const at = new Map((flow?.items ?? []).map((i) => [i.id, i.current]));
   const cols = STAGE_FLOW.map((stage) => ({ stage, rows: stage === "done" ? recentDone : openRows.filter((r) => orderWordColumn(r.word) === stage) }));
+  // Every column's total, in each currency it holds ("USD 1.2M + CNY 300K"), not none when they mix (review 24
+  // Nov, S-30: Confirmed had no total).
   const valueOf = (rows: OrderRow[]) => {
-    const cur = rows[0]?.currency;
-    return cur && rows.every((r) => r.currency === cur) ? short(rows.reduce((t, r) => t + Number(r.total), 0), cur) : null;
+    const by = new Map<string, number>();
+    for (const r of rows) by.set(r.currency, (by.get(r.currency) ?? 0) + Number(r.total));
+    return by.size ? [...by].map(([cur, v]) => short(v, cur)).join(" + ") : null;
   };
   // Each card's pill and line (board): where it stands now, in a word or two.
   const pill = (o: OrderRow): [string, "warn" | "info" | "bad" | "ok" | "neutral"] => {
@@ -373,7 +376,8 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
       <BoardColumns
         columns={cols.map((c) => ({
           key: c.stage,
-          label: c.stage === "done" ? "Done" : ORDER_STAGE_LABEL[c.stage],
+          // Shipped holds the ones arrived and delivered too, until the order is done: named so (S-30).
+          label: c.stage === "done" ? "Done" : c.stage === "shipped" ? "Shipped and delivered" : ORDER_STAGE_LABEL[c.stage],
           tone: ORDER_STAGE_TONE[c.stage],
           total: c.rows.length,
           rows: c.rows.slice(0, 40),

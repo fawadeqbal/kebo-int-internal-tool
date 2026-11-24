@@ -19,6 +19,7 @@ import {
   portBullets,
   textBullets,
   type DocColumn,
+  totalPriceLabel,
 } from "@/components/print/kebo-doc";
 import { getSettings } from "@/lib/loaders";
 
@@ -54,15 +55,15 @@ export default async function QuotationPrint({
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const r = await load(() => api.get<RevisionDoc>(`/revisions/${id}`));
-  const [company, customer, now] = await Promise.all([
+  const [company, customer, now, unitPrices] = await Promise.all([
     companyOr(r.companySnapshot),
     customerOr(r.customerSnapshot, async () => {
       const deal = await api.get<DealDetail>(`/inquiries/${r.quotation.inquiryId}`);
       return { customerId: deal.customer.id, contactId: deal.contactId };
     }),
     // The stamp is not frozen with the letterhead: documents print the current one.
-    getSettings().then((s) => s.company),
-  ]);
+    getSettings(),
+  ]).then(([company, customer, settings]) => [company, customer, settings.company, settings.sales.quoteUnitPrices] as const);
   const c = r.currency;
   const internal = sp.copy === "internal";
   // Its months from a moment and what it covers (an older quotation: its words as they are).
@@ -102,7 +103,16 @@ export default async function QuotationPrint({
         { label: "Unit price", width: 66, align: "right", render: (l) => docMoney(l.unitPrice, c) },
         { label: "Amount", width: 74, align: "right", render: (l) => docMoney(l.lineTotal, c) },
       ]
-    : [no, description, { label: "Quantity", width: 71.4, render: (l) => docQty(l.quantity, l.unit) }];
+    : unitPrices
+      ? // Settings › Sales: the customer's copy shows each line's price (review 24 Nov, S-21).
+        [
+          no,
+          description,
+          { label: "Quantity", width: 58, render: (l) => docQty(l.quantity, l.unit) },
+          { label: "Unit price", width: 66, align: "right", render: (l) => docMoney(l.unitPrice, c) },
+          { label: "Amount", width: 74, align: "right", render: (l) => docMoney(l.lineTotal, c) },
+        ]
+      : [no, description, { label: "Quantity", width: 71.4, render: (l) => docQty(l.quantity, l.unit) }];
 
   // Each option: its lines and its own total. Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
   const groups = options.map((o) => ({
@@ -115,7 +125,7 @@ export default async function QuotationPrint({
             ...(Number(o.discount) ? [{ label: "Discount", value: docMoney(-Number(o.discount), c) }] : []),
           ]
         : [],
-    total: { label: `${single ? "" : `Option ${o.letter} `}Total ${r.incoterm} Price :`, words: docWords(o.total, c), amount: docMoney(o.total, c) },
+    total: { label: totalPriceLabel(r.incoterm, o.lines, single ? "" : `Option ${o.letter} `), words: docWords(o.total, c), amount: docMoney(o.total, c) },
   }));
 
   return (

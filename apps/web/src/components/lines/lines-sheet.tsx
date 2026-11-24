@@ -45,13 +45,16 @@ export function LinesView({
         <thead className="bg-faint">
           <tr>
             <th scope="col" className={cn(TH, "w-14 pl-5 max-sm:pl-4")}>No.</th>
-            {columns.map((c) => (
+            {columns.map((c, k) => (
               <th
                 key={c.key}
                 scope="col"
+                // A number's head may go onto two lines ("Unit price" / "USD") with less room around it, so the
+                // description has the width (review 24 Nov, S-34: it ran to 3–4 lines beside roomy number columns).
                 className={cn(
                   TH,
-                  c.align === "right" ? "text-right" : "text-left",
+                  c.align === "right" ? "px-2.5 text-right leading-tight whitespace-normal" : "text-left",
+                  k === 0 && "min-w-56",
                   c.phoneHidden && "max-sm:hidden",
                   c.shade && "bg-info-soft/60",
                 )}
@@ -74,8 +77,8 @@ export function LinesView({
                 <td
                   key={c.key}
                   className={cn(
-                    "px-3.5 py-2.5 align-top",
-                    c.align === "right" ? "text-right whitespace-nowrap tabular" : "",
+                    "py-2.5 align-top",
+                    c.align === "right" ? "px-2.5 text-right whitespace-nowrap tabular" : "px-3.5",
                     k === 0 && "whitespace-pre-line",
                     k === 0 && r.parentKey && "pl-7",
                     c.phoneHidden && "max-sm:hidden",

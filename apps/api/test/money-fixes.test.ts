@@ -299,8 +299,11 @@ describe("money fixes", () => {
     it("is settled by paying exactly that, in the database too", async () => {
       const f = (await orderMoney(orderId)).factories.rows[0].factory.id;
       await api(app, manager)
-        .post(`/orders/${orderId}/factory-payments`, { factoryId: f, kind: "balance", amount: 194.96, currency: "CNY", paidOn: today })
+        .post(`/orders/${orderId}/factory-payments`, { factoryId: f, kind: "balance", amount: 194.96, currency: "CNY", paidOn: today, bankCharges: 15 })
         .expect(201);
+      // Our bank's charge for sending it is the order's cost, not part of what the supplier got (review 24 Nov, M-38).
+      const costs = (await orderMoney(orderId)).expenses as { category: string; amount: string; currency: string }[];
+      expect(costs.filter((c) => c.category === "bank_charges")).toEqual([expect.objectContaining({ amount: "15.00", currency: "CNY" })]);
       const payables = (await api(app, sana).get("/money/payables").expect(200)).body;
       expect(payables.flatMap((p: { orders: { id: string }[] }) => p.orders).find((o: { id: string }) => o.id === orderId)).toBeUndefined();
       expect((await orderMoney(orderId)).factories.rows[0]).toMatchObject({ paid: "194.96", toPay: "0.00", overpaid: null });

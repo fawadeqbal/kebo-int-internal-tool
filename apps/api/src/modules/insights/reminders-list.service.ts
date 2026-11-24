@@ -66,13 +66,14 @@ export class RemindersListService {
     private readonly limits: LimitsService,
   ) {}
 
-  async list(user: SessionUser) {
+  /** `all`: every one (the Needs you page), not only the most urgent hundred (Home). */
+  async list(user: SessionUser, all = false) {
     const today = this.clock.today();
     // Worked out once per person while nothing changes (ReadCache); done and put-off are applied fresh.
     // The money warnings come from Insights and expenses (plan features): part of the key, so a plan change shows at once.
     const warnings = (await this.limits.allows("insights")) && (await this.limits.allows("expenses"));
     const items = await this.cache.get(`reminders:${user.id}:${today}:${warnings}`, () => this.build(user, today, warnings));
-    return this.withStates(user, items, today);
+    return this.withStates(user, items, today, all);
   }
 
   private async build(user: SessionUser, today: ISODate, warnings: boolean): Promise<Reminder[]> {
@@ -577,7 +578,7 @@ export class RemindersListService {
   }
 
   /** Leaves out what this person marked done, or put off until later; the most urgent first. */
-  private async withStates(user: SessionUser, items: Reminder[], today: ISODate) {
+  private async withStates(user: SessionUser, items: Reminder[], today: ISODate, all = false) {
     const states = await this.prisma.db.reminderState.findMany({ where: { userId: user.id, key: { in: items.map((i) => i.key) } } });
     const hidden = new Map(states.filter((x) => x.doneAt || (x.snoozedUntil && fromDbDate(x.snoozedUntil) > today)).map((x) => [x.key, x]));
     const shown = items
@@ -585,7 +586,7 @@ export class RemindersListService {
       .sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level] || (a.due ?? "9999").localeCompare(b.due ?? "9999"));
     // The most urgent hundred are plenty for a screen; the counts are for all of them.
     return {
-      items: shown.slice(0, MAX_ITEMS),
+      items: all ? shown : shown.slice(0, MAX_ITEMS),
       counts: { total: shown.length, bad: shown.filter((i) => i.level === "bad").length, hidden: hidden.size },
     };
   }

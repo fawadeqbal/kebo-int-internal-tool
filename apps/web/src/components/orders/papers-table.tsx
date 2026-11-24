@@ -18,6 +18,10 @@ import { ownDocumentAction, paperAgainAction, paperDeleteDraftAction } from "@/a
 import { RecordForm, StateMark } from "./papers-card";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
+/** The paper's Make page, coming back to Documents when done or on Esc (review 24 Nov, O-28: it went to Payment). */
+const makeHref = (orderId: string, r: { kind: string; ref?: string | null }) =>
+  `/orders/${orderId}/papers/${r.kind}?${new URLSearchParams({ ...(r.ref ? { ref: r.ref } : {}), back: `/orders/${orderId}/documents` })}`;
+
 export type PapersTab = "bank" | "all" | "missing";
 /** A row of the table: a paper of GET /orders/:id/papers, or the quotation (its own print page); `links` overrides where it prints. */
 export type PaperLineRow = PaperRow & { links?: { view: string; pdf: string; internal?: string } };
@@ -240,7 +244,7 @@ export function PapersTable({
                       tools.open({
                         kind: "share",
                         files: [],
-                        papers: setKeys.map((r) => ({ key: r.key, label: [r.label, r.number].filter(Boolean).join(" ") })),
+                        papers: setKeys.map((r) => ({ key: r.key, label: [r.label, r.number].filter(Boolean).join(" "), draft: r.draft || (r.kind === "proforma" && !r.number) })),
                       })
                     }
                   >
@@ -267,7 +271,7 @@ export function PapersTable({
                       <Link
                         key={r.key}
                         role="menuitem"
-                        href={`/orders/${orderId}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}`}
+                        href={makeHref(orderId, r)}
                         className="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none"
                       >
                         <span className="truncate">{r.label}</span>
@@ -318,7 +322,7 @@ function PaperLine({
   const { ask, dialog } = useConfirm();
   const from = fromOf(r);
   const print = printOf(orderId, r);
-  const make = r.makeable ? `/orders/${orderId}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}` : null;
+  const make = r.makeable ? makeHref(orderId, r) : null;
   const file = r.doc?.file ? (tools?.files.find((f) => f.sourceId === r.doc!.file!.id) ?? null) : null;
   const isDate = r.doc?.issuedOn ?? (/\d{4}-\d{2}-\d{2}/.exec(r.sub)?.[0] || null);
   const numberLine = [r.number, isDate ? day(isDate) : null].filter(Boolean).join(" · ") || "—";
@@ -526,7 +530,7 @@ export function PaperMenu({
   const more = useRef<HTMLButtonElement>(null);
   const scanId = useId();
   const print = printOf(orderId, r);
-  const make = r.makeable ? `/orders/${orderId}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}` : null;
+  const make = r.makeable ? makeHref(orderId, r) : null;
   const file = r.doc?.file ? (tools?.files.find((f) => f.sourceId === r.doc!.file!.id) ?? null) : null;
   const recordable = r.docKind && canRecord;
   const drop = attachKey(r);
@@ -599,7 +603,7 @@ export function PaperMenu({
                 tools.open({
                   kind: "share",
                   files: print ? [] : file ? [file] : [],
-                  papers: print ? [{ key: r.key, label: [r.label, r.number].filter(Boolean).join(" ") }] : [],
+                  papers: print ? [{ key: r.key, label: [r.label, r.number].filter(Boolean).join(" "), draft: r.draft || (r.kind === "proforma" && !r.number) }] : [],
                 }),
               "WhatsApp, email",
             )}

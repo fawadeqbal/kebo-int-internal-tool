@@ -51,10 +51,11 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
   ]);
   const c = data.counts;
   const count = (t: Tab) =>
+    // The stages' tabs count the ones going on; Open and All count those on hold too, once.
     t === "open"
-      ? (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0)
+      ? (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0) + (c.on_hold ?? 0)
       : t === "all"
-        ? (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0) + (c.won ?? 0) + (c.lost ?? 0)
+        ? (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0) + (c.on_hold ?? 0) + (c.won ?? 0) + (c.lost ?? 0)
         : (c[t] ?? 0);
   const keep = { stage: tab === "open" ? undefined : tab, q: sp.q, assignee, customer: sp.customer, priority, channel, category: sp.category };
   const href = (patch: Params) => buildHref("/inquiries", keep, { page: undefined, ...patch });

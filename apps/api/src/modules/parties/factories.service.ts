@@ -156,15 +156,23 @@ export class FactoriesService {
    */
   private async record(id: string, user?: SessionUser) {
     const db = this.prisma.db;
-    const [requests, quotes, orders, late] = await Promise.all([
+    const [requests, quotes, orders, late, every] = await Promise.all([
       db.factoryRequest.findMany({ where: { factoryId: id }, select: { inquiryId: true, status: true, sentOn: true } }),
       db.factoryQuote.findMany({ where: { factoryId: id, deletedAt: null }, select: { inquiryId: true, receivedOn: true } }),
-      db.order.findMany({ where: { status: "open", lines: { some: { factoryId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, factories: { where: { factoryId: id }, select: { readyOn: true } }, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" }, take: 20 }),
+      db.order.findMany({ where: { status: "open", lines: { some: { factoryId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, factories: { where: { factoryId: id }, select: { readyOn: true } }, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" } }),
       // Late: the ready date it gave has passed and not every line of its goods has come in.
       db.orderFactory.findMany({
         where: { factoryId: id, readyOn: { lt: new Date() }, order: { status: "open" } },
         select: { order: { select: { lines: { where: { factoryId: id, type: "goods" }, select: { quantity: true, receivedQty: true } } } } },
       }),
+      // Every order it made for us, not only the ones it is making (review 24 Nov, O-38: the Orders tab showed those only).
+      user
+        ? db.order.findMany({
+            where: { status: { not: "cancelled" }, lines: { some: { factoryId: id } }, ...orderAccess(user) },
+            select: { id: true, refNo: true, status: true, stage: true, factories: { where: { factoryId: id }, select: { readyOn: true } }, customer: { select: { name: true } } },
+            orderBy: { orderedOn: "desc" },
+          })
+        : Promise.resolve([]),
     ]);
     const lateSteps = late.filter((f) => f.order.lines.some((l) => Number(l.receivedQty) < Number(l.quantity))).length;
     const answered = requests.filter((r) => r.status === "quoted" || quotes.some((q) => q.inquiryId === r.inquiryId));
@@ -181,6 +189,7 @@ export class FactoriesService {
       noReply: requests.filter((r) => r.status === "no_reply").length,
       avgDaysToAnswer: days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null,
       openOrders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, readyOn: fromDbDateOrNull(o.factories[0]?.readyOn ?? null) })), // this factory's own ready date
+      orders: every.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, status: o.status, stage: o.stage, readyOn: fromDbDateOrNull(o.factories[0]?.readyOn ?? null) })),
       lateSteps,
     };
   }

@@ -17,7 +17,7 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
  * "Approve" (records it now as the usual payment or expense). `what` names the row for screen readers
  * ("money received · SO-2026-0447 · USD 1,000.00").
  */
-export function ApproveButtons({ approve, sendBack, what, verb = "Approve" }: { approve: Action; sendBack: Action; what: string; /** The word on the button ("Verify" where the page says verify). */ verb?: "Approve" | "Verify" }) {
+export function ApproveButtons({ approve, sendBack, what, verb = "Verify" }: { approve: Action; sendBack: Action; what: string; /** The word on the button ("Verify" where the page says verify). */ verb?: "Approve" | "Verify" }) {
   const [asking, setAsking] = useState(false);
   return (
     <div className="flex flex-wrap items-start justify-end gap-2">

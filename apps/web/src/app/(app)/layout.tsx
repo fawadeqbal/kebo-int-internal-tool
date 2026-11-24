@@ -84,7 +84,7 @@ export default async function AppLayout({ children, window: win }: { children: R
       <RememberColours colours={settings.company.colours} />
       <AppShell modules={modules} initialOpen={initialOpen} initialFold={initialFold} newItems={newItems} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
         {me.viaPlatform && (
-          <form action={leaveCompanyAction} className="no-print flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary-soft/60 px-3 py-2 text-sm">
+          <form action={leaveCompanyAction.bind(null, me.company?.slug)} className="no-print flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary-soft/60 px-3 py-2 text-sm">
             <span>
               <strong className="font-semibold">Platform admin</strong> · you are working in {company?.name ?? "this company"}. Everything you do is in its history under your name.
             </span>

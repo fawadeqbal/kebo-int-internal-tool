@@ -25,7 +25,8 @@ describe("the amount on a payment page", () => {
         party={{ label: "To", value: "Shenjing" }}
       />,
     );
-    expect(screen.getByText("≈ USD 957.75 at 7.1 CNY per USD")).toBeTruthy();
+    // The amount is kept on one line (its own span), so the sentence is read from the whole line.
+    expect(screen.getByText((_, el) => el?.tagName === "P" && el.textContent === "≈ USD 957.75 at 7.1 CNY per USD")).toBeTruthy();
     expect(screen.getByText("Shenjing")).toBeTruthy();
   });
 });

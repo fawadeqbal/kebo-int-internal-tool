@@ -480,7 +480,8 @@ export function PageHeader({
         // (globals.css hides that while this is on the page), and its ⋯ at the bar's end; the menu, search and
         // alerts stay around them.
         <div data-page-title="" className="no-print pointer-events-none fixed top-0 right-36 left-14 z-30 flex h-14 items-center gap-1 md:hidden">
-          <span aria-hidden className="min-w-0 flex-1 truncate text-lg leading-5 font-bold text-text">
+          {/* Two lines, smaller, on the narrowest phones rather than "Purcha…" (review 24 Nov, X-32). */}
+          <span aria-hidden className="line-clamp-2 min-w-0 flex-1 text-lg leading-5 font-bold break-words text-text max-[360px]:text-base max-[360px]:leading-[18px]">
             {named}
           </span>
           {more && <div className="pointer-events-auto shrink-0 [&>button]:size-10 [&>button]:rounded-full [&>button]:border-transparent [&>button]:bg-transparent [&>button]:shadow-none">{more}</div>}

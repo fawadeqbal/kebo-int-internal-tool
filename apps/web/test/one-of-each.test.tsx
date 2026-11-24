@@ -380,6 +380,8 @@ describe("one of each", () => {
       // The company's roles, and one balance per party and currency: whole from the server, paged here.
       "app/(app)/access/roles/page.tsx",
       "app/(app)/finance/ledger/page.tsx",
+      // What needs the person now: worked out whole by the API (Home shows its first five), paged here.
+      "app/(app)/needs-you/page.tsx",
       "app/platform/(admin)/companies/page.tsx",
       "app/platform/(admin)/leads/page.tsx",
       "app/platform/(admin)/companies/[id]/sections.tsx",

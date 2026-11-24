@@ -376,6 +376,10 @@ export interface OrderDocument {
     documentTitle: string | null;
     portOfDischarge: string | null;
     leadTime: string | null;
+    /** The warranty agreed, as papers print it. */
+    warranty?: string | null;
+    /** The customer's own order number. */
+    customerRef?: string | null;
   };
   /** Packing list versions made since the shipment is the one place: its ports as printed (older ones: none). */
   shipment?: { mode: ShipMode; portOfLoading: string | null; portOfDischarge: string | null } | null;

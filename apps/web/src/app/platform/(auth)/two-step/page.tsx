@@ -6,9 +6,10 @@ export const metadata = { title: "Platform sign in" };
 export default function PlatformTwoStepPage() {
   return (
     <AuthShell subtitle="Platform admin">
-      <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-2xl sm:leading-9">Enter your code</h1>
-      <p className="mt-1 text-sm text-muted">Open your authenticator app and enter the code for RFQ Desk platform.</p>
-      <PlatformTwoStepForm />
+      <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-2xl sm:leading-9">Two-step verification</h1>
+      <div className="mt-6 text-center">
+        <PlatformTwoStepForm />
+      </div>
     </AuthShell>
   );
 }
