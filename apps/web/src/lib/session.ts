@@ -2,9 +2,11 @@ import { SERVER_TZ, setCompanyTime } from "@/lib/format";
 import type { DateFormat, TimeFormat, TimeStyle } from "@kebo/utils";
 import "server-only";
 import { cache } from "react";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { can, type Permission, type PlanFeature, type Role } from "@kebo/shared";
 import { api, ApiError } from "./api";
+import { PAGE_HEADER } from "./page-header";
 
 export interface Me {
   id: string;
@@ -60,6 +62,17 @@ export async function hasFeature(feature: PlanFeature) {
 
 export const TWO_STEP_SETUP_PATH = "/login/set-up-two-step";
 
+/**
+ * The sign-in page, coming back afterwards to the page that was asked for (review 24 Nov, X-30: a link opened
+ * while signed out landed on the dashboard). Home needs no return.
+ */
+export async function signInHref() {
+  const page = (await headers()).get(PAGE_HEADER) ?? "";
+  return page.startsWith("/") && !page.startsWith("//") && !/^\/(dashboard)?(\?|$)/.test(page) && !page.startsWith("/login")
+    ? `/login?next=${encodeURIComponent(page)}`
+    : "/login";
+}
+
 /** The signed-in person (once per request), or off to the sign-in page. */
 export const requireUser = cache(async (): Promise<Me> => {
   try {
@@ -69,7 +82,7 @@ export const requireUser = cache(async (): Promise<Me> => {
     setCompanyTime(timeStyleOf(me));
     return me;
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) redirect("/login");
+    if (e instanceof ApiError && e.status === 401) redirect(await signInHref());
     throw e;
   }
 });
@@ -90,7 +103,7 @@ export async function load<T>(fn: () => Promise<T>): Promise<T> {
       notFound();
     }
     if (e instanceof ApiError && e.status === 403) redirect("/forbidden");
-    if (e instanceof ApiError && e.status === 401) redirect("/login");
+    if (e instanceof ApiError && e.status === 401) redirect(await signInHref());
     throw e;
   }
 }

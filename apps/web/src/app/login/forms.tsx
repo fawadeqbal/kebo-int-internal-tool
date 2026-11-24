@@ -133,6 +133,10 @@ export function TwoStepForm({ next }: { next?: string }) {
   return (
     <form action={action} className="flex flex-col gap-4" noValidate>
       <input type="hidden" name="next" value={next ?? ""} />
+      {/* What to type, for the view on screen (review 24 Nov, A-23: the recovery view still asked for 6 digits). */}
+      <p className="-mt-5 text-sm text-muted" aria-live="polite">
+        {recovery ? "Enter one of the recovery codes you saved when you set up two-step sign-in." : "Enter the 6-digit code from your authenticator app."}
+      </p>
       {recovery ? (
         <Field label="Recovery code" htmlFor="code" error={state.errors?.code} className="text-left">
           <Input id="code" name="code" autoComplete="one-time-code" autoFocus required />

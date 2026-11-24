@@ -91,7 +91,7 @@ export function RemoveDomain({ domain, ours, connected }: { domain: string; ours
     start(async () => {
       const r = await removeDomainAction({}, new FormData());
       setAsking(false);
-      toast(r.message ?? (r.ok ? "Domain removed." : "Could not remove the domain."));
+      toast({ ...(r.ok ? {} : { kind: "fail" as const }), message: r.message ?? (r.ok ? "Domain removed." : "Could not remove the domain.") });
       if (r.ok) router.refresh();
     });
   return (

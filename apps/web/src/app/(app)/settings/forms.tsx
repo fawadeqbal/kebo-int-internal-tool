@@ -40,7 +40,7 @@ function ImageControl({ f, text, error }: { f: SettingField; text: string; error
   const choose = (file: File | undefined) => {
     setProblem(null);
     if (!file) return;
-    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return setProblem("Choose a PNG or JPEG image.");
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return setProblem("Choose a PNG, JPG or WebP image.");
     if (file.size > (f.maxPixels ? 5 * 1024 : 300) * 1024) return setProblem(`This image is over ${f.maxPixels ? "5 MB" : "300 KB"}. Use a smaller one.`);
     const reader = new FileReader();
     reader.onload = async () => {
@@ -51,7 +51,7 @@ function ImageControl({ f, text, error }: { f: SettingField; text: string; error
     reader.readAsDataURL(file);
   };
   return (
-    <Field label={f.label} htmlFor={id} hint={f.hint} error={problem ? [problem] : error} className={cn(f.wide && "sm:col-span-2")}>
+    <Field label={f.label} htmlFor={id} error={problem ? [problem] : error} className={cn(f.wide && "sm:col-span-2")}>
       <div className="flex flex-wrap items-center gap-4">
         <input ref={hidden} type="hidden" name={f.name} value={value} />
         {value ? (
@@ -61,7 +61,7 @@ function ImageControl({ f, text, error }: { f: SettingField; text: string; error
           <div className="flex size-24 items-center justify-center rounded-md border border-dashed border-line text-xs text-muted">No {noun}</div>
         )}
         <div className="flex flex-col gap-2">
-          <FileZone label={value ? `Replace the ${noun}` : `Add the ${noun}`} inputId={id} optional={false} compact one accept="image/png,image/jpeg,image/webp" hint="PNG, JPG or WebP" onFiles={(fs) => choose(fs[0])} />
+          <FileZone label={value ? `Replace the ${noun}` : `Add the ${noun}`} inputId={id} optional={false} compact one accept="image/png,image/jpeg,image/webp" hint={f.hint ?? "PNG, JPG or WebP"} onFiles={(fs) => choose(fs[0])} />
           {value && (
             <button type="button" className="self-start text-sm text-bad underline-offset-2 hover:underline" onClick={() => setValue("")}>
               Remove the {noun}

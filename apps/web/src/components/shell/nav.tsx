@@ -82,10 +82,18 @@ function Menu({ trigger, label, children, className }: { trigger: ReactNode; lab
     setLastPath(pathname);
     setOpen(false);
   }
+  const button = useRef<HTMLButtonElement>(null);
+  const items = () => [...(ref.current?.querySelectorAll<HTMLElement>("[role=menu] [role=menuitem]") ?? [])];
   useEffect(() => {
     if (!open) return;
+    // Opened: its first item takes the focus, and the arrow keys move through it (review 24 Nov, X-27).
+    ref.current?.querySelector<HTMLElement>("[role=menu] [role=menuitem]")?.focus({ preventScroll: true });
     const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      if (ref.current?.contains(document.activeElement)) button.current?.focus();
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -96,11 +104,18 @@ function Menu({ trigger, label, children, className }: { trigger: ReactNode; lab
   return (
     <div ref={ref} className="relative">
       <button
+        ref={button}
         type="button"
         aria-label={label}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" && !open) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
         className="flex rounded-xl"
       >
         {trigger}
@@ -115,6 +130,15 @@ function Menu({ trigger, label, children, className }: { trigger: ReactNode; lab
           // Close after a choice, but not for a form button (removing the form before it submits cancels the submit: Sign out)
           // nor for a setting chosen in place (the look).
           onClick={(e) => !(e.target as HTMLElement).closest("form,[data-keep-open]") && setOpen(false)}
+          onKeyDown={(e) => {
+            if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+            const list = items();
+            if (!list.length) return;
+            e.preventDefault();
+            const at = list.indexOf(document.activeElement as HTMLElement);
+            const next = e.key === "Home" ? 0 : e.key === "End" ? list.length - 1 : (at + (e.key === "ArrowDown" ? 1 : -1) + list.length) % list.length;
+            list[next]!.focus();
+          }}
         >
           {children}
         </div>

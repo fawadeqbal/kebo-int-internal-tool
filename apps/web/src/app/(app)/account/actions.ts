@@ -3,14 +3,15 @@
 import QRCode from "qrcode";
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
-import { attempt, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formValues, newPasswordProblems, type ActionState } from "@/lib/actions";
 
 /** Passwords are never sent back to the browser, not even after an error. */
 const forget = (r: ActionState): ActionState => ({ ...r, values: undefined });
 
 export async function changePasswordAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  if (v.next && v.confirm !== v.next) return { ok: false, message: "The two new passwords are not the same.", errors: { confirm: ["Type the same new password again"] } };
+  const problems = newPasswordProblems(v);
+  if (problems) return problems;
   return forget(await attempt(form, () => api.post("/me/password", { current: v.current, next: v.next }), "Password changed. Your other devices are signed out."));
 }
 

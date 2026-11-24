@@ -25,8 +25,10 @@ export function Delta({
   const flat = Math.abs(value) < 0.5;
   const up = value > 0;
   const good = flat ? null : up === goodWhenUp;
-  const size = Math.abs(value) >= 1000 ? ">999" : Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 1 });
-  const unit = points ? " pts" : "%";
+  // Ten times or more: said as times ("12×"), not ">999%" (review 24 Nov, S-31).
+  const times = !points && value >= 900 ? Math.round(value / 100 + 1) : null;
+  const size = times ? String(times) : Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 1 });
+  const unit = times ? "×" : points ? " pts" : "%";
   return (
     <span
       className={cn(
@@ -37,7 +39,7 @@ export function Delta({
       <span aria-hidden>{flat ? "=" : up ? "▲" : "▼"}</span>
       <span aria-hidden>{flat ? "same" : `${size}${unit}`}</span>
       <span className="sr-only">
-        {flat ? `the same as ${vs}` : `${up ? "up" : "down"} ${size}${points ? " points" : " percent"} on ${vs}`}
+        {flat ? `the same as ${vs}` : times ? `${times} times ${vs}` : `${up ? "up" : "down"} ${size}${points ? " points" : " percent"} on ${vs}`}
       </span>
     </span>
   );

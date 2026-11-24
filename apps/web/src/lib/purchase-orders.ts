@@ -40,7 +40,8 @@ export const PURCHASE_ORDER_STATUS: Record<PurchaseOrderStatus, { label: string;
   in_production: { label: "In production", meaning: "info" },
   late: { label: "Ready date passed", meaning: "bad" },
   ready: { label: "Ready", meaning: "ok" },
-  shipped: { label: "Shipped", meaning: "ok" },
+  // The same colour as the order's "Shipped" (review 24 Nov, X-21: green on one page, blue on another).
+  shipped: { label: "Shipped", meaning: "info" },
   cancelled: { label: "Cancelled", meaning: "neutral" },
 };
 

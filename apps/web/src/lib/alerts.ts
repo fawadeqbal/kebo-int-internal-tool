@@ -28,7 +28,8 @@ const KINDS: [test: string, label: string, tone: Tone][] = [
   ["quotation.", "Quotation", "info"],
   ["order.created", "Order made", "ok"],
   ["order.purchaseOrderSent", "Purchase order", "info"],
-  ["order.shipped", "Shipped", "ok"],
+  // The order word's colour, everywhere "Shipped" shows (review 24 Nov, X-21).
+  ["order.shipped", "Shipped", "info"],
   ["order.", "Order moved", "info"],
   ["reminder.orderEscalated", "Order late", "bad"],
   ["reminder.order", "Order needs you", "warn"],

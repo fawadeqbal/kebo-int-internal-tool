@@ -38,7 +38,7 @@ export function RequestMore({
       const form = new FormData();
       for (const [k, v] of Object.entries(values)) form.set(k, v);
       const r = await fn({}, form);
-      if (!r.ok && r.message) toast(r.message);
+      if (!r.ok && r.message) toast({ kind: "fail", message: r.message });
       router.refresh();
     });
   };

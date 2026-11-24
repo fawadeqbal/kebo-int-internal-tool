@@ -6,6 +6,8 @@ export const DB_ERROR = {
   uniqueViolation: "P2002",
   /** The record to update or delete does not exist. */
   notFound: "P2025",
+  /** A value the column cannot hold (a malformed id in a link, "not-an-id" for a UUID). */
+  badValue: "P2023",
 } as const;
 
 /** Whether an error is a known Prisma error with this code (keeps Prisma's classes inside this package). */

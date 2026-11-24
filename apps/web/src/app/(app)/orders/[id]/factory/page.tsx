@@ -276,10 +276,19 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         <div key={po.id} className="grid items-start gap-4 lg:grid-cols-2">
           <Section
             title={(pos?.items.length ?? 0) > 1 ? `Purchase order · ${po.supplier.name}` : "Purchase order"}
+            // A cancelled order's purchase order is not waiting to be sent (review 24 Nov, O-48).
             state={
-              po.sentOn ? (po.sentEarlyReason ? `Sent ${date(po.sentOn)} · before the deposit` : `Sent ${date(po.sentOn)}`) : "Not sent"
+              o.status === "cancelled"
+                ? po.sentOn
+                  ? `Sent ${date(po.sentOn)} · order cancelled`
+                  : "Order cancelled"
+                : po.sentOn
+                  ? po.sentEarlyReason
+                    ? `Sent ${date(po.sentOn)} · before the deposit`
+                    : `Sent ${date(po.sentOn)}`
+                  : "Not sent"
             }
-            tone={po.sentOn ? (po.sentEarlyReason ? "warn" : "ok") : "neutral"}
+            tone={o.status === "cancelled" ? "neutral" : po.sentOn ? (po.sentEarlyReason ? "warn" : "ok") : "neutral"}
             cols={3}
             rows={[
               { label: "Purchase order no.", value: <RefCode>{po.number}</RefCode> },

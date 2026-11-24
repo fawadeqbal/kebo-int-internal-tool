@@ -27,7 +27,7 @@ export type MenuEntry =
   | { separator: true };
 
 const itemClass =
-  "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-text hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none";
+  "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-text hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-offset-[-2px]";
 
 /**
  * ⋯ and its menu: everything a page or a row can do other than its one main
@@ -90,7 +90,7 @@ export function MoreMenu({
     setBusy(true);
     try {
       const r = await asking.action({}, new FormData());
-      if (r && r.ok === false) toast(r.message ?? "Could not do that.");
+      if (r && r.ok === false) toast({ kind: "fail", message: r.message ?? "Could not do that." });
       else router.refresh();
     } finally {
       setBusy(false);

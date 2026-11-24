@@ -98,7 +98,7 @@ export function PlatformRemoveDomain({ id, domain, ours, connected }: { id: stri
     start(async () => {
       const r = await platformRemoveDomainAction(id);
       setAsking(false);
-      toast(r.message ?? (r.ok ? "Domain removed." : "Could not remove the domain."));
+      toast({ ...(r.ok ? {} : { kind: "fail" as const }), message: r.message ?? (r.ok ? "Domain removed." : "Could not remove the domain.") });
       if (r.ok) router.refresh();
     });
   return (

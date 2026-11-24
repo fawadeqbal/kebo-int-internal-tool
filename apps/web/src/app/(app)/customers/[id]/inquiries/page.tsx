@@ -111,7 +111,7 @@ export default async function CustomerInquiries({
                       </Td>
                       <Td>
                         <span className="block font-semibold">{d.title}</span>
-                        <span className="block text-xs text-text-2">Ask: {CHANNEL_LABEL[d.channel].toLowerCase()}</span>
+                        <span className="block text-xs text-text-2">Came by {CHANNEL_LABEL[d.channel]}</span>
                       </Td>
                       <Td>{d.category}</Td>
                       <Td className="whitespace-nowrap">{date(d.createdAt)}</Td>

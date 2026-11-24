@@ -217,7 +217,7 @@ export class FollowUpsService {
         group: "followups",
         tag: "Follow-up for you",
         subject: `${actor.name} gave you a follow-up: ${row.title}, ${when}`,
-        sentence: `${actor.name} planned ${kind === "other" ? "a follow-up" : `a ${kind}`} for you on ${when}${row.place ? ` at ${row.place}` : ""}.${row.note ? `\n${row.note}` : ""}`,
+        sentence: `${actor.name} planned ${kind === "other" ? "a follow-up" : withArticle(kind)} for you on ${when}${row.place ? ` at ${row.place}` : ""}.${row.note ? `\n${row.note}` : ""}`,
         where: ref ? { ref: refNo!, title: rest.join(" · ") || row.title } : null,
         people: rowsOf([
           ["About", ref?.label],

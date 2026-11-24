@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { addressOf, adminOrigin, CONNECT_SUB, marketingOrigin } from "@kebo/shared";
+import { PAGE_HEADER } from "@/lib/page-header";
 
 /**
  * Addresses per company (only when BASE_DOMAIN is set; otherwise everything is
@@ -54,8 +55,10 @@ const companyOf = (host: string) => ask(`host:${host}`, `company-at?host=${encod
 
 export async function proxy(req: NextRequest) {
   const base = process.env.BASE_DOMAIN;
-  if (!base) return NextResponse.next();
   const headers = new Headers(req.headers);
+  // The page asked for, so a signed-out person comes back to it after signing in (review 24 Nov, X-30).
+  headers.set(PAGE_HEADER, `${req.nextUrl.pathname}${req.nextUrl.search}`);
+  if (!base) return NextResponse.next({ request: { headers } });
   // Only this decides the company: never what the browser sent.
   headers.delete("x-company");
   const path = req.nextUrl.pathname;
