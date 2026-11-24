@@ -59,7 +59,7 @@ import { requireReason } from "../../common/audit/reason";
 import { ordersWithMoneyDue } from "../billing/api";
 import { chargedExpenses, fxOf, moneyFacts, positionOf, reachedOn, type MoneyCtx } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
-import { factoryPlansFor } from "../billing/api";
+import { chasesOf, factoryPlansFor } from "../billing/api";
 import { createPlan, termsOf } from "../billing/api";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { setPaymentTerms } from "./payment-terms";
@@ -676,9 +676,11 @@ export class OrdersService {
     };
   }
 
-  private facts(o: OrderRow, fx: MoneyCtx): OrderFacts {
+  /** `chase`: the plan's part to chase (chasesOf), so the needs say its amount and date as the Payment tab does. */
+  private facts(o: OrderRow, fx: MoneyCtx, chase?: OrderFacts["chase"]): OrderFacts {
     const m = this.moneyOf(o, fx);
     return {
+      chase,
       ...moneyFacts(m.position),
       currency: o.currency,
       stage: o.stage,
@@ -805,7 +807,11 @@ export class OrdersService {
       goods: goodsSummary(o),
       next: this.nextOf(o),
       back: back ? { to: back, label: `Back to ${ORDER_STAGE_LABEL[back]}` } : null,
-      needs: orderNeeds(this.facts(o, fx), this.clock.today(), days),
+      needs: orderNeeds(
+        this.facts(o, fx, (await chasesOf(this.prisma.db, [{ id: o.id, settledMinor: p.settledMinor }], this.clock.today())).get(o.id)),
+        this.clock.today(),
+        days,
+      ),
       history: history.map((h) => ({
         id: h.id,
         from: h.fromStage,
@@ -1098,6 +1104,7 @@ export class OrdersService {
     const fx = fxOf(settings, await this.limits.allows("expenses"));
     const today = this.clock.today();
     const features = await this.limits.features();
+    const chases = await chasesOf(this.prisma.db, rows.map((o) => ({ id: o.id, settledMinor: positionOf(o, fx).settledMinor })), today);
     const items = rows.map((o) => {
       const p = positionOf(o, fx);
       return {
@@ -1119,7 +1126,7 @@ export class OrdersService {
         charged: fromMinor(p.chargedMinor),
         due: fromMinor(p.dueMinor),
         next: this.nextOf(o),
-        needs: orderNeeds(this.facts(o, fx), today, days),
+        needs: orderNeeds(this.facts(o, fx, chases.get(o.id)), today, days),
       };
     });
     return filter.lateOnly ? items.filter((i) => i.needs?.late) : items;

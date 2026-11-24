@@ -65,6 +65,10 @@ describe("what stands out: late customers", () => {
       text: "Accra Water: 1 day.",
     });
     expect(lateSentence([], money)).toBeNull();
+    // Part of it in another currency: said, as Receivables lists each currency apart.
+    expect(lateSentence([{ name: "Accra Water", amount: usd(500), days: 1, paidLate: 0, paid: 2, others: true }], money)!.lead).toBe(
+      "One customer is late with USD 500, other currencies counted in.",
+    );
   });
 });
 

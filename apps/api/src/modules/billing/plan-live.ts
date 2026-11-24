@@ -1,5 +1,7 @@
 import { decimalToMinor, fromDbDateOrNull, type Prisma, termsSelect } from "@kebo/database";
-import { livePlan, shippedOnOf, type PlanDates } from "@kebo/shared";
+import { livePlan, partToChase, planStatus, shippedOnOf, type PlanDates } from "@kebo/shared";
+import type { Minor } from "@kebo/money";
+import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
 import { readyOnOf, readySelect } from "@kebo/database";
 import { termsOf } from "./route-plan";
@@ -85,4 +87,13 @@ export async function livePlansOf(db: Db, orderIds: string[]) {
 /** One order's plan, live. */
 export async function livePlanOf(db: Db, orderId: string) {
   return (await livePlansOf(db, [orderId])).get(orderId) ?? { dates: { readyOn: null, shippedOn: null, papersOn: null }, items: [] };
+}
+
+/**
+ * Each order's part to chase (partToChase over its live plan and what came in), by order id: the one due date
+ * and lateness per part that Home, Receivables, the orders list and the order all show.
+ */
+export async function chasesOf(db: Db, orders: { id: string; settledMinor: Minor }[], today: ISODate) {
+  const plans = await livePlansOf(db, orders.map((o) => o.id));
+  return new Map(orders.map((o) => [o.id, partToChase(planStatus(plans.get(o.id)?.items ?? [], o.settledMinor, today, 0))]));
 }

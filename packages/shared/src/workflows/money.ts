@@ -51,6 +51,17 @@ export function planStatus<T extends PlanItem>(items: T[], settledMinor: Minor, 
 }
 
 /**
+ * The part of a plan to chase (review 24 Nov, one due date and lateness per part): the open part due first, so
+ * a late part comes before one due later whatever their order in the plan; else the first open undated part.
+ * Every screen that says what is late or due next (Home, Receivables, the orders list, the order) uses it.
+ */
+export function partToChase<T extends { openMinor: Minor; dueOn: ISODate | null }>(plan: T[]): T | null {
+  const open = plan.filter((p) => p.openMinor > 0);
+  const dated = open.filter((p) => p.dueOn).sort((a, b) => a.dueOn!.localeCompare(b.dueOn!));
+  return dated[0] ?? open[0] ?? null;
+}
+
+/**
  * Where a payment request stands (the plan row with a status, claude/core-plan.md phase 1): not sent yet,
  * sent (the request itself, or the proforma for the deposit), part paid, paid. Worked out, never typed:
  * paid and part paid from the money received (earliest row first), sent from the copy kept when it was sent.

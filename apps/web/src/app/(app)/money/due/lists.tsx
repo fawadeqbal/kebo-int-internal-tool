@@ -110,6 +110,7 @@ export async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; toda
           }
           tone={lateRows.length ? "bad" : undefined}
           href={lateRows.length ? href({ show: "late", page: undefined, open: undefined }) : undefined}
+          how="Orders with a part of their payment plan past its date and not paid. The orders list's Late counts orders whose next step is past its date, money or goods, so the two can differ."
         />
         <StatTile
           label="Due in the next 7 days"

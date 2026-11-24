@@ -16,7 +16,7 @@ export {
   type MoneyCtx,
   type PositionFacts,
 } from "./position";
-export { livePlanOf, livePlanOfOrder, livePlansOf, type LiveItem } from "./plan-live";
+export { chasesOf, livePlanOf, livePlanOfOrder, livePlansOf, type LiveItem } from "./plan-live";
 export { createPlan, lcBalanceMinor, lcChecksOf, rebuildRoutePlan, termsOf } from "./route-plan";
 export { advanceOf, factoryPlansFor, factoryPlansOf, owedByFactory, seedFactoryPlans, startingPlan, type FactoryPlanView } from "./factory-plan";
 export { factoryPositionsSql, ordersOwingFactories, ordersWithMoneyDue, owedLineSql, positionsSql } from "./due";

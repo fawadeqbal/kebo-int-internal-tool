@@ -6,6 +6,7 @@ import {
   checkManualMove,
   checkMove,
   orderNeeds,
+  partToChase,
   stageAfter,
   supersededBy,
   can,
@@ -130,6 +131,21 @@ describe("order stages", () => {
     // Closed with money still owed is still chased.
     expect(orderNeeds({ ...base, stage: "done", status: "closed", shippedOn: "2026-10-20", receivedMinor: 9_000_00 }, "2026-11-04")).toEqual({ title: "Get the balance (USD 1,000.00) — the order is closed", due: "2026-11-03", late: true });
     expect(orderNeeds({ ...base, status: "cancelled" }, "2026-11-04")).toBeNull();
+  });
+
+  it("chases the plan's part due first, with its amount and its own date (one lateness per part)", () => {
+    // The review's SO-2026-0034: the deposit is dated after the balance; the balance is the one that is late.
+    const plan = [
+      { label: "Deposit 30%", openMinor: 9_942_00, dueOn: "2026-11-27" },
+      { label: "Balance 70%", openMinor: 23_198_01, dueOn: "2026-09-10" },
+    ];
+    expect(partToChase(plan)).toMatchObject({ label: "Balance 70%" });
+    expect(partToChase([{ label: "Balance", openMinor: 5_00, dueOn: null }, { label: "Paid", openMinor: 0, dueOn: "2026-01-01" }])).toMatchObject({ label: "Balance" });
+    expect(partToChase([])).toBeNull();
+    const shipped: OrderFacts = { ...money, stage: "shipped", status: "open", stageSince: "2026-09-10", readyOn: null, shippedOn: "2026-09-10", chase: partToChase(plan) };
+    expect(orderNeeds(shipped, "2026-11-25")).toEqual({ title: "Get the balance 70% (USD 23,198.01)", due: "2026-09-10", late: true });
+    // An undated part (the ship date not known yet) keeps the reminder days.
+    expect(orderNeeds({ ...shipped, chase: { label: "Balance", openMinor: 7_000_00, dueOn: null } }, "2026-11-25")).toMatchObject({ due: "2026-09-24" });
   });
 });
 

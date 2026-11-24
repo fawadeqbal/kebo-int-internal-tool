@@ -123,6 +123,11 @@ export interface OrderFacts extends OrderMoney {
   readyOn: ISODate | null;
   shippedOn: ISODate | null;
   goods?: OrderGoods;
+  /**
+   * The customer's plan part to chase (partToChase): when given, the money needs name it, its amount and its own
+   * due date, as the Payment tab and Receivables do; without it, the reminder days below date them.
+   */
+  chase?: { label: string; openMinor: Minor; dueOn: ISODate | null } | null;
 }
 
 /** What an open order needs from someone now, and by when. Null when nothing (done or cancelled). */
@@ -136,13 +141,19 @@ export function orderNeeds(o: OrderFacts, today: ISODate, days: OrderReminderDay
   const due = dueOf(o);
   const need = (title: string, by: ISODate): OrderNeed => ({ title, due: by, late: by < today });
   const balanceBy = addDays(o.shippedOn ?? o.stageSince, days.balanceDays);
+  // The plan's part, its amount and its date when known ("Get the balance 70% (USD 23,198.01)", due 10 Sep).
+  const chase = o.chase && o.chase.openMinor > 0 ? o.chase : null;
+  const getPart = (fallback: string, amount: Minor, by: ISODate, after = "") =>
+    chase
+      ? need(`Get the ${chase.label.charAt(0).toLowerCase()}${chase.label.slice(1)} (${formatMinor(chase.openMinor, o.currency)})${after}`, chase.dueOn ?? by)
+      : need(`Get the ${fallback} (${formatMinor(amount, o.currency)})${after}`, by);
   if (o.status === "cancelled") return null;
   // Closed with money still owed (closed anyway, or a payment removed later): keep chasing it.
-  if (o.status === "closed") return due > 0 ? need(`Get the balance (${formatMinor(due, o.currency)}) — the order is closed`, balanceBy) : null;
+  if (o.status === "closed") return due > 0 ? getPart("balance", due, balanceBy, " — the order is closed") : null;
   switch (o.stage) {
     case "confirmed": {
       const deposit = depositOf(o);
-      if (deposit > 0 && o.receivedMinor < deposit) return need(`Get the deposit (${formatMinor(deposit - o.receivedMinor, o.currency)})`, addDays(o.stageSince, days.depositDays));
+      if (deposit > 0 && o.receivedMinor < deposit) return getPart("deposit", deposit - o.receivedMinor, addDays(o.stageSince, days.depositDays));
       return need(deposit > 0 ? "Deposit is in: start production" : "Start production (no deposit on these terms)", addDays(o.stageSince, days.depositDays));
     }
     case "in_production": {
@@ -153,8 +164,8 @@ export function orderNeeds(o: OrderFacts, today: ISODate, days: OrderReminderDay
       return o.readyOn ? need("Goods due from the supplier", o.readyOn) : need("Ask the supplier for the ready date", by);
     }
     case "shipped":
-      return need(due > 0 ? `Get the balance (${formatMinor(due, o.currency)})` : "Paid in full: close the order", balanceBy);
+      return due > 0 ? getPart("balance", due, balanceBy) : need("Paid in full: close the order", balanceBy);
     case "done":
-      return due > 0 ? need(`Get the balance (${formatMinor(due, o.currency)})`, balanceBy) : null;
+      return due > 0 ? getPart("balance", due, balanceBy) : null;
   }
 }

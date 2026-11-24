@@ -186,7 +186,7 @@ export const how = {
 
   ordersNow: (c: string) =>
     [
-      `The open orders, by the stage each is at now, with what they were sold for. "Late to pay": an order with a part past its due date and not paid.`,
+      `The open orders, by where each stands, as on the board and the list (arrived and delivered orders stay under Shipped until closed), with what they were sold for. "Late to pay": an order with a part past its due date and not paid.`,
       `"Past the ready date": goods the supplier promised for a day that has gone, not ready yet. ${ORDER_RATE(c)}`,
     ].join("\n"),
 

@@ -88,7 +88,8 @@ describe("Home's figures", () => {
   });
 
   it("orders and inquiries are counted by stage, and add up to what is open", () => {
-    expect(h.orders.stages.map((s) => s.key)).toEqual(["confirmed", "in_production", "shipped", "done"]);
+    // The board's columns, by the one word (arrived and delivered orders stay under Shipped until closed).
+    expect(h.orders.stages.map((s) => s.key)).toEqual(["confirmed", "in_production", "shipped"]);
     expect(h.orders.stages.reduce((t, s) => t + s.count, 0)).toBe(h.orders.open);
     expect(h.orders.stages.reduce((t, s) => t + cents(s.value!), 0)).toBe(cents(h.orders.value));
     expect(h.inquiries.stages.map((s) => s.key)).toEqual(["new", "sourcing", "quoted"]);

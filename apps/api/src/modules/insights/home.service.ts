@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { convert, fromMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
-import { can, EXPENSE_CATEGORY_LABEL, type ExpenseCategory } from "@kebo/shared";
+import { can, EXPENSE_CATEGORY_LABEL, orderWord, orderWordColumn, type ExpenseCategory } from "@kebo/shared";
+import { wordFactsByOrder } from "@kebo/database";
 import { ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
@@ -83,11 +84,12 @@ export class HomeService {
             from expenses e where e.voided_at is null and e.borne_by = 'us' and e.spent_on >= ${lastMonth}::date and e.spent_on <= ${today}::date`
         : Promise.resolve([]),
       // Customers with a part past its date: how much, and how long the oldest has waited.
-      db.$queryRaw<{ customerId: string; name: string; amount: string; days: number; paidLate: number; paid: number }[]>`
+      db.$queryRaw<{ customerId: string; name: string; amount: string; days: number; paidLate: number; paid: number; others: boolean }[]>`
         select x.customer_id as "customerId", p.name, sum(x.overdue)::text as amount, max(x.days)::int as days,
+               bool_or(x.currency <> x.main_currency) as others,
                (select count(*) from order_facts h where h.customer_id = x.customer_id and h.paid_on_time = false)::int as "paidLate",
                (select count(*) from order_facts h where h.customer_id = x.customer_id and h.paid_in_full_on is not null)::int as paid
-        from (select f.customer_id,
+        from (select f.customer_id, f.currency, f.main_currency,
                      (select coalesce(sum((q ->> 'open')::numeric), 0) from jsonb_array_elements(f.open_parts) q where (q ->> 'dueOn')::date < ${today}::date) as overdue,
                      (select max(${today}::date - (q ->> 'dueOn')::date) from jsonb_array_elements(f.open_parts) q
                       where (q ->> 'dueOn')::date < ${today}::date and (q ->> 'open')::numeric > 0) as days
@@ -116,17 +118,19 @@ export class HomeService {
         left join lateral (select max(r.sent_on) as sent_on from quotations q join quotation_revisions r on r.quotation_id = q.id
                            where q.inquiry_id = f.inquiry_id and r.deleted_at is null and r.status = 'sent') s on true
         where f.outcome = 'open' and f.stage = 'quoted'`,
-      // Open orders by stage: how many, their value, how many have a part past its date, how many still owe.
-      db.$queryRaw<{ stage: string; n: number; value: string; late: number; owing: number }[]>`
-        select f.stage::text as stage, count(*)::int as n, sum(f.total_main)::text as value,
-               count(*) filter (where exists (select 1 from jsonb_array_elements(f.open_parts) q where (q ->> 'dueOn')::date < ${today}::date and (q ->> 'open')::numeric > 0))::int as late,
-               count(*) filter (where f.due_main > 0)::int as owing
-        from order_facts f where f.status = 'open' group by 1`,
+      // Open orders, each with its value, whether a part is past its date and whether it still owes: grouped below
+      // by the one word (orderWord) into the board's columns, so Home, the board and the list count the same.
+      db.$queryRaw<{ orderId: string; value: string; late: boolean; owing: boolean }[]>`
+        select f.order_id as "orderId", f.total_main::text as value,
+               exists (select 1 from jsonb_array_elements(f.open_parts) q where (q ->> 'dueOn')::date < ${today}::date and (q ->> 'open')::numeric > 0) as late,
+               f.due_main > 0 as owing
+        from order_facts f where f.status = 'open'`,
       // Goods being made: past the promised day, or promised within the next 14 days.
-      db.$queryRaw<{ late: number; soon: number }[]>`
-        select count(distinct f.order_id) filter (where f.ready_promised < ${today}::date)::int as late,
-               count(distinct f.order_id) filter (where f.ready_promised between ${today}::date and ${addDays(today, 14)}::date)::int as soon
-        from factory_order_facts f where f.status = 'open' and f.ready_actual is null and f.ready_promised is not null`,
+      // Per order, counted below only for orders under In production (as the list's "late" there).
+      db.$queryRaw<{ orderId: string; late: boolean; soon: boolean }[]>`
+        select f.order_id as "orderId", bool_or(f.ready_promised < ${today}::date) as late,
+               bool_or(f.ready_promised between ${today}::date and ${addDays(today, 14)}::date) as soon
+        from factory_order_facts f where f.status = 'open' and f.ready_actual is null and f.ready_promised is not null group by f.order_id`,
       db.$queryRaw<{ stage: string; n: number; value: string; old: number }[]>`
         select f.stage::text as stage, count(*)::int as n, coalesce(sum(f.quoted_value_main), 0)::text as value,
                count(*) filter (where f.received_on < ${week}::date)::int as old
@@ -204,7 +208,7 @@ export class HomeService {
     const standout = standoutOf([
       salesSentence({ now: soldNow, before: soldBefore, biggest: top ? { refNo: top.refNo, customer: top.customer, sold: m(top.sold) } : null, lastMonth: monthName(ymBefore), money }),
       lateSentence(
-        overdue.map((o) => ({ name: o.name, amount: m(o.amount), days: o.days, paidLate: o.paidLate, paid: o.paid })),
+        overdue.map((o) => ({ name: o.name, amount: m(o.amount), days: o.days, paidLate: o.paidLate, paid: o.paid, others: o.others })),
         money,
       ),
       seeProfit
@@ -233,15 +237,41 @@ export class HomeService {
       : null;
 
     /* ---------------------------------------------------------------- orders and inquiries now */
-    const stage = (s: string) => stages.find((x) => x.stage === s);
-    const r = ready[0] ?? { late: 0, soon: 0 };
+    // Each open order under the board's column for its word (arrived and delivered orders are still under Shipped).
+    const words = await wordFactsByOrder(db, stages.map((x) => x.orderId));
+    const features = await this.limits.features();
+    const wordOf = (id: string) => {
+      const f = words.get(id);
+      return f ? orderWord(f, features) : null;
+    };
+    const column = (key: string) => {
+      const rows = stages.filter((x) => {
+        const w = wordOf(x.orderId);
+        return w !== null && orderWordColumn(w) === key;
+      });
+      return { n: rows.length, value: rows.reduce((t, x) => t + m(x.value), 0), late: rows.filter((x) => x.late).length, owing: rows.filter((x) => x.owing).length, rows };
+    };
     const note = (text: string, level?: "bad" | "warn") => ({ note: text, level: level ?? null });
+    const [confirmed, making, shipped] = [column("confirmed"), column("in_production"), column("shipped")];
+    const beingMade = new Set(making.rows.map((x) => x.orderId));
+    const r = { late: ready.filter((x) => x.late && beingMade.has(x.orderId)).length, soon: ready.filter((x) => !x.late && x.soon && beingMade.has(x.orderId)).length };
+    const delivered = shipped.rows.filter((x) => wordOf(x.orderId) === "Delivered").length;
     const orderStages = [
-      { key: "confirmed", label: "Confirmed", ...(stage("confirmed")?.late ? note(`${stage("confirmed")!.late} late to pay`, "bad") : note("waiting for the deposit")) },
-      { key: "in_production", label: "In production", ...(r.late ? note(`${r.late} past the ready date`, "bad") : r.soon ? note(`${r.soon} ready in the next 14 days`) : note("being made")) },
-      { key: "shipped", label: "Shipped", ...(stage("shipped")?.late ? note(`${stage("shipped")!.late} late to pay`, "bad") : stage("shipped")?.owing ? note(`${stage("shipped")!.owing} still to be paid`) : note("on the way")) },
-      { key: "done", label: "Delivered", ...(stage("done")?.owing ? note(`${stage("done")!.owing} still to be paid`, "warn") : note("paid, to close")) },
-    ].map((s) => ({ ...s, count: stage(s.key)?.n ?? 0, value: fromMinor(m(stage(s.key)?.value)) }));
+      { key: "confirmed", label: "Confirmed", col: confirmed, ...(confirmed.late ? note(`${confirmed.late} late to pay`, "bad") : note("waiting for the deposit")) },
+      { key: "in_production", label: "In production", col: making, ...(r.late ? note(`${r.late} past the ready date`, "bad") : r.soon ? note(`${r.soon} ready in the next 14 days`) : note("being made")) },
+      {
+        key: "shipped",
+        label: "Shipped",
+        col: shipped,
+        ...(shipped.late
+          ? note(`${shipped.late} late to pay`, "bad")
+          : delivered
+            ? note(`${delivered} delivered, to close`, "warn")
+            : shipped.owing
+              ? note(`${shipped.owing} still to be paid`)
+              : note("on the way")),
+      },
+    ].map(({ col, ...s }) => ({ ...s, count: col.n, value: fromMinor(col.value) }));
     const inq = (s: string) => inquiries.find((x) => x.stage === s);
     const d = decided[0] ?? { won: 0, lost: 0, wonBefore: 0, lostBefore: 0 };
 
@@ -273,7 +303,7 @@ export class HomeService {
         profit: fromMinor(profitOf(k)),
       })),
       orders: {
-        open: stages.reduce((t, s) => t + s.n, 0),
+        open: stages.length,
         value: fromMinor(stages.reduce((t, s) => t + m(s.value), 0)),
         stages: orderStages,
       },

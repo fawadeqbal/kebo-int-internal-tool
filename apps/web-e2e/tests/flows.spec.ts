@@ -288,7 +288,8 @@ test("Mark as lost has Undo: the note takes it back, the inquiry is as it was", 
 test("Orders: a status tab filters the list and stays the list (never jumps to the board)", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/orders");
-  for (const name of ["In production", "Confirmed", "Shipped", "Done"]) {
+  // No Done tab: a finished order is under Closed (review 24 Nov).
+  for (const name of ["In production", "Confirmed", "Shipped"]) {
     await page.getByRole("navigation", { name: "Which orders" }).getByRole("link", { name: new RegExp(`^${name}`) }).click();
     await expect(page).toHaveURL((u) => u.pathname === "/orders" && u.searchParams.has("stage"));
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sales orders");

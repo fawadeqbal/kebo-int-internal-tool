@@ -56,8 +56,12 @@ export function salesSentence(a: { now: Minor; before: Minor; biggest: { refNo: 
   };
 }
 
-/** Customers with a part past its date (the longest wait first): how many, how much, and whether the oldest paid late before. */
-export function lateSentence(rows: { name: string; amount: Minor; days: number; paidLate: number; paid: number }[], money: Money): Standout | null {
+/**
+ * Customers with a part past its date (the longest wait first): how many, how much, and whether the oldest paid
+ * late before. `others`: some of it is in another currency, counted in the main one (Receivables lists each
+ * currency apart, so the sentence says so rather than seem to disagree with it).
+ */
+export function lateSentence(rows: { name: string; amount: Minor; days: number; paidLate: number; paid: number; others?: boolean }[], money: Money): Standout | null {
   const o = rows[0];
   if (!o) return null;
   const total = rows.reduce((t, r) => t + r.amount, 0);
@@ -66,7 +70,7 @@ export function lateSentence(rows: { name: string; amount: Minor; days: number; 
   return {
     key: "late",
     level: "bad",
-    lead: `${countWord(rows.length)} ${plural(rows.length, "customer is", "customers are")} late with ${money(total)}.`,
+    lead: `${countWord(rows.length)} ${plural(rows.length, "customer is", "customers are")} late with ${money(total)}${rows.some((r) => r.others) ? ", other currencies counted in" : ""}.`,
     text: rows.length === 1 ? `${o.name}: ${wait}${history}.` : `${o.name} is the oldest: ${wait}${history}.`,
     href: "/money/due?show=late",
     link: "Who owes",
