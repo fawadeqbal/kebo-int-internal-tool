@@ -195,7 +195,7 @@ describe("a whole deal through the API", () => {
       next: { to: "in_production" },
     });
     expect(order.money.deposit).toBe("6900.00");
-    expect(order.needs.title).toBe("Get the deposit (USD 6,900.00)");
+    expect(order.needs.title).toBe("Get the deposit 30% (USD 6,900.00)");
     // Acceptance is final.
     const after = (await api(app, staff).get(`/inquiries/${inquiryId}/quotation`).expect(200)).body;
     expect(after.canStartRevision).toBe(false);

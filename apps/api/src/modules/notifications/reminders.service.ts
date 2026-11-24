@@ -2,7 +2,7 @@ import { PROFIT_LABEL } from "@kebo/money";
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { claimOnce, livePart, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
-import { orderNeeds, PERMISSIONS, planStatus, REMINDER_HOUR, rowsOf, shippedOnOf, type Message, type MessageListRow } from "@kebo/shared";
+import { orderNeeds, partToChase, PERMISSIONS, planStatus, REMINDER_HOUR, rowsOf, shippedOnOf, type Message, type MessageListRow } from "@kebo/shared";
 import { formatMinor } from "@kebo/money";
 import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -164,9 +164,12 @@ export class RemindersService {
     const fx = fxOf(s, expensesOn);
     for (const o of orders) {
       // The same position as the order page: the plan's deposit, what was charged to the customer.
+      const position = positionOf(o, fx);
       const need = orderNeeds(
         {
-          ...moneyFacts(positionOf(o, fx)),
+          ...moneyFacts(position),
+          // The plan's part to chase, as on the order and Receivables (one due date and lateness per part).
+          chase: partToChase(planStatus(plans.get(o.id)?.items ?? [], position.settledMinor, today, 0)),
           stage: o.stage,
           status: o.status,
           currency: o.currency,

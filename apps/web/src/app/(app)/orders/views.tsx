@@ -68,7 +68,7 @@ function statusBadge(o: OrderRow) {
 
 export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
   const status: Status = STATUSES.includes(sp.status as Status) ? (sp.status as Status) : sp.view === "cancelled" ? "cancelled" : "open";
-  const stage = (["confirmed", "in_production", "shipped", "done"] as const).find((x) => x === sp.stage);
+  const stage = (["confirmed", "in_production", "shipped"] as const).find((x) => x === sp.stage);
   const keep = { q: sp.q, mine: mine ? "1" : undefined, status: status === "open" ? undefined : status, stage, customer: sp.customer, assignee: sp.assignee };
   const href = (patch: Params) => buildHref("/orders", keep, { page: undefined, ...patch });
   const year = new Date().getFullYear();
@@ -105,7 +105,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
     { key: "confirmed", label: "Confirmed", n: c.confirmed, href: href({ status: undefined, stage: "confirmed" }), active: stage === "confirmed" },
     { key: "in_production", label: "In production", n: c.in_production, href: href({ status: undefined, stage: "in_production" }), active: stage === "in_production" },
     { key: "shipped", label: "Shipped", n: c.shipped, href: href({ status: undefined, stage: "shipped" }), active: stage === "shipped" },
-    { key: "done", label: "Done", n: c.done ?? 0, href: href({ status: undefined, stage: "done" }), active: stage === "done" },
+    // No "Done" tab: an open order is never Done (orderWordColumn), a finished one is Closed (review 24 Nov: always 0).
     { key: "late", label: "Late", n: c.late, href: href({ status: "late", stage: undefined }), active: status === "late" },
     { key: "closed", label: "Closed", n: c.closed ?? 0, href: href({ status: "closed", stage: undefined }), active: status === "closed" },
     { key: "cancelled", label: "Cancelled", n: c.cancelled ?? 0, href: href({ status: "cancelled", stage: undefined }), active: status === "cancelled" },

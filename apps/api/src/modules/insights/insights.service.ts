@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { livePart, fromDbDate, routeOf, termsOf, termsSelect } from "@kebo/database";
 import { fromMinor, toMinor } from "@kebo/money";
-import { can, PAYMENT_ROUTE_SHORT, planStatus, planWhen } from "@kebo/shared";
+import { can, partToChase, PAYMENT_ROUTE_SHORT, planStatus, planWhen } from "@kebo/shared";
 import { daysBetween, DomainError, ForbiddenError, type ISODate } from "@kebo/utils";
 import { orderAccess } from "../../common/auth/order-access";
 import { creditsAll } from "../treasury/api";
@@ -245,7 +245,9 @@ export class InsightsService {
         if (settled.dueMinor <= 0) return null;
         // Dated from each instalment's rule and the order's dates as they are now.
         const plan = planStatus(livePlans.get(o.id)?.items ?? [], settled.settledMinor, today, 7);
-        const next = plan.find((p) => p.openMinor > 0) ?? null;
+        // The part to chase: a late part before one due later, whatever their order in the plan (review 24 Nov:
+        // the deposit's amount, not yet due, was shown beside the balance's lateness).
+        const next = partToChase(plan);
         const terms = termsOf(o);
         const late = plan.filter((p) => p.status === "late");
         const lastPaid =
@@ -267,7 +269,7 @@ export class InsightsService {
           charged: fromMinor(settled.chargedMinor),
           due: fromMinor(settled.dueMinor),
           overdue: fromMinor(late.reduce((t, p) => t + p.openMinor, 0)),
-          daysLate: late.length && late[0]!.dueOn ? daysBetween(late[0]!.dueOn, today) : 0,
+          daysLate: next?.status === "late" && next.dueOn ? daysBetween(next.dueOn, today) : 0,
           next: next && {
             label: next.label,
             open: fromMinor(next.openMinor),

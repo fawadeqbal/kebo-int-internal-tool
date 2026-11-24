@@ -231,7 +231,8 @@ export function OrdersNow({ h }: { h: HomeFigures }) {
         actions={<More href="/orders/board">Order board</More>}
         how={how.ordersNow(h.currency)}
       />
-      <Stages rows={h.orders.stages} currency={h.currency} href={() => "/orders/board"} />
+      {/* Each row opens the list at that column: the same count as the list's tab and the board's column. */}
+      <Stages rows={h.orders.stages} currency={h.currency} href={(k) => `/orders?stage=${k}`} />
     </Card>
   );
 }

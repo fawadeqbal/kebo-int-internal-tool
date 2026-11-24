@@ -11,5 +11,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const board = ordersBoardTarget(sp);
   if (board) redirect(board);
+  // The Done tab is gone: a finished order is under Closed.
+  if (sp.stage === "done") redirect("/orders?status=closed");
   return <List sp={sp} mine={sp.mine === "1" || sp.view === "mine"} />;
 }

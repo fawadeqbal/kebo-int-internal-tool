@@ -50,7 +50,8 @@ describe("orders: four stages", () => {
   it("starts Confirmed, with one button and the deposit to ask for", async () => {
     const o = await order();
     expect(o).toMatchObject({ status: "open", stage: "confirmed", depositPercent: 30, next: { to: "in_production", label: "Start production" }, back: null });
-    expect(o.needs).toMatchObject({ title: expect.stringMatching(/^Get the deposit \(USD /), late: false });
+    // Named from the plan's part, with its amount and its own date (as the Payment tab and Receivables say).
+    expect(o.needs).toMatchObject({ title: expect.stringMatching(/^Get the deposit 30% \(USD /), late: false });
     expect(Number(o.money.deposit)).toBeCloseTo(Number(o.total) * 0.3, 2);
     expect(o.money).toMatchObject({ received: "0.00", due: o.total, status: "unpaid" });
     expect(o.history).toEqual([expect.objectContaining({ from: null, to: "confirmed" })]);
@@ -173,7 +174,7 @@ describe("orders: four stages", () => {
     await move(sana, { to: "shipped", confirm: true, shippedOn: "2099-01-01" }).expect(400); // no future dates
     const shipped = (await move(sana, { to: "shipped", confirm: true, shippedOn: day(-18), blNo: "QDLOS-77" }).expect(200)).body;
     expect(shipped).toMatchObject({ stage: "shipped", shippedOn: day(-18), blNo: "QDLOS-77", next: { to: "done", label: "Close the order" } });
-    expect(shipped.needs.title).toMatch(/^Get the balance \(USD /);
+    expect(shipped.needs.title).toMatch(/^Get the balance before shipment \(USD /);
   });
 
   it("serves two clicks at once one after the other: exactly one moves", async () => {
@@ -240,7 +241,7 @@ describe("orders: four stages", () => {
   it("keeps chasing money on a closed order, and only a manager may close one with money due", async () => {
     // The payment removed above left money owed on a Done order: it stays on Sana's to-do.
     const todo = (await api(app, sana).get("/me/todo").expect(200)).body;
-    expect(todo.find((t: { id: string }) => t.id === orderId)?.needs.title).toMatch(/^Get the balance \(USD .*\) — the order is closed$/);
+    expect(todo.find((t: { id: string }) => t.id === orderId)?.needs.title).toMatch(/^Get the balance before shipment \(USD .*\) — the order is closed$/);
     await move(sana, { to: "shipped", reason: "Customer claim" }).expect(200);
     const staffClose = await move(sana, { to: "done", confirm: true }).expect(409);
     expect(staffClose.body).toMatchObject({ code: "manager_needed", error: expect.stringMatching(/still due .* ask a manager/) });

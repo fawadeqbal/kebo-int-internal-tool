@@ -63,7 +63,8 @@ export default async function OrderLayout({ children, params }: { children: Reac
         tone === "bad" ? "text-bad" : tone === "ok" ? "text-ok" : tone === "neutral" ? "text-text-2" : tone === "info" ? "text-info" : "text-action",
       )}
     >
-      {o.status === "closed" ? `Closed${o.stageSince ? ` ${date(o.stageSince)}` : ""}` : goodsIn && o.word === "In production" ? "Ready to ship" : o.word}
+      {/* The one word, as in the list and on the board ("goods in" is a note beside it, not another word). */}
+      {o.status === "closed" ? `${o.word}${o.stageSince ? ` · closed ${date(o.stageSince)}` : ""}` : o.word}
       {notes.filter(Boolean).map((x) => ` · ${x}`)}
     </span>
   );

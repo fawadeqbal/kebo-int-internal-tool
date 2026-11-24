@@ -46,7 +46,7 @@ const h: HomeFigures = {
       { key: "confirmed", label: "Confirmed", count: 3, value: "129710.00", note: "1 late to pay", level: "bad" },
       { key: "in_production", label: "In production", count: 5, value: "421300.00", note: "2 ready in the next 14 days", level: null },
       { key: "shipped", label: "Shipped", count: 4, value: "188400.00", note: "on the way", level: null },
-      { key: "done", label: "Delivered", count: 0, value: "0.00", note: "paid, to close", level: null },
+      { key: "other", label: "Elsewhere", count: 0, value: "0.00", note: "", level: null },
     ],
   },
   thin: {
@@ -145,8 +145,10 @@ describe("Home: cash, orders, inquiries", () => {
     expect(screen.getByText("1 late to pay").className).toContain("text-bad");
     expect(screen.getByText("USD 421,300")).toBeTruthy();
     // An empty stage says none and shows no amount.
-    const delivered = screen.getByText("Delivered").closest("a")!;
-    expect(delivered.textContent).toBe("Delivered0none");
+    const empty = screen.getByText("Elsewhere").closest("a")!;
+    expect(empty.textContent).toBe("Elsewhere0none");
+    // Each row opens the list at that column: the same count as its tab and the board's column.
+    expect(screen.getByText("Shipped").closest("a")!.getAttribute("href")).toBe("/orders?stage=shipped");
   });
 
   it("inquiries by stage, with the share won of those answered", () => {

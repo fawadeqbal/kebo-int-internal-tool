@@ -190,11 +190,11 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
         )}
         {d.pay && (
           <ShortList
-            title="To pay in the next 7 days"
+            title="To pay: late or due in 7 days"
             how={how.toPaySoon}
             total={totals(d.pay.totals.map(([currency, amount]) => ({ currency, amount })))}
             all={{ href: "/money/payables", label: `All ${d.pay.count}` }}
-            empty="Nothing to pay this week."
+            empty="Nothing late or due in the next 7 days."
             rows={d.pay.rows.map((r) => ({
               key: r.key,
               href: "/money/payables",

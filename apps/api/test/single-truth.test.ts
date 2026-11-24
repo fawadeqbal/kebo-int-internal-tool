@@ -185,7 +185,7 @@ describe("one money truth", () => {
       const v = await order(o.orderId);
       expect(v.money).toMatchObject({ deposit: "5000.00", depositPercent: 50, depositDue: "2000.00", status: "partly_paid" });
       expect(v.depositPercent).toBe(30); // as accepted
-      expect(v.needs.title).toBe("Get the deposit (USD 2,000.00)");
+      expect(v.needs.title).toBe("Get the deposit 50% (USD 2,000.00)"); // the plan's part, as the Payment tab names it
       expect((await api(app, sana).get(`/orders/${o.orderId}/flow`).expect(200)).body.payment.depositIn).toBe(false);
       const stands = (await api(app, sana).get(`/orders/${o.orderId}/sections`).expect(200)).body.stands as { stage: string; word: string; fact: string; missing: string }[];
       expect(stands.find((x) => x.stage === "payment")).toMatchObject({ word: "Part paid", fact: expect.stringContaining("deposit 50% USD 5,000 to come") }); // USD 3,000 is in
