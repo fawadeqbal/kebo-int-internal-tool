@@ -17,11 +17,20 @@ export function keyDates(o: OrderView, flow: OrderFlow | null, now: string): { l
   const ready = flow?.factory.readyOn ?? o.readyOn;
   const sailed = ship?.departedOn ?? o.shippedOn ?? null;
   const goodsIn = o.goods?.allReceived ?? false;
+  // Once every line is in: the day the last one came, not the supplier's ready date (review 24 Nov, O-43).
+  const inOn = goodsIn
+    ? (o.lines ?? [])
+        .filter((l) => l.type === "goods")
+        .map((l) => l.receivedOn)
+        .filter((d): d is string => !!d)
+        .sort()
+        .at(-1) ?? null
+    : null;
   // [label, the day, it has happened]
   const rows: [string, string | null, boolean][] = [
     ["Ordered", o.orderedOn, true],
     ["Supplier ordered", flow?.factory.orderedOn ?? null, true],
-    ["Goods ready", ready, goodsIn || !!sailed],
+    [goodsIn ? "Goods in" : "Goods ready", goodsIn ? (inOn ?? ready) : ready, goodsIn || !!sailed],
     ["Ship by", o.shipBy, !!sailed],
     [sailed ? "Sailed" : "Sails", sailed ?? ship?.etd ?? null, !!sailed],
     [ship?.arrivedOn ? "Arrived" : "Arrives", ship?.arrivedOn ?? ship?.eta ?? null, !!ship?.arrivedOn],
@@ -31,7 +40,7 @@ export function keyDates(o: OrderView, flow: OrderFlow | null, now: string): { l
     [dv?.satDoneOn ? "SAT signed" : "SAT planned", dv?.satDoneOn ?? dv?.satPlannedOn ?? null, !!dv?.satDoneOn],
   ];
   // Always the four people plan by; the others once they have a day.
-  const always = new Set(["Goods ready", "Ship by", "Sails", "Arrives"]);
+  const always = new Set(["Goods ready", "Goods in", "Ship by", "Sails", "Arrives"]);
   const shown = rows.filter(([label, day]) => day || always.has(label));
   const next = shown.find(([, day, happened]) => day && !happened);
   return shown.map(([label, day, happened]) => {

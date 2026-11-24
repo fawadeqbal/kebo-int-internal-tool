@@ -31,7 +31,7 @@ const framed = "flex flex-col gap-3 rounded-lg border border-line bg-surface-2/6
  */
 export function VoidWindow({ action, label }: { action: Action; label: string }) {
   return (
-    <UrlWindow name="remove" title={`Remove ${label}`} description="It stays listed, crossed out, with the reason." className={RULES.window.part}>
+    <UrlWindow name="remove" title={`Remove ${label}`} description="It stops counting and is kept, with the reason, under Removed in Payments." className={RULES.window.part}>
       {(close) => (
         <ActionForm action={action} onDone={close} className="flex flex-col gap-4">
           {(s) => (
@@ -52,7 +52,7 @@ export function VoidWindow({ action, label }: { action: Action; label: string })
   );
 }
 
-/** Remove a payment or an expense recorded by mistake, with a reason (it stays listed, crossed out). */
+/** Remove a payment or an expense recorded by mistake, with a reason (kept under Removed in Payments). */
 export function VoidForm({ action, label, button = "Remove" }: { action: Action; label: string; /** The closed button's words ("Remove this payment"). */ button?: string }) {
   const [open, setOpen] = useState(false);
   if (!open)

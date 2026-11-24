@@ -367,7 +367,16 @@ export function PartsEditor({
                             const amount = Number.isFinite(v)
                               ? fromMinor(Math.round((totalMinor * Math.min(Math.max(v, 0), 100)) / 100))
                               : p.amount;
-                            set(p.key, { share, amount, label: relabel(p.label, Number.isFinite(v) ? String(v) : "") });
+                            // Shares that add up to 100% leave no cent over: the last installment not yet paid takes
+                            // the rounding (review 24 Nov, O-41: 30 / 40 / 30 was refused for 0.01).
+                            onChange((all) => {
+                              const next = all.map((x) => (x.key === p.key ? { ...x, share, amount, label: relabel(p.label, Number.isFinite(v) ? String(v) : "") } : x));
+                              const shares = next.reduce((t, x) => t + (Number.isFinite(num(x.share)) ? num(x.share) : NaN), 0);
+                              const at = next.map((x) => x.locked).lastIndexOf(false);
+                              const off = totalMinor - sumOf(next);
+                              if (Math.abs(shares - 100) > 1e-9 || at < 0 || off === 0 || Math.abs(off) > next.length) return next;
+                              return next.map((x, i) => (i === at ? { ...x, amount: fromMinor(minorOf(x.amount) + off) } : x));
+                            });
                           }}
                         />
                         <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted">
@@ -591,7 +600,8 @@ export function PartsEditor({
                 : "mt-2 w-fit text-primary hover:text-primary @min-[38rem]:ml-6"
               : "mt-2 w-fit text-primary hover:text-primary @min-[38rem]:ml-6"
           }
-          onClick={() => onChange((all) => [...all, freshPart(0, totalMinor, rules[0]!)])}
+          // A new installment starts with what is left to allocate (review 24 Nov, O-41: it started empty).
+          onClick={() => onChange((all) => [...all, freshPart(Math.max(0, totalMinor - sumOf(all)), totalMinor, rules[0]!)])}
           disabled={parts.length >= max}
         >
           <Plus aria-hidden /> Add installment

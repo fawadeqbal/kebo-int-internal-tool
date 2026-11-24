@@ -130,8 +130,13 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
           (contract ? (
             <Section
               title={lc ? "The letter of credit" : "The bank contract"}
-              state={`${CONTRACT_WORD[contract.status] ?? contract.status}${contract.openedOn ? ` since ${date(contract.openedOn)}` : ""}`}
-              tone={contract.status === "paid" || contract.status === "opened" ? "ok" : contract.status === "amended" ? "warn" : "neutral"}
+              // A closed order's contract is not still "Open since…" (review 24 Nov, O-44); "since" only while it is open.
+              state={
+                o.status !== "open" && !["paid", "closed"].includes(contract.status)
+                  ? `Order ${o.status}${contract.openedOn ? ` · opened ${date(contract.openedOn)}` : ""}`
+                  : `${CONTRACT_WORD[contract.status] ?? contract.status}${contract.openedOn ? `${contract.status === "opened" ? " since" : " · opened"} ${date(contract.openedOn)}` : ""}`
+              }
+              tone={o.status !== "open" ? "neutral" : contract.status === "paid" || contract.status === "opened" ? "ok" : contract.status === "amended" ? "warn" : "neutral"}
               cols={4}
               rows={[
                 { label: lc ? "LC no." : "Contract no.", value: contract.number },
