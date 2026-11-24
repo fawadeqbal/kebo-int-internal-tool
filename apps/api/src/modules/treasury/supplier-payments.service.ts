@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { asSupplierPayment, createSupplierPayment, fromDbDate, isSupplier, liveFile, purchasePart, supplierPayment, toDbDate } from "@kebo/database";
-import { formatMinor, fromMinor, fxRate, toMinor } from "@kebo/money";
+import { formatMinor, fxRate, toMinor } from "@kebo/money";
 import { can, type FactoryPaymentInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import type { Prisma } from "@kebo/database";
