@@ -47,6 +47,13 @@ class TreasuryController {
     return { opens: await this.payments.opens(user) };
   }
 
+  /** A supplier payment's or an expense's voucher, printed in the one paper template. */
+  @SignedIn("checked inside: expenses.manage, ledger.view, money.submit, orders.manage, payments.record, sourcing.manage")
+  @Get(":kind/:id/paper")
+  paper(@CurrentUser() user: SessionUser, @Param("kind", kindPipe) kind: PaymentRecordKind, @Param("id", ParseUUIDPipe) id: string) {
+    return this.payments.paper(user, kind, id);
+  }
+
   @SignedIn("checked inside: expenses.manage, ledger.view, money.submit, orders.manage, payments.record, sourcing.manage")
   @Get(":kind/:id")
   one(@CurrentUser() user: SessionUser, @Param("kind", kindPipe) kind: PaymentRecordKind, @Param("id", ParseUUIDPipe) id: string) {

@@ -477,6 +477,12 @@ export function CostForm({
                 
               />
             </Field>
+            {!send && (
+              // Who was paid (the forwarder, the courier, the shop): the payment page and the voucher name them.
+              <Field label="Paid to" htmlFor="cost-payee" optional error={st.errors?.payee}>
+                <Input id="cost-payee" name="payee" maxLength={120} placeholder="Forwarder, courier, shop…" defaultValue={st.values?.payee ?? from?.payee ?? ""} />
+              </Field>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -683,7 +689,7 @@ function Receipt({ file, onChange, kept, label }: { file: File | null; onChange:
 
 /* ---------------------------------------------------------------- the window */
 
-function CostPanel({
+export function CostPanel({
   title,
   sub,
   setup,

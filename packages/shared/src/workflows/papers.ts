@@ -508,7 +508,15 @@ export interface PaperDoc {
     stamp: string | null;
   };
   /** "Prepared for": the customer, or the factory on a purchase order, or our bank on the cover letter. */
-  party: { name: string; country?: string | null; address?: string | null; taxNo?: string | null; regNo?: string | null };
+  party: {
+    name: string;
+    country?: string | null;
+    address?: string | null;
+    taxNo?: string | null;
+    regNo?: string | null;
+    /** Over the party's name: "Prepared for" unless said ("Received from" on a receipt, "Paid to" on a voucher). */
+    label?: string | null;
+  };
   meta: { label: string; value: PaperCell }[];
   heading: string | null;
   columns: PaperColumn[];

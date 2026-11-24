@@ -22,6 +22,12 @@ const SETTING_LABEL = {
 
 const CACHE_MS = 30_000;
 
+/** The letterhead frozen on a document when it is sent (the stamp image is not copied: documents print the current one). */
+export function companySnapshot(s: Settings) {
+  const { stamp: _stamp, ...company } = s.company;
+  return company;
+}
+
 /** Typed settings with defaults filled in; read often, so cached briefly per process (per company). */
 @Injectable()
 export class SettingsService {

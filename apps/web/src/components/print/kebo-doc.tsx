@@ -92,8 +92,8 @@ const SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", CNY: "
 /** "$ 90,000" (cents only when there are any). */
 export function docMoney(amount: string | number, currency: string) {
   const n = Number(amount);
-  const cents = Math.round(Math.abs(n) * 100) % 100 !== 0;
-  const figure = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 });
+  // Always two decimals: "$ 2,817.00" beside "$ 845.10", never "$ 2,817".
+  const figure = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${n < 0 ? "- " : ""}${SYMBOL[currency] ?? currency} ${figure}`;
 }
 
@@ -433,7 +433,7 @@ html[data-embedded] .kebo-doc { zoom: 1 !important; }`}</style>
         }}
       >
         <div>
-          <div style={{ ...label, color: BLUE }}>Prepared for</div>
+          <div style={{ ...label, color: BLUE }}>{customer.label ?? "Prepared for"}</div>
           <div style={{ fontWeight: 700, fontSize: "14px" }}>{customer.name}</div>
           {address && <div style={{ whiteSpace: "pre-line" }}>{address}</div>}
         </div>

@@ -317,6 +317,8 @@ export interface CustomerSnapshot {
   taxNo?: string | null;
   regNo?: string | null;
   contact?: { name?: string | null; email?: string | null; phone?: string | null } | null;
+  /** Over the name: "Prepared for" unless said ("Received from", "Paid to"). */
+  label?: string | null;
 }
 
 /** One version of the proforma or the packing list (final: printed exactly as it was made). */

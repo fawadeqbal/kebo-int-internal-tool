@@ -52,7 +52,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import type { SessionUser } from "../../common/auth/session-user";
-import { SettingsService } from "../settings/settings.service";
+import { companySnapshot, SettingsService } from "../settings/settings.service";
 import { InquiriesService } from "../inquiries/inquiries.service";
 import { StagesService } from "../inquiries/stages.service";
 import { OrdersService } from "../orders/orders.service";
@@ -115,12 +115,6 @@ export function numbersOf(lines: Prisma.QuoteLineGetPayload<{ include: typeof nu
       itemParentId: l.requestedItem?.parentId ?? null,
     })),
   );
-}
-
-/** The letterhead frozen on a document when it is sent (the stamp image is not copied: documents print the current one). */
-export function companySnapshot(s: Settings) {
-  const { stamp: _stamp, ...company } = s.company;
-  return company;
 }
 
 /** The customer as it is now (name, address, tax and registration numbers, the deal's contact): see orders/buyer. */

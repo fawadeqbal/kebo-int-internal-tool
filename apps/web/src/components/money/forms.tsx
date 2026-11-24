@@ -515,18 +515,3 @@ export function NewFactoryPayment({
   return <FactoryPaymentForm {...props} onClose={() => setOpen(false)} onFileError={setFileError} />;
 }
 
-/** "Change" on one factory payment. */
-export function EditFactoryPayment(props: Omit<Parameters<typeof FactoryPaymentForm>[0], "onClose">) {
-  const [open, setOpen] = useState(false);
-  if (!open)
-    return (
-      <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
-        Change
-      </Button>
-    );
-  return (
-    <div className="mt-2 w-full">
-      <FactoryPaymentForm {...props} onClose={() => setOpen(false)} />
-    </div>
-  );
-}

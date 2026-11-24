@@ -1,3 +1,4 @@
+import type { PaperDoc } from "./workflows/papers";
 /**
  * Treasury › Payments: every payment in and out in one list, and one page per payment
  * (architecture review §8, work order step 2a). The API builds these from the money records
@@ -110,18 +111,30 @@ export interface PaymentView extends PaymentRow {
   /** What it was, in order: label, value, and a link where there is one. */
   fields: { label: string; value: string; href?: string | null }[];
   /** The bank slip, transfer screenshot or receipt photo. */
-  file: { name: string; href: string } | null;
+  file: { id: string; name: string; type: string; size: number; href: string } | null;
+  /** Who paid it (out) or who handed it over (in): a person or the customer's payer. */
+  paidBy: string | null;
+  /** A foreign amount in the company's main currency, at the rate it counts at. */
+  inMain: { amount: string; currency: string; rate: string } | null;
   /** The order it is on (its page changes the payment and its proof there). */
   orderId: string | null;
   /** A customer payment that pays one order in full: that payment on the order (changed as it). */
   partId?: string | null;
   /** Its posting in the general ledger. */
   ledgerHref: string | null;
-  /** Where a receipt goes: each order part it pays ("SO-2026-0035 · Deposit 30% · 15,720.00"), in the order's currency. */
+  /** What it paid, on every kind: each order and installment ("SO-2026-0035 · Deposit 30% · 15,720.00"), or the order an expense is on. */
   parts?: { order: string; href: string; part: string; amount: string; currency: string; released: boolean }[];
   recordedBy: string | null;
   recordedAt: string;
   voided: { at: string; reason: string | null } | null;
   /** Remove it (with a reason): the endpoint that does it, when this person may. */
   voidPath: string | null;
+}
+
+/** A supplier payment's or an expense's voucher (GET /treasury/payments/:kind/:id/paper), in the one paper template. */
+export interface PaymentPaper {
+  doc: PaperDoc;
+  /** "Payment voucher FP-2026-0012-1". */
+  title: string;
+  fileName: string;
 }

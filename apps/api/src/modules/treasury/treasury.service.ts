@@ -6,6 +6,7 @@ import {
   PAYMENT_KIND_LABEL,
   PAYMENT_METHOD_LABEL,
   PAYMENT_TITLE,
+  paperDateText,
   paperNumber,
   type ExpenseCategory,
   type PaymentDirection,
@@ -16,11 +17,15 @@ import {
   type PaymentRow,
   type PaymentStatus,
   type PaymentView,
+  type PaymentPaper,
+  type PaperDoc,
 } from "@kebo/shared";
+import { convert, fromMinor, fxRate, orderRate } from "@kebo/money";
 import { ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { LimitsService } from "../../common/company/limits.service";
+import { companySnapshot, SettingsService } from "../settings/settings.service";
 import { orderAccess } from "../../common/auth/order-access";
 import { customerAccess } from "../parties/customers.service";
 
@@ -69,6 +74,12 @@ const statusOf = (voidedAt: Date | null): PaymentStatus => (voidedAt ? "void" : 
 const customerLink = (c: { id: string; name: string } | null) => (c ? { label: c.name, href: `/customers/${c.id}` } : null);
 const supplierLink = (f: { id: string; name: string }) => ({ label: f.name, href: `/factories/${f.id}` });
 const orderLink = (o: { id: string; refNo: string }) => ({ label: o.refNo, href: `/orders/${o.id}` });
+/** A record's file as its page shows and changes it. */
+const fileOf = (f: { id: string; fileName: string; mimeType: string; size: number } | undefined) =>
+  f ? { id: f.id, name: f.fileName, type: f.mimeType, size: f.size, href: `/files/${f.id}` } : null;
+/** A foreign amount in the main currency: amount ÷ rate (units of its currency per one of the main), or null when it is the main currency or no rate is known. */
+const inMainOf = (amount: Prisma.Decimal, currency: string, main: string, rate: number | null) =>
+  currency === main || !rate ? null : { amount: fromMinor(convert(decimalToMinor(amount), rate)), currency: main, rate: String(Number(rate.toFixed(6))) };
 
 /** What this person sees and records on Treasury › Payments: the same rules as the pages that hold these records. */
 interface Scope {
@@ -94,6 +105,7 @@ export class TreasuryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly limits: LimitsService,
+    private readonly settings: SettingsService,
   ) {}
 
   private async scope(user: SessionUser): Promise<Scope> {
@@ -421,7 +433,8 @@ export class TreasuryService {
         name: PAYMENT_TITLE.expense(e.description, EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory] ?? e.category),
         amount: money(e.amount),
         currency: e.currency,
-        party: e.factory ? supplierLink(e.factory) : customerLink(e.customer),
+        // Who was paid: the payee typed on it, else the supplier it was charged to; never the customer it was for.
+        party: e.payee ? { label: e.payee, href: null } : e.factory ? supplierLink(e.factory) : null,
         for: e.order ? [orderLink(e.order)] : e.inquiry ? [{ label: e.inquiry.refNo, href: `/inquiries/${e.inquiry.id}` }] : [],
         account: e.ownMoney ? `${e.paidBy?.name ?? "Someone"}'s own money` : (from?.name ?? null),
         reference: e.reference,
@@ -530,6 +543,58 @@ export class TreasuryService {
     };
   }
 
+  /**
+   * A supplier payment's or an expense's voucher, in the one paper template the receipt uses: who was paid, what
+   * for, the amount in figures and words, its main-currency value, how it was paid, and two signature lines.
+   * (A customer payment prints its receipt, kept as recorded, from the order's papers.)
+   */
+  async paper(user: SessionUser, kind: PaymentRecordKind, id: string): Promise<PaymentPaper> {
+    if (kind !== "supplier" && kind !== "expense") throw new NotFoundError("Voucher");
+    const v = await this.one(user, kind, id);
+    const s = await this.settings.get();
+    const partyId = v.party?.href?.match(/^\/factories\/([0-9a-f-]{36})$/)?.[1];
+    const details = partyId ? await this.prisma.db.party.findUnique({ where: { id: partyId }, select: { name: true, address: true, country: true } }) : null;
+    const title = kind === "supplier" ? "PAYMENT VOUCHER" : "EXPENSE VOUCHER";
+    const number = v.number ?? "Not numbered";
+    const parts = v.parts ?? [];
+    const doc: PaperDoc = {
+      kind: "payment-receipt",
+      title,
+      numberLabel: "Voucher No.",
+      number,
+      date: v.on,
+      company: { ...companySnapshot(s), stamp: null },
+      party: { name: details?.name ?? v.party?.label ?? "—", country: details?.country ?? null, address: details?.address ?? null, label: "Paid to" },
+      meta: parts.length ? [{ label: "Order No.", value: parts.map((x) => x.order).join(", ") }] : [],
+      heading: null,
+      columns: [
+        { key: "no", label: "No.", width: 32 },
+        { key: "item", label: "For" },
+        { key: "ref", label: "Reference", width: 120, wrap: true },
+        { key: "amount", label: "Amount", width: 110, align: "right" },
+      ],
+      rows: (parts.length ? parts : [{ order: "", part: v.what, amount: v.amount, currency: v.currency }]).map((x, i) => ({
+        no: String(i + 1),
+        item: { item: x.order ? `${x.part} · ${x.order}` : x.part, model: kind === "expense" ? v.title : null },
+        ref: v.reference ?? "",
+        amount: { money: x.amount, currency: x.currency },
+      })),
+      sums: [],
+      total: { label: "Paid", amount: v.amount, currency: v.currency },
+      under: v.inMain ? [{ label: `In ${v.inMain.currency} at ${v.inMain.rate} ${v.currency} per ${v.inMain.currency}`, value: { money: v.inMain.amount, currency: v.inMain.currency } }] : [],
+      foot: null,
+      boxTitle: "Payment",
+      bullets: [
+        [`Paid`, v.method ? `by ${v.method}` : null, `on ${paperDateText(v.on)}`, v.account ? `from ${v.account}` : null].filter(Boolean).join(" ") + ".",
+        ...(v.paidBy ? [{ label: "Paid by:", value: v.paidBy }] : []),
+        ...v.fields.map((f) => ({ label: `${f.label}:`, value: f.value })),
+      ],
+      bank: null,
+      signatures: { left: "Prepared by", right: kind === "supplier" ? "Received by (the supplier)" : "Received by" },
+    };
+    return { doc, title: `${kind === "supplier" ? "Payment voucher" : "Expense voucher"} ${number}`, fileName: `${kind === "supplier" ? "Payment voucher" : "Expense voucher"} ${number}`.replace(/[^\w.() -]+/g, "-") };
+  }
+
   /** What only one payment's page shows: its fields, proof, who recorded it, and how to remove it. */
   private async detail(
     user: SessionUser,
@@ -537,8 +602,13 @@ export class TreasuryService {
     id: string,
   ): Promise<Omit<PaymentView, keyof PaymentRow | "title" | "ledgerHref">> {
     const db = this.prisma.db;
+    const { sales } = await this.settings.get();
+    const main = sales.currency;
     const voidOf = (at: Date | null, reason: string | null) => (at ? { at: at.toISOString(), reason } : null);
     const method = (m: string) => PAYMENT_METHOD_LABEL[m as PaymentMethod] ?? m;
+    // The page draws what every payment has (date, who from or to, method, account, reference, who paid, the amount
+    // and what it paid) the same way for every kind; `fields` holds only what is this kind's own.
+    const none = { paidBy: null, inMain: null };
     switch (kind) {
       case "customer": {
         const m = await db.moneyMovement.findUniqueOrThrow({
@@ -555,21 +625,17 @@ export class TreasuryService {
         const charges = live.reduce((t, a) => t + decimalToMinor(a.bankCharges), 0);
         return {
           fields: [
-            { label: "Received", value: amount(m.currency, m.amount) },
-            ...(m.currency !== m.allocCurrency ? [{ label: "Rate", value: `${Number(m.rate)} per ${m.allocCurrency}` }] : []),
-            ...m.allocations.map((a) => ({
-              label: `${PAYMENT_KIND_LABEL[a.kind as PaymentKind]} on ${a.order!.refNo}`,
-              value: `${amount(m.allocCurrency, a.amount)}${a.voidedAt && !m.voidedAt ? ` · released: ${a.voidReason ?? "order cancelled"}` : ""}`,
-              href: `/orders/${a.order!.id}`,
-            })),
-            ...(leftMinor > 0 ? [{ label: "Kept as the customer's credit", value: `${m.allocCurrency} ${(leftMinor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`, href: `/customers/${m.partyId}` }] : []),
+            ...(m.currency !== m.allocCurrency ? [{ label: "Rate", value: `${Number(m.rate)} ${m.currency} per ${m.allocCurrency}` }] : []),
             ...(charges ? [{ label: "Bank charges", value: `${m.allocCurrency} ${(charges / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}` }] : []),
-            { label: "Paid on", value: fromDbDate(m.valueDate) },
-            { label: "Method", value: method(m.method) },
-            ...(m.paidByName ? [{ label: "Paid by", value: m.paidByName }] : []),
+            ...(leftMinor > 0 ? [{ label: "Kept as the customer's credit", value: `${m.allocCurrency} ${(leftMinor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`, href: `/customers/${m.partyId}` }] : []),
+            ...m.allocations
+              .filter((a) => a.voidedAt && !m.voidedAt)
+              .map((a) => ({ label: `Released from ${a.order!.refNo}`, value: a.voidReason ?? "order cancelled" })),
             ...(m.note ? [{ label: "Note", value: m.note }] : []),
           ],
-          file: m.files[0] ? { name: m.files[0].fileName, href: `/files/${m.files[0].id}` } : null,
+          paidBy: m.paidByName ?? null,
+          inMain: m.currency === m.allocCurrency ? null : { amount: m.allocatable.toFixed(2), currency: m.allocCurrency, rate: String(Number(m.rate)) },
+          file: fileOf(m.files[0]),
           recordedBy: m.recordedBy.name,
           recordedAt: m.createdAt.toISOString(),
           voided: voidOf(m.voidedAt, m.voidReason),
@@ -589,11 +655,8 @@ export class TreasuryService {
       case "credit": {
         const a = await db.allocation.findUniqueOrThrow({ where: { id }, include: { order: orderRef, recordedBy: name } });
         return {
-          fields: [
-            { label: "For", value: `${PAYMENT_KIND_LABEL[a.kind as PaymentKind]} on ${a.order!.refNo}`, href: `/orders/${a.order!.id}` },
-            { label: "Paid on", value: fromDbDate(a.on) },
-            { label: "Method", value: "From the customer's credit (no money moved)" },
-          ],
+          fields: [{ label: "For", value: `${PAYMENT_KIND_LABEL[a.kind as PaymentKind]} on ${a.order!.refNo}`, href: `/orders/${a.order!.id}` }],
+          ...none,
           file: null,
           recordedBy: a.recordedBy.name,
           recordedAt: a.createdAt.toISOString(),
@@ -605,7 +668,8 @@ export class TreasuryService {
       case "refund": {
         const m = await db.moneyMovement.findUniqueOrThrow({ where: { id }, include: { recordedBy: name } });
         return {
-          fields: [{ label: "Refunded on", value: fromDbDate(m.valueDate) }, ...(m.note ? [{ label: "Note", value: m.note }] : [])],
+          fields: [...(m.note ? [{ label: "Note", value: m.note }] : [])],
+          ...none,
           file: null,
           recordedBy: m.recordedBy.name,
           recordedAt: m.createdAt.toISOString(),
@@ -617,18 +681,28 @@ export class TreasuryService {
       case "supplier": {
         const a = await db.allocation.findUniqueOrThrow({
           where: { id },
-          include: { purchaseOrder: orderRef, movement: { include: { recordedBy: name, paidBy: name, files: liveFile } } },
+          include: {
+            purchaseOrder: { select: { id: true, refNo: true, currency: true, mainCurrency: true, mainRate: true } },
+            movement: { include: { recordedBy: name, paidBy: name, files: liveFile } },
+          },
         });
         const p = { ...a.movement, kind: a.kind, order: a.purchaseOrder!, orderId: a.purchaseOrderId!, paidOn: a.on, voidedAt: a.voidedAt ?? a.movement.voidedAt, id: a.id };
+        const rate = p.order.currency === p.currency ? orderRate(p.order, main, sales.exchangeRates) : fxRate(p.currency, main, main, sales.exchangeRates);
         return {
-          fields: [
-            { label: "For", value: `${PAYMENT_KIND_LABEL[p.kind as PaymentKind]} on ${p.order.refNo}`, href: `/orders/${p.order.id}` },
-            { label: "Paid on", value: fromDbDate(p.paidOn) },
-            { label: "Method", value: method(p.method) },
-            ...(p.paidBy ? [{ label: "Paid by", value: p.paidBy.name }] : []),
-            ...(p.note ? [{ label: "Note", value: p.note }] : []),
+          fields: [...(p.note ? [{ label: "Note", value: p.note }] : [])],
+          paidBy: p.paidBy?.name ?? null,
+          inMain: inMainOf(a.share, p.currency, main, rate),
+          parts: [
+            {
+              order: p.order.refNo,
+              href: `/orders/${p.order.id}/factory`,
+              part: PAYMENT_KIND_LABEL[p.kind as PaymentKind],
+              amount: money(a.share),
+              currency: p.currency,
+              released: !!a.voidedAt && !a.movement.voidedAt,
+            },
           ],
-          file: p.files[0] ? { name: p.files[0].fileName, href: `/files/${p.files[0].id}` } : null,
+          file: fileOf(p.files[0]),
           recordedBy: p.recordedBy.name,
           recordedAt: p.createdAt.toISOString(),
           voided: voidOf(p.voidedAt, p.voidReason),
@@ -637,7 +711,16 @@ export class TreasuryService {
         };
       }
       case "expense": {
-        const e = await db.expense.findUniqueOrThrow({ where: { id }, include: { recordedBy: name, paidBy: name, repaidAccount: name, files: liveFile } });
+        const e = await db.expense.findUniqueOrThrow({
+          where: { id },
+          include: { recordedBy: name, paidBy: name, repaidAccount: name, files: liveFile, order: orderRef, inquiry: orderRef },
+        });
+        const category = EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory] ?? e.category;
+        const on = e.order
+          ? { order: e.order.refNo, href: `/orders/${e.order.id}/costs` }
+          : e.inquiry
+            ? { order: e.inquiry.refNo, href: `/inquiries/${e.inquiry.id}/costs` }
+            : null;
         const borne =
           e.borneBy === "customer"
             ? "The customer (added to what they owe)"
@@ -646,10 +729,8 @@ export class TreasuryService {
               : "Us";
         return {
           fields: [
-            { label: "Spent on", value: fromDbDate(e.spentOn) },
-            { label: "Category", value: EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory] ?? e.category },
+            { label: "Category", value: category },
             { label: "Borne by", value: borne },
-            ...(e.paidBy ? [{ label: "Paid by", value: e.paidBy.name }] : []),
             ...(e.ownMoney || e.payLater
               ? [
                   {
@@ -658,10 +739,12 @@ export class TreasuryService {
                   },
                 ]
               : []),
-            ...(e.payee ? [{ label: "Owed to", value: e.payee }] : []),
             ...(e.note ? [{ label: "Note", value: e.note }] : []),
           ],
-          file: e.files[0] ? { name: e.files[0].fileName, href: `/files/${e.files[0].id}` } : null,
+          paidBy: e.paidBy?.name ?? null,
+          inMain: inMainOf(e.amount, e.currency, main, Number(e.rate)),
+          parts: on ? [{ ...on, part: category, amount: money(e.amount), currency: e.currency, released: false }] : [],
+          file: fileOf(e.files[0]),
           recordedBy: e.recordedBy.name,
           recordedAt: e.createdAt.toISOString(),
           voided: voidOf(e.voidedAt, e.voidReason),
@@ -679,9 +762,9 @@ export class TreasuryService {
           fields: [
             { label: "From", value: `${t.fromAccount.name} · ${amount(t.fromAccount.currency, t.amountOut)}` },
             { label: "To", value: `${t.toAccount.name} · ${amount(t.toAccount.currency, t.amountIn)}` },
-            { label: "Moved on", value: fromDbDate(t.transferredOn) },
             ...(t.note ? [{ label: "Note", value: t.note }] : []),
           ],
+          ...none,
           file: null,
           recordedBy: t.recordedBy.name,
           recordedAt: t.createdAt.toISOString(),
@@ -700,7 +783,8 @@ export class TreasuryService {
             ...(m.status === "sent_back" && m.reason ? [{ label: "Sent back because", value: m.reason }] : []),
             { label: "Verify it", value: "In the verification queue", href: "/approvals" },
           ],
-          file: m.files[0] ? { name: m.files[0].fileName, href: `/files/${m.files[0].id}` } : null,
+          ...none,
+          file: fileOf(m.files[0]),
           recordedBy: m.submittedBy.name,
           recordedAt: m.submittedAt.toISOString(),
           voided: null,

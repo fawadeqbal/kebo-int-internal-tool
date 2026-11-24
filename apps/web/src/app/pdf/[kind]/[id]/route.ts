@@ -3,7 +3,7 @@ import { apiFetch, ApiError, SESSION_COOKIE } from "@/lib/api";
 import type { ReportView } from "@/lib/types-deals";
 import type { OrderDocument, RevisionDoc } from "@/lib/types-orders";
 import type { PaperDocView } from "@/lib/types-papers";
-import { LEDGER_PARTY_KINDS, PAPER_KINDS, type PaperKind } from "@kebo/shared";
+import { LEDGER_PARTY_KINDS, PAPER_KINDS, type PaperKind, type PaymentPaper } from "@kebo/shared";
 import type { LedgerStatement } from "@/lib/types-ledger";
 import { attachmentHeaders, pdfName, withChromium } from "../../render";
 import { UUID } from "@/lib/ids";
@@ -19,6 +19,7 @@ import { UUID } from "@/lib/ids";
  *   /pdf/<paper>/<order id>?v=&ref=              a paper the app makes (sales-contract, commercial-invoice…)
  *   /pdf/report/summary?from&to&staff            the Reports page (any UUID works in place of "summary")
  *   /pdf/ledger-customer|factory|staff/<id>?from&to&cur&no   a statement of account (Finance › Ledger)
+ *   /pdf/voucher-supplier|expense/<id>          a supplier payment's or an expense's voucher (Finance › Payments)
  *
  * The session is the kebo_session cookie, or `Authorization: Bearer <token>`
  * (the phone app), which is then used as the session cookie while rendering.
@@ -90,7 +91,17 @@ const statement =
     return { name: s.share.fileName, path: `/print/ledger/${kind}/${id}${qs.size ? `?${qs}` : ""}` };
   };
 
+/** A supplier payment's or an expense's voucher (Finance › Payments). */
+const voucher =
+  (kind: "supplier" | "expense"): Kind =>
+  async (id, token) => {
+    const p = await ask<PaymentPaper>(token, `/treasury/payments/${kind}/${id}/paper`);
+    return { name: p.fileName, path: `/print/payments/${kind}/${id}` };
+  };
+
 const KINDS: Record<string, { id: (id: string) => boolean; target: Kind }> = {
+  "voucher-supplier": { id: (id) => UUID.test(id), target: voucher("supplier") },
+  "voucher-expense": { id: (id) => UUID.test(id), target: voucher("expense") },
   ...Object.fromEntries(LEDGER_PARTY_KINDS.map((k) => [`ledger-${k}`, { id: (id: string) => UUID.test(id), target: statement(k) }])),
   ...Object.fromEntries(PAPER_KINDS.map((k) => [k, { id: (id: string) => UUID.test(id), target: paper(k) }])),
   revisions: {
