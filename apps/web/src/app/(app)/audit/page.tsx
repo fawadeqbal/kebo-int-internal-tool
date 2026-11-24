@@ -7,6 +7,8 @@ import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { api } from "@/lib/api";
 import { readableHistory } from "@/components/insights/readable-dates";
 import { ExportCsv } from "@/components/sheets/export-link";
+import { cardSentences, fieldLabel, hiddenChange, isCardEdit, valueText } from "@/components/common/history-words";
+import { MessageSquareQuote } from "lucide-react";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
 import { dateTime, timeAgo, countOf } from "@/lib/format";
@@ -55,22 +57,36 @@ function entityHref(r: AuditRow, canUsers: boolean): string | null {
   }
 }
 
-const show = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v));
-
 /**
  * Fields whose value changed. When the entry recorded values but none of them
  * differ (e.g. only a customer's contacts were edited), all recorded values.
  */
 function changes(r: AuditRow): { rows: { key: string; from: unknown; to: unknown }[]; changed: boolean } {
+  // A card's edit: its sentences are the change (its count, keys and lines are bookkeeping).
+  if (isCardEdit(r.action)) return { rows: cardSentences(r.newValues).map((x, i) => ({ key: `#${i}`, from: null, to: x })), changed: true };
   const before = r.oldValues ?? {};
   const after = r.newValues ?? {};
-  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])];
+  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((k) => !hiddenChange({ field: k, from: null, to: null }));
   const all = keys.map((k) => ({ key: k, from: before[k], to: after[k] }));
   const diff = all.filter((c) => JSON.stringify(c.from) !== JSON.stringify(c.to));
   return diff.length ? { rows: diff, changed: true } : { rows: all, changed: false };
 }
 
 const words = (key: string) => key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase();
+
+/** The reason typed in "Why?" (review 24 Nov: kept, as the box says, but shown nowhere). */
+function Reason({ r }: { r: AuditRow }) {
+  if (!r.reason) return null;
+  return (
+    <p className="mt-1 flex items-start gap-1.5 text-xs text-text-2">
+      <MessageSquareQuote className="mt-0.5 size-3.5 shrink-0 text-info" aria-hidden />
+      <span>
+        <span className="sr-only">Reason: </span>
+        {r.reason}
+      </span>
+    </p>
+  );
+}
 
 /** "Show 3 changes": the fields, before → after (outside the row's link). */
 function Changes({ r }: { r: AuditRow }) {
@@ -96,9 +112,9 @@ function Changes({ r }: { r: AuditRow }) {
           <tbody>
             {diff.rows.map((c) => (
               <tr key={c.key} className="border-t border-line align-top">
-                <td className="px-3 py-1.5 whitespace-nowrap text-text-2">{words(c.key)}</td>
-                <td className={cn("max-w-72 px-3 py-1.5 break-words", diff.changed ? "text-bad line-through decoration-bad/40" : "text-text-2")}>{show(c.from)}</td>
-                <td className={cn("max-w-72 px-3 py-1.5 break-words", diff.changed ? "text-ok" : "text-text-2")}>{show(c.to)}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap text-text-2">{c.key.startsWith("#") ? "Changed" : fieldLabel(c.key)}</td>
+                <td className={cn("max-w-72 px-3 py-1.5 break-words", diff.changed ? "text-bad line-through decoration-bad/40" : "text-text-2")}>{c.key.startsWith("#") ? "" : valueText(c.from)}</td>
+                <td className={cn("max-w-72 px-3 py-1.5 break-words", diff.changed ? "text-ok" : "text-text-2")}>{c.key.startsWith("#") ? readableHistory(String(c.to)) : valueText(c.to)}</td>
               </tr>
             ))}
           </tbody>
@@ -191,7 +207,12 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                   title={r.summary ? readableHistory(r.summary) : words(r.action)}
                   line={`${r.userName} · ${label(r.entityType)}`}
                   figure={timeAgo(r.createdAt)}
-                  extra={<Changes r={r} />}
+                  extra={
+                    <>
+                      <Reason r={r} />
+                      <Changes r={r} />
+                    </>
+                  }
                 />
               ))}
             </PhoneList>
@@ -228,6 +249,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                             <span>{r.summary ? readableHistory(r.summary) : words(r.action)}</span>
                           )}
                         </p>
+                        <Reason r={r} />
                         <Changes r={r} />
                       </Td>
                       <Td className="py-2.5 text-right align-top">

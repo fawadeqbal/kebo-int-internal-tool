@@ -206,6 +206,8 @@ export interface AuditRow {
   entityType: string;
   entityId: string | null;
   summary: string | null;
+  /** What was typed in "Why?", when the change asked for one. */
+  reason?: string | null;
   oldValues: Record<string, unknown> | null;
   newValues: Record<string, unknown> | null;
   createdAt: string;

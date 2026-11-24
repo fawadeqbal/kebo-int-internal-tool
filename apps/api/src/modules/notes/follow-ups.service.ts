@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { fromDbDate, toDbDate, type Prisma } from "@kebo/database";
-import { can, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, QUOTE_FOLLOW_UP_DAYS, REMINDER_HOUR, rowsOf, type FollowUpDoneInput, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
+import { can, withArticle, FOLLOW_UP_ESCALATE_DAYS, FOLLOW_UP_KIND_LABEL, OPEN_STAGES, QUOTE_FOLLOW_UP_DAYS, REMINDER_HOUR, rowsOf, type FollowUpDoneInput, type FollowUpEditInput, type FollowUpInput, type FollowUpKind, type FollowUpListQuery } from "@kebo/shared";
 import { addDays, daysBetween, DomainError, ForbiddenError, formatClock, GateError, NotFoundError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -346,7 +346,7 @@ export class FollowUpsService {
         ref,
         "follow_up.added",
         row.id,
-        `${user.name} planned a ${FOLLOW_UP_KIND_LABEL[input.kind].toLowerCase()} for ${assigneeId === user.id ? "themselves" : row.assignee.name} on ${dueWords(input.dueOn, input.dueAt)}: ${row.title}`,
+        `${user.name} planned ${withArticle(FOLLOW_UP_KIND_LABEL[input.kind].toLowerCase())} for ${assigneeId === user.id ? "themselves" : row.assignee.name} on ${dueWords(input.dueOn, input.dueAt)}: ${row.title}`,
         { assignee: row.assignee.name, dueOn: input.dueOn, dueAt: input.dueAt },
       );
       return row.id;

@@ -115,7 +115,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           ) : undefined
         }
         more={
-          <ExportCsv what="cash-book" query={{ from: allDates ? undefined : pr.from, to: allDates ? undefined : pr.to, account }} />
+          // This list as it is filtered (review 24 Nov: the export ignored the tab and method and had no numbers).
+          <ExportCsv what="payments" query={{ from: allDates ? undefined : pr.from, to: allDates ? undefined : pr.to, ...keep, p: undefined }} />
         }
         primary={
           canRecord ? (

@@ -3,6 +3,7 @@ import { isSupplier } from "@kebo/database";
 import { z } from "zod";
 import { can, FLOW_STEPS, STEP_OF_ACTION } from "@kebo/shared";
 import { ForbiddenError, NotFoundError } from "@kebo/utils";
+import { changesOf } from "../../common/audit/changes";
 import { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { inquiryAccess } from "../inquiries/inquiries.service";
@@ -109,7 +110,7 @@ export class HistoryService {
     );
     const stepped = q.step ? rows.filter((r) => STEP_OF_ACTION(r.action, r.newValues) === q.step) : rows;
     const shown = paged ? (q.step ? stepped.slice((q.page! - 1) * q.pageSize, q.page! * q.pageSize) : stepped) : stepped.slice(0, q.limit ?? 100);
-    const out = shown.map((r) => ({
+    const out = withoutRepeats(shown).map((r) => ({
       id: r.id,
       step: STEP_OF_ACTION(r.action, r.newValues),
       at: r.createdAt,
@@ -118,18 +119,37 @@ export class HistoryService {
       entityType: r.entityType,
       summary: r.summary,
       reason: r.reason,
-      changes: changesOf(r.oldValues, r.newValues),
+      // A card's edit says its changes in its summary; its fields (count, keys, lines) are bookkeeping, not changes
+      // (review 24 Nov: "N — → 1 · Card — → lines" on the History tab).
+      changes: r.action.startsWith("card.") ? [] : changesOf(r.oldValues, r.newValues),
     }));
     return paged ? { rows: out, total: counted ?? stepped.length, page: q.page!, pageSize: q.pageSize } : out;
   }
 }
 
-/** Fields whose value changed, as { field, from, to } (both objects are flat snapshots). */
-export function changesOf(oldValues: unknown, newValues: unknown) {
-  const o = (oldValues && typeof oldValues === "object" ? oldValues : {}) as Record<string, unknown>;
-  const n = (newValues && typeof newValues === "object" ? newValues : {}) as Record<string, unknown>;
-  const show = (v: unknown) => (v === null || v === undefined || v === "" ? null : typeof v === "object" ? JSON.stringify(v) : String(v));
-  return [...new Set([...Object.keys(o), ...Object.keys(n)])]
-    .filter((k) => k !== "reason" && show(o[k]) !== show(n[k]))
-    .map((k) => ({ field: k, from: show(o[k]), to: show(n[k]) }));
+/**
+ * One save that wrote the same line twice (review 24 Nov: "edited the offer" with and without its reason, a second
+ * apart) is told once: the same record, person and words within a few seconds, where one copy adds nothing (no
+ * reason of its own, no changes of its own). Two saves that differ in their reason or their changes both stay.
+ */
+export function withoutRepeats<T extends { entityType: string; entityId: string | null; userId: string | null; summary: string | null; reason: string | null; createdAt: Date; oldValues: unknown; newValues: unknown }>(rows: T[]): T[] {
+  const out: T[] = [];
+  const changed = (r: T) => JSON.stringify(changesOf(r.oldValues, r.newValues));
+  const adds = (r: T, other: T) => (!!r.reason && r.reason !== other.reason) || (changesOf(r.oldValues, r.newValues).length > 0 && changed(r) !== changed(other));
+  for (const r of rows) {
+    const i = out.findIndex(
+      (x) =>
+        x.summary !== null &&
+        x.summary === r.summary &&
+        x.entityType === r.entityType &&
+        x.entityId === r.entityId &&
+        x.userId === r.userId &&
+        Math.abs(x.createdAt.getTime() - r.createdAt.getTime()) < 5_000 &&
+        (!adds(r, x) || !adds(x, r)),
+    );
+    if (i < 0) out.push(r);
+    else if (adds(r, out[i]!)) out[i] = r;
+  }
+  return out;
 }
+

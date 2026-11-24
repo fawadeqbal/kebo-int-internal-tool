@@ -613,6 +613,9 @@ export function countText(n: string | number, word?: string | null): string {
   return `${text} ${many}`;
 }
 
+/** "a call", "an other": the word with its article, for a sentence. */
+export const withArticle = (word: string) => `${/^[aeiou]/i.test(word.trim()) ? "an" : "a"} ${word.trim()}`;
+
 /** "USD 44,100.00", for amounts inside a sentence on a paper. */
 export function paperMoneyText(amount: string | number, currency: string): string {
   return `${currency} ${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

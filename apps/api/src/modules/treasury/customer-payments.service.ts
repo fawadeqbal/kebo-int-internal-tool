@@ -964,6 +964,8 @@ export class CustomerPaymentsService {
           reference: m.reference,
         },
         newValues: {
+          // Its page reads its own changes by this (the order's history keeps them too).
+          paymentId: m.id,
           amount: fromMinor(amountMinor),
           received: `${formatMinor(receivedMinor, receivedCurrency)}`,
           rate,

@@ -28,6 +28,7 @@ export * from "./schemas/flow";
 export * from "./schemas/sections";
 export * from "./schemas/papers";
 export * from "./schemas/notes";
+export * from "./schemas/plain-errors";
 export * from "./workflows/devices";
 export * from "./platform";
 export * from "./treasury";

@@ -10,6 +10,7 @@ import {
   leadWords,
   lineNumbers,
   offerPartsOf,
+  countText,
   offerTaxText,
   taxSentence,
   type CopyLinesInput,
@@ -371,7 +372,7 @@ export class SourcingService {
         action: "create",
         entityType: "factory_quote",
         entityId: q.id,
-        summary: `${inquiry.refNo}: offer from ${factory.name} (${input.currency}, tax ${offerTaxText(tax.taxRate, tax.taxIncluded)}${input.lines ? `, ${input.lines.length} items` : ""})`,
+        summary: `${inquiry.refNo}: offer from ${factory.name} (${input.currency}, tax ${offerTaxText(tax.taxRate, tax.taxIncluded)}${input.lines ? `, ${countText(input.lines.length, "items")}` : ""})`,
       });
       const moved = await this.stages.after(tx, inquiry, "factory_price_added", user.id);
       if (moved) events.push(moved);
