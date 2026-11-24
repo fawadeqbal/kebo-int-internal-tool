@@ -163,7 +163,14 @@ export function DealForm({
   const [removing, startRemove] = useTransition();
   const set = <K extends keyof DealFormValues>(k: K, value: DealFormValues[K]) => setV((s) => ({ ...s, [k]: value }));
   // The window in steps (design 17 Nov): Customer · Items · Details · Files.
-  const [step, setStep] = useState<RequestStep>(startStep);
+  const [step, setStepNow] = useState<RequestStep>(startStep);
+  // The steps opened so far: only those get their tick (e2e 24 Nov: Files was ticked though Review was reached
+  // straight from Details, the files never looked at).
+  const [seen, setSeen] = useState<Set<RequestStep>>(() => new Set([startStep]));
+  const setStep = (k: RequestStep) => {
+    setStepNow(k);
+    setSeen((was) => (was.has(k) ? was : new Set(was).add(k)));
+  };
   // The items on a copy; changing a saved list asks why before the save (kept with the edit).
   const sheet = useItemRows(items);
   // Why (an edit with a change): picked in the window's "Why the change?" box, sent with the save.
@@ -424,7 +431,7 @@ export function DealForm({
                           : files.length + staged.length
                             ? `${files.length + staged.length} file${files.length + staged.length === 1 ? "" : "s"}`
                             : undefined,
-                done: create && k < at,
+                done: create && k < at && seen.has(x.key),
                 icon: STEP_ICON[x.key],
                 count: create ? undefined : changesIn(x.key) || undefined,
                 apart: x.key === "review" || x.key === "changes",

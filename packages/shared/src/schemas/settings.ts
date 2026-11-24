@@ -103,6 +103,8 @@ export const salesSettings = z.object({
   /** When each rate was last changed (YYYY-MM-DD): kept by the API, so old rates can be flagged. */
   rateDates: z.record(z.string(), z.string()).default({}),
   defaultMarginPercent: z.coerce.number().min(0).max(95).default(15),
+  /** Under this margin an order is thin: adding a cost that takes it there says so first (e2e 24 Nov). */
+  marginFloorPercent: z.coerce.number().min(0).max(95).default(5),
   quotationValidityDays: days(15),
   defaultDepositPercent: z.coerce.number().min(0).max(100).default(30),
   defaultBalanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),

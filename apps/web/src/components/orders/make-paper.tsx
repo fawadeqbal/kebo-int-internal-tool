@@ -44,6 +44,14 @@ function CheckRow({
   const id = useId();
   const [v, setV] = useState("");
   const [hs, setHs] = useState<Record<string, string>>({});
+  // Saved on leaving the field as well as with Save (e2e 24 Nov: Tab did not save, and the live paper waited for it);
+  // each value once, so the blur that comes before a click on Save does not save it twice.
+  const sent = useRef<Record<string, string>>({});
+  const save = (key: string, value: string, run: () => void) => {
+    if (!value || pending || sent.current[key] === value) return;
+    sent.current[key] = value;
+    run();
+  };
   const mark = c.ok ? (
     <Check className="size-4 shrink-0 text-ok" strokeWidth={3} aria-label="From the order" />
   ) : (
@@ -65,7 +73,7 @@ function CheckRow({
             className="ml-auto flex min-w-0 items-center gap-1.5"
             onSubmit={(e) => {
               e.preventDefault();
-              if (v.trim()) onFix(c.fix!, v.trim());
+              save("", v.trim(), () => onFix(c.fix!, v.trim()));
             }}
           >
             <label htmlFor={id} className="sr-only">
@@ -76,6 +84,7 @@ function CheckRow({
               type={fix.type}
               value={v}
               onChange={(e) => setV(e.target.value)}
+              onBlur={() => save("", v.trim(), () => onFix(c.fix!, v.trim()))}
               className={cn(controlClass, controlSizes.sm, "w-36 min-w-0 border-primary/60")}
             />
             {v.trim() && (
@@ -110,7 +119,7 @@ function CheckRow({
                 className="flex items-center gap-2 text-xs"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (hs[l.id]?.trim()) onFix("hs", hs[l.id]!.trim(), l.id);
+                  save(l.id, hs[l.id]?.trim() ?? "", () => onFix("hs", hs[l.id]!.trim(), l.id));
                 }}
               >
                 <label htmlFor={`${id}-${l.id}`} className="min-w-0 flex-1 truncate text-text-2">
@@ -120,6 +129,7 @@ function CheckRow({
                   id={`${id}-${l.id}`}
                   value={hs[l.id] ?? ""}
                   onChange={(e) => setHs((x) => ({ ...x, [l.id]: e.target.value }))}
+                  onBlur={() => save(l.id, hs[l.id]?.trim() ?? "", () => onFix("hs", hs[l.id]!.trim(), l.id))}
                   inputMode="decimal"
                   className={cn(controlClass, controlSizes.sm, "w-28 tabular")}
                 />
@@ -361,10 +371,8 @@ export function MakePaper({
       if (!r.ok) return;
       id = (r.data as PaperChecks).paper?.id ?? null;
     }
-    if (id) {
-      const r = await call("final", id, { options: opts });
-      if (r.ok) setNotice(`Made final: ${p.number}.`);
-    }
+    // Once final, the side says "Made final · the date" above Send it: no second "Made final" notice (e2e 24 Nov).
+    if (id) await call("final", id, { options: opts });
   };
 
   const required = p.checks.filter((c) => c.required && !c.ok);

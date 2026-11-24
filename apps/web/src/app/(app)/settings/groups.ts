@@ -170,6 +170,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
         wide: true,
       },
       { name: "defaultMarginPercent", label: "Usual margin", kind: "number", unit: "%" },
+      { name: "marginFloorPercent", label: "Warn when an order's margin falls under", kind: "number", unit: "%" },
       { name: "quotationValidityDays", label: "Quotations are valid for", kind: "number", unit: "days" },
       { name: "leadSpareDays", label: "Spare days on a supplier's lead time", kind: "number", unit: "days" },
       { name: "defaultDepositPercent", label: "Usual deposit", kind: "number", unit: "%" },
@@ -201,7 +202,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
         key: "quotations",
         title: "New quotations start with",
         description: "Margin, validity, deposit and terms. Made from a supplier's offer, a quotation takes its port, its warranty and its days plus the spare days, and is never valid longer than its prices. People can change them on each quotation.",
-        fields: ["defaultMarginPercent", "quotationValidityDays", "leadSpareDays", "defaultDepositPercent", "defaultBalanceTerms", "defaultIncoterm"],
+        fields: ["defaultMarginPercent", "marginFloorPercent", "quotationValidityDays", "leadSpareDays", "defaultDepositPercent", "defaultBalanceTerms", "defaultIncoterm"],
       },
       {
         key: "factory",

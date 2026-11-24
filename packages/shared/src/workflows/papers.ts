@@ -605,3 +605,37 @@ export function paperWordsText(amount: string | number, currency: string): strin
   const rest = cents % 100;
   return `${currency} ${numberToWords(whole)}${rest ? ` and Cents ${numberToWords(rest)}` : ""} only`;
 }
+
+/** Text typed to fill a field for now ("Xxxx", "Reg. no. xxx", "TBD", "lorem"): never meant to print. */
+const PLACEHOLDER = /(^|[^a-z0-9])(x{3,}|tbd|lorem)([^a-z0-9]|$)/i;
+
+/**
+ * The words on a paper that are placeholders, each with where it sits ("Forwarder: Xxxx", "Our tax no.: xxx"), so
+ * they are put right before the paper is made final (e2e 24 Nov: "Xxxx" and "Reg. no. xxx" printed on the receipt,
+ * the packing list and the invoice). Looks at the letterhead, the party, the facts at the top and the lines under.
+ */
+export function placeholdersIn(doc: Pick<PaperDoc, "company" | "party" | "meta" | "bullets">): string[] {
+  const found: string[] = [];
+  const look = (where: string, v: PaperCell | undefined) => {
+    const text = typeof v === "string" ? v : v && "item" in v ? v.item : null;
+    if (text && PLACEHOLDER.test(text)) found.push(`${where}: ${text.trim().split("\n")[0]}`);
+  };
+  const c = doc.company;
+  look("Our name", c.name);
+  look("Our address", c.address ?? null);
+  look("Our phone", c.phone ?? null);
+  look("Our email", c.email ?? null);
+  look("Our tax no.", c.taxNo ?? null);
+  const p = doc.party;
+  look(p.label ?? "Party", p.name);
+  look("Their address", p.address ?? null);
+  look("Their tax no.", p.taxNo ?? null);
+  look("Their reg. no.", p.regNo ?? null);
+  for (const m of doc.meta) look(m.label, m.value);
+  for (const b of doc.bullets) {
+    if (typeof b === "string") look("Terms", b);
+    else look(b.label, b.value);
+  }
+  return found;
+}
+

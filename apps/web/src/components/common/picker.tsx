@@ -232,7 +232,8 @@ export function Picker<T extends PickerOption>({
           <ul id={listId} role="listbox" aria-label={listLabel} className="max-h-80 scroll-y scroll-sm p-1">
             {firstRows.length > 0 && first && group(first.title)}
             {firstRows.map((r, i) => option(r, i, (first?.line ?? line)(r)))}
-            {results.length > 0 && group(showRecent ? recentTitle : typed ? `Results for “${typed}”` : othersTitle)}
+            {/* "Other suppliers" only after a first group: alone it named nothing (e2e 24 Nov). */}
+            {results.length > 0 && (showRecent || typed || firstRows.length > 0) && group(showRecent ? recentTitle : typed ? `Results for “${typed}”` : othersTitle)}
             {results.map((r, k) => option(r, firstRows.length + k, line(r)))}
             {!loading && all.length === 0 && (
               <li role="presentation" className="px-2.5 py-3 text-sm text-text-2">

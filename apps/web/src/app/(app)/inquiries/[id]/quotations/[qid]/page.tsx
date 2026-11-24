@@ -222,7 +222,9 @@ export default async function QuotationOwnPage({
     ) : null;
   const editable = !!editor || (!isDraft && manage);
 
-  const terms = PAPER.ofRevision({ ...r, leadTime: o?.leadTime ?? r.leadTime });
+  // Accepted: how they pay is what was chosen when it was accepted (the order's route; e2e 24 Nov showed "—").
+  const route = (r.status === "accepted" ? acceptedOrder?.paymentTerms?.route : null) ?? r.paymentRoute;
+  const terms = PAPER.ofRevision({ ...r, paymentRoute: route, leadTime: o?.leadTime ?? r.leadTime });
   const total = Number(o?.total ?? r.total);
   const allChecks = showCosts ? checksOf(r, o) : [];
   const chip = (key: TermsCheck["key"]) => {

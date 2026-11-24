@@ -200,7 +200,7 @@ export function ReceivedFields({
                 ))}
               </Select>
             </Field>
-            <AccountSelect id="r-account" label="Deposit to account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+            <AccountSelect id="r-account" label="Deposit to account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} method={method} />
             <Field label="Reference" htmlFor="r-reference" optional error={s.errors?.reference}>
               <Input id="r-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
             </Field>
@@ -430,7 +430,7 @@ function ReceiptFields({
                 <MoneyInput id="rc-amount" name="receivedAmount" currency={a.received} value={a.amount} onChange={(e) => a.setAmount(e.target.value)} placeholder="0.00" />
               </div>
             </Field>
-            <AccountSelect id="rc-account" label="Deposit to account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+            <AccountSelect id="rc-account" label="Deposit to account" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} method={method} />
             <Field label="Date" htmlFor="rc-on" error={s.errors?.paidOn}>
               <Input id="rc-on" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
             </Field>
