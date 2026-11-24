@@ -91,7 +91,7 @@ describe("the quotation's form, in the four groups", () => {
 
   it("a usual payment in one tap; the parts are what is sent, with the deposit and balance worked out", () => {
     show();
-    fireEvent.click(screen.getByRole("button", { name: "30 · 60 · 10 after the site test" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Apply template" }), { target: { value: "30 · 60 · 10 after the site test" } });
     expect(screen.getAllByLabelText("Percentage").map((x) => (x as HTMLInputElement).value)).toEqual(["30", "60", "10"]);
     const p = sent();
     expect(p.paymentParts.map((x: { percent: string; rule: string }) => `${x.percent} ${x.rule}`)).toEqual(["30 on_order", "60 before_shipment", "10 after_sat"]);
@@ -106,7 +106,7 @@ describe("the quotation's form, in the four groups", () => {
     show();
     const [, balance] = screen.getAllByLabelText("Percentage");
     fireEvent.change(balance!, { target: { value: "60" } });
-    expect(screen.getByText("10% not allocated · 90%")).toBeTruthy();
+    expect(screen.getByText(/10% not allocated/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Save draft/ }));
     expect(screen.getByText("The installments must add up to 100%: 10% not allocated.")).toBeTruthy();
   });

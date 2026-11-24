@@ -148,7 +148,7 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   // A box's Edit opens only that part: its fields and Save, no steps; nothing changed is nothing to save.
   await page.getByRole("button", { name: "Edit delivery and payment" }).click();
   let win = page.getByRole("dialog", { name: "Edit delivery & payment" });
-  await expect(win.getByText("Start from")).toBeVisible();
+  await expect(win.getByRole("combobox", { name: "Apply template" })).toBeVisible();
   await expect(win.getByRole("navigation", { name: "Steps" })).toHaveCount(0);
   await expect(win.getByRole("button", { name: /^Next/ })).toHaveCount(0);
   await expect(win.getByRole("button", { name: "No changes" })).toBeDisabled();
