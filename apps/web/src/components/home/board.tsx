@@ -292,7 +292,7 @@ export function CustomersOwe({ r }: { r: Receivables }) {
         how={how.customersOwe}
       />
       <Lines
-        empty="No customer owes anything."
+        empty={r.scope === "mine" ? "Nothing is owed on the orders you handle." : "No customer owes anything."}
         rows={rows.slice(0, 4).map((x) => ({
           key: x.id,
           href: `/orders/${x.id}/payment`,

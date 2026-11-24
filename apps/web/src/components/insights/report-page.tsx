@@ -128,10 +128,14 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
             <span className="text-xs text-text-2">
               {p.label} · vs {p.vsLabel}
             </span>
+            {/* The summary has its own paper; every other report prints itself (review 24 Nov: Cash flow and Profit
+                printed the Sales summary). */}
             <FileActions
               excelHref={excel}
-              viewHref={buildHref("/print/report", {}, { from: p.from, to: reportTo })}
-              pdfHref={buildHref("/pdf/report/summary", {}, { from: p.from, to: reportTo })}
+              viewHref={kind === "overview" ? buildHref("/print/report", {}, { from: p.from, to: reportTo }) : undefined}
+              pdfHref={kind === "overview" ? buildHref("/pdf/report/summary", {}, { from: p.from, to: reportTo }) : undefined}
+              printHere={kind !== "overview"}
+              of={kind === "overview" ? undefined : `${title.toLowerCase()} report`}
             />
           </div>
         )}

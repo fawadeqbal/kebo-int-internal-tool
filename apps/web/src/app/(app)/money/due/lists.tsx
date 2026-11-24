@@ -155,7 +155,7 @@ export async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; toda
           <EmptyState
             framed
             title={r.rows.length ? "No order matches" : "Nothing to receive"}
-            description={r.rows.length ? "Clear the search or choose All open." : "Every customer has paid what they owe."}
+            description={r.rows.length ? "Clear the search or choose All open." : r.scope === "mine" ? "Nothing is owed on the orders you handle." : "Every customer has paid what they owe."}
           />
         ) : (
           <div>

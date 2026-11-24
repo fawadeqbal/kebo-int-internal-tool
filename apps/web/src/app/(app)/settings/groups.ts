@@ -188,7 +188,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "factoryAdvancePercent", label: "Supplier deposit", kind: "number", unit: "%" },
       { name: "exportVatRefundPercent", label: "Export VAT refund", kind: "number", unit: "%" },
       { name: "defaultPaymentTerms", label: "Payment terms on new quotations", kind: "textarea", wide: true },
-      { name: "defaultDeliveryTerms", label: "Incoterm on new quotations", kind: "textarea", wide: true },
+      { name: "defaultDeliveryTerms", label: "Delivery conditions on new quotations", kind: "textarea", wide: true, hint: "Packing, inspection, marks: printed under the delivery. The Incoterm itself is Usual Incoterm above." },
       { name: "warrantyTerms", label: "Warranty on sales contracts", kind: "textarea", wide: true },
       { name: "categories", label: "Product categories", kind: "lines", wide: true, hint: "One per line" },
     ],

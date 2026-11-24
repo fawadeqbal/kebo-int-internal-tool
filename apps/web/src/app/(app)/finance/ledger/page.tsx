@@ -172,7 +172,8 @@ async function Entries({
             description="Try a longer period, another type or currency, or show removed entries."
           />
         ) : (
-          <DataTable label="Ledger entries">
+          // Eight columns do not fit a 1280 px card: it scrolls sideways there too (review 24 Nov: "As recorded" was cut off).
+          <DataTable label="Ledger entries" className="fits:scroll-x">
             <THead>
               <tr>
                 <Th>Day</Th>

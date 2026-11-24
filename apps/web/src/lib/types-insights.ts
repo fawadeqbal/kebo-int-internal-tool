@@ -43,6 +43,8 @@ export interface Receivables {
   totals: { currency: string; due: string; overdue: string; credit?: string; net?: string }[];
   /** Money held for customers (their credit). */
   held?: { currency: string; amount: string; customers: number }[];
+  /** "mine": only the orders this person may see, so "nothing owed" is about those. */
+  scope?: "all" | "mine";
 }
 
 /** A sentence of Home's "What stands out": worked out from the numbers by a rule, shown only when it fires. */

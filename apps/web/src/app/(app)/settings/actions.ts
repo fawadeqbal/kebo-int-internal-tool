@@ -17,7 +17,10 @@ const plain = (m: string) =>
   m
     .replace(/^Too big: expected number to be <=?\s*(\S+)$/, "Use at most $1")
     .replace(/^Too small: expected number to be >=?\s*(\S+)$/, "Use at least $1")
-    .replace(/^Too (small|big): expected string to have [<>]?=?\s*\d+ characters?$/, "Use a three-letter code, e.g. USD")
+    // Any short or long text (review 24 Nov: an empty company name said "Use a three-letter code, e.g. USD").
+    .replace(/^Too small: expected string to have >=?\s*1 characters?$/, "This is needed")
+    .replace(/^Too small: expected string to have >=?\s*(\d+) characters?$/, "Use at least $1 characters")
+    .replace(/^Too big: expected string to have <=?\s*(\d+) characters?$/, "Use at most $1 characters")
     .replace(/^Invalid email address$/, "One of these is not a valid email address")
     .replace(/^Invalid input: expected int, received number$/, "Use a whole number");
 
