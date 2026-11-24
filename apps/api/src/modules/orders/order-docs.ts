@@ -1,4 +1,4 @@
-import { fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
 import { documentTotals, fromMinor } from "@kebo/money";
 import {
   BALANCE_TERMS_LABEL,
@@ -6,7 +6,7 @@ import {
   packingListNo,
   portsOf,
   routeAsAccepted,
-  routePaymentSentence,
+  orderPaymentSentence,
   type BalanceTerms,
   type BuyerSnapshot,
   type Settings,
@@ -61,7 +61,7 @@ export const orderDocInclude = {
   // The accepted option's discount and lead time (the revision keeps no figures of its own).
   revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
   allocations: livePartsWithEntry,
-  receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+  receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true, dueRule: true, dueDays: true, dueOn: true } },
   expenses: chargedExpenses,
   inquiry: { select: { contactId: true } },
   papers: { where: { kind: { in: [...ORDER_DOCUMENTS] } }, orderBy: { version: "asc" } },
@@ -149,7 +149,14 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       : null,
     paymentTerms: paymentTermsOf(depositPercent, balanceTermsOf(terms, o.balanceTerms)),
     /** The payment terms from the route, e.g. "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
-    paymentSentence: routePaymentSentence(depositPercent, terms, o.balanceTerms),
+    paymentSentence: orderPaymentSentence({
+      depositPercent,
+      terms,
+      accepted: o.balanceTerms,
+      quote: rev,
+      plan: o.receivables.map((r) => ({ amountMinor: decimalToMinor(r.amount), part: r.part, dueRule: r.dueRule, dueDays: r.dueDays, dueOn: fromDbDateOrNull(r.dueOn) })),
+      totalMinor: decimalToMinor(o.total),
+    }),
     currency: o.currency,
     showPrices: !goodsOnly,
     lines: lines.map((l, i) => ({

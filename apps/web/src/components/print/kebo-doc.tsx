@@ -1,5 +1,5 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
-import { paperMoneyText, paperWordsText, portsOf } from "@kebo/shared";
+import { countText, paperDateText, paperMoneyText, paperWordsText, portsOf } from "@kebo/shared";
 import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 import { countryName, isUnknownCountry } from "@/lib/countries";
 
@@ -81,9 +81,9 @@ const label: CSSProperties = { fontSize: "11px", fontWeight: 700, letterSpacing:
 
 /** "SEP 16, 2026" */
 export function docDate(iso: string) {
-  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
-  const month = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][(m ?? 1) - 1];
-  return `${month} ${d}, ${y}`;
+  // One style on every paper, the same as inside its sentences: "04 Sep 2026" (review 24 Nov: "SEP 4, 2026" beside
+  // "04 Sep 2026"). Papers go abroad, so the month is in letters whatever the company's own date setting.
+  return paperDateText(iso);
 }
 
 /** "USD 90,000.00", as the app and every other paper write it (the ISO code, never "$": many currencies use it). */
@@ -97,7 +97,7 @@ export const docWords = (amount: string, currency: string) => paperWordsText(amo
 
 /** "1 Set", "2,000 pcs" */
 export function docQty(quantity: string | number, unit?: string | null) {
-  return `${Number(quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${unit ?? ""}`.trim();
+  return countText(quantity, unit);
 }
 
 /** Free text (terms, notes) as list items: one per line, without the "1." numbering people type. */
@@ -160,12 +160,20 @@ export const docFootCell = (align: "left" | "right" = "left"): CSSProperties => 
   verticalAlign: "top",
 });
 
+/** Short words written small inside a title ("Statement of Account", not "Statement OF Account"). */
+const SMALL_WORDS = new Set(["of", "and", "the", "for", "to", "on", "in", "at", "by", "or"]);
 /** "PROFORMA  INVOICE" → "Proforma Invoice"; short abbreviations stay as they are ("SAT CERTIFICATE" → "SAT Certificate"). */
 const titleCase = (t: string) =>
   t
     .trim()
     .split(/\s+/)
-    .map((w) => (/^[A-Z]{2,3}$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .map((w, i) =>
+      i > 0 && SMALL_WORDS.has(w.toLowerCase())
+        ? w.toLowerCase()
+        : /^[A-Z]{2,3}$/.test(w)
+          ? w
+          : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+    )
     .join(" ");
 /** "Invoice.NO." → "Invoice No." */
 const numberText = (l: string) => l.replace(/\.?\s*no\.?\s*:?\s*$/i, " No.").trim();
@@ -254,13 +262,15 @@ export function KeboDoc<T>({
   const width = (c: DocColumn<T>) => (c.width ? `${c.width}pt` : undefined);
   const contacts = [
     company.phone ? { icon: <IconPhone />, text: company.phone } : null,
-    company.email ? { icon: <IconMail />, text: company.email } : null,
+    // Both emails, as Settings › Company says they print (review 24 Nov: the second never printed).
+    company.email || company.email2 ? { icon: <IconMail />, text: [company.email, company.email2].filter(Boolean).join(" · ") } : null,
     company.website ? { icon: <IconGlobe />, text: company.website, href: `https://${company.website.replace(/^https?:\/\//, "")}` } : null,
     company.address ? { icon: <IconPin />, text: company.address } : null,
   ].filter((x) => x !== null);
   const details = [{ label: "Date", value: docDate(date) as ReactNode }, ...meta.map((m) => ({ label: noColon(m.label), value: m.value }))];
   const footLeft = company.taxNo ? `Business License No. ${company.taxNo}` : "";
-  const thanks = "Thank you for your business";
+  // The company's own line at the bottom (Settings › Company › Invoice footer), else the usual thanks.
+  const thanks = company.invoiceFooter?.trim().replace(/\s*\n\s*/g, " · ") || "Thank you for your business";
   const th = (c: DocColumn<T>, i: number): CSSProperties => ({
     ...label,
     color: TEXT_2,

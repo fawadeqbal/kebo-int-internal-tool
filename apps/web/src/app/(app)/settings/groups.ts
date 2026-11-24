@@ -145,7 +145,8 @@ export const SETTING_GROUPS: SettingGroup[] = [
       {
         key: "time",
         title: "Time and dates",
-        description: "The company's time zone and how dates and times are written, on every page, email and reminder.",
+        description:
+          "The company's time zone and how dates and times are written, on every page, email and reminder. Papers for customers and suppliers always write 04 Sep 2026, so no one abroad misreads a date.",
         fields: ["timeZone", "dateFormat", "timeFormat"],
       },
       {

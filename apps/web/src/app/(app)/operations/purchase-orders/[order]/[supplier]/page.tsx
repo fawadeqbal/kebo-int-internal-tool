@@ -72,7 +72,12 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   const live = payments.filter((x) => !x.voided);
   const canPay = !!m.factories?.canRecord && owing.length > 0 && o.status !== "cancelled";
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  const basis = defaults.priceBasis ? `${defaults.priceBasis.basis}${defaults.priceBasis.place ? ` ${defaults.priceBasis.place}` : ""}` : null;
+  // What was agreed with the supplier first (as the order's Purchase order tab shows it), else the usual basis.
+  const basis = po.agreed?.basis
+    ? `${po.agreed.basis}${po.agreed.basisPlace ? ` ${po.agreed.basisPlace}` : ""}`
+    : defaults.priceBasis
+      ? `${defaults.priceBasis.basis}${defaults.priceBasis.place ? ` ${defaults.priceBasis.place}` : ""}`
+      : null;
   const taxes = [...new Set(lines.map((l) => `${l.factoryPrice!.taxIncluded ? "Tax included" : "Without tax"} · ${Number(l.factoryPrice!.taxRate)}%`))];
   const orderHref = `/orders/${o.id}/factory`;
   const byId = new Map(payments.map((x) => [x.id, x]));
@@ -246,7 +251,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               { label: "Incoterm", value: basis },
               { label: "Currency", value: po.currency },
               { label: "Tax", value: taxes.length ? taxes.join(", ") : null },
-              { label: "Lead time", value: defaults.leadTime?.text ?? null },
+              { label: "Lead time", value: po.agreed?.leadTime ?? defaults.leadTime?.text ?? null },
               { label: "Ready date", value: po.readyOn ? date(po.readyOn) : null },
               { label: "Sent on", value: po.sentOn ? `${date(po.sentOn)}${po.sentBy ? ` · ${po.sentBy.name}` : ""}` : null },
               { label: "Payment", value: plans.length ? plans.map((p) => supplierPlanWords(p)).join(" · ") : null },

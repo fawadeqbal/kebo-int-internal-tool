@@ -76,3 +76,30 @@ describe("the packing list's number", () => {
     expect(packingListNo("SO-2026-0031")).toBe(paperNumber("SO-2026-0031", "commercial-invoice").replace(/^CI-/, "PL-"));
   });
 });
+
+describe("papers write counts and payments as they are (review 24 Nov)", () => {
+  it("a count's word agrees with it; trade short forms stay", async () => {
+    const { countText } = await import("../src");
+    expect(countText(1, "sets")).toBe("1 set");
+    expect(countText(2000, "Carton")).toBe("2,000 Cartons");
+    expect(countText(3, "Box")).toBe("3 Boxes");
+    expect(countText(1, "Boxes")).toBe("1 Box");
+    expect(countText(12, "pcs")).toBe("12 pcs");
+    expect(countText(1.5, "m3")).toBe("1.5 m3");
+    expect(countText(4)).toBe("4");
+  });
+
+  it("a plan of more than a deposit and one balance prints each part, whatever the quotation said", async () => {
+    const { orderPaymentSentence } = await import("../src");
+    const quote = { paymentParts: null, depositPercent: 30, balanceTerms: "before_shipment" as const };
+    const terms: RouteTerms = { route: "bank_contract", balanceWhen: null, lcTerms: null, lcDays: null };
+    const part = (amountMinor: number, p: string, dueRule: string | null) => ({ amountMinor, part: p, dueRule, dueDays: null, dueOn: null });
+    const two = [part(30_00, "deposit", "fixed"), part(70_00, "balance", "after_papers")];
+    expect(orderPaymentSentence({ depositPercent: 30, terms, accepted: "before_shipment", quote, plan: two, totalMinor: 100_00 })).toBe(
+      "Our usual payment is made by 30% deposit and 70% through the banks against the shipping documents.",
+    );
+    const three = [part(30_00, "deposit", "fixed"), part(40_00, "balance", "on_ready"), part(30_00, "balance", "after_papers")];
+    const s = orderPaymentSentence({ depositPercent: 30, terms, accepted: "before_shipment", quote, plan: three, totalMinor: 100_00 });
+    expect(s).toMatch(/^Our usual payment is made by 30% .*, 40% .* and 30% /);
+  });
+});

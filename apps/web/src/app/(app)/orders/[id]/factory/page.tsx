@@ -296,7 +296,13 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                 ? [
                     {
                       label: "Incoterm",
-                      value: po.offer?.basis ? `${po.offer.basis}${po.offer.basisPlace ? ` ${po.offer.basisPlace}` : ""}` : basis,
+                      // What was agreed with the supplier (the box beside it), else their offer's, else the usual
+                      // (review 24 Nov: "Incoterm —" here beside "EXW Jinan · 30 days" there).
+                      value: po.agreed?.basis
+                        ? `${po.agreed.basis}${po.agreed.basisPlace ? ` ${po.agreed.basisPlace}` : ""}`
+                        : po.offer?.basis
+                          ? `${po.offer.basis}${po.offer.basisPlace ? ` ${po.offer.basisPlace}` : ""}`
+                          : basis,
                     },
                   ]
                 : []),

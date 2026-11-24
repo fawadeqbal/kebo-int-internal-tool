@@ -145,7 +145,7 @@ export default async function OrderDocumentPrint({
           label: "Packages",
           width: 82,
           wrap: true,
-          render: (l) => (l.packing?.packages ? `${l.packing.packages} ${l.packing.packageType ?? ""}`.trim() : ""),
+          render: (l) => (l.packing?.packages ? docQty(l.packing.packages, l.packing.packageType) : ""),
         },
         { label: "N.W. (kg)", width: 52, align: "right", render: (l) => kg(l.packing?.netWeightKg) },
         { label: "G.W. (kg)", width: 52, align: "right", render: (l) => kg(l.packing?.grossWeightKg) },

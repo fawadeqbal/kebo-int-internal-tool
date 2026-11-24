@@ -593,6 +593,26 @@ export function paperDateText(iso: string): string {
   return `${String(d).padStart(2, "0")} ${MONTHS[(m ?? 1) - 1]} ${y}`;
 }
 
+/**
+ * A count with its word, the word agreeing with the count (review 24 Nov: "1 sets", "2000 Carton"): "1 set",
+ * "2,000 Cartons", "3 Boxes". Trade short forms ("pcs", "kg", "m³") and words already plural for any count stay.
+ */
+export function countText(n: string | number, word?: string | null): string {
+  const count = Number(n);
+  const text = count.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const w = (word ?? "").trim();
+  if (!w) return text;
+  const lower = w.toLowerCase();
+  const fixed = /^(pcs|pc|kg|kgs|g|t|mt|m|m2|m3|m²|m³|l|ltr|cbm|ft|lot|lots|nos|no|unit\(s\)|set\(s\))$/.test(lower) || /\d|\.|\//.test(w);
+  if (fixed) return `${text} ${w}`;
+  if (count === 1) {
+    const one = /(xes|ches|shes|sses)$/i.test(w) ? w.slice(0, -2) : /[^s]s$/i.test(w) ? w.slice(0, -1) : w;
+    return `${text} ${one}`;
+  }
+  const many = /s$/i.test(w) ? w : /(x|ch|sh)$/i.test(w) ? `${w}${w === w.toUpperCase() ? "ES" : "es"}` : `${w}${w === w.toUpperCase() ? "S" : "s"}`;
+  return `${text} ${many}`;
+}
+
 /** "USD 44,100.00", for amounts inside a sentence on a paper. */
 export function paperMoneyText(amount: string | number, currency: string): string {
   return `${currency} ${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
