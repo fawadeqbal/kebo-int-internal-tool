@@ -13,8 +13,18 @@ export const metadata = { title: "Search" };
 /** On "All", the first few of each kind; one kind's tab shows up to this many. */
 const FIRST = 5;
 const MOST = 50;
-/** "Show all": every one of a kind, up to this many. */
-const ALL = 500;
+/** "Show all": one kind's first 100 (a page's most); beyond that its own list, searched with the same words, has them all. */
+const ALL = 100;
+/** Each kind's own list, searched with the words (quotations live on their inquiries). */
+const LIST: Record<SearchKind, { href: string; label: string }> = {
+  customers: { href: "/customers", label: "Customers" },
+  suppliers: { href: "/suppliers", label: "Suppliers" },
+  inquiries: { href: "/inquiries", label: "Inquiries" },
+  quotations: { href: "/inquiries", label: "Inquiries" },
+  orders: { href: "/orders", label: "Sales orders" },
+  purchase_orders: { href: "/operations/purchase-orders", label: "Purchase orders" },
+  payments: { href: "/payments", label: "Payments" },
+};
 
 /**
  * Search (design "search everything", board LSearchAll): every result for some words, a tab per kind with how
@@ -109,12 +119,14 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                 {kind && g.total > g.items.length && (
                   <p className={cn(RULES.box.inset, "border-t border-line py-2.5 text-md text-text-2")}>
                     The first {g.items.length} of {g.total}.{" "}
-                    {!sp.all ? (
+                    {!sp.all && g.total <= ALL ? (
                       <Link href={buildHref("/search", { q, kind }, { all: "1" })} className={linkClass}>
-                        Show all {g.total > ALL ? `(the first ${ALL})` : g.total}
+                        Show all {g.total}
                       </Link>
                     ) : (
-                      "Add words to narrow it."
+                      <Link href={buildHref(LIST[kind].href, {}, { q })} className={linkClass}>
+                        Search {LIST[kind].label} for all {g.total}
+                      </Link>
                     )}
                   </p>
                 )}

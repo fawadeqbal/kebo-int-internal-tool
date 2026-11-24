@@ -22,8 +22,8 @@ export const SEARCH_KIND_LABEL: Record<SearchKind, string> = {
 export const searchQuery = z.object({
   q: z.string().trim().max(100).default(""),
   kind: z.enum(SEARCH_KINDS).optional(),
-  /** Up to 500: one kind's tab can show all it found (review 24 Nov: the first 50 of 60, no way to the rest). */
-  limit: z.coerce.number().int().min(0).max(500).default(3),
+  /** Up to 100, as every page (one kind's tab can show the first 100; its own list has the rest, review 24 Nov). */
+  limit: z.coerce.number().int().min(0).max(100).default(3),
 });
 export type SearchQuery = z.infer<typeof searchQuery>;
 
