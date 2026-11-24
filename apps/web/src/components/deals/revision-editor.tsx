@@ -705,9 +705,7 @@ export function RevisionEditor({
                   const facts = [
                     none
                       ? "No items yet: add its items on Supplier offers to quote it"
-                      : off.coverage.missing.length
-                        ? `Does not include item ${off.coverage.missing.join(", ")}`
-                        : "Covers every item",
+                      : `${off.coverage.missing.length ? `Does not include item ${off.coverage.missing.join(", ")}` : "Covers every item"}${off.unpriced > 0 ? ` · ${off.unpriced} without a price` : ""}`,
                     off.leadTime,
                     showCosts && off.totalCost ? `cost ${formatMinor(toMinor(off.totalCost), currency)}` : null,
                     showCosts && t && t.costing.marginPercent !== null ? `margin ${t.costing.marginPercent.toFixed(1)}%` : null,
@@ -777,7 +775,8 @@ export function RevisionEditor({
                       value={margin}
                       onChange={(e) => priceEveryOffer(e.target.value)}
                     />
-                    <span>% on our cost. Each price can be changed after, in Edit items.</span>
+                    {/* A margin, as everywhere else (profit as a share of the price), not a markup on cost (review 24 Nov). */}
+                    <span>% margin: profit as a share of the price, on our landed cost. Each price can be changed after, in Edit items.</span>
                   </p>
                   {pricedAt !== null && marginOk && (
                     <p role="status" className="text-text">

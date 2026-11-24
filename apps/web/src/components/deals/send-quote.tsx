@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Mail } from "lucide-react";
 import { SENT_VIA, SENT_VIA_LABEL, SENT_VIA_TEXT, type SentVia } from "@kebo/shared";
-import { cn, Field, Input, RULES, Select, Textarea, linkClass } from "@kebo/ui";
+import { cn, Field, Input, Notice, RULES, Select, Textarea, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelBody, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
@@ -53,6 +53,7 @@ export function SendWindow({
   together = [],
   subjectMany = "",
   messageMany = "",
+  checks = [],
 }: {
   number: number;
   customer: string;
@@ -75,6 +76,8 @@ export function SendWindow({
   /** The subject when several go: "{names}" is where their numbers go. */
   subjectMany?: string;
   messageMany?: string;
+  /** What to look at before it goes (items without a price…): said at the top (review 24 Nov: none was). */
+  checks?: string[];
 }) {
   const close = useClosePanel();
   const [by, setBy] = useState<"email" | "self">("email");
@@ -153,6 +156,18 @@ export function SendWindow({
   const names = namesOf(chosen, true);
   return (
     <PanelBody>
+      {checks.length > 0 && (
+        <div className="mb-4">
+          <Notice tone="todo">
+            <p className="font-semibold">Before it goes</p>
+            <ul className="mt-1 list-disc pl-5">
+              {checks.map((c) => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+          </Notice>
+        </div>
+      )}
       {!again && (
         <fieldset className="mb-5 flex flex-col gap-2">
           <legend className="mb-2 text-xs font-bold text-text-2">How does it go to the customer?</legend>

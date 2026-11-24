@@ -8,7 +8,7 @@ import { requirePermission } from "@/lib/session";
 import { companyToday, date } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import { optional } from "@/components/print/data";
-import { coverOf } from "@/components/deals/offer-facts";
+import { coverOf, coverText } from "@/components/deals/offer-facts";
 import { OfferBoxes, OfferUrlWindow, type OfferKit } from "@/components/deals/offer-work";
 import { RecordPage } from "@/components/records/record-page";
 import { getSettings } from "@/lib/loaders";
@@ -80,7 +80,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
   const next = at < s.quotes.length - 1 ? s.quotes[at + 1]! : null;
   // What it covers; its reference, dates, currency and tax are in Details beside (each said once).
   const summary = [
-    !x.lines.length ? "no items yet" : cover ? (cover.all ? (cover.of === 1 ? "covers the 1 item" : `covers all ${cover.of} items`) : `covers ${cover.n} of ${cover.of} items`) : null,
+    cover || !x.lines.length ? coverText(x, s.items) : null,
   ].filter(Boolean);
 
   const pager = {

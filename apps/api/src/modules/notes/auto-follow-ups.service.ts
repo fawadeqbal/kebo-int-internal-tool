@@ -21,6 +21,9 @@ type Of<T extends DomainEvent["type"]> = Extract<DomainEvent, { type: T }>;
  * answers or a newer quotation is sent, and all of them when the inquiry is won or lost. Follow-ups people
  * made are never touched.
  */
+/** What a follow-up ended by a loss says: also how Undo and Reopen find it again. */
+export const LOST_NOTE = "Inquiry lost";
+
 @Injectable()
 export class AutoFollowUps implements OnModuleInit {
   constructor(
@@ -69,11 +72,27 @@ export class AutoFollowUps implements OnModuleInit {
     });
   }
 
-  /** Won or lost: nothing is left to wait for. */
+  /**
+   * Won or lost: nothing is left to wait for, so the system's own follow-ups end (people's own stay: they planned
+   * them). Taking a loss back (Undo, Reopen) opens again those the loss ended, as they were (review 24 Nov: Reopen
+   * did not bring them back).
+   */
   private async stage(e: Of<"inquiry.stageChanged">) {
+    if (e.from === "lost" && isOpen(e.to)) {
+      await this.prisma.tx(async (tx) => {
+        const lost = await tx.inquiryStageChange.findFirst({ where: { inquiryId: e.inquiryId, toStage: "lost" }, orderBy: { changedAt: "desc" }, select: { changedAt: true } });
+        if (!lost) return;
+        await tx.followUp.updateMany({
+          where: { inquiryId: e.inquiryId, auto: { not: null }, doneNote: LOST_NOTE, doneAt: { gte: lost.changedAt } },
+          data: { doneAt: null, doneById: null, doneNote: null },
+        });
+      });
+      return;
+    }
     if (isOpen(e.to)) return;
-    await this.prisma.tx((tx) => this.close(tx, e.inquiryId, e.actorId, `Inquiry ${e.to}`));
+    await this.prisma.tx((tx) => this.close(tx, e.inquiryId, e.actorId, e.to === "lost" ? LOST_NOTE : `Inquiry ${e.to}`));
   }
+
 
   private async set(tx: Tx, f: { inquiryId: string; label: string; auto: string; title: string; dueOn: ISODate; assigneeId: string; actorId: string }) {
     const row = await tx.followUp.create({

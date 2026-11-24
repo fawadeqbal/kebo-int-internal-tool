@@ -224,11 +224,14 @@ export function PartsEditor({
       const k = Math.max(Math.min(n, max) - kept.length, 1);
       const free = Math.max(totalMinor - kept.reduce((t, p) => t + minorOf(p.amount), 0), 0);
       const each = Math.floor(free / k);
+      // A new installment is named for its place and falls due no earlier than the one before it (review 24 Nov: the
+      // third of "3 equal" had no name and was due "When we order", after "When they say ready").
+      const lastRule = () => rules.find((r) => r.value === (open.at(-1) ?? kept.at(-1))?.rule) ?? rules[rules.length - 1]!;
       const made = Array.from({ length: k }, (_, i): EditorPart => {
         const minor = i === k - 1 ? free - each * (k - 1) : each;
-        const base = open[i] ?? freshPart(minor, totalMinor, rules[0]!);
+        const base = open[i] ?? { ...freshPart(minor, totalMinor, lastRule()), label: `Installment ${kept.length + i + 1}` };
         const share = shareText(minor, totalMinor);
-        return { ...base, amount: fromMinor(minor), share, label: relabel(base.label, share) };
+        return { ...base, amount: fromMinor(minor), share, label: relabel(base.label || `Installment ${kept.length + i + 1}`, share) };
       });
       return [...kept, ...made];
     });

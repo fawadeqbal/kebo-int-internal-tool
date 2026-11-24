@@ -435,6 +435,8 @@ export interface QuoteOffers {
     terms?: FactoryTerms;
     coverage: Coverage;
     missingRate: boolean;
+    /** Items still without a supplier price. */
+    unpriced: number;
     totalCost: string | null;
     lines: OfferLine[];
   }[];

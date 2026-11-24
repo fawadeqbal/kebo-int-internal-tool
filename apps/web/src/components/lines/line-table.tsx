@@ -182,6 +182,8 @@ export const canIndent = (rows: LineRow[], i: number) => !rows[i]!.parentKey && 
 const pastedValues = (p: PastedItem, columns: LineColumn[], parentKey: string | null): LineValues => {
   const v = initialValues(columns, parentKey);
   for (const k of ["description", "model", "quantity", "unit"] as const) if (k in v && p[k]) v[k] = p[k];
+  // A target price column (the customer's items), as the Excel upload keeps it.
+  if ("targetPrice" in v && p.price) v.targetPrice = p.price;
   return v;
 };
 

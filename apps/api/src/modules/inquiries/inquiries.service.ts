@@ -24,6 +24,7 @@ import { requireReason } from "../../common/audit/reason";
 import { SettingsService } from "../settings/settings.service";
 import { StagesService } from "./stages.service";
 import { dealQuotations, optionFigures, revisionRow } from "../quotations/revision-figures";
+import { LOST_NOTE } from "../notes/auto-follow-ups.service";
 
 /** Staff see the deals they handle or created; managers see all. */
 export function inquiryAccess(user: SessionUser): Prisma.InquiryWhereInput {
@@ -508,7 +509,7 @@ export class InquiriesService {
       const { event, since } = await this.stages.undoLost(tx, i, user.id, this.clock.now());
       // The system's own follow-ups that "Mark as lost" ended are open again, as they were.
       await tx.followUp.updateMany({
-        where: { inquiryId: id, auto: { not: null }, doneNote: "Inquiry lost", doneAt: { gte: since } },
+        where: { inquiryId: id, auto: { not: null }, doneNote: LOST_NOTE, doneAt: { gte: since } },
         data: { doneAt: null, doneById: null, doneNote: null },
       });
       return event;
