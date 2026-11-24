@@ -57,7 +57,7 @@ import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
 import { ordersWithMoneyDue } from "../billing/api";
-import { chargedExpenses, fxOf, moneyFacts, positionOf, reachedOn, type MoneyCtx } from "../billing/api";
+import { chargedExpenses, factoryBorneExpenses, factoryPositionOf, fxOf, moneyFacts, positionOf, reachedOn, supplierPaidRelation, type MoneyCtx } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
 import { chasesOf, factoryPlansFor } from "../billing/api";
 import { createPlan, termsOf } from "../billing/api";
@@ -244,6 +244,8 @@ function goodsSummary(o: Pick<OrderRow, "lines" | "packedAt" | "shipments" | "sh
   return {
     lines: g.lines,
     received: g.received,
+    /** Lines with something in but not all of it (review 24 Nov: one line part in read "Not received yet"). */
+    started: goodsLines.filter((l) => Number(l.receivedQty ?? 0) > 0 && Number(l.receivedQty ?? 0) < Number(l.quantity)).length,
     allReceived: g.lines > 0 && g.received === g.lines,
     short: g.short,
     packed: g.packed,
@@ -720,7 +722,11 @@ export class OrdersService {
       /** The customer's PO / reference (given when they accepted). */
       customerRef: o.customerRef,
       /** The inquiry's contact person. */
-      contactName: contact?.name ?? null,
+      // The inquiry's contact, else the one its papers write to (the customer's main contact, kept on the order),
+      // so the page and the papers name the same person (review 24 Nov: "Contact —" beside "Dear Imran Ali").
+      contactName:
+        contact?.name ??
+        ((o.buyerSnapshot as { contact?: { name?: string | null } | null } | null)?.contact?.name || null),
       /** The accepted quotation: its number and revision, the day and the option chosen, its delivery terms. */
       quotation: {
         refNo: o.revision.quotation.refNo,
@@ -1216,6 +1222,27 @@ export class OrdersService {
 
   /* ---------------------------------------------------------------- moving */
 
+  /** What we still owe on an order, in words: each supplier's balance and each bill not paid yet. */
+  private async weOwe(tx: Tx, orderId: string): Promise<string[]> {
+    const fx = fxOf(await this.settings.get(), await this.limits.allows("expenses"));
+    const o = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: {
+        lines: { select: { factoryId: true, factoryUnitPrice: true, factoryCurrency: true, factoryTaxRate: true, factoryTaxIncluded: true, quantity: true, factory: { select: { name: true } } } },
+        supplierPaid: supplierPaidRelation,
+        expenses: factoryBorneExpenses,
+      },
+    });
+    const bills = await tx.expense.findMany({ where: { orderId, voidedAt: null, payLater: true, repaidOn: null }, select: { amount: true, currency: true, description: true } });
+    const name = (id: string) => o.lines.find((l) => l.factoryId === id)?.factory?.name ?? "a supplier";
+    return [
+      ...factoryPositionOf(o, fx)
+        .filter((r) => r.toPayMinor > 0)
+        .map((r) => `${formatMinor(r.toPayMinor, r.currency)} to ${name(r.factoryId)}`),
+      ...bills.map((b) => `${formatMinor(toMinor(b.amount.toString()), b.currency)} for ${b.description}`),
+    ];
+  }
+
   /**
    * One stage forward or back. A forward move with warnings (no deposit, money
    * due) is refused with code "confirm" and the warnings, until it is sent again
@@ -1231,7 +1258,7 @@ export class OrdersService {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
       const m = this.moneyOf(o, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
-      const check = checkMove(o.stage, input.to, o.status, { ...m, goods: goodsOf(o.lines, o.packedAt) });
+      const check = checkMove(o.stage, input.to, o.status, { ...m, goods: goodsOf(o.lines, o.packedAt), weOwe: input.to === "done" ? await this.weOwe(tx, o.id) : [] });
       if (!check.ok) throw new GateError(check.message, check.code);
       if (check.warnings.some((w) => w.code === "money_due") && !can(user, "orders.manage")) {
         throw new GateError(

@@ -959,10 +959,18 @@ export class FlowService {
   }
 
   /** A shipment's dates against each other and the order's ship-by date. */
-  private shipmentSeen(next: { departedOn?: string | null; arrivedOn?: string | null }, shipBy: string | null, changed: { departedOn: boolean; arrivedOn: boolean }): string[] {
+  private shipmentSeen(
+    next: { departedOn?: string | null; arrivedOn?: string | null; clearedOn?: string | null },
+    shipBy: string | null,
+    changed: { departedOn: boolean; arrivedOn: boolean; clearedOn?: boolean },
+  ): string[] {
     const seen: string[] = [];
     if ((changed.arrivedOn || changed.departedOn) && next.arrivedOn && next.departedOn && next.arrivedOn < next.departedOn)
       seen.push(`It arrived on ${next.arrivedOn}, before it sailed on ${next.departedOn}.`);
+    // Customs clear goods that have come in (review 24 Nov: cleared before it arrived, and before it sailed, was kept).
+    const came = next.arrivedOn ?? next.departedOn;
+    if ((changed.clearedOn || changed.arrivedOn || changed.departedOn) && next.clearedOn && came && next.clearedOn < came)
+      seen.push(`Customs cleared it on ${next.clearedOn}, before it ${next.arrivedOn ? "arrived" : "sailed"} on ${came}.`);
     if (changed.departedOn && next.departedOn && shipBy && next.departedOn > shipBy) {
       const days = Math.round((Date.parse(next.departedOn) - Date.parse(shipBy)) / 86_400_000);
       seen.push(`It sails ${days} day${days === 1 ? "" : "s"} after the ship-by date (${shipBy}).`);
@@ -985,7 +993,7 @@ export class FlowService {
       // Ports not sent: from the order's terms (E/F terms load at the Incoterm place, C/D terms discharge there).
       const ports = portsOf(o);
       const order = await tx.order.findUniqueOrThrow({ where: { id }, select: { shipBy: true } });
-      const went = this.checked(this.shipmentSeen(input, fromDbDateOrNull(order.shipBy), { departedOn: !!input.departedOn, arrivedOn: !!input.arrivedOn }), input);
+      const went = this.checked(this.shipmentSeen(input, fromDbDateOrNull(order.shipBy), { departedOn: !!input.departedOn, arrivedOn: !!input.arrivedOn, clearedOn: !!input.clearedOn }), input);
       const s = await tx.shipment.create({
         data: {
           orderId: id,
@@ -1021,11 +1029,12 @@ export class FlowService {
       if (next.etd && next.eta && next.eta < next.etd)
         throw new DomainError("The arrival date (ETA) cannot be before the departure date (ETD).");
       const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { shipBy: true } });
-      const was = { departedOn: fromDbDateOrNull(before.departedOn), arrivedOn: fromDbDateOrNull(before.arrivedOn) };
+      const was = { departedOn: fromDbDateOrNull(before.departedOn), arrivedOn: fromDbDateOrNull(before.arrivedOn), clearedOn: fromDbDateOrNull(before.clearedOn) };
       const went = this.checked(
         this.shipmentSeen({ ...was, ...input }, fromDbDateOrNull(order.shipBy), {
           departedOn: input.departedOn !== undefined && input.departedOn !== was.departedOn,
           arrivedOn: input.arrivedOn !== undefined && input.arrivedOn !== was.arrivedOn,
+          clearedOn: input.clearedOn !== undefined && input.clearedOn !== was.clearedOn,
         }),
         input,
       );

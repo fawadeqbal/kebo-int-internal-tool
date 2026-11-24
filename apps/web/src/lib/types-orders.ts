@@ -236,6 +236,8 @@ export interface OrderGoodsView {
   lines: number;
   received: number;
   allReceived: boolean;
+  /** Lines with some received, not all. */
+  started?: number;
   /** Lines still short, e.g. "Maize sheller: 60 of 100 pcs". */
   short: string[];
   packed: boolean;

@@ -47,7 +47,7 @@ export const depositOf = (m: OrderMoney): Minor =>
 export const dueOf = (m: OrderMoney): Minor => Math.max(m.totalMinor + (m.chargedMinor ?? 0) - m.receivedMinor, 0);
 
 export interface StageWarning {
-  code: "no_deposit" | "balance_before_shipping" | "money_due" | "not_received" | "no_packing_list";
+  code: "no_deposit" | "balance_before_shipping" | "money_due" | "not_received" | "no_packing_list" | "suppliers_owed";
   message: string;
 }
 
@@ -61,7 +61,13 @@ export interface OrderGoods {
   packed: boolean;
 }
 
-export type MoveFacts = OrderMoney & { currency: string; balanceTerms: BalanceTerms; goods?: OrderGoods };
+export type MoveFacts = OrderMoney & {
+  currency: string;
+  balanceTerms: BalanceTerms;
+  goods?: OrderGoods;
+  /** What we still owe on the order, in words ("CNY 120,000 to Jinan Valves", "USD 350 for inspection"). */
+  weOwe?: string[];
+};
 
 /**
  * Things worth a second look before moving forward. Moving back never warns.
@@ -86,6 +92,10 @@ export function stageWarnings(to: OrderStage, m: MoveFacts): StageWarning[] {
   }
   if (to === "done" && due > 0) {
     out.push({ code: "money_due", message: `${formatMinor(due, m.currency)} is still due from the customer.` });
+  }
+  // Closing with our own side still open (review 24 Nov: it closed with a supplier balance and a bill unpaid).
+  if (to === "done" && m.weOwe?.length) {
+    out.push({ code: "suppliers_owed", message: `We still owe ${m.weOwe.join(", ")}.` });
   }
   return out;
 }
