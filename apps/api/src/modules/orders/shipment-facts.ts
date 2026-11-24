@@ -21,6 +21,7 @@ export const shipmentFactsSelect = {
   status: true,
   blNo: true,
   containerNo: true,
+  containerType: true,
   departedOn: true,
   portOfLoading: true,
   portOfDischarge: true,
@@ -29,7 +30,7 @@ export const shipmentFactsSelect = {
 
 export const orderShipments = { orderBy: SHIPMENT_ORDER, select: shipmentFactsSelect } as const;
 
-type Row = { id: string; createdAt: Date; departedOn: Date | null; blNo: string | null; containerNo: string | null };
+type Row = { id: string; createdAt: Date; departedOn: Date | null; blNo: string | null; containerNo: string | null; containerType?: string | null };
 
 /** Shipment 1, shipped on (the earliest departure), and Shipment 1's B/L and container. */
 export function shipFacts<T extends Row>(shipments: readonly T[]) {
@@ -41,6 +42,7 @@ export function shipFacts<T extends Row>(shipments: readonly T[]) {
     shippedOn: shippedOnOf(list.map((s) => ({ departedOn: fromDbDateOrNull(s.departedOn) }))),
     blNo: primary?.blNo ?? null,
     containerNo: primary?.containerNo ?? null,
+    containerType: primary?.containerType ?? null,
   };
 }
 

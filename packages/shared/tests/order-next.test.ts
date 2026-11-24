@@ -61,6 +61,9 @@ describe("the order's next step: the first that is true", () => {
     expect(next({ poSent: true, readyOn: "2026-11-30" })).toBe("book");
     expect(next({ poSent: true, goodsIn: true })).toBe("book");
     expect(next({ poSent: true, goodsIn: true, booked: true, balanceBeforeShipment: 500 })).toBe("ask_balance");
+    // Asked already: what is next is recording it, not asking again; then the supplier's balance on the goods.
+    expect(next({ poSent: true, goodsIn: true, booked: true, balanceBeforeShipment: 500, balanceAsked: true })).toBe("record_balance");
+    expect(next({ poSent: true, goodsIn: true, booked: true, supplierBalanceDue: 10200 })).toBe("pay_supplier_balance");
     expect(next({ poSent: true, goodsIn: true, booked: true, etd: "2026-11-25" })).toBe("sailed");
     expect(next({ poSent: true, goodsIn: true, booked: true, etd: "2026-11-18" })).toBe("sailed");
   });

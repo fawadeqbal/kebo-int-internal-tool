@@ -136,7 +136,7 @@ export default async function OrderDocuments({
   const agreedConditions = o.agreed?.paymentConditions?.trim() ?? "";
   const pp = o.papers;
   const conditionsWord = !agreedConditions
-    ? "None agreed"
+    ? "No extra text · the payment plan prints as agreed"
     : !pp?.conditionsChoice
       ? "Printed"
       : pp.conditionsPrinted

@@ -77,7 +77,8 @@ export default async function OrderLayout({ children, params }: { children: Reac
     optional(() => orderPapersOf(id)),
   ]);
   const advice = papers?.papers.find((p) => p.kind === "shipping-advice") ?? null;
-  const step = orderNextStep(orderStepFacts(o, flow, sections?.stages ?? null, { update: can(me, "orders.update") }, { money, advice }), now);
+  const requests = papers?.papers.filter((p) => p.kind === "payment-request") ?? [];
+  const step = orderNextStep(orderStepFacts(o, flow, sections?.stages ?? null, { update: can(me, "orders.update") }, { money, advice, requests }), now);
   // Closing with papers not made says so first (Documents "2 of 5"): closed only on a yes.
   const docs = /^(\d+) of (\d+)$/.exec(sections?.tabs.documents ?? "");
   const papersLeft = docs ? Number(docs[2]) - Number(docs[1]) : 0;

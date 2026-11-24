@@ -437,7 +437,8 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           orderId={o.id}
           lines={o.lines.filter((l) => l.type === "goods")}
           goods={packGoods}
-          containerNo={o.goods.containerNo}
+          // The booked type stands in until the number is known ("1 × 20GP · no number yet").
+          containerNo={o.goods.containerNo ?? (o.goods.containerType ? `${o.goods.containerType} · no number yet` : null)}
           containerHref={`/orders/${o.id}/shipping`}
           shippingMarks={o.goods.shippingMarks}
           canEdit={canEdit}

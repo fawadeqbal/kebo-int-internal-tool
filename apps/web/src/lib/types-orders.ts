@@ -238,6 +238,8 @@ export interface OrderGoodsView {
   packed: boolean;
   packedAt: string | null;
   containerNo: string | null;
+  /** As booked ("1 × 20GP"), until the number is known. */
+  containerType?: string | null;
   shippingMarks: string | null;
   totals: { packages: number; netWeightKg: string; grossWeightKg: string; cbm: string };
 }

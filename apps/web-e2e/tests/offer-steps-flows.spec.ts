@@ -57,9 +57,8 @@ test("a new offer: Factory, Prices, Delivery & payment, Warranty & conditions, R
   await expect(win.getByText("Mr Chen")).toBeVisible();
   await win.getByRole("button", { name: /^Next/ }).click();
 
-  // Prices: the customer's items copied with the other ways in (never inside the table); prices typed in the sheet.
+  // Prices: a new offer starts with the customer's items already in the sheet (design 24 Nov); prices typed in it.
   await expect(rail.getByRole("button", { name: /Prices/ })).toHaveAttribute("aria-current", "step");
-  await win.getByRole("button", { name: /Copy customer’s items/ }).click();
   const sheet = win.getByRole("grid");
   await expect(sheet.getByRole("row", { name: "Item 1" })).toContainText("Capsule filling machine");
   await expect(sheet.getByRole("row", { name: "Item 2" })).toContainText("Change parts");

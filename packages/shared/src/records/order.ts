@@ -51,6 +51,10 @@ export interface OrderStepFacts {
   arrived: boolean;
   /** The balance is due before shipment, and still to come. */
   balanceBeforeShipment: number;
+  /** Its payment request went to the customer (so what is next is recording it, not asking again). */
+  balanceAsked?: boolean;
+  /** The supplier's part due when the goods are ready, still to pay (0: none, or paid). */
+  supplierBalanceDue?: number;
   /** The shipping advice went to the customer (null: this company does not make one). */
   adviceSent: boolean | null;
   /** The company keeps Delivery & SAT. */
@@ -70,6 +74,8 @@ export type OrderStepKey =
   | "goods_in"
   | "book"
   | "ask_balance"
+  | "record_balance"
+  | "pay_supplier_balance"
   | "sailed"
   | "send_advice"
   | "arrived"
@@ -98,6 +104,8 @@ const STEP: Record<OrderStepKey, Omit<OrderStep, "key">> = {
   goods_in: { label: "Goods received", tab: "production", window: "all-received" },
   book: { label: "Book the shipment", tab: "shipping", window: "booking" },
   ask_balance: { label: "Ask for the balance", tab: "payment", window: "ask-balance" },
+  record_balance: { label: "Record the balance", tab: "payment", window: "record-payment" },
+  pay_supplier_balance: { label: "Pay the supplier's balance", tab: "factory", window: "pay-supplier" },
   sailed: { label: "Record the sailing", tab: "shipping", window: "vessel" },
   send_advice: { label: "Send the shipping advice", tab: "shipping", path: "papers/shipping-advice" },
   arrived: { label: "Record the arrival", tab: "shipping", window: "arrival" },
@@ -130,7 +138,9 @@ export function orderNextStep(f: OrderStepFacts, today: ISODate): OrderStep | nu
   if (f.shipping && !gone) {
     const soon = f.goodsIn || (!!f.readyOn && f.readyOn <= addDays(today, 14));
     if (!f.booked && soon) return step("book");
-    if (f.balanceBeforeShipment > 0 && (f.booked || f.goodsIn)) return step("ask_balance");
+    if (f.balanceBeforeShipment > 0 && (f.booked || f.goodsIn)) return step(f.balanceAsked ? "record_balance" : "ask_balance");
+    // The goods are in: what we owe the supplier on them is due before they leave.
+    if ((f.supplierBalanceDue ?? 0) > 0 && f.goodsIn) return step("pay_supplier_balance");
     if (f.booked) return step("sailed");
   }
   if (f.shipping && f.sailed && f.adviceSent === false && !f.delivered) return step("send_advice");

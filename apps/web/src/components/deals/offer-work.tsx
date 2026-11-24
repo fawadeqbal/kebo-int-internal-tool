@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { factoryTaxMinor, formatMinor, toMinor } from "@kebo/money";
@@ -224,6 +224,13 @@ function OfferWindow({
   const savedRows = useMemo(() => offerRows(q?.lines ?? []), [q]);
   const baseColumns = useMemo(() => offerColumns(q?.lines ?? [], q?.currency ?? mainCurrency, q?.taxRate ?? taxDefault?.rate ?? 0), [q, mainCurrency, taxDefault]);
   const batch = useBatchLines({ rows: savedRows, columns: baseColumns, plain: !used, report: false });
+  // What the lines add up to now (another spec is not in it): the payment's installments show amounts from it.
+  const linesTotalMinor = batch.rows.reduce((t, r) => {
+    if (r.values.alternativeOfId) return t;
+    const p = Number((r.values.unitPrice ?? "").replace(/,/g, ""));
+    const n = Number((r.values.quantity ?? "").replace(/,/g, ""));
+    return Number.isFinite(p) && Number.isFinite(n) ? t + Math.round(toMinor(p) * n) : t;
+  }, 0);
   const [copyFrom, setCopyFrom] = useState("");
 
   // The factory's files, sent once the offer is saved; what did not go up, said.
@@ -374,6 +381,14 @@ function OfferWindow({
       parentId: it.parentId,
       values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(taxRate) },
     }));
+  // A new offer is for this inquiry's items: they start in the table, priced by the supplier (design 24 Nov).
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || q || batch.rows.length || !items.length) return;
+    seeded.current = true;
+    batch.add(newLinesOf(fromItems(taxDefault?.rate ?? 0)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when a new offer opens
+  }, []);
   const count = batch.rows.length ? linesCount(batch.rows) : "no items yet";
 
   return (
@@ -385,6 +400,7 @@ function OfferWindow({
         startStep={startStep}
         asked={asked}
         linesCount={count}
+        linesTotalMinor={linesTotalMinor}
         linesChanges={q && batch.dirty ? batch.diff.changes : []}
         onUndoLines={batch.reset}
         filesAdded={files.map((f) => f.name)}

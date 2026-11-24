@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import { asPayment, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma, routeOf, type WithTerms } from "@kebo/database";
-import { fromMinor } from "@kebo/money";
+import { fromMinor, spreadPayments, toMinor } from "@kebo/money";
 import { chargedExpenses, fxOf, positionOf as orderPositionOf } from "../billing/api";
 import {
   bankContractInput,
@@ -590,15 +590,24 @@ export class PapersService implements OnModuleInit {
           const copy = this.rowsOf(o, kind, ref).filter((x) => x.status === "final").at(-1) ?? null;
           return copy ? { copy, on: companyDay(dateIn(copy.finalAt ?? copy.madeAt, this.clock.timeZone)) } : null;
         };
-        livePlanOfPaper(o).forEach((p, i) => {
+        // A row already paid needs no request: it is done, not "not sent" (money pays the earliest row first).
+        const plan = livePlanOfPaper(o);
+        const paidMinor = plan.map(() => 0);
+        const spread = spreadPayments(
+          plan,
+          o.allocations.map(asPayment).map((x) => ({ id: x.id, minor: toMinor(x.amount.toString()) + toMinor(x.bankCharges.toString()) })),
+        );
+        for (const parts of spread.values()) for (const q of parts) paidMinor[q.index]! += q.minor;
+        plan.forEach((p, i) => {
           const sent = sentOf(p.id);
+          const paid = p.amountMinor > 0 && paidMinor[i]! >= p.amountMinor;
           out.push(
             row({
               ...base,
               key: `${kind}:${p.id}`,
               label: `${PAPER_LABEL[kind]} · ${p.label}`,
-              state: sent ? "ready" : "can",
-              stateLabel: sent ? "Sent" : "Not sent",
+              state: sent || paid ? "ready" : "can",
+              stateLabel: sent ? "Sent" : paid ? "Paid" : "Not sent",
               // Given when the plan row was made: a rebuilt plan keeps the numbers of the rows it keeps.
               number: paperNumber(o.refNo, kind, p.requestNo ?? i + 1),
               version: sent?.copy.version ?? null,

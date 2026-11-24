@@ -73,7 +73,7 @@ export function orderStepFacts(
   flow: OrderFlow | null,
   stages: FlowStep[] | null,
   may: { update: boolean },
-  more: { money?: OrderMoney | null; advice?: { state: string } | null } = {},
+  more: { money?: OrderMoney | null; advice?: { state: string } | null; requests?: { stateLabel: string }[] } = {},
 ): OrderStepFacts {
   const uses = (s: FlowStep) => !stages || stages.includes(s);
   const ship = flow?.shipping?.shipments[0] ?? null;
@@ -109,6 +109,12 @@ export function orderStepFacts(
     eta: ship?.eta ?? null,
     arrived,
     balanceBeforeShipment: flow?.payment.balanceWhen === "before_shipment" ? balanceDue : 0,
+    // A request sent and not paid yet (a paid one says "Paid"): the balance was asked for.
+    balanceAsked: (more.requests ?? []).some((r) => r.stateLabel === "Sent"),
+    supplierBalanceDue: (more.money?.factories?.plans ?? [])
+      .flatMap((p) => p.rows)
+      .filter((r) => r.dueRule === "on_ready" && r.status !== "paid" && r.status !== "later")
+      .reduce((t, r) => t + Number(r.open), 0),
     deliverySat: uses("delivery") && (flow?.modules.deliverySat ?? true),
     delivered,
     satOpen: !!dv && (!!dv.satPlannedOn || dv.sat.length > 0) && !dv.satDoneOn,
