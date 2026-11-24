@@ -140,7 +140,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
           top={
             <RecordTop
               header={{
-                crumbs: [{ label: "Admin settings" }, { label: "People", href: "/users" }, { label: u.name }],
+                crumbs: [{ label: "Admin settings" }, { label: "Staff", href: "/users" }, { label: u.name }],
                 title: u.name,
                 badge: (<>
                 {u.isActive ? <StatusBadge meaning="ok">Active</StatusBadge> : <StatusBadge meaning="neutral">Switched off</StatusBadge>}

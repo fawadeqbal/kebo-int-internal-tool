@@ -258,13 +258,14 @@ export function TwoStepPanel({
                 <>
                   <p className="text-sm font-medium">2. Enter the 6-digit code the app shows</p>
                   <CodeField id="confirm-code" error={s.errors?.code} label="Code" />
-                  <div className="flex gap-2">
-                    <SubmitButton size="sm" pendingText="Checking…">
-                      Turn on two-step sign-in
-                    </SubmitButton>
+                  {/* Cancel, then the save, as every form ends (review 24 Nov, A-36: this one had them the other way). */}
+                  <div className="flex justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setSetup(null)}>
                       Cancel
                     </Button>
+                    <SubmitButton size="sm" pendingText="Checking…">
+                      Turn on two-step sign-in
+                    </SubmitButton>
                   </div>
                 </>
               )}

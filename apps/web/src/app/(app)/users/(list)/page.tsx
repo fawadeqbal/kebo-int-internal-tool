@@ -143,7 +143,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           />
         ) : (
           <>
-            <PhoneList label="People">
+            <PhoneList label="Staff">
               {rows.slice((page - 1) * size, page * size).map((u) => (
                 <PhoneRow
                   key={u.id}
@@ -157,7 +157,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 />
               ))}
             </PhoneList>
-            <DataTable label="People" clearParam="saved" className="max-sm:hidden">
+            <DataTable label="Staff" clearParam="saved" className="max-sm:hidden">
               <THead>
                 <tr>
                   <Th>Person</Th>

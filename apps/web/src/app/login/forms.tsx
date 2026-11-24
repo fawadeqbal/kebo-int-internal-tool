@@ -120,8 +120,8 @@ export function LoginForm({ next, demo, remembered }: { next?: string; demo?: De
  * The two-step code (board "Two-step sign-in"): six boxes that move along as digits are typed (a pasted
  * code fills them all); "Use a recovery code" swaps them for one field.
  */
-export function TwoStepForm({ next }: { next?: string }) {
-  const [state, action] = useActionState(twoStepAction, {});
+export function TwoStepForm({ next, send = twoStepAction }: { next?: string; /** The platform's own check (its sign-in uses this form too). */ send?: typeof twoStepAction }) {
+  const [state, action] = useActionState(send, {});
   const [recovery, setRecovery] = useState(false);
   const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
   const boxes = useRef<(HTMLInputElement | null)[]>([]);

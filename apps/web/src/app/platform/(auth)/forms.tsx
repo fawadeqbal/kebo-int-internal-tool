@@ -5,6 +5,7 @@ import { Field, Input, Notice } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { platformLoginAction, platformTwoStepAction } from "../actions";
 import { PasswordInput } from "@/components/common/password-input";
+import { TwoStepForm } from "@/app/login/forms";
 
 export function PlatformLoginForm() {
   const [state, action] = useActionState(platformLoginAction, {});
@@ -24,17 +25,10 @@ export function PlatformLoginForm() {
   );
 }
 
+/**
+ * The platform's code, asked the same way as a company's (six boxes, "Use a recovery code"): one two-step sign-in
+ * (review 24 Nov, A-36: the two screens used different patterns).
+ */
 export function PlatformTwoStepForm() {
-  const [state, action] = useActionState(platformTwoStepAction, {});
-  return (
-    <form action={action} className="mt-5 flex flex-col gap-4" noValidate>
-      {state.message && <Notice tone="bad">{state.message}</Notice>}
-      <Field label="Code" htmlFor="code" hint="The 6 digits from your authenticator app, or a recovery code" error={state.errors?.code}>
-        <Input id="code" name="code" inputMode="numeric" autoComplete="one-time-code" autoFocus required />
-      </Field>
-      <SubmitButton pendingText="Checking…" size="lg" className="w-full">
-        Continue
-      </SubmitButton>
-    </form>
-  );
+  return <TwoStepForm send={platformTwoStepAction} />;
 }
