@@ -211,6 +211,7 @@ export function CustomerPlanWindow({
       paidMinor,
       locked: r.state === "paid",
       note,
+      named: i.part === "deposit" || i.part === "balance" ? "Named from how they pay: the deposit and the balance keep these names" : undefined,
     };
   });
   const after = (on: string | null, days: string) => (on ? ` (${dayMonth(addDays(on, Number(days) || 0))})` : "");

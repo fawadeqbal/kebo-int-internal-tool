@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn, RULES } from "@kebo/ui";
 import { PanelBody, SidePanel } from "@/components/common/panel";
-import { useOpenFromLink, WindowOpener, type WindowButton } from "./section-window";
+import { firstToAsk, useOpenFromLink, WindowOpener, type WindowButton } from "./section-window";
 
 /**
  * A section's window around a form that already exists (the route, the plan,
@@ -35,7 +35,16 @@ export function FormWindow({
   name?: string;
   children: (close: () => void) => ReactNode;
 }) {
-  const [open, setOpen] = useState(startOpen);
+  const [open, setOpen] = useState(false);
+  // Opened as it is drawn: once on the page, though a list's row (and its window) is drawn for phone and laptop.
+  useEffect(() => {
+    if (!startOpen) return;
+    const t = setTimeout(() => {
+      if (firstToAsk("start")) setOpen(true);
+    });
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only as it is drawn
+  }, []);
   useOpenFromLink(name, () => setOpen(true));
   const close = () => {
     setOpen(false);

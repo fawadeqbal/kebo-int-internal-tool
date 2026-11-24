@@ -98,7 +98,8 @@ export function ActionForm({
   quietCodes?: string[];
   /**
    * Forms whose fields live in React state: React resets a form after each send, which puts every <select>
-   * back on its first option while the state still holds the choice. These forms skip that reset.
+   * back on its first option while the state still holds the choice. These forms skip that reset even after a
+   * save that went through (every form skips it after a refusal).
    */
   keepFields?: boolean;
 }) {
@@ -108,6 +109,11 @@ export function ActionForm({
   // note, so every save says it was saved. Nothing is added when the owner of the form already showed its own
   // note, or when the form stays open and shows the message itself.
   const unseen = useRef<{ note: ToastInput; toasts: number } | null>(null);
+  // Whether the last send went through. React resets a form after every send, which puts a <select> or a field
+  // kept in React state back on its first value while the screen still shows the choice, and the next send then
+  // carries that first value (review 24 Nov: "open every month" closed the books through October; an order's
+  // responsible person could not be changed once a reason was asked). After a refusal nothing is reset.
+  const lastOk = useRef<boolean | undefined>(undefined);
   // A save that cannot reach the server says so and keeps what was typed (it does not end on an error page).
   const send = useCallback(
     async (prev: ActionState, form: FormData): Promise<ActionState> => {
@@ -116,8 +122,10 @@ export function ActionForm({
         r = await action(prev, form);
       } catch (e) {
         if (!noConnection(e)) throw e;
+        lastOk.current = false;
         return { ok: false, code: "offline", message: "Not saved: no connection. What you typed is still here.", values: typed(form) };
       }
+      lastOk.current = !!r.ok;
       // Remembered now, before the page changes: the answer and a fresh page come back together.
       if (r.ok && r.message && !banner) {
         const undo = r.undo;
@@ -280,7 +288,9 @@ export function ActionForm({
       action={formAction}
       className={className}
       noValidate
-      onReset={keepFields ? (e) => e.preventDefault() : undefined}
+      onReset={(e) => {
+        if (keepFields || lastOk.current === false) e.preventDefault();
+      }}
       // The person moved on (a click, a key): a field still waiting for its step no longer takes the cursor.
       onPointerDownCapture={() => {
         focusNext.current = null;

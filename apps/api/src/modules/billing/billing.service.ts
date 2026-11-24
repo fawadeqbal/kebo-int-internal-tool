@@ -111,7 +111,9 @@ export class BillingService {
               : null;
         return {
           id: i.id,
-          label: i.label,
+          // The deposit and the balance are named from how they pay (planItemLabel): a name typed there would be
+          // kept but never shown, and History would say it changed (review 24 Nov). Their stored name stays.
+          label: old && (old.part === "deposit" || old.part === "balance") ? old.label : i.label,
           amount: i.amount,
           dueOn: rule === "fixed" ? i.dueOn : null,
           dueRule: rule,
