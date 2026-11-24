@@ -13,6 +13,18 @@ export const metadata = { title: "Search" };
 /** On "All", the first few of each kind; one kind's tab shows up to this many. */
 const FIRST = 5;
 const MOST = 50;
+/** "Show all": one kind's first 100 (a page's most); beyond that its own list, searched with the same words, has them all. */
+const ALL = 100;
+/** Each kind's own list, searched with the words (quotations live on their inquiries). */
+const LIST: Record<SearchKind, { href: string; label: string }> = {
+  customers: { href: "/customers", label: "Customers" },
+  suppliers: { href: "/suppliers", label: "Suppliers" },
+  inquiries: { href: "/inquiries", label: "Inquiries" },
+  quotations: { href: "/inquiries", label: "Inquiries" },
+  orders: { href: "/orders", label: "Sales orders" },
+  purchase_orders: { href: "/operations/purchase-orders", label: "Purchase orders" },
+  payments: { href: "/payments", label: "Payments" },
+};
 
 /**
  * Search (design "search everything", board LSearchAll): every result for some words, a tab per kind with how
@@ -20,14 +32,14 @@ const MOST = 50;
  * see is found. The address keeps the words and the tab, so Back returns to them. A number typed whole is
  * offered at the top to open.
  */
-export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string; kind?: string }> }) {
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string; kind?: string; all?: string }> }) {
   await requireUser();
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const kind = (SEARCH_KINDS as readonly string[]).includes(sp.kind ?? "") ? (sp.kind as SearchKind) : undefined;
   const asked = q.length >= 2;
   const [counts, found] = asked
-    ? await Promise.all([api.get<SearchResult>("/search", { q, limit: 0 }), api.get<SearchResult>("/search", { q, kind, limit: kind ? MOST : FIRST })])
+    ? await Promise.all([api.get<SearchResult>("/search", { q, limit: 0 }), api.get<SearchResult>("/search", { q, kind, limit: kind ? (sp.all ? ALL : MOST) : FIRST })])
     : [null, null];
   const total = counts?.groups.reduce((t, g) => t + g.total, 0) ?? 0;
   const countFor = (k: SearchKind) => counts?.groups.find((g) => g.kind === k)?.total ?? 0;
@@ -106,7 +118,16 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                 </ul>
                 {kind && g.total > g.items.length && (
                   <p className={cn(RULES.box.inset, "border-t border-line py-2.5 text-md text-text-2")}>
-                    The first {g.items.length} of {g.total}: add words to narrow it.
+                    The first {g.items.length} of {g.total}.{" "}
+                    {!sp.all && g.total <= ALL ? (
+                      <Link href={buildHref("/search", { q, kind }, { all: "1" })} className={linkClass}>
+                        Show all {g.total}
+                      </Link>
+                    ) : (
+                      <Link href={buildHref(LIST[kind].href, {}, { q })} className={linkClass}>
+                        Search {LIST[kind].label} for all {g.total}
+                      </Link>
+                    )}
                   </p>
                 )}
               </section>

@@ -28,8 +28,13 @@ export class CustomersService {
     private readonly limits: LimitsService,
   ) {}
 
-  names(user: SessionUser) {
-    return this.prisma.db.party.findMany({ where: { ...isCustomer, deletedAt: null, ...customerAccess(user) }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  /** Every customer, or only those with an order (a list's customer filter: all of them, not the first 100). */
+  names(user: SessionUser, withOrders = false) {
+    return this.prisma.db.party.findMany({
+      where: { ...isCustomer, deletedAt: null, ...customerAccess(user), ...(withOrders ? { orders: { some: {} } } : {}) },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
   }
 
   async list(

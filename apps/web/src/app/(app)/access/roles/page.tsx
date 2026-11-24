@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Badge, Card, CardHeader, PageHeader, PhoneList, PhoneRow, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice, Stack, RULES } from "@kebo/ui";
+import { Badge, Card, CardHeader, PageHeader, PhoneList, PhoneRow, StatRow, StatusBadge, Table, Td, Th, THead, Tr, StatTile, Notice, Stack, RULES, Pager, toPage, toPageSize } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
@@ -14,7 +14,8 @@ import { AccessMapCard, type AccessRoute } from "./access-map";
 export const metadata = { title: "Roles" };
 
 /** How people stand (signed in, two-step sign-in, failed attempts) and the roles: what each allows and whether it needs two-step sign-in. */
-export default async function RolesPage() {
+export default async function RolesPage({ searchParams }: { searchParams: Promise<{ page?: string; size?: string }> }) {
+  const sp = await searchParams;
   const [o, roles, company, me, custom, access] = await Promise.all([
     api.get<SecurityOverview>("/security/overview"),
     api.get<RoleRow[]>("/roles"),
@@ -27,6 +28,10 @@ export default async function RolesPage() {
   // Permissions follow the company's plan: what it leaves out nobody has, and it is not counted.
   const available = PERMISSIONS.filter((p) => permissionInPlan(p, company?.features ?? null)).length;
   const frozen = roles.filter((r) => r.frozen);
+  // A page at a time, as every list (review 24 Nov: 140 roles on one page).
+  const size = toPageSize(sp.size);
+  const page = Math.min(toPage(sp.page), Math.max(1, Math.ceil(roles.length / size)));
+  const rolesHere = roles.slice((page - 1) * size, page * size);
   return (
     <Stack>
       <PageHeader kind="list" crumbs={crumbsFor("/access/roles")} title="Roles" />
@@ -92,7 +97,7 @@ export default async function RolesPage() {
         />
         {/* A phone: a row per role — its name, how many people, its two-step rule. */}
         <PhoneList label="Roles">
-          {roles.map((r) => (
+          {rolesHere.map((r) => (
             <PhoneRow
               key={r.key}
               href={`/access/roles/${r.key}`}
@@ -113,7 +118,7 @@ export default async function RolesPage() {
             </tr>
           </THead>
           <tbody>
-            {roles.map((r) => (
+            {rolesHere.map((r) => (
               <Tr key={r.key} href={`/access/roles/${r.key}`}>
                 <Td className="max-w-md">
                   <Link href={`/access/roles/${r.key}`} className="group block">
@@ -149,6 +154,7 @@ export default async function RolesPage() {
         </Table>
         </div>
       </Card>
+      <Pager base="/access/roles" params={{ size: sp.size }} page={page} total={roles.length} pageSize={size} bare />
       {access && <AccessMapCard routes={access} />}
       {custom && (
         <RolePanel
