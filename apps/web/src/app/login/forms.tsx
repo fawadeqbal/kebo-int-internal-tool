@@ -91,7 +91,8 @@ export function LoginForm({ next, demo, remembered }: { next?: string; demo?: De
           />
         </Field>
       )}
-      <Field label="Password" required htmlFor="password" error={state.errors?.password}>
+      {/* How to get back in, said before a sign-in fails, not only after (review 24 Nov, A-30). */}
+      <Field label="Password" required htmlFor="password" hint="Forgot it? Your company's admin can set a new one." error={state.errors?.password}>
         <PasswordInput
           id="password"
           name="password"

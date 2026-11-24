@@ -238,9 +238,12 @@ export default async function FollowUpsPage({
           {list.rows.length === 0 ? (
             <EmptyState
               framed
-              title={status === "done" ? "Nothing done yet" : status === "late" ? "Nothing late" : "Nothing planned"}
+              // A search that finds nothing says so, not "Nothing planned" (review 24 Nov, S-28).
+              title={q || due || who || about ? "Nothing matches" : status === "done" ? "Nothing done yet" : status === "late" ? "Nothing late" : "Nothing planned"}
               description={
-                status === "done"
+                q || due || who || about
+                  ? "No follow-up matches this search. Clear it to see them all."
+                  : status === "done"
                   ? "Follow-ups ticked done show here, the latest first."
                   : "Add a follow-up here, or on an order, a customer, a supplier or an inquiry. It shows on the dashboard on its day, with a reminder."
               }

@@ -27,11 +27,11 @@ const rules = [
   { value: "on_order", label: "On order placement" },
   { value: "on_ready", label: "On goods ready" },
 ];
-const show = (start: Part[]) =>
+const show = (start: Part[], totalMinor = 300000) =>
   render(
     <PlanEditor
       intro="Payable to Ningbo Pumps"
-      totalMinor={300000}
+      totalMinor={totalMinor}
       currency="USD"
       rules={rules}
       presets={[]}
@@ -75,10 +75,26 @@ describe("the plan editor", () => {
     expect(screen.getByRole("status").textContent).toContain("Fully allocated");
   });
 
-  it("adds an empty installment", () => {
+  it("adds an installment with what is left to allocate (review 24 Nov, O-41)", () => {
     show([part("a", "Advance", "1200.00", "40")]);
     fireEvent.click(screen.getByRole("button", { name: "Add installment" }));
-    expect(amounts()).toEqual(["1200.00", ""]);
+    expect(amounts()).toEqual(["1200.00", "1800.00"]);
+    expect(screen.getByRole("status").textContent).toContain("Fully allocated");
+  });
+
+  it("30 / 40 / 30 of an odd total leaves no cent over: the last installment takes it", () => {
+    show([part("a", "Advance", "0.00", ""), part("b", "Middle", "0.00", ""), part("c", "Balance", "0.00", "")], 100001);
+    const pct = screen.getAllByRole("textbox", { name: "Percentage" });
+    fireEvent.change(pct[0]!, { target: { value: "30" } });
+    fireEvent.change(pct[1]!, { target: { value: "40" } });
+    fireEvent.change(pct[2]!, { target: { value: "30" } });
+    expect(screen.getByRole("status").textContent).toContain("Fully allocated");
+  });
+
+  it("adds an empty installment when everything is allocated", () => {
+    show([part("a", "Advance", "3000.00", "100")]);
+    fireEvent.click(screen.getByRole("button", { name: "Add installment" }));
+    expect(amounts()).toEqual(["3000.00", ""]);
   });
 
   it("takes a percentage or an amount on any line, and fills in the other", () => {

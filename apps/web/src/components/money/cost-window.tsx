@@ -886,7 +886,7 @@ export function ChangeCost({
           onConfirm={remove}
         >
           <div className="flex flex-col gap-3">
-            <WhatHappens lines={[`${expense.description}, ${money(expense.amount, expense.currency)}, stops counting.`, "It stays listed, crossed out, with your reason."]} />
+            <WhatHappens lines={[`${expense.description}, ${money(expense.amount, expense.currency)}, stops counting.`, "It leaves the lists and is kept, with your reason, under Removed in Payments."]} />
             <Field label="Why remove it?" htmlFor="cost-remove-why" error={error ?? undefined}>
               <Textarea id="cost-remove-why" rows={2} className="min-h-0" value={why} onChange={(e) => setWhy(e.target.value)} maxLength={500} />
             </Field>

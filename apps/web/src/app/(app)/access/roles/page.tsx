@@ -45,7 +45,8 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
           tone={o.people && o.withTwoStep === o.people ? "ok" : undefined}
         />
         <StatTile label="Failed sign-ins" value={o.failedLastDay} sub="In the last 24 hours" tone={o.failedLastDay >= 10 ? "bad" : o.failedLastDay ? "warn" : undefined} href="/access/sign-ins?failed=1" />
-        <StatTile label="Blocked addresses" value={o.blockedIpsLastDay} sub="Too many attempts, last 24 hours" tone={o.blockedIpsLastDay ? "bad" : undefined} href="/access/sign-ins?failed=1" />
+        {/* Not a second way to the same list of failed sign-ins (review 24 Nov, A-35): the addresses are among them. */}
+        <StatTile label="Blocked addresses" value={o.blockedIpsLastDay} sub="Too many attempts, last 24 hours" tone={o.blockedIpsLastDay ? "bad" : undefined} />
       </StatRow>
 
       {o.mustSetUp.length > 0 && (

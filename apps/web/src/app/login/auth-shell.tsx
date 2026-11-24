@@ -128,9 +128,8 @@ export async function AuthShell({
           )
         ) : (
           <>
-            <span className="grid size-7 place-items-center rounded-[7px] bg-primary-solid text-sm font-bold text-primary-fg" aria-hidden>
-              K
-            </span>
+            {/* The same mark as the card below it (review 24 Nov, A-31: "K" here, "RD" there). */}
+            <BrandMark name={title} logoSrc={null} size="top" />
             <span className="text-lead font-semibold tracking-tight text-text">{title}</span>
           </>
         )}
