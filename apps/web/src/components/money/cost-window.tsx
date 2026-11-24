@@ -297,6 +297,11 @@ export function CostForm({
     (d) => (d as { id?: string } | undefined)?.id ?? expense?.id,
   );
 
+  // "An order" (an inquiry, a customer) with none picked is a choice not finished, not a company cost: the save
+  // stops and says so (review 24 Nov: two costs went to the company unasked).
+  const missing = place === "order" ? !orderId && "Choose the order, or choose The company." : place === "deal" ? !dealId && "Choose the inquiry, or choose The company." : place === "customer" ? !customerId && "Choose the customer, or choose The company." : false;
+  const guarded = async (prev: ActionState, form: FormData): Promise<ActionState> => (missing ? { ok: false, message: missing } : save(prev, form));
+
   const saveLabel = send ? "Send for approval" : month ? "Confirm" : expense ? "Save changes" : "Add the cost";
   const forOptions: { value: CostPlace; label: string }[] = send
     ? [
@@ -335,7 +340,7 @@ export function CostForm({
   );
 
   return (
-    <ActionForm action={save} onDone={() => onSaved?.()} keepFields showSuccess={!inPanel} className={PANEL_FORM}>
+    <ActionForm action={guarded} onDone={() => onSaved?.()} keepFields showSuccess={!inPanel} className={PANEL_FORM}>
       {(st) => (
         <>
           {/* What it is for: the API takes the order, else the inquiry, else the customer. */}

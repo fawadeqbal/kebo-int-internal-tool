@@ -441,6 +441,21 @@ export function plainOfferParts(parts: Pick<TermPart, "rule">[]): boolean {
 }
 
 /**
+ * Each part's amount of a total from its share: rounded to the cent, and when the shares make 100% the last takes
+ * what is left, so they add up exactly (review 24 Nov: 21,319.40 + 49,745.26 = 71,064.66 on a 71,064.65 quotation).
+ * Every place that turns shares into money reads it: the quotation, the editors, the order's and factory's plans.
+ */
+export function partAmounts(percents: number[], totalMinor: Minor): Minor[] {
+  const whole = Math.round(percents.reduce((t, p) => t + p, 0) * 100) === 10000;
+  let left = totalMinor;
+  return percents.map((p, i) => {
+    const amount = whole && i === percents.length - 1 ? left : Math.round((totalMinor * p) / 100);
+    left -= amount;
+    return amount;
+  });
+}
+
+/**
  * The factory's plan on an order from its offer's parts (design "terms that travel", step 3): each part its share
  * of what we owe (the last the rest, so they add up exactly), due when we order, when they say ready, or days after
  * the goods leave. Null when the parts are the usual advance and the rest when ready — the company's default plan
@@ -448,10 +463,12 @@ export function plainOfferParts(parts: Pick<TermPart, "rule">[]): boolean {
  */
 export function offerPlan(parts: TermPart[], owedMinor: Minor): FactoryPlanRow[] | null {
   if (!parts.length || !partsAddUp(parts) || plainOfferParts(parts)) return null;
-  let left = owedMinor;
+  const amounts = partAmounts(
+    parts.map((p) => p.percent),
+    owedMinor,
+  );
   return parts.map((p, i) => {
-    const amountMinor = i === parts.length - 1 ? left : Math.round((owedMinor * p.percent) / 100);
-    left -= amountMinor;
+    const amountMinor = amounts[i]!;
     const dueRule: FactoryDueRule = p.rule === "on_order" ? "on_order" : p.rule === "on_ready" ? "on_ready" : "on_ship_plus_days";
     const when = partWhen(p, "factory");
     return {
@@ -491,11 +508,13 @@ export const ARRIVAL_DAYS = 30;
  * days after); after the site test, days after it is done.
  */
 export function partsPlan(parts: TermPart[], totalMinor: Minor, orderedOn: ISODate, depositDays: number, balanceDays: number): PartsPlanRow[] {
-  let left = totalMinor;
+  const amounts = partAmounts(
+    parts.map((p) => p.percent),
+    totalMinor,
+  );
   let deposit = false;
   return parts.map((p, i) => {
-    const amountMinor = i === parts.length - 1 ? left : Math.round((totalMinor * p.percent) / 100);
-    left -= amountMinor;
+    const amountMinor = amounts[i]!;
     const days = Math.max(p.days ?? 0, 0);
     const row = (dueRule: PlanDueRule, dueDays: number | null, dueOn: ISODate | null = null, part: PlanPart | null = null): PartsPlanRow => ({
       label: p.label,

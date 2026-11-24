@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, nextCount, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
-import { formatMinor, fromMinor, fxRate, toMinor } from "@kebo/money";
+import { documentTotals, formatMinor, fromMinor, fxRate, toMinor } from "@kebo/money";
 import {
   can,
   checkMove,
@@ -136,7 +136,7 @@ const orderInclude = {
       warrantyMonths: true,
       warrantyFrom: true,
       quotation: { select: { refNo: true } },
-      options: { where: { status: "accepted" }, select: { letter: true, status: true, leadTime: true, leadDays: true, leadFrom: true } },
+      options: { where: { status: "accepted" }, select: { letter: true, status: true, leadTime: true, leadDays: true, leadFrom: true, discount: true } },
     },
   },
   // The shipments hold the B/L, the day the goods left and the container (Shipment 1 first).
@@ -779,6 +779,10 @@ export class OrdersService {
       deliveryAddress: o.deliveryAddress,
       currency: o.currency,
       total: o.total.toFixed(2),
+      /** The lines before the discount and the accepted option's discount, as the proforma prints them ("0.00": none). */
+      ...((t) => ({ subtotal: fromMinor(t.subtotal), discount: fromMinor(t.discount) }))(
+        documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), o.revision.options[0]?.discount.toFixed(2) ?? "0"),
+      ),
       /** The deposit % as accepted on the quotation (the plan may ask for another: money.depositPercent). */
       depositPercent: Number(o.depositPercent),
       balanceTerms: o.balanceTerms,

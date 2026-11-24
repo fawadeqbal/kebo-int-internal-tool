@@ -70,6 +70,7 @@ export function orderFactsOf(o: FactsOrderRow, factories: SectionFacts["factorie
     depositOn: depositIn && deposit > 0 ? reachedOn(o.allocations, deposit) : null,
     deposit: fromMinor(deposit),
     due: fromMinor(position.dueMinor),
+    received: fromMinor(Math.max(position.owedMinor - position.dueMinor, 0)),
     paidInFullOn: position.dueMinor === 0 ? reachedOn(o.allocations, position.owedMinor) : null,
     factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
     factoryOrderNo: o.factoryOrderNo,

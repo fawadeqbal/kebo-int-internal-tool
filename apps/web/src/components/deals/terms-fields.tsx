@@ -11,6 +11,7 @@ import {
   PAYMENT_ROUTE_HINT,
   PAYMENT_ROUTE_LABEL,
   PAYMENT_ROUTES,
+  partAmounts,
   percentText,
   WARRANTY_FROM_LABEL,
   WARRANTY_FROMS,
@@ -139,14 +140,19 @@ export function PartsField({
       ...(days !== undefined ? { needs: "days" as const, days, ...(v === "lc" ? { daysLabel: "Days (0 at sight)" } : {}) } : {}),
     };
   });
-  const parts: EditorPart[] = rows.map((r) => {
+  // Amounts from the shares as the quotation shows them (the last takes the cent left: partAmounts).
+  const fromShares = partAmounts(
+    rows.map((r) => (Number.isFinite(num(r.share)) ? num(r.share) : 0)),
+    total,
+  );
+  const parts: EditorPart[] = rows.map((r, i) => {
     const v = num(r.share);
     return {
       key: r.key,
       id: null,
       label: r.label,
       share: r.share,
-      amount: money && r.amount !== undefined ? r.amount : Number.isFinite(v) ? fromMinor(Math.round((total * v) / 100)) : "",
+      amount: money && r.amount !== undefined ? r.amount : Number.isFinite(v) ? fromMinor(fromShares[i]!) : "",
       rule: r.rule,
       dueOn: "",
       dueDays: r.days,

@@ -164,6 +164,8 @@ export interface StoredFacts {
   deposit: string;
   /** Still due from the customer ("0.00": paid in full). */
   due: string;
+  /** Received so far ("1720.79"), so a part paid is not "nothing in" (optional: older callers). */
+  received?: string;
   paidInFullOn: ISODate | null;
   factoryOrderedOn: ISODate | null;
   /** The factory's own number for our order. */
@@ -273,7 +275,9 @@ export function stageWords(f: SectionFacts, today: ISODate): Record<(typeof ORDE
       ? { word: `${bankName} open`, tone: "info", tab: `${bankName === "LC" ? "LC" : "contract"} open` }
       : f.depositIn && f.depositPercent > 0
         ? { word: "Deposit in", tone: "ok", tab: "deposit in" }
-        : { word: "Nothing in", tone: "warn", tab: "nothing in" };
+        : Number(f.received ?? 0) > 0
+          ? { word: "Part paid", tone: "warn", tab: "part paid" }
+          : { word: "Nothing in", tone: "warn", tab: "nothing in" };
 
   // Factory order: sent, then paid (the money only for people who may see it).
   const factoryPaid = !!f.factories?.length && f.factories.every((x) => Number(x.toPay) === 0 && Number(x.paid) > 0);
@@ -371,7 +375,11 @@ export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
     ? join(f.depositPercent > 0 && f.depositOn ? `Deposit ${dayMonth(f.depositOn)}` : null, `paid in full ${dayMonth(f.paidInFullOn!)}`)
     : f.depositIn && f.depositPercent > 0
       ? join(route, `${f.depositPercent}% ${amount(cur, f.deposit)} in${f.depositOn ? ` on ${dayMonth(f.depositOn)}` : ""}`, `balance ${amount(cur, f.due)}${through}`)
-      : join(route, f.depositPercent > 0 ? `deposit ${f.depositPercent}% ${amount(cur, f.deposit)} to come` : `${amount(cur, f.due)} to come${through}`);
+      : join(
+          route,
+          Number(f.received ?? 0) > 0 ? `${amount(cur, f.received!)} in so far` : null,
+          f.depositPercent > 0 ? `deposit ${f.depositPercent}% ${amount(cur, f.deposit)} to come` : `${amount(cur, f.due)} to come${through}`,
+        );
 
   // Factory order
   const fac = f.factories ?? [];
