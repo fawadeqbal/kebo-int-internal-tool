@@ -12,7 +12,9 @@ import {
   paperMoneyText,
   paperNumber,
   paperWordsText,
-  routePaymentSentence,
+  countText,
+  orderPaymentSentence,
+  planStatus,
   FACTORY_DUE_RULE_LABEL,
   type FactoryDueRule,
   documentDone,
@@ -23,9 +25,6 @@ import {
   SAT_RESULT_LABEL,
   SHIP_MODE_LABEL,
   leadWords,
-  planSentence,
-  plainQuoteParts,
-  quotePartsOf,
   warrantyLine,
   type OrderDocumentKind,
   type PaperCell,
@@ -77,7 +76,7 @@ export const paperOrderInclude = {
   // The accepted option's discount and lead time (the revision keeps no figures of its own).
   revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
   // What was agreed with each factory, kept on its purchase order once sent (design "terms that travel").
-  purchaseOrders: { select: { supplierId: true, ...poTermsSelect } },
+  purchaseOrders: { select: { supplierId: true, number: true, ...poTermsSelect } },
   // Receipts are numbered when the payment is recorded (its allocation's receiptNo); listed in date order.
   allocations: livePartsWithEntry,
   receivables: { orderBy: { sortOrder: "asc" } },
@@ -126,7 +125,8 @@ export type Party = PaperDoc["party"];
 /** The customer's orders and payments, for the statement (only the orders the person may see). */
 export interface StatementData {
   orders: { refNo: string; orderedOn: ISODate; currency: string; total: string; charged: string; received: string; due: string }[];
-  payments: { paidOn: ISODate; refNo: string; amount: string; currency: string }[];
+  /** `bankCharges`: borne on the way and counted as paid, so the list adds up to Received (review 24 Nov). */
+  payments: { paidOn: ISODate; refNo: string; amount: string; bankCharges: string; currency: string }[];
 }
 
 export interface PaperCtx {
@@ -249,12 +249,14 @@ const chargedLine = (chargedMinor: number, currency: string) =>
  * after the site test): each part of its plan as it stands now.
  */
 export const termsSentence = (c: PaperCtx) =>
-  plainQuoteParts(quotePartsOf(c.o.revision))
-    ? routePaymentSentence(positionOf(c).depositPercent, termsOf(c.o), c.o.balanceTerms)
-    : planSentence(
-        c.o.receivables.map((r) => ({ amountMinor: decimalToMinor(r.amount), part: r.part, dueRule: r.dueRule, dueDays: r.dueDays, dueOn: fromDbDateOrNull(r.dueOn) })),
-        decimalToMinor(c.o.total),
-      );
+  orderPaymentSentence({
+    depositPercent: positionOf(c).depositPercent,
+    terms: termsOf(c.o),
+    accepted: c.o.balanceTerms,
+    quote: c.o.revision,
+    plan: c.o.receivables.map((r) => ({ amountMinor: decimalToMinor(r.amount), part: r.part, dueRule: r.dueRule, dueDays: r.dueDays, dueOn: fromDbDateOrNull(r.dueOn) })),
+    totalMinor: decimalToMinor(c.o.total),
+  });
 
 /**
  * What was agreed with the customer, as the order's papers print it: the order's own copy (taken when the
@@ -612,6 +614,7 @@ function purchaseOrder(c: PaperCtx): Built {
   const borne = c.o.expenses.filter((e) => f && e.borneBy === "factory" && e.factoryId === f.id);
   const terms = f && currency ? poPaymentTerms(c, f.id, currency, tax.owedMinor) : null;
   const offer = poOffer(c, f?.id ?? null, mine, readyOn);
+  const poNumber = (f && c.o.purchaseOrders.find((p) => p.supplierId === f.id)?.number) || null;
   return {
     n: factories.length > 1 && f ? factories.indexOf(f) + 1 : null,
     checks: [
@@ -635,7 +638,10 @@ function purchaseOrder(c: PaperCtx): Built {
       party: { name: f?.name ?? "Supplier", address: f?.address ?? null },
       date: fromDbDateOrNull(c.o.factoryOrderedOn) ?? c.today,
       meta: [
-        { label: "Our order", value: c.o.refNo },
+        // The purchase order's own number, with the sales order it is for (review 24 Nov: it asked the supplier to
+        // quote the SO number).
+        ...(poNumber ? [{ label: "PO No.", value: poNumber }] : []),
+        { label: poNumber ? "For our order" : "Our order", value: c.o.refNo },
         ...(offer?.ref ? [{ label: "Your offer", value: offer.ref }] : []),
         { label: "Ready by", value: date(readyOn) ?? "to confirm" },
       ],
@@ -671,7 +677,7 @@ function purchaseOrder(c: PaperCtx): Built {
         // Expenses the factory bears come off what we owe it (as on the order's money).
         ...borne.map((e) => ({ label: `Charged to you on ${paperDateText(fromDbDate(e.spentOn))}:`, value: money(e.amount.toString(), e.currency) })),
         ...(position && (paid.length || borne.length) ? [{ label: "Still to pay:", value: money(fromMinor(position.toPayMinor), position.currency) }] : []),
-        `Please quote our order number ${c.o.refNo} on every document and on the packing.`,
+        `Please quote our order number ${poNumber ?? c.o.refNo} on every document and on the packing.`,
         ...(c.o.shippingMarks ? [{ label: "Shipping marks:", value: `\n${c.o.shippingMarks}` }] : []),
         ...(offer?.notes ? [offer.notes] : []),
       ],
@@ -689,7 +695,10 @@ function shippingAdvice(c: PaperCtx): Built {
   const s = ship.primary;
   const { pol, pod } = portsOf(c);
   const blNo = ship.blNo;
-  const etd = fromDbDateOrNull(s?.etd);
+  // Once it has sailed, the day it left (as the commercial invoice says), not the booking's ETD (review 24 Nov:
+  // "ETD: JAN 10, 2027" printed after the ship left on 24 Nov).
+  const sailed = fromDbDateOrNull(s?.departedOn);
+  const etd = sailed ?? fromDbDateOrNull(s?.etd);
   const eta = fromDbDateOrNull(s?.eta);
   const rows = itemRows(c, true);
   const goods = rows.map((r) => r.line);
@@ -699,7 +708,7 @@ function shippingAdvice(c: PaperCtx): Built {
     checks: [
       check("vessel", air ? "Flight" : "Vessel", s?.vessel ?? "needed", !!s?.vessel, { required: true, fix: "vessel" }),
       check("blNo", air ? "AWB number" : "B/L number", blNo ?? "needed", !!blNo, { required: true, fix: "blNo" }),
-      check("etd", "ETD", etd ? paperDateText(etd) : "needed", !!etd, { required: true, fix: "etd" }),
+      check("etd", sailed ? "Left on" : "ETD", etd ? paperDateText(etd) : "needed", !!etd, { required: true, fix: "etd" }),
       check("eta", "ETA", eta ? paperDateText(eta) : "not known", !!eta, { fix: "eta" }),
       check("container", "Container", s?.containerNo ?? "not set", !!s?.containerNo, {
         href: "shipping#shipments",
@@ -731,7 +740,7 @@ function shippingAdvice(c: PaperCtx): Built {
         no: cells.no!,
         item: cells.item!,
         qty: cells.qty!,
-        packages: l.packages ? `${l.packages} ${l.packageType ?? ""}`.trim() : "",
+        packages: l.packages ? countText(l.packages, l.packageType) : "",
         gross: l.grossWeightKg !== null ? kg(Number(l.grossWeightKg)) : "",
         cbm: l.cbm !== null ? m3(Number(l.cbm)) : "",
       })),
@@ -752,7 +761,7 @@ function shippingAdvice(c: PaperCtx): Built {
         ...(s?.containerNo ? [{ label: "Container:", value: `${s.containerNo}${s.containerType ? ` (${s.containerType})` : ""}` }] : []),
         ...(pol ? [{ label: "Port of loading:", value: pol }] : []),
         ...(pod ? [{ label: "Port of discharge:", value: pod }] : []),
-        ...(etd ? [{ label: "ETD:", value: date(etd) }] : []),
+        ...(etd ? [{ label: sailed ? (air ? "Departed:" : "Sailed on:") : "ETD:", value: date(etd) }] : []),
         ...(eta ? [{ label: "ETA:", value: date(eta) }] : []),
         ...(s?.forwarder ? [{ label: "Forwarder:", value: s.forwarder }] : []),
         ...(c.o.shippingMarks ? [{ label: "Shipping marks:", value: `\n${c.o.shippingMarks}` }] : []),
@@ -860,7 +869,11 @@ function paymentRequest(c: PaperCtx): Built {
   const items = livePlanOfPaper(c.o);
   const pos = positionOf(c);
   const item = items.find((x) => x.id === c.ref) ?? null;
-  const amount = item ? fromMinor(item.amountMinor) : pos.due;
+  // What is still open on this part after the money received (the earliest part first): a paid part asks for
+  // nothing (review 24 Nov: a paid order's request said "Amount due USD 6,600" beside "Received USD 22,000").
+  const row = item ? (planStatus(items, toMinor(pos.received), c.today, 0).find((x) => x.id === item.id) ?? null) : null;
+  const amount = item ? fromMinor(row ? row.openMinor : item.amountMinor) : pos.due;
+  const partPaid = row ? row.paidMinor : 0;
   const label = item ? item.label : "Balance due on the order";
   const due = item ? item.dueOn : null;
   // Its number was given when the plan row was made (never moved by a void, a back-date or a rebuilt plan);
@@ -886,18 +899,26 @@ function paymentRequest(c: PaperCtx): Built {
       heading: null,
       columns: [{ key: "no", label: "No.", width: 32 }, { key: "item", label: "For" }, { key: "due", label: "Due", width: 90 }, COL.amount],
       rows: [
-        { no: "1", item: { item: `${label} · order ${c.o.refNo}` }, due: date(due) ?? "on receipt", amount: money(amount, c.o.currency) },
+        {
+          no: "1",
+          item: { item: `${label} · order ${c.o.refNo}` },
+          due: date(due) ?? "on receipt",
+          amount: money(item ? fromMinor(item.amountMinor) : amount, c.o.currency),
+        },
       ],
       sums: [
         { label: "Order total", value: money(pos.total, c.o.currency) },
         ...(pos.chargedMinor > 0 ? [{ label: "Charged to you (expenses)", value: money(pos.charged, c.o.currency) }] : []),
         { label: "Received so far", value: money(pos.received, c.o.currency) },
+        ...(partPaid > 0 ? [{ label: "Paid on this part", value: money(fromMinor(partPaid), c.o.currency) }] : []),
       ],
-      total: { label: "Amount due", amount: Number(amount).toFixed(2), currency: c.o.currency },
+      total: { label: Number(amount) > 0 ? "Amount due" : "Paid in full", amount: Number(amount).toFixed(2), currency: c.o.currency },
       foot: null,
       boxTitle: "Payment",
       bullets: [
-        `Please pay ${paperMoneyText(amount, c.o.currency)}${due ? ` by ${paperDateText(due)}` : ""} to the account below.`,
+        Number(amount) > 0
+          ? `Please pay ${paperMoneyText(amount, c.o.currency)}${due ? ` by ${paperDateText(due)}` : ""} to the account below.`
+          : "This part is paid in full. Thank you.",
         // The balance asked for includes what was charged to them (an instalment of the plan does not).
         ...(item ? [] : chargedLine(pos.chargedMinor, c.o.currency)),
         `Please quote ${number} with the payment.`,
@@ -1333,7 +1354,12 @@ function customerStatement(c: PaperCtx): Built {
       foot: null,
       boxTitle: "Payments received",
       bullets: s.payments.length
-        ? s.payments.slice(-15).map((p) => ({ label: `${paperDateText(p.paidOn)} · ${p.refNo}:`, value: money(p.amount, p.currency) }))
+        ? s.payments.slice(-15).map((p) => ({
+            label: `${paperDateText(p.paidOn)} · ${p.refNo}:`,
+            value: Number(p.bankCharges)
+              ? `${paperMoneyText(p.amount, p.currency)} + ${paperMoneyText(p.bankCharges, p.currency)} bank charges`
+              : money(p.amount, p.currency),
+          }))
         : ["No payments yet."],
       bank: c.settings.company.bankDetails || null,
       signatures: null,

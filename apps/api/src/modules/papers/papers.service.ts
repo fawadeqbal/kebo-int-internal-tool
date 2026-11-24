@@ -250,7 +250,9 @@ export class PapersService implements OnModuleInit {
       }),
       payments: rows
         .flatMap((o) =>
-          o.allocations.map(asPayment).map((p) => ({ paidOn: fromDbDate(p.paidOn), refNo: o.refNo, amount: p.amount.toFixed(2), currency: p.currency })),
+          o.allocations
+            .map(asPayment)
+            .map((p) => ({ paidOn: fromDbDate(p.paidOn), refNo: o.refNo, amount: p.amount.toFixed(2), bankCharges: p.bankCharges.toFixed(2), currency: p.currency })),
         )
         .sort((a, b) => a.paidOn.localeCompare(b.paidOn)),
     };

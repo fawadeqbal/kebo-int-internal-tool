@@ -38,6 +38,10 @@ export const COLOUR_SETS = ["green", "graphite", "midnight", "warm", "clay", "te
 export type ColourSet = (typeof COLOUR_SETS)[number];
 export const COLOUR_SET_LABEL: Record<ColourSet, string> = { green: "Green", graphite: "Graphite", midnight: "Midnight", warm: "Warm", clay: "Clay", teal: "Teal", ink: "Ink", onyx: "Onyx" };
 
+/** Empty, or an email address (review 24 Nov: "bad@" was saved and printed on the customer's proforma). */
+const isEmailOrEmpty = (v: string) => v === "" || z.email().safeParse(v).success;
+const companyEmail = z.string().trim().max(254).refine(isEmailOrEmpty, "Type an email address, like sales@example.com").default("");
+
 export const companySettings = z.object({
   /**
    * Time and dates: the company's time zone (IANA) and how it writes dates and times. Kept on the company itself
@@ -50,8 +54,8 @@ export const companySettings = z.object({
   nameLocal: z.string().trim().max(120).default(""),
   address: z.string().trim().max(500).default(""),
   phone: z.string().trim().max(60).default(""),
-  email: z.string().trim().max(254).default(""),
-  email2: z.string().trim().max(254).default(""),
+  email: companyEmail,
+  email2: companyEmail,
   website: z.string().trim().max(120).default(""),
   /** Business license number (unified social credit code). */
   taxNo: z.string().trim().max(60).default(""),
@@ -262,7 +266,13 @@ export function readSettings(stored: Partial<Record<string, unknown>>): Settings
     // Colours no longer offered go back to the default, rather than making the whole group unreadable.
     if (key === "company" && raw && typeof raw === "object")
       raw = Object.fromEntries(
-        Object.entries(raw).filter(([k, v]) => !(COMPANY_TIME_KEYS as readonly string[]).includes(k) && (k !== "colours" || (COLOUR_SETS as readonly unknown[]).includes(v))),
+        Object.entries(raw).filter(
+          ([k, v]) =>
+            !(COMPANY_TIME_KEYS as readonly string[]).includes(k) &&
+            (k !== "colours" || (COLOUR_SETS as readonly unknown[]).includes(v)) &&
+            // An email saved before it was checked, that is not one, is left out (never printed, never breaks the rest).
+            ((k !== "email" && k !== "email2") || (typeof v === "string" && isEmailOrEmpty(v.trim()))),
+        ),
       );
     const parsed = SETTINGS[key].safeParse(raw);
     out[key] = parsed.success ? parsed.data : SETTINGS[key].parse({});

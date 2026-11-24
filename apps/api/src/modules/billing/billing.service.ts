@@ -8,7 +8,7 @@ import {
   dueRuleWords,
   paperNumber,
   planStatus,
-  routePaymentSentence,
+  orderPaymentSentence,
   type FactoryPlanInput,
   type InvoiceSide,
   type OrderWord,
@@ -601,7 +601,7 @@ export class BillingService {
         expenses: chargedExpenses,
         customer: { select: { id: true, name: true } },
         inquiry: { select: { id: true, assignee: person } },
-        revision: { select: { number: true, quotation: { select: { refNo: true } } } },
+        revision: { select: { number: true, paymentParts: true, depositPercent: true, balanceTerms: true, quotation: { select: { refNo: true } } } },
         allocations: { where: livePart, select: { amount: true, bankCharges: true } },
         receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         papers: BillingService.invoicePapers,
@@ -662,7 +662,7 @@ export class BillingService {
       }),
       terms: {
         priceBasis: [o.incoterm, o.incotermPlace].filter(Boolean).join(" "),
-        payment: routePaymentSentence(pos.depositPercent, termsOf(o), o.balanceTerms),
+        payment: orderPaymentSentence({ depositPercent: pos.depositPercent, terms: termsOf(o), accepted: o.balanceTerms, quote: o.revision, plan, totalMinor: decimalToMinor(o.total) }),
       },
       linked: {
         quotation: o.revision.quotation ? { refNo: o.revision.quotation.refNo, revision: o.revision.number, inquiryId: o.inquiry.id } : null,

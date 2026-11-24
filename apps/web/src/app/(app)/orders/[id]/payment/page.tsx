@@ -102,8 +102,14 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
           rows={[
             { label: "Route", value: route ? PAYMENT_ROUTE_LABEL[route] : null },
             { label: "Terms", value: flow?.payment.summary ?? BALANCE_TERMS_LABEL[o.balanceTerms] },
-            { label: "Deposit", value: o.money.depositPercent > 0 ? `${o.money.depositPercent}% · ${money(o.money.deposit, c)}` : "None" },
-            { label: "Balance", value: o.money.depositPercent < 100 ? `${100 - o.money.depositPercent}% · ${money(balance, c)}` : "None" },
+            // A deposit and one balance read as before; a plan of more parts names each (review 24 Nov: 30 / 40 / 30
+            // still read "Balance 70%").
+            ...(m.plan.items.length > 2
+              ? [{ label: "Parts", value: m.plan.items.map((i) => `${i.label} · ${money(i.amount, c)}`).join(" · ") }]
+              : [
+                  { label: "Deposit", value: o.money.depositPercent > 0 ? `${o.money.depositPercent}% · ${money(o.money.deposit, c)}` : "None" },
+                  { label: "Balance", value: o.money.depositPercent < 100 ? `${100 - o.money.depositPercent}% · ${money(balance, c)}` : "None" },
+                ]),
           ]}
           actions={
             canRoute && (

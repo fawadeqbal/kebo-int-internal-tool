@@ -173,8 +173,10 @@ describe("the supplier's side starts from its offer", () => {
       ["Balance 60%", "111600.00", "on_ready", null],
     ]);
     const paper = await poPaper(id);
-    expect(paper.meta.map((m) => m.label)).toEqual(["Our order", "Your offer", "Ready by"]);
-    expect(paper.meta[1]!.value).toBe(`dated ${formatDate(addDays(today, -3))}`);
+    // Its own PO number first, with the sales order it is for; the supplier is asked to quote the PO's.
+    expect(paper.meta.map((m) => m.label)).toEqual(["PO No.", "For our order", "Your offer", "Ready by"]);
+    expect(paper.bullets).toContain(`Please quote our order number ${paper.meta[0]!.value} on every document and on the packing.`);
+    expect(paper.meta[2]!.value).toBe(`dated ${formatDate(addDays(today, -3))}`);
     expect(paper.bullets).toContain("Delivery: lead time about six weeks.");
     // Its payment words are its terms, not a note beside parts: the plan prints those.
     expect(paper.bullets).not.toContain("40% deposit, balance before shipment");

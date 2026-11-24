@@ -41,7 +41,7 @@ export function Letterhead({
   number: ReactNode;
   meta: { label: string; value: ReactNode }[];
 }) {
-  const contact = [company.phone && `Tel ${company.phone}`, company.email, company.website].filter(Boolean).join("  ·  ");
+  const contact = [company.phone && `Tel ${company.phone}`, company.email, company.email2, company.website].filter(Boolean).join("  ·  ");
   return (
     <header className="flex items-start justify-between gap-8 border-b-[2.5px] border-kebo pb-4">
       <div className="flex min-w-0 gap-3">

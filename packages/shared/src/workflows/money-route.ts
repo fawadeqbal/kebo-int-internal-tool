@@ -2,6 +2,7 @@ import { divideMinor, multiplyMinor, payInstalments, percentOfMinor, splitDeposi
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
 import type { BalanceTerms, PaymentRoute } from "../enums";
 import { paymentSentenceOf } from "./quotation";
+import { plainQuoteParts, planSentence, quotePartsOf } from "./terms";
 
 /**
  * Money v2 (order flow v3, phase 5), the rules shared by the API, the web and
@@ -390,6 +391,25 @@ export function routePaymentSentence(depositPercent: number, t: RouteTerms, acce
   if (depositPercent <= 0) return `Payment: 100% ${how}.`;
   if (depositPercent >= 100) return "Our usual payment is made by 100% Advance payment.";
   return `Our usual payment is made by ${depositPercent}% deposit and ${100 - depositPercent}% ${how}.`;
+}
+
+/**
+ * The payment sentence an order's papers and screens print, from its plan as it stands: the route's sentence
+ * while the quotation and the plan are a deposit and one balance (or one payment), else each part of the plan
+ * with its share (review 24 Nov: a plan changed to 30 / 40 / 30 still printed "30% deposit and 70% through the
+ * banks" on the proforma, the payment request, the contract and How they pay).
+ */
+export function orderPaymentSentence(o: {
+  depositPercent: number;
+  terms: RouteTerms;
+  accepted: BalanceTerms;
+  quote: Parameters<typeof quotePartsOf>[0];
+  plan: { amountMinor: Minor; part: string | null; dueRule: string | null; dueDays: number | null; dueOn: ISODate | null }[];
+  totalMinor: Minor;
+}): string {
+  const parts = o.plan.filter((r) => r.amountMinor > 0);
+  const plainPlan = parts.length <= 1 || (parts.length === 2 && parts[0]!.part === "deposit" && parts[1]!.part === "balance");
+  return plainPlan && plainQuoteParts(quotePartsOf(o.quote)) ? routePaymentSentence(o.depositPercent, o.terms, o.accepted) : planSentence(parts, o.totalMinor);
 }
 
 /** The route's terms an order starts with from its balance terms (an informal order "against B/L copy"). */
