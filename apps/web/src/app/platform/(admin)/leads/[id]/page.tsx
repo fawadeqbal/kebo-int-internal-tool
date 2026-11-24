@@ -16,6 +16,7 @@ import { LeadPanels, ProgressSteps } from "./panels";
 import { cache } from "react";
 import { RecordShell } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
+import { EmailText } from "@/components/common/email-text";
 
 /** The client inquiry, read once per request (the page and its tab title). */
 const leadOf = cache((id: string) => loadPlatform(() => platformApi.get<LeadDetail>(`/leads/${id}`)));
@@ -238,8 +239,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               {
                 label: "Email",
                 value: (
-                  <a href={`mailto:${l.email}`} className={cn(linkClass, "break-all")}>
-                    {l.email}
+                  <a href={`mailto:${l.email}`} className={cn(linkClass, "break-words")}>
+                    <EmailText email={l.email} />
                   </a>
                 ),
               },

@@ -862,6 +862,8 @@ export function TabRow({
   phone?: "tabs" | "chips";
 }) {
   const chips = phone === "chips";
+  /** Some tab carries a word (not only a count): the row may need two lines on a laptop. */
+  const worded = !chips && items.some((t) => typeof t.tag === "string" && /[a-z]/i.test(t.tag));
   return (
     <Scroll axis="x" size="none" fade
       as="nav"
@@ -870,6 +872,8 @@ export function TabRow({
       data-count={items.length}
       className={cn(
         "no-print flex ",
+        // @container: a row too narrow for its tabs side by side with their words puts each word under its tab.
+        "@container",
         chips ? "-mx-4 items-center gap-2 px-4 py-0.5 sm:mx-0 sm:items-stretch sm:gap-x-[22px] sm:border-b sm:border-line sm:px-0 sm:py-0" : "items-stretch gap-x-[22px] border-b border-line",
         className,
       )}
@@ -890,12 +894,26 @@ export function TabRow({
                   "sm:-mb-px sm:h-[42px] sm:rounded-none sm:border-0 sm:border-b-2 sm:bg-transparent sm:px-0",
                   t.active ? "sm:border-primary-solid sm:font-bold sm:text-text" : "sm:border-transparent sm:font-medium sm:text-text-2 sm:hover:text-text",
                 )
-              : "-mb-px flex h-[42px] gap-[7px] border-b-2 border-transparent font-medium text-text-2 hover:text-text aria-[current]:border-primary-solid aria-[current]:font-bold aria-[current]:text-text",
+              : cn(
+                  "-mb-px flex h-[42px] gap-[7px] border-b-2 border-transparent font-medium text-text-2 hover:text-text aria-[current]:border-primary-solid aria-[current]:font-bold aria-[current]:text-text",
+                  // A laptop row under 72rem with words on its tabs (an order's "nothing in", "ready 18 Nov"…): each
+                  // word goes under its tab, the names on one line at the top, so every tab stays in view (e2e 24 Nov:
+                  // History was pushed off at 1440 px).
+                  worded && "md:@max-6xl:h-12 md:@max-6xl:flex-col md:@max-6xl:items-start md:@max-6xl:justify-start md:@max-6xl:gap-0 md:@max-6xl:pt-[7px] md:@max-6xl:leading-5",
+                ),
           )}
         >
           {t.label}
           {t.tag !== undefined && t.tag !== null && t.tag !== "" && (
-            <span className={cn("text-xs font-semibold tabular", t.alert ? "rounded-md bg-bad-soft px-1.5 text-bad" : "text-text-2 max-md:rounded-full max-md:bg-surface-2 max-md:px-1.5 max-md:leading-[17px]")}>{t.tag}</span>
+            <span
+              className={cn(
+                "text-xs font-semibold tabular",
+                worded && "md:@max-6xl:text-2xs md:@max-6xl:font-medium",
+                t.alert ? "rounded-md bg-bad-soft px-1.5 text-bad" : "text-text-2 max-md:rounded-full max-md:bg-surface-2 max-md:px-1.5 max-md:leading-[17px]",
+              )}
+            >
+              {t.tag}
+            </span>
           )}
           <Pending />
         </Link>

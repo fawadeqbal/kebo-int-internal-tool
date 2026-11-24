@@ -10,6 +10,7 @@ import { late } from "./shared";
 import { hasFeature, requireUser } from "@/lib/session";
 import { api } from "@/lib/api";
 import type { CustomerAccount } from "@/lib/types-money";
+import { EmailText } from "@/components/common/email-text";
 
 const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 
@@ -112,8 +113,8 @@ export async function CustomerSide({ id }: { id: string }) {
                     </span>
                   )}
                   {primary.email && (
-                    <a href={`mailto:${primary.email}`} className="break-all hover:text-primary">
-                      {primary.email}
+                    <a href={`mailto:${primary.email}`} className="break-words hover:text-primary">
+                      <EmailText email={primary.email} />
                     </a>
                   )}
                   {primary.phone && primary.phone === primary.whatsapp ? (

@@ -202,8 +202,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                     <Th>Number</Th>
                     <Th>Date</Th>
                     <Th>Who · for</Th>
-                    <Th>Method</Th>
-                    <Th>Account</Th>
+                    <Th>Method · account</Th>
                     <Th className="text-right">Amount</Th>
                     <Th>Recorded by</Th>
                     <Th>Status</Th>
@@ -214,7 +213,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                     <DataRow key={`${r.kind}:${r.id}`} href={paymentHref(r)} className={cn(r.status === "void" && "text-muted line-through")}>
                       <Td className="whitespace-nowrap">{r.number ? <RefCode>{r.number}</RefCode> : <Dash />}</Td>
                       <Td className="text-sm whitespace-nowrap">{date(r.on)}</Td>
-                      <Td className="min-w-64">
+                      <Td className="min-w-56">
                         <Link href={paymentHref(r)} className="text-sm font-semibold hover:text-primary">
                           {r.party?.label ?? r.what}
                         </Link>
@@ -222,8 +221,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                           {[r.for.map((f) => f.label).join(", "), r.party ? r.what : null, r.reference ? `ref. ${r.reference}` : null].filter(Boolean).join(" · ")}
                         </span>
                       </Td>
-                      <Td className="text-sm whitespace-nowrap">{r.method ?? <Dash />}</Td>
-                      <Td className="text-sm">{r.account ?? <Dash />}</Td>
+                      {/* One column, as on the order's Payments received: the method, the account under it (e2e 24 Nov: eight
+                          columns pushed Recorded by and Status out of a 1280 px laptop). */}
+                      <Td className="text-sm">
+                        <span className="block whitespace-nowrap">{r.method ?? <Dash />}</span>
+                        {r.account && <span className="block text-xs text-text-2">{r.account}</span>}
+                      </Td>
                       <Td className="text-right text-sm whitespace-nowrap">
                         <Amount r={r} />
                       </Td>

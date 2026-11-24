@@ -9,6 +9,7 @@ import { ConfirmAction } from "@/components/people/confirm-action";
 import { ContactForm } from "@/components/people/contact-form";
 import { makePrimaryContactAction, removeContactAction, saveContactAction } from "../../actions";
 import { customerTitle } from "@/lib/titles";
+import { EmailText } from "@/components/common/email-text";
 
 export const generateMetadata = customerTitle("Contacts");
 
@@ -58,9 +59,11 @@ export default async function CustomerContacts({ params }: { params: Promise<{ i
               </div>
               {p.position && <span className="text-md text-text-2">{p.position}</span>}
               {p.email && (
-                <a href={`mailto:${p.email}`} className="flex items-center gap-2 break-all hover:text-primary">
+                <a href={`mailto:${p.email}`} className="flex items-center gap-2 break-words hover:text-primary">
                   <Mail className="size-[15px] shrink-0 text-muted" aria-hidden />
-                  {p.email}
+                  <span className="min-w-0">
+                    <EmailText email={p.email} />
+                  </span>
                 </a>
               )}
               {p.phone && (

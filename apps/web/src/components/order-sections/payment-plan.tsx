@@ -219,11 +219,11 @@ export function PaymentPlanTable({
           <tbody>
             {plan.items.map((i) => (
               <Tr key={i.id}>
-                <Td className="min-w-[10rem]">
+                <Td className="min-w-[8rem]">
                   <span className="font-semibold">{i.label}</span>
                   {under(i)}
                 </Td>
-                <Td className={cn("min-w-[7.5rem] text-sm", i.late > 0 && i.request.state !== "paid" && "font-medium text-bad")}>
+                <Td className={cn("text-sm whitespace-nowrap", i.late > 0 && i.request.state !== "paid" && "font-medium text-bad")}>
                   {dueText(i, style)}
                 </Td>
                 <Td className="text-right whitespace-nowrap tabular">
