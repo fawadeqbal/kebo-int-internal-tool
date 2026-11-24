@@ -19,10 +19,19 @@ function walk(dir: string): string[] {
   });
 }
 
-/** The app's pages as routes: "/customers/[id]/money" (groups left out, the window's parallel route too). */
-function routes(): string[] {
+/** A page that only sends you on to another address (an old link) draws nothing, so it needs no shape. */
+const forwards = (f: string) => {
+  const source = readFileSync(f, "utf8");
+  return /\bredirect\(/.test(source) && !/\breturn\b/.test(source);
+};
+
+/**
+ * The app's pages as routes: "/customers/[id]/money" (groups left out, the window's parallel route too); `drawn`:
+ * only those that draw something.
+ */
+function routes(drawn = false): string[] {
   return walk(APP)
-    .filter((f) => f.endsWith("/page.tsx") && !f.includes("/@"))
+    .filter((f) => f.endsWith("/page.tsx") && !f.includes("/@") && !(drawn && forwards(f)))
     .map((f) =>
       (
         "/" +
@@ -53,7 +62,7 @@ describe("every page loads in its own shape", () => {
   });
 
   it("every page has a shape: its own line in PAGE_SHAPES or the page above it", () => {
-    const missing = routes().filter((r) => {
+    const missing = routes(true).filter((r) => {
       // The address with its [segments] filled in, as the browser has it.
       const address = r.replace(/\[[^\]]+\]/g, "x0");
       for (let p = r; p; p = p.slice(0, p.lastIndexOf("/"))) if (PAGE_SHAPES[p]) return false;
