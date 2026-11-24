@@ -968,6 +968,8 @@ export function RevisionEditor({
                 onChange={(rows) => set("parts", rows)}
                 presets={presets}
                 amounts={totalsText}
+                totalMinor={many ? null : totalsOf(s.options[0]!).totals.total}
+                currency={currency === "—" ? undefined : currency}
                 error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts ?? st.errors?.depositPercent}
               />
               {checksOf("payment").map((c) => (

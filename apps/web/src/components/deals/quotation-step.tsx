@@ -158,7 +158,8 @@ export function QuoteEdit({
 }) {
   const [open, setOpen] = useState(false);
   const [one, setOne] = useState(only);
-  const width = !one || step === "lines" ? RULES.window.items : step === "warranty" ? RULES.window.part : RULES.window.wideRows;
+  const width =
+    !one || step === "lines" ? RULES.window.items : step === "warranty" ? RULES.window.part : step === "payment" ? RULES.window.table : RULES.window.wideRows;
   const at: QuoteStep = step === "terms" ? "delivery" : step;
   return (
     <>

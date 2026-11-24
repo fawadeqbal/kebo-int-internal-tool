@@ -106,7 +106,8 @@ describe("the quotation's form, in the four groups", () => {
     show();
     const [, balance] = screen.getAllByLabelText("Percentage");
     fireEvent.change(balance!, { target: { value: "60" } });
-    expect(screen.getByText(/10% not allocated/)).toBeTruthy();
+    // The quotation's total is known: the remainder is said as money, as on the order.
+    expect(screen.getAllByRole("status").some((x) => /not allocated/.test(x.textContent ?? ""))).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: /Save draft/ }));
     expect(screen.getByText("The installments must add up to 100%: 10% not allocated.")).toBeTruthy();
   });

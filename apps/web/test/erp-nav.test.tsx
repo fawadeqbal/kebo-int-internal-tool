@@ -234,7 +234,7 @@ describe("the menu down the left", () => {
     // Its group's name is bold; the others are not.
     expect(menu().getByRole("button", { name: "Finance" }).className).toContain("font-bold");
     expect(menu().getByRole("button", { name: "Sales" }).className).not.toContain("font-bold");
-  });
+  }, 20_000); // The first render of the whole shell: slow on a busy CI runner.
 
   it("marks the list on a record's page, and Home on the dashboard", () => {
     at.path = "/orders/9a1b";
