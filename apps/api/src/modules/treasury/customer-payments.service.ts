@@ -343,7 +343,7 @@ export class CustomerPaymentsService {
         });
         continue;
       }
-      const receipt = { id: m.id, received: `${m.currency} ${m.amount.toFixed(2)}`, method: m.method, paidOn: fromDbDate(m.valueDate) };
+      const receipt = { id: m.id, received: `${formatMinor(toMinor(m.amount), m.currency)}`, method: m.method, paidOn: fromDbDate(m.valueDate) };
       const atTime = m.allocations.filter((a) => !a.later);
       const leftMinor = decimalToMinor(m.allocatable) - atTime.reduce((t, a) => t + decimalToMinor(a.amount), 0);
       if (leftMinor > 0)
@@ -354,7 +354,7 @@ export class CustomerPaymentsService {
           currency: m.allocCurrency,
           on: fromDbDate(m.valueDate),
           at: m.createdAt,
-          note: `Left over from ${m.currency} ${m.amount.toFixed(2)}${m.reference ? ` (${m.reference})` : ""}`,
+          note: `Left over from ${formatMinor(toMinor(m.amount), m.currency)}${m.reference ? ` (${m.reference})` : ""}`,
           order: null,
           account: null,
           receipt,
@@ -505,13 +505,13 @@ export class CustomerPaymentsService {
         },
       });
       ids.push(created.id);
-      const arrived = same ? "" : ` (${a.receivedCurrency} ${fromMinor(share)} at ${a.rate})`;
+      const arrived = same ? "" : ` (${formatMinor(share, a.receivedCurrency)} at ${a.rate})`;
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_in",
         entityType: "order",
         entityId: p.order.id,
-        summary: `${p.order.refNo}: received ${a.currency} ${fromMinor(p.amountMinor)}${arrived}${p.bankChargesMinor ? ` (+${fromMinor(p.bankChargesMinor)} bank charges)` : ""}${split ? " from one transfer" : ""}, ${a.reference ?? "no reference"}`,
+        summary: `${p.order.refNo}: received ${formatMinor(p.amountMinor, a.currency)}${arrived}${p.bankChargesMinor ? ` (+${fromMinor(p.bankChargesMinor)} bank charges)` : ""}${split ? " from one transfer" : ""}, ${a.reference ?? "no reference"}`,
       });
     }
     if (leftMinor > 0)
@@ -520,7 +520,7 @@ export class CustomerPaymentsService {
         action: "credit_in",
         entityType: "customer",
         entityId: customerId,
-        summary: `Credit ${a.currency} ${fromMinor(leftMinor)} left over from ${a.receivedCurrency} ${fromMinor(a.receivedMinor)}`,
+        summary: `Credit ${formatMinor(leftMinor, a.currency)} left over from ${formatMinor(a.receivedMinor, a.receivedCurrency)}`,
       });
     // The ledger: the money in, off each order, the rest to the customer's credit.
     await this.ledger.post(tx, [{ type: "movement", id: m.id }, ...parts.map((p) => ({ type: "order_all" as const, id: p.order.id }))], {
@@ -550,7 +550,7 @@ export class CustomerPaymentsService {
         type: "payment.recorded" as const,
         orderId,
         refNo: o.refNo,
-        amount: `${o.currency} ${fromMinor(thisMinor)}`,
+        amount: `${formatMinor(thisMinor, o.currency)}`,
         paidOn: input.paidOn ?? null,
         actorId: user.id,
         notify: [o.inquiry.assigneeId].filter((v): v is string => !!v),
@@ -699,7 +699,7 @@ export class CustomerPaymentsService {
         type: "payment.recorded" as const,
         orderId: p.order.id,
         refNo: p.order.refNo,
-        amount: `${input.currency} ${fromMinor(p.amountMinor)}`,
+        amount: `${formatMinor(p.amountMinor, input.currency)}`,
         paidOn: input.paidOn ?? null,
         actorId: user.id,
         notify: [p.order.inquiry.assigneeId].filter((v): v is string => !!v),
@@ -741,7 +741,7 @@ export class CustomerPaymentsService {
         action: "payment_credit",
         entityType: "order",
         entityId: orderId,
-        summary: `${o.refNo}: paid ${o.currency} ${fromMinor(amountMinor)} from the customer's credit`,
+        summary: `${o.refNo}: paid ${formatMinor(amountMinor, o.currency)} from the customer's credit`,
       });
       await this.ledger.post(tx, [{ type: "order_all", id: orderId }], { userId: user.id });
     });
@@ -802,7 +802,7 @@ export class CustomerPaymentsService {
       action: "credit_refund",
       entityType: orderId ? "order" : "customer",
       entityId: orderId ?? customerId,
-      summary: `Refunded ${currency} ${fromMinor(amountMinor)} of the customer's credit`,
+      summary: `Refunded ${formatMinor(amountMinor, currency)} of the customer's credit`,
     });
   }
 
@@ -823,7 +823,7 @@ export class CustomerPaymentsService {
         action: "credit_refund_void",
         entityType: "customer",
         entityId: m.partyId!,
-        summary: `Removed the refund of ${m.currency} ${m.amount.toFixed(2)}`,
+        summary: `Removed the refund of ${formatMinor(toMinor(m.amount), m.currency)}`,
         reason,
       });
       await this.ledger.post(tx, [{ type: "movement", id }], { userId: user.id, reason });
@@ -851,7 +851,7 @@ export class CustomerPaymentsService {
           action: "payment_void",
           entityType: "order",
           entityId: p.orderId!,
-          summary: `Removed payment of ${m.allocCurrency} ${p.amount.toFixed(2)} (one transfer)`,
+          summary: `Removed payment of ${formatMinor(toMinor(p.amount), m.allocCurrency)} (one transfer)`,
           reason,
         });
       await this.ledger.post(tx, [{ type: "movement", id }, ...orderIds.map((o) => ({ type: "order_all" as const, id: o }))], {
@@ -957,7 +957,7 @@ export class CustomerPaymentsService {
         summary: `${o.refNo}: changed a payment from the customer`,
         oldValues: {
           amount: p.amount.toFixed(2),
-          received: `${m.currency} ${m.amount.toFixed(2)}`,
+          received: `${formatMinor(toMinor(m.amount), m.currency)}`,
           rate: Number(m.rate),
           bankCharges: p.bankCharges.toFixed(2),
           paidOn: fromDbDate(p.on),
@@ -965,7 +965,7 @@ export class CustomerPaymentsService {
         },
         newValues: {
           amount: fromMinor(amountMinor),
-          received: `${receivedCurrency} ${fromMinor(receivedMinor)}`,
+          received: `${formatMinor(receivedMinor, receivedCurrency)}`,
           rate,
           bankCharges: fromMinor(toMinor(input.bankCharges)),
           paidOn: input.paidOn,
@@ -1009,7 +1009,7 @@ export class CustomerPaymentsService {
         action: "payment_void",
         entityType: "order",
         entityId: o.id,
-        summary: `${o.refNo}: removed payment of ${p.movement.allocCurrency} ${p.amount.toFixed(2)}${p.later ? " (the credit is back)" : ""}${steps.count ? " (Money reached us undone)" : ""}`,
+        summary: `${o.refNo}: removed payment of ${formatMinor(toMinor(p.amount), p.movement.allocCurrency)}${p.later ? " (the credit is back)" : ""}${steps.count ? " (Money reached us undone)" : ""}`,
         reason,
       });
       await this.ledger.post(tx, refs, { userId: user.id, reason });

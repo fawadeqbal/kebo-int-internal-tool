@@ -104,7 +104,7 @@ export function RouteForm({
       {pick === "letter_of_credit" && lcTerms === "deferred" && <input type="hidden" name="lcDays" value={lcDays} />}
       <SelectCardList label="How the customer pays">
         {options.map((r) => (
-          <SelectCard key={r} title={PAYMENT_ROUTE_LABEL[r].replace(/ \(.*\)$/, "")} meta={ROUTE_TEXT[r]} selected={pick === r} onSelect={() => setPick(r)} />
+          <SelectCard key={r} title={PAYMENT_ROUTE_LABEL[r]} meta={ROUTE_TEXT[r]} selected={pick === r} onSelect={() => setPick(r)} />
         ))}
       </SelectCardList>
       {pick === "informal" && (

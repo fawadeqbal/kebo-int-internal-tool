@@ -5,6 +5,7 @@ import { Badge, cn, Table, Td, Th, THead, Tr, EmptyLine, RULES, PhoneList, Phone
 import { date, dayMonth, dueText, money, num2 as grouped } from "@/lib/format";
 import type { FactoryPaymentView, FactoryPlanView } from "@/lib/types-money";
 import { ROW_LINK } from "./section-window";
+import { PlanTotals } from "./plan-totals";
 import { BoxNote } from "@/components/common/record-box";
 
 type Row = FactoryPlanView["rows"][number];
@@ -62,7 +63,7 @@ function Stand({ r, paidOn }: { r: Row; paidOn: string | null }) {
 /**
  * What we pay one supplier on an order (Order › Factory order, and the purchase order's page), drawn as the
  * customer's payment plan is: one row per part (a card on a phone) with where it stands and what to do on
- * it — Pay on the part that is next, Receipt beside a paid one — then We owe · Paid · Still to pay. Money
+ * it — Pay on the part that is next, Receipt beside a paid one — then PO total · Paid · Still to pay. Money
  * pays the parts in order, so only the first open part offers Pay.
  */
 export function SupplierPlanTable({
@@ -147,7 +148,7 @@ export function SupplierPlanTable({
         <Table>
           <THead>
             <tr>
-              <Th>Part</Th>
+              <Th>Installment</Th>
               <Th>Due</Th>
               <Th className="text-right">Amount {c}</Th>
               <Th>Status</Th>
@@ -177,20 +178,18 @@ export function SupplierPlanTable({
           </tbody>
         </Table>
       </div>
-      <div data-target="factory.payments" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-4 text-sm sm:px-3.5">
-        <span className="text-muted">
-          We owe <span className="font-semibold text-text tabular">{money(plan.owed, c)}</span>
-        </span>
-        <span className="text-muted">
-          Paid <span className="font-semibold text-text tabular">{money(plan.paid, c)}</span>
-          {paidInOrder && c !== orderCurrency && Number(plan.paid) > 0 && (
-            <span className="tabular"> = {money(paidInOrder, orderCurrency)}</span>
-          )}
-        </span>
-        <span className="text-muted">
-          Still to pay <span className="font-semibold text-text tabular">{money(plan.toPay, c)}</span>
-        </span>
-      </div>
+      <PlanTotals
+        target="factory.payments"
+        items={[
+          { label: "PO total", value: money(plan.owed, c) },
+          {
+            label: "Paid",
+            value: money(plan.paid, c),
+            after: paidInOrder && c !== orderCurrency && Number(plan.paid) > 0 ? <span className="tabular"> = {money(paidInOrder, orderCurrency)}</span> : null,
+          },
+          { label: "Still to pay", value: money(plan.toPay, c) },
+        ]}
+      />
       {(Number(plan.takenOff ?? 0) > 0 || overpaid) && (
         <div className="flex flex-col gap-1 px-4 text-xs sm:px-3.5">
           {Number(plan.takenOff ?? 0) > 0 && (

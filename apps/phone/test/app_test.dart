@@ -43,8 +43,8 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('Stepped form'));
     await t.pumpAndSettle();
-    expect(find.text('Who paid'), findsWidgets);
+    expect(find.text('Paid by'), findsWidgets);
     expect(t.takeException(), isNull);
-    expect(GoRouter.of(t.element(find.text('Who paid').first)), isNotNull);
+    expect(GoRouter.of(t.element(find.text('Paid by').first)), isNotNull);
   });
 }

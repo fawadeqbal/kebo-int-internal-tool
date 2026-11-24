@@ -172,7 +172,7 @@ describe("the Overview's lines", () => {
   it("come in the tabs' order with their label and word", () => {
     const all = stageStands(fresh(), TODAY);
     expect(all.map((s) => s.label)).toEqual(["Payment", "Purchase order", "Production", "Shipping", "Delivery & SAT", "Documents"]);
-    expect(all[0]).toMatchObject({ word: "Nothing in", tone: "warn", fact: "Bank transfer (T/T) · deposit 30% USD 55,260 to come", missing: "" });
+    expect(all[0]).toMatchObject({ word: "Nothing in", tone: "warn", fact: "Informal · deposit 30% USD 55,260 to come", missing: "" });
     expect(all[1]!.fact).toBe("Jiangsu Filling Machinery · CNY 950,000");
     expect(all[2]!.fact).toBe("No ready date yet");
     expect(line(fresh({ shipBy: "2026-12-12" }), "shipping").fact).toBe("Ship by 12 Dec");
@@ -193,7 +193,7 @@ describe("the Overview's lines", () => {
       shipments: [ship({ status: "booked", forwarder: "Sino-Africa Logistics", bookingNo: "SAL-88213", etd: "2026-12-14", eta: "2027-01-18" })],
       documents: [{ kind: "packing_list", status: "ready", number: "PL-0412", issuedOn: null }],
     });
-    expect(line(f, "payment").fact).toBe("Bank transfer (T/T) · 30% USD 55,260 in on 16 Nov · balance USD 128,940");
+    expect(line(f, "payment").fact).toBe("Informal · 30% USD 55,260 in on 16 Nov · balance USD 128,940");
     expect(line(f, "factory").fact).toBe("Jiangsu Filling Machinery · ordered 16 Nov · their no. JF-26-1107 · CNY 380,000 paid of CNY 950,000");
     expect(line(f, "production")).toMatchObject({ fact: "10 days left · factory test planned 3 Dec", missing: "" });
     expect(line(f, "shipping")).toMatchObject({ fact: "Sino-Africa Logistics · SAL-88213 · sails 14 Dec · arrives 18 Jan", missing: "container, B/L empty" });

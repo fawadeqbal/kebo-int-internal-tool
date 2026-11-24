@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Check, Pencil } from "lucide-react";
-import { PAYMENT_ROUTES, type PaymentRoute } from "@kebo/shared";
+import { PAYMENT_ROUTE_LABEL, PAYMENT_ROUTES, type PaymentRoute } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, Textarea, RULES } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -260,7 +260,7 @@ export function AcceptForm({
                 <Select id="accept-route" name="route" defaultValue={s.values?.route ?? route ?? "informal"}>
                   {PAYMENT_ROUTES.map((r) => (
                     <option key={r} value={r}>
-                      {ROUTE_WORD[r]}
+                      {PAYMENT_ROUTE_LABEL[r]}
                     </option>
                   ))}
                 </Select>
@@ -300,8 +300,6 @@ export function AcceptForm({
   );
 }
 
-/** The payment routes as the accept window says them. */
-const ROUTE_WORD: Record<PaymentRoute, string> = { informal: "Bank transfer (informal)", bank_contract: "Bank contract", letter_of_credit: "Letter of credit" };
 
 /** Expired: the validity passed without an answer. */
 export function ExpiredForm({ action, today, number }: { action: Action; today: string; number: number }) {

@@ -11,6 +11,7 @@ import { requestPrintHref, requestWords } from "@/lib/requests";
 import { SendDialog } from "@/components/money/requests";
 import { RecordPaymentWindow } from "./payment-windows";
 import { ROW_LINK, useOpenFromLink } from "./section-window";
+import { PlanTotals } from "./plan-totals";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 type Send = (ref: string, prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -206,7 +207,7 @@ export function PaymentPlanTable({
         <Table>
           <THead>
             <tr>
-              <Th>Part</Th>
+              <Th>Installment</Th>
               <Th>Due</Th>
               <Th className="text-right">Amount {currency}</Th>
               <Th>Status</Th>
@@ -275,17 +276,14 @@ export function PaymentPlanTable({
           />
         </span>
       )}
-      <div data-target="payments.received" className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-4 text-sm sm:px-3.5">
-        <span className="text-muted">
-          Order total <span className="font-semibold text-text tabular">{money(total, currency)}</span>
-        </span>
-        <span className="text-muted">
-          Received <span className="font-semibold text-text tabular">{money(received, currency)}</span>
-        </span>
-        <span className="text-muted">
-          Still due <span className="font-semibold text-text tabular">{money(due, currency)}</span>
-        </span>
-      </div>
+      <PlanTotals
+        target="payments.received"
+        items={[
+          { label: "Order total", value: money(total, currency) },
+          { label: "Received", value: money(received, currency) },
+          { label: "Still due", value: money(due, currency) },
+        ]}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { BALANCE_TERMS_LABEL, can, PAYMENT_METHOD_LABEL, ROUTE_NAME, type PaymentRoute } from "@kebo/shared";
+import { BALANCE_TERMS_LABEL, can, PAYMENT_METHOD_LABEL, PAYMENT_ROUTE_LABEL, type PaymentRoute } from "@kebo/shared";
 import { getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderPaymentsOf } from "@/lib/order-data";
 import { date, money } from "@/lib/format";
@@ -100,7 +100,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
           title="How they pay"
           cols={4}
           rows={[
-            { label: "Route", value: route ? ROUTE_NAME[route] : null },
+            { label: "Route", value: route ? PAYMENT_ROUTE_LABEL[route] : null },
             { label: "Terms", value: flow?.payment.summary ?? BALANCE_TERMS_LABEL[o.balanceTerms] },
             { label: "Deposit", value: o.money.depositPercent > 0 ? `${o.money.depositPercent}% · ${money(o.money.deposit, c)}` : "None" },
             { label: "Balance", value: o.money.depositPercent < 100 ? `${100 - o.money.depositPercent}% · ${money(balance, c)}` : "None" },

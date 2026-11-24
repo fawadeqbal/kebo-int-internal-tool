@@ -7,6 +7,7 @@ import {
   ORDER_DOCUMENT_LABEL,
   PAYMENT_KIND_LABEL,
   PAYMENT_METHOD_LABEL,
+  PAYMENT_ROUTE_SHORT,
   paperDateText,
   paperMoneyText,
   paperNumber,
@@ -371,7 +372,7 @@ function salesContract(c: PaperCtx): Built {
       check(
         "route",
         "Payment route",
-        route ? (route === "letter_of_credit" ? "LC" : route === "bank_contract" ? "Bank contract" : "Informal") : "not chosen yet",
+        route ? PAYMENT_ROUTE_SHORT[route] : "not chosen yet",
         !!route,
         {
           required: true,

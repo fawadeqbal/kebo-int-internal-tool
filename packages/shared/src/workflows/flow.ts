@@ -26,11 +26,19 @@ import type { PlanFeature } from "../platform";
  * here touches the database: the API, the web and the phone app share it.
  */
 
+/** How the customer pays, one name everywhere (quotation, accept window, order, papers). */
 export const PAYMENT_ROUTE_LABEL: Record<PaymentRoute, string> = {
-  informal: "Informal (cash, Alipay, WeChat, personal account)",
+  informal: "Informal",
   bank_contract: "Bank contract",
   letter_of_credit: "Letter of credit (LC)",
 };
+/** What each route covers, in a few words (the line under a route choice). */
+export const PAYMENT_ROUTE_HINT: Record<PaymentRoute, string> = {
+  informal: "T/T, cash, Alipay, WeChat",
+  bank_contract: "Through the banks",
+  letter_of_credit: "LC at sight or after days",
+};
+/** The same names where space is short (tables, tags). */
 export const PAYMENT_ROUTE_SHORT: Record<PaymentRoute, string> = { informal: "Informal", bank_contract: "Bank contract", letter_of_credit: "LC" };
 
 export const BANK_CONTRACT_STATUS_LABEL: Record<BankContractStatus, string> = {

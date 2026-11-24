@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import { asPayment, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma, routeOf, type WithTerms } from "@kebo/database";
-import { fromMinor, spreadPayments, toMinor } from "@kebo/money";
+import { formatMinor, fromMinor, spreadPayments, toMinor } from "@kebo/money";
 import { chargedExpenses, fxOf, positionOf as orderPositionOf } from "../billing/api";
 import {
   bankContractInput,
@@ -572,7 +572,7 @@ export class PapersService implements OnModuleInit {
               // Kept when the payment was recorded; version 2 and on: the payment was corrected.
               version: copy?.version ?? null,
               paperId: copy?.id ?? null,
-              sub: `${p.currency} ${p.amount.toFixed(2)} · ${fromDbDate(p.paidOn)}${copy && copy.version > 1 ? " · corrected" : ""}`,
+              sub: `${formatMinor(toMinor(p.amount), p.currency)} · ${fromDbDate(p.paidOn)}${copy && copy.version > 1 ? " · corrected" : ""}`,
               ref: p.id,
               makeable: false,
               inSet: false,
@@ -612,7 +612,7 @@ export class PapersService implements OnModuleInit {
               number: paperNumber(o.refNo, kind, p.requestNo ?? i + 1),
               version: sent?.copy.version ?? null,
               paperId: sent?.copy.id ?? null,
-              sub: `${o.currency} ${fromMinor(p.amountMinor)}${p.dueOn ? ` · due ${companyDay(p.dueOn)}` : ""}${sent ? ` · sent ${sent.on}${sent.copy.version > 1 ? ` (R${sent.copy.version})` : ""}` : ""}`,
+              sub: `${formatMinor(p.amountMinor, o.currency)}${p.dueOn ? ` · due ${companyDay(p.dueOn)}` : ""}${sent ? ` · sent ${sent.on}${sent.copy.version > 1 ? ` (R${sent.copy.version})` : ""}` : ""}`,
               ref: p.id,
               makeable: false,
               inSet: false,

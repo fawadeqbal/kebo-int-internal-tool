@@ -742,7 +742,7 @@ export class MoneyService {
       await this.expenseAudit(tx, user, id, order ?? e.order, `changed the expense "${e.description}"`, "expense_edit", {
         reason,
         oldValues: {
-          amount: `${e.currency} ${e.amount.toFixed(2)}`,
+          amount: `${formatMinor(toMinor(e.amount), e.currency)}`,
           category: e.category,
           spentOn: fromDbDate(e.spentOn),
           order: e.order?.refNo ?? null,
@@ -755,7 +755,7 @@ export class MoneyService {
         newValues: {
           step: data.step,
           borneBy: data.borneBy,
-          amount: `${data.currency} ${fromMinor(toMinor(data.amount))}`,
+          amount: `${formatMinor(toMinor(data.amount), data.currency)}`,
           category: data.category,
           spentOn: input.spentOn,
           order: order?.refNo ?? null,
@@ -791,7 +791,7 @@ export class MoneyService {
         user,
         id,
         e.order,
-        `removed the expense "${e.description}" (${e.currency} ${e.amount.toFixed(2)})`,
+        `removed the expense "${e.description}" (${formatMinor(toMinor(e.amount), e.currency)})`,
         "expense_void",
         { reason, newValues: { step: e.step } },
       );
@@ -823,8 +823,8 @@ export class MoneyService {
         id,
         e.order,
         e.payLater
-          ? `paid ${e.payee ?? e.factory?.name ?? "the bill"} ${e.currency} ${e.amount.toFixed(2)} for "${e.description}"`
-          : `repaid ${e.paidBy?.name ?? "the person"} ${e.currency} ${e.amount.toFixed(2)} for "${e.description}"`,
+          ? `paid ${e.payee ?? e.factory?.name ?? "the bill"} ${formatMinor(toMinor(e.amount), e.currency)} for "${e.description}"`
+          : `repaid ${e.paidBy?.name ?? "the person"} ${formatMinor(toMinor(e.amount), e.currency)} for "${e.description}"`,
         "expense_repay",
         { newValues: { step: e.step, [e.payLater ? "paidOn" : "repaidOn"]: input.repaidOn, account: updated.repaidAccount?.name ?? null } },
       );

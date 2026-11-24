@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, nextCount, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
-import { fromMinor, fxRate } from "@kebo/money";
+import { formatMinor, fromMinor, fxRate, toMinor } from "@kebo/money";
 import {
   can,
   checkMove,
@@ -583,7 +583,7 @@ export class OrdersService {
       action: "create",
       entityType: "order",
       entityId: order.id,
-      summary: `Order ${refNo} from ${rev.quotation.refNo} R${rev.number} Option ${option.letter} (${rev.currency} ${option.total.toString()})`,
+      summary: `Order ${refNo} from ${rev.quotation.refNo} R${rev.number} Option ${option.letter} (${formatMinor(toMinor(option.total), rev.currency)})`,
     });
     // The ledger: the customer owes the order total, and we owe each factory its part, from today.
     await this.ledger.post(tx, [{ type: "order_all", id: order.id }], { userId: actorId });
@@ -1193,7 +1193,7 @@ export class OrdersService {
         for (const p of plans.get(i.id) ?? []) {
           const n = p.next;
           if (!n?.due || (n.status !== "due" && n.status !== "late")) continue;
-          if (!i.needs || n.due < i.needs.due) i.needs = { title: `Pay ${p.factory.name}: ${n.label} ${p.currency} ${n.open}`, due: n.due, late: n.due < today };
+          if (!i.needs || n.due < i.needs.due) i.needs = { title: `Pay ${p.factory.name}: ${n.label} ${formatMinor(toMinor(n.open), p.currency)}`, due: n.due, late: n.due < today };
         }
       }
     }

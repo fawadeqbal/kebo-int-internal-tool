@@ -1,6 +1,5 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
-import { portsOf } from "@kebo/shared";
-import { numberToWords } from "@kebo/utils";
+import { paperMoneyText, paperWordsText, portsOf } from "@kebo/shared";
 import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 import { countryName, isUnknownCountry } from "@/lib/countries";
 
@@ -87,23 +86,14 @@ export function docDate(iso: string) {
   return `${month} ${d}, ${y}`;
 }
 
-const SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", CNY: "¥", JPY: "¥" };
-
-/** "$ 90,000" (cents only when there are any). */
+/** "USD 90,000.00", as the app and every other paper write it (the ISO code, never "$": many currencies use it). */
 export function docMoney(amount: string | number, currency: string) {
   const n = Number(amount);
-  // Always two decimals: "$ 2,817.00" beside "$ 845.10", never "$ 2,817".
-  const figure = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `${n < 0 ? "- " : ""}${SYMBOL[currency] ?? currency} ${figure}`;
+  return n < 0 ? `- ${paperMoneyText(-n, currency)}` : paperMoneyText(n, currency);
 }
 
 /** "USD Ninety Thousand only" */
-export function docWords(amount: string, currency: string) {
-  const cents = Math.round(Math.abs(Number(amount)) * 100);
-  const whole = Math.floor(cents / 100);
-  const rest = cents % 100;
-  return `${currency} ${numberToWords(whole)}${rest ? ` and Cents ${numberToWords(rest)}` : ""} only`;
-}
+export const docWords = (amount: string, currency: string) => paperWordsText(amount, currency);
 
 /** "1 Set", "2,000 pcs" */
 export function docQty(quantity: string | number, unit?: string | null) {

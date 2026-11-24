@@ -366,7 +366,7 @@ class _StepFormDemoState extends State<StepFormDemo> {
               },
               steps: [
                 KFormStep(
-                  title: 'Who paid',
+                  title: 'Paid by',
                   builder: (_) => Column(
                     children: [
                       KSelectField(label: 'Customer', value: 'Kabul Medical Supplies', onTap: () {}),
@@ -405,7 +405,7 @@ class _StepFormDemoState extends State<StepFormDemo> {
               review: (ctx, goTo) => Column(
                 children: [
                   KDetails(
-                    title: 'Who paid',
+                    title: 'Paid by',
                     onEdit: () => goTo(0),
                     items: const [KDetail('Customer', 'Kabul Medical Supplies'), KDetail('Order', 'SO-2026-0035')],
                   ),

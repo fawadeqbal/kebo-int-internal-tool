@@ -69,7 +69,7 @@ export function PaymentsList({ name, account, total, rows }: { name: string; acc
             <tr>
               <Th>Date</Th>
               <Th>For</Th>
-              <Th>How</Th>
+              <Th>Method</Th>
               <Th className="text-right">Amount</Th>
               <Th>
                 <span className="sr-only">Receipt and change</span>

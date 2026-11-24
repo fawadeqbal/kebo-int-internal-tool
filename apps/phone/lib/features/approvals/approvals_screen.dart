@@ -177,7 +177,7 @@ class _DecideState extends ConsumerState<_Decide> {
             if (pay) ...[
               KDetail('Order', [s.at('order.refNo'), s.at('order.customer')].whereType<String>().join(' · ')),
               KDetail('Received on', fmtDate(DateTime.tryParse(s.str('paidOn')))),
-              KDetail('How', PaymentMethod.labels[s.strOrNull('method')] ?? s.strOrNull('method')),
+              KDetail('Method', PaymentMethod.labels[s.strOrNull('method')] ?? s.strOrNull('method')),
               KDetail('Reference', s.strOrNull('reference')),
               KDetail('Bank charges', b['bankCharges'] == null ? null : fmtMoney('${b['bankCharges']}', cur)),
             ] else ...[

@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { getPeople, getSettings } from "@/lib/loaders";
 import { orderMoneyOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
-import { date, dayMonth, money } from "@/lib/format";
+import { date, dayMonth, money, plural } from "@/lib/format";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
@@ -225,7 +225,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
               "Payment",
               plan ? (
                 <span className="flex flex-col gap-0.5">
-                  <span>{`${plan.rows.length} part${plan.rows.length === 1 ? "" : "s"}`}</span>
+                  <span>{plural(plan.rows.length, "installment")}</span>
                   {plan.rows.map((x, i) => (
                     <span key={x.id ?? i} className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 font-normal">
                       <span className="min-w-0 text-text-2">{x.label}</span>

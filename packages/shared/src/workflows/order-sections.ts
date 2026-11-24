@@ -3,7 +3,7 @@ import type { BankContractStatus, BankStepKind, OrderDocumentKind, PaymentRoute,
 import type { Tone } from "../labels";
 import type { LcCheck } from "./money-route";
 import { daysBetween } from "@kebo/utils";
-import { documentDone, FLOW_STEP_LABEL, FLOW_STEPS, type FlowStep } from "./flow";
+import { documentDone, FLOW_STEP_LABEL, FLOW_STEPS, PAYMENT_ROUTE_LABEL, type FlowStep } from "./flow";
 import { documentsInUse } from "./papers";
 
 /**
@@ -324,13 +324,6 @@ export function stageWords(f: SectionFacts, today: ISODate): Record<(typeof ORDE
   return { payment, factory, production, shipping, delivery, documents };
 }
 
-/** How the customer pays, as the order's page says it. */
-export const ROUTE_NAME: Record<PaymentRoute, string> = {
-  informal: "Bank transfer (T/T)",
-  bank_contract: "Bank contract",
-  letter_of_credit: "Letter of credit (LC)",
-};
-
 const amount = (currency: string | null | undefined, value: string | null | undefined) => {
   const n = Number(value ?? 0);
   return `${currency ?? ""} ${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`.trim();
@@ -371,7 +364,7 @@ export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
   const cur = f.currency;
 
   // Payment
-  const route = f.route ? ROUTE_NAME[f.route] : "Route not chosen";
+  const route = f.route ? PAYMENT_ROUTE_LABEL[f.route] : "Route not chosen";
   const through = f.route === "letter_of_credit" ? " through the LC" : f.route === "bank_contract" ? " through the banks" : "";
   const paid = Number(f.due) === 0 && !!f.paidInFullOn;
   const payment = paid
