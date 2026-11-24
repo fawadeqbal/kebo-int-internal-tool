@@ -283,7 +283,7 @@ export function ReceivedFields({
             <Textarea id="r-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
           </Field>
           <RecordedBy verify={verify} />
-          <FormButtons onCancel={onClose}>
+          <FormButtons onCancel={onClose} note={a.countsMinor <= 0 ? "Type the amount received to record it." : leftMinor < 0 ? "The orders take more than the payment." : undefined}>
             <SubmitButton pendingText={file ? "Sending, with the file…" : verify ? "Sending…" : "Recording…"} disabled={a.countsMinor <= 0 || tooMuch || leftMinor < 0}>
               {verify ? "Send to verify" : "Record the payment"}
             </SubmitButton>
@@ -532,7 +532,7 @@ function ReceiptFields({
               </p>
             )}
           </div>
-          <FormButtons onCancel={onClose}>
+          <FormButtons onCancel={onClose} note={a.countsMinor <= 0 ? "Type the amount received to record it." : leftMinor < 0 ? "The orders take more than the payment." : undefined}>
             <SubmitButton pendingText="Recording…" disabled={a.countsMinor <= 0 || leftMinor < 0 || !!over}>
               Record the payment
             </SubmitButton>

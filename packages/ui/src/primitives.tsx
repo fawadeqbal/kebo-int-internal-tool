@@ -513,7 +513,9 @@ export function PageHeader({
             // button to the bottom), so the row itself makes no room.
             // At the right at every width: on a phone too, where they wrap under the title (they sat right on some
             // pages and left on others: sweep 20 Nov).
-            <div className={cn("flex items-center justify-end gap-2", framed ? "shrink-0 sm:flex-wrap" : "flex-wrap", up && !actions && !views && "max-md:contents")}>
+            // Never wider than the page: on a 320 px phone a second button and the views wrap under each other
+            // (review 24 Nov, X-11: Approvals scrolled sideways by 23 px).
+            <div className={cn("flex max-w-full flex-wrap items-center justify-end gap-2", framed && "shrink-0", up && !actions && !views && "max-md:contents")}>
               {actions}
               {papers && (
                 <div data-slot="papers" className="flex items-center gap-2 max-sm:hidden">

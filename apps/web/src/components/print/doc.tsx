@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@kebo/ui";
 import type { CompanySnapshot } from "@/lib/types-orders";
+import { paperZoomCss } from "./kebo-doc";
 
 /**
  * The building blocks of the printed sales report (the customer documents use
@@ -12,7 +13,7 @@ import type { CompanySnapshot } from "@/lib/types-orders";
 /** One A4 page (more when it flows over), with a watermark for drafts and void documents. */
 export function Sheet({ watermark, children }: { watermark?: string | null; children: ReactNode }) {
   return (
-    <article className="relative mx-auto w-[210mm] max-w-full min-h-[297mm] overflow-hidden bg-white px-[14mm] pt-[12mm] pb-[14mm] font-doc text-[9.5pt] leading-snug text-kebo-ink shadow-[0_1px_3px_rgba(16,24,40,.12),0_8px_24px_rgba(16,24,40,.08)] print:min-h-0 print:w-auto print:overflow-visible print:p-0 print:shadow-none">
+    <article className="kebo-sheet relative mx-auto w-[210mm] min-h-[297mm] overflow-hidden bg-white px-[14mm] pt-[12mm] pb-[14mm] font-doc text-[9.5pt] leading-snug text-kebo-ink shadow-[0_1px_3px_rgba(16,24,40,.12),0_8px_24px_rgba(16,24,40,.08)] print:min-h-0 print:w-auto print:overflow-visible print:p-0 print:shadow-none">
       {watermark && (
         // The stamp (DRAFT, VOID, PREVIEW) is meant to be faint behind the paper, so it is drawn (CSS content) and
         // not text a contrast check reads as hard to read: decoration in WCAG 1.4.3's sense. Its word is still
@@ -21,6 +22,7 @@ export function Sheet({ watermark, children }: { watermark?: string | null; chil
           <span data-mark={watermark} className="-rotate-[30deg] rounded-xl border-[6px] border-[#dc2626]/25 px-10 font-doc-display text-[110pt] leading-none font-extrabold tracking-[0.08em] text-[#dc2626]/[0.13] select-none before:content-[attr(data-mark)]" />
         </div>
       )}
+      <style>{paperZoomCss(".kebo-sheet")}</style>
       <div className="relative">{children}</div>
     </article>
   );

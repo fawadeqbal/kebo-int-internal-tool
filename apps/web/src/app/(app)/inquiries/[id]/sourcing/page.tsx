@@ -117,7 +117,15 @@ export default async function SourcingPage({
   const declined = others.filter((r) => r.status === "declined").length;
   const summary =
     asked > 0
-      ? [`${asked} asked`, `${answered} offer${answered === 1 ? "" : "s"} in`, waiting.length ? `${waiting.length} waiting` : null, declined ? `${declined} declined` : null].filter(Boolean).join(" · ")
+      ? // An offer typed in is not a supplier asked: "asked" only for the asks recorded (review 24 Nov, S-13: "2 asked" counted offers).
+        [
+          requests?.items.length ? `${requests.items.length} asked` : null,
+          `${answered} offer${answered === 1 ? "" : "s"} in`,
+          waiting.length ? `${waiting.length} waiting` : null,
+          declined ? `${declined} declined` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : "No offer yet";
   const status = (x: FactoryQuoteView) => {
     const letters = usedIn.get(x.id) ?? [];

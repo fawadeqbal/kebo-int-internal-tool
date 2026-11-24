@@ -164,7 +164,7 @@ export function SupplierPlanTable({
                   <span className="font-semibold">{r.label}</span>
                   {under(r)}
                 </Td>
-                <Td className={cn("text-sm whitespace-nowrap", late(r) && "font-medium text-bad")}>{due(r)}</Td>
+                <Td className={cn("min-w-28 text-sm", late(r) && "font-medium text-bad")}>{due(r)}</Td>
                 <Td className="text-right whitespace-nowrap tabular">
                   {grouped(r.amount)}
                   {Number(r.paid) > 0 && r.status !== "paid" && <span className="block text-xs text-muted">{grouped(r.paid)} paid</span>}

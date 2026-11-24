@@ -54,7 +54,14 @@ export function inquiryFacts(funnel: Funnel | null, lateFollowUps: number, curre
           { label: "Time to quote", value: daysText(funnel.medianDaysToFirstQuote), sub: "typical" },
         ]
       : []),
-    { label: "Follow-ups late", value: lateFollowUps, tone: lateFollowUps > 0 ? ("bad" as const) : undefined },
+    // It counts inquiries (whose next follow-up is late), not follow-ups, and opens them on Follow-ups (review 24 Nov,
+    // S-15: "Follow-ups late 129" was not a link, and Follow-ups said 138).
+    {
+      label: "Follow-up late on",
+      value: countOf(lateFollowUps, "inquiry", "inquiries"),
+      tone: lateFollowUps > 0 ? ("bad" as const) : undefined,
+      href: lateFollowUps > 0 ? "/follow-ups?view=everyone&status=late&about=inquiry" : undefined,
+    },
   ];
 }
 

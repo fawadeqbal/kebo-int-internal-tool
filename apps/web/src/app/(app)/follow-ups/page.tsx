@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { crumbsFor } from "@/lib/nav";
 import { Pencil, Plus } from "lucide-react";
-import { Badge, Card, cn, EmptyState, LinkTabs, PageHeader, Pager, Td, Th, THead, toPage, toPageSize } from "@kebo/ui";
+import { Badge, Card, cn, EmptyState, linkClass, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, toPageSize } from "@kebo/ui";
 import { can, type Tone } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { allPages } from "@/lib/exports";
@@ -16,7 +16,7 @@ import { FollowUpCheck, FollowUpDoneNext, FollowUpFields, type AboutOption } fro
 import { dueText, todayHere } from "@/components/notes/kinds";
 import { DataTable } from "@/components/common/data-table";
 import { NewFollowUpBody } from "@/components/notes/new-follow-up";
-import { addFollowUpAction, editFollowUpAction, followUpDoneAction, followUpReopenAction } from "./actions";
+import { addFollowUpAction, editFollowUpAction, followUpDoneAction, followUpReopenAction, removeFollowUpAction } from "./actions";
 import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Follow-ups" };
@@ -73,7 +73,16 @@ function duePill(f: FollowUp, today: string): { text: string; tone: Tone } {
 export default async function FollowUpsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; status?: string; q?: string; due?: string; who?: string; about?: string; page?: string; size?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    status?: string;
+    q?: string;
+    due?: string;
+    who?: string;
+    about?: string;
+    page?: string;
+    size?: string;
+  }>;
 }) {
   const me = await requireUser();
   const sp = await searchParams;
@@ -102,7 +111,11 @@ export default async function FollowUpsPage({
     api.get<{ id: string; name: string }[]>("/customers/names").catch(() => [] as { id: string; name: string }[]),
     allPages<{ id: string; name: string }>("/factories", {}).catch(() => [] as { id: string; name: string }[]),
     // The other of Mine / Everyone, for its tab's count (the same search).
-    viewAll ? api.get<FollowUpList>("/follow-ups", { mine: everyone ? "true" : undefined, open: "true", ...filters, page: 1, pageSize: 1 }).catch(() => null) : null,
+    viewAll
+      ? api
+          .get<FollowUpList>("/follow-ups", { mine: everyone ? "true" : undefined, open: "true", ...filters, page: 1, pageSize: 1 })
+          .catch(() => null)
+      : null,
   ]);
   const who = viewAll ? people.find((p) => p.id === sp.who)?.id : undefined;
   const keep = { view: everyone ? "everyone" : undefined, status: status === "open" ? undefined : status, q, due, who, about };
@@ -117,6 +130,37 @@ export default async function FollowUpsPage({
     ...suppliers.map((f) => ({ value: `factoryId:${f.id}`, label: f.name, group: "Suppliers" })),
   ];
 
+  // The tick and the pencil, the same in the table and in the phone's list.
+  const doneButton = (f: (typeof list.rows)[number]) =>
+    f.can.done &&
+    (!f.done && f.needsNext ? (
+      <FollowUpDoneNext action={followUpDoneAction.bind(null, f.id)} title={f.title} what={f.title} inquiryHref={f.link} as="check" />
+    ) : (
+      <FollowUpCheck action={(f.done ? followUpReopenAction : followUpDoneAction).bind(null, f.id)} done={f.done} what={f.title} />
+    ));
+  const editButton = (f: (typeof list.rows)[number]) =>
+    f.can.edit && (
+      <PanelButton
+        variant="ghost"
+        size="icon-sm"
+        icon={<Pencil aria-hidden />}
+        label={<span className="sr-only">Edit {f.title}</span>}
+        title="Edit follow-up"
+        body={
+          <div className="p-5 sm:px-6">
+            <FollowUpFields
+              action={editFollowUpAction.bind(null, f.id)}
+              people={people}
+              meId={me.id}
+              today={today}
+              initial={{ title: f.title, assigneeId: f.assignee.id, dueOn: f.dueOn, dueAt: f.dueAt, place: f.place }}
+              submit="Save follow-up"
+              remove={f.can.delete ? removeFollowUpAction.bind(null, f.id) : undefined}
+            />
+          </div>
+        }
+      />
+    );
   return (
     <>
       <PageHeader
@@ -130,7 +174,15 @@ export default async function FollowUpsPage({
             label="Add follow-up"
             title="New follow-up"
             description="Shows on the dashboard on its day, with a reminder."
-            body={<NewFollowUpBody action={addFollowUpAction.bind(null, null)} people={people} meId={me.id} today={today} about={aboutOptions} />}
+            body={
+              <NewFollowUpBody
+                action={addFollowUpAction.bind(null, null)}
+                people={people}
+                meId={me.id}
+                today={today}
+                about={aboutOptions}
+              />
+            }
           />
         }
       />
@@ -174,7 +226,9 @@ export default async function FollowUpsPage({
         keep={{ view: keep.view, status: keep.status }}
         selects={[
           { name: "due", label: "Due", value: due, options: DUE.map((d) => ({ value: d.value, label: d.label })), all: "Any day" },
-          ...(viewAll ? [{ name: "who", label: "Person", value: who, options: people.map((p) => ({ value: p.id, label: p.name })), all: "Everyone" }] : []),
+          ...(viewAll
+            ? [{ name: "who", label: "Person", value: who, options: people.map((p) => ({ value: p.id, label: p.name })), all: "Everyone" }]
+            : []),
           { name: "about", label: "About", value: about, options: ABOUT.map((a) => ({ value: a.value, label: a.label })) },
         ]}
         count={countOf(list.total, "follow-up")}
@@ -192,7 +246,38 @@ export default async function FollowUpsPage({
               }
             />
           ) : (
-            <DataTable label="Follow-ups">
+            <>
+              {/* On a phone, rows like every other list (review 24 Nov, X-10: a desktop table with an empty column). */}
+              <PhoneList label="Follow-ups">
+                {list.rows.map((f) => {
+                  const pill = duePill(f, today);
+                  return (
+                    <PhoneRow
+                      key={f.id}
+                      title={<span className={cn(f.done && "line-through")}>{f.title}</span>}
+                      line={[f.target?.label, f.place, f.assignee.id === me.id ? "Me" : f.assignee.name].filter(Boolean).join(" · ")}
+                      status={
+                        <Badge tone={pill.tone} dot>
+                          {pill.text}
+                        </Badge>
+                      }
+                      muted={f.done}
+                      extra={
+                        <span className="flex items-center justify-between gap-2">
+                          {doneButton(f)}
+                          {f.target && (
+                            <Link href={f.link} className={cn(linkClass, "text-sm")}>
+                              Open {ON_LABEL[f.target.type].toLowerCase()}
+                            </Link>
+                          )}
+                          {editButton(f)}
+                        </span>
+                      }
+                    />
+                  );
+                })}
+              </PhoneList>
+              <DataTable label="Follow-ups" className="max-sm:hidden">
                 <THead>
                   <tr>
                     <Th className="w-12">
@@ -213,18 +298,7 @@ export default async function FollowUpsPage({
                     const sub = [f.target?.label, f.place].filter(Boolean).join(" · ");
                     return (
                       <tr key={f.id} className="border-t border-surface-2">
-                        <Td>
-                          {f.can.done &&
-                            (!f.done && f.needsNext ? (
-                              <FollowUpDoneNext action={followUpDoneAction.bind(null, f.id)} title={f.title} what={f.title} inquiryHref={f.link} as="check" />
-                            ) : (
-                              <FollowUpCheck
-                                action={(f.done ? followUpReopenAction : followUpDoneAction).bind(null, f.id)}
-                                done={f.done}
-                                what={f.title}
-                              />
-                            ))}
-                        </Td>
+                        <Td>{doneButton(f)}</Td>
                         <Td>
                           <span className={cn("block font-semibold text-text [overflow-wrap:anywhere]", f.done && "line-through")}>
                             {f.title}
@@ -245,34 +319,13 @@ export default async function FollowUpsPage({
                           </Badge>
                         </Td>
                         <Td className="whitespace-nowrap">{f.assignee.id === me.id ? "Me" : f.assignee.name}</Td>
-                        <Td className="text-right">
-                          {f.can.edit && (
-                            <PanelButton
-                              variant="ghost"
-                              size="icon-sm"
-                              icon={<Pencil aria-hidden />}
-                              label={<span className="sr-only">Edit {f.title}</span>}
-                              title="Edit follow-up"
-                              body={
-                                <div className="p-5 sm:px-6">
-                                  <FollowUpFields
-                                    action={editFollowUpAction.bind(null, f.id)}
-                                    people={people}
-                                    meId={me.id}
-                                    today={today}
-                                    initial={{ title: f.title, assigneeId: f.assignee.id, dueOn: f.dueOn, dueAt: f.dueAt, place: f.place }}
-                                    submit="Save follow-up"
-                                  />
-                                </div>
-                              }
-                            />
-                          )}
-                        </Td>
+                        <Td className="text-right">{editButton(f)}</Td>
                       </tr>
                     );
                   })}
                 </tbody>
-            </DataTable>
+              </DataTable>
+            </>
           )}
         </Card>
         <Pager base="/follow-ups" params={keep} page={page} pageSize={toPageSize(sp.size)} total={list.total} bare />

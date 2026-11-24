@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Globe } from "lucide-react";
 import {
   can,
+  CURRENCIES,
   dayMonth,
   FREIGHT_TERMS,
   FREIGHT_TERMS_LABEL,
@@ -263,7 +264,16 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         ];
         const freight: DetailField[] = [
           { name: "freightAmount", label: "Freight", type: "number", value: s.freightAmount },
-          { name: "freightCurrency", label: "Currency", value: s.freightCurrency ?? (s.freightAmount ? null : o.currency) },
+          // One of the currencies, chosen (a typo was refused only after "Why?"); the order's currency is only a
+          // start, so choosing another for the first freight asks nothing (review 24 Nov, O-14).
+          {
+            name: "freightCurrency",
+            label: "Currency",
+            type: "select",
+            value: s.freightCurrency ?? (s.freightAmount ? null : o.currency),
+            suggested: !s.freightCurrency,
+            options: [...(s.freightCurrency || !s.freightAmount ? [] : [{ value: "", label: "Not said" }]), ...CURRENCIES.map((c) => ({ value: c, label: c }))],
+          },
           {
             name: "freightTerms",
             label: "Paid",

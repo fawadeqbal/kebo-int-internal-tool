@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, useTransition } from "react";
 import { Check, RotateCcw } from "lucide-react";
 import { FOLLOW_UP_KIND_LABEL, FOLLOW_UP_KINDS, NOTE_KIND_LABEL, NOTE_KINDS } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { followUpReopenAction, removeFollowUpAction, removeNoteAction } from "@/app/(app)/follow-ups/actions";
 import Link from "next/link";
 import { ActionForm } from "@/components/common/action-form";
-import { Modal } from "@/components/common/dialog";
+import { Modal, useConfirm } from "@/components/common/dialog";
 import { PANEL_FORM, PanelBody, PanelSection, useClosePanel, WindowCancel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { NOTE_ICON } from "./kinds";
@@ -321,6 +321,7 @@ export function FollowUpFields({
   initial,
   submit,
   onDone,
+  remove,
 }: {
   action: Action;
   people: { id: string; name: string }[];
@@ -330,9 +331,14 @@ export function FollowUpFields({
   initial?: FollowUpValues;
   submit: string;
   onDone?: () => void;
+  /** Editing one that may be removed: Remove at the left of the buttons (review 24 Nov, S-14: Edit had no Delete). */
+  remove?: Action;
 }) {
   const id = useId();
   const closePanel = useClosePanel();
+  const router = useRouter();
+  const { ask, dialog: asking } = useConfirm();
+  const [removing, startRemove] = useTransition();
   const done = onDone ?? (initial ? (state?: ActionState) => closePanel(state) : undefined);
   const groups = about ? [...new Set(about.map((a) => a.group))] : [];
   return (
@@ -389,8 +395,32 @@ export function FollowUpFields({
               </Select>
             </Field>
           )}
-          {/* In its window: Cancel and save at the bottom right, like every window. */}
+          {/* In its window: Cancel and save at the bottom right, like every window; Remove on its own at the left. */}
           <div className="col-span-2 flex flex-wrap items-center justify-end gap-3 border-t border-line pt-4 sm:col-span-3">
+            {remove && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="mr-auto text-bad hover:bg-bad-soft"
+                disabled={removing}
+                onClick={() =>
+                  ask({ question: `Remove "${initial?.title ?? "this follow-up"}"? It stays in the history.`, confirmLabel: "Remove", danger: true }, () =>
+                    startRemove(async () => {
+                      const r = await remove({}, new FormData());
+                      if (r.ok === false) toast({ kind: "fail", message: r.message ?? "It was not removed." });
+                      else {
+                        toast("Follow-up removed.");
+                        closePanel({ ok: true });
+                        router.refresh();
+                      }
+                    }),
+                  )
+                }
+              >
+                {removing ? "Removing…" : "Remove"}
+              </Button>
+            )}
+            {asking}
             <WindowCancel />
             <SubmitButton pendingText="Saving…">
               <Check aria-hidden />
