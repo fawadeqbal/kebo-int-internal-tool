@@ -26,7 +26,15 @@ export const orderCostsSetup = cache(async (id: string) => {
     today: today(),
     people: (people ?? []).map((p) => ({ id: p.id, name: p.name })),
     for: { place: "order", id, customerId: o?.customer.id ?? null, label: `Order ${costs.refNo}${o ? ` · ${o.customer.name}` : ""}` },
-    order: { currency: costs.currency, factories: [...factories].map(([fid, name]) => ({ id: fid, name })) },
+    order: {
+      currency: costs.currency,
+      factories: [...factories].map(([fid, name]) => ({ id: fid, name })),
+      // What a new cost does to the margin: the costed value, the profit now, and where it gets thin.
+      margin:
+        costs.sheet.costs !== null && costs.sheet.profit !== null
+          ? { value: String(Number(costs.sheet.costs) + Number(costs.sheet.profit)), profit: costs.sheet.profit, floor: settings.sales.marginFloorPercent }
+          : null,
+    },
   };
   return { costs, setup, canEdit: costs.canEdit, money: m };
 });

@@ -246,7 +246,8 @@ export class InquiriesService {
         },
         orders: {
           orderBy: { createdAt: "desc" },
-          select: { id: true, refNo: true, status: true, orderedOn: true, total: true, currency: true, customerRef: true },
+          // paymentTerms: how the customer pays, chosen when the quotation was accepted (its page shows it).
+          select: { id: true, refNo: true, status: true, orderedOn: true, total: true, currency: true, customerRef: true, paymentTerms: { select: { route: true } } },
         },
         ...(seeCosts
           ? {

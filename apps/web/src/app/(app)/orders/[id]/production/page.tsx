@@ -261,6 +261,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
                     today={now}
                     place={place}
                     lines={o.goods.lines}
+                    readyOn={o.readyOn}
                   />
                 )}
                 {o.goods.allReceived && (

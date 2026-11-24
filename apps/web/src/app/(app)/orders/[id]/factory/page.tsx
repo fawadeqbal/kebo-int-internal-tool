@@ -366,6 +366,11 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                         deposit={{ verified: pos!.deposit.verified, text: depositText }}
                         today={now}
                         supplierRef={po.supplierRef}
+                        paper={{
+                          viewHref: `/orders/${o.id}/papers/purchase-order?ref=${po.supplier.id}`,
+                          pdfHref: `/pdf/purchase-order/${o.id}?ref=${po.supplier.id}`,
+                          fileName: `${po.number}.pdf`,
+                        }}
                       />
                     }
                   />

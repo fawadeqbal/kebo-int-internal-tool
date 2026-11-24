@@ -6,7 +6,7 @@ import type { PaymentList } from "@kebo/shared";
 import type { ReactNode } from "react";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote } from "lucide-react";
 import { buildHref, Card, CardBody, CardHeader, LinkTabs, Table, Td, Th, THead, Tr, Notice, buttonClass } from "@kebo/ui";
-import { date, money, companyToday } from "@/lib/format";
+import { date, money, companyToday, numberOnSave } from "@/lib/format";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
@@ -103,11 +103,11 @@ export async function RecordPayment({ sp, inWindow = false }: { sp: Search; inWi
   );
 }
 
-/** "RC-2026-…": the number a payment of this kind gets on save. */
+/** "Its RC number is given when you save": the number a payment of this kind gets. */
 export function numberHint(kindParam: string | undefined) {
   const kind: Kind = KINDS.find((k) => k.kind === kindParam)?.kind ?? "in";
   const PREFIX: Record<Kind, string> = { in: "RC", out: "FP", expense: "EX", transfer: "TR" };
-  return `Number given on save · ${PREFIX[kind]}-${companyToday().slice(0, 4)}-…`;
+  return numberOnSave(PREFIX[kind]);
 }
 
 /** Beside the form (board PaymentIn): the order's payment plan, and what happens after saving. */

@@ -205,9 +205,8 @@ export function PapersTable({
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
           <p className="text-xs text-text-2">
-            <b className="text-text">
-              {ready.length} of {bank.length} ready.
-            </b>{" "}
+            {/* Named for its set: the tab counts every document, this only the bank's (e2e 24 Nov: "0 of 5" beside "0 of 4"). */}
+            {bank.length > 0 && <b className="text-text">{ready.length} of the {bank.length} for the bank ready. </b>}
             {still.length ? `Still needed: ${still.map((r) => r.label).join(", ")}.` : bank.length ? "The set can go to the bank." : ""}
           </p>
           <span className="flex flex-wrap items-center gap-1.5">

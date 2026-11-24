@@ -3,6 +3,7 @@
 import { useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { RULES } from "@kebo/ui";
+import { numberOnSave } from "@/lib/format";
 import { toast } from "@kebo/ui/client";
 import { SidePanel, useSidePanel } from "@/components/common/panel";
 import { DealForm, type RequestStep } from "@/components/deals/deal-form";
@@ -27,7 +28,7 @@ export function InquiryPanel({ refNo, customerName, inquiryTitle, numberHint, ..
     <SidePanel
       // Design rules 18 Nov: "Edit customer" (one part, a smaller window but for the items), "Edit inquiry" (all parts).
       title={one ? `Edit ${PART_TITLE[form.startStep ?? "customer"]}` : edit ? "Edit inquiry" : "New inquiry"}
-      description={edit ? [refNo, inquiryTitle ?? customerName].filter(Boolean).join(" · ") : `The number is given on save · ${numberHint ?? "RFQ"}-…`}
+      description={edit ? [refNo, inquiryTitle ?? customerName].filter(Boolean).join(" · ") : numberOnSave((numberHint ?? "RFQ").split("-")[0]!)}
       onClose={() => panel.close()}
       className={one && form.startStep !== "items" ? RULES.window.part : RULES.window.items}
     >

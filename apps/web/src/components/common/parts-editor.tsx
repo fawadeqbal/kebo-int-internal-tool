@@ -593,7 +593,7 @@ export function PartsEditor({
   );
 }
 
-/** The total under the installments: green when they add up, red with what is left and "Add to last installment". */
+/** The total under the installments: green when they add up; red with what is left or too much, and the last installment takes it. */
 export function PartsSummary({
   parts,
   onChange,
@@ -612,10 +612,14 @@ export function PartsSummary({
   const diff = totalMinor - sum;
   const ok = diff === 0;
   const pct = totalMinor > 0 ? Number(((sum * 100) / totalMinor).toFixed(2)) : 0;
-  const addToLast = () =>
+  // The last installment not yet paid takes the difference: what is left over, or what is too much (e2e 24 Nov:
+  // over 100% had no one-click fix). Taking off only while something is left in it.
+  const last = parts.map((p) => p.locked).lastIndexOf(false);
+  const canSettle = last >= 0 && diff !== 0 && minorOf(parts[last]!.amount) + diff > 0;
+  const settleOnLast = () =>
     onChange((all) => {
       const at = all.map((p) => p.locked).lastIndexOf(false);
-      if (at < 0 || diff <= 0) return all;
+      if (at < 0 || diff === 0 || minorOf(all[at]!.amount) + diff <= 0) return all;
       return all.map((p, i) => {
         if (i !== at) return p;
         const minor = minorOf(p.amount) + diff;
@@ -637,9 +641,9 @@ export function PartsSummary({
         {ok ? "Fully allocated · 100%" : diff > 0 ? `${say(diff, currency)} not allocated` : `${say(-diff, currency)} over-allocated`}
         {ok && note ? <span className="font-normal text-text-2"> · {note}</span> : null}
       </b>
-      {diff > 0 && parts.some((p) => !p.locked) && (
-        <Button size="xs" variant="ghost" className="text-primary underline underline-offset-2 hover:text-primary" onClick={addToLast}>
-          Add to last installment
+      {canSettle && (
+        <Button size="xs" variant="ghost" className="text-primary underline underline-offset-2 hover:text-primary" onClick={settleOnLast}>
+          {diff > 0 ? "Add to last installment" : "Take from last installment"}
         </Button>
       )}
     </div>

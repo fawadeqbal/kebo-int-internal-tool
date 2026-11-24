@@ -1,7 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { Field, Input, RULES, Select, Textarea, Notice } from "@kebo/ui";
+import { Field, Input, RULES, Select, Textarea, Notice, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PanelBody, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
@@ -55,7 +55,20 @@ export interface FactoryAgreedView extends FactoryTermsView {
 const HOW = ["Email", "WeChat", "WhatsApp", "By hand"];
 
 /** "Send PO-2026-0044 to …" (board POSendEarly): the day, their order no., how; before the deposit is verified, why. */
-export function SendForm({ action, deposit, today, supplierRef }: { action: Action; deposit: { verified: boolean; text: string }; today: string; supplierRef: string | null }) {
+export function SendForm({
+  action,
+  deposit,
+  today,
+  supplierRef,
+  paper,
+}: {
+  action: Action;
+  deposit: { verified: boolean; text: string };
+  today: string;
+  supplierRef: string | null;
+  /** The PO the app prints: sent from here as the quotation is, with its PDF to hand (e2e 24 Nov: none in the window). */
+  paper?: { viewHref: string; pdfHref: string; fileName: string };
+}) {
   const close = useClosePanel();
   return (
     <ActionForm action={action} onDone={close} className="flex min-h-0 flex-1 flex-col">
@@ -94,6 +107,19 @@ export function SendForm({ action, deposit, today, supplierRef }: { action: Acti
               >
                 <Textarea id="po-reason" name="reason" rows={3} maxLength={300} defaultValue={s.values?.reason ?? ""} />
               </Field>
+            )}
+            {paper && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3.5 py-2.5 text-md">
+                <span className="font-semibold">{paper.fileName}</span>
+                <span className="flex gap-4">
+                  <a href={paper.viewHref} className={linkClass}>
+                    View
+                  </a>
+                  <a href={paper.pdfHref} download={paper.fileName} className={linkClass}>
+                    Download PDF
+                  </a>
+                </span>
+              </div>
             )}
             <WhatHappens lines={["Nothing is sent by the system: send the PO yourself, then mark it here.", "The purchase order becomes Sent and is kept exactly as sent."]} />
           </PanelBody>

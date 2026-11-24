@@ -168,6 +168,7 @@ export function EditCustomerPayment({
   onClose?: () => void;
 }) {
   const [open, setOpen] = useState(!!onClose);
+  const [method, setMethod] = useState<PaymentMethod>(payment.method);
   const received = payment.receivedCurrency ?? currency;
   const close = onClose ?? (() => setOpen(false));
   if (!open)
@@ -211,18 +212,12 @@ export function EditCustomerPayment({
               <Input id="ep-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? payment.paidOn} />
             </Field>
             <Field label="Method" htmlFor="ep-method">
-              <Choice
-                id="ep-method"
-                name="method"
-                options={PAYMENT_METHODS.filter((m) => m !== "credit")}
-                labels={PAYMENT_METHOD_LABEL}
-                value={(s.values?.method as PaymentMethod) ?? payment.method}
-              />
+              <Choice id="ep-method" name="method" options={PAYMENT_METHODS.filter((m) => m !== "credit")} labels={PAYMENT_METHOD_LABEL} value={method} onChange={setMethod} />
             </Field>
             <Field label="Reference" htmlFor="ep-reference" optional>
               <Input id="ep-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment.reference ?? ""} />
             </Field>
-            <AccountSelect id="ep-account" label="Deposit to account" currency={received} defaultValue={s.values?.accountId ?? payment.account?.id} error={s.errors?.accountId} />
+            <AccountSelect id="ep-account" label="Deposit to account" currency={received} defaultValue={s.values?.accountId ?? payment.account?.id} error={s.errors?.accountId} method={method} />
           </div>
           <input type="hidden" name="paidByName" value={payment.paidByName ?? ""} />
           <input type="hidden" name="note" value={payment.note ?? ""} />
@@ -324,6 +319,7 @@ export function FactoryPaymentForm({
   const mismatch = !!owedIn && m.currency !== owedIn && !kept;
   const left = chosen && Number(chosen.toPay) > 0 && m.currency === chosen.currency ? chosen.toPay : null;
   const [file, setFile] = useState<File | null>(null);
+  const [method, setMethod] = useState<PaymentMethod>(payment?.method ?? "bank_transfer");
   // The slip goes with the save itself: the page re-draws once the payment is saved.
   const save = useSaveThenSend(
     action,
@@ -440,15 +436,9 @@ export function FactoryPaymentForm({
           )}
           <div className={RULES.form.fields}>
             <Field label="Method" htmlFor="fp-method">
-              <Choice
-                id="fp-method"
-                name="method"
-                options={PAYMENT_METHODS}
-                labels={PAYMENT_METHOD_LABEL}
-                value={(s.values?.method as PaymentMethod) ?? payment?.method ?? "bank_transfer"}
-              />
+              <Choice id="fp-method" name="method" options={PAYMENT_METHODS} labels={PAYMENT_METHOD_LABEL} value={method} onChange={setMethod} />
             </Field>
-            <AccountSelect id="fp-account" label="Paid from account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
+            <AccountSelect id="fp-account" label="Paid from account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} method={method} />
             <Field label="Reference" htmlFor="fp-reference" optional>
               <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? prefill?.reference ?? ""} />
             </Field>

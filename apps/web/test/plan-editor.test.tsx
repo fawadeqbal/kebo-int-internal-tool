@@ -66,6 +66,15 @@ describe("the plan editor", () => {
     expect(screen.getByRole("status").textContent).toContain("Fully allocated");
   });
 
+  it("says what is over-allocated and takes it off the last installment in one click", () => {
+    show([part("a", "Advance", "1200.00", "40"), part("b", "Balance", "2100.00", "70")]);
+    expect(screen.getByRole("status").textContent).toContain("300.00");
+    expect(screen.getByRole("status").textContent).toContain("over-allocated");
+    fireEvent.click(screen.getByRole("button", { name: "Take from last installment" }));
+    expect(amounts()).toEqual(["1200.00", "1800.00"]);
+    expect(screen.getByRole("status").textContent).toContain("Fully allocated");
+  });
+
   it("adds an empty installment", () => {
     show([part("a", "Advance", "1200.00", "40")]);
     fireEvent.click(screen.getByRole("button", { name: "Add installment" }));

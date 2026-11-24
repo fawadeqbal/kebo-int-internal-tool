@@ -58,7 +58,6 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
       continue;
     }
     const diffs: string[] = [];
-    let onlyAdded = true;
     for (const c of shown) {
       const a = (old.r.values[c.key] ?? "").trim();
       const b = (r.values[c.key] ?? "").trim();
@@ -67,13 +66,14 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
       // The words for changes (canvas group 9): an empty cell filled is Added, never "empty → 3".
       const text = (v: string) => (c.options?.find((o) => o.value === v)?.label ?? firstLine(v, 32)) || "";
       const k = changeKind(text(a), text(b)) ?? "changed";
-      if (k !== "added") onlyAdded = false;
       diffs.push(k === "added" ? `${label(c)} ${text(b)}` : k === "removed" ? `${label(c)} removed · was ${text(a)}` : `${label(c)} ${text(a)} → ${text(b)}`);
     }
     if (diffs.length) {
       keys.add(r.key);
       byKey[r.key] = diffs;
-      changes.push(`${onlyAdded ? "Added " : ""}${noAfter[i]} · ${diffs.join(", ")}`);
+      // A saved line whose empty cells were filled is that line changed, not a line added (e2e 24 Nov: a packing
+      // edit said "1 added"): "2 · Packages 3, Gross kg 120".
+      changes.push(`${noAfter[i]} · ${diffs.join(", ")}`);
     }
   }
   // The order (or which line a part belongs to) of the lines that stayed.
@@ -90,8 +90,8 @@ export function linesDiff(before: LineRow[], after: LineRow[], columns: LineColu
       if (old && (old.r.parentKey !== r.parentKey || old.no !== now.get(r.key)!.no)) keys.add(r.key);
     }
   }
-  const added = after.some((r) => !was.has(r.key));
-  return { changes, keys: [...keys], byKey, filledChanged, added };
+  const addedRows = after.filter((r) => !was.has(r.key)).length;
+  return { changes, keys: [...keys], byKey, filledChanged, added: addedRows > 0, addedRows };
 }
 
 /**
@@ -256,8 +256,7 @@ export function BatchLines({
   const { rows, local, diff, dirty, run: send, askWhy, add } = useBatchLines({ rows: saved, columns, plain, askOnAdd });
   const run = (reason?: string) => send(handlers, reason);
 
-  const added = diff.changes.filter((x) => x.startsWith("Added ")).length;
-  const counts = { changed: diff.changes.length - added, added };
+  const counts = { changed: diff.changes.length - diff.addedRows, added: diff.addedRows };
 
   return (
     <PanelBody className="gap-3">

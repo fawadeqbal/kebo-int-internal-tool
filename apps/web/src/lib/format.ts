@@ -17,6 +17,8 @@ import {
 export const SERVER_TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 const SERVER_STYLE: TimeStyle = { zone: SERVER_TZ, date: "d_mmm_yyyy", time: "24h" };
 
+/** A new record's window says its number comes on save, in words (never a half number such as "RFQ-2026-…"). */
+export const numberOnSave = (prefix: string) => `Its ${prefix} number is given when you save`;
 /** "1 order", "3 orders"; a third word for irregular plurals ("1 inquiry", "2 inquiries"). */
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** How many a list shows, for its filter line: "1,204 inquiries". */

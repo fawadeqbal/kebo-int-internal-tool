@@ -1,4 +1,4 @@
-import type { AttachmentKind, InquiryChannel, InquiryStage, LostReason, OrderStatus, Priority, RevisionStatus } from "@kebo/shared";
+import type { AttachmentKind, InquiryChannel, InquiryStage, LostReason, OrderStatus, PaymentRoute, Priority, RevisionStatus } from "@kebo/shared";
 
 /** The API's response shapes the screens use (the API is the source of truth; keep these in step with it). */
 
@@ -135,7 +135,17 @@ export interface DealDetail {
   quotation: DealQuotation | null;
   /** Every quotation, A, B, C…, each with its revisions (newest first). */
   quotations: DealQuotation[];
-  orders: { id: string; refNo: string; status: OrderStatus; orderedOn: string; total: string; currency: string; customerRef?: string | null }[];
+  orders: {
+    id: string;
+    refNo: string;
+    status: OrderStatus;
+    orderedOn: string;
+    total: string;
+    currency: string;
+    customerRef?: string | null;
+    /** How the customer pays, chosen on accepting the quotation (null until chosen). */
+    paymentTerms?: { route: PaymentRoute | null } | null;
+  }[];
   people: Record<string, string>;
   canWork: boolean;
   allowed: { edit: boolean; quote: boolean; source: boolean; assign: boolean; hold: boolean; reopen: boolean };

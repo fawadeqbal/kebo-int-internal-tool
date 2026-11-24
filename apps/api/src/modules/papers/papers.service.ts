@@ -30,6 +30,7 @@ import {
   PAPER_TITLE,
   PER_FACTORY_PAPERS,
   paperNumber,
+  placeholdersIn,
   paperOptionsOf,
   paperFieldsOf,
   withPaperFields,
@@ -294,19 +295,33 @@ export class PapersService implements OnModuleInit {
     // The parts the Make window can hide (models, reference numbers, terms, bank, signatures): those it has, then hidden as asked.
     const fields = paperFieldsOf(b.doc);
     const { party, ...rest } = withPaperFields(b.doc, c.options);
-    return {
-      checks: b.checks,
-      fields,
-      doc: {
-        kind,
-        title: PAPER_TITLE[kind],
-        numberLabel: PAPER_NUMBER_LABEL[kind],
-        number: c.number ?? paperNumber(c.o.refNo, kind, b.n),
-        company: c.company,
-        party: party ?? c.customer,
-        ...rest,
-      },
+    const doc: PaperDoc = {
+      kind,
+      title: PAPER_TITLE[kind],
+      numberLabel: PAPER_NUMBER_LABEL[kind],
+      number: c.number ?? paperNumber(c.o.refNo, kind, b.n),
+      company: c.company,
+      party: party ?? c.customer,
+      ...rest,
     };
+    // Words typed for now ("Xxxx") are put right before it is final: needed, with where each one sits.
+    const placeholders = placeholdersIn(doc);
+    const checks = placeholders.length
+      ? [
+          ...b.checks,
+          {
+            key: "placeholders",
+            label: "No placeholder text",
+            value: placeholders.join(" · "),
+            ok: false,
+            required: true,
+            fix: null,
+            href: null,
+            warn: "Put the real words where they belong (the shipment, the customer, Company settings), then make it final.",
+          },
+        ]
+      : b.checks;
+    return { checks, fields, doc };
   }
 
   /** The default ref: the first factory of a purchase order; "" otherwise. */
@@ -669,10 +684,11 @@ export class PapersService implements OnModuleInit {
       const refs = PER_FACTORY_PAPERS.includes(kind) ? factoriesOf(o).map((f) => ({ ref: f.id, name: f.name })) : [{ ref: "", name: "" }];
       if (PER_FACTORY_PAPERS.includes(kind) && !refs.length) continue;
       // A purchase order prints its own number (PO-2026-0044), one per supplier.
-      const poNumbers =
+      const pos =
         kind === "purchase-order"
-          ? new Map((await this.prisma.db.purchaseOrder.findMany({ where: { orderId: o.id }, select: { supplierId: true, number: true } })).map((x) => [x.supplierId, x.number]))
+          ? new Map((await this.prisma.db.purchaseOrder.findMany({ where: { orderId: o.id }, select: { supplierId: true, number: true, sentOn: true } })).map((x) => [x.supplierId, x]))
           : null;
+      const poNumbers = pos ? new Map([...pos].map(([k, x]) => [k, x.number])) : null;
       for (const r of refs) {
         const rows = this.rowsOf(o, kind, r.ref);
         const latest = rows.at(-1) ?? null;
@@ -685,7 +701,9 @@ export class PapersService implements OnModuleInit {
         const needs = built.checks.filter((x) => x.required && !x.ok).map((x) => inSentence(x.label));
         const recorded = docKind ? o.documents.find((d) => d.kind === docKind && !d.paperId && documentDone(d.status)) : undefined;
         if (!used(kind) && !latest && !recorded) continue;
-        const state: PaperState = latest ? this.stateOf(latest, ready) : recorded ? docState(recorded) : this.stateOf(null, ready);
+        // A PO marked sent on the Purchase order tab is sent, made here or not (e2e 24 Nov: "Can be made" beside "PO sent").
+        const poSent = !latest && !recorded ? (pos?.get(r.ref)?.sentOn ?? null) : null;
+        const state: PaperState = latest ? this.stateOf(latest, ready) : recorded ? docState(recorded) : poSent ? "ready" : this.stateOf(null, ready);
         out.push(
           row({
             ...base,
@@ -701,7 +719,9 @@ export class PapersService implements OnModuleInit {
                 ? `version ${latest.version}${latest.finalAt ? ` · ${latest.finalAt.toISOString().slice(0, 10)}` : ""}`
                 : recorded && (state === "ready" || state === "up")
                   ? `recorded${recorded.issuedOn ? ` · ${fromDbDate(recorded.issuedOn)}` : ""}`
-                  : state === "wait"
+                  : poSent
+                    ? `sent · ${fromDbDate(poSent)}`
+                    : state === "wait"
                     ? `needs ${needs.join(", ")}`
                     : state === "else"
                       ? `kept: ${recorded?.keptWhere ?? ""}`

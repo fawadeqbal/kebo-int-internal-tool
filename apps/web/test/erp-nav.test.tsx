@@ -72,7 +72,7 @@ describe("the groups", () => {
     // Money, simple (14 Nov 2026): four pages. To verify and the Ledger keep their addresses and left the menu.
     expect(pages(m, "money")).toEqual(["Receivables", "Payables", "Payments", "Cash & bank", "Expenses"]);
     // Reports is a group (22 Nov 2026): each report a page; money ones first.
-    expect(pages(m, "reports")).toEqual(["Overview", "Profit & loss", "Cash flow", "Expenses", "Customers", "Suppliers", "Sales team", "Sales funnel"]);
+    expect(pages(m, "reports")).toEqual(["Overview", "Profit & loss", "Cash flow", "Spending", "Customers", "Suppliers", "Sales team", "Sales funnel"]);
     expect(m.filter(isSingle)).toEqual([]);
     // Settings is two groups: the company's own (managers too), and the admin's.
     expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails", "Website form"]);
@@ -159,7 +159,7 @@ describe("the groups", () => {
     const MANAGER = new Set(["sourcing.manage", "expenses.manage", "payments.record", "reports.view", "settings.manage", "audit.view", "inquiries.create"]);
     const m = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 4, approves: true, companyAddresses: false });
     expect(titles(m)).toEqual(["Sales", "Purchasing", "Finance", "Reports", "Company settings", "Admin settings"]);
-    expect(pages(m, "reports")).toEqual(["Overview", "Profit & loss", "Cash flow", "Expenses", "Customers", "Suppliers", "Sales team", "Sales funnel"]);
+    expect(pages(m, "reports")).toEqual(["Overview", "Profit & loss", "Cash flow", "Spending", "Customers", "Suppliers", "Sales team", "Sales funnel"]);
     // The company's web address and its website form are the admin's too: a manager does not see them.
     expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails"]);
     const withAddresses = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 0, approves: true, companyAddresses: true });

@@ -11,8 +11,8 @@ import { timeStyle } from "@/lib/format";
 
 export const requestPrintHref = (orderId: string, ref: string, q: { now?: boolean; v?: number; back?: string } = {}) =>
   `/print/orders/${orderId}/payment-request?${new URLSearchParams({ ref, ...(q.now ? { now: "1" } : {}), ...(q.v ? { v: String(q.v) } : {}), ...(q.back ? { back: q.back } : {}) })}`;
-export const requestPdfHref = (orderId: string, ref: string, v?: number) =>
-  `/pdf/payment-request/${orderId}?${new URLSearchParams({ ref, ...(v ? { v: String(v) } : {}) })}`;
+export const requestPdfHref = (orderId: string, ref: string, v?: number, now?: boolean) =>
+  `/pdf/payment-request/${orderId}?${new URLSearchParams({ ref, ...(v ? { v: String(v) } : {}), ...(now ? { now: "1" } : {}) })}`;
 
 /** "Sent 12 Nov · R2", "Sent with the proforma", "At the bank since 3 Nov", "Not sent", "Part paid", "Paid", "Cancelled". */
 export function requestWords(r: {

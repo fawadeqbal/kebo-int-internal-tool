@@ -82,7 +82,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
       { href: "/reports", label: "Overview" },
       { href: "/reports/profit", label: "Profit & loss" },
       { href: "/reports/cash", label: "Cash flow" },
-      { href: "/reports/spending", label: "Expenses" },
+      { href: "/reports/spending", label: "Spending" },
       { href: "/reports/customers", label: "Customers", lineBefore: true },
       { href: "/reports/factories", label: "Suppliers" },
       { href: "/reports/people", label: "Sales team" },

@@ -222,8 +222,9 @@ export function FieldsForm({
                   label={f.panelLabel ?? f.label}
                   htmlFor={`${id}-${f.name}`}
                   hint={
-                    // A first fill (nothing saved yet) has nothing to compare: no "Added" on every field.
-                    f.name! in nowOf && !fresh ? (
+                    // A first fill (nothing saved yet, or a window that never asks why: a first booking) has nothing
+                    // to compare: no "Added" on every field typed in (e2e 24 Nov).
+                    f.name! in nowOf && !fresh && !(plain && !(f.value ?? "").trim()) ? (
                       <>
                         <ChangeHint was={changeText(f, (f.value ?? "").trim())} now={changeText(f, nowOf[f.name!]!)} />
                         {f.hint}

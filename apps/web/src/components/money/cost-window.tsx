@@ -75,8 +75,11 @@ export interface CostSetup {
   people: Person[];
   /** What it is for; null: chosen in the window. */
   for: CostFor | null;
-  /** Opened from an order: its currency, and the factories on it (one of them can bear a cost). */
-  order?: { currency: string; factories: { id: string; name: string }[] };
+  /**
+   * Opened from an order: its currency, the factories on it (one of them can bear a cost), and its margin now
+   * (the costed value and the profit, in its currency; the floor from Settings) to say when a cost makes it thin.
+   */
+  order?: { currency: string; factories: { id: string; name: string }[]; margin?: { value: string; profit: string; floor: number } | null };
   /** What "For" can choose; loaded when the window opens when not given. */
   choices?: ExpenseChoices;
 }
@@ -267,6 +270,15 @@ export function CostForm({
         = <span className="font-semibold tabular">{money(inMain, s0.mainCurrency)}</span> at {num(rate) > 0 ? "this" : "today's"} rate
       </>
     ) : null;
+
+  // A new cost we bear that takes the order's margin under the floor in Settings: said before it is saved.
+  const m = onSetupOrder && !expense && bearer === "us" && inOrder !== null ? s0.order!.margin : null;
+  const thin = (() => {
+    if (!m || Number(m.value) <= 0) return null;
+    const now = (Number(m.profit) / Number(m.value)) * 100;
+    const then = ((Number(m.profit) - inOrder!) / Number(m.value)) * 100;
+    return then < m.floor ? { now, then, floor: m.floor } : null;
+  })();
 
   const factories = (() => {
     if (bearer === "factory" && onSetupOrder) return s0.order!.factories;
@@ -495,6 +507,11 @@ export function CostForm({
               </Field>
             </div>
             {worth && <p className="text-xs text-text-2">{worth}</p>}
+            {thin && (
+              <Notice tone="todo">
+                This cost takes the order&apos;s margin from {thin.now.toFixed(1)}% to {thin.then.toFixed(1)}%, under the {thin.floor}% set in Settings.
+              </Notice>
+            )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

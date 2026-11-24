@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Button, buttonClass, linkClass, cn } from "@kebo/ui";
+import { Button, buttonClass, linkClass } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { Modal } from "@/components/common/dialog";
@@ -24,8 +24,9 @@ interface SendWhat {
 }
 
 /**
- * The Send request dialog: says what is kept, then keeps it. Afterwards (`after` "links"): the two ways to
- * give it to the customer. Sent again: the form asks why (R2); the first copy stays as it was.
+ * The Send request dialog: the PDF to give the customer first, then it is kept as sent (e2e 24 Nov: it was marked
+ * sent before "Now give it to the customer"). Afterwards (`after` "links"): the kept copy's two links again.
+ * Sent again: the form asks why (R2); the first copy stays as it was.
  */
 export function SendDialog({ what, after = "links", onClose }: { what: SendWhat; after?: "links" | "close"; onClose: () => void }) {
   const { date } = useTime();
@@ -40,7 +41,7 @@ export function SendDialog({ what, after = "links", onClose }: { what: SendWhat;
     >
       {sent ? (
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-text-2">Now give it to the customer. This copy stays the same whatever changes on the order later.</p>
+          <p className="text-sm text-text-2">This copy stays the same whatever changes on the order later. Its PDF, again:</p>
           <div className="flex flex-wrap gap-2">
             <a href={requestPrintHref(orderId, refId)} className={buttonClass("primary", "sm")}>
               View / Print
@@ -61,15 +62,19 @@ export function SendDialog({ what, after = "links", onClose }: { what: SendWhat;
               ? "The copy sent before stays as it was; this one is the next revision."
               : "If the order changes later, this copy does not."}
           </p>
-          <a
-            href={requestPrintHref(orderId, refId, { now: true })}
-            className={cn(linkClass, "w-fit text-sm")}
-          >
-            See how it prints
-          </a>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="font-semibold">1. Give it to the customer</span>
+            <a href={requestPrintHref(orderId, refId, { now: true })} className={linkClass}>
+              View / Print
+            </a>
+            <a href={requestPdfHref(orderId, refId, undefined, true)} className={linkClass}>
+              Download PDF
+            </a>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold">2.</span>
             <SubmitButton size="sm" pendingText="Keeping…">
-              {again ? "Keep and send again" : "Keep and mark as sent"}
+              {again ? "Keep and send again" : "Given: keep it as sent"}
             </SubmitButton>
             <Button type="button" size="sm" variant="ghost" onClick={onClose}>
               Cancel

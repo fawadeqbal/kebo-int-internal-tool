@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { MONEY_ACCOUNT_KIND_LABEL, MONEY_ACCOUNT_KINDS, type MoneyAccountKind } from "@kebo/shared";
+import { MONEY_ACCOUNT_KIND_LABEL, MONEY_ACCOUNT_KINDS, PAYMENT_METHOD_LABEL, type MoneyAccountKind, type PaymentMethod } from "@kebo/shared";
 import { Button, Field, Input, Select } from "@kebo/ui";
 import { quickAccountAction } from "@/app/(app)/money/actions";
 
@@ -74,6 +74,21 @@ const remember = (currency: string, id: string) => {
  * currency are offered; the one used last time for that currency (or the only one) is chosen already. With no account in the
  * currency, a manager adds one here without leaving the window.
  */
+/** Methods that go through a bank: into a cash account they are probably the wrong account. */
+const THROUGH_BANK: readonly string[] = ["bank_transfer", "cheque", "online", "letter_of_credit"];
+
+/**
+ * When the method and the account do not go together (a bank transfer into Cash, cash into a bank account), the
+ * words that say so; null when they fit (e2e 24 Nov: a T/T was booked into the only USD account, Cash, unasked).
+ */
+export function methodAccountClash(method: string | null | undefined, account: Pick<AccountOption, "name" | "kind"> | undefined): string | null {
+  if (!method || !account) return null;
+  const clash = (method === "cash" && account.kind === "bank") || (THROUGH_BANK.includes(method) && account.kind === "cash");
+  if (!clash) return null;
+  const how = PAYMENT_METHOD_LABEL[method as PaymentMethod] ?? method;
+  return `${how} into ${account.name}, a ${account.kind === "cash" ? "cash" : "bank"} account: is that the right account?`;
+}
+
 export function AccountSelect({
   id,
   label,
@@ -82,6 +97,7 @@ export function AccountSelect({
   error,
   className,
   name = "accountId",
+  method,
 }: {
   id: string;
   label: string;
@@ -90,6 +106,8 @@ export function AccountSelect({
   error?: string[];
   className?: string;
   name?: string;
+  /** The payment's method: a cash account for a bank transfer (or the other way round) is questioned. */
+  method?: string | null;
 }) {
   const { accounts, canAdd } = useContext(DeskContext);
   const fits = accounts.filter((a) => a.currency === currency && (!a.archived || a.id === defaultValue));
@@ -113,6 +131,7 @@ export function AccountSelect({
   };
   // An account just added is in the list only once the page has read it again: until then the choice waits.
   const shown = fits.some((a) => a.id === value) ? value : "";
+  const clash = methodAccountClash(method, fits.find((a) => a.id === shown));
   return (
     <Field
       label={label}
@@ -153,6 +172,7 @@ export function AccountSelect({
           </option>
         ))}
       </Select>
+      {clash && <p className="text-xs font-medium text-action">{clash}</p>}
       {adding && (
         <QuickAccount
           currency={currency}
