@@ -4,13 +4,13 @@ import { ChevronRight, Columns3, List } from "lucide-react";
 import { REQUEST_CHANNEL_LABEL } from "@kebo/shared";
 import { THead, Th, Tr, Badge, cn, EmptyLine, Notice, RULES, subTitleClass, Dash } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
-import { dayMonth, money, plural, qty, companyToday } from "@/lib/format";
+import { dayMonth, money, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 import { TabList } from "@/components/lists/tab-list";
 import { offerFigures, OfferCompare, offerLine } from "@/components/deals/offer-list";
 import { optional } from "@/components/print/data";
-import { coverOf } from "@/components/deals/offer-facts";
+import { coverText } from "@/components/deals/offer-facts";
 import { AddOfferButton } from "@/components/deals/offer-work";
 import { requestsOf } from "../facts";
 import { WithSide } from "../side";
@@ -139,8 +139,7 @@ export default async function SourcingPage({
   // An offer with its items but not one price yet says so (not "USD 0.00").
   const unpriced = (x: FactoryQuoteView) => x.lines.length > 0 && x.unpriced >= x.lines.length;
   const covers = (x: FactoryQuoteView) => {
-    const cover = coverOf(x, s.items);
-    return !x.lines.length ? "No items yet" : cover ? (cover.all ? (cover.of === 1 ? "The 1 item" : `All ${cover.of} items`) : `${cover.n} of ${cover.of} items`) : plural(x.lines.length, "item");
+    return coverText(x, s.items, "cell");
   };
   const more = (r: (typeof others)[number]) =>
     canEdit && <RequestMore name={r.factory.name} status={r.status} setStatus={factoryRequestStatusAction.bind(null, d.id, r.id)} remove={removeFactoryRequestAction.bind(null, d.id, r.id)} />;

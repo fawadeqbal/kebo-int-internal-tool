@@ -91,8 +91,19 @@ export class UsersService {
   }
 
   /** Active people, for "assign to" pickers (anyone signed in may see names). */
-  people() {
-    return this.prisma.db.user.findMany({ where: { isSystem: false, platformAdminId: null, isActive: true }, select: { id: true, name: true, role: true }, orderBy: { name: "asc" } });
+  /**
+   * Everyone who can be picked (handled by, follow-ups, @mentions…). Two people with the same name are told apart by
+   * their sign-in name (review 24 Nov: "Ali" four times in a picker, nothing to choose by).
+   */
+  async people() {
+    const rows = await this.prisma.db.user.findMany({
+      where: { isSystem: false, platformAdminId: null, isActive: true },
+      select: { id: true, name: true, role: true, email: true },
+      orderBy: { name: "asc" },
+    });
+    const seen = new Map<string, number>();
+    for (const r of rows) seen.set(r.name.trim().toLowerCase(), (seen.get(r.name.trim().toLowerCase()) ?? 0) + 1);
+    return rows.map(({ email, ...r }) => ({ ...r, name: (seen.get(r.name.trim().toLowerCase()) ?? 0) > 1 ? `${r.name} (${email.split("@")[0]})` : r.name }));
   }
 
   /**

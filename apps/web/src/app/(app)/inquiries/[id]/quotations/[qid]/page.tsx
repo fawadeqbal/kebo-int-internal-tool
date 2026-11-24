@@ -84,7 +84,8 @@ export default async function QuotationOwnPage({
   const dear = `Dear ${who?.name.split(" ")[0] ?? "Sir or Madam"},`;
   const ready: SendItem[] = q.quotations.flatMap((y) => {
     const c = currentOf(y);
-    return c.status === "draft" && c.options.length > 0 && c.options.every((o) => Number(o.total) > 0)
+    // Ready: every option priced, line by line (review 24 Nov: an option with unpriced items was ticked to go).
+    return c.status === "draft" && c.options.length > 0 && c.options.every((o) => Number(o.total) > 0) && !draftChecks(c).some((x) => x.includes("without a price"))
       ? [{ id: c.id, refNo: y.refNo, letter: y.letter, number: c.number, total: money(c.total, c.currency), printHref: printHref(c), pdfHref: pdfHref(c) }]
       : [];
   });
@@ -94,6 +95,7 @@ export default async function QuotationOwnPage({
       <SendWindow
         revisionId={r.id}
         together={isDraft ? ready : []}
+        checks={isDraft ? draftChecks(r) : []}
         subjectMany={`Quotations {names} — ${d.title}`}
         messageMany={`${dear} please find our quotations for ${d.title}.`}
         number={r.number}

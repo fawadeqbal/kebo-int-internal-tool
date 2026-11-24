@@ -47,7 +47,10 @@ export function dueText(dueOn: string, dueAt: string | null, today = companyToda
       ? "today"
       : dueOn === tomorrow.toISOString().slice(0, 10)
         ? "tomorrow"
-        : `${new Date(`${dueOn}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })} ${dayMonth(dueOn)}`;
+        : // Another year says its year (review 24 Nov: a 2021 day read "Wed 10 Mar").
+          dueOn.slice(0, 4) !== today.slice(0, 4)
+          ? date(dueOn)
+          : `${new Date(`${dueOn}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })} ${dayMonth(dueOn)}`;
   return dueAt ? `${d} ${clockTime(dueAt)}` : d;
 }
 

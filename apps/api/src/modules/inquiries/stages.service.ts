@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { checkManualMove, INQUIRY_STAGE_LABEL, stageAfter, type InquiryEvent, type InquiryStage, type LostReason } from "@kebo/shared";
+import { checkManualMove, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, stageAfter, type InquiryEvent, type InquiryStage, type LostReason } from "@kebo/shared";
 import { DomainError, GateError } from "@kebo/utils";
 import type { Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -47,10 +47,11 @@ export class StagesService {
       action: "stage_change",
       entityType: "inquiry",
       entityId: subject.id,
-      summary: `${subject.refNo}: ${INQUIRY_STAGE_LABEL[subject.stage]} → ${INQUIRY_STAGE_LABEL[to]}${cause === "manual" ? "" : ` (${cause.replace(/_/g, " ")})`}${extra.note ? ` — ${extra.note}` : ""}`,
+      // Lost says why, in the list's words (review 24 Nov: the reason was missing from History).
+      summary: `${subject.refNo}: ${INQUIRY_STAGE_LABEL[subject.stage]} → ${INQUIRY_STAGE_LABEL[to]}${to === "lost" ? ` (${LOST_REASON_LABEL[extra.lostReason ?? "other"]})` : cause === "manual" ? "" : ` (${cause.replace(/_/g, " ")})`}${extra.note ? ` — ${extra.note}` : ""}`,
       oldValues: { stage: subject.stage },
-      newValues: { stage: to },
-      reason: extra.reason ?? (to === "lost" ? (extra.note ?? null) : null),
+      newValues: { stage: to, ...(to === "lost" ? { lostReason: LOST_REASON_LABEL[extra.lostReason ?? "other"] } : {}) },
+      reason: extra.reason ?? (to === "lost" ? (extra.note ?? LOST_REASON_LABEL[extra.lostReason ?? "other"]) : null),
     });
     const event: DomainEvent = {
       type: "inquiry.stageChanged",

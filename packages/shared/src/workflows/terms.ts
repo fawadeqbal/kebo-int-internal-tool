@@ -406,7 +406,8 @@ export function paymentCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | n
     key: "payment",
     ok: true,
     word: "Covered",
-    text: `Covered: the customer pays ${fmt(depMinor)} with the order and ${fmt(ourPreMinor)} before shipping; ${theirs.factory} wants ${fmt(advMinor)} and ${fmt(theirPreMinor)}.`,
+    // Running totals, said as such (review 24 Nov: they read as the installments themselves).
+    text: `Covered: the customer pays ${fmt(depMinor)} with the order and ${fmt(ourPreMinor)} in all by shipping; ${theirs.factory} wants ${fmt(advMinor)} when we order and ${fmt(theirPreMinor)} in all by then.`,
   };
 }
 
