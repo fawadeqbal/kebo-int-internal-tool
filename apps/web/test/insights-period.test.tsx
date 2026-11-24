@@ -5,11 +5,11 @@ import { change, lastMonths, periodOf, sectionOfTab, spanLabel } from "@/lib/ins
 describe("Insights period", () => {
   const today = "2026-11-03";
 
-  it("is the 3 months ending this month by default, against the 3 before", () => {
+  it("is this calendar quarter by default, against the one before (review 24 Nov, M-30)", () => {
     const p = periodOf({}, today);
-    expect([p.kind, p.from, p.to, p.prevFrom, p.prevTo]).toEqual(["quarter", "2026-09-01", "2026-11-30", "2026-06-01", "2026-08-31"]);
-    expect(p.label).toBe("1 Sep – 30 Nov 2026");
-    expect(p.vsLabel).toBe("Jun – Aug");
+    expect([p.kind, p.from, p.to, p.prevFrom, p.prevTo]).toEqual(["quarter", "2026-10-01", "2026-12-31", "2026-07-01", "2026-09-30"]);
+    expect(p.label).toBe("1 Oct – 31 Dec 2026");
+    expect(p.vsLabel).toBe("Jul – Sep");
   });
 
   it("knows a month and a year, across the turn of the year", () => {
@@ -17,8 +17,8 @@ describe("Insights period", () => {
     expect([m.from, m.to, m.prevFrom, m.prevTo, m.vsLabel]).toEqual(["2026-01-01", "2026-01-31", "2025-12-01", "2025-12-31", "Dec"]);
     expect(m.label).toBe("1–31 Jan 2026");
     const y = periodOf({ period: "year" }, today);
-    expect([y.from, y.to, y.prevFrom, y.prevTo]).toEqual(["2025-12-01", "2026-11-30", "2024-12-01", "2025-11-30"]);
-    expect(y.vsLabel).toBe("Dec 2024 – Nov 2025");
+    expect([y.from, y.to, y.prevFrom, y.prevTo]).toEqual(["2026-01-01", "2026-12-31", "2025-01-01", "2025-12-31"]);
+    expect(y.vsLabel).toBe("Jan – Dec 2025");
   });
 
   it("takes your own dates and compares them with as many days just before", () => {

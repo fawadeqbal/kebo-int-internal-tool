@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { crumbsFor } from "@/lib/nav";
 import { Pencil, Plus } from "lucide-react";
-import { Badge, Card, cn, EmptyState, linkClass, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage, toPageSize } from "@kebo/ui";
+import { Badge, Card, cn, EmptyState, linkClass, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Segmented, Td, Th, THead, toPage, toPageSize } from "@kebo/ui";
 import { can, type Tone } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { allPages } from "@/lib/exports";
@@ -161,6 +161,17 @@ export default async function FollowUpsPage({
         }
       />
     );
+  // Whose (Mine · Everyone) is a switch of its own, apart from which (Open · Late · Done) — review 24 Nov, S-15:
+  // Late and Done sat as tabs beside Mine and Everyone, their counts changing with them.
+  const whose = viewAll ? (
+    <Segmented
+      label="Whose"
+      options={[
+        { href: href({ view: undefined, page: undefined }), active: !everyone, label: `Mine · ${(everyone ? other?.counts.open : list.counts.open) ?? 0}` },
+        { href: href({ view: "everyone", page: undefined }), active: everyone, label: `Everyone · ${(everyone ? list.counts.open : other?.counts.open) ?? 0}` },
+      ]}
+    />
+  ) : null;
   return (
     <>
       <PageHeader
@@ -185,39 +196,16 @@ export default async function FollowUpsPage({
             }
           />
         }
+        views={whose && <span className="max-md:hidden">{whose}</span>}
       />
+      {/* A list's header switch is not on a phone (the header folds away): there it sits over the tabs. */}
+      {whose && <div className="md:hidden">{whose}</div>}
       <LinkTabs
         label="Which follow-ups"
         tabs={[
-          {
-            href: href({ view: undefined, status: undefined, page: undefined }),
-            label: "Mine",
-            count: everyone ? other?.counts.open : list.counts.open,
-            active: status === "open" && !everyone,
-          },
-          ...(viewAll
-            ? [
-                {
-                  href: href({ view: "everyone", status: undefined, page: undefined }),
-                  label: "Everyone",
-                  count: everyone ? list.counts.open : other?.counts.open,
-                  active: status === "open" && everyone,
-                },
-              ]
-            : []),
-          {
-            href: href({ status: "late", page: undefined }),
-            label: "Late",
-            count: list.counts.late,
-            alert: list.counts.late > 0,
-            active: status === "late",
-          },
-          {
-            href: href({ status: "done", page: undefined }),
-            label: "Done",
-            count: list.counts.done,
-            active: status === "done",
-          },
+          { href: href({ status: undefined, page: undefined }), label: "Open", count: list.counts.open, active: status === "open" },
+          { href: href({ status: "late", page: undefined }), label: "Late", count: list.counts.late, alert: list.counts.late > 0, active: status === "late" },
+          { href: href({ status: "done", page: undefined }), label: "Done", count: list.counts.done, active: status === "done" },
         ]}
       />
       <FilterCard

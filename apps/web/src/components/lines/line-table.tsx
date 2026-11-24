@@ -243,7 +243,7 @@ export function sameAs(rows: { key: string; values: LineValues }[], numbers: str
 const STICKY_HEAD = "md:sticky md:top-0 md:z-[3] md:shadow-[inset_0_-1px_0_var(--color-line)]";
 
 type Pending = { run: (reason: string) => Promise<LineResult>; message: string; choices: string[] };
-type Removed = { label: string; lines: NewLine[]; at: { afterKey: string | null; parentKey: string | null } };
+type Removed = { label: string; lines: NewLine[]; at: { afterKey: string | null; parentKey: string | null }; /** More removed together (ticked rows), put back in order. */ more?: { lines: NewLine[]; at: { afterKey: string | null; parentKey: string | null } }[] };
 /** Something that can be done to a row; `short` is the toolbar's label, `hint` its key. */
 type RowActionKey = "below" | "part" | "edit" | "out" | "in" | "up" | "down" | "dup" | "pick" | "del";
 /** `note`: shown on the right in a phone's sheet too ("2.3", the number a new part gets). */
@@ -742,18 +742,22 @@ export function LineTable({
     }
   };
 
-  const remove = async (row: LineRow, i: number) => {
-    setMenu(null);
-    setCtx(null);
+  /** What putting a row back needs: its lines (with its parts) and where it was. */
+  const removedOf = (row: LineRow, i: number): Removed => {
     const block = [row, ...rows.filter((r) => r.parentKey === row.key)];
     const before = rows[i - 1];
-    const removedRow = {
+    return {
       label: `${noun} ${numbers[i]}${block.length > 1 ? ` and its ${block.length - 1} part${block.length === 2 ? "" : "s"}` : ""}`,
       lines: block.map((b, n) => ({ values: b.values, partOf: n === 0 ? null : 0 })),
       at: row.parentKey
         ? { afterKey: before && before.key !== row.parentKey ? before.key : row.parentKey, parentKey: row.parentKey }
         : { afterKey: lineBefore(rows, i)?.key ?? null, parentKey: null },
     };
+  };
+  const remove = async (row: LineRow, i: number) => {
+    setMenu(null);
+    setCtx(null);
+    const removedRow = removedOf(row, i);
     await run(
       row.key,
       (reason) => onRemove(row.key, reason),
@@ -767,10 +771,13 @@ export function LineTable({
 
   const undo = async () => {
     if (!removed) return;
-    const { lines, at } = removed;
+    const { lines, at, more = [] } = removed;
     setRemoved(null);
-    // The first line has no line before it to go after: it comes back at the end.
-    await run("entry", (reason) => onAdd(lines, at, reason));
+    // The first line has no line before it to go after: it comes back at the end. Several: in their order.
+    for (const b of [{ lines, at }, ...more]) {
+      const res = await run("entry", (reason) => onAdd(b.lines, b.at, reason));
+      if (!res.ok) break;
+    }
   };
 
   const backToGrid = () => requestAnimationFrame(() => gridRef.current?.focus({ preventScroll: true }));
@@ -828,12 +835,33 @@ export function LineTable({
     setAskDelete(false);
     // A line's parts go with it: they are not removed a second time.
     const list = pickedRows.filter((r) => !(r.parentKey && picked.has(r.parentKey)));
-    for (const r of [...list].reverse()) {
+    // Kept to put back with Undo, as one row deleted is (review 24 Nov, S-29: deleting had no Undo).
+    const back = list.map((r) => removedOf(r, rows.indexOf(r)));
+    const gone: Removed[] = [];
+    for (const [k, r] of [...list].reverse().entries()) {
       const res = await run(r.key, (reason) => onRemove(r.key, reason));
       if (!res.ok) break;
+      gone.unshift(back[list.length - 1 - k]!);
     }
     setPicked(new Set());
     setSelecting(false);
+    if (gone.length) {
+      // A row that came after another one deleted goes back after the first line still there before them both;
+      // put back from the last, each right after its line, they come back in their order.
+      const heads = new Map(list.map((r, k) => [r.key, back[k]!]));
+      const anchor = (at: Removed["at"]) => {
+        let a = at;
+        while (a.afterKey && heads.has(a.afterKey)) a = { ...a, afterKey: heads.get(a.afterKey)!.at.afterKey };
+        return a;
+      };
+      const order = [...gone].reverse().map((g) => ({ lines: g.lines, at: anchor(g.at) }));
+      setRemoved({
+        label: gone.length === 1 ? gone[0]!.label : `${gone.length} ${noun}s`,
+        lines: order[0]!.lines,
+        at: order[0]!.at,
+        more: order.slice(1),
+      });
+    }
   };
   const pickedLabel = `${pickedRows.length} selected`;
   const stopSelecting = () => {

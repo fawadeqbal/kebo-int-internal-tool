@@ -640,6 +640,22 @@ export function Th({ className, ...props }: ComponentProps<"th">) {
   // sideways keeps it in its box instead of widening the page.
   return <th scope="col" className={cn("relative h-[42px] border-b border-line px-3.5 text-left text-md font-semibold whitespace-nowrap text-muted", EDGE, className)} {...props} />;
 }
+/**
+ * A column head that sorts the list (review 24 Nov, O-39): a link to the same list sorted by it; pressed again, the
+ * other way. `sorted`: whether the list is sorted by it now, and which way. Screen readers hear it (aria-sort).
+ */
+export function SortTh({ href, sorted, className, children }: { href: string; sorted: "asc" | "desc" | null; className?: string; children: ReactNode }) {
+  return (
+    <Th aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"} className={className}>
+      <Link href={href} scroll={false} className={cn("inline-flex items-center gap-1 hover:text-text", sorted && "text-text")}>
+        {children}
+        <span aria-hidden className="text-xs">
+          {sorted === "asc" ? "▲" : sorted === "desc" ? "▼" : "↕"}
+        </span>
+      </Link>
+    </Th>
+  );
+}
 export function Td({ className, ...props }: ComponentProps<"td">) {
   return <td className={cn("h-[52px] border-b border-line px-3.5 py-3 align-middle text-text", EDGE, className)} {...props} />;
 }

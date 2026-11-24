@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { Clock } from "lucide-react";
-import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from "@kebo/shared";
+import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, REASON_CHOICES, type InquiryStage } from "@kebo/shared";
 import { Field, Select, Textarea, RULES } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { ReasonChips } from "@/components/edits/reason-chips";
 import { PanelButton } from "@/components/orders/step-view";
 import { PANEL_FORM, PanelBody, SidePanel, useClosePanel, useSidePanel, WindowFooter } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
@@ -25,9 +26,10 @@ function Buttons({ save, danger }: { save: string; danger?: boolean }) {
 }
 
 /** Mark lost (with a reason), start working, or reopen: the moves people make by hand. Everything else moves by itself. */
-function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
+function StageForm({ to, action, reopen }: { to: InquiryStage; action: Action; reopen?: boolean }) {
   const close = useClosePanel();
   const lost = to === "lost";
+  const [why, setWhy] = useState("");
   return (
     <PanelBody>
       <ActionForm action={action} onDone={close} className={PANEL_FORM}>
@@ -53,9 +55,17 @@ function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
                 {s.errors?.lostReason && <p className="text-xs text-bad">{s.errors.lostReason[0]}</p>}
               </fieldset>
             )}
-            <Field label="Note" htmlFor="note">
-              <Textarea id="note" name="note" rows={3} className="min-h-0" defaultValue={s.values?.note} />
-            </Field>
+            {reopen ? (
+              // The same "Why?" as putting many on hold: quick reasons, or one's own words (review 24 Nov, S-24).
+              <>
+                <ReasonChips title="Why reopen it?" choices={REASON_CHOICES.reopen} value={why} onChange={setWhy} />
+                <input type="hidden" name="note" value={why} />
+              </>
+            ) : (
+              <Field label="Note" htmlFor="note">
+                <Textarea id="note" name="note" rows={3} className="min-h-0" defaultValue={s.values?.note} />
+              </Field>
+            )}
             {lost && <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-md text-text-2">A quotation sent and not answered is marked “rejected”. You can reopen the inquiry later.</p>}
             <Buttons save={lost ? "Mark lost" : "Confirm"} danger={lost} />
           </>
@@ -67,13 +77,22 @@ function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
 
 function HoldForm({ onHold, action }: { onHold: boolean; action: Action }) {
   const close = useClosePanel();
+  const [why, setWhy] = useState("");
   return (
     <PanelBody>
       <ActionForm action={action} onDone={close} className={PANEL_FORM}>
         <input type="hidden" name="onHold" value={onHold ? "false" : "true"} />
-        <Field label={onHold ? "Note" : "What are we waiting for?"} optional={onHold} htmlFor="hold-note">
-          <Textarea id="hold-note" name="note" rows={3} className="min-h-0" />
-        </Field>
+        {onHold ? (
+          <Field label="Note" optional htmlFor="hold-note">
+            <Textarea id="hold-note" name="note" rows={3} className="min-h-0" />
+          </Field>
+        ) : (
+          // The same "Why?" as putting many on hold from the list (review 24 Nov, S-24: three layouts).
+          <>
+            <ReasonChips title="What are we waiting for?" choices={REASON_CHOICES.hold} value={why} onChange={setWhy} />
+            <input type="hidden" name="note" value={why} />
+          </>
+        )}
         <Buttons save={onHold ? "Resume" : "Put on hold"} />
       </ActionForm>
     </PanelBody>
@@ -131,7 +150,7 @@ export function DecisionWindows({
           onClose={() => move.close({})}
           className={RULES.window.part}
         >
-          <StageForm to={m.to} action={stageAction} />
+          <StageForm to={m.to} action={stageAction} reopen={!!m.reopen} />
         </SidePanel>
       )}
     </>

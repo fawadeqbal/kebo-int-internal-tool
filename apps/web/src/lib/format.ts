@@ -24,20 +24,33 @@ export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n ==
 /** How many a list shows, for its filter line: "1,204 inquiries". */
 export const countOf = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
-export const money = (amount: string | number | null | undefined, currency: string) => (amount === null || amount === undefined ? "—" : formatMinor(toMinor(amount), currency));
+/**
+ * A negative amount in the one shape the app writes it: "− USD 1,250.00" (a minus sign, then the amount), not
+ * "USD -1,250.00", "(1,250)" or "USD −1,250" (review 24 Nov, M-26: five shapes).
+ */
+export const minus = (text: string) => `− ${text}`;
+
+export const money = (amount: string | number | null | undefined, currency: string) => {
+  if (amount === null || amount === undefined) return "—";
+  const minor = toMinor(amount);
+  return minor < 0 ? minus(formatMinor(-minor, currency)) : formatMinor(minor, currency);
+};
 /** A headline amount in whole units (KPI cards): "USD 58,140". Exact amounts stay in the tables. */
-export const whole = (amount: string | number | null | undefined, currency: string) =>
-  amount === null || amount === undefined ? "—" : `${currency} ${Math.round(Number(amount)).toLocaleString("en-US")}`;
+export const whole = (amount: string | number | null | undefined, currency: string) => {
+  if (amount === null || amount === undefined) return "—";
+  const v = Math.round(Number(amount));
+  return v < 0 ? minus(`${currency} ${(-v).toLocaleString("en-US")}`) : `${currency} ${v.toLocaleString("en-US")}`;
+};
 /** A count of days (worked out from dates): "Same day" for 0, "1 day", "2.5 days"; none: "—". */
 export const daysText = (n: number | null | undefined) =>
   n === null || n === undefined ? "—" : n === 0 ? "Same day" : `${n.toLocaleString("en-US", { maximumFractionDigits: 1 })} day${n === 1 ? "" : "s"}`;
 /** A figure tile's amount, short: "USD 159.6K", "USD 1.24M"; under 10,000 in whole units. */
-export const short = (amount: string | number | null | undefined, currency: string) => {
+export const short = (amount: string | number | null | undefined, currency: string): string => {
   if (amount === null || amount === undefined) return "—";
   const v = Number(amount);
-  const a = Math.abs(v);
-  if (a >= 1_000_000) return `${currency} ${(v / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 2 })}M`;
-  if (a >= 10_000) return `${currency} ${(v / 1_000).toLocaleString("en-US", { maximumFractionDigits: 1 })}K`;
+  if (v < 0) return minus(short(-v, currency));
+  if (v >= 1_000_000) return `${currency} ${(v / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 2 })}M`;
+  if (v >= 10_000) return `${currency} ${(v / 1_000).toLocaleString("en-US", { maximumFractionDigits: 1 })}K`;
   return `${currency} ${Math.round(v).toLocaleString("en-US")}`;
 };
 /**

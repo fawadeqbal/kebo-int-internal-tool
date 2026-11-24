@@ -21,7 +21,7 @@ export const PAGE_SHAPES: Record<string, string> = {
   "/dashboard": "~greeting · tiles:4 · table · ~cards:2",
   "/search": "header · filter:0 · table",
   "/notifications": "header · tabs:7 · filter:0 · table · ~pager",
-  "/follow-ups": "header · tabs:4 · filter:3 · table",
+  "/follow-ups": "header · tabs:3 · filter:3 · table",
   "/needs-you": "header · table · ~pager",
   "/approvals": "header · facts:3 · tabs:4 · filter:0 · table",
   "/audit": "header · tabs:5 · filter:2 · table · ~pager",
