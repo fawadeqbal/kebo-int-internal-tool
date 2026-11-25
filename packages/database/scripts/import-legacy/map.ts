@@ -398,6 +398,8 @@ export function mapSettings(old: Record<string, unknown> | null | undefined): Se
     }),
     // The old app had no such list: every paper is used.
     papers: {},
+    // Nor a translator: no words of the company's own yet.
+    translation: {},
   };
   const problems: string[] = [];
   const values = {} as Record<SettingsKey, unknown>;
